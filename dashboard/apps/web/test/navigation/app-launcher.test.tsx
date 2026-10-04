@@ -4,12 +4,14 @@
  *
  * What is asserted: Game servers is its own entry, gated on its install like
  * Places and Tools, and no longer a screen in the Apps rail; its path resolves to
- * it although Apps owns everything under /apps; the menu is favorites, then a
- * row of recent apps, then a shelf per category, each app once and only apps the
- * account can open - for thirty-two apps as for nine; the Overview rail is the
- * favorites; arranging keeps favorites the account cannot open today; a stored list
- * that is not a list of real apps is read as nothing pinned; and the switcher
- * draws each app once, as an icon and a name with no description.
+ * it although Apps owns everything under /apps; the menu is one order - the
+ * arranged one, then favorites, then by decayed use, then the registry - each
+ * app once and only apps the account can open, for thirty-two apps as for nine;
+ * a usage history that does not parse is none; the Overview rail is the
+ * favorites in that order; arranging keeps apps the account cannot open today in
+ * their slots; a stored list from before the menu could be arranged keeps its
+ * favorites in their order; anything else unparseable is nothing chosen; and the
+ * switcher draws each app once, as an icon and a name with no description.
  */
 
 import { AppSwitcher } from "@polaris/ui";
@@ -17,17 +19,24 @@ import { describe, expect, it } from "vitest";
 import { reachableApps } from "@/lib/app-access";
 import { Gamepad2, HardDrive } from "lucide-react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { APP_CATEGORIES, APP_SECTIONS, POLARIS_APPS, resolveActiveApp } from "@/lib/apps";
+import { APP_SECTIONS, POLARIS_APPS, resolveActiveApp } from "@/lib/apps";
 import {
     LAUNCHER_ROW_SIZE,
-    RECENT_APPS,
+    arrangeApps,
     arrangeFavorites,
     favoriteAppsSchema,
-    launcherLayout,
+    launcherOrder,
+    launcherPrefsSchema,
     moveFavorite,
+    parseAppUsage,
     parseFavoriteApps,
+    parseLauncherPrefs,
     railApps,
-    sameOrder
+    recordAppOpen,
+    sameOrder,
+    serializeLauncherPrefs,
+    usageScore,
+    type AppUsage
 } from "@/lib/app-launcher";
 
 describe("Game servers in the switcher", () => {
@@ -61,7 +70,7 @@ describe("Game servers in the switcher", () => {
     });
 });
 
-describe("the launcher's layout", () => {
+describe("the launcher's order", () => {
     const available = [
         "overview",
         "drive",
@@ -73,73 +82,110 @@ describe("the launcher's layout", () => {
         "mail",
         "notes"
     ];
+    const DAY = 24 * 60 * 60 * 1000;
+    const NOW = Date.UTC(2026, 0, 31);
+    /** `count` opens of `id`, the last `daysAgo` days before NOW. */
+    const opened = (usage: AppUsage, id: string, count: number, daysAgo: number) => {
+        let next = usage;
+        for (let at = 0; at < count; at++) next = recordAppOpen(next, id, NOW - daysAgo * DAY);
+        return next;
+    };
 
-    it("puts favorites first in their order, then recent apps, each once", () => {
-        const layout = launcherLayout({
-            available,
-            favorites: ["mail", "games"],
-            recent: ["chat", "mail", "chat", "notes", "drive", "vault"]
-        });
-        expect(layout.favorites).toEqual(["mail", "games"]);
-        expect(layout.recent).toEqual(["chat", "notes", "drive"]);
-        expect(layout.recent).toHaveLength(RECENT_APPS);
+    it("is the registry's order for somebody with no favorites, arrangement or use", () => {
+        expect(launcherOrder({ available, favorites: [], now: NOW })).toEqual(available);
     });
 
-    it("files every other app on its category's shelf, in the order the shelves are declared", () => {
-        const layout = launcherLayout({ available, favorites: ["mail"], recent: ["drive"] });
-        expect(layout.shelves).toEqual([
-            { category: "work", ids: ["overview", "tasks", "notes"] },
-            { category: "communication", ids: ["chat"] },
-            { category: "infrastructure", ids: ["apps"] },
-            { category: "games", ids: ["games"] },
-            { category: "tools", ids: ["vault"] }
+    it("puts favorites first in their order, then the rest by use, then never-used apps in registry order", () => {
+        const usage = opened(opened({}, "notes", 3, 1), "chat", 1, 1);
+        expect(launcherOrder({ available, favorites: ["mail", "games"], usage, now: NOW })).toEqual(
+            ["mail", "games", "notes", "chat", "overview", "drive", "vault", "apps", "tasks"]
+        );
+    });
+
+    it("lets recent use outweigh more opens long ago", () => {
+        // Ten opens two months ago are worth less than two this week.
+        const usage = opened(opened({}, "drive", 10, 60), "tasks", 2, 2);
+        const order = launcherOrder({ available, favorites: [], usage, now: NOW });
+        expect(order.indexOf("tasks")).toBeLessThan(order.indexOf("drive"));
+        expect(usageScore(usage.drive, NOW)).toBeCloseTo(10 * 0.5 ** (60 / 14), 6);
+    });
+
+    it("breaks a tie in use by the latest open", () => {
+        const usage: AppUsage = {
+            vault: { score: 1, at: NOW - DAY },
+            drive: { score: 1, at: NOW - DAY }
+        };
+        const order = launcherOrder({ available, favorites: [], usage, now: NOW - DAY });
+        expect(order.slice(0, 2)).toEqual(["drive", "vault"]);
+        const later = { ...usage, vault: { score: 1, at: NOW - DAY + 1 } };
+        expect(
+            launcherOrder({ available, favorites: [], usage: later, now: NOW - DAY + 1 })[0]
+        ).toBe("vault");
+    });
+
+    it("keeps the arranged order above favorites and use, and puts apps it does not name after it", () => {
+        const usage = opened({}, "notes", 5, 0);
+        expect(
+            launcherOrder({
+                available,
+                arranged: ["chat", "drive", "overview"],
+                favorites: ["mail"],
+                usage,
+                now: NOW
+            })
+        ).toEqual([
+            "chat",
+            "drive",
+            "overview",
+            "mail",
+            "notes",
+            "vault",
+            "apps",
+            "games",
+            "tasks"
         ]);
     });
 
-    it("keeps every favorite, however many there are", () => {
-        const favorites = available.slice(0, 8).reverse();
-        expect(launcherLayout({ available, favorites, recent: [] }).favorites).toEqual(favorites);
+    it("never draws an app the account cannot open, and draws each app once", () => {
+        expect(
+            launcherOrder({
+                available: ["drive", "chat"],
+                arranged: ["admin", "chat", "chat"],
+                favorites: ["admin", "drive"],
+                usage: opened({}, "mail", 4, 0),
+                now: NOW
+            })
+        ).toEqual(["chat", "drive"]);
     });
 
-    it("never draws an app the account cannot open", () => {
-        const layout = launcherLayout({
-            available: ["drive", "chat"],
-            favorites: ["admin"],
-            recent: ["home"]
-        });
-        expect(layout).toEqual({
-            favorites: [],
-            recent: [],
-            shelves: [
-                { category: "work", ids: ["drive"] },
-                { category: "communication", ids: ["chat"] }
-            ]
-        });
-    });
-
-    it("draws thirty-two apps once each, on six shelves", () => {
-        const categories = APP_CATEGORIES.map((category) => category.id);
+    it("orders thirty-two apps, each once", () => {
         const ids = Array.from({ length: 32 }, (_, at) => `fixture-${at + 1}`);
-        const categoryOf = (id: string) => categories[Number(id.split("-")[1]) % categories.length];
-        const layout = launcherLayout({
+        const order = launcherOrder({
             available: ids,
+            arranged: ["fixture-30"],
             favorites: ["fixture-7", "fixture-2"],
-            recent: ["fixture-30", "fixture-7", "fixture-11"],
-            categoryOf
+            now: NOW
         });
-        const drawn = [
-            ...layout.favorites,
-            ...layout.recent,
-            ...layout.shelves.flatMap((shelf) => shelf.ids)
-        ];
-        expect(drawn.sort()).toEqual([...ids].sort());
-        expect(layout.shelves.map((shelf) => shelf.category)).toEqual(categories);
-        expect(layout.recent).toEqual(["fixture-30", "fixture-11"]);
+        expect([...order].sort()).toEqual([...ids].sort());
+        expect(order.slice(0, 4)).toEqual(["fixture-30", "fixture-7", "fixture-2", "fixture-1"]);
+    });
+});
+
+describe("app usage", () => {
+    it("counts listed apps only, so it never outgrows the catalogue", () => {
+        expect(recordAppOpen({}, "nope", 1)).toEqual({});
+        expect(recordAppOpen({}, "account", 1)).toEqual({});
+        expect(recordAppOpen({}, "chat", 5)).toEqual({ chat: { score: 1, at: 5 } });
     });
 
-    it("gives every app in the catalogue a shelf that exists", () => {
-        const shelves = new Set<string>(APP_CATEGORIES.map((category) => category.id));
-        for (const app of POLARIS_APPS) expect(shelves.has(app.category)).toBe(true);
+    it("reads a corrupt history as none and drops what is not an app", () => {
+        expect(parseAppUsage(null)).toEqual({});
+        expect(parseAppUsage("chat")).toEqual({});
+        expect(parseAppUsage({ chat: { score: -1, at: 1 } })).toEqual({});
+        expect(parseAppUsage({ chat: { score: "1", at: 1 } })).toEqual({});
+        expect(parseAppUsage({ chat: { score: 2, at: 10 }, nope: { score: 1, at: 1 } })).toEqual({
+            chat: { score: 2, at: 10 }
+        });
     });
 });
 
@@ -159,6 +205,16 @@ describe("the Overview rail", () => {
             available.slice(1, 1 + LAUNCHER_ROW_SIZE)
         );
     });
+
+    it("lists the favorites in the order the menu was arranged in", () => {
+        expect(
+            railApps({
+                available: ["overview", "drive", "chat", "mail", "notes"],
+                favorites: ["mail", "drive", "notes"],
+                arranged: ["drive", "chat", "mail"]
+            })
+        ).toEqual(["drive", "mail", "notes"]);
+    });
 });
 
 describe("arranging favorites", () => {
@@ -174,6 +230,16 @@ describe("arranging favorites", () => {
         expect(
             arrangeFavorites(["mail", "admin", "drive", "chat"], ["chat", "mail", "drive"])
         ).toEqual(["chat", "admin", "mail", "drive"]);
+    });
+
+    it("keeps arranged apps this account cannot open in their slots, and adds new ones at the end", () => {
+        expect(arrangeApps([], ["chat", "mail"])).toEqual(["chat", "mail"]);
+        expect(arrangeApps(["mail", "admin", "drive"], ["drive", "chat", "mail"])).toEqual([
+            "drive",
+            "admin",
+            "chat",
+            "mail"
+        ]);
     });
 
     it("tells an unchanged order from a changed one", () => {
@@ -202,6 +268,45 @@ describe("stored favorites", () => {
         expect(parseFavoriteApps('["chat"]')).toEqual(["chat"]);
         expect(parseFavoriteApps('["nope","chat","chat"]')).toEqual(["chat"]);
     });
+
+    it("keeps a list stored before the menu could be arranged, in its order", () => {
+        const stored = parseLauncherPrefs('["mail","drive","chat"]');
+        expect(stored).toEqual({ favorites: ["mail", "drive", "chat"], order: [] });
+        expect(
+            launcherOrder({
+                available: ["drive", "chat", "mail", "notes"],
+                arranged: stored.order,
+                favorites: stored.favorites,
+                now: 0
+            })
+        ).toEqual(["mail", "drive", "chat", "notes"]);
+    });
+
+    it("stores the old list until the menu is arranged, and both lists after", () => {
+        expect(serializeLauncherPrefs({ favorites: [], order: [] })).toBeNull();
+        expect(serializeLauncherPrefs({ favorites: ["mail"], order: [] })).toBe('["mail"]');
+        const both = serializeLauncherPrefs({ favorites: ["mail"], order: ["chat", "mail"] });
+        expect(parseLauncherPrefs(both)).toEqual({ favorites: ["mail"], order: ["chat", "mail"] });
+    });
+
+    it("reads a stored arrangement that is not usable as none, keeping what is", () => {
+        const stored = JSON.stringify({ favorites: "mail", order: ["chat", "nope", "chat"] });
+        expect(parseLauncherPrefs(stored)).toEqual({ favorites: [], order: ["chat"] });
+        expect(parseLauncherPrefs("42")).toEqual({ favorites: [], order: [] });
+        expect(parseLauncherPrefs(JSON.stringify(null))).toEqual({ favorites: [], order: [] });
+    });
+
+    it("accepts a save of both lists, or of the favorites alone from an older tab", () => {
+        expect(launcherPrefsSchema.parse({ favorites: ["mail"], order: ["chat"] })).toEqual({
+            favorites: ["mail"],
+            order: ["chat"]
+        });
+        expect(launcherPrefsSchema.parse(["mail"])).toEqual(["mail"]);
+        expect(launcherPrefsSchema.safeParse({ favorites: ["mail"] }).success).toBe(false);
+        expect(
+            launcherPrefsSchema.safeParse({ favorites: [], order: ["chat", "chat"] }).success
+        ).toBe(false);
+    });
 });
 
 describe("the switcher", () => {
@@ -227,7 +332,7 @@ describe("the switcher", () => {
             <AppSwitcher
                 apps={apps}
                 currentAppId="games"
-                sections={[{ key: "favorites", label: "Favorites", ids: ["games"] }]}
+                order={["games"]}
                 pinned={["games"]}
                 onTogglePin={() => undefined}
             />

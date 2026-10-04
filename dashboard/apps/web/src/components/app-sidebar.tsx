@@ -66,7 +66,7 @@ export function AppSidebar({
     const label = useNavLabel();
     const t = useTranslations("nav");
     const app = nav.resolveActiveApp(pathname);
-    const { favorites, openLauncher } = useFavoriteApps();
+    const { favorites, order, openLauncher } = useFavoriteApps();
     // Null everywhere except inside an organization, where it says what this
     // reader may open. Absent until it arrives, which draws the baseline rail.
     const org = useOrgNav(nav.orgSlugForPath(pathname));
@@ -85,11 +85,11 @@ export function AppSidebar({
     // The Overview is the exception: it belongs to no app's list of screens
     // because it is a window onto all of them, which left the rail empty on the
     // one screen where somebody has not yet decided where they are going. Its
-    // rail is the apps themselves - only the favorites, in the order they were
-    // arranged, and a way to the rest. Thirty apps in a rail is a list to read;
-    // the app menu is where the whole set is searched and shelved.
+    // rail is the apps themselves - only the favorites, in the order the app
+    // menu was arranged in, and a way to the rest. Thirty apps in a rail is a
+    // list to read; the app menu is where the whole set is searched.
     const onOverview = !subapp && app.id === nav.OVERVIEW_APP_ID;
-    const railIds = onOverview ? railApps({ available: appIds, favorites }) : [];
+    const railIds = onOverview ? railApps({ available: appIds, favorites, arranged: order }) : [];
     const moreApps =
         onOverview && appIds.filter((id) => id !== nav.OVERVIEW_APP_ID).length > railIds.length;
     const sections = subapp

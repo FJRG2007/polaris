@@ -1047,7 +1047,7 @@
         "web/src/components/app-chrome.tsx",
         "web/src/components/app-nav.tsx",
         "web/src/components/app-sidebar.tsx",
-        "web/src/components/arrange-favorites-dialog.tsx",
+        "web/src/components/arrange-apps-dialog.tsx",
         "web/src/components/device-cache-card.tsx",
         "web/src/components/display-preferences-form.tsx",
         "web/src/components/dns/dns-propagation-panel.tsx",
@@ -1665,6 +1665,11 @@
         "web/src/components/search-rows.tsx",
         "web/src/lib/app-extensions/registry.ts",
         "web/src/lib/app-extensions/types.ts",
-        "web/src/lib/cron/scheduler.ts"
+        "web/src/lib/cron/scheduler.ts",
+        "web/src/components/favorite-apps-context.ts",
+        "web/src/components/overview/visit-recorder.tsx",
+        "web/src/lib/app-launcher.ts",
+        "web/src/lib/app-launcher-service.ts",
+        "web/src/lib/app-usage.ts"
     ]
 }

@@ -18,12 +18,12 @@
  *  An app that remembered where it was left leads back there rather than to its
  *  front door - see `last-place`. Read after mount rather than during render:
  *  the server has no idea what one browser remembers, and a link that differed
- *  between the two would fail hydration. The recent apps are read the same way,
- *  from the history the Overview's "Recently visited" card keeps
- *  (`recent-places`); the favorites come from the account, through the store the
+ *  between the two would fail hydration. How much each app is used is read the
+ *  same way, from this browser's history (`app-usage`); the favorites and the
+ *  order the menu was arranged in come from the account, through the store the
  *  Overview's rail shares (`favorite-apps`).
  *
- *  Every app is also found by its English name and by its shelf, so somebody
+ *  Every app is also found by its English name and by its category, so somebody
  *  reading in Spanish who types "settings" or "games" still finds it. */
 
 import Link from "next/link";
@@ -31,20 +31,15 @@ import * as nav from "@/lib/apps";
 import { useEffect, useState } from "react";
 import { readPlace } from "@/lib/last-place";
 import { usePathname } from "next/navigation";
+import { readAppUsage } from "@/lib/app-usage";
 import { ArrowUpDown, Store } from "lucide-react";
-import { launcherLayout } from "@/lib/app-launcher";
 import { badgeLabel } from "@/lib/notification-badge";
 import { useFavoriteApps } from "@/components/favorite-apps-context";
-import { readRecentPlaces } from "@/lib/overview/recent-places";
 import { useInstalledNav } from "@/components/use-installed-nav";
 import { anythingWaiting, useAppUnread } from "@/components/app-unread";
-import {
-    AppSwitcher,
-    DropdownMenuItem,
-    type AppSwitcherSection,
-    type PolarisApp
-} from "@polaris/ui";
-import { ArrangeFavoritesDialog } from "@/components/arrange-favorites-dialog";
+import { launcherOrder, type AppUsage } from "@/lib/app-launcher";
+import { AppSwitcher, DropdownMenuItem, type PolarisApp } from "@polaris/ui";
+import { ArrangeAppsDialog } from "@/components/arrange-apps-dialog";
 import { useNavLabel } from "@/components/i18n/use-nav-label";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { NamespaceKey } from "@/lib/i18n/types";
@@ -78,7 +73,7 @@ export function AppNav({
     const asGuest = new Set(guestAppIds);
     const waiting = useAppUnread();
     const [places, setPlaces] = useState<Record<string, string>>({});
-    const [recent, setRecent] = useState<string[]>([]);
+    const [usage, setUsage] = useState<{ usage: AppUsage; at: number }>({ usage: {}, at: 0 });
     // A game server's own screens live with the installed apps, and belong to
     // Game servers. The path only says "an installed app"; whether it is a game
     // server is the answer the rail already asks for (a server has screens).
@@ -86,7 +81,7 @@ export function AppNav({
     const installed = useInstalledNav(installedId);
 
     // Re-read on every navigation: leaving Tasks is the moment the entry that
-    // leads back into it becomes wrong, and the moment it becomes recent.
+    // leads back into it becomes wrong, and the moment it was used once more.
     useEffect(() => {
         const found: Record<string, string> = {};
         for (const app of nav.POLARIS_APPS) {
@@ -94,7 +89,7 @@ export function AppNav({
             if (place) found[app.id] = place;
         }
         setPlaces(found);
-        setRecent(readRecentPlaces().map((place) => nav.resolveActiveApp(place.href).id));
+        setUsage({ usage: readAppUsage(), at: Date.now() });
     }, [pathname]);
 
     const apps = nav.POLARIS_APPS.filter((app) => allowed.has(app.id)).map((app) => {
@@ -129,7 +124,8 @@ export function AppNav({
             apps={apps}
             currentAppId={current.id}
             currentApp={current.hidden ? current : undefined}
-            recent={recent}
+            usage={usage.usage}
+            now={usage.at}
             marketplace={marketplace}
             // The dot on the switcher itself, which is all somebody sees while
             // the list is closed. Derived from what is actually waiting rather
@@ -140,56 +136,42 @@ export function AppNav({
     );
 }
 
-/** An app as the menu lists it: drawn, and filed on a shelf. */
-export type LauncherApp = PolarisApp & { readonly category: nav.AppCategory };
-
 /**
- * The menu itself, from a list of apps already resolved for this reader - the
- * favorites, recent apps and shelves, the search, the arranging. Apart from
- * `AppNav` so it can be drawn from any list of apps, which is how it is
- * exercised with more apps than the catalogue holds.
+ * The menu itself, from a list of apps already resolved for this reader - one
+ * grid in the reader's order (see `launcherOrder`), the search, the arranging.
+ * Apart from `AppNav` so it can be drawn from any list of apps, which is how it
+ * is exercised with more apps than the catalogue holds.
  */
 export function AppLauncher({
     apps,
     currentAppId,
     currentApp,
-    recent,
+    usage = {},
+    now = 0,
     marketplace = false,
     alert = false
 }: {
-    apps: readonly LauncherApp[];
+    apps: readonly PolarisApp[];
     currentAppId: string;
     currentApp?: PolarisApp;
-    /** App ids, most recent first. */
-    recent: readonly string[];
+    /** How much this browser has opened each app. */
+    usage?: AppUsage;
+    /** When `usage` was read, which is what its decay is measured from. */
+    now?: number;
     marketplace?: boolean;
     alert?: boolean;
 }) {
     const t = useTranslations("nav");
-    const label = useNavLabel();
-    const { favorites, toggle, arrange, launcherOpen, setLauncherOpen } = useFavoriteApps();
+    const { favorites, order, toggle, arrangeApps, launcherOpen, setLauncherOpen } =
+        useFavoriteApps();
     const [arranging, setArranging] = useState(false);
-    const categoryOf = new Map(apps.map((app) => [app.id, app.category]));
-    const layout = launcherLayout({
+    const ids = launcherOrder({
         available: apps.map((app) => app.id),
+        arranged: order,
         favorites,
-        recent,
-        categoryOf: (id) => categoryOf.get(id)
+        usage,
+        now
     });
-    const sections: AppSwitcherSection[] = [
-        {
-            key: "favorites",
-            label: t("switcher.favorites"),
-            ids: layout.favorites,
-            arrangeable: true
-        },
-        { key: "recent", label: t("switcher.recent"), ids: layout.recent },
-        ...layout.shelves.map((shelf) => ({
-            key: shelf.category,
-            label: label(CATEGORY_LABEL.get(shelf.category) ?? shelf.category),
-            ids: shelf.ids
-        }))
-    ];
 
     return (
         <>
@@ -197,7 +179,7 @@ export function AppLauncher({
                 apps={apps}
                 currentAppId={currentAppId}
                 currentApp={currentApp}
-                sections={sections}
+                order={ids}
                 open={launcherOpen}
                 onOpenChange={setLauncherOpen}
                 strings={{
@@ -205,11 +187,12 @@ export function AppLauncher({
                     noMatch: (query) => t("switcher.noMatch", { query }),
                     pin: (app) => t("switcher.pin", { app }),
                     unpin: (app) => t("switcher.unpin", { app }),
-                    moved: (app, position, total) => t("switcher.moved", { app, position, total })
+                    moved: (app, position, total) => t("switcher.moved", { app, position, total }),
+                    more: t("switcher.more")
                 }}
                 pinned={favorites}
                 onTogglePin={toggle}
-                onArrange={arrange}
+                onArrange={arrangeApps}
                 footer={
                     <>
                         <DropdownMenuItem onSelect={() => setArranging(true)}>
@@ -232,7 +215,12 @@ export function AppLauncher({
                 linkAs={Link}
                 alert={alert}
             />
-            <ArrangeFavoritesDialog open={arranging} onOpenChange={setArranging} apps={apps} />
+            <ArrangeAppsDialog
+                open={arranging}
+                onOpenChange={setArranging}
+                apps={apps}
+                order={ids}
+            />
         </>
     );
 }

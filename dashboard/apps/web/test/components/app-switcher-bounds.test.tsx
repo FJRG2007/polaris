@@ -12,7 +12,7 @@ import { AppSwitcher } from "@polaris/ui";
 import { Bell, Files, Mail } from "lucide-react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it } from "vitest";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen, within } from "@testing-library/react";
 
 afterEach(cleanup);
 
@@ -54,5 +54,29 @@ describe("the app switcher's surface", () => {
         // Long names cut at the tile's edge rather than widening it.
         expect(screen.getByText("Mail").className).toContain("truncate");
         expect(screen.getAllByRole("menuitem")).toHaveLength(APPS.length);
+    });
+
+    it("keeps thirty-two apps with long names inside a phone's width", async () => {
+        const many = Array.from({ length: 32 }, (_, at) => ({
+            id: `fixture-${at}`,
+            label: `Fixture application with a very long name ${at}`,
+            icon: Files,
+            href: `/fixture-${at}`
+        }));
+        render(<AppSwitcher apps={many} currentAppId="fixture-0" />);
+        await userEvent.click(screen.getByRole("button"));
+        const menu = await screen.findByRole("menu");
+        // 19.5rem is 312px: inside a 390px screen with its 16px gutters, and
+        // never wider than what is left of the screen.
+        expect(menu.className).toContain("w-[19.5rem]");
+        expect(menu.className).toContain("max-w-[--radix-dropdown-menu-content-available-width]");
+        const grid = menu.querySelector("[data-launcher-grid]")!;
+        expect(grid.className).toContain("grid-cols-3");
+        const first = menu.querySelector<HTMLElement>('[data-launcher-tile="fixture-0"]')!;
+        // The name is cut at the tile's edge, and the whole of it is on hover.
+        expect(first.getAttribute("title")).toBe(many[0]!.label);
+        expect(first.parentElement?.className).toContain("min-w-0");
+        expect(first.className).toContain("min-w-0");
+        expect(within(first).getByText(many[0]!.label).className).toContain("truncate");
     });
 });
