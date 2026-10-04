@@ -159,6 +159,17 @@ async function openVisual(automationId: string | null, canManage = true): Promis
     await painted();
 }
 
+/** A design-system menu opens on the pointer going down, as Radix menus do. */
+function openMenu(name: string): void {
+    fireEvent.pointerDown(screen.getByRole("button", { name }), { button: 0, ctrlKey: false });
+}
+
+async function pick(menu: string, item: string): Promise<void> {
+    openMenu(menu);
+    fireEvent.click(await screen.findByRole("menuitem", { name: item }));
+    await painted();
+}
+
 /** A key pressed and let go, as a hand does: the diagram tracks which keys are
  *  down, and one never released is still held. */
 function press(element: HTMLElement, key: string): void {
@@ -339,10 +350,8 @@ describe("the palette", () => {
     it("adds a step, opens it, and says what it still needs only when Save is pressed", async () => {
         await openVisual(null);
         expect(screen.queryByText("Add at least one trigger.")).toBeNull();
-        fireEvent.click(screen.getByRole("button", { name: "Only by hand" }));
-        await painted();
-        fireEvent.click(screen.getByRole("button", { name: "Notify me" }));
-        await painted();
+        await pick("Add trigger", "Only by hand");
+        await pick("Add step", "Notify me");
         const message = screen.getByLabelText(/^Message/) as HTMLInputElement;
         expect(message.value).toBe("");
         fireEvent.change(screen.getByLabelText(/^Name/), { target: { value: "Fixture" } });
@@ -362,20 +371,41 @@ describe("the palette", () => {
         ]);
     });
 
+    it("offers every kind the schema has", async () => {
+        await openVisual("auto-1");
+        openMenu("Add trigger");
+        expect((await screen.findAllByRole("menuitem")).map((item) => item.textContent)).toEqual([
+            "A device changes",
+            "A device stays",
+            "A reading crosses",
+            "At a time",
+            "Every so often",
+            "Only by hand"
+        ]);
+        fireEvent.keyDown(screen.getAllByRole("menuitem")[0]!, { key: "Escape" });
+        await painted();
+        openMenu("Add step");
+        expect((await screen.findAllByRole("menuitem")).map((item) => item.textContent)).toEqual([
+            "Operate a device",
+            "Wait a while",
+            "Wait for a device",
+            "Notify me",
+            "Run an automation"
+        ]);
+    });
+
     it("puts a condition into the selected group, and starts a group otherwise", async () => {
         await openVisual("auto-1");
         fireEvent.click(node("cond03"));
         await painted();
         expect(screen.getByText("Conditions go into the selected group.")).toBeDefined();
-        fireEvent.click(screen.getByRole("button", { name: "On days" }));
-        await painted();
+        await pick("Add condition", "On days");
         fireEvent.click(screen.getByRole("button", { name: "Close" }));
         await painted();
         expect(
             screen.getByText("Each condition starts a new group. Select a group to add to it.")
         ).toBeDefined();
-        fireEvent.click(screen.getByRole("button", { name: "Between times" }));
-        await painted();
+        await pick("Add condition", "Between times");
         fireEvent.click(screen.getByRole("button", { name: "Save" }));
         await painted();
         const input = saved[0] as { definition: AutomationView["definition"] };
@@ -385,24 +415,11 @@ describe("the palette", () => {
         expect(groups[2]!.items.map((item) => item.kind)).toEqual(["time"]);
     });
 
-    it("can be folded away, and says so", async () => {
-        await openVisual("auto-1");
-        const fold = screen.getByRole("button", { name: "Hide what can be added" });
-        expect(fold.getAttribute("aria-expanded")).toBe("true");
-        fireEvent.click(fold);
-        expect(screen.queryByRole("button", { name: "Notify me" })).toBeNull();
-        expect(
-            screen
-                .getByRole("button", { name: "Show what can be added" })
-                .getAttribute("aria-expanded")
-        ).toBe("false");
-    });
-
     it("is not offered to somebody who can only read", async () => {
         await openVisual("auto-1", false);
         expect(screen.getByRole("region", { name: "Automation diagram" })).toBeDefined();
-        expect(screen.queryByRole("button", { name: "Notify me" })).toBeNull();
-        expect(screen.queryByRole("button", { name: "Hide what can be added" })).toBeNull();
+        expect(screen.queryByRole("button", { name: "Add step" })).toBeNull();
+        expect(screen.queryByRole("button", { name: "Add trigger" })).toBeNull();
     });
 });
 

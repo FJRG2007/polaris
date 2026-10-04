@@ -32,20 +32,15 @@ import {
     type NodeProps,
     type OnSelectionChangeFunc
 } from "@xyflow/react";
+import { AlertCircle, Filter, Maximize, Play, Plus, X, Zap, ZoomIn, ZoomOut } from "lucide-react";
 import {
-    AlertCircle,
-    ChevronDown,
-    ChevronUp,
-    Filter,
-    Maximize,
-    Play,
-    Plus,
-    X,
-    Zap,
-    ZoomIn,
-    ZoomOut
-} from "lucide-react";
-import { Button, cn } from "@polaris/ui";
+    Button,
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+    cn
+} from "@polaris/ui";
 import { usePlacesT } from "../use-places-t";
 import * as auto from "../../lib/automation-kinds";
 import * as words from "../../lib/automation-words";
@@ -83,6 +78,10 @@ type ViewData = {
 };
 
 type ViewNode = Node<ViewData>;
+
+/** How the whole diagram is framed: never past life size, and never so small
+ *  that a node's words cannot be read - a long automation is panned instead. */
+const FIT = { padding: 0.1, maxZoom: 1, minZoom: 0.6 };
 
 /** What removes the selected node: Delete, and the key Macs label delete. */
 const DELETE_KEYS = ["Delete", "Backspace"];
@@ -404,8 +403,63 @@ type Adding =
     | { readonly role: "condition"; readonly kind: auto.ConditionKind }
     | { readonly role: "step"; readonly kind: auto.StepKind };
 
-/** What can be added, by stage. Every kind the schema has, and the reason when
- *  one more is more than an automation can hold. */
+/** One "add" button of the palette: a menu of the kinds it can add, or - when
+ *  the automation holds as many as it can - a button that says so. */
+function AddKind<K extends string>({
+    label,
+    kinds,
+    text,
+    full,
+    onPick
+}: {
+    label: string;
+    kinds: readonly K[];
+    text: (kind: K) => string;
+    full: boolean;
+    onPick: (kind: K) => void;
+}) {
+    const t = usePlacesT();
+    const face = (
+        <>
+            <Plus className="size-4 shrink-0" />
+            <span className="truncate" title={label}>
+                {label}
+            </span>
+        </>
+    );
+    if (full) {
+        return (
+            <Button
+                size="sm"
+                variant="outline"
+                className="max-w-full border-dashed opacity-60"
+                aria-disabled="true"
+                title={t("automations.errors.tooMany")}
+            >
+                {face}
+            </Button>
+        );
+    }
+    return (
+        <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+                <Button size="sm" variant="outline" className="max-w-full border-dashed">
+                    {face}
+                </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start">
+                {kinds.map((kind) => (
+                    <DropdownMenuItem key={kind} onSelect={() => onPick(kind)}>
+                        {text(kind)}
+                    </DropdownMenuItem>
+                ))}
+            </DropdownMenuContent>
+        </DropdownMenu>
+    );
+}
+
+/** What can be added, by stage: every kind the schema has. A condition goes
+ *  into the selected group while it has room, and starts a new one otherwise. */
 function Palette({
     definition,
     selectedId,
@@ -416,81 +470,42 @@ function Palette({
     onAdd: (adding: Adding) => void;
 }) {
     const t = usePlacesT();
-    const full = t("automations.errors.tooMany");
     const group = targetGroup(definition, selectedId);
-    const triggersFull = definition.triggers.length >= auto.LIMITS.triggers;
-    const conditionsFull = !group && definition.conditions.groups.length >= auto.LIMITS.groups;
-    const stepsFull = definition.actions.length >= auto.LIMITS.steps;
-    const section = (
-        title: string,
-        hint: string | null,
-        disabled: boolean,
-        items: readonly { key: string; label: string; add: () => void }[]
-    ) => (
-        <section aria-label={title} className="flex min-w-0 flex-col gap-1">
-            <h3 className="text-[0.6875rem] font-semibold uppercase tracking-wide text-muted-foreground">
-                {title}
-            </h3>
-            {hint && <p className="text-[0.6875rem] text-foreground-subtle">{hint}</p>}
-            <ul className="flex flex-wrap gap-1">
-                {items.map((item) => (
-                    <li key={item.key} className="min-w-0">
-                        <Button
-                            size="sm"
-                            variant="outline"
-                            className="h-7 max-w-full border-dashed px-2 text-xs"
-                            aria-disabled={disabled || undefined}
-                            title={disabled ? full : undefined}
-                            onClick={() => {
-                                if (!disabled) item.add();
-                            }}
-                        >
-                            <Plus className="size-3.5 shrink-0" />
-                            <span className="truncate" title={item.label}>
-                                {item.label}
-                            </span>
-                        </Button>
-                    </li>
-                ))}
-            </ul>
-        </section>
-    );
     return (
-        <div className="flex min-w-0 flex-col gap-3">
-            {section(
-                t("automations.editor.addTrigger"),
-                null,
-                triggersFull,
-                auto.TRIGGER_KINDS.map((kind) => ({
-                    key: kind,
-                    label: words.triggerKindText(kind, t),
-                    add: () => onAdd({ role: "trigger", kind })
-                }))
-            )}
-            {section(
-                t("automations.editor.addCondition"),
-                group ? t("automations.canvas.toGroup") : t("automations.canvas.newGroup"),
-                conditionsFull,
-                auto.CONDITION_KINDS.map((kind) => ({
-                    key: kind,
-                    label: words.conditionKindText(kind, t),
-                    add: () => onAdd({ role: "condition", kind })
-                }))
-            )}
-            {section(
-                t("automations.editor.addStep"),
-                null,
-                stepsFull,
-                auto.STEP_KINDS.map((kind) => ({
-                    key: kind,
-                    label: words.stepKindText(kind, t),
-                    add: () => onAdd({ role: "step", kind })
-                }))
-            )}
+        <div className="flex min-w-0 flex-col gap-1">
+            <div
+                role="group"
+                aria-label={t("automations.canvas.add")}
+                className="flex min-w-0 flex-wrap items-center gap-2"
+            >
+                <AddKind
+                    label={t("automations.editor.addTrigger")}
+                    kinds={auto.TRIGGER_KINDS}
+                    text={(kind) => words.triggerKindText(kind, t)}
+                    full={definition.triggers.length >= auto.LIMITS.triggers}
+                    onPick={(kind) => onAdd({ role: "trigger", kind })}
+                />
+                <AddKind
+                    label={t("automations.editor.addCondition")}
+                    kinds={auto.CONDITION_KINDS}
+                    text={(kind) => words.conditionKindText(kind, t)}
+                    full={!group && definition.conditions.groups.length >= auto.LIMITS.groups}
+                    onPick={(kind) => onAdd({ role: "condition", kind })}
+                />
+                <AddKind
+                    label={t("automations.editor.addStep")}
+                    kinds={auto.STEP_KINDS}
+                    text={(kind) => words.stepKindText(kind, t)}
+                    full={definition.actions.length >= auto.LIMITS.steps}
+                    onPick={(kind) => onAdd({ role: "step", kind })}
+                />
+            </div>
+            <p className="text-[0.6875rem] text-foreground-subtle">
+                {group ? t("automations.canvas.toGroup") : t("automations.canvas.newGroup")}
+            </p>
         </div>
     );
 }
-
 function Toolbar() {
     const t = usePlacesT();
     const flow = useReactFlow();
@@ -521,7 +536,7 @@ function Toolbar() {
             {button(
                 t("automations.canvas.fit"),
                 <Maximize className="size-4" />,
-                () => void flow.fitView({ duration: 200, padding: 0.15 })
+                () => void flow.fitView({ ...FIT, duration: 200 })
             )}
         </div>
     );
@@ -564,7 +579,6 @@ function CanvasBody({
     const t = usePlacesT();
     const wide = useWide();
     const [selectedId, setSelectedId] = useState<string | null>(null);
-    const [paletteOpen, setPaletteOpen] = useState(true);
     const dragging = useRef(false);
 
     const graph = useMemo(() => graphs.automationToGraph(definition), [definition]);
@@ -612,9 +626,7 @@ function CanvasBody({
     useEffect(() => {
         if (!wide || framed.current === count) return;
         framed.current = count;
-        const frame = requestAnimationFrame(
-            () => void flow.fitView({ duration: 200, padding: 0.15, maxZoom: 1 })
-        );
+        const frame = requestAnimationFrame(() => void flow.fitView({ ...FIT, duration: 200 }));
         return () => cancelAnimationFrame(frame);
     }, [count, wide, flow]);
 
@@ -628,6 +640,9 @@ function CanvasBody({
                 targetHandle: edge.targetHandle,
                 selectable: false,
                 focusable: false,
+                // The lines only repeat what the nodes' order already says, and
+                // React Flow would name each by its two node ids.
+                domAttributes: { "aria-hidden": true },
                 style: {
                     stroke: "hsl(var(--border-strong))",
                     strokeWidth: 1.5,
@@ -748,29 +763,40 @@ function CanvasBody({
         setSelectedId(node.id);
     };
 
-    const ariaLabelConfig = useMemo(
-        () => ({
-            "node.a11yDescription.default": readOnly
-                ? t("automations.canvas.nodeHelpReadOnly")
-                : t("automations.canvas.nodeHelp"),
-            "node.a11yDescription.keyboardDisabled": t("automations.canvas.nodeHelpReadOnly"),
+    // React Flow reads one of the two descriptions depending on whether its
+    // keyboard handling is on, and it is; both say the same here, for the reader
+    // who can change the automation and for the one who cannot.
+    const ariaLabelConfig = useMemo(() => {
+        const help = readOnly
+            ? t("automations.canvas.nodeHelpReadOnly")
+            : t("automations.canvas.nodeHelp");
+        return {
+            "node.a11yDescription.default": help,
+            "node.a11yDescription.keyboardDisabled": help,
             "node.a11yDescription.ariaLiveMessage": () => t("automations.canvas.moved"),
             "edge.a11yDescription.default": t("automations.canvas.edgeHelp"),
             "handle.ariaLabel": t("automations.canvas.handle")
-        }),
-        [readOnly, t]
-    );
+        };
+    }, [readOnly, t]);
 
+    // Beside the diagram the card says which stage it is from; under a node of
+    // the narrow list, which already sits under that stage's heading, it does not.
     const inspector = selection ? (
         <div className="flex min-w-0 flex-col gap-2">
             <div className="flex items-center gap-2">
-                <h3 className="min-w-0 flex-1 truncate text-xs font-semibold uppercase tracking-wide">
+                <h3
+                    className={cn(
+                        "min-w-0 flex-1 truncate text-xs font-semibold uppercase tracking-wide",
+                        !wide && "sr-only"
+                    )}
+                >
                     {selection.role === "trigger"
                         ? t("automations.editor.when")
                         : selection.role === "step"
                           ? t("automations.editor.then")
                           : t("automations.editor.if")}
                 </h3>
+                {!wide && <span className="flex-1" />}
                 <Button
                     size="sm"
                     variant="ghost"
@@ -817,6 +843,7 @@ function CanvasBody({
 
     return (
         <div className="flex flex-col gap-3">
+            {!readOnly && <Palette definition={definition} selectedId={selectedId} onAdd={add} />}
             {issues}
             <div className="grid min-w-0 gap-4 xl:grid-cols-[minmax(0,1fr)_24rem]">
                 <div
@@ -858,7 +885,7 @@ function CanvasBody({
                         multiSelectionKeyCode={null}
                         deleteKeyCode={readOnly ? null : DELETE_KEYS}
                         fitView
-                        fitViewOptions={{ padding: 0.15, maxZoom: 1 }}
+                        fitViewOptions={FIT}
                         minZoom={0.25}
                         maxZoom={1.75}
                         ariaLabelConfig={ariaLabelConfig}
@@ -869,53 +896,12 @@ function CanvasBody({
                         }
                     >
                         <Background gap={20} size={1} color="hsl(var(--border))" />
-                        {!readOnly && (
-                            <Panel position="top-left" className="!m-2">
-                                <aside className="flex max-h-[calc(min(40rem,75vh)-5rem)] w-64 max-w-[calc(100vw-4rem)] flex-col gap-2 overflow-y-auto rounded-lg border border-border bg-elevated p-2 shadow-popover">
-                                    <div className="flex items-center gap-2">
-                                        <h2 className="min-w-0 flex-1 truncate text-xs font-semibold">
-                                            {t("automations.canvas.add")}
-                                        </h2>
-                                        <Button
-                                            size="sm"
-                                            variant="ghost"
-                                            className="size-7 p-0"
-                                            aria-expanded={paletteOpen}
-                                            aria-label={
-                                                paletteOpen
-                                                    ? t("automations.canvas.hidePalette")
-                                                    : t("automations.canvas.showPalette")
-                                            }
-                                            title={
-                                                paletteOpen
-                                                    ? t("automations.canvas.hidePalette")
-                                                    : t("automations.canvas.showPalette")
-                                            }
-                                            onClick={() => setPaletteOpen((open) => !open)}
-                                        >
-                                            {paletteOpen ? (
-                                                <ChevronUp className="size-3.5" />
-                                            ) : (
-                                                <ChevronDown className="size-3.5" />
-                                            )}
-                                        </Button>
-                                    </div>
-                                    {paletteOpen && (
-                                        <Palette
-                                            definition={definition}
-                                            selectedId={selectedId}
-                                            onAdd={add}
-                                        />
-                                    )}
-                                </aside>
-                            </Panel>
-                        )}
                         <Panel position="bottom-left" className="!m-2">
                             <Toolbar />
                         </Panel>
                     </ReactFlow>
                 </div>
-                <aside className="min-w-0">
+                <aside aria-label={t("automations.canvas.inspector")} className="min-w-0">
                     {inspector ?? (
                         <p className="text-xs text-muted-foreground">
                             {t("automations.canvas.pick")}
