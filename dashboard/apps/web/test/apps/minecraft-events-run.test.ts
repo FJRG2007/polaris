@@ -474,7 +474,7 @@ function quickAnswer(line: string): string | null {
  * score range for everybody inside, and set for everybody in a range.
  */
 function stageScoreAnswer(line: string): string | null {
-    const objectives = /^pe_(drop|low|back|gate|next|last|fin|cut)$/;
+    const objectives = /^(pe_(drop|low|back|gate|next|last|fin|cut)|polaris_tntrun)$/;
     const set = /^scoreboard players set (\w+) (\w+) (-?\d+)$/.exec(line);
     if (set && objectives.test(set[2]!)) {
         (world.stageScores[set[2]!] ??= {})[set[1]!] = Number(set[3]);
@@ -6473,6 +6473,28 @@ describe("a TNT run", () => {
                     visible(line).includes("TNT run cannot be played")
             )
         ).toBe(true);
+    });
+
+    it("names a winner when the last two fall within one look, by the tick each fell", async () => {
+        setUp([run()]);
+        await startArena("tnt");
+        await play(2_100);
+        chat(["Ana", "join"], ["Ben", "join"]);
+        await play(52_000);
+        const arena = arenaNow();
+        expect(world.sent).toContain("scoreboard players set #on polaris_tntrun 1");
+        // Both on the net by the next look; Ben, two seconds' worth of ticks
+        // after Ana, stood the longest.
+        const under = arena.floors.at(-1)! - 3;
+        world.at.Ana = [arena.center.x, under, arena.center.z];
+        world.at.Ben = [arena.center.x + 1, under, arena.center.z];
+        world.stageScores.polaris_tntrun = { Ana: 4000, Ben: 4030 };
+        await play(2_100);
+        const after = state();
+        expect(after.run).toBeNull();
+        expect(after.history[0]?.note).toBe("Ben was the last one standing");
+        expect(after.history[0]?.podium?.[0]).toMatchObject({ place: 1, name: "Ben" });
+        expect(after.history[0]?.podium?.[1]).toMatchObject({ place: 2, name: "Ana" });
     });
 
     it("called off mid-game, puts its fuses out and takes every floor down", async () => {

@@ -602,6 +602,7 @@ async function admit(
             // dropper's racer, nowhere yet.
             ...(layout.kind === "parkour" ? parkour.racerScores(one.name, racer.checkpoint) : []),
             ...(layout.kind === "dropper" ? dropper.racerScores(one.name, layout.shaft) : []),
+            ...(layout.kind === "tnt-run" ? tntRun.racerLines(one.name) : []),
             ...(layout.kind === "boat-race" ? boatRace.racerScores(one.name) : []),
             ...(way ? boatRace.boatLines(one.name, way) : [])
         ]);
@@ -1541,9 +1542,25 @@ async function spleefTick(
     }
     if (out.length > 0) {
         // Everybody out on the same look shares the place: one point for each
-        // player already out, and one for taking part.
-        const points = state(loop).racers.filter((one) => one.outAt !== null).length + 1;
-        for (const name of out) markOut(loop, name, now, points);
+        // player already out, and one for taking part. A TNT run's pack notes
+        // the tick each racer fell, which tells those of one look apart - and
+        // the last two, when only one of them fell last (`tntRun.fallOrder`).
+        const othersStanding = state(loop).racers.filter(
+            (one) => one.outAt === null && !out.some((name) => same(name, one.name))
+        ).length;
+        const order =
+            tnt && out.length > 1
+                ? tntRun.fallOrder(
+                      out,
+                      lowered(commands.readScores(await server.say([tntRun.READ_FELL]))),
+                      othersStanding
+                  )
+                : { groups: [out], survivor: null };
+        for (const group of order.groups) {
+            const points = state(loop).racers.filter((one) => one.outAt !== null).length + 1;
+            for (const name of group) markOut(loop, name, now, points);
+        }
+        out.splice(0, out.length, ...order.groups.flat());
         const left = state(loop).racers.filter((one) => one.outAt === null).length;
         for (const name of out) {
             await sendHome(loop, server, tools, name);

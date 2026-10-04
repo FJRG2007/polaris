@@ -243,8 +243,14 @@ export const FUNCTIONS: Readonly<Record<string, readonly string[]>> = {
         "particle minecraft:poof ~ ~0.5 ~ 0.25 0.1 0.25 0.02 3",
         "kill @s"
     ],
-    // As a player inside: only over the arena's own floors is anything lit.
-    player: [...STORE_POSITION, `execute ${within("")} at @s run function polaris:tntrun/under`],
+    // As a player inside: the game tick they first went under the lowest
+    // floor noted (their own score); only over the arena's own floors is
+    // anything lit.
+    player: [
+        ...STORE_POSITION,
+        `execute unless score @s ${OBJECTIVE} matches 1.. if score ${score("py")} < ${score("fy")} store result score @s ${OBJECTIVE} run time query gametime`,
+        `execute ${within("")} at @s run function polaris:tntrun/under`
+    ],
     // At a player's feet: each corner's block, if it is TNT and has no fuse yet,
     // gets one; then every fuse just lit is given its count.
     under: [
@@ -295,9 +301,53 @@ export function armLines(arena: TntArena): string[] {
         set("ny2", to(volume.y2 + NEAR)),
         set("nz1", from(volume.z1 - NEAR)),
         set("nz2", to(volume.z2 + NEAR)),
+        // Out under here: feet half a block into the lowest floor
+        // (`spleef.fell`); nobody has fallen yet.
+        set("fy", from(bottom) + SCALE / 2),
+        `scoreboard players reset @a ${OBJECTIVE}`,
         `kill ${FUSE}`,
         set("on", 1)
     ];
+}
+
+/** The tick each racer fell, as the pack noted it. */
+export const READ_FELL = `execute as @a[tag=pe_in,scores={${OBJECTIVE}=1..}] run scoreboard players get @s ${OBJECTIVE}`;
+
+/** A racer coming in late: no fall of an earlier run kept against them. */
+export function racerLines(name: string): string[] {
+    return [`scoreboard players reset ${name} ${OBJECTIVE}`];
+}
+
+/**
+ * Who went out on one look, in the order they fell, by the tick the pack
+ * noted (`fell`, by lower-case name; somebody it has none for - who left -
+ * first): each group that fell on the same tick shares a place. When nobody
+ * is left standing but those, and one of them fell alone and last, that one
+ * is still standing (`survivor`): the floor goes from under the last two
+ * within one look as often as not, and a look comes round every two seconds.
+ */
+export function fallOrder(
+    out: readonly string[],
+    fell: ReadonlyMap<string, number>,
+    othersStanding: number
+): { groups: string[][]; survivor: string | null } {
+    const tick = (name: string) => fell.get(name.toLowerCase()) ?? Number.NEGATIVE_INFINITY;
+    const sorted = [...out].sort((a, b) => tick(a) - tick(b));
+    const groups: string[][] = [];
+    for (const name of sorted) {
+        const last = groups.at(-1);
+        if (last && tick(last[0]!) === tick(name)) last.push(name);
+        else groups.push([name]);
+    }
+    const final = groups.at(-1);
+    if (
+        othersStanding === 0 &&
+        groups.length > 1 &&
+        final?.length === 1 &&
+        tick(final[0]!) !== Number.NEGATIVE_INFINITY
+    )
+        return { groups: groups.slice(0, -1), survivor: final[0]! };
+    return { groups, survivor: null };
 }
 
 /**
