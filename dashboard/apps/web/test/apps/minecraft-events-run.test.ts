@@ -6860,12 +6860,15 @@ describe("an ice boat race", () => {
         chat(["Cy", "join"], ["Dan", "join"]);
         await play(2_100);
         const tpLine = (name: string) =>
-            world.sent.find((line) => line.startsWith(`execute in minecraft:overworld run tp ${name} `));
+            world.sent.find((line) =>
+                line.startsWith(`execute in minecraft:overworld run tp ${name} `)
+            );
         const cy = tpLine("Cy");
         const dan = tpLine("Dan");
         expect(cy).toBeDefined();
         expect(dan).toBeDefined();
-        const coords = (line: string, name: string) => line.slice(`execute in minecraft:overworld run tp ${name} `.length);
+        const coords = (line: string, name: string) =>
+            line.slice(`execute in minecraft:overworld run tp ${name} `.length);
         // Each joined the race already on, in the same tick: one grid spot apiece,
         // not both dropped on the same one (stage-service.ts admits one name at a
         // time, so `fresh.length` is 1 per call - `grid(track, fresh.length)` then
