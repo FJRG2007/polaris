@@ -2,8 +2,10 @@
 
 /**
  * One automation, laid out as it runs: WHEN any of these happens, IF these hold,
- * THEN these steps, in order - a column of cards joined by a line, each card
- * one node, each added, removed and moved where it sits.
+ * THEN these steps, in order - as a column of cards joined by a line, or as a
+ * diagram of the same nodes (see `automation-canvas.tsx`), each card or node
+ * added, removed and moved where it sits. The reader's choice between the two
+ * is kept in this browser only; the stored automation is the same either way.
  *
  * Checked as it is typed, against the same schema and the same device checks
  * the server runs, so a problem is said under the field it is about. A field not
