@@ -10,12 +10,14 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const deploy = vi.fn();
-const listVariables = vi.fn();
+const listVariableNames = vi.fn();
 
 vi.mock("@polaris/db", () => ({ prisma: {} }));
 vi.mock("@/lib/deploy/api/surface", () => ({
     deploy: (...args: unknown[]) => deploy(...args),
-    listVariables: (...args: unknown[]) => listVariables(...args),
+    listVariables: vi.fn(),
+    listVariableNames: (...args: unknown[]) => listVariableNames(...args),
+    deleteVariableNamed: vi.fn(),
     listProjects: vi.fn(),
     getService: vi.fn(),
     listDeployments: vi.fn(),
@@ -102,14 +104,16 @@ describe("the deploy tools", () => {
         expect(result.content[0]?.text).not.toContain("docker.sock");
     });
 
-    it("list variables with every secret withheld", async () => {
-        listVariables.mockResolvedValue([
-            { id: "v1", key: "PUBLIC_URL", isSecret: false, value: "https://shop.test" },
-            { id: "v2", key: "API_TOKEN", isSecret: true, value: null }
+    it("list variables by name, with no value of either kind", async () => {
+        listVariableNames.mockResolvedValue([
+            { key: "PUBLIC_URL", isSecret: false, updatedAt: "2026-10-01T10:00:00.000Z" },
+            { key: "API_TOKEN", isSecret: true, updatedAt: "2026-10-02T10:00:00.000Z" }
         ]);
         const result = (await call("deploy_variables", { service: "shop/api" }, ["deploy.read"]))
             ?.result as ToolResult;
-        expect(result.content[0]?.text).toBe("PUBLIC_URL=https://shop.test\nAPI_TOKEN=(secret)");
+        expect(result.content[0]?.text).toBe(
+            "PUBLIC_URL  updated 2026-10-01T10:00:00.000Z\nAPI_TOKEN (secret)  updated 2026-10-02T10:00:00.000Z"
+        );
     });
 
     it("refuse a service reference of the wrong shape as bad arguments", async () => {

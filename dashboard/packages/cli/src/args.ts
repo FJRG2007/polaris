@@ -18,6 +18,12 @@ export interface Flags {
     readonly version: boolean;
     /** Answers yes to the one question the CLI asks (`plr uninstall`). */
     readonly yes: boolean;
+    /** `plr env set|rm`: redeploy the service so it picks the change up. */
+    readonly restart: boolean;
+    /** `plr env set`: store the value as plain rather than secret. */
+    readonly plain: boolean;
+    /** `plr env set`: read the value from this file instead of a prompt or stdin. */
+    readonly fromFile?: string;
     readonly url?: string;
     readonly profile?: string;
     readonly tail?: number;
@@ -36,6 +42,9 @@ const OPTIONS = {
     help: { type: "boolean", short: "h" },
     version: { type: "boolean", short: "v" },
     yes: { type: "boolean", short: "y" },
+    restart: { type: "boolean" },
+    plain: { type: "boolean" },
+    "from-file": { type: "string" },
     url: { type: "string" },
     profile: { type: "string", short: "p" },
     tail: { type: "string", short: "n" }
@@ -67,7 +76,7 @@ export function parse(argv: readonly string[]): Parsed {
             throw usage(`--tail takes a whole number from 1 to ${MAX_TAIL}.`);
         }
     }
-    for (const name of ["url", "profile"] as const) {
+    for (const name of ["url", "profile", "from-file"] as const) {
         if (values[name] === "") throw usage(`--${name} needs a value.`);
     }
 
@@ -80,6 +89,9 @@ export function parse(argv: readonly string[]): Parsed {
             help: values.help === true,
             version: values.version === true,
             yes: values.yes === true,
+            restart: values.restart === true,
+            plain: values.plain === true,
+            fromFile: typeof values["from-file"] === "string" ? values["from-file"] : undefined,
             url: typeof values.url === "string" ? values.url : undefined,
             profile: typeof values.profile === "string" ? values.profile : undefined,
             tail

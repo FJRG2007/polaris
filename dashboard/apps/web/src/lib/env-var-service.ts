@@ -21,6 +21,18 @@ export interface EnvVarView {
 
 export type EnvScope = "application" | "environment";
 
+/**
+ * A variable as a listing that must never carry its value shows it: the name,
+ * whether it is secret, and when it last changed. Nothing derived from the
+ * value either - no hash, no length - since either narrows a guess.
+ */
+export interface EnvVarName {
+    id: string;
+    key: string;
+    isSecret: boolean;
+    updatedAt: Date;
+}
+
 /** Confirm the signed-in owner owns the app or environment the scope points at. */
 async function assertOwnsScope(scope: EnvScope, scopeId: string, ownerId: string): Promise<void> {
     if (scope === "environment") {
@@ -78,6 +90,32 @@ export async function listEnvVars(
     }));
 }
 
+/**
+ * A scope's variables by name only. The value columns are never selected, so
+ * no later change to the mapping can put one in the answer by accident.
+ */
+export async function listEnvVarNames(
+    scope: EnvScope,
+    scopeId: string,
+    ownerId: string
+): Promise<EnvVarName[]> {
+    await assertOwnsScope(scope, scopeId, ownerId);
+    return prisma.envVar.findMany({
+        where: { scopeType: scope, scopeId },
+        orderBy: { key: "asc" },
+        select: { id: true, key: true, isSecret: true, updatedAt: true }
+    });
+}
+
+/** The id of the variable a scope holds under `key`, or null. */
+export async function envVarIdByKey(scope: EnvScope, scopeId: string, key: string): Promise<string | null> {
+    const row = await prisma.envVar.findFirst({
+        where: { scopeType: scope, scopeId, key },
+        select: { id: true }
+    });
+    return row?.id ?? null;
+}
+
 /** Reveal a single variable's value, decrypting a secret on demand (owner-gated).
  *  Used by the eye toggle so a secret is only sent to the client when asked for. */
 export async function revealEnvVar(id: string, ownerId: string): Promise<string | null> {
@@ -104,7 +142,7 @@ export async function setEnvVar(
     scopeId: string,
     ownerId: string,
     input: { key: string; value: string; isSecret: boolean }
-): Promise<void> {
+): Promise<{ created: boolean }> {
     await assertOwnsScope(scope, scopeId, ownerId);
     const key = input.key.trim();
     if (!VALID_KEY.test(key))
@@ -113,7 +151,8 @@ export async function setEnvVar(
     if (input.value.length > ENV_VALUE_MAX) throw new Error(`${key} is longer than ${ENV_VALUE_MAX / 1024} KB.`);
 
     const existing = await prisma.envVar.findFirst({
-        where: { scopeType: scope, scopeId, key }
+        where: { scopeType: scope, scopeId, key },
+        select: { id: true }
     });
 
     let data: {
@@ -147,6 +186,7 @@ export async function setEnvVar(
     } else {
         await prisma.envVar.create({ data: { scopeType: scope, scopeId, key, ...data } });
     }
+    return { created: !existing };
 }
 
 /** Moved to a pure module so the browser can stage a paste; kept here for callers. */

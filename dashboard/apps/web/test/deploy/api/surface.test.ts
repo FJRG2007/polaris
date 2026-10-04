@@ -68,6 +68,8 @@ vi.mock("@/lib/env-var-service", () => ({
     revealEnvVar: (...args: unknown[]) => revealEnvVar(...args),
     setEnvVar: (...args: unknown[]) => setEnvVar(...args),
     listEnvVars: async () => [],
+    listEnvVarNames: async () => [],
+    envVarIdByKey: async () => null,
     setEnvVars: async () => 0,
     deleteEnvVar: async () => null,
     parseDotEnv: () => []
@@ -96,6 +98,7 @@ beforeEach(() => {
     vi.clearAllMocks();
     requireApplicationAccess.mockResolvedValue(access());
     deployApplication.mockResolvedValue("dep-1");
+    setEnvVar.mockResolvedValue({ created: true });
     applications.mockResolvedValue([]);
 });
 

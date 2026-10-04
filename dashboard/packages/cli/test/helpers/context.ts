@@ -71,6 +71,8 @@ export interface ContextOptions {
     readonly browser?: boolean;
     readonly answers?: string[];
     readonly platform?: NodeJS.Platform;
+    /** What a hidden prompt or stdin hands `readSecret`; null when nothing does. */
+    readonly secret?: string | null;
 }
 
 export async function testContext(options: ContextOptions = {}): Promise<Recorded> {
@@ -102,6 +104,7 @@ export async function testContext(options: ContextOptions = {}): Promise<Recorde
         canOpenBrowser: () => options.browser ?? true,
         sleep: async () => undefined,
         prompt: async () => answers.shift() ?? null,
+        readSecret: async () => options.secret ?? null,
         machineName: () => "test-laptop"
     };
     return { context, stdout: () => out, stderr: () => err, opened, dir };

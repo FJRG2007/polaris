@@ -123,7 +123,7 @@ example, changing tasks needs reading them) ticks that one too.
 | `tasks.manage`   | Create tasks, change them, and comment                           |
 | `agents.read`    | See agent sessions                                               |
 | `agents.manage`  | Start agent sessions and send them prompts                       |
-| `deploy.read`    | See apps, deployments, logs, variables (never secret values) and domains |
+| `deploy.read`    | See apps, deployments, logs, variable names (never values) and domains |
 | `deploy.manage`  | Deploy, restart, roll back, set variables and add domains        |
 | `notes.use`      | List, read, write and change your notes                          |
 | `chat.use`       | List your conversations, read them and send messages             |
@@ -166,9 +166,9 @@ annotations to ask you before a change; tools marked "changes" ask by default.
 | `tasks_update`         | `tasks.manage`  | changes                      |
 | `agent_sessions_list`, `agent_session_get` | `agents.read` | read      |
 | `agent_session_start`, `agent_session_prompt` | `agents.manage` | adds |
-| `deploy_projects`, `deploy_service`, `deploy_deployments`, `deploy_deployment`, `deploy_logs`, `deploy_variables`, `deploy_domains` | `deploy.read` | read |
+| `deploy_projects`, `deploy_service`, `deploy_deployments`, `deploy_deployment`, `deploy_logs`, `deploy_variables`, `env_list`, `deploy_domains` | `deploy.read` | read |
 | `deploy_add_domain`    | `deploy.manage` | adds                         |
-| `deploy_start`, `deploy_set_variable`, `deploy_restart`, `deploy_rollback` | `deploy.manage` | changes |
+| `deploy_start`, `deploy_set_variable`, `env_set`, `env_delete`, `deploy_restart`, `deploy_rollback` | `deploy.manage` | changes |
 | `notes_list`, `notes_get` | `notes.use`  | read                         |
 | `notes_create`         | `notes.use`     | adds                         |
 | `notes_update`         | `notes.use`     | changes                      |
@@ -178,7 +178,8 @@ annotations to ask you before a change; tools marked "changes" ask by default.
 | `drive_share_create`   | `shares.create` | changes (publishes a file)   |
 | `calendar_upcoming`    | `calendar.use`  | read                         |
 
-Not offered on purpose: secret values, file contents, vault items and mail.
+Not offered on purpose: variable values, file contents, vault items and mail.
+A value set with `env_set` is stored and never returned.
 Every change made through a tool is written to your activity log with the
 assistant that made it. Each connection may make 120 tool calls a minute, 30 of
 them changes.

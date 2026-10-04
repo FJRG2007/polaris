@@ -6,6 +6,7 @@
  * by the developer's own Node, handed out by each Polaris at `/cli`.
  */
 
+import { env } from "./commands/env.js";
 import { open } from "./commands/open.js";
 import { CLI_VERSION } from "./version.js";
 import { CliError, usage } from "./errors.js";
@@ -48,6 +49,14 @@ Deploy
   plr build-log DEPLOYMENT [--follow] [--tail N]
   plr logs SERVICE [--follow] [--tail N]
   plr restart SERVICE
+
+Environment variables (values are never shown)
+  plr env ls SERVICE     Names, whether each is secret, and when it changed
+  plr env set SERVICE NAME [--from-file PATH] [--plain] [--restart]
+                         Create or replace one; type the value at a hidden
+                         prompt or pipe it in, never on the command line
+  plr env rm SERVICE NAME [--yes] [--restart]
+                         Remove one. --restart redeploys so the change applies
 
 Other
   plr open [home|deploy|keys|downloads]
@@ -133,6 +142,8 @@ async function dispatch(
             return logs(context, flags, first);
         case "restart":
             return restart(context, flags, first);
+        case "env":
+            return env(context, flags, args);
         case "open":
             return open(context, flags, first);
         case "update":

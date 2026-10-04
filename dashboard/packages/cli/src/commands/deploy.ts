@@ -35,7 +35,7 @@ const DEFAULT_TAIL = 200;
 const STAMP = /^(\d{4}-\d{2}-\d{2}T\S+)\s/;
 
 /** The service a reference names, asked of the server. */
-async function resolveService(
+export async function resolveService(
     context: Context,
     session: Session,
     ref: string | undefined
@@ -56,7 +56,7 @@ async function resolveService(
 }
 
 /** How a service is named in output: the way it is typed. */
-function refOf(service: ServiceDetail): string {
+export function refOf(service: ServiceDetail): string {
     return `${service.project.slug}/${service.environment.slug}/${service.slug}`;
 }
 
