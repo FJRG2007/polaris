@@ -44,6 +44,19 @@
  */
 
 import { backgroundImage, BLUR_PIXELS, type CameraBackground } from "./camera-background";
+import {
+    autoGain,
+    cameraLook,
+    followFrame,
+    frameFor,
+    lookFilter,
+    lookIsPlain,
+    meanLuma,
+    personBox,
+    WHOLE_FRAME,
+    type CameraLook,
+    type FrameBox
+} from "./camera-look";
 
 /** Where the staged model and its loader are served from. */
 const ASSETS = "/video";
@@ -78,6 +91,14 @@ const EDGE_OVER_BLUR = 8;
 /** How many frames in a row may fail before the model is treated as gone. */
 const GIVE_UP = 10;
 
+/** The copy of a frame the look measures - brightness, and where the person
+ *  is. Small on purpose: reading pixels back is the one slow thing a canvas
+ *  does, and a crop is aimed, not drawn, from this. */
+const SAMPLE_WIDTH = 48;
+const SAMPLE_HEIGHT = 27;
+/** How often, in frames, the look measures. A few times a second at 30 fps. */
+const MEASURE_EVERY = 6;
+
 /** A camera with something between it and the call. */
 export interface MaskedCamera {
     /** What to send, or null when it could not be built - see `problem`. */
@@ -85,7 +106,7 @@ export interface MaskedCamera {
     /** Let go of the canvas, the model and the loop. The camera itself is the
      *  caller's to stop: this only undoes what it built. */
     readonly stop: () => Promise<void>;
-    /** Which background is running. */
+    /** Which background is running - "off" when only the look is. */
     readonly using: CameraBackground;
     /**
      * Why there is no masked track, or null when nothing went wrong.
@@ -101,21 +122,32 @@ export interface MaskedCamera {
 /**
  * Build the pipeline, or answer null.
  *
- * Null means there was nothing to do: no background was asked for, or this is
- * not a browser. Anything else comes back as a `MaskedCamera`, whose `track` is
- * null when it could not be built and whose `problem` then says why.
+ * Null means there was nothing to do: no background and no look was asked for,
+ * or this is not a browser. Anything else comes back as a `MaskedCamera`, whose
+ * `track` is null when it could not be built and whose `problem` then says why.
+ *
+ * Two passes, each only when it is wanted. The background is composited onto a
+ * stage exactly as it always was; the look - light, colour, framing - is then
+ * one more draw of that stage onto what is sent, through a canvas filter and a
+ * crop. With no look the stage is what is sent and the second pass does not
+ * exist, so a background alone costs what it cost before.
  */
 export async function maskCamera(
     track: MediaStreamTrack,
-    background: CameraBackground,
-    image: string | null = backgroundImage()
+    asked: CameraBackground,
+    image: string | null = backgroundImage(),
+    look: CameraLook = cameraLook()
 ): Promise<MaskedCamera | null> {
-    if (background === "off") return null;
     if (typeof window === "undefined" || typeof document === "undefined") return null;
     // A picture that is not there is not a background. Nothing is said about it
     // because nothing can be: the setting is only reachable from a menu that
     // offers it after a picture has been chosen.
-    if (background === "image" && !image) return null;
+    const background: CameraBackground = asked === "image" && !image ? "off" : asked;
+    const finishing = !lookIsPlain(look);
+    if (background === "off" && !finishing) return null;
+    // The model is what says where the person is: the background needs it to
+    // cut them out, framing to follow them. Light and colour need nothing.
+    const segmenting = background !== "off" || look.frame === "auto";
 
     const video = document.createElement("video");
     video.autoplay = true;
@@ -130,12 +162,31 @@ export async function maskCamera(
     const canvas = document.createElement("canvas");
     const context = canvas.getContext("2d");
     if (!context) return refusal(background, "This browser has no canvas to draw on.");
+    // Where the background is composited. The canvas that is sent when there is
+    // no look to apply after it.
+    const stage = finishing ? document.createElement("canvas") : canvas;
+    const staging = finishing ? stage.getContext("2d") : context;
+    // A few dozen pixels, read back for the two measurements the look makes:
+    // how bright the picture is, and where the person is in it.
+    const sample = finishing ? document.createElement("canvas") : null;
+    const sampling = sample?.getContext("2d", { willReadFrequently: true }) ?? null;
+    if (!staging || (finishing && !sampling)) {
+        return refusal(background, "This browser has no canvas to draw on.");
+    }
+    if (sample) {
+        sample.width = SAMPLE_WIDTH;
+        sample.height = SAMPLE_HEIGHT;
+    }
 
     let picture: HTMLImageElement | null = null;
     let segmenter: Segmenter | null = null;
     let ticker: Worker | null = null;
     let stopped = false;
     let failures = 0;
+    let frames = 0;
+    let gain = 1;
+    let crop: FrameBox = WHOLE_FRAME;
+    let aim: FrameBox = WHOLE_FRAME;
 
     /** Everything built here, undone in the order it was built. */
     const teardown = async (): Promise<void> => {
@@ -156,27 +207,38 @@ export async function maskCamera(
         }
         await within(START_TIMEOUT, firstFrame(video));
 
-        const Segmentation = await within(START_TIMEOUT, loader());
-        segmenter = new Segmentation({ locateFile: (file) => `${ASSETS}/${file}` });
-        // The landscape model - the wider, cheaper of the two, and the one a
-        // call is shaped like.
-        segmenter.setOptions({ modelSelection: 1, selfieMode: false });
-        segmenter.onResults(draw);
-        await within(START_TIMEOUT, segmenter.initialize());
-        // The first frame, before this returns, and it is not a formality.
-        //
-        // `initialize` resolves in about a tenth of a second and leaves the real
-        // work - instantiating the wasm, building the graph, compiling the
-        // shaders - to the first frame that goes through it. Measured in Chrome
-        // on this model: one task of 1.1 to 1.4 seconds that holds the main
-        // thread, and 69ms for every switch-on after it in the same tab. Held
-        // here, that second is inside the caller's `await`, where a screen has
-        // already said it is starting; left where it was, it landed on whatever
-        // the page was doing and read as the picture freezing.
-        await within(START_TIMEOUT, segmenter.send({ image: video }));
+        if (segmenting) {
+            const Segmentation = await within(START_TIMEOUT, loader());
+            segmenter = new Segmentation({ locateFile: (file) => `${ASSETS}/${file}` });
+            // The landscape model - the wider, cheaper of the two, and the one a
+            // call is shaped like.
+            segmenter.setOptions({ modelSelection: 1, selfieMode: false });
+            segmenter.onResults(draw);
+            await within(START_TIMEOUT, segmenter.initialize());
+            // The first frame, before this returns, and it is not a formality.
+            //
+            // `initialize` resolves in about a tenth of a second and leaves the
+            // real work - instantiating the wasm, building the graph, compiling
+            // the shaders - to the first frame that goes through it. Measured in
+            // Chrome on this model: one task of 1.1 to 1.4 seconds that holds
+            // the main thread, and 69ms for every switch-on after it in the same
+            // tab. Held here, that second is inside the caller's `await`, where a
+            // screen has already said it is starting; left where it was, it
+            // landed on whatever the page was doing and read as the picture
+            // freezing.
+            await within(START_TIMEOUT, segmenter.send({ image: video }));
+        }
     } catch (caught) {
         await teardown();
         return refusal(background, reasonOf(caught));
+    }
+
+    /** Size a canvas to the camera, which can change shape mid-call. */
+    function fit(target: HTMLCanvasElement, width: number, height: number): void {
+        if (target.width !== width || target.height !== height) {
+            target.width = width;
+            target.height = height;
+        }
     }
 
     /**
@@ -188,36 +250,41 @@ export async function maskCamera(
      * operations and no pixel is ever read back into JavaScript.
      */
     function draw(results: SegmenterResults): void {
-        if (stopped || !context) return;
+        if (stopped || !staging) return;
         const width = video.videoWidth;
         const height = video.videoHeight;
         if (!width || !height) return;
-        if (canvas.width !== width || canvas.height !== height) {
-            canvas.width = width;
-            canvas.height = height;
+
+        if (look.frame === "auto" && frames % MEASURE_EVERY === 0) {
+            aim = frameFor(measurePerson(results.segmentationMask));
+        }
+        if (background === "off") {
+            finish(results.image, width, height);
+            return;
         }
 
+        fit(stage, width, height);
         const blur = BLUR_PIXELS[background === "strong" ? "strong" : "blur"];
 
-        context.globalCompositeOperation = "copy";
-        context.filter = `blur(${picture ? EDGE_OVER_IMAGE : EDGE_OVER_BLUR}px)`;
-        context.drawImage(results.segmentationMask, 0, 0, width, height);
+        staging.globalCompositeOperation = "copy";
+        staging.filter = `blur(${picture ? EDGE_OVER_IMAGE : EDGE_OVER_BLUR}px)`;
+        staging.drawImage(results.segmentationMask, 0, 0, width, height);
 
-        context.globalCompositeOperation = "source-in";
-        context.filter = "none";
-        context.drawImage(results.image, 0, 0, width, height);
+        staging.globalCompositeOperation = "source-in";
+        staging.filter = "none";
+        staging.drawImage(results.image, 0, 0, width, height);
 
-        context.globalCompositeOperation = "destination-over";
+        staging.globalCompositeOperation = "destination-over";
         if (picture) {
-            context.drawImage(picture, 0, 0, width, height);
+            staging.drawImage(picture, 0, 0, width, height);
         } else {
-            context.filter = `blur(${blur}px)`;
+            staging.filter = `blur(${blur}px)`;
             // Drawn larger than the canvas by the width of the blur, which is
             // the difference between a blurred room and a blurred room inside a
             // dark frame: a blur samples past the edge of what it is given, and
             // past the edge of the canvas there is nothing to sample. Pushing
             // the faded border outside the picture costs one multiplication.
-            context.drawImage(
+            staging.drawImage(
                 results.image,
                 -blur * 2,
                 -blur * 2,
@@ -226,8 +293,9 @@ export async function maskCamera(
             );
         }
 
-        context.filter = "none";
-        context.globalCompositeOperation = "source-over";
+        staging.filter = "none";
+        staging.globalCompositeOperation = "source-over";
+        finish(stage, width, height);
     }
 
     /**
@@ -237,22 +305,76 @@ export async function maskCamera(
      * rather than nothing: somebody who turned a background on did so to keep a
      * room out of a call, and quietly handing that room back because an inference
      * failed is the one outcome here that is worse than a worse picture.
+     *
+     * With no background - the model was only there for framing - the picture
+     * goes out uncropped instead, which is what it would be with framing off.
      */
     function drawBlind(): void {
-        if (!context) return;
+        if (!staging) return;
         const width = video.videoWidth;
         const height = video.videoHeight;
         if (!width || !height) return;
-        if (canvas.width !== width || canvas.height !== height) {
-            canvas.width = width;
-            canvas.height = height;
+        aim = WHOLE_FRAME;
+        if (background === "off") {
+            finish(video, width, height);
+            return;
         }
+        fit(stage, width, height);
         const blur = BLUR_PIXELS.strong;
+        staging.globalCompositeOperation = "copy";
+        staging.filter = `blur(${blur}px)`;
+        staging.drawImage(video, -blur * 2, -blur * 2, width + blur * 4, height + blur * 4);
+        staging.filter = "none";
+        staging.globalCompositeOperation = "source-over";
+        finish(stage, width, height);
+    }
+
+    /**
+     * The look: light, colour and framing, as one draw onto what is sent.
+     *
+     * The brightness is measured from a tiny copy of the frame every so often,
+     * and eased towards rather than jumped to, so a lamp switched on is a
+     * picture that settles rather than one that flashes.
+     */
+    function finish(source: CanvasImageSource, width: number, height: number): void {
+        frames += 1;
+        if (!finishing || !context) return;
+        fit(canvas, width, height);
+        if (look.light === "auto" && sampling && frames % MEASURE_EVERY === 1) {
+            sampling.globalCompositeOperation = "copy";
+            sampling.drawImage(source, 0, 0, SAMPLE_WIDTH, SAMPLE_HEIGHT);
+            const wanted = autoGain(meanLuma(sampling.getImageData(0, 0, SAMPLE_WIDTH, SAMPLE_HEIGHT).data));
+            gain += (wanted - gain) * 0.3;
+        }
+        crop = look.frame === "auto" ? followFrame(crop, aim) : WHOLE_FRAME;
         context.globalCompositeOperation = "copy";
-        context.filter = `blur(${blur}px)`;
-        context.drawImage(video, -blur * 2, -blur * 2, width + blur * 4, height + blur * 4);
+        context.filter = lookFilter(look, gain);
+        context.drawImage(
+            source,
+            crop.x * width,
+            crop.y * height,
+            crop.w * width,
+            crop.h * height,
+            0,
+            0,
+            width,
+            height
+        );
         context.filter = "none";
         context.globalCompositeOperation = "source-over";
+    }
+
+    /** Where the person is, from the model's mask, read at a size that costs
+     *  nothing. */
+    function measurePerson(mask: CanvasImageSource): FrameBox | null {
+        if (!sampling) return null;
+        sampling.globalCompositeOperation = "copy";
+        sampling.drawImage(mask, 0, 0, SAMPLE_WIDTH, SAMPLE_HEIGHT);
+        return personBox(
+            sampling.getImageData(0, 0, SAMPLE_WIDTH, SAMPLE_HEIGHT).data,
+            SAMPLE_WIDTH,
+            SAMPLE_HEIGHT
+        );
     }
 
     const settings = track.getSettings();
@@ -272,9 +394,17 @@ export async function maskCamera(
                 ticker?.postMessage(Math.round(1000 / fps));
                 return;
             }
+            if (!segmenter) {
+                // Light and colour only: no model, one draw.
+                const width = video.videoWidth;
+                const height = video.videoHeight;
+                if (width && height) finish(video, width, height);
+                ticker?.postMessage(Math.round(1000 / fps));
+                return;
+            }
             try {
                 if (failures < GIVE_UP) {
-                    await segmenter?.send({ image: video });
+                    await segmenter.send({ image: video });
                     failures = 0;
                 } else {
                     drawBlind();
@@ -304,7 +434,6 @@ export async function maskCamera(
         }
     };
 }
-
 /** A background that was asked for and could not be built. */
 function refusal(background: CameraBackground, problem: string): MaskedCamera {
     return { track: null, using: background, problem, stop: async () => undefined };

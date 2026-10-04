@@ -503,7 +503,7 @@
             "pictureStays": "Una imagen tuya se queda en este navegador y no se envía a ningún sitio.",
             "pictureFailed": "Polaris no ha podido usar esa imagen.",
             "starting": "Iniciando. La primera vez en un ordenador se descarga el modelo.",
-            "failed": "No se ha podido iniciar, así que no hay nada detrás de ti: {problem}",
+            "failed": "No pudo iniciarse, así que no se aplica nada a tu cámara: {problem}",
             "running": "Funcionando. Esto es lo que envía una llamada."
         },
         "input": {

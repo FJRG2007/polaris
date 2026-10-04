@@ -246,6 +246,30 @@
                 "label": "Pulsa y habla",
                 "note": "Tu micrófono está cerrado salvo mientras mantienes pulsada una tecla."
             }
+        },
+        "look": {
+            "title": "Aspecto",
+            "help": "Se aplica en este equipo antes de enviar la imagen. El encuadre usa el modelo de los fondos.",
+            "light": {
+                "title": "Luz",
+                "off": "Tal cual",
+                "auto": "Auto",
+                "bright": "Más clara"
+            },
+            "style": {
+                "title": "Estilo",
+                "none": "Ninguno",
+                "warm": "Cálido",
+                "cool": "Frío",
+                "vivid": "Vivo",
+                "soft": "Suave",
+                "mono": "Blanco y negro"
+            },
+            "frame": {
+                "title": "Encuadre",
+                "off": "No",
+                "auto": "Mantenerme al centro"
+            }
         }
     },
     "channelMenu": {
@@ -366,7 +390,7 @@
         "handsUpLower": "{count, plural, one {Hay # mano levantada} other {Hay # manos levantadas}}. Baja la tuya",
         "handsUpRaise": "{count, plural, one {Hay # mano levantada} other {Hay # manos levantadas}}. Levanta la tuya",
         "deviceSettings": "Ajustes de {device}",
-        "noBackground": "No hay ningún fondo activo. {problem}",
+        "noBackground": "No se aplica nada a tu cámara. {problem}",
         "handUpPlace": "Mano levantada, {place} en la cola",
         "watchNamed": "Ver {name}",
         "devices": {
