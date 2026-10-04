@@ -1117,7 +1117,7 @@
         "replaceToBin": "Replace: the current file moves to the trash, where you can restore it.",
         "replaceForGood": "Replace: this location has no trash, so the current file is overwritten for good.",
         "mergeHint": "Merge: the contents end up in one folder. You're asked about any file that is in both.",
-        "keepBothHint": "Keep both: the new one gets a number, like \"{name}\".",
+        "keepBothHint": "Keep both: the new one gets a number after its name.",
         "alsoTaken": "Also taken ({count}):",
         "applyToAll": "Do this for all {count} items",
         "blocked": {

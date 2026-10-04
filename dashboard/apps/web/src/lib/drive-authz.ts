@@ -349,6 +349,35 @@ export async function drivePathFilter(
 }
 
 /**
+ * Why a user may not perform a Drive verb on each of many paths - "permission",
+ * "locked" - or null when they may: `authorizeDrive`'s answer per path, with the
+ * reader resolved and the locks read once for the whole list.
+ */
+export async function drivePathRefusal(
+    userId: string,
+    connectionId: string,
+    action: DriveAction
+): Promise<(path: string) => Promise<"permission" | "locked" | null>> {
+    let check: PathCheck;
+    try {
+        check = await resolveReader(userId, connectionId, action);
+    } catch (caught) {
+        if (caught instanceof DriveAccessError) return async () => "permission";
+        throw caught;
+    }
+    const gate = await lockGate(userId, connectionId);
+    return async (path) => {
+        try {
+            await checkPath(check, userId, connectionId, path, action);
+        } catch (caught) {
+            if (caught instanceof DriveAccessError) return "permission";
+            throw caught;
+        }
+        return gate(path) ? "locked" : null;
+    };
+}
+
+/**
  * Assert a user may perform a Drive verb on a path, throwing DriveAccessError or
  * DriveLockedError otherwise. Pass `skipLock` for lock-management operations,
  * which must run even while the path is locked.

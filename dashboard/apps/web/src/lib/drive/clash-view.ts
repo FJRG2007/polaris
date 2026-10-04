@@ -45,7 +45,8 @@ export async function assertMayReplace(
  * The view of one clash. `path` is the arrival's path relative to `base`, the
  * folder it was sent to, which is how the screen knows it. `merge` says whether
  * a folder arriving onto a folder may be merged into it (an upload) or not (a
- * move or copy, which keeps both instead).
+ * move or copy, which keeps both instead). `refusal` answers `replaceRefusal`
+ * for the item there; pass one from `drivePathRefusal` when viewing many clashes.
  */
 export async function clashView(
     userId: string,
@@ -53,14 +54,16 @@ export async function clashView(
     base: string,
     clash: Clash,
     incomingKind: "file" | "dir",
-    merge = true
+    merge = true,
+    refusal: (existingPath: string) => Promise<ReplaceBlocked | null> = (existingPath) =>
+        replaceRefusal(userId, connectionId, existingPath)
 ): Promise<ClashView> {
     const blocked: ReplaceBlocked | null =
         clash.existingKind !== incomingKind
             ? "kind"
             : incomingKind === "dir" && !merge
               ? "merge"
-              : await replaceRefusal(userId, connectionId, clash.existingPath);
+              : await refusal(clash.existingPath);
     return {
         path:
             base && clash.path.startsWith(`${base}/`)

@@ -115,13 +115,19 @@ export async function findClashes(
     return clashes;
 }
 
-/** The clash for one path, or null when its name is free. */
+/**
+ * The clash for one path, or null when its name is free. The stat answers the
+ * exact name for the price of one call - the usual case when a replace is
+ * settled under the lock - and the folder is only read when it misses, to find
+ * the same name in another case. A storage that matches names its own way (or
+ * a listing that hides an entry) still cannot have a file written over without
+ * anyone being asked.
+ */
 export async function findClash(driver: StorageDriver, path: string): Promise<Clash | null> {
+    const exact = await statClash(driver, path);
+    if (exact) return exact;
     const [clash] = await findClashes(driver, [path]);
-    // The listing is the comparison; the stat is the guarantee. A storage that
-    // matches names its own way (or a listing that hides an entry) still cannot
-    // have a file written over without anyone being asked.
-    return clash ?? (await statClash(driver, path));
+    return clash ?? null;
 }
 
 /**

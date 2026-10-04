@@ -11,7 +11,6 @@
 
 import { useState } from "react";
 import { File, Folder } from "lucide-react";
-import { baseName, withCopyNumber } from "@polaris/core";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { choicesFor, decide, startQueue, type ConflictQueue } from "./conflict-queue";
 import type { ClashView, ConflictChoice, ReplaceBlocked } from "@/lib/drive/conflict-types";
@@ -137,11 +136,7 @@ function ConflictBody({
                     </li>
                 ) : null}
                 {choices.includes("merge") ? <li>{t("conflicts.mergeHint")}</li> : null}
-                <li className="break-words">
-                    {t("conflicts.keepBothHint", {
-                        name: withCopyNumber(baseName(current.path), 1)
-                    })}
-                </li>
+                <li>{t("conflicts.keepBothHint")}</li>
                 {current.replaceBlocked ? (
                     <li>
                         {t(BLOCKED_KEYS[current.replaceBlocked], {

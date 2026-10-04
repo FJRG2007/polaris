@@ -17,9 +17,22 @@ import {
     fileNameSchema,
     saveFileBytes,
     siblingNames,
-    withExtension
+    withExtension,
+    type NameProblem
 } from "./save";
 import type { EditorExport, ViewerTarget } from "./types";
+
+const NAME_PROBLEMS: readonly string[] = [
+    "nameEmpty",
+    "nameTooLong",
+    "nameIllegalChars",
+    "nameInvalid"
+] satisfies NameProblem[];
+
+/** The `NameProblem` a name issue carries, read defensively from zod's message. */
+function nameProblem(message: string | undefined): NameProblem {
+    return message && NAME_PROBLEMS.includes(message) ? (message as NameProblem) : "nameInvalid";
+}
 
 export function EditorActions({
     target,
@@ -52,12 +65,10 @@ export function EditorActions({
         setBusy("save");
         setError(null);
         const blob = await exportAs(target.name).catch(() => null);
-        const message = blob
-            ? await saveFileBytes(target, target.name, blob)
-            : "Could not prepare this file.";
+        const problem = blob ? await saveFileBytes(target, target.name, blob) : "prepareFailed";
         setBusy(null);
-        if (message) {
-            setError(message);
+        if (problem) {
+            setError(t(`editorActions.problems.${problem}`));
             return;
         }
         onSaved?.(target.name);
@@ -69,7 +80,7 @@ export function EditorActions({
         const blob = await exportAs(exportName).catch(() => null);
         setBusy(null);
         if (!blob) {
-            setError("Could not prepare this file.");
+            setError(t("editorActions.problems.prepareFailed"));
             return;
         }
         downloadBytes(blob, exportName);
@@ -147,7 +158,7 @@ function SaveCopyDialog({
     const parsed = fileNameSchema.safeParse(name);
     const problem = parsed.success
         ? null
-        : (parsed.error.issues[0]?.message ?? "That name is not valid");
+        : t(`editorActions.problems.${nameProblem(parsed.error.issues[0]?.message)}`);
     const replaces = parsed.success && taken.has(parsed.data.toLowerCase());
 
     async function submit(event: React.FormEvent) {
@@ -156,12 +167,12 @@ function SaveCopyDialog({
         setSaving(true);
         setError(null);
         const blob = await exportAs(parsed.data).catch(() => null);
-        const message = blob
+        const failed = blob
             ? await saveFileBytes(target, parsed.data, blob, replaces ? "replace" : "fail")
-            : "Could not prepare this file.";
+            : "prepareFailed";
         setSaving(false);
-        if (message) {
-            setError(message);
+        if (failed) {
+            setError(t(`editorActions.problems.${failed}`));
             return;
         }
         onOpenChange(false);
@@ -203,7 +214,11 @@ function SaveCopyDialog({
                             {t("editorActions.cancel")}
                         </Button>
                         <Button type="submit" size="sm" disabled={!parsed.success || saving}>
-                            {saving ? t("editorActions.saving") : replaces ? t("editorActions.replace") : t("editorActions.saveCopy")}
+                            {saving
+                                ? t("editorActions.saving")
+                                : replaces
+                                  ? t("editorActions.replace")
+                                  : t("editorActions.saveCopy")}
                         </Button>
                     </div>
                 </form>

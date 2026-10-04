@@ -12,6 +12,9 @@ import { memoryDriver, type MemoryDriver } from "./fixtures/memory-driver";
 
 const authorizeDrive = vi.fn();
 const getDriverForConnection = vi.fn();
+const readable = vi.fn();
+const refusal = vi.fn();
+const drivePathRefusal = vi.fn();
 
 vi.mock("@/lib/session", () => ({ requireUser: async () => ({ id: "user-1" }) }));
 vi.mock("@/lib/i18n/request", () => ({ getTranslations: async () => (key: string) => key }));
@@ -21,7 +24,8 @@ vi.mock("@/lib/drive-authz", () => ({
     DriveAccessError: class DriveAccessError extends Error {},
     DriveLockedError: class DriveLockedError extends Error {},
     authorizeDrive,
-    drivePathFilter: async () => async () => true
+    drivePathFilter: async () => readable,
+    drivePathRefusal
 }));
 
 const actions = await import("../../src/app/(app)/drive/conflict-actions");
@@ -32,6 +36,9 @@ let storage: MemoryDriver;
 beforeEach(() => {
     vi.clearAllMocks();
     authorizeDrive.mockResolvedValue(undefined);
+    readable.mockResolvedValue(true);
+    refusal.mockResolvedValue(null);
+    drivePathRefusal.mockResolvedValue(refusal);
     storage = memoryDriver({
         files: { "docs/a.txt": "1", "docs/album/x.jpg": "2", "docs/locked.txt": "3" },
         dirs: ["docs", "docs/album"]
@@ -59,13 +66,35 @@ describe("checking a folder for names already taken", () => {
     });
 
     it("withholds Replace from a file the person may not change, saying why", async () => {
-        authorizeDrive.mockImplementation(async (_user: string, _conn: string, path: string) => {
-            if (path === "docs/locked.txt") throw new authz.DriveAccessError();
-        });
+        refusal.mockImplementation(async (path: string) =>
+            path === "docs/locked.txt" ? "permission" : null
+        );
         const answer = await clashes([{ path: "locked.txt", kind: "file" }]);
         expect(answer).toEqual({
             clashes: [expect.objectContaining({ canReplace: false, replaceBlocked: "permission" })]
         });
+    });
+
+    it("asks about access once per folder and once for every clash, not per entry", async () => {
+        await clashes([
+            { path: "a.txt", kind: "file" },
+            { path: "locked.txt", kind: "file" },
+            { path: "free.txt", kind: "file" },
+            { path: "album/x.jpg", kind: "file" },
+            { path: "album/y.jpg", kind: "file" }
+        ]);
+        expect(readable.mock.calls.map(([path]) => path)).toEqual(["docs", "docs/album"]);
+        expect(drivePathRefusal).toHaveBeenCalledTimes(1);
+        expect(refusal).toHaveBeenCalledTimes(3);
+    });
+
+    it("leaves out what lands in a folder the person may not read", async () => {
+        readable.mockImplementation(async (path: string) => path !== "docs/album");
+        const answer = await clashes([
+            { path: "a.txt", kind: "file" },
+            { path: "album/x.jpg", kind: "file" }
+        ]);
+        expect(answer).toEqual({ clashes: [expect.objectContaining({ path: "a.txt" })] });
     });
 
     it("does not offer to merge a folder that is being moved or copied", async () => {

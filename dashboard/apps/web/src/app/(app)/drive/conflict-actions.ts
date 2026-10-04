@@ -19,7 +19,8 @@ import {
     authorizeDrive,
     DriveAccessError,
     DriveLockedError,
-    drivePathFilter
+    drivePathFilter,
+    drivePathRefusal
 } from "@/lib/drive-authz";
 
 const clashQuerySchema = z.object({
@@ -75,9 +76,16 @@ export async function nameClashesAction(
     // A folder inside this one that the person may not read is not listed for
     // them; the write into it is refused on its own terms.
     const readable = await drivePathFilter(user.id, connectionId, "read");
+    const readableFolders = new Map<string, boolean>();
     const visible: typeof paths = [];
     for (const entry of paths) {
-        if (await readable(parentPath(entry.path))) visible.push(entry);
+        const parent = parentPath(entry.path);
+        let allowed = readableFolders.get(parent);
+        if (allowed === undefined) {
+            allowed = await readable(parent);
+            readableFolders.set(parent, allowed);
+        }
+        if (allowed) visible.push(entry);
     }
     const kinds = new Map(visible.map((entry) => [entry.path, entry.kind]));
     let driver;
@@ -92,6 +100,7 @@ export async function nameClashesAction(
             driver,
             visible.map((entry) => entry.path)
         );
+        const refusal = await drivePathRefusal(user.id, connectionId, "write");
         const views: ClashView[] = [];
         for (const clash of clashes) {
             views.push(
@@ -101,7 +110,8 @@ export async function nameClashesAction(
                     folder,
                     clash,
                     kinds.get(clash.path) ?? "file",
-                    merge
+                    merge,
+                    refusal
                 )
             );
         }

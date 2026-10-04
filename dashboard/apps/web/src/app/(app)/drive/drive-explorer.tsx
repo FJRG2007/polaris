@@ -512,22 +512,6 @@ export function DriveExplorer({
             if (!answers) return null;
             for (const [key, choice] of answers) decisions.set(key, choice);
         }
-        // "Keep both" on a folder: the folder is made under its new name now, so
-        // every file of it goes there instead of into the one already here.
-        const renamed = new Map<string, string>();
-        for (const clash of clashes) {
-            if (clash.incomingKind !== "dir" || decisions.get(clash.path) !== "keepBoth") continue;
-            const made = await conflictActions.reserveFolderAction({
-                connectionId,
-                folder: path,
-                name: clash.path
-            });
-            if (made.error !== undefined) {
-                setOpError(made.error);
-                return null;
-            }
-            renamed.set(clash.path, made.name);
-        }
         // "Merge": what is inside both folders is a question of its own.
         const merged = new Set(
             clashes
@@ -545,6 +529,22 @@ export function DriveExplorer({
                 if (!answers) return null;
                 for (const [key, choice] of answers) decisions.set(key, choice);
             }
+        }
+        // "Keep both" on a folder: the folder is made under its new name, so
+        // every file of it goes there instead of into the one already here.
+        const renamed = new Map<string, string>();
+        for (const clash of clashes) {
+            if (clash.incomingKind !== "dir" || decisions.get(clash.path) !== "keepBoth") continue;
+            const made = await conflictActions.reserveFolderAction({
+                connectionId,
+                folder: path,
+                name: clash.path
+            });
+            if (made.error !== undefined) {
+                setOpError(made.error);
+                return null;
+            }
+            renamed.set(clash.path, made.name);
         }
         return planUploads(items, decisions, renamed);
     }

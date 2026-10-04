@@ -154,7 +154,19 @@
         "aFileWithThisName": "Ya hay aquí un archivo con este nombre y se sustituirá.",
         "cancel": "Cancelar",
         "replace": "Sustituir",
-        "saveCopy": "Guardar"
+        "saveCopy": "Guardar",
+        "problems": {
+            "unavailable": "Este archivo no se puede guardar desde aquí.",
+            "denied": "No se pudo guardar; puede que no tengas permiso de escritura aquí.",
+            "locked": "Este archivo está bloqueado.",
+            "nameTaken": "Acaban de añadir aquí un archivo con ese nombre. Elige otro nombre.",
+            "failed": "No se pudo guardar este archivo.",
+            "prepareFailed": "No se pudo preparar este archivo.",
+            "nameEmpty": "Pon un nombre",
+            "nameTooLong": "Nombre muy largo",
+            "nameIllegalChars": "Un nombre no puede contener \\ / : * ? \" < > |",
+            "nameInvalid": "Ese nombre no es válido"
+        }
     },
     "find": {
         "findInThisFile": "Buscar en este archivo",

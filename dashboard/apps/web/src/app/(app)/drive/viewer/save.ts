@@ -21,15 +21,24 @@ function hasControlChar(value: string): boolean {
     return false;
 }
 
-/** A single file name (no path separators), validated the same way on every editor. */
+/** Why a file name was refused, as a key under `driveViewer.editorActions.problems`. */
+export type NameProblem = "nameEmpty" | "nameTooLong" | "nameIllegalChars" | "nameInvalid";
+
+/** Why a save did not happen, as a key under `driveViewer.editorActions.problems`. */
+export type SaveProblem = "unavailable" | "denied" | "locked" | "nameTaken" | "failed";
+
+/**
+ * A single file name (no path separators), validated the same way on every
+ * editor. Each issue's message is a `NameProblem`, translated where it is shown.
+ */
 export const fileNameSchema = z
     .string()
     .trim()
-    .min(1, "Enter a file name")
-    .max(255, "That name is too long")
-    .refine((name) => !ILLEGAL_NAME_CHARS.test(name), 'A name cannot contain \\ / : * ? " < > |')
-    .refine((name) => !hasControlChar(name), "That name is not valid")
-    .refine((name) => name !== "." && name !== "..", "That name is not valid");
+    .min(1, "nameEmpty" satisfies NameProblem)
+    .max(255, "nameTooLong" satisfies NameProblem)
+    .refine((name) => !ILLEGAL_NAME_CHARS.test(name), "nameIllegalChars" satisfies NameProblem)
+    .refine((name) => !hasControlChar(name), "nameInvalid" satisfies NameProblem)
+    .refine((name) => name !== "." && name !== "..", "nameInvalid" satisfies NameProblem);
 
 /** Split a file name into its base and its dot-prefixed extension ("" when none). */
 function splitName(name: string): { base: string; extension: string } {
@@ -58,15 +67,15 @@ export function withExtension(name: string, extension: string): string {
  * file already holding the name: `overwrite` for the file being saved in place,
  * `replace` (old one to the bin) for a copy the person agreed may replace one,
  * and `fail` for a copy under a name they were told is free.
- * Returns a human-readable error, or null on success.
+ * Returns why it did not save, or null on success.
  */
 export async function saveFileBytes(
     target: ViewerTarget,
     name: string,
     body: Blob,
     conflict: "overwrite" | "replace" | "fail" = "overwrite"
-): Promise<string | null> {
-    if (!target.connectionId) return "This file cannot be saved from here.";
+): Promise<SaveProblem | null> {
+    if (!target.connectionId) return "unavailable";
     const query = new URLSearchParams({ c: target.connectionId, name, conflict });
     const parent = parentPath(target.path);
     if (parent) query.set("p", parent);
@@ -75,12 +84,12 @@ export async function saveFileBytes(
         // somebody watches, and this is the one that reports how far it has got.
         const sent = await sendFile(`/api/drive/upload?${query.toString()}`, body, { name });
         if (sent.ok) return null;
-        if (sent.status === 403) return "Could not save - you may not have write access here.";
-        if (sent.status === 423) return "This file is locked.";
-        if (sent.status === 409) return "A file with that name was just added here. Pick another name.";
-        return "Could not save this file.";
+        if (sent.status === 403) return "denied";
+        if (sent.status === 423) return "locked";
+        if (sent.status === 409) return "nameTaken";
+        return "failed";
     } catch {
-        return "Could not save this file.";
+        return "failed";
     }
 }
 
