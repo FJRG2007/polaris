@@ -707,7 +707,8 @@ dialog.pdfSlick-dialog .dialogButton {
 [data-service-panel] :is(input, textarea, button).bg-field:not([aria-invalid="true"]):hover,
 [data-service-panel] :is(input, textarea, button).bg-field:not([aria-invalid="true"]):focus,
 [data-service-panel] :is(input, textarea, button).bg-field:not([aria-invalid="true"]):focus-within,
-[data-service-panel] :is(input, textarea, button).bg-field:not([aria-invalid="true"])[data-state="open"] {
+[data-service-panel]
+    :is(input, textarea, button).bg-field:not([aria-invalid="true"])[data-state="open"] {
     border-color: hsl(var(--muted-foreground));
 }
 
