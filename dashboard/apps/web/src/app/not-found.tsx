@@ -31,7 +31,7 @@ export default function NotFound() {
     const t = useTranslations("common");
 
     return (
-        <main className="flex min-h-screen items-center justify-center p-6">
+        <main className="flex min-h-dvh items-center justify-center p-6">
             <div className="flex w-full max-w-md flex-col gap-4 rounded-lg border border-border bg-surface p-6">
                 <div className="flex flex-col gap-1">
                     <p className="font-mono text-xs text-muted-foreground">404</p>

@@ -30,7 +30,7 @@ import { readerWords } from "@/lib/i18n/reader-words";
 export async function PublicChrome({ children, className }: { children: ReactNode; className?: string }) {
     const t = await readerWords("components");
     return (
-        <div className="flex min-h-screen flex-col bg-background">
+        <div className="flex min-h-dvh flex-col bg-background">
             {/* Deliberately the signed-in header's own measurements. A public
                 page an inch shorter in the bar is the kind of difference nobody
                 can name and everybody notices. */}

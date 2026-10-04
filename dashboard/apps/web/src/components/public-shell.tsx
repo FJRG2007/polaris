@@ -27,7 +27,7 @@ export function PublicShell({
 }) {
     const t = useTranslations("components");
     return (
-        <div className={cn("mx-auto flex min-h-screen max-w-2xl flex-col gap-4 p-6", className)}>
+        <div className={cn("mx-auto flex min-h-dvh max-w-2xl flex-col gap-4 p-6", className)}>
             <header className="flex items-center justify-between gap-2">
                 {/* The mark carries the name itself. It used to be drawn beside
                     a second "Polaris" inside a 24px box, so the word was printed

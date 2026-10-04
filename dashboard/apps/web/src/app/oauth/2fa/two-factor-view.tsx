@@ -112,7 +112,7 @@ export function TwoFactorView({ options }: { options: ChallengeOptions }) {
     }
 
     return (
-        <main className="grid min-h-screen place-items-center p-4">
+        <main className="grid min-h-dvh place-items-center p-4">
             <Card className="w-full max-w-sm">
                 <CardHeader className="items-center">
                     <PolarisMark className="mb-1" />

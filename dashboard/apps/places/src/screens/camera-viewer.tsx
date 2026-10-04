@@ -401,7 +401,7 @@ export function CameraViewer({
         else void frame.current?.requestFullscreen().catch(() => setFull(false));
     };
 
-    const surface = full ? "h-screen object-contain" : "aspect-video object-contain";
+    const surface = full ? "h-dvh object-contain" : "aspect-video object-contain";
 
     return (
         <Dialog open onOpenChange={(open) => !open && onClose()}>

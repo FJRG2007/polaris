@@ -60,7 +60,7 @@ export default function GlobalError({
     return (
         <html lang="en" suppressHydrationWarning>
             <body>
-                <div className="flex min-h-screen items-center justify-center p-6">
+                <div className="flex min-h-dvh items-center justify-center p-6">
                     <div className="flex max-w-md flex-col gap-4 rounded-lg border border-border bg-surface p-6">
                         <div className="flex flex-col gap-1">
                             <h1 className="text-sm font-medium">

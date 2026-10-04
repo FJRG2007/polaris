@@ -34,7 +34,7 @@ export function AppShell({
     children: ReactNode;
 }) {
     return (
-        <div className="relative flex min-h-screen flex-col bg-background">
+        <div className="relative flex min-h-dvh flex-col bg-background">
             <header className="sticky top-0 z-40 flex h-header shrink-0 items-center justify-between gap-2 border-b border-border bg-surface px-3 sm:gap-4 sm:px-4">
                 <div className="flex min-w-0 items-center gap-1.5 sm:gap-3">
                     {navButton}
