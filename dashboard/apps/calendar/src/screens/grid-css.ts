@@ -53,6 +53,11 @@ export const GRID_CSS = `
 .pc-grid .fc .fc-daygrid-dot-event .fc-event-title { font-weight: 500; }
 .pc-grid .fc .fc-list { border-color: hsl(var(--border)); }
 .pc-grid .fc .fc-list-empty { background: transparent; color: hsl(var(--muted-foreground)); }
+/* The month's weeks are all one height (month-rows.ts): a day's events are laid
+   over its cell instead of sizing the week, and every week is at least as high
+   as the busiest day needs. */
+.pc-grid .fc .fc-dayGridMonth-view .fc-daygrid-day-events { position: absolute; left: 0; right: 0; min-height: 0; }
+.pc-grid .fc .fc-dayGridMonth-view .fc-daygrid-body tbody > tr { height: var(--pc-week-min, auto); }
 .pc-grid .fc .fc-multimonth { border-color: hsl(var(--border)); }
 .pc-grid .fc .fc-multimonth-title { font-size: 0.8125rem; font-weight: 600; }
 .pc-grid .fc .fc-highlight { background: var(--fc-highlight-color); }

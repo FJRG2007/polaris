@@ -25,9 +25,10 @@ import * as time from "./time";
 import { GRID_CSS } from "./grid-css";
 import listPlugin from "@fullcalendar/list";
 import { KEYBOARD_CELLS } from "./grid-target";
+import { measureMonth, monthDayLimit, type MonthRoom } from "./month-rows";
 import FullCalendar from "@fullcalendar/react";
 import dayGridPlugin from "@fullcalendar/daygrid";
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import timeGridPlugin from "@fullcalendar/timegrid";
 import multiMonthPlugin from "@fullcalendar/multimonth";
 import interactionPlugin from "@fullcalendar/interaction";
@@ -272,6 +273,9 @@ export default function GridView(props: GridViewProps) {
 
     const views = useMemo(
         () => ({
+            // Only the weeks of the month, as Google draws it: five most months,
+            // each taller for it. (The range read is still six weeks.)
+            dayGridMonth: { fixedWeekCount: false },
             timeGridDays: { type: "timeGrid", duration: { days: props.customDays } },
             listRange: { type: "list", duration: { days: time.LIST_DAYS } }
         }),
@@ -303,8 +307,53 @@ export default function GridView(props: GridViewProps) {
         return props.dimPast && todayShown ? [...drawn, elapsedToday(today, nowWall)] : drawn;
     }, [props.events, props.selectedId, props.dimPast, todayShown, today, nowWall]);
 
+    // Every week of the month the same height (see month-rows.ts): read again
+    // once the events are drawn, when the limit or the window changes, and when
+    // the grid is resized.
+    const month = props.view === "month";
+    const [room, setRoom] = useState<MonthRoom | null>(null);
+    useEffect(() => {
+        const element = root.current;
+        if (!month || !element) return;
+        let outer = 0;
+        let inner = 0;
+        const read = () => {
+            cancelAnimationFrame(outer);
+            cancelAnimationFrame(inner);
+            // Two frames: FullCalendar places the events after it has measured them.
+            outer = requestAnimationFrame(() => {
+                inner = requestAnimationFrame(() => {
+                    const next = measureMonth(element);
+                    if (!next) return;
+                    setRoom((current) =>
+                        current?.fit === next.fit && current.tallest === next.tallest
+                            ? current
+                            : next
+                    );
+                });
+            });
+        };
+        read();
+        const observer = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(read);
+        observer?.observe(element);
+        return () => {
+            cancelAnimationFrame(outer);
+            cancelAnimationFrame(inner);
+            observer?.disconnect();
+        };
+    }, [month, events, props.eventLimit, props.anchor, props.showWeekends, room?.fit]);
+    // Only with no limit: a limit is already capped to what an equal share holds.
+    const weekFloor =
+        month && room && props.eventLimit === 0
+            ? ({ "--pc-week-min": `${room.tallest}px` } as CSSProperties)
+            : undefined;
+
     return (
-        <div ref={root} className={`pc-grid h-full min-h-0${props.dimPast ? " pc-dim-past" : ""}`}>
+        <div
+            ref={root}
+            className={`pc-grid h-full min-h-0${props.dimPast ? " pc-dim-past" : ""}`}
+            style={weekFloor}
+        >
             <style>{GRID_CSS}</style>
             <FullCalendar
                 ref={calendar}
@@ -415,7 +464,13 @@ export default function GridView(props: GridViewProps) {
                         <span className="pc-now-time">{hourFormat.format(arg.date)}</span>
                     ) : null
                 }
-                dayMaxEvents={props.eventLimit === 0 ? false : props.eventLimit}
+                dayMaxEvents={
+                    month
+                        ? monthDayLimit(props.eventLimit, room?.fit ?? null)
+                        : props.eventLimit === 0
+                          ? false
+                          : props.eventLimit
+                }
                 businessHours={props.businessHours.length > 0 ? props.businessHours : false}
                 nowIndicator
                 editable

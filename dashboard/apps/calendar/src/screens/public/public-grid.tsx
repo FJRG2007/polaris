@@ -54,7 +54,11 @@ export default function PublicGrid(props: PublicGridProps) {
                 plugins={[dayGridPlugin, timeGridPlugin, listPlugin]}
                 initialView={fcView}
                 initialDate={props.anchor}
-                views={{ listRange: { type: "list", duration: { days: props.listDays } } }}
+                views={{
+                    // Only the month's own weeks, as the calendar itself draws them.
+                    dayGridMonth: { fixedWeekCount: false },
+                    listRange: { type: "list", duration: { days: props.listDays } }
+                }}
                 timeZone="UTC"
                 now={props.now}
                 locale={{
@@ -69,6 +73,7 @@ export default function PublicGrid(props: PublicGridProps) {
                 firstDay={props.firstDay}
                 headerToolbar={false}
                 height="100%"
+                // As many as fit: every week the same height, the rest behind "+N more".
                 dayMaxEvents
                 nowIndicator
                 scrollTime="08:00:00"
