@@ -140,6 +140,16 @@ connected, what it may do, and when it was last used. **Disconnect** stops it at
 once: every token it holds is ended, and it has to be connected again through
 the consent screen.
 
+Connecting an assistant raises the same security alert as creating an API key,
+and so does a connection Polaris ends on its own because one of its tokens was
+presented twice - which means somebody else held it. Both open **Account > API
+keys**.
+
+If you go through the consent screen again for an app you already connected and
+untick a permission, every token it holds - including ones already issued - is
+cut down to what you ticked the next time it is used or refreshed, not only on
+its next new token.
+
 If you are removed from a role, your assistants lose what that role gave them on
 their next call.
 

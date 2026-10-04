@@ -38,6 +38,12 @@ where copies of keys are kept outside the instance, and the organization's own p
 - **Project access** gives a person a set of capabilities on one project, optionally for
   some environments only and until a date. **Project tokens** reach one project and
   nothing else.
+- **Connected AI assistants**: a third-party MCP client (Claude, ChatGPT, Cursor, VS
+  Code and others) reaches a person's own account over OAuth 2.1, scoped to the
+  permissions they tick on Polaris's own consent screen and cut down live if they
+  reconnect with fewer. Connecting one, and a connection Polaris ends itself because a
+  token was presented twice, both raise the same security alert a new API key does
+  (Account > API keys).
 - **Firewall** rules sit in front of every service and in front of Polaris itself:
   managed rule packs, custom rules, address allow and deny lists, a required Polaris
   sign-in, SQL injection and cross-site scripting checks, and bans (Firewall).

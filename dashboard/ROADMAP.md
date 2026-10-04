@@ -603,14 +603,24 @@ Telemetry (what breaks):
   leak past it. Read receipts stay the one reciprocal setting: hiding that
   you read a message also hides whether yours was read, because a one-way
   version is not a privacy setting, it is a mirror.
-- MCP's stateless `/api/mcp` accepts two credentials and treats them
+- MCP's stateless `/api/mcp` accepts three credentials and treats them
   differently: an API key acts with whatever scopes and admin standing its
-  owner holds, but a session's own reporting token - handed to the agent
-  Polaris started before it ran, so nothing has to be configured by hand -
-  resolves to a fixed, non-admin scope covering only tasks and reading agents.
-  An agent that can start more agents is one bad turn from starting them in a
-  loop with nobody watching; that reach is only ever an API key somebody chose
-  to hand over.
+  owner holds; an OAuth access token is an assistant its person connected
+  through the consent screen, never admin, and cut to what that person
+  approved and still holds; and a session's own reporting token - handed to
+  the agent Polaris started before it ran, so nothing has to be configured by
+  hand - resolves to a fixed, non-admin scope covering only tasks and reading
+  agents. An agent that can start more agents is one bad turn from starting
+  them in a loop with nobody watching; that reach is only ever an API key
+  somebody chose to hand over.
+- Connecting Claude, ChatGPT, Cursor, VS Code or any other remote-MCP client
+  is OAuth 2.1 per the MCP authorization spec, with Polaris as its own
+  authorization server (Dynamic Client Registration, PKCE, resource
+  indicators, token rotation and replay detection) - see
+  [`docs/connecting-ai-assistants.md`](../docs/connecting-ai-assistants.md).
+  Tools beyond Tasks and sessions: Deploy, Notes, Chat, Drive and Calendar,
+  each gated by its own scope and offered only when the account holds the
+  underlying permission.
 - Enigma resolves down four tiers - session, repository, account, instance -
   nearest wins for every field except its escape-hatch `config` map, which
   merges far-to-near instead: an instance-wide key an operator set is a
