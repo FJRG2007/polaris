@@ -580,6 +580,7 @@ function CanvasBody({
     const wide = useWide();
     const [selectedId, setSelectedId] = useState<string | null>(null);
     const dragging = useRef(false);
+    const [diagramFocused, setDiagramFocused] = useState(false);
 
     const graph = useMemo(() => graphs.automationToGraph(definition), [definition]);
     const selection = selectionOf(definition, selectedId);
@@ -850,6 +851,15 @@ function CanvasBody({
                     role="region"
                     aria-label={t("automations.canvas.diagram")}
                     className="relative h-[min(40rem,75vh)] min-h-[24rem] min-w-0 overflow-hidden rounded-lg border border-border bg-surface"
+                    onFocus={() => setDiagramFocused(true)}
+                    onBlur={(event) => {
+                        if (
+                            !event.currentTarget.contains(
+                                event.relatedTarget as globalThis.Node | null
+                            )
+                        )
+                            setDiagramFocused(false);
+                    }}
                 >
                     <ReactFlow<ViewNode>
                         nodes={nodes}
@@ -883,7 +893,7 @@ function CanvasBody({
                         elementsSelectable
                         selectionKeyCode={null}
                         multiSelectionKeyCode={null}
-                        deleteKeyCode={readOnly ? null : DELETE_KEYS}
+                        deleteKeyCode={readOnly || !diagramFocused ? null : DELETE_KEYS}
                         fitView
                         fitViewOptions={FIT}
                         minZoom={0.25}

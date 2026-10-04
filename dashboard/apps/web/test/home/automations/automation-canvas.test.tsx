@@ -183,6 +183,13 @@ function node(id: string): HTMLElement {
     return found;
 }
 
+/** A node clicked as a hand does: a click on it also gives it the focus, which
+ *  this environment's click alone does not. */
+function choose(id: string): void {
+    node(id).focus();
+    fireEvent.click(node(id));
+}
+
 /** This environment's own storage is the runtime's, which warns and keeps
  *  nothing; a page's is a map that lives as long as the test. */
 function memoryStorage(): Storage {
@@ -313,7 +320,7 @@ describe("an automation saved by the form, opened as a diagram", () => {
         ]);
         expect(moved.definition.triggers).toEqual(SAVED.definition.triggers);
 
-        fireEvent.click(node("step02"));
+        choose("step02");
         await painted();
         press(node("step02"), "Delete");
         await painted();
@@ -324,9 +331,25 @@ describe("an automation saved by the form, opened as a diagram", () => {
         expect(removed.definition.actions.map((step) => step.id)).toEqual(["step01", "step03"]);
     });
 
+    it("leaves the selected node alone when Delete is pressed outside the diagram", async () => {
+        await openVisual("auto-1");
+        choose("step02");
+        await painted();
+        const close = screen.getByRole("button", { name: "Close" });
+        act(() => close.focus());
+        await painted();
+        press(close, "Delete");
+        press(close, "Backspace");
+        await painted();
+        expect(node("step02")).toBeDefined();
+        expect(screen.getByRole("button", { name: "Save" }).getAttribute("aria-disabled")).toBe(
+            "true"
+        );
+    });
+
     it("never removes the gate", async () => {
         await openVisual("auto-1");
-        fireEvent.click(node("$gate"));
+        choose("$gate");
         await painted();
         expect(screen.getByText("It only goes on if these hold.")).toBeDefined();
         press(node("$gate"), "Delete");
