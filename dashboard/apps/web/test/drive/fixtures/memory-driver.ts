@@ -23,7 +23,8 @@ export function memoryDriver(
     const files = new Map(Object.entries(seed.files ?? {}));
     const dirs = new Set(seed.dirs ?? []);
     const key = (path: string) => (options.caseInsensitive ? path.toLowerCase() : path);
-    const findFile = (path: string) => [...files.keys()].find((stored) => key(stored) === key(path));
+    const findFile = (path: string) =>
+        [...files.keys()].find((stored) => key(stored) === key(path));
     const findDir = (path: string) => [...dirs].find((stored) => key(stored) === key(path));
     const parentOf = (path: string) => path.split("/").slice(0, -1).join("/");
     const nameOf = (path: string) => path.split("/").pop() ?? path;
@@ -90,7 +91,8 @@ export function memoryDriver(
             }
         },
         async move(from: string, to: string) {
-            if (options.failMoveFrom === from) throw new StorageError("io_error", `Cannot move ${from}`);
+            if (options.failMoveFrom === from)
+                throw new StorageError("io_error", `Cannot move ${from}`);
             const file = findFile(from);
             if (file !== undefined) {
                 const body = files.get(file) ?? "";
@@ -122,7 +124,8 @@ export function memoryDriver(
                 return;
             }
             for (const stored of [...dirs]) {
-                if (key(stored) === key(path) || key(stored).startsWith(`${key(path)}/`)) dirs.delete(stored);
+                if (key(stored) === key(path) || key(stored).startsWith(`${key(path)}/`))
+                    dirs.delete(stored);
             }
             for (const stored of [...files.keys()]) {
                 if (key(stored).startsWith(`${key(path)}/`)) files.delete(stored);

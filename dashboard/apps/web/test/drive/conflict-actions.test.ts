@@ -97,7 +97,9 @@ describe("checking a folder for names already taken", () => {
 
     it("refuses somebody who cannot write in the folder", async () => {
         authorizeDrive.mockRejectedValue(new authz.DriveAccessError());
-        expect(await clashes([{ path: "a.txt", kind: "file" }])).toEqual({ error: "errors.cannotWrite" });
+        expect(await clashes([{ path: "a.txt", kind: "file" }])).toEqual({
+            error: "errors.cannotWrite"
+        });
     });
 });
 

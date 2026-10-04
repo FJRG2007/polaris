@@ -178,7 +178,8 @@ export async function claimFileName(
 ): Promise<string> {
     return withNameLock(driver, parentPath(path), async () => {
         let target = path;
-        const clash = mode === "fail" ? await statClash(driver, path) : await findClash(driver, path);
+        const clash =
+            mode === "fail" ? await statClash(driver, path) : await findClash(driver, path);
         if (clash) {
             if (mode === "fail") throw new NameConflictError(clash);
             target = await freeCopyPath(driver, path);

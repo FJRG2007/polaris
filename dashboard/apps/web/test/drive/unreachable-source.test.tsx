@@ -36,6 +36,7 @@ vi.mock("@/components/use-live-resource", () => ({
     })
 }));
 vi.mock("../../src/app/(app)/drive/actions", () => ({}));
+vi.mock("../../src/app/(app)/drive/conflict-actions", () => ({}));
 // The panel looks for a server that has moved, and the module that does it is a
 // server action file: it reaches the session and the configuration as it is
 // imported. Stubbed as a promise that never settles, so the markup asserted

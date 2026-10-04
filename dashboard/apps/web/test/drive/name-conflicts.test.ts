@@ -35,20 +35,29 @@ describe("finding clashes", () => {
     it("sees a folder of the same name, and nothing in a folder that does not exist yet", async () => {
         const { driver } = memoryDriver({ dirs: ["album"] });
         const clashes = await findClashes(driver, ["album", "new/photo.jpg"]);
-        expect(clashes.map((clash) => [clash.path, clash.existingKind])).toEqual([["album", "dir"]]);
+        expect(clashes.map((clash) => [clash.path, clash.existingKind])).toEqual([
+            ["album", "dir"]
+        ]);
     });
 });
 
 describe("taking a name for a new file", () => {
     it("refuses a taken name under fail, and leaves the file there alone", async () => {
         const { driver, files } = memoryDriver({ files: { "a.txt": "old" } });
-        await expect(claimFileName(driver, "a.txt", "fail")).rejects.toBeInstanceOf(NameConflictError);
+        await expect(claimFileName(driver, "a.txt", "fail")).rejects.toBeInstanceOf(
+            NameConflictError
+        );
         expect(files.get("a.txt")).toBe("old");
     });
 
     it("refuses a name taken in another case on a storage that ignores case", async () => {
-        const { driver, files } = memoryDriver({ files: { "A.TXT": "old" } }, { caseInsensitive: true });
-        await expect(claimFileName(driver, "a.txt", "fail")).rejects.toBeInstanceOf(NameConflictError);
+        const { driver, files } = memoryDriver(
+            { files: { "A.TXT": "old" } },
+            { caseInsensitive: true }
+        );
+        await expect(claimFileName(driver, "a.txt", "fail")).rejects.toBeInstanceOf(
+            NameConflictError
+        );
         expect(files.get("A.TXT")).toBe("old");
     });
 
@@ -96,7 +105,9 @@ describe("replacing", () => {
     });
 
     it("retires the file by its own spelling when the name differs only in case", async () => {
-        const { driver, files } = memoryDriver({ files: { "Report.pdf": "old", ".staged": "new" } });
+        const { driver, files } = memoryDriver({
+            files: { "Report.pdf": "old", ".staged": "new" }
+        });
         const trash = vi.fn(async (path: string) => {
             files.delete(path);
         });
@@ -136,7 +147,9 @@ describe("replacing", () => {
         const guard = vi.fn(async () => {
             throw new Error("not yours");
         });
-        await expect(replaceWith(driver, ".staged", "a.txt", { guard, trash })).rejects.toThrow("not yours");
+        await expect(replaceWith(driver, ".staged", "a.txt", { guard, trash })).rejects.toThrow(
+            "not yours"
+        );
         expect(trash).not.toHaveBeenCalled();
         expect(files.get("a.txt")).toBe("old");
     });
@@ -150,14 +163,20 @@ describe("folders and moves", () => {
     });
 
     it("moves under a free name instead of over the file there", async () => {
-        const { driver, files } = memoryDriver({ files: { "a/x.txt": "moving", "b/x.txt": "staying" }, dirs: ["a", "b"] });
+        const { driver, files } = memoryDriver({
+            files: { "a/x.txt": "moving", "b/x.txt": "staying" },
+            dirs: ["a", "b"]
+        });
         expect(await moveToName(driver, "a/x.txt", "b/x.txt", "keepBoth")).toBe("b/x (1).txt");
         expect(files.get("b/x.txt")).toBe("staying");
         expect(files.get("b/x (1).txt")).toBe("moving");
     });
 
     it("refuses a move onto a taken name under fail", async () => {
-        const { driver, files } = memoryDriver({ files: { "a/x.txt": "moving", "b/x.txt": "staying" }, dirs: ["a", "b"] });
+        const { driver, files } = memoryDriver({
+            files: { "a/x.txt": "moving", "b/x.txt": "staying" },
+            dirs: ["a", "b"]
+        });
         await expect(moveToName(driver, "a/x.txt", "b/x.txt", "fail")).rejects.toBeInstanceOf(
             NameConflictError
         );

@@ -52,9 +52,11 @@ beforeEach(() => {
     vi.clearAllMocks();
     authorizeDrive.mockResolvedValue(undefined);
     hasTrash.mockReturnValue(true);
-    trashWithDriver.mockImplementation(async (_driver: unknown, _user: string, _conn: string, path: string) => {
-        storage.files.delete(path);
-    });
+    trashWithDriver.mockImplementation(
+        async (_driver: unknown, _user: string, _conn: string, path: string) => {
+            storage.files.delete(path);
+        }
+    );
     useStorage(memoryDriver({ files: { "docs/a.txt": "old" }, dirs: ["docs"] }));
 });
 
@@ -89,7 +91,12 @@ describe("an upload onto a taken name", () => {
     it("replaces, putting the old file in the uploader's bin", async () => {
         const answer = await upload("a.txt", "new", "replace");
         expect(answer.status).toBe(200);
-        expect(trashWithDriver).toHaveBeenCalledWith(storage.driver, "writer-1", "conn-1", "docs/a.txt");
+        expect(trashWithDriver).toHaveBeenCalledWith(
+            storage.driver,
+            "writer-1",
+            "conn-1",
+            "docs/a.txt"
+        );
         expect([...storage.files.entries()]).toEqual([["docs/a.txt", "new"]]);
     });
 
@@ -123,7 +130,12 @@ describe("an upload onto a taken name", () => {
     });
 
     it("clashes with a name in another case on a storage that ignores case", async () => {
-        useStorage(memoryDriver({ files: { "docs/Report.PDF": "old" }, dirs: ["docs"] }, { caseInsensitive: true }));
+        useStorage(
+            memoryDriver(
+                { files: { "docs/Report.PDF": "old" }, dirs: ["docs"] },
+                { caseInsensitive: true }
+            )
+        );
         const answer = await upload("report.pdf", "new");
         expect(answer.status).toBe(409);
         expect((await answer.json()).clash.existingName).toBe("Report.PDF");
@@ -161,14 +173,18 @@ describe("two uploads racing for one free name", () => {
 
 describe("a folder upload into a folder of the same name", () => {
     it("merges a new file into it", async () => {
-        useStorage(memoryDriver({ files: { "docs/album/old.jpg": "1" }, dirs: ["docs", "docs/album"] }));
+        useStorage(
+            memoryDriver({ files: { "docs/album/old.jpg": "1" }, dirs: ["docs", "docs/album"] })
+        );
         expect((await upload("album/new.jpg", "2")).status).toBe(200);
         expect(storage.files.get("docs/album/new.jpg")).toBe("2");
         expect(storage.files.get("docs/album/old.jpg")).toBe("1");
     });
 
     it("asks about a file that is in both, by its path inside the upload", async () => {
-        useStorage(memoryDriver({ files: { "docs/album/old.jpg": "1" }, dirs: ["docs", "docs/album"] }));
+        useStorage(
+            memoryDriver({ files: { "docs/album/old.jpg": "1" }, dirs: ["docs", "docs/album"] })
+        );
         const answer = await upload("album/old.jpg", "2");
         expect(answer.status).toBe(409);
         expect((await answer.json()).clash.path).toBe("album/old.jpg");

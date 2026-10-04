@@ -15,7 +15,12 @@ import { MAX_CLASH_ENTRIES, type ClashView } from "@/lib/drive/conflict-types";
 import { getDriverForConnection } from "@/lib/storage-service";
 import { baseName, normalizeRelPath, parentPath } from "@polaris/core";
 import { claimFolderName, findClashes } from "@/lib/drive/name-conflicts";
-import { authorizeDrive, DriveAccessError, DriveLockedError, drivePathFilter } from "@/lib/drive-authz";
+import {
+    authorizeDrive,
+    DriveAccessError,
+    DriveLockedError,
+    drivePathFilter
+} from "@/lib/drive-authz";
 
 const clashQuerySchema = z.object({
     connectionId: z.string().trim().min(1).max(200),
