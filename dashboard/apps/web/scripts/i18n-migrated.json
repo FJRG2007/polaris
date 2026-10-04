@@ -737,6 +737,7 @@
         "web/src/app/(app)/drive/hardware-panel.tsx",
         "web/src/app/(app)/drive/insights/drive-insights.tsx",
         "web/src/app/(app)/drive/insights/page.tsx",
+        "web/src/app/(app)/drive/link-visitor-cell.tsx",
         "web/src/app/(app)/drive/overview/overview-view.tsx",
         "web/src/app/(app)/drive/overview/page.tsx",
         "web/src/app/(app)/drive/page.tsx",
