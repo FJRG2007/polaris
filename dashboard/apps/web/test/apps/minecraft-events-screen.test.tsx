@@ -106,6 +106,44 @@ afterEach(() => {
 });
 
 describe("the Events tab", () => {
+    it("marks an event incompatible only on a server too old for it, and says why", async () => {
+        render(<MinecraftEvents installedAppId="00000000-0000-4000-8000-000000000001" canManage />);
+        answerRead({
+            view: {
+                ...view,
+                version: "1.16.5",
+                config: {
+                    ...config,
+                    presets: [
+                        catalog.newPreset("sky-wars", "sky"),
+                        catalog.newPreset("parkour", "pk")
+                    ]
+                }
+            }
+        });
+        const why = await screen.findByText(
+            "Needs Minecraft 1.17 or later, where what players carry is put away before they play; this server runs 1.16.5."
+        );
+        expect(why).toBeTruthy();
+        expect(screen.getAllByText("Incompatible")).toHaveLength(1);
+        expect(screen.getByLabelText("Run SkyWars now").hasAttribute("disabled")).toBe(true);
+        // The parkour plays on 1.16.5: no version said anywhere about it.
+        expect(document.body.textContent).not.toMatch(/1\.14|Needs Java/);
+    });
+
+    it("says nothing about versions when the server can play everything", async () => {
+        render(<MinecraftEvents installedAppId="00000000-0000-4000-8000-000000000001" canManage />);
+        answerRead({
+            view: {
+                ...view,
+                version: "1.21.4",
+                config: { ...config, presets: [catalog.newPreset("sky-wars", "sky")] }
+            }
+        });
+        await screen.findByText("SkyWars");
+        expect(screen.queryByText("Incompatible")).toBeNull();
+    });
+
     it("groups the events by where they are played", async () => {
         render(<MinecraftEvents installedAppId="00000000-0000-4000-8000-000000000001" canManage />);
         answerRead({
@@ -692,7 +730,7 @@ describe("the TNT run, ice boat race and dropper editors", () => {
         expect(screen.getByText(/Nothing explodes/)).toBeTruthy();
         fireEvent.click(screen.getByLabelText("What Ice boat race is"));
         expect(screen.getByText(/2 laps of an ice track/)).toBeTruthy();
-        expect(screen.getByText(/From Java 1.19.4 every racer is put in a boat/)).toBeTruthy();
+        expect(screen.getByText(/Every racer starts with a boat/)).toBeTruthy();
         fireEvent.click(screen.getByLabelText("What Dropper is"));
         expect(screen.getByText(/A shaft of 10 floors, medium/)).toBeTruthy();
         expect(screen.getByText(/Played under Slow Falling/)).toBeTruthy();

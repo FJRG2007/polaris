@@ -439,6 +439,9 @@ export interface EventsView {
      *  nobody has looked yet. */
     readonly players: { readonly online: number; readonly active: number } | null;
     readonly refusal: string | null;
+    /** The Minecraft version the server runs, when its log says: what the
+     *  screen marks an event this server cannot play by (`catalog.incompatibility`). */
+    readonly version: string | null;
     /** Saved events with settings that could not be read, set back to their
      *  defaults, and how many settings each. */
     readonly repaired: readonly {
@@ -562,6 +565,7 @@ export async function eventsView(installedAppId: string): Promise<EventsView> {
         repaired: catalog
             .repairedPresets(row.config)
             .map((one) => ({ id: one.id, name: one.name, count: one.reset.length })),
+        version: await knownVersion(row.ownerId, installedAppId),
         refusal:
             editionOf(row.catalogId) === "bedrock"
                 ? "Events run on Java servers; Bedrock has no scoreboard statistics or boss bars to play them with"
@@ -4783,17 +4787,26 @@ async function serverAtLeast(server: ServerContainer, wanted: readonly number[])
 
 /** Whether a version is at least another. A snapshot is taken as recent; one
  *  that cannot be read at all as unknown, which is not at least anything. */
-export function atLeast(version: string | null, wanted: readonly number[]): boolean {
-    if (version === null) return false;
-    const match = /^(\d+)\.(\d+)(?:\.(\d+))?/.exec(version);
-    if (!match) return true;
-    const have = [Number(match[1]), Number(match[2]), Number(match[3] ?? 0)];
-    for (let index = 0; index < wanted.length; index += 1) {
-        const left = have[index] ?? 0;
-        const right = wanted[index] ?? 0;
-        if (left !== right) return left > right;
-    }
-    return true;
+export const atLeast = catalog.versionAtLeast;
+
+/** The version each server's log last said it runs, kept a while: the Events
+ *  screen asks every few seconds, and the version only changes with a restart. */
+const versions = new Map<string, { version: string | null; at: number }>();
+const VERSION_TTL_MS = 10 * 60_000;
+
+/** The version this server runs, as far as its log says - or null when it is
+ *  off, slow, or the log does not say. Never waited on for long. */
+async function knownVersion(ownerId: string, installedAppId: string): Promise<string | null> {
+    const kept = versions.get(installedAppId);
+    if (kept && fresh(kept.at, VERSION_TTL_MS)) return kept.version;
+    const version = await withTimeout(
+        withServerContainer(ownerId, installedAppId, (server) => versionOf(server)),
+        3_000,
+        "slow"
+    ).catch(() => null);
+    // An answer is kept; a server that did not give one is asked again next time.
+    if (version !== null) versions.set(installedAppId, { version, at: Date.now() });
+    return version ?? kept?.version ?? null;
 }
 
 // ------------------------------------------------------------------ who is playing

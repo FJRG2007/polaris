@@ -12,7 +12,7 @@
 import { useMemo, useState } from "react";
 import { useGameText, useSchemaText, type GameText } from "../game-text";
 import type { GameKey } from "../../../messages";
-import { kindLabel, kindSummary, kindUnit } from "./event-kinds";
+import { incompatibleText, kindLabel, kindSummary, kindUnit } from "./event-kinds";
 import {
     Button,
     Dialog,
@@ -1173,11 +1173,15 @@ function OptionsFields({
 
 export function EventEditor({
     preset: saved,
+    version = null,
     open,
     onOpenChange,
     onSave
 }: {
     preset: catalog.EventPreset;
+    /** The version the server runs, when known: an option this server cannot
+     *  play is said beside the fields, and nothing is said otherwise. */
+    version?: string | null;
     open: boolean;
     onOpenChange: (open: boolean) => void;
     onSave: (preset: catalog.EventPreset) => void;
@@ -1295,6 +1299,11 @@ export function EventEditor({
                             change({ options: next } as Partial<catalog.EventPreset>)
                         }
                     />
+                    {incompatibleText(t, draft, version) && (
+                        <p role="status" className="text-xs text-warning">
+                            {t("events.incompatible.badge")}: {incompatibleText(t, draft, version)}
+                        </p>
+                    )}
 
                     {info.competitive && (
                         <div className="flex flex-col gap-2">

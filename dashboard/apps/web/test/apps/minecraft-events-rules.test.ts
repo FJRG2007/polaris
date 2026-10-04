@@ -24,6 +24,48 @@ const at = (time: string, day = "2026-09-28") => Date.parse(`${day}T${time}:00Z`
 /** Always the same number, so a draw is decided by the test. */
 const always = (value: number) => () => value;
 
+describe("an event a server cannot play", () => {
+    const of = (kind: catalog.EventKind) => catalog.newPreset(kind, "k");
+
+    it("is named only when the server's version is known and too old, with why", () => {
+        expect(catalog.incompatibility(of("sky-wars"), "1.16.5")).toEqual({
+            why: "items",
+            needs: "1.17"
+        });
+        expect(catalog.incompatibility(of("team-duel"), "1.15.2")).toEqual({
+            why: "arena",
+            needs: "1.16"
+        });
+        // Compatible, or not known: nothing to say.
+        expect(catalog.incompatibility(of("sky-wars"), "1.21.4")).toBeNull();
+        expect(catalog.incompatibility(of("sky-wars"), null)).toBeNull();
+        expect(catalog.incompatibility(of("parkour"), "1.13.2")).toBeNull();
+    });
+
+    it("follows the options that name something only newer worlds have", () => {
+        const drop = of("supply-drop") as catalog.EventPreset<"supply-drop">;
+        const bastion = { ...drop, options: { ...drop.options, loot: "bastion" as const } };
+        expect(catalog.incompatibility(bastion, "1.15.2")).toEqual({ why: "loot", needs: "1.16" });
+        expect(catalog.incompatibility(bastion, "1.16")).toBeNull();
+        const city = { ...drop, options: { ...drop.options, loot: "ancient-city" as const } };
+        expect(catalog.incompatibility(city, "1.18.2")).toEqual({ why: "loot", needs: "1.19" });
+        const shower = of("meteor-shower") as catalog.EventPreset<"meteor-shower">;
+        expect(
+            catalog.incompatibility(
+                { ...shower, options: { ...shower.options, ores: "debris" as const } },
+                "1.15.2"
+            )
+        ).toEqual({ why: "ores", needs: "1.16" });
+        const gather = of("gathering") as catalog.EventPreset<"gathering">;
+        expect(
+            catalog.incompatibility(
+                { ...gather, options: { ...gather.options, material: "bamboo" as const } },
+                "1.13.2"
+            )
+        ).toEqual({ why: "material", needs: "1.14" });
+    });
+});
+
 describe("where each event is played", () => {
     const where = (kind: catalog.EventKind) => catalog.heldWhere(catalog.newPreset(kind, "k"));
 

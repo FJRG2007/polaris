@@ -1801,7 +1801,7 @@
             "xpBoost": "Todos los conectados reciben {extra} hasta que termine. Nunca se quita nada; un bloque de mena colocado durante el evento no se vuelve a pagar.",
             "waves": "{waves} oleadas, {minutes} minutos como mucho. Una oleada termina cuando se la mata entera, o a los dos minutos.",
             "wavesPoint": "El punto está en terreno llano y abierto generado por el mundo, a al menos 96 bloques de la cama de cualquier jugador conectado. Solo llegan monstruos que no pueden romper bloques - ni creepers, ni endermen, ni devastadores - y todos se retiran al terminar.",
-            "keepInventory": "Conservar inventario está activo mientras dura, así que morir no cuesta nada; el ajuste propio del servidor vuelve después. Java 1.17 o posterior.",
+            "keepInventory": "Conservar inventario está activo mientras dura, así que morir no cuesta nada; el ajuste propio del servidor vuelve después.",
             "meteors": "{meteors} meteoritos de {size} bloques de mena cada uno, uno cada {seconds} segundos desde el principio. Cada bloque minado cerca de un meteorito puntúa 1; la mena colocada cerca de uno resta.",
             "meteorsLand": "Los meteoritos caen en terreno llano y abierto generado por el mundo, lejos de la cama de cualquier jugador conectado - en una isla, en la propia isla -, y la mena solo se pone donde había aire. Lo que nadie minó se retira al final - solo los bloques que siguen siendo exactamente la mena del meteorito - y no se toca nada más.",
             "pickaxes": "La mena de diamante y esmeralda necesita un pico de hierro, los escombros ancestrales uno de diamante.",
@@ -1809,23 +1809,23 @@
             "spleef": "Un suelo de nieve de {size} por {size} a unos {height} bloques de altura. Caer a través queda fuera; el último en él gana.",
             "joinCountdown": "Solo participan los jugadores que escriben join (o unirse) en el chat durante la cuenta atrás - al menos {seconds} segundos. Se les lleva allí y se les devuelve exactamente donde estaban al terminar, incluso tras un reinicio.",
             "stageBuilt": "Se construye solo en aire vacío, sobre terreno abierto lejos de la cama de todos, y se desmonta bloque a bloque después - solo lo que colocó. Dentro nadie recibe daño y todos están en modo aventura; su modo de juego se les devuelve después.",
-            "spleefShovel": "Los jugadores reciben una pala marcada que solo rompe la nieve; se retira al final, y no se toca nada más suyo. Necesita Java 1.14.4 o posterior; antes de 1.20.5 la nieve suelta bolas de nieve al cavarla.",
-            "parkourItems": "No se tocan los objetos de nadie. Necesita Java 1.14.4 o posterior.",
+            "spleefShovel": "Los jugadores reciben una pala marcada que solo rompe la nieve; se retira al final, y no se toca nada más suyo.",
+            "parkourItems": "No se tocan los objetos de nadie.",
             "tntRun": "{layers} pisos de TNT de {size} por {size}, apilados a unos {height} bloques de altura. Cada bloque que pisa un jugador desaparece un instante después; quien cae por un piso aterriza en el siguiente, y quien cae por el último queda fuera. Gana el último en pie.",
-            "tntRunSafe": "Nada explota: los bloques solo se quitan, y cualquier TNT que se encienda cerca de la arena se apaga al instante. Lo juega un pequeño paquete de datos que Polaris añade al mundo. Necesita Java 1.14.4 o posterior.",
+            "tntRunSafe": "Nada explota: los bloques solo se quitan, y cualquier TNT que se encienda cerca de la arena se apaga al instante. Lo juega un pequeño paquete de datos que Polaris añade al mundo.",
             "boatRace": "{laps} {laps, plural, one {vuelta} other {vueltas}} a una pista de hielo a unos {height} bloques de altura: un circuito nuevo cada vez, con muros a ambos lados y puertas que pasar en orden. Si caes, atajas o dejas el barco, vuelves a tu última puerta en uno nuevo.",
-            "boatRaceBoats": "Desde Java 1.19.4 cada corredor sale ya montado en un barco; antes, recibe un barco marcado para ponerlo él mismo, que se retira al final. Las puertas las cuenta un pequeño paquete de datos que Polaris añade al mundo. Necesita Java 1.14.4 o posterior.",
+            "boatRaceBoats": "Cada corredor empieza con un barco, que se retira al final. Las puertas las cuenta un pequeño paquete de datos que Polaris añade al mundo.",
             "dropper": "Un pozo de {levels} pisos, {difficulty}, cada uno con un hueco que nunca coincide con el de arriba, y una piscina al fondo. Un pozo nuevo cada vez, y cada hueco alcanzable desde el anterior mientras caes.",
-            "dropperSafe": "Se juega con Caída lenta, así que da tiempo a guiarse y ninguna caída hace daño. Tocar un piso se detecta en el momento con un pequeño paquete de datos que Polaris añade al mundo. Necesita Java 1.14.4 o posterior.",
+            "dropperSafe": "Se juega con Caída lenta, así que da tiempo a guiarse y ninguna caída hace daño. Tocar un piso se detecta en el momento con un pequeño paquete de datos que Polaris añade al mundo.",
             "duelJoin": "Solo participan los jugadores que escriben join (o unirse) en el chat durante la cuenta atrás. Se reparten en dos equipos y se les lleva a una arena construida a 30 bloques de altura, sobre terreno abierto lejos de la cama de nadie.",
             "duelKit": "Todos reciben la misma espada de {kit} y un escudo. Un jugador que baja a {hearts} {hearts, plural, one {corazón} other {corazones}} queda fuera: el otro equipo puntúa, el rival que lo derribó se lleva la eliminación, y se le devuelve a su lado, curado. Gana el equipo con más; el podio va por eliminaciones.",
             "duelKeepInventory": "Conservar inventario está activo mientras dura y se restaura después, así que incluso una muerte en la arena lo conserva todo.",
-            "duelNeeds": "Necesita permitir Jugador contra jugador en Ajustes, y Minecraft 1.16 o posterior. Hasta 16 jugadores.",
+            "duelNeeds": "Necesita permitir Jugador contra jugador en Ajustes. Hasta 16 jugadores.",
             "buildJoin": "Solo participan los jugadores que escriben join (o unirse) en el chat durante la cuenta atrás. Cada uno recibe una parcela en una plataforma construida a 30 bloques de altura, sobre terreno abierto lejos de la cama de nadie.",
             "buildPlanMine": "Un tema de tu lista, una parcela de {size} por {size}, 16 tipos de cristal y un pincel; {minutes} minutos para construir, luego {seconds} segundos recorriendo las parcelas y votando en el chat - un voto cada uno, no para la propia parcela. Gana quien más votos tenga.",
             "buildPlanBuiltIn": "Un tema incluido, una parcela de {size} por {size}, 16 tipos de cristal y un pincel; {minutes} minutos para construir, luego {seconds} segundos recorriendo las parcelas y votando en el chat - un voto cada uno, no para la propia parcela. Gana quien más votos tenga.",
             "buildGlass": "Solo se puede colocar el cristal del kit: los constructores juegan en modo aventura, donde sus propios bloques no se pueden poner, así que no se usa ni se deja nada suyo en una parcela. El cristal roto a mano no suelta nada, así que ningún kit sale de una parcela.",
-            "buildNeeds": "Necesita Minecraft 1.16 o posterior. Hasta 12 constructores.",
+            "buildNeeds": "Hasta 12 constructores.",
             "arena": "No se toca nada de nadie. La arena solo va donde el aire estaba vacío, y se desmonta tipo de bloque a tipo de bloque; solo se recoge el kit marcado del propio evento; cada jugador vuelve exactamente donde estaba, en su propio modo de juego, con lo que soltara. Quien esté desconectado al final la encuentra aún en pie al entrar, y se le devuelve entonces.",
             "overworld": "Ocurre en el mundo normal; solo participan los jugadores que están allí.",
             "rankedFrom": "Clasifica desde {score} {unit}; por debajo, ni podio ni premio.",
@@ -1923,7 +1923,7 @@
             "iron_ingot": "Hierro (lingotes fundidos)",
             "coal": "Carbón",
             "kelp": "Algas",
-            "bamboo": "Bambú (1.14+)",
+            "bamboo": "Bambú",
             "sugar_cane": "Caña (azúcar)",
             "potato": "Patatas",
             "carrot": "Zanahorias",
@@ -2033,6 +2033,14 @@
                 "label": "Donde esté cada jugador",
                 "hint": "No se construye nada ni se mueve a nadie: cada uno juega donde está."
             }
+        },
+        "incompatible": {
+            "badge": "Incompatible",
+            "arena": "Necesita Minecraft {needs} o posterior para leer el kit que reparte; este servidor tiene la {version}.",
+            "items": "Necesita Minecraft {needs} o posterior, donde lo que llevan los jugadores se guarda antes de jugar; este servidor tiene la {version}.",
+            "loot": "El botín elegido solo existe desde Minecraft {needs}; este servidor tiene la {version}.",
+            "ores": "La mena elegida solo existe desde Minecraft {needs}; este servidor tiene la {version}.",
+            "material": "El material elegido solo existe desde Minecraft {needs}; este servidor tiene la {version}."
         }
     },
     "editor": {
@@ -2144,9 +2152,9 @@
             "loot": {
                 "treasure": "Tesoro enterrado",
                 "dungeon": "Mazmorra",
-                "bastion": "Tesoro de bastión (1.16+)",
+                "bastion": "Tesoro de bastión",
                 "end-city": "Ciudad End",
-                "ancient-city": "Ciudad antigua (1.19+)"
+                "ancient-city": "Ciudad antigua"
             },
             "boss": {
                 "wither-skeleton": "El Caudillo (esqueleto wither)",
@@ -2174,10 +2182,10 @@
                 "mixed": "Todo lo anterior, y saqueadores"
             },
             "meteorOre": {
-                "common": "Comunes: carbón, hierro, cobre (1.17+), oro, redstone, lapislázuli",
+                "common": "Comunes: carbón, hierro, cobre, oro, redstone, lapislázuli",
                 "precious": "Preciosas: oro, lapislázuli, diamante, esmeralda",
                 "diamond": "Solo diamante",
-                "debris": "Solo escombros ancestrales (1.16+)"
+                "debris": "Escombros ancestrales"
             },
             "trivia": {
                 "questions": "Preguntas",

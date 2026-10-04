@@ -19,7 +19,7 @@ import { CATCH_LABELS } from "./event-options-rare-catch";
 import { MATERIAL_LABELS } from "./event-options-gathering";
 import { worldBossFacts } from "./event-options-world-boss";
 import * as catalog from "../../lib/minecraft/events/catalog";
-import { kindLabel, kindSummary, kindUnit } from "./event-kinds";
+import { incompatibleText, kindLabel, kindSummary, kindUnit } from "./event-kinds";
 import { figureLanguage, formatCount, formatDuration } from "../../lib/figures";
 import { type GameText, useGameText, useSchemaText } from "../game-text";
 import type { EventHistoryEntry } from "../../lib/minecraft/events/state";
@@ -88,6 +88,17 @@ const KINDS_BY_PLACE = catalog.HELD_WHERE.map((where) => ({
         (kind) => catalog.heldWhere(catalog.newPreset(kind, "kind")) === where
     )
 }));
+
+/** "Incompatible", with why in its tooltip and for screen readers. */
+function IncompatibleBadge({ reason }: { reason: string }) {
+    const t = useGameText("minecraft");
+    return (
+        <ui.Badge variant="warning" title={reason} className="shrink-0">
+            {t("events.incompatible.badge")}
+            <span className="sr-only">: {reason}</span>
+        </ui.Badge>
+    );
+}
 
 /** The saved events grouped by where they are played, in their saved order. */
 function byPlace(
@@ -755,6 +766,11 @@ export function MinecraftEvents({
             : catalog.minPlayersOf(preset);
     }
 
+    /** Why this server cannot play it, or null - only ever said when true. */
+    function cannotOn(preset: catalog.EventPreset): string | null {
+        return incompatibleText(t, preset, view?.version ?? null);
+    }
+
     function tooFewOn(preset: catalog.EventPreset): boolean {
         return view?.players != null && view.players.online < neededOn(preset);
     }
@@ -1102,8 +1118,26 @@ export function MinecraftEvents({
                                                         })
                                                     }
                                                 >
-                                                    <span className="text-sm">
+                                                    <span className="flex items-center gap-2 text-sm">
                                                         {kindLabel(t, kind)}
+                                                        {incompatibleText(
+                                                            t,
+                                                            catalog.newPreset(kind, "kind"),
+                                                            view?.version ?? null
+                                                        ) && (
+                                                            <IncompatibleBadge
+                                                                reason={
+                                                                    incompatibleText(
+                                                                        t,
+                                                                        catalog.newPreset(
+                                                                            kind,
+                                                                            "kind"
+                                                                        ),
+                                                                        view?.version ?? null
+                                                                    )!
+                                                                }
+                                                            />
+                                                        )}
                                                     </span>
                                                     <span className="line-clamp-2 text-xs text-muted-foreground">
                                                         {kindSummary(t, kind)}
@@ -1140,13 +1174,25 @@ export function MinecraftEvents({
                                             <li key={preset.id} className="flex flex-col px-3 py-2">
                                                 <div className="flex flex-wrap items-center gap-3">
                                                     <div className="min-w-0 flex-1">
-                                                        <p
-                                                            className="truncate text-sm font-medium"
-                                                            title={preset.name}
-                                                        >
-                                                            {preset.name}
-                                                        </p>
+                                                        <div className="flex min-w-0 items-center gap-2">
+                                                            <p
+                                                                className="truncate text-sm font-medium"
+                                                                title={preset.name}
+                                                            >
+                                                                {preset.name}
+                                                            </p>
+                                                            {cannotOn(preset) && (
+                                                                <IncompatibleBadge
+                                                                    reason={cannotOn(preset)!}
+                                                                />
+                                                            )}
+                                                        </div>
                                                         <PresetDetail preset={preset} />
+                                                        {cannotOn(preset) && (
+                                                            <p className="text-xs text-warning">
+                                                                {cannotOn(preset)}
+                                                            </p>
+                                                        )}
                                                     </div>
                                                     <ui.Switch
                                                         checked={preset.enabled}
@@ -1188,28 +1234,31 @@ export function MinecraftEvents({
                                                             title={
                                                                 dirty
                                                                     ? t("events.saveFirst")
-                                                                    : tooFewOn(preset)
-                                                                      ? t(
-                                                                            "events.errors.tooFewPlayers",
-                                                                            {
-                                                                                count:
-                                                                                    view?.players
-                                                                                        ?.online ??
-                                                                                    0,
-                                                                                needed: neededOn(
-                                                                                    preset
-                                                                                )
-                                                                            }
-                                                                        )
-                                                                      : t("events.runNow", {
-                                                                            name: preset.name
-                                                                        })
+                                                                    : cannotOn(preset)
+                                                                      ? cannotOn(preset)!
+                                                                      : tooFewOn(preset)
+                                                                        ? t(
+                                                                              "events.errors.tooFewPlayers",
+                                                                              {
+                                                                                  count:
+                                                                                      view?.players
+                                                                                          ?.online ??
+                                                                                      0,
+                                                                                  needed: neededOn(
+                                                                                      preset
+                                                                                  )
+                                                                              }
+                                                                          )
+                                                                        : t("events.runNow", {
+                                                                              name: preset.name
+                                                                          })
                                                             }
                                                             disabled={
                                                                 locked ||
                                                                 pending ||
                                                                 running ||
                                                                 dirty ||
+                                                                cannotOn(preset) !== null ||
                                                                 tooFewOn(preset) ||
                                                                 !view?.config.presets.some(
                                                                     (one) => one.id === preset.id
@@ -2034,6 +2083,7 @@ export function MinecraftEvents({
                 <EventEditor
                     key={editing.preset.id}
                     preset={editing.preset}
+                    version={view?.version ?? null}
                     open
                     onOpenChange={(open) => !open && setEditing(null)}
                     onSave={(preset) => {
