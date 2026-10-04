@@ -580,10 +580,17 @@ async function admit(
     for (const [index, one] of fresh.entries()) {
         if (stashing && !(await stashSaved(loop, server, tools, one.name, false))) continue;
         const racer = state(loop).racers.find((each) => same(each.name, one.name))!;
+        // Back in a boat race already on, after leaving it: from the last gate
+        // they passed, with every pass they made - not from nothing, on a clock
+        // that kept running while they were away.
+        const resumed =
+            layout.kind === "boat-race" && !holding(loop) && racer.best > 0 ? racer.best : 0;
         const spot =
             layout.kind === "parkour"
                 ? parkour.spotOn(layout.course, racer.checkpoint)
-                : places[index]!;
+                : resumed > 0 && layout.kind === "boat-race"
+                  ? boatRace.resumeSpot(layout.track, resumed)
+                  : places[index]!;
         await server.sayAll([
             ...stage.admitLines(one.name, spot),
             `title ${one.name} times 5 50 15`,
@@ -603,7 +610,9 @@ async function admit(
             ...(layout.kind === "parkour" ? parkour.racerScores(one.name, racer.checkpoint) : []),
             ...(layout.kind === "dropper" ? dropper.racerScores(one.name, layout.shaft) : []),
             ...(layout.kind === "tnt-run" ? tntRun.racerLines(one.name) : []),
-            ...(layout.kind === "boat-race" ? boatRace.racerScores(one.name) : []),
+            ...(layout.kind === "boat-race"
+                ? boatRace.racerScores(one.name, resumed, layout.track.gates.length)
+                : []),
             ...(way ? boatRace.boatLines(one.name, way) : [])
         ]);
         brought.push(one.name);

@@ -6986,6 +6986,31 @@ describe("an ice boat race", () => {
         expect(coords(cy!, "Cy")).not.toBe(coords(dan!, "Dan"));
     });
 
+    it("takes a racer who left back in at their last gate, with the gates they passed", async () => {
+        setUp([race()]);
+        await startArena("boats");
+        await play(2_100);
+        chat(["Ana", "join"], ["Ben", "join"]);
+        await play(52_000);
+        const track = trackNow();
+        expect(world.sent).toContain("scoreboard players set #on polaris_boat 1");
+        // Ben three passes on - the line and two gates - then out and back in.
+        scores("pe_gate").Ben = 3;
+        await play(2_100);
+        expect(state().run!.stage!.racers.find((one) => one.name === "Ben")!.best).toBe(3);
+        chat(["Ben", "leave"]);
+        await play(2_100);
+        world.sent = [];
+        chat(["Ben", "join"]);
+        await play(2_100);
+        expect(world.sent).toContain("scoreboard players set Ben pe_gate 3");
+        expect(world.sent).not.toContain("scoreboard players set Ben pe_gate 0");
+        const spot = track.respawns[2]!;
+        expect(world.sent).toContain(
+            `execute in minecraft:overworld run tp Ben ${spot.x.toFixed(3)} ${spot.y.toFixed(3)} ${spot.z.toFixed(3)} ${spot.yaw.toFixed(1)} 0.0`
+        );
+    });
+
     it("hands a marked boat to put down before 1.19.4, where nobody can be put in one", async () => {
         world.version = "1.19.2";
         setUp([race()]);

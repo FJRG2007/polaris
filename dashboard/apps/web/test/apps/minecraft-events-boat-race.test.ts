@@ -342,6 +342,50 @@ describe("boats", () => {
         );
     });
 
+    it("tells somebody past the boats one look has room for why only once, and seats them on the next", () => {
+        const track = trackOf("crowd", 2);
+        const told = { fell: '"fell"', cut: '"cut"', lost: '"lost"' };
+        const lines = boatRace.quickLines(track, "oak_boat", told);
+        // Whoever is still waiting for a boat from the last look is not told
+        // they left theirs.
+        const lost = lines.find((line) => line.endsWith('tellraw @s "lost"'))!;
+        expect(lost).toContain("tag=!pe_reset,tag=!pe_bwait,");
+        // Marked as waiting before the look's marks go, and the mark kept no
+        // longer than the next look's check.
+        expect(lines.at(-2)).toBe("tag @a[tag=pe_reset] add pe_bwait");
+        expect(lines.indexOf("tag @a remove pe_bwait")).toBeGreaterThan(lines.indexOf(lost));
+        expect(
+            boatRace.quickLines(track, "item", told).some((line) => line.includes("pe_bwait"))
+        ).toBe(false);
+    });
+
+    it("takes a racer back in a race they left from their last gate, with every pass they made", () => {
+        const track = trackOf("back", 2);
+        const gates = track.gates.length;
+        expect(boatRace.racerScores("Ana")).toEqual([
+            "scoreboard players set Ana pe_gate 0",
+            "scoreboard players set Ana pe_next 0",
+            "scoreboard players set Ana pe_last -1",
+            "scoreboard players set Ana pe_fin 0",
+            "scoreboard players set Ana pe_cut 0"
+        ]);
+        // The start line and two gates passed: the next is the third.
+        expect(boatRace.racerScores("Ana", 3, gates).slice(0, 3)).toEqual([
+            "scoreboard players set Ana pe_gate 3",
+            "scoreboard players set Ana pe_next 3",
+            "scoreboard players set Ana pe_last 2"
+        ]);
+        expect(boatRace.resumeSpot(track, 3)).toEqual(track.respawns[2]);
+        // A whole lap and the line again: back to the line's own spot.
+        expect(boatRace.racerScores("Ana", gates + 1, gates).slice(0, 3)).toEqual([
+            `scoreboard players set Ana pe_gate ${gates + 1}`,
+            "scoreboard players set Ana pe_next 1",
+            "scoreboard players set Ana pe_last 0"
+        ]);
+        expect(boatRace.resumeSpot(track, gates + 1)).toEqual(track.respawns[0]);
+        expect(boatRace.resumeSpot(track, 0)).toEqual(boatRace.grid(track, 1)[0]);
+    });
+
     it("are all taken off the track at the end, under either name", () => {
         const track = trackOf("gone", 2);
         const lines = boatRace.boatsGone(track.volume);
