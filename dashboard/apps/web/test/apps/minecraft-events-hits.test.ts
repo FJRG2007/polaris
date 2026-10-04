@@ -96,9 +96,7 @@ describe("a count the game keeps, read between looks", () => {
     it("only notes what somebody who was off comes back with", () => {
         const tally = hits.tally();
         hits.rose(tally, new Map([["Ben", 0]]), new Set(["ben"]));
-        expect(hits.rose(tally, new Map([["Cy", 40]]), new Set(["ben", "cy"]))).toEqual(
-            new Map()
-        );
+        expect(hits.rose(tally, new Map([["Cy", 40]]), new Set(["ben", "cy"]))).toEqual(new Map());
         expect(hits.rose(tally, new Map([["Cy", 42]]), new Set(["ben", "cy"]))).toEqual(
             new Map([["Cy", 2]])
         );

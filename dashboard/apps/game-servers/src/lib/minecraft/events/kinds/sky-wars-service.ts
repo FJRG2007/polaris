@@ -152,9 +152,7 @@ async function tick(ctx: KindContext, lines: string[]): Promise<string | null> {
     // Each hit credited to whoever the game says hurt them (from 1.19.4) -
     // nobody, for a fall or a fire - or before that to whoever struck nearest,
     // or else drew a bow.
-    const hurtNow = alive().filter(
-        (one) => here.has(lower(one.name)) && hurt.has(lower(one.name))
-    );
+    const hurtNow = alive().filter((one) => here.has(lower(one.name)) && hurt.has(lower(one.name)));
     const attackers = await hitsService.attackers(
         ctx,
         hurtNow.map((one) => one.name)

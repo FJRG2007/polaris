@@ -136,8 +136,7 @@ export function rose(
 ): Map<string, number> {
     const risen = new Map<string, number>();
     for (const [name, value] of scores) {
-        const before =
-            tally.seen.get(name) ?? (tally.on?.has(name.toLowerCase()) ? 0 : undefined);
+        const before = tally.seen.get(name) ?? (tally.on?.has(name.toLowerCase()) ? 0 : undefined);
         if (before !== undefined && value > before) risen.set(name, value - before);
         tally.seen.set(name, value);
     }

@@ -212,9 +212,7 @@ async function tick(ctx: KindContext, lines: string[]): Promise<string | null> {
             .map((one) => ({ ...here.get(lower(one.name))!, name: one.name }));
         const hurtHiders = run.entrants.filter(
             (one) =>
-                here.has(lower(one.name)) &&
-                !hs.seeks(state, one.name) &&
-                hurt.has(lower(one.name))
+                here.has(lower(one.name)) && !hs.seeks(state, one.name) && hurt.has(lower(one.name))
         );
         const attackers = await hitsService.attackers(
             ctx,

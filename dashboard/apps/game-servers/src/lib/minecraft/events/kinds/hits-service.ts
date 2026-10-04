@@ -25,7 +25,8 @@ export async function ensure(ctx: KindContext): Promise<boolean> {
         console.warn("polaris: the event pack could not be put on", String(error));
         return false;
     });
-    if (!on) console.warn("polaris: an arena's hits are read by statistics", ctx.server.installedAppId);
+    if (!on)
+        console.warn("polaris: an arena's hits are read by statistics", ctx.server.installedAppId);
     if (packs.size >= 16) packs.delete(packs.keys().next().value!);
     packs.set(ctx.run.id, on);
     return on;

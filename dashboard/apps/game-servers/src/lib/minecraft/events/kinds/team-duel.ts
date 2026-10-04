@@ -52,8 +52,7 @@ export function healthOf(
 ): Map<string, number> {
     const health = new Map(read);
     const known = new Set([...read.keys()].map((name) => name.toLowerCase()));
-    for (const name of on)
-        if (!known.has(name.toLowerCase())) health.set(name, FULL_HEALTH);
+    for (const name of on) if (!known.has(name.toLowerCase())) health.set(name, FULL_HEALTH);
     return health;
 }
 export const READ_DEALT = `execute as @a run scoreboard players get @s ${DEALT}`;
@@ -252,9 +251,7 @@ export function creditFor(
     attacker?: string | null
 ): string | null {
     if (attacker !== undefined)
-        return (
-            rivals.find((name) => name.toLowerCase() === (attacker ?? "").toLowerCase()) ?? null
-        );
+        return rivals.find((name) => name.toLowerCase() === (attacker ?? "").toLowerCase()) ?? null;
     const killer = rivals.find((name) => (killsSince.get(name) ?? 0) > 0);
     if (killer) return killer;
     let best: string | null = null;
