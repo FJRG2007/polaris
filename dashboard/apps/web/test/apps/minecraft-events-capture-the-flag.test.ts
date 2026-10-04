@@ -99,8 +99,12 @@ describe("capture the flag's arena", () => {
         });
     });
 
-    it("comes down whole: every block it is built of is in its list", () => {
+    it("comes down whole: every block it is built of is in its list, the banners before their floor", () => {
         for (const one of fills) expect(ctf.ARENA_BLOCKS).toContain(one.block.replace(/\[.*$/, ""));
+        const lines = arena.teardown({ box, blocks: [...ctf.ARENA_BLOCKS] });
+        const banner = lines.findIndex((line) => line.endsWith("replace minecraft:blue_banner"));
+        const floor = lines.findIndex((line) => line.endsWith("replace minecraft:blue_concrete"));
+        expect(banner).toBeLessThan(floor);
     });
 
     it("stands each flag on a light at its own end, the teams starting in front of their own", () => {

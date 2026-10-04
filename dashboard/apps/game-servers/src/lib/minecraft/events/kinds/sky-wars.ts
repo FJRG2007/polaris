@@ -105,8 +105,11 @@ export const PLACE_ON: readonly string[] = [
     ...BRIDGES
 ];
 
-/** Every kind of block the arena holds, built or placed, as bare ids. */
+/** Every kind of block the arena holds, built or placed, as bare ids: the
+ *  flowers first, which come down before the grass they grow on
+ *  (`arena.teardown`). */
 export const ARENA_BLOCKS: readonly string[] = [
+    ...FLOWERS,
     BARRIER,
     GLASS,
     GRASS,
@@ -116,7 +119,6 @@ export const ARENA_BLOCKS: readonly string[] = [
     LOG,
     "minecraft:oak_leaves",
     BOULDER,
-    ...FLOWERS,
     CHEST,
     ...BRIDGES
 ];

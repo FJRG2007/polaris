@@ -453,6 +453,12 @@ new map:
   spare, cannot reach the middle. Over 4,100 seeds from two to eight
   players: no rule broken; the ring 19 to 26 blocks across up to six
   players, 24 to 31 for eight.
+- **What hangs comes down first**: a flower, a ladder or a banner whose
+  support is taken away drops as an item nobody owns. `arena.teardown`
+  takes a kind at a time over the whole box, in the order the arena lists
+  its blocks, and a map lists what hangs first (`ARENA_BLOCKS`,
+  `HALL_BLOCKS`). Built, the order is the other way: what holds a thing up
+  goes in before it.
 - **Nothing a player places is outside the box**: a block goes only against a
   block within reach (`sky-wars.REACH`, six with the block), so the box
   reaches `MARGIN` (twelve) past the play area on every side - room for that

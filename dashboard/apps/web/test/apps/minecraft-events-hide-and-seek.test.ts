@@ -105,6 +105,14 @@ describe("hide and seek's hall in the world", () => {
         expect(flipped.some((one) => one.block === "minecraft:ladder[facing=north]")).toBe(true);
     });
 
+    it("comes down with its ladder before the post the ladder hangs on", () => {
+        const lines = arena.teardown({ box, blocks: [...hs.HALL_BLOCKS] });
+        const ladder = lines.findIndex((line) => line.endsWith("replace minecraft:ladder"));
+        const post = lines.findIndex((line) => line.endsWith("replace minecraft:spruce_log"));
+        expect(ladder).toBeGreaterThanOrEqual(0);
+        expect(ladder).toBeLessThan(post);
+    });
+
     it("takes the cage down by its barrier alone, inside its own box", () => {
         const cage = hs.cageBox(box, layout);
         expect(cage.x2 - cage.x1).toBe(4);

@@ -77,8 +77,10 @@ const PIECE_BLOCKS = {
     stack: "minecraft:barrel[facing=up]"
 } as const;
 
-/** Every kind of block the hall is built of, as bare ids. */
+/** Every kind of block the hall is built of, as bare ids: the ladder first,
+ *  which comes down before the post it hangs on (`arena.teardown`). */
 export const HALL_BLOCKS: readonly string[] = [
+    LADDER,
     BARRIER,
     OUTER,
     FLOOR,
@@ -88,7 +90,6 @@ export const HALL_BLOCKS: readonly string[] = [
     POST,
     RAIL,
     STAIR,
-    LADDER,
     "minecraft:bricks",
     "minecraft:oak_leaves",
     "minecraft:barrel"

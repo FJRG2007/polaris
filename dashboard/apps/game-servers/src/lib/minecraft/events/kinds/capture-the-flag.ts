@@ -70,15 +70,16 @@ const COVER = {
     pillar: "minecraft:chiseled_stone_bricks"
 } as const;
 
-/** Every kind of block the arena is built of. */
+/** Every kind of block the arena is built of: the banners first, which come
+ *  down before the floor they stand on (`arena.teardown`). */
 export const ARENA_BLOCKS: readonly string[] = [
+    ...BANNERS,
     BARRIER,
     RIM,
     LIGHT,
     FIELD_FLOOR,
     MID_LINE,
     ...BASE_FLOORS,
-    ...BANNERS,
     ...Object.values(COVER)
 ];
 

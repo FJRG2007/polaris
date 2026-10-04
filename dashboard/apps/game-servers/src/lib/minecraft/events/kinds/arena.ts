@@ -136,13 +136,22 @@ export function fillKeep(box: Box, block: string): string {
 /**
  * The arena taken down: every kind of block it used replaced with air, and
  * nothing else, inside its own box and nowhere else.
+ *
+ * A kind at a time over the whole box, in the order the arena lists them: a
+ * flower, a ladder or a banner listed first comes down before what holds it
+ * up. Taken the other way - every kind in the lowest slice, then the next -
+ * the ground of one slice went first, and what stood on it in the slice over
+ * it dropped as an item nobody owns.
  */
 export function teardown(arena: Arena): string[] {
-    return slices(arena.box).flatMap((piece) =>
-        arena.blocks
-            .filter((block) => ITEM_ID.test(block))
-            .map((block) => `${IN_OVERWORLD} fill ${region(piece)} minecraft:air replace ${block}`)
-    );
+    const pieces = slices(arena.box);
+    return arena.blocks
+        .filter((block) => ITEM_ID.test(block))
+        .flatMap((block) =>
+            pieces.map(
+                (piece) => `${IN_OVERWORLD} fill ${region(piece)} minecraft:air replace ${block}`
+            )
+        );
 }
 
 /** Whether a fill could not reach its blocks, and has to be tried again. */

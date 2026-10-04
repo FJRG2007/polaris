@@ -144,6 +144,19 @@ describe("SkyWars' arena in the world", () => {
         expect(fills.length).toBeLessThan(600);
     });
 
+    it("comes down a kind at a time over the whole box, the flowers before the grass they grow on", () => {
+        const lines = arena.teardown({ box, blocks: [...sw.ARENA_BLOCKS] });
+        expect(arena.slices(box).length).toBeGreaterThan(1);
+        const flowers = lines
+            .map((line, index) =>
+                /(poppy|dandelion|cornflower|oxeye_daisy)$/.test(line) ? index : -1
+            )
+            .filter((index) => index >= 0);
+        const grass = lines.findIndex((line) => line.endsWith("replace minecraft:grass_block"));
+        expect(Math.max(...flowers)).toBeLessThan(grass);
+        expect(lines).toHaveLength(arena.slices(box).length * sw.ARENA_BLOCKS.length);
+    });
+
     it("leaves room past the play area on every side for a player's reach, walled in barrier", () => {
         expect(sw.MARGIN).toBeGreaterThanOrEqual(2 * sw.REACH);
         expect(play.x1 - box.x1).toBe(sw.MARGIN);
