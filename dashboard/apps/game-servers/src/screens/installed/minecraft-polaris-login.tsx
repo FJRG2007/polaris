@@ -155,8 +155,9 @@ export function useLoginState(
         };
         const onReturn = (): void => {
             if (!live || document.hidden || inFlight) return;
-            if (sinceRead() < RETURN_GAP_MS) return;
-            void cycle();
+            const since = sinceRead();
+            if (since >= RETURN_GAP_MS) void cycle();
+            else if (every && !timer) timer = setTimeout(() => void cycle(), RETURN_GAP_MS - since);
         };
         // A cadence that changed because of the answer just read waits out the
         // rest of the new one rather than asking the same question again at once.

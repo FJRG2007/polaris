@@ -205,6 +205,29 @@ describe("a password set in game on the players table", () => {
         expect(within(steveRow()).getByText("password set")).toBeTruthy();
     });
 
+    it("keeps the beat when the tab is back moments after a read answered while hidden", async () => {
+        let answer: (value: { state?: LoginState; error?: string }) => void = () => {};
+        vi.mocked(loginActions.loginStateAction).mockImplementationOnce(
+            () => new Promise((resolve) => (answer = resolve))
+        );
+        render(<LivePlayers initial={NOBODY} />);
+        await pass(LOGIN_LIVE_MS);
+        expect(loginActions.loginStateAction).toHaveBeenCalledTimes(1);
+
+        hidden = true;
+        document.dispatchEvent(new Event("visibilitychange"));
+        await act(async () => answer({ state: NOBODY }));
+        hidden = false;
+        document.dispatchEvent(new Event("visibilitychange"));
+        await pass(0);
+        expect(loginActions.loginStateAction).toHaveBeenCalledTimes(1);
+
+        vi.mocked(loginActions.loginStateAction).mockResolvedValue({ state: STEVE });
+        await pass(LOGIN_LIVE_MS);
+        expect(loginActions.loginStateAction).toHaveBeenCalledTimes(2);
+        expect(within(steveRow()).getByText("password set")).toBeTruthy();
+    });
+
     it("reads at once when the window is focused again from the game", async () => {
         vi.mocked(loginActions.loginStateAction).mockResolvedValue({ state: STEVE });
         render(<LivePlayers initial={NOBODY} />);
