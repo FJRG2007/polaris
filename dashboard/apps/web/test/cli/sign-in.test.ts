@@ -20,7 +20,7 @@ interface Row {
 let authorizations: Row[] = [];
 let users: Row[] = [];
 let held: string[] = [];
-const minted: { userId: string; input: Row; kind?: string }[] = [];
+const minted: { userId: string; input: Row; kind?: string; client?: Row }[] = [];
 const revoked: { userId: string; id: string }[] = [];
 
 function match(row: Row, where: Row): boolean {
@@ -72,15 +72,25 @@ vi.mock("@polaris/db", () => ({
 
 vi.mock("@polaris/auth", () => ({
     scopesAvailableTo: async () => held,
-    createApiKey: async (userId: string, input: Row, options: { kind?: string } = {}) => {
-        minted.push({ userId, input, kind: options.kind });
+    createApiKey: async (
+        userId: string,
+        input: Row,
+        options: { kind?: string; client?: Row } = {}
+    ) => {
+        minted.push({ userId, input, kind: options.kind, client: options.client });
         return {
             id: `key-${minted.length}`,
             prefix: "plk_abc",
             secret: `plk_abc.secret-${minted.length}`
         };
-    },
-    revokeApiKey: async (userId: string, id: string) => void revoked.push({ userId, id })
+    }
+}));
+
+vi.mock("@/lib/cli/sessions", () => ({
+    revokeCliSession: async (userId: string, id: string) => {
+        revoked.push({ userId, id });
+        return true;
+    }
 }));
 
 const { answerCliSignIn, claimCliSignIn, cliOs, describeCliSignIn, endCliSignIn, openCliSignIn } =
@@ -167,6 +177,13 @@ describe("collecting it", () => {
             account: { id: ADA, email: "ada@example.com" }
         });
         expect(minted[0]).toMatchObject({ userId: ADA, kind: "cli" });
+        // What the sessions screen lists it by.
+        expect(minted[0]!.client).toEqual({
+            name: "ada-laptop",
+            os: "macOS",
+            version: "0.4.6",
+            ip: "203.0.113.4"
+        });
         expect(minted[0]!.input).toMatchObject({
             name: "CLI - ada-laptop",
             scopes: ["deploy.read", "deploy.manage"],

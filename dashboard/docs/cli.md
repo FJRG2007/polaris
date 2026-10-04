@@ -58,9 +58,20 @@ or with `--browserless`, it prints the address and the code to type on any
 device instead. The code is good for five minutes.
 
 What you approve is an API key of kind CLI, limited to Deploy (`deploy.read`,
-`deploy.manage`, and never more than your account holds), valid for a year. It
-is listed under **Account > API keys** with a CLI badge, where you can revoke
-it. `plr logout` revokes it too.
+`deploy.manage`, and never more than your account holds), valid for a year.
+
+That key is the sign-in, and it shows in two places that act on the same row:
+
+- **Account > Sessions**, as a session: the computer, its system, the CLI
+  version, the address it was approved from, and when and where it was last
+  used (recorded at most once a minute, at once when the address changes). Sign
+  it out there, lock it to its address like any session, or sign out
+  everywhere, which includes every CLI sign-in. An administrator sees and can
+  end it in their view of the account.
+- **Account > API keys**, with a CLI badge that links to Sessions.
+
+`plr logout` revokes it too. Once it is ended anywhere, the CLI's next command
+says it was signed out from Polaris and to run `plr login`.
 
 The key is kept in the system keychain (macOS Keychain, the Windows Credential
 Locker, or libsecret on Linux). Where there is none, it goes to

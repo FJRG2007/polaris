@@ -22,6 +22,7 @@ import { useRouter } from "next/navigation";
 import type { RoleOption } from "@/lib/role-service";
 import { banLengthOptions } from "../ban-lengths";
 import { useConfirm } from "@/components/confirm-dialog";
+import type { CliSessionView } from "@/lib/cli/sessions";
 import type { SessionView } from "@/lib/session-directory";
 import { SessionsTable } from "@/components/sessions-table";
 import type { DirectoryUser } from "@/lib/user-admin-service";
@@ -41,6 +42,7 @@ import {
 import {
     banUserAction,
     deleteUserAction,
+    revokeUserCliSessionAction,
     revokeUserSessionAction,
     revokeUserSessionsAction,
     setAdminAccessAction,
@@ -87,11 +89,13 @@ export function AccountView({
     // Null until the list arrives, so the section holds its shape rather than the
     // page waiting on a query nothing above it needs.
     const [sessions, setSessions] = useState<SessionView[] | null>(null);
+    const [cliSessions, setCliSessions] = useState<CliSessionView[]>([]);
 
     /** The open sessions, re-read whenever an action may have ended one. */
     const loadSessions = useCallback(async () => {
         const result = await userSessionsAction(user.id);
         setSessions(result.sessions ?? []);
+        setCliSessions(result.cliSessions ?? []);
     }, [user.id]);
 
     useEffect(() => {
@@ -241,7 +245,7 @@ export function AccountView({
                             <Button
                                 size="sm"
                                 variant="ghost"
-                                disabled={busy || sessions?.length === 0}
+                                disabled={busy || (sessions?.length === 0 && cliSessions.length === 0)}
                                 onClick={() => void run(() => revokeUserSessionsAction(user.id))}
                             >
                                 <LogOut className="size-4" />
@@ -255,6 +259,10 @@ export function AccountView({
                                 busyId={busy ? "all" : null}
                                 emptyLabel={t("usersDetail.account.sessions.empty")}
                                 onRevoke={(session) => void run(() => revokeUserSessionAction(user.id, session.id))}
+                                cliSessions={cliSessions}
+                                onSignOutCli={(session) =>
+                                    void run(() => revokeUserCliSessionAction(user.id, session.id))
+                                }
                             />
                         ) : (
                             <Skeleton className="h-24 w-full rounded-lg" />

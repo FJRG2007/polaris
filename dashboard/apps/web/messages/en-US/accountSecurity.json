@@ -96,7 +96,8 @@
         "sessionGone": "That session is no longer signed in.",
         "deviceForgotten": "That device is no longer remembered.",
         "unknownConnection": "Unknown connection.",
-        "connectionEnded": "That connection has already ended."
+        "connectionEnded": "That connection has already ended.",
+        "cliEnded": "That command-line sign-in has already ended."
     },
     "phone": {
         "confirmationMessage": "{code} is your Polaris confirmation code. It expires in {minutes} minutes."
@@ -189,6 +190,11 @@
             "forgetButton": "Ask this device for a code again",
             "stopNamed": "Stop remembering {device}",
             "stopThis": "Stop remembering this device"
+        },
+        "cli": {
+            "title": "Sign this command line out?",
+            "description": "plr on {name} stops working at its next command and asks to sign in again with plr login.",
+            "confirm": "Sign out"
         }
     },
     "stepUp": {

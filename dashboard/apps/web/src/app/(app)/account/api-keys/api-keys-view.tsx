@@ -355,10 +355,12 @@ function KeyRow({
                     </Link>
                     {/* Which keys a terminal is holding, so somebody cleaning up
                         the list can tell a laptop's sign-in from a pipeline's key. */}
+                    {/* The key is the sign-in; Sessions lists the same row as a
+                        session, so the badge leads there. */}
                     {entry.kind === "cli" ? (
-                        <Badge variant="neutral" title={t("apiKeys.list.cli.title")}>
-                            {t("apiKeys.list.cli.badge")}
-                        </Badge>
+                        <Link href="/account/sessions" className="shrink-0 no-underline" title={t("apiKeys.list.cli.title")}>
+                            <Badge variant="neutral">{t("apiKeys.list.cli.badge")}</Badge>
+                        </Link>
                     ) : null}
                     {/* Only when it is not what a key normally is. A row that
                         says "Active" on every line says nothing on any of

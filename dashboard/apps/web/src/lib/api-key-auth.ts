@@ -11,6 +11,7 @@
  */
 
 import { touchApiKey, verifyApiKey, type ApiKeyKind } from "@polaris/auth";
+import { cliAddressAllows } from "@/lib/cli/sessions";
 import { evaluateAccountAccess } from "@/lib/network-rules";
 import { userAgentAllowed, type Permission } from "@polaris/core";
 import { clientIp, clientUserAgent } from "@/lib/request-context";
@@ -58,6 +59,11 @@ export async function authenticateApiKey(request: Request): Promise<ApiKeyPrinci
     // A user-agent is written by whoever makes the request, so this narrows a
     // credential that has already been proven; it never stands in for proving one.
     if (!userAgentAllowed(verified.clients, userAgent)) return null;
+
+    // A CLI sign-in is also a session, and answers to the address lock like
+    // one: used from somewhere other than where it was last seen while locked,
+    // it is signed out rather than let through.
+    if (verified.kind === "cli" && !(await cliAddressAllows(verified, ip))) return null;
 
     await touchApiKey(verified.id, ip, userAgent);
     return {

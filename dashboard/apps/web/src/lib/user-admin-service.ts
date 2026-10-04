@@ -20,6 +20,7 @@ import { discardPersonalDrive } from "@/lib/personal-drive";
 import { revokeSessionsRefusedByRules } from "@/lib/session-guard";
 import { parseStringList, type AccessRulesInput } from "@polaris/core";
 import { notifySessionsClosed } from "@/lib/notifications/session-events";
+import { revokeCliSession, revokeCliSessions } from "@/lib/cli/sessions";
 import { revokeExtensionSessions } from "@/lib/extension/sessions";
 import { markPrincipalsMoved, updateEnforcedRules, type AccessGroupView } from "@polaris/auth";
 import { readerWords } from "@/lib/i18n/reader-words";
@@ -184,8 +185,9 @@ async function wouldStrandInstance(userId: string): Promise<boolean> {
 async function dropSessions(userId: string): Promise<number> {
     const { count } = await prisma.session.deleteMany({ where: { userId } });
     const extensions = await revokeExtensionSessions(userId);
+    const terminals = await revokeCliSessions(userId);
     await markPrincipalsMoved([userId]);
-    return count + extensions;
+    return count + extensions + terminals;
 }
 
 /** The longest a suspension can run before it is simply a ban. A year, so a
@@ -464,6 +466,31 @@ export async function revokeSessionForUser(
         userId,
         count: result.count,
         reason: "An administrator ended one of your sessions."
+    });
+    return {};
+}
+
+/** End one of somebody's command-line sign-ins - the same safety valve as
+ *  ending one of their sessions, and told to them the same way. */
+export async function revokeCliSessionForUser(
+    actorId: string,
+    userId: string,
+    keyId: string
+): Promise<{ error?: string }> {
+    if (!(await revokeCliSession(userId, keyId))) {
+        return { error: (await readerWords("api"))("refusals.users.sessionEnded") };
+    }
+    await recordAudit({
+        actorId,
+        action: "user.cli.revoke",
+        targetType: "apiKey",
+        targetId: keyId,
+        metadata: { userId }
+    });
+    await notifySessionsClosed({
+        userId,
+        count: 1,
+        reason: "An administrator signed out one of your command-line sign-ins."
     });
     return {};
 }

@@ -261,7 +261,7 @@
             "edit": "Editar",
             "cli": {
                 "badge": "CLI",
-                "title": "Creada por plr login en un equipo. plr logout la revoca."
+                "title": "Creada por plr login en un equipo. También aparece en Sesiones, donde se puede cerrar; plr logout también la revoca."
             }
         },
         "form": {

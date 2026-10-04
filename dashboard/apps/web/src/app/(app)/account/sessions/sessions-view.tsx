@@ -21,6 +21,7 @@ import { Check, LogOut, ScanLine, X } from "lucide-react";
 import { RelativeTime } from "@/components/relative-time";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { VaultClientRow } from "@/lib/vault/devices";
+import type { CliSessionView } from "@/lib/cli/sessions";
 import type { ExtensionSessionView } from "@/lib/extension/sessions";
 import { TrustedDevicesCard } from "./trusted-devices-card";
 import { signInParts, signInText } from "@/lib/sign-in-words";
@@ -31,9 +32,11 @@ import {
     disconnectExtensionAction,
     noteSignOutAction,
     revokeOtherSessionsAction,
+    pinCliSessionAction,
     pinExtensionAction,
     pinSessionAction,
-    revokeSessionAction
+    revokeSessionAction,
+    signOutCliSessionAction
 } from "./actions";
 import {
     Button,
@@ -74,7 +77,8 @@ export function SessionsView({
     sessions,
     trusted,
     extensions,
-    clients
+    clients,
+    cliSessions
 }: {
     sessions: SessionView[];
     /** Browsers allowed to skip the second-factor challenge. Empty on an account
@@ -88,6 +92,8 @@ export function SessionsView({
      *  the extension is this account signed in from the same machine as the row
      *  beside it, and listing it separately said it was something external. */
     clients: VaultClientRow[];
+    /** The command-line sign-ins, listed and ended like any other session. */
+    cliSessions: CliSessionView[];
 }) {
     const router = useRouter();
     const t = useTranslations("accountSecurity");
@@ -100,7 +106,8 @@ export function SessionsView({
     const active = sessions.filter((session) => session.approval !== "pending");
     const others = active.filter((session) => !session.current);
     // What "everywhere else" reaches: the other browsers and every extension.
-    const elsewhere = others.length + extensions.length;
+    // And every command-line sign-in: none of them is the browser this is.
+    const elsewhere = others.length + extensions.length + cliSessions.length;
 
     /** Refusing is immediate; allowing goes through the PIN prompt first. */
     async function deny(sessionId: string) {
@@ -123,6 +130,33 @@ export function SessionsView({
         setBusyId(session.id);
         setError(null);
         const result = await revokeSessionAction(session.id);
+        setBusyId(null);
+        if (result.error) setError(result.error);
+        else router.refresh();
+    }
+
+    /** Sign a command-line sign-in out. Its key is revoked, so the CLI's next
+     *  command says it was signed out and to run plr login. */
+    async function signOutCli(session: CliSessionView) {
+        const ok = await confirm({
+            title: t("sessions.cli.title"),
+            description: t("sessions.cli.description", { name: session.name }),
+            confirmLabel: t("sessions.cli.confirm"),
+            danger: true
+        });
+        if (!ok) return;
+        setBusyId(session.id);
+        setError(null);
+        const result = await signOutCliSessionAction(session.id);
+        setBusyId(null);
+        if (result.error) setError(result.error);
+        else router.refresh();
+    }
+
+    async function pinCli(session: CliSessionView, pinned: boolean | null) {
+        setBusyId(session.id);
+        setError(null);
+        const result = await pinCliSessionAction(session.id, pinned);
         setBusyId(null);
         if (result.error) setError(result.error);
         else router.refresh();
@@ -288,6 +322,9 @@ export function SessionsView({
                             void (session.current ? signOutHere() : revoke(session))
                         }
                         onPin={(session, pinned) => void pin(session, pinned)}
+                        cliSessions={cliSessions}
+                        onSignOutCli={(session) => void signOutCli(session)}
+                        onPinCli={(session, pinned) => void pinCli(session, pinned)}
                     />
 
                     {/* The table says nothing about apps until one is connected,
@@ -295,7 +332,7 @@ export function SessionsView({
                         with no rows this page answers neither "is anything
                         connected" nor "where do I go about it", which is the
                         question that brings people here. */}
-                    {extensions.length === 0 && clients.length === 0 ? (
+                    {extensions.length === 0 && clients.length === 0 && cliSessions.length === 0 ? (
                         <p className="text-xs text-muted-foreground">
                             {t.rich("sessions.active.nothingElse", {
                                 link: (chunks) => (

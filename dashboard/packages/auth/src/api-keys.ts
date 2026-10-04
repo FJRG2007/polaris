@@ -94,6 +94,24 @@ export interface VerifiedApiKey {
      *  Surfaces that reach projects narrow such a key to this one. */
     projectId: string | null;
     kind: ApiKeyKind;
+    /** Where it was last presented from, for the address lock a CLI sign-in
+     *  answers to like a session does. */
+    lastUsedIp: string | null;
+    /** A CLI sign-in's own answer to that lock; null follows the account's rule. */
+    pinToAddress: boolean | null;
+    /** The system a CLI sign-in reported, which the account's rule reads
+     *  ("computers only"). Null on every other key. */
+    clientOs: string | null;
+}
+
+/** What a CLI sign-in says about the computer it runs on. Labels, never
+ *  decisions: the CLI wrote them. */
+export interface ApiKeyClient {
+    readonly name: string;
+    readonly os: string;
+    readonly version: string | null;
+    /** The address the sign-in was approved from, read off that request. */
+    readonly ip: string | null;
 }
 
 /** The public half of a key: "plk_" plus 8 URL-safe characters. */
@@ -122,6 +140,12 @@ function dayKey(at: Date): string {
  *  the caller's to choose. */
 const MAX_USER_AGENT = 512;
 
+/** How often the "last used" stamp is written for a key in steady use. A key
+ *  answering a call a second does not need a write a second to say it is in
+ *  use; an address change is written at once, since that is what the address
+ *  lock and the sessions screen read. The day's counter still counts every call. */
+export const LAST_USED_EVERY_MS = 60_000;
+
 /** When a key stops working: a hand-picked date if there is one, otherwise the
  *  chosen span, and null for a key that never expires. */
 function expiryFor(input: CreateApiKeyInput): Date | null {
@@ -139,7 +163,7 @@ function expiryFor(input: CreateApiKeyInput): Date | null {
 export async function createApiKey(
     userId: string,
     input: CreateApiKeyInput,
-    options: { readonly kind?: ApiKeyKind } = {}
+    options: { readonly kind?: ApiKeyKind; readonly client?: ApiKeyClient } = {}
 ): Promise<{ id: string; prefix: string; secret: string }> {
     const prefix = generatePrefix();
     const secret = `${prefix}.${generateToken()}`;
@@ -164,6 +188,10 @@ export async function createApiKey(
             deniedUserAgents: stringifyList(input.deniedUserAgents),
             expiresAt: expiryFor(input),
             kind: options.kind ?? "key",
+            clientName: options.client?.name ?? null,
+            clientOs: options.client?.os ?? null,
+            clientVersion: options.client?.version ?? null,
+            signedInIp: options.client?.ip ?? null,
             groups: { createMany: { data: owned.map((group) => ({ groupId: group.id })) } }
         },
         select: { id: true }
@@ -335,7 +363,10 @@ export async function verifyApiKey(presented: string): Promise<VerifiedApiKey | 
             deniedUserAgents: parseStringList(row.deniedUserAgents)
         },
         projectId: row.projectId,
-        kind: row.kind === "cli" ? "cli" : "key"
+        kind: row.kind === "cli" ? "cli" : "key",
+        lastUsedIp: row.lastUsedIp,
+        pinToAddress: row.pinToAddress,
+        clientOs: row.clientOs
     };
 }
 
@@ -371,8 +402,17 @@ export async function touchApiKey(
     const now = new Date();
     const day = dayKey(now);
     try {
-        await prisma.apiKey.update({
-            where: { id },
+        // Written only when it is stale or the address moved - one conditional
+        // update, so two calls racing cannot both decide to write.
+        await prisma.apiKey.updateMany({
+            where: {
+                id,
+                OR: [
+                    { lastUsedAt: null },
+                    { lastUsedAt: { lt: new Date(now.getTime() - LAST_USED_EVERY_MS) } },
+                    ...(ip ? [{ lastUsedIp: null }, { lastUsedIp: { not: ip } }] : [])
+                ]
+            },
             data: {
                 lastUsedAt: now,
                 lastUsedIp: ip ?? null,

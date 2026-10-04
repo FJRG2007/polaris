@@ -261,7 +261,7 @@
             "edit": "Edit",
             "cli": {
                 "badge": "CLI",
-                "title": "Made by plr login on a computer. plr logout revokes it."
+                "title": "Made by plr login on a computer. It is also listed under Sessions, where it can be signed out; plr logout revokes it too."
             }
         },
         "form": {

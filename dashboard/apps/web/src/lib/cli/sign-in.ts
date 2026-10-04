@@ -23,7 +23,8 @@
 import { prisma } from "@polaris/db";
 import { generateToken, hashToken } from "@polaris/core/tokens";
 import { CLI_TOKEN_DAYS, isCliScope, type CliScope } from "./scopes";
-import { createApiKey, revokeApiKey, scopesAvailableTo } from "@polaris/auth";
+import { createApiKey, scopesAvailableTo } from "@polaris/auth";
+import { revokeCliSession } from "./sessions";
 import { AUTHORIZATION_POLL_MS, AUTHORIZATION_TTL_MS, newUserCode } from "@/lib/device-code";
 import { createApiKeySchema, describeClient, parseStringList, stringifyList } from "@polaris/core";
 
@@ -252,7 +253,16 @@ export async function claimCliSignIn(
         }),
         scopes
     };
-    const created = await createApiKey(account.id, input, { kind: "cli" });
+    const created = await createApiKey(account.id, input, {
+        kind: "cli",
+        // What the sessions screen shows for this sign-in.
+        client: {
+            name: row.deviceName,
+            os: cliOs(row.requestUserAgent),
+            version: row.clientVersion,
+            ip: row.requestIp
+        }
+    });
     return {
         status: "approved",
         token: created.secret,
@@ -275,6 +285,5 @@ export async function endCliSignIn(principal: {
     readonly kind: string;
 }): Promise<boolean> {
     if (principal.kind !== "cli") return false;
-    await revokeApiKey(principal.userId, principal.keyId);
-    return true;
+    return revokeCliSession(principal.userId, principal.keyId);
 }

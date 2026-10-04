@@ -26,6 +26,7 @@ import { translate } from "@/lib/i18n/translate";
 import { getUserLocale } from "@/lib/i18n/locale-service";
 import { localized } from "../security/action-messages";
 import { revokeTrustedDevice, revokeTrustedDevices } from "@polaris/auth";
+import { pinCliSession, revokeCliSession } from "@/lib/cli/sessions";
 import { pinExtensionSession, revokeExtensionSession } from "@/lib/extension/sessions";
 import { notifySessionsClosed } from "@/lib/notifications/session-events";
 import {
@@ -55,7 +56,8 @@ type SessionError =
     | "errors.sessionGone"
     | "errors.deviceForgotten"
     | "errors.unknownConnection"
-    | "errors.connectionEnded";
+    | "errors.connectionEnded"
+    | "errors.cliEnded";
 
 /** One of this file's own refusals, in the reader's language. */
 async function refuse(key: SessionError): Promise<{ error: string }> {
@@ -323,6 +325,54 @@ export async function pinExtensionAction(
         actorId: user.id,
         action: "account.extension.pinned",
         targetType: "extension",
+        targetId: parsed.data,
+        metadata: { pinToAddress: pinned }
+    });
+    revalidatePath("/account/sessions");
+    return {};
+}
+
+/**
+ * Sign a command-line sign-in (`plr login`) out.
+ *
+ * It is an API key underneath, so this revokes the key: the CLI's next command
+ * is refused and says it was signed out. The same gate as every other device
+ * action here.
+ */
+export async function signOutCliSessionAction(id: unknown): Promise<{ error?: string }> {
+    const user = await requireUser();
+    const blocked = await newDeviceRefusal(user);
+    if (blocked) return localized({ error: blocked });
+    const parsed = sessionIdSchema.safeParse(id);
+    if (!parsed.success) return refuse("errors.unknownSession");
+
+    if (!(await revokeCliSession(user.id, parsed.data))) return refuse("errors.cliEnded");
+    await recordAudit({
+        actorId: user.id,
+        action: "account.cli.signedOut",
+        targetType: "apiKey",
+        targetId: parsed.data
+    });
+    revalidatePath("/account/sessions");
+    revalidatePath("/account/api-keys");
+    return {};
+}
+
+/** Tie one CLI sign-in to its address, untie it, or hand it back to the
+ *  account's rule - the same three answers, and the same gate, as a session. */
+export async function pinCliSessionAction(id: unknown, pinned: unknown): Promise<{ error?: string }> {
+    const user = await requireUser();
+    const blocked = await newDeviceRefusal(user);
+    if (blocked) return localized({ error: blocked });
+    const parsed = sessionIdSchema.safeParse(id);
+    if (!parsed.success) return refuse("errors.unknownSession");
+    if (pinned !== null && typeof pinned !== "boolean") return refuse("errors.unknownSetting");
+
+    if (!(await pinCliSession(user.id, parsed.data, pinned))) return refuse("errors.cliEnded");
+    await recordAudit({
+        actorId: user.id,
+        action: "account.cli.pinned",
+        targetType: "apiKey",
         targetId: parsed.data,
         metadata: { pinToAddress: pinned }
     });

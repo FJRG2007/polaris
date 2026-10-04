@@ -52,6 +52,7 @@ vi.mock("@polaris/db", () => ({
 vi.mock("@/lib/audit-service", () => ({ recordAudit: async () => undefined }));
 vi.mock("@/lib/session-directory", () => ({ describeOrigin: () => "" }));
 vi.mock("@/lib/extension/sessions", () => ({ revokeExtensionSessions: async () => 0 }));
+vi.mock("@/lib/cli/sessions", () => ({ revokeCliSessions: async () => 0, revokeCliSession: async () => false }));
 vi.mock("@/lib/request-context", () => ({
     clientHost: async () => null,
     clientIp: async () => undefined,

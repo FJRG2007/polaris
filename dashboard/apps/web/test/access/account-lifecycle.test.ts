@@ -35,6 +35,7 @@ const sessionsDeleted = vi.fn(async () => ({ count: 3 }));
 const caseOpened = vi.fn(async () => undefined);
 const grantsRevoked = vi.fn(async () => undefined);
 const extensionsEnded = vi.fn(async () => 1);
+const terminalsEnded = vi.fn(async () => 1);
 
 vi.mock("@polaris/db", () => ({
     prisma: {
@@ -66,6 +67,7 @@ vi.mock("@/lib/notifications/dispatch", () => ({ notify: async () => undefined }
 vi.mock("@/lib/safety-queue", () => ({ openLockdownCase: caseOpened }));
 vi.mock("@/lib/step-up-grant", () => ({ revokeStepUpGrants: grantsRevoked }));
 vi.mock("@/lib/extension/sessions", () => ({ revokeExtensionSessions: extensionsEnded }));
+vi.mock("@/lib/cli/sessions", () => ({ revokeCliSessions: terminalsEnded }));
 
 const lifecycle = await import("@/lib/account-lifecycle");
 
@@ -114,6 +116,11 @@ describe("switching off and deleting", () => {
     it("ends the browser extensions' connections with them", async () => {
         await lifecycle.closeAccount("ada", "disabled");
         expect(extensionsEnded).toHaveBeenCalledWith("ada");
+    });
+
+    it("signs its command-line sign-ins out as well", async () => {
+        await lifecycle.closeAccount("ada", "disabled");
+        expect(terminalsEnded).toHaveBeenCalledWith("ada");
     });
 
     it("marks a deletion as switched off as well, so it disappears straight away", async () => {

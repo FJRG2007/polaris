@@ -705,6 +705,15 @@
             "follow": "seguir el ajuste de tu cuenta",
             "title": "{says}. Pulsa para {then}.",
             "label": "Fijación de dirección de {label}: {says}"
+        },
+        "cli": {
+            "badge": "Terminal",
+            "lockedHint": "Este inicio de sesión solo funciona desde la dirección en la que se usó por última vez",
+            "signedIn": "Sesión iniciada <time></time>",
+            "signedInFrom": "Sesión iniciada <time></time> desde {ip}",
+            "notUsedYet": "Aún sin usar",
+            "named": "Terminal de {name}",
+            "signOutNamed": "Cerrar la sesión de terminal de {name}"
         }
     },
     "modelKeys": {
