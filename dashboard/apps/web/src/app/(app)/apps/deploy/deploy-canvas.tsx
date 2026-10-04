@@ -6,6 +6,11 @@
  * positions and links persist per environment (Environment.layout JSON). Links are
  * organizational for now - a visual map of how services relate - not yet wired to
  * private networking. Full service controls live in the List view.
+ *
+ * The board zooms (the corner controls, or Ctrl/Cmd + wheel towards the pointer)
+ * and pointing at a service lights up the lines that join it, so the shape of a
+ * project with many services can still be read. The arithmetic for both lives
+ * in canvas-geometry.ts.
  */
 
 import { useRouter } from "next/navigation";
@@ -20,14 +25,35 @@ import { DatabaseManageDialog } from "./database-panel";
 import { DbEngineIcon } from "@/components/db-engine-icon";
 import { VolumeDetailDialog, type VolumeTab } from "./volume-detail";
 import { duplicateApplicationAction, saveLayoutAction } from "./actions";
-import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { stageDatabaseDeleteAction, stageServiceDeleteAction } from "./project-actions";
-import { Copy, Files, HardDrive, Loader2, Plus, ScrollText, Settings2, Trash2 } from "lucide-react";
+import {
+    Fragment,
+    useCallback,
+    useEffect,
+    useLayoutEffect,
+    useMemo,
+    useRef,
+    useState
+} from "react";
+import {
+    Copy,
+    Files,
+    HardDrive,
+    Loader2,
+    Maximize2,
+    Plus,
+    ScrollText,
+    Settings2,
+    Trash2,
+    ZoomIn,
+    ZoomOut
+} from "lucide-react";
+import * as geometry from "./canvas-geometry";
+import { dbTone, StatusPill } from "./status-pill";
 import {
     NewServiceDialog,
     SERVICE_TYPES,
     ServiceIcon,
-    dbTone,
     runStateLabel,
     serviceKindOf,
     type ProjectApp,
@@ -36,6 +62,7 @@ import {
     type ServiceView
 } from "./deploy-view";
 import {
+    Button,
     ConfirmDeleteDialog,
     ContextMenu,
     ContextMenuContent,
@@ -145,6 +172,13 @@ function nodesFromEnvironment(
     return [...apps, ...databases];
 }
 
+/** The room a node takes on the board: its card plus the volume strips stacked
+ *  under it, so a line leaving through the bottom clears the strips. */
+function footprintOf(node: CanvasNode, at: Point): geometry.Rect {
+    const strips = node.volumes?.length ?? (node.volume ? 1 : 0);
+    return { x: at.x, y: at.y, w: NODE_W, h: NODE_H + strips * VOL_STRIP_H };
+}
+
 function parseLayout(raw: string): Layout {
     try {
         const parsed = JSON.parse(raw) as Partial<Layout>;
@@ -205,25 +239,12 @@ const DOT_BG: React.CSSProperties = {
     backgroundSize: `${GRID}px ${GRID}px`
 };
 
-const TONE_DOT: Record<Tone, string> = {
-    success: "bg-success-solid",
-    warning: "bg-warning-solid",
-    danger: "bg-danger-solid",
-    idle: "bg-muted-foreground"
-};
-
-/** Status text color, like Railway's "Online" / "Crashed" node label. */
-const TONE_TEXT: Record<Tone, string> = {
-    success: "text-success-ink",
-    warning: "text-warning-ink",
-    danger: "text-danger-ink",
-    idle: "text-muted-foreground"
-};
-
-/** Resting border: neutral, tinted only on failure (Railway keys errors in red). */
+/** Resting border: neutral, tinted on failure (Railway keys errors in red), and
+ *  ringed in amber while a deploy is under way so the one card that is moving is
+ *  the one the eye lands on. */
 const TONE_BORDER: Record<Tone, string> = {
     success: "border-border hover:border-muted-foreground/40",
-    warning: "border-border hover:border-muted-foreground/40",
+    warning: "border-warning-edge shadow-[0_0_0_3px_var(--warning-soft)]",
     danger: "border-danger-edge hover:border-danger-edge",
     idle: "border-border hover:border-muted-foreground/40"
 };
@@ -327,6 +348,45 @@ export function DeployCanvas({
     const posRef = useRef(pos);
     posRef.current = pos;
 
+    // --- zoom ---------------------------------------------------------------
+    // The board is drawn at its own coordinates and scaled as one piece, so the
+    // stored layout never depends on how far the reader happened to be zoomed.
+    const [zoom, setZoom] = useState(1);
+    const zoomRef = useRef(1);
+    // The scroll a zoom change has to land on, applied once the board has been
+    // redrawn at its new size - scrolling before that is clamped to the old one.
+    const pendingScrollRef = useRef<{ left: number; top: number } | null>(null);
+
+    /** Zoom to `next`, holding `anchor` (a point of the frame, the middle when
+     *  omitted) over the same part of the board. */
+    const zoomTo = useCallback((next: number, anchor?: Point) => {
+        const container = containerRef.current;
+        if (!container) return;
+        const target = geometry.clampZoom(next);
+        if (target === zoomRef.current) return;
+        const scroll = pendingScrollRef.current ?? {
+            left: container.scrollLeft,
+            top: container.scrollTop
+        };
+        pendingScrollRef.current = geometry.scrollForZoom(
+            scroll,
+            anchor ?? { x: container.clientWidth / 2, y: container.clientHeight / 2 },
+            zoomRef.current,
+            target
+        );
+        zoomRef.current = target;
+        setZoom(target);
+    }, []);
+
+    useLayoutEffect(() => {
+        const container = containerRef.current;
+        const scroll = pendingScrollRef.current;
+        if (!container || !scroll) return;
+        pendingScrollRef.current = null;
+        container.scrollLeft = scroll.left;
+        container.scrollTop = scroll.top;
+    }, [zoom]);
+
     // Reset when switching environments.
     useEffect(() => {
         setPos(initial.pos);
@@ -345,28 +405,80 @@ export function DeployCanvas({
         [canManage, environment.id]
     );
 
-    // Cursor position in board coordinates.
+    // Cursor position in board coordinates. The board's box on screen is already
+    // scaled, so the offset into it is divided back out of the zoom.
     const toBoard = useCallback((clientX: number, clientY: number): Point => {
         const rect = boardRef.current?.getBoundingClientRect();
-        return { x: clientX - (rect?.left ?? 0), y: clientY - (rect?.top ?? 0) };
+        const scale = zoomRef.current;
+        return {
+            x: (clientX - (rect?.left ?? 0)) / scale,
+            y: (clientY - (rect?.top ?? 0)) / scale
+        };
     }, []);
 
     /** Scroll the board as little as it takes to put a card inside the frame, and
      *  nothing at all when it is already there. */
-    const revealCard = useCallback((point: Point) => {
+    const revealCard = useCallback((at: Point) => {
         const container = containerRef.current;
         if (!container) return;
         const pad = 24;
+        const scale = zoomRef.current;
+        const point = { x: at.x * scale, y: at.y * scale };
+        const width = NODE_W * scale;
+        const height = NODE_H * scale;
         const { scrollLeft, scrollTop, clientWidth, clientHeight } = container;
         if (point.x - pad < scrollLeft) container.scrollLeft = Math.max(0, point.x - pad);
-        else if (point.x + NODE_W + pad > scrollLeft + clientWidth) {
-            container.scrollLeft = point.x + NODE_W + pad - clientWidth;
+        else if (point.x + width + pad > scrollLeft + clientWidth) {
+            container.scrollLeft = point.x + width + pad - clientWidth;
         }
         if (point.y - pad < scrollTop) container.scrollTop = Math.max(0, point.y - pad);
-        else if (point.y + NODE_H + pad > scrollTop + clientHeight) {
-            container.scrollTop = point.y + NODE_H + pad - clientHeight;
+        else if (point.y + height + pad > scrollTop + clientHeight) {
+            container.scrollTop = point.y + height + pad - clientHeight;
         }
     }, []);
+
+    /** Zoom and scroll so every service is in the frame at once. */
+    function fitAll() {
+        const container = containerRef.current;
+        const bounds = geometry.boundsOf(
+            nodes.map((node) => footprintOf(node, posRef.current[node.id] ?? { x: 0, y: 0 }))
+        );
+        if (!container || !bounds) return;
+        const view = geometry.fitView(bounds, {
+            width: container.clientWidth,
+            height: container.clientHeight
+        });
+        const scroll = { left: view.scrollLeft, top: view.scrollTop };
+        if (view.zoom === zoomRef.current) {
+            container.scrollLeft = scroll.left;
+            container.scrollTop = scroll.top;
+            return;
+        }
+        pendingScrollRef.current = scroll;
+        zoomRef.current = view.zoom;
+        setZoom(view.zoom);
+    }
+
+    // Ctrl/Cmd + wheel zooms towards the pointer, as every map and design tool
+    // does; a plain wheel still scrolls the board. A trackpad pinch arrives as a
+    // wheel with ctrlKey set, so it zooms too. Registered by hand because React's
+    // wheel listener is passive and could not stop the page zooming instead.
+    const hasNodes = nodes.length > 0;
+    useEffect(() => {
+        const container = containerRef.current;
+        if (!container) return;
+        function onWheel(event: WheelEvent) {
+            if (!event.ctrlKey && !event.metaKey) return;
+            event.preventDefault();
+            const rect = container!.getBoundingClientRect();
+            zoomTo(zoomRef.current * Math.exp(-event.deltaY * 0.002), {
+                x: event.clientX - rect.left,
+                y: event.clientY - rect.top
+            });
+        }
+        container.addEventListener("wheel", onWheel, { passive: false });
+        return () => container.removeEventListener("wheel", onWheel);
+    }, [hasNodes, zoomTo]);
 
     /**
      * Open the board on the services rather than on the corner it starts in.
@@ -398,15 +510,16 @@ export function DeployCanvas({
                     extentOf - frame
                 )
             );
+        const scale = zoomRef.current;
         container.scrollLeft = offset(
-            Math.min(...points.map((point) => point.x)),
-            Math.max(...points.map((point) => point.x + NODE_W)),
+            Math.min(...points.map((point) => point.x)) * scale,
+            Math.max(...points.map((point) => point.x + NODE_W)) * scale,
             container.clientWidth,
             container.scrollWidth
         );
         container.scrollTop = offset(
-            Math.min(...points.map((point) => point.y)),
-            Math.max(...points.map((point) => point.y + NODE_H)),
+            Math.min(...points.map((point) => point.y)) * scale,
+            Math.max(...points.map((point) => point.y + NODE_H)) * scale,
             container.clientHeight,
             container.scrollHeight
         );
@@ -452,6 +565,17 @@ export function DeployCanvas({
 
     // --- node dragging ------------------------------------------------------
     const [dragId, setDragId] = useState<string | null>(null);
+    // The service the pointer or the keyboard is on, whose lines are lit.
+    const [focusId, setFocusId] = useState<string | null>(null);
+
+    /** Open a node: the service panel for an application, the Manage panel for a
+     *  database. What a click does, and what Enter does on a focused card. */
+    function openNode(id: string) {
+        const app = environment.applications.find((item) => item.id === id);
+        if (app && onOpenService) onOpenService(app);
+        const database = environment.databases.find((item) => item.id === id);
+        if (database) setManaging(database);
+    }
 
     function onNodePointerDown(event: React.PointerEvent, id: string) {
         // Only the primary (left) button drags or opens; a right-click must fall
@@ -467,8 +591,10 @@ export function DeployCanvas({
             if (Math.abs(moveEvent.clientX - start.x) + Math.abs(moveEvent.clientY - start.y) > 4)
                 moved = true;
             if (!canManage || !moved) return;
-            const nx = Math.round((origin.x + moveEvent.clientX - start.x) / 8) * 8;
-            const ny = Math.round((origin.y + moveEvent.clientY - start.y) / 8) * 8;
+            // The pointer moves in screen pixels; the card moves in board ones.
+            const scale = zoomRef.current;
+            const nx = Math.round((origin.x + (moveEvent.clientX - start.x) / scale) / 8) * 8;
+            const ny = Math.round((origin.y + (moveEvent.clientY - start.y) / scale) / 8) * 8;
             setPos((prev) => ({ ...prev, [id]: { x: Math.max(0, nx), y: Math.max(0, ny) } }));
         }
         function up() {
@@ -478,10 +604,7 @@ export function DeployCanvas({
             // A click (no meaningful drag) opens the service detail for app nodes,
             // and a database's Manage panel for database nodes.
             if (!moved) {
-                const app = environment.applications.find((item) => item.id === id);
-                if (app && onOpenService) onOpenService(app);
-                const database = environment.databases.find((item) => item.id === id);
-                if (database) setManaging(database);
+                openNode(id);
                 return;
             }
             if (canManage) persist(posRef.current, links);
@@ -549,9 +672,11 @@ export function DeployCanvas({
         });
     }
 
-    const center = (id: string): Point => {
-        const p = pos[id] ?? { x: 0, y: 0 };
-        return { x: p.x + NODE_W / 2, y: p.y + NODE_H / 2 };
+    const nodeById = new Map(nodes.map((node) => [node.id, node]));
+    const footprint = (id: string): geometry.Rect => {
+        const node = nodeById.get(id);
+        const at = pos[id] ?? { x: 0, y: 0 };
+        return node ? footprintOf(node, at) : { x: at.x, y: at.y, w: NODE_W, h: NODE_H };
     };
 
     // The variable references between services, drawn under the links made by
@@ -566,14 +691,37 @@ export function DeployCanvas({
                     (link.source === edge.target && link.target === edge.source)
             )
     );
-    const nameOf = (id: string): string => nodes.find((node) => node.id === id)?.name ?? "";
+    const nameOf = (id: string): string => nodeById.get(id)?.name ?? "";
 
-    // The link handle sits on the node's right edge, vertically centered - the
-    // in-progress drag line starts there, not from the card centre.
-    const handlePoint = (id: string): Point => {
-        const p = pos[id] ?? { x: 0, y: 0 };
-        return { x: p.x + NODE_W, y: p.y + NODE_H / 2 };
-    };
+    // The service whose lines are lit: the one being dragged or linked from, else
+    // the one under the pointer or the keyboard. Every other line steps back, so
+    // what one service is joined to can be read even on a crowded board.
+    const activeId = dragId ?? pending?.source ?? focusId;
+    const neighbours = activeId
+        ? geometry.neighboursOf(activeId, [...links, ...referenceLines])
+        : new Set<string>();
+    const touchesActive = (edge: Link): boolean =>
+        activeId !== null && (edge.source === activeId || edge.target === activeId);
+
+    // The card a link being dragged would land on, ringed so the drop is aimed.
+    const linkTarget = pending
+        ? nodes.find((node) => {
+              const p = pos[node.id];
+              return (
+                  node.id !== pending.source &&
+                  p &&
+                  pending.cursor.x >= p.x &&
+                  pending.cursor.x <= p.x + NODE_W &&
+                  pending.cursor.y >= p.y &&
+                  pending.cursor.y <= p.y + NODE_H
+              );
+          })?.id
+        : undefined;
+
+    // A service that is deploying keeps the lines into it moving.
+    const inFlight = new Set(
+        nodes.filter((node) => node.tone === "warning").map((node) => node.id)
+    );
 
     // Board extent so it scrolls to fit the furthest node.
     const extent = useMemo(() => {
@@ -674,6 +822,19 @@ export function DeployCanvas({
                             <p className="max-w-xs text-xs text-muted-foreground">
                                 {canManage ? t("canvas.emptyManage") : t("canvas.emptyView")}
                             </p>
+                            {canManage && (
+                                <Button
+                                    size="sm"
+                                    className="mt-2"
+                                    onClick={() => {
+                                        // Not from a right-click, so no spot to land on.
+                                        menuSpawnRef.current = null;
+                                        openNewService("list");
+                                    }}
+                                >
+                                    <Plus /> {t("view.newService")}
+                                </Button>
+                            )}
                         </div>
                     </div>
                 )}
@@ -696,364 +857,543 @@ export function DeployCanvas({
                         className="absolute inset-0 overflow-auto overscroll-contain"
                         style={DOT_BG}
                     >
+                        {/* Sized to the board at the current zoom, so the frame
+                            scrolls exactly as far as the scaled board reaches. */}
                         <div
-                            ref={boardRef}
                             className="relative"
-                            style={{ width: extent.w, height: extent.h }}
+                            style={{ width: extent.w * zoom, height: extent.h * zoom }}
                         >
-                            <svg
-                                className="pointer-events-none absolute inset-0"
-                                width={extent.w}
-                                height={extent.h}
+                            <div
+                                ref={boardRef}
+                                className="absolute left-0 top-0 origin-top-left"
+                                style={{
+                                    width: extent.w,
+                                    height: extent.h,
+                                    transform: zoom === 1 ? undefined : `scale(${zoom})`
+                                }}
                             >
-                                {referenceLines.map((line) => {
-                                    const a = center(line.source);
-                                    const b = center(line.target);
-                                    const midX = (a.x + b.x) / 2;
-                                    return (
-                                        <path
-                                            key={`ref-${line.source}-${line.target}`}
-                                            d={`M ${a.x} ${a.y} C ${midX} ${a.y}, ${midX} ${b.y}, ${b.x} ${b.y}`}
-                                            fill="none"
-                                            stroke="hsl(var(--primary) / 0.55)"
-                                            strokeWidth={1.5}
-                                            strokeDasharray="6 5"
-                                            strokeLinecap="round"
-                                            className="pointer-events-auto"
-                                        >
-                                            <title>
-                                                {t("canvas.referenceLine", {
-                                                    source: nameOf(line.source),
-                                                    target: nameOf(line.target)
-                                                })}
-                                            </title>
-                                        </path>
-                                    );
-                                })}
-                                {links.map((link, index) => {
-                                    const a = center(link.source);
-                                    const b = center(link.target);
-                                    const midX = (a.x + b.x) / 2;
-                                    return (
-                                        <g
-                                            key={`${link.source}-${link.target}-${index}`}
-                                            className="pointer-events-auto"
-                                        >
+                                <svg
+                                    className="pointer-events-none absolute inset-0 overflow-visible"
+                                    width={extent.w}
+                                    height={extent.h}
+                                >
+                                    {referenceLines.map((line) => {
+                                        const path = geometry.edgePath(
+                                            footprint(line.source),
+                                            footprint(line.target)
+                                        );
+                                        const lit = touchesActive(line);
+                                        const moving =
+                                            inFlight.has(line.source) || inFlight.has(line.target);
+                                        return (
                                             <path
-                                                d={`M ${a.x} ${a.y} C ${midX} ${a.y}, ${midX} ${b.y}, ${b.x} ${b.y}`}
+                                                key={`ref-${line.source}-${line.target}`}
+                                                d={path.d}
                                                 fill="none"
-                                                stroke="hsl(var(--muted-foreground) / 0.45)"
-                                                strokeWidth={2}
-                                                strokeLinecap="round"
-                                            />
-                                            {canManage && (
-                                                <circle
-                                                    cx={midX}
-                                                    cy={(a.y + b.y) / 2}
-                                                    r={7}
-                                                    className="cursor-pointer fill-card stroke-border"
-                                                    onClick={() => removeLink(index)}
-                                                >
-                                                    <title>{t("canvas.removeLink")}</title>
-                                                </circle>
-                                            )}
-                                        </g>
-                                    );
-                                })}
-                                {pending && (
-                                    <path
-                                        d={`M ${handlePoint(pending.source).x} ${handlePoint(pending.source).y} L ${pending.cursor.x} ${pending.cursor.y}`}
-                                        fill="none"
-                                        stroke="hsl(var(--primary))"
-                                        strokeWidth={2}
-                                        strokeLinecap="round"
-                                        strokeDasharray="5 5"
-                                    />
-                                )}
-                            </svg>
-
-                            {nodes.map((node) => {
-                                const p = pos[node.id] ?? { x: 0, y: 0 };
-                                const label =
-                                    node.tone === "success" ? t("canvas.online") : node.statusLabel;
-                                const pulsing = node.tone === "warning";
-                                const app = environment.applications.find(
-                                    (item) => item.id === node.id
-                                );
-                                const removing = staged.has(node.id);
-                                const card = (
-                                    <div
-                                        className={`group absolute flex select-none flex-col border bg-elevated transition-[border-color,box-shadow] hover:shadow-popover hover:shadow-black/25 ${
-                                            node.volume || node.volumes?.length
-                                                ? "rounded-t-2xl"
-                                                : "rounded-2xl"
-                                        } ${
-                                            removing
-                                                ? "border-primary/60 ring-1 ring-primary/30"
-                                                : dragId === node.id
-                                                  ? "border-primary ring-1 ring-primary/40"
-                                                  : TONE_BORDER[node.tone]
-                                        } ${canManage ? "cursor-grab active:cursor-grabbing" : ""}`}
-                                        style={{
-                                            left: p.x,
-                                            top: p.y,
-                                            width: NODE_W,
-                                            height: NODE_H
-                                        }}
-                                        onPointerDown={(event) => onNodePointerDown(event, node.id)}
-                                        onContextMenu={(event) => event.stopPropagation()}
-                                    >
-                                        <div
-                                            className={`flex flex-1 flex-col p-4 ${removing ? "opacity-60" : ""}`}
-                                        >
-                                            <div className="flex items-center gap-3">
-                                                {node.engine ? (
-                                                    <DbEngineIcon
-                                                        engine={node.engine}
-                                                        className="size-10 rounded-xl"
-                                                    />
-                                                ) : (
-                                                    <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-muted text-foreground">
-                                                        <ServiceIcon
-                                                            kind={node.kind}
-                                                            className="size-5"
-                                                        />
-                                                    </span>
-                                                )}
-                                                <span className="min-w-0 flex-1 truncate text-base font-semibold">
-                                                    {node.name}
-                                                </span>
-                                            </div>
-                                            <p className="mt-1 flex min-w-0 items-center gap-1.5 text-sm text-muted-foreground">
-                                                {node.elsewhere && (
-                                                    <>
-                                                        <IntegrationLogo
-                                                            slug={node.elsewhere.provider}
-                                                            className="size-3.5 w-4 shrink-0 object-contain"
-                                                        />
-                                                        <span
-                                                            className={`size-1.5 shrink-0 rounded-full ${
-                                                                node.elsewhere.status === "live"
-                                                                    ? "bg-success-solid"
-                                                                    : node.elsewhere.status ===
-                                                                        "failed"
-                                                                      ? "bg-danger-solid"
-                                                                      : "bg-foreground-subtle"
-                                                            }`}
-                                                        />
-                                                    </>
-                                                )}
-                                                <span className="truncate">{node.subtitle}</span>
-                                            </p>
-                                            <div className="mt-auto flex items-center gap-2 text-sm">
-                                                {removing ? (
-                                                    <>
-                                                        <span className="size-2 rounded-full bg-primary" />
-                                                        <span className="text-primary">
-                                                            {t("view.removalPending")}
-                                                        </span>
-                                                    </>
-                                                ) : (
-                                                    <>
-                                                        <span
-                                                            className={`size-2 rounded-full ${TONE_DOT[node.tone]} ${pulsing ? "animate-pulse" : ""}`}
-                                                        />
-                                                        <span
-                                                            className={`capitalize ${TONE_TEXT[node.tone]}`}
-                                                        >
-                                                            {label}
-                                                        </span>
-                                                    </>
-                                                )}
-                                            </div>
-                                        </div>
-                                        {canManage && (
-                                            <button
-                                                type="button"
-                                                title={t("canvas.dragToLink")}
-                                                onPointerDown={(event) =>
-                                                    onHandlePointerDown(event, node.id)
+                                                stroke={
+                                                    lit
+                                                        ? "hsl(var(--primary))"
+                                                        : "hsl(var(--primary) / 0.55)"
                                                 }
-                                                className="absolute -right-1.5 top-1/2 size-3.5 -translate-y-1/2 rounded-full border-2 border-primary bg-card opacity-0 transition-opacity hover:bg-primary group-hover:opacity-100"
-                                            />
-                                        )}
-                                    </div>
-                                );
-                                return (
-                                    <Fragment key={node.id}>
-                                        {canManage ? (
-                                            <ContextMenu>
-                                                <ContextMenuTrigger asChild>
-                                                    {card}
-                                                </ContextMenuTrigger>
-                                                <ContextMenuContent>
-                                                    {app && (
+                                                strokeWidth={lit ? 2 : 1.5}
+                                                strokeDasharray="6 5"
+                                                strokeLinecap="round"
+                                                className={`pointer-events-auto transition-opacity ${
+                                                    activeId && !lit ? "opacity-25" : ""
+                                                } ${moving ? "deploy-edge-flow" : ""}`}
+                                            >
+                                                <title>
+                                                    {t("canvas.referenceLine", {
+                                                        source: nameOf(line.source),
+                                                        target: nameOf(line.target)
+                                                    })}
+                                                </title>
+                                            </path>
+                                        );
+                                    })}
+                                    {links.map((link, index) => {
+                                        const path = geometry.edgePath(
+                                            footprint(link.source),
+                                            footprint(link.target)
+                                        );
+                                        const lit = touchesActive(link);
+                                        const moving =
+                                            inFlight.has(link.source) || inFlight.has(link.target);
+                                        const removeLabel = t("canvas.removeLinkBetween", {
+                                            source: nameOf(link.source),
+                                            target: nameOf(link.target)
+                                        });
+                                        return (
+                                            <g
+                                                key={`${link.source}-${link.target}-${index}`}
+                                                className={`group/edge pointer-events-auto transition-opacity ${
+                                                    activeId && !lit ? "opacity-30" : ""
+                                                }`}
+                                            >
+                                                {/* A wide invisible stroke, so the line can be
+                                                pointed at without pixel hunting. */}
+                                                <path
+                                                    d={path.d}
+                                                    fill="none"
+                                                    stroke="transparent"
+                                                    strokeWidth={16}
+                                                />
+                                                <path
+                                                    d={path.d}
+                                                    fill="none"
+                                                    stroke={
+                                                        lit
+                                                            ? "hsl(var(--primary))"
+                                                            : "hsl(var(--muted-foreground) / 0.45)"
+                                                    }
+                                                    strokeWidth={2}
+                                                    strokeLinecap="round"
+                                                    className="transition-[stroke] group-hover/edge:[stroke:hsl(var(--muted-foreground)/0.8)]"
+                                                />
+                                                {moving && (
+                                                    <path
+                                                        d={path.d}
+                                                        fill="none"
+                                                        stroke="hsl(var(--warning-solid))"
+                                                        strokeWidth={2}
+                                                        strokeLinecap="round"
+                                                        strokeDasharray="4 7"
+                                                        className="deploy-edge-flow"
+                                                    />
+                                                )}
+                                                {canManage && (
+                                                    <g
+                                                        role="button"
+                                                        tabIndex={0}
+                                                        aria-label={removeLabel}
+                                                        transform={`translate(${path.mid.x} ${path.mid.y})`}
+                                                        onClick={() => removeLink(index)}
+                                                        onKeyDown={(event) => {
+                                                            if (
+                                                                event.key !== "Enter" &&
+                                                                event.key !== " "
+                                                            )
+                                                                return;
+                                                            event.preventDefault();
+                                                            removeLink(index);
+                                                        }}
+                                                        className={`cursor-pointer outline-none transition-opacity focus-visible:opacity-100 group-hover/edge:opacity-100 [@media(hover:none)]:opacity-100 [&:focus-visible>circle]:stroke-primary ${
+                                                            lit ? "opacity-100" : "opacity-0"
+                                                        }`}
+                                                    >
+                                                        <title>{removeLabel}</title>
+                                                        <circle
+                                                            r={10}
+                                                            className="fill-card stroke-border"
+                                                            strokeWidth={1.5}
+                                                        />
+                                                        <path
+                                                            d="M -3.5 -3.5 L 3.5 3.5 M 3.5 -3.5 L -3.5 3.5"
+                                                            className="stroke-muted-foreground"
+                                                            strokeWidth={1.5}
+                                                            strokeLinecap="round"
+                                                        />
+                                                    </g>
+                                                )}
+                                            </g>
+                                        );
+                                    })}
+                                    {pending && (
+                                        <path
+                                            d={
+                                                geometry.edgePath(
+                                                    footprint(pending.source),
+                                                    linkTarget
+                                                        ? footprint(linkTarget)
+                                                        : { ...pending.cursor, w: 0, h: 0 }
+                                                ).d
+                                            }
+                                            fill="none"
+                                            stroke="hsl(var(--primary))"
+                                            strokeWidth={2}
+                                            strokeLinecap="round"
+                                            strokeDasharray="5 5"
+                                        />
+                                    )}
+                                </svg>
+
+                                {nodes.map((node) => {
+                                    const p = pos[node.id] ?? { x: 0, y: 0 };
+                                    const label =
+                                        node.tone === "success"
+                                            ? t("canvas.online")
+                                            : node.statusLabel;
+                                    const app = environment.applications.find(
+                                        (item) => item.id === node.id
+                                    );
+                                    const removing = staged.has(node.id);
+                                    const chrome = removing
+                                        ? "border-primary/60 ring-1 ring-primary/30"
+                                        : dragId === node.id || linkTarget === node.id
+                                          ? "border-primary ring-2 ring-primary/40"
+                                          : neighbours.has(node.id)
+                                            ? "border-primary/50"
+                                            : TONE_BORDER[node.tone];
+                                    const card = (
+                                        <div
+                                            role="button"
+                                            tabIndex={0}
+                                            aria-label={t("canvas.openNode", {
+                                                name: node.name,
+                                                status: removing ? t("view.removalPending") : label
+                                            })}
+                                            className={`group absolute flex select-none flex-col border bg-elevated outline-none transition-[border-color,box-shadow] hover:shadow-popover hover:shadow-black/25 focus-visible:ring-2 focus-visible:ring-ring ${
+                                                node.volume || node.volumes?.length
+                                                    ? "rounded-t-2xl"
+                                                    : "rounded-2xl"
+                                            } ${chrome} ${canManage ? "cursor-grab active:cursor-grabbing" : "cursor-pointer"}`}
+                                            style={{
+                                                left: p.x,
+                                                top: p.y,
+                                                width: NODE_W,
+                                                height: NODE_H
+                                            }}
+                                            onPointerDown={(event) =>
+                                                onNodePointerDown(event, node.id)
+                                            }
+                                            onPointerEnter={() => setFocusId(node.id)}
+                                            onPointerLeave={() =>
+                                                setFocusId((current) =>
+                                                    current === node.id ? null : current
+                                                )
+                                            }
+                                            onFocus={() => setFocusId(node.id)}
+                                            onBlur={() =>
+                                                setFocusId((current) =>
+                                                    current === node.id ? null : current
+                                                )
+                                            }
+                                            onKeyDown={(event) => {
+                                                if (event.target !== event.currentTarget) return;
+                                                if (event.key !== "Enter" && event.key !== " ")
+                                                    return;
+                                                event.preventDefault();
+                                                openNode(node.id);
+                                            }}
+                                            onContextMenu={(event) => event.stopPropagation()}
+                                        >
+                                            <div
+                                                className={`flex flex-1 flex-col p-4 ${removing ? "opacity-60" : ""}`}
+                                            >
+                                                <div className="flex items-center gap-3">
+                                                    {node.engine ? (
+                                                        <DbEngineIcon
+                                                            engine={node.engine}
+                                                            className="size-10 rounded-xl"
+                                                        />
+                                                    ) : (
+                                                        <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-muted text-foreground">
+                                                            <ServiceIcon
+                                                                kind={node.kind}
+                                                                className="size-5"
+                                                            />
+                                                        </span>
+                                                    )}
+                                                    <span
+                                                        className="min-w-0 flex-1 truncate text-base font-semibold"
+                                                        title={node.name}
+                                                    >
+                                                        {node.name}
+                                                    </span>
+                                                </div>
+                                                <p className="mt-1 flex min-w-0 items-center gap-1.5 text-sm text-muted-foreground">
+                                                    {node.elsewhere && (
                                                         <>
-                                                            <ContextMenuItem
-                                                                onSelect={() =>
-                                                                    onOpenService?.(app)
-                                                                }
-                                                            >
-                                                                <ScrollText className="size-4" />{" "}
-                                                                {t("canvas.openService")}
-                                                            </ContextMenuItem>
-                                                            <ContextMenuItem
-                                                                onSelect={() => duplicate(app)}
-                                                            >
-                                                                <Copy className="size-4" />{" "}
-                                                                {t("canvas.duplicate")}
-                                                            </ContextMenuItem>
+                                                            <IntegrationLogo
+                                                                slug={node.elsewhere.provider}
+                                                                className="size-3.5 w-4 shrink-0 object-contain"
+                                                            />
+                                                            <span
+                                                                className={`size-1.5 shrink-0 rounded-full ${
+                                                                    node.elsewhere.status === "live"
+                                                                        ? "bg-success-solid"
+                                                                        : node.elsewhere.status ===
+                                                                            "failed"
+                                                                          ? "bg-danger-solid"
+                                                                          : "bg-foreground-subtle"
+                                                                }`}
+                                                            />
                                                         </>
                                                     )}
-                                                    {!app && (
+                                                    <span
+                                                        className="truncate"
+                                                        title={node.subtitle}
+                                                    >
+                                                        {node.subtitle}
+                                                    </span>
+                                                </p>
+                                                <div className="mt-auto flex min-w-0 items-center">
+                                                    {removing ? (
+                                                        <span className="inline-flex items-center gap-1.5 rounded-full border border-primary/40 bg-primary/10 px-2 py-0.5 text-xs text-primary">
+                                                            <span className="size-1.5 rounded-full bg-primary" />
+                                                            {t("view.removalPending")}
+                                                        </span>
+                                                    ) : (
+                                                        <StatusPill
+                                                            tone={node.tone}
+                                                            label={label}
+                                                            // An application's state is already
+                                                            // words; a database's is its raw status.
+                                                            capitalize={!app}
+                                                        />
+                                                    )}
+                                                </div>
+                                            </div>
+                                            {canManage && (
+                                                <button
+                                                    type="button"
+                                                    title={t("canvas.dragToLink")}
+                                                    // Linking is a drag, which a keyboard
+                                                    // cannot do; the card itself is the
+                                                    // keyboard's way in.
+                                                    tabIndex={-1}
+                                                    aria-hidden
+                                                    onPointerDown={(event) =>
+                                                        onHandlePointerDown(event, node.id)
+                                                    }
+                                                    className="absolute -right-1.5 top-1/2 size-3.5 -translate-y-1/2 rounded-full border-2 border-primary bg-card opacity-0 transition-opacity hover:bg-primary group-hover:opacity-100"
+                                                />
+                                            )}
+                                        </div>
+                                    );
+                                    return (
+                                        <Fragment key={node.id}>
+                                            {canManage ? (
+                                                <ContextMenu>
+                                                    <ContextMenuTrigger asChild>
+                                                        {card}
+                                                    </ContextMenuTrigger>
+                                                    <ContextMenuContent>
+                                                        {app && (
+                                                            <>
+                                                                <ContextMenuItem
+                                                                    onSelect={() =>
+                                                                        onOpenService?.(app)
+                                                                    }
+                                                                >
+                                                                    <ScrollText className="size-4" />{" "}
+                                                                    {t("canvas.openService")}
+                                                                </ContextMenuItem>
+                                                                <ContextMenuItem
+                                                                    onSelect={() => duplicate(app)}
+                                                                >
+                                                                    <Copy className="size-4" />{" "}
+                                                                    {t("canvas.duplicate")}
+                                                                </ContextMenuItem>
+                                                            </>
+                                                        )}
+                                                        {!app && (
+                                                            <ContextMenuItem
+                                                                onSelect={() =>
+                                                                    setManaging({
+                                                                        id: node.id,
+                                                                        name: node.name,
+                                                                        engine: node.engine ?? ""
+                                                                    })
+                                                                }
+                                                            >
+                                                                <Settings2 className="size-4" />{" "}
+                                                                {t("view.manage")}
+                                                            </ContextMenuItem>
+                                                        )}
+                                                        <ContextMenuSeparator />
                                                         <ContextMenuItem
+                                                            variant="danger"
+                                                            disabled={removing}
                                                             onSelect={() =>
-                                                                setManaging({
+                                                                setDeleteTarget({
                                                                     id: node.id,
                                                                     name: node.name,
-                                                                    engine: node.engine ?? ""
+                                                                    kind: app
+                                                                        ? "service"
+                                                                        : "database",
+                                                                    hostedCount:
+                                                                        node.hostedCount ?? 0
                                                                 })
                                                             }
                                                         >
-                                                            <Settings2 className="size-4" />{" "}
-                                                            {t("view.manage")}
+                                                            <Trash2 className="size-4" />
+                                                            {removing
+                                                                ? t("view.removalPending")
+                                                                : t("canvas.delete")}
                                                         </ContextMenuItem>
-                                                    )}
-                                                    <ContextMenuSeparator />
-                                                    <ContextMenuItem
-                                                        variant="danger"
-                                                        disabled={removing}
-                                                        onSelect={() =>
-                                                            setDeleteTarget({
-                                                                id: node.id,
-                                                                name: node.name,
-                                                                kind: app ? "service" : "database",
-                                                                hostedCount: node.hostedCount ?? 0
-                                                            })
-                                                        }
-                                                    >
-                                                        <Trash2 className="size-4" />
-                                                        {removing
-                                                            ? t("view.removalPending")
-                                                            : t("canvas.delete")}
-                                                    </ContextMenuItem>
-                                                </ContextMenuContent>
-                                            </ContextMenu>
-                                        ) : (
-                                            card
-                                        )}
-                                        {node.volume && (
-                                            <div
-                                                className="absolute flex items-center gap-2 rounded-b-2xl border border-t-0 border-border bg-card/60 px-4 py-2.5 text-xs text-muted-foreground"
-                                                style={{
-                                                    left: p.x,
-                                                    top: p.y + NODE_H,
-                                                    width: NODE_W
-                                                }}
-                                            >
-                                                <HardDrive className="size-3.5 shrink-0" />{" "}
-                                                {node.volume}
-                                            </div>
-                                        )}
-                                        {node.volumes?.map((vol, vi) => (
-                                            <ContextMenu key={vol.id}>
-                                                <ContextMenuTrigger asChild>
-                                                    <button
-                                                        type="button"
-                                                        onClick={() =>
-                                                            setOpenVolume({
-                                                                id: vol.id,
-                                                                tab: "Metrics"
-                                                            })
-                                                        }
-                                                        onContextMenu={(event) =>
-                                                            event.stopPropagation()
-                                                        }
-                                                        className={`absolute flex items-center gap-2 border border-t-0 border-border bg-card/60 px-4 py-2.5 text-left text-xs text-muted-foreground transition-colors hover:bg-card ${
-                                                            vi === (node.volumes?.length ?? 0) - 1
-                                                                ? "rounded-b-2xl"
-                                                                : ""
-                                                        }`}
-                                                        style={{
-                                                            left: p.x,
-                                                            top: p.y + NODE_H + vi * VOL_STRIP_H,
-                                                            width: NODE_W
-                                                        }}
-                                                    >
-                                                        <HardDrive
-                                                            className={`size-3.5 shrink-0 ${vol.kind === "nas" ? "text-sky-400" : ""}`}
-                                                        />
-                                                        <span className="truncate" title={vol.name}>
-                                                            {vol.name}
-                                                        </span>
-                                                        <span className="ml-auto shrink-0 truncate text-[0.625rem] text-muted-foreground/70">
-                                                            {vol.kind === "nas"
-                                                                ? (vol.connectionName ??
-                                                                  t("canvas.nas"))
-                                                                : vol.kind === "bind"
-                                                                  ? t("canvas.server")
-                                                                  : t("canvas.volume")}
-                                                        </span>
-                                                    </button>
-                                                </ContextMenuTrigger>
-                                                <ContextMenuContent>
-                                                    <ContextMenuItem
-                                                        onSelect={() =>
-                                                            setOpenVolume({
-                                                                id: vol.id,
-                                                                tab: "Metrics"
-                                                            })
-                                                        }
-                                                    >
-                                                        <Settings2 className="size-4" />{" "}
-                                                        {t("canvas.volumeSettings")}
-                                                    </ContextMenuItem>
-                                                    <ContextMenuItem
-                                                        onSelect={() =>
-                                                            setOpenVolume({
-                                                                id: vol.id,
-                                                                tab: "Files"
-                                                            })
-                                                        }
-                                                    >
-                                                        <Files className="size-4" />{" "}
-                                                        {t("canvas.browseFiles")}
-                                                    </ContextMenuItem>
-                                                    <ContextMenuItem
-                                                        onSelect={() =>
-                                                            router.push(
-                                                                volumeDriveHref(node.id, vol)
-                                                            )
-                                                        }
-                                                    >
-                                                        <HardDrive className="size-4" />{" "}
-                                                        {t("canvas.viewInDrive")}
-                                                    </ContextMenuItem>
-                                                    {canManage && (
+                                                    </ContextMenuContent>
+                                                </ContextMenu>
+                                            ) : (
+                                                card
+                                            )}
+                                            {node.volume && (
+                                                <div
+                                                    className="absolute flex items-center gap-2 rounded-b-2xl border border-t-0 border-border bg-card/60 px-4 py-2.5 text-xs text-muted-foreground"
+                                                    style={{
+                                                        left: p.x,
+                                                        top: p.y + NODE_H,
+                                                        width: NODE_W
+                                                    }}
+                                                >
+                                                    <HardDrive className="size-3.5 shrink-0" />{" "}
+                                                    {node.volume}
+                                                </div>
+                                            )}
+                                            {node.volumes?.map((vol, vi) => (
+                                                <ContextMenu key={vol.id}>
+                                                    <ContextMenuTrigger asChild>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() =>
+                                                                setOpenVolume({
+                                                                    id: vol.id,
+                                                                    tab: "Metrics"
+                                                                })
+                                                            }
+                                                            onContextMenu={(event) =>
+                                                                event.stopPropagation()
+                                                            }
+                                                            className={`absolute flex items-center gap-2 border border-t-0 border-border bg-card/60 px-4 py-2.5 text-left text-xs text-muted-foreground transition-colors hover:bg-card ${
+                                                                vi ===
+                                                                (node.volumes?.length ?? 0) - 1
+                                                                    ? "rounded-b-2xl"
+                                                                    : ""
+                                                            }`}
+                                                            style={{
+                                                                left: p.x,
+                                                                top:
+                                                                    p.y + NODE_H + vi * VOL_STRIP_H,
+                                                                width: NODE_W
+                                                            }}
+                                                        >
+                                                            <HardDrive
+                                                                className={`size-3.5 shrink-0 ${vol.kind === "nas" ? "text-sky-400" : ""}`}
+                                                            />
+                                                            <span
+                                                                className="truncate"
+                                                                title={vol.name}
+                                                            >
+                                                                {vol.name}
+                                                            </span>
+                                                            <span className="ml-auto shrink-0 truncate text-[0.625rem] text-muted-foreground/70">
+                                                                {vol.kind === "nas"
+                                                                    ? (vol.connectionName ??
+                                                                      t("canvas.nas"))
+                                                                    : vol.kind === "bind"
+                                                                      ? t("canvas.server")
+                                                                      : t("canvas.volume")}
+                                                            </span>
+                                                        </button>
+                                                    </ContextMenuTrigger>
+                                                    <ContextMenuContent>
                                                         <ContextMenuItem
                                                             onSelect={() =>
                                                                 setOpenVolume({
                                                                     id: vol.id,
-                                                                    tab: "Settings"
+                                                                    tab: "Metrics"
                                                                 })
                                                             }
                                                         >
-                                                            <ScrollText className="size-4" />{" "}
-                                                            {t("canvas.editMount")}
+                                                            <Settings2 className="size-4" />{" "}
+                                                            {t("canvas.volumeSettings")}
                                                         </ContextMenuItem>
-                                                    )}
-                                                </ContextMenuContent>
-                                            </ContextMenu>
-                                        ))}
-                                    </Fragment>
-                                );
-                            })}
+                                                        <ContextMenuItem
+                                                            onSelect={() =>
+                                                                setOpenVolume({
+                                                                    id: vol.id,
+                                                                    tab: "Files"
+                                                                })
+                                                            }
+                                                        >
+                                                            <Files className="size-4" />{" "}
+                                                            {t("canvas.browseFiles")}
+                                                        </ContextMenuItem>
+                                                        <ContextMenuItem
+                                                            onSelect={() =>
+                                                                router.push(
+                                                                    volumeDriveHref(node.id, vol)
+                                                                )
+                                                            }
+                                                        >
+                                                            <HardDrive className="size-4" />{" "}
+                                                            {t("canvas.viewInDrive")}
+                                                        </ContextMenuItem>
+                                                        {canManage && (
+                                                            <ContextMenuItem
+                                                                onSelect={() =>
+                                                                    setOpenVolume({
+                                                                        id: vol.id,
+                                                                        tab: "Settings"
+                                                                    })
+                                                                }
+                                                            >
+                                                                <ScrollText className="size-4" />{" "}
+                                                                {t("canvas.editMount")}
+                                                            </ContextMenuItem>
+                                                        )}
+                                                    </ContextMenuContent>
+                                                </ContextMenu>
+                                            ))}
+                                        </Fragment>
+                                    );
+                                })}
+                            </div>
                         </div>
                     </div>
                     <div
                         className="pointer-events-none absolute inset-0 rounded-lg"
                         style={VIGNETTE}
                     />
+                    <div
+                        role="toolbar"
+                        aria-label={t("canvas.zoomControls")}
+                        aria-orientation="vertical"
+                        className="absolute bottom-3 right-3 z-10 flex flex-col items-center gap-0.5 rounded-lg border border-border bg-elevated/95 p-0.5 shadow-popover backdrop-blur"
+                        // The board's own right-click menu is for adding a service;
+                        // it has nothing to offer over the zoom controls.
+                        onContextMenu={(event) => event.stopPropagation()}
+                    >
+                        <Button
+                            variant="ghost"
+                            size="icon-sm"
+                            aria-label={t("canvas.zoomIn")}
+                            title={t("canvas.zoomIn")}
+                            disabled={zoom >= geometry.ZOOM_MAX}
+                            onClick={() => zoomTo(zoomRef.current * geometry.ZOOM_STEP)}
+                        >
+                            <ZoomIn aria-hidden />
+                        </Button>
+                        <button
+                            type="button"
+                            aria-label={t("canvas.resetZoom")}
+                            title={t("canvas.resetZoom")}
+                            onClick={() => zoomTo(1)}
+                            className="h-6 w-9 rounded text-[0.6875rem] tabular-nums text-muted-foreground transition-colors hover:bg-card-hover hover:text-foreground"
+                        >
+                            {Math.round(zoom * 100)}%
+                        </button>
+                        <Button
+                            variant="ghost"
+                            size="icon-sm"
+                            aria-label={t("canvas.zoomOut")}
+                            title={t("canvas.zoomOut")}
+                            disabled={zoom <= geometry.ZOOM_MIN}
+                            onClick={() => zoomTo(zoomRef.current / geometry.ZOOM_STEP)}
+                        >
+                            <ZoomOut aria-hidden />
+                        </Button>
+                        <span className="my-0.5 h-px w-5 bg-border" aria-hidden />
+                        <Button
+                            variant="ghost"
+                            size="icon-sm"
+                            aria-label={t("canvas.fitView")}
+                            title={t("canvas.fitView")}
+                            onClick={fitAll}
+                        >
+                            <Maximize2 aria-hidden />
+                        </Button>
+                    </div>
                 </div>
             )}
             {canManage && (

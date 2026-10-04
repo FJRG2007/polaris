@@ -605,6 +605,22 @@ dialog.pdfSlick-dialog .dialogButton {
     animation-delay: 0.4s;
 }
 
+/*
+ * A line on the project canvas into a service that is deploying: its dashes
+ * march along it, so the one part of the project that is changing shows where it
+ * sits among the rest. One cycle moves the pattern by exactly its own length
+ * (4 + 7, the dasharray on the line), which is a frame identical to the first.
+ */
+@keyframes polaris-dash-flow {
+    to {
+        stroke-dashoffset: -11;
+    }
+}
+
+.deploy-edge-flow {
+    animation: polaris-dash-flow 0.6s linear infinite;
+}
+
 /* Nothing moves for somebody who asked their machine for less of it. The plate
    still appears - it is information, not decoration - it simply arrives. The
    hand is the same: it is somebody asking to speak, so it is still drawn, still
@@ -622,6 +638,11 @@ dialog.pdfSlick-dialog .dialogButton {
     .typing-dots > span {
         animation: none;
         opacity: 1;
+    }
+
+    /* Still dashed and amber, so the deploy still shows; it just holds still. */
+    .deploy-edge-flow {
+        animation: none;
     }
 }
 

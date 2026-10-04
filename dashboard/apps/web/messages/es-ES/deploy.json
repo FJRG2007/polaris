@@ -300,9 +300,16 @@
         "browseFiles": "Ver archivos",
         "viewInDrive": "Ver en Drive",
         "editMount": "Montaje",
-        "hint": "Arrastra los nodos para colocarlos. Arrastra desde el tirador derecho de un nodo hasta otro servicio para enlazarlos. Haz clic derecho en el tablero para añadir un servicio, o en un servicio para ver más.",
+        "hint": "Arrastra los nodos para colocarlos. Arrastra desde el tirador derecho de un nodo hasta otro servicio para enlazarlos. Haz clic derecho en el tablero para añadir un servicio, o en un servicio para ver más. Mantén Ctrl y desplaza para hacer zoom.",
         "removeService": "Esto elimina el servicio, su contenedor, sus dominios y sus variables.",
-        "deleteServiceTitle": "Borrar servicio"
+        "deleteServiceTitle": "Borrar servicio",
+        "zoomControls": "Zoom",
+        "zoomIn": "Acercar",
+        "zoomOut": "Alejar",
+        "resetZoom": "Volver al 100%",
+        "fitView": "Encuadrar todo",
+        "openNode": "Abrir {name} ({status})",
+        "removeLinkBetween": "Quitar el enlace entre {source} y {target}"
     },
     "projects": {
         "title": "Proyectos",

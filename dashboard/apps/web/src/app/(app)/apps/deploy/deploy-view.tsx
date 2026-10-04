@@ -9,6 +9,7 @@
  */
 
 import { FilesPanel } from "./files-panel";
+import { dbTone, StatusPill } from "./status-pill";
 import * as deployActions from "./actions";
 import { IntegrationLogo } from "@/components/logos";
 import { NewFolderForm } from "./upload-source";
@@ -2204,51 +2205,6 @@ export function RunStatePill({ app }: { app: Pick<ProjectApp, "runState" | "depl
             <StatusPill tone={state.tone} label={state.label} capitalize={false} />
         </span>
     );
-}
-
-export function StatusPill({
-    tone,
-    label,
-    capitalize = true
-}: {
-    tone: "success" | "warning" | "danger" | "idle";
-    label: string;
-    /** Off for a label that is already words in the reader's language: it would
-     *  turn "En marcha" into "En Marcha". On for a raw status like "running". */
-    capitalize?: boolean;
-}) {
-    const dot = {
-        success: "bg-success-solid",
-        warning: "bg-warning-solid",
-        danger: "bg-danger-solid",
-        idle: "bg-muted-foreground"
-    }[tone];
-    // Tint the whole chip by tone so state reads in color at a glance, Railway-style.
-    const chip = {
-        success: "border-success-edge bg-success-soft text-success-ink",
-        warning: "border-warning-edge bg-warning-soft text-warning-ink",
-        danger: "border-danger-edge bg-danger-soft text-danger-ink",
-        idle: "border-border/60 bg-surface text-muted-foreground"
-    }[tone];
-    return (
-        <span
-            className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border px-2 py-0.5 text-xs ${capitalize ? "capitalize" : ""} ${chip}`}
-        >
-            <span
-                className={`size-1.5 rounded-full ${dot} ${tone === "warning" ? "animate-pulse" : ""}`}
-            />
-            {label}
-        </span>
-    );
-}
-
-export function dbTone(status: string): "success" | "warning" | "danger" | "idle" {
-    const value = status.toLowerCase();
-    if (["running", "active", "healthy", "ready"].includes(value)) return "success";
-    if (["failed", "error", "stopped"].includes(value)) return "danger";
-    if (["queued", "provisioning", "deploying", "pending", "building"].includes(value))
-        return "warning";
-    return "idle";
 }
 
 export function DeploymentLogs({
