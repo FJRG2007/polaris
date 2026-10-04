@@ -275,8 +275,14 @@ export async function searchModrinth(
  * nothing a server can run - and finding that out afterwards means a server that
  * comes back up as ordinary vanilla.
  */
-export async function searchModpacks(query: string, version?: string | null): Promise<ModrinthProject[]> {
-    const facets: string[][] = [["project_type:modpack"], ["server_side:required", "server_side:optional"]];
+export async function searchModpacks(
+    query: string,
+    version?: string | null
+): Promise<ModrinthProject[]> {
+    const facets: string[][] = [
+        ["project_type:modpack"],
+        ["server_side:required", "server_side:optional"]
+    ];
     const wanted = (version ?? "").trim();
     if (isGameVersion(wanted)) facets.push([`versions:${wanted}`]);
 
