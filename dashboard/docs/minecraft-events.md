@@ -318,8 +318,11 @@ left out.
     - An item is marked the first time it is seen in a player's inventory
       (`clear <player> <item> 0`, as a gathering reads one) - once the game's
       own statistics say they came by one since the start: picked up (less
-      what they dropped), crafted, smelted or traded for. A stack carried in
-      or taken out of their own chest marks nothing. It is all worked out in
+      what they dropped), crafted, smelted or traded for. Smelted and traded
+      count as the game counts them, as crafted, taken from the furnace's or
+      the villager's result slot by hand: what a hopper pulls out of a
+      furnace has no statistic, and marks nothing. A stack carried in or
+      taken out of their own chest marks nothing. It is all worked out in
       the game, every player in one batch a look, and kept on the scoreboard
       (`pe_bg*`), so a restart finds the marks; a mark is never taken back.
     - The card is shown to everybody at the start, each item named by the
