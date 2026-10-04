@@ -5,6 +5,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { browserZone } from "../time";
+import { EmailLink } from "../contact-links";
 import { useCalendarT } from "../i18n";
 import { hostUi } from "@polaris/app-host/client";
 import { formatRange, StatusNote } from "../public/kit";
@@ -165,12 +166,10 @@ export function BookingsList({ pageId }: { pageId: string }) {
                             <span className="text-muted-foreground">
                                 {formatRange(booking.start, booking.end, zone, locale)}
                             </span>
-                            <a
-                                href={`mailto:${booking.email}`}
-                                className="w-fit max-w-full truncate text-xs text-muted-foreground underline-offset-2 hover:underline"
-                            >
-                                {booking.email}
-                            </a>
+                            <EmailLink
+                                address={booking.email}
+                                className="w-fit max-w-full truncate text-xs text-muted-foreground no-underline underline-offset-2 hover:underline"
+                            />
                             {booking.answers.length > 0 ? (
                                 <dl className="grid grid-cols-1 gap-x-3 gap-y-0.5 text-xs sm:grid-cols-[max-content_1fr]">
                                     {booking.answers.map((answer, index) => (

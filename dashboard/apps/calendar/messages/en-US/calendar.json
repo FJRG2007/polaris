@@ -281,6 +281,17 @@
         "dismiss": "Hide this tip",
         "text": "Bring in your other calendars: Google, Microsoft, iCloud, or any CalDAV server or .ics link."
     },
+    "links": {
+        "copiedEmail": "Email address copied",
+        "copiedLink": "Link copied",
+        "copyEmail": "Copy email address",
+        "copyFailed": "Couldn't copy. Select the text and copy it instead.",
+        "copyLink": "Copy link",
+        "emailMenu": "Actions for this address",
+        "linkMenu": "Actions for this link",
+        "openLink": "Open link",
+        "sendEmail": "Send email"
+    },
     "newTask": {
         "create": "Create task",
         "created": "{reference} created",
