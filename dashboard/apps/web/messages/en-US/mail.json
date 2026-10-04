@@ -672,7 +672,8 @@
         "list": "This arrived as a mailing list.",
         "thisSender": "this sender",
         "saveZip": "Save all as a .zip",
-        "saveMessage": "Save this message"
+        "saveMessage": "Save this message",
+        "filterLike": "Filter messages like this"
     },
     "spam": {
         "spf": "The address it claims to be from does not allow this server to send for it",

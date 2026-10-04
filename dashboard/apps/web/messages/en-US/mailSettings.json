@@ -300,7 +300,8 @@
             "endsWith": "ends with",
             "matches": "matches the pattern",
             "greaterThan": "is more than",
-            "lessThan": "is less than"
+            "lessThan": "is less than",
+            "similar": "is similar to"
         },
         "title": "Filters on {address}",
         "hint": "Run on arrival, top to bottom. A rule set to stop there is the last one a message meets.",
@@ -351,6 +352,17 @@
         "existingLabel": "Also run it over the mail already here",
         "existing": "Also run it over the mail already in the inbox",
         "saved": "Filter saved.",
-        "save": "Save the filter"
+        "save": "Save the filter",
+        "likeName": "Messages like {subject}",
+        "matchLabel": "Which have to hold",
+        "matchAll": "All of these",
+        "matchAny": "Any one of these",
+        "andShort": "and",
+        "orShort": "or",
+        "similarPlaceholder": "Paste one of the subjects",
+        "similarShape": "Matches subjects shaped like: {shape} (* is anything that changes)",
+        "similarNothing": "Nothing in that subject stays the same from one message to the next, so it would match nothing.",
+        "removeCondition": "Remove this condition",
+        "addCondition": "Add a condition"
     }
 }

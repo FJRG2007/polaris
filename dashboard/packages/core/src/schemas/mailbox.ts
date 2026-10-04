@@ -16,6 +16,7 @@
  * anything finer.
  */
 
+import { mailSubjectShape } from "../mailbox.js";
 import { z } from "zod";
 import { DEFAULT_MAIL_SORT, MAIL_SORTS } from "../mailbox-list.js";
 
@@ -544,14 +545,35 @@ export const mailRuleOperator = z.enum([
     "ends-with",
     "matches",
     "greater-than",
-    "less-than"
+    "less-than",
+    "similar"
 ]);
 
-export const mailRuleConditionSchema = z.object({
-    field: mailRuleField,
-    operator: mailRuleOperator,
-    value: z.string().trim().min(1, "Say what to look for").max(500)
-});
+export const mailRuleConditionSchema = z
+    .object({
+        field: mailRuleField,
+        operator: mailRuleOperator,
+        value: z.string().trim().min(1, "Say what to look for").max(500)
+    })
+    // "Similar" is about a subject's shape, and the example it was written from
+    // is stored as that shape, so what the rule matches on is what it says.
+    .transform((condition) =>
+        condition.operator === "similar"
+            ? { ...condition, value: mailSubjectShape(condition.value) }
+            : condition
+    )
+    .superRefine((condition, context) => {
+        if (condition.operator !== "similar") return;
+        if (condition.field !== "subject") {
+            context.addIssue({ code: "custom", path: ["field"], message: "Only a subject can be similar" });
+        } else if (!condition.value) {
+            context.addIssue({
+                code: "custom",
+                path: ["value"],
+                message: "That subject has no fixed words to match on"
+            });
+        }
+    });
 
 export const mailRuleActionSchema = z.discriminatedUnion("kind", [
     z.object({ kind: z.literal("move"), folder: z.string().uuid() }),

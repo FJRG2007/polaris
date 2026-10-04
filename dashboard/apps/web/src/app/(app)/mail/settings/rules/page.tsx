@@ -5,7 +5,7 @@
  */
 
 import { RulesView } from "./rules-view";
-import { listRules } from "@/lib/mailbox/rules";
+import { listRulesFor } from "@/lib/mailbox/rules";
 import { requirePermission } from "@/lib/session";
 import { NoMailboxes } from "../empty-accounts";
 import { listFolders } from "@/lib/mailbox/views";
@@ -21,12 +21,12 @@ export default async function MailRulesPage() {
     const accounts = await listAccountViews(user.id, shelfOrgId);
     if (accounts.length === 0) return <NoMailboxes what="rules" />;
 
-    const [folders, labels] = await Promise.all([
+    // Every mailbox's rules in one read, beside the folders and labels.
+    const [folders, labels, rules] = await Promise.all([
         listFolders(user.id, shelfOrgId),
-        listLabels(user.id)
+        listLabels(user.id),
+        listRulesFor(accounts.map((account) => account.id))
     ]);
-    const rules: Record<string, Awaited<ReturnType<typeof listRules>>> = {};
-    for (const account of accounts) rules[account.id] = await listRules(user.id, account.id);
 
     return <RulesView accounts={accounts} folders={folders} labels={labels} rules={rules} />;
 }

@@ -879,7 +879,10 @@ export type MailRuleOperator =
     | "ends-with"
     | "matches"
     | "greater-than"
-    | "less-than";
+    | "less-than"
+    /** The subject has the same shape as the one in `value` - see
+     *  `mailSubjectShape`. Subject only. */
+    | "similar";
 
 export interface MailRuleCondition {
     readonly field: MailRuleField;
@@ -956,6 +959,12 @@ export function mailConditionHolds(
     condition: MailRuleCondition,
     message: MailRuleSubject
 ): boolean {
+    if (condition.operator === "similar") {
+        // Stored as a shape already (see the schema), and shaped again here so a
+        // rule written by hand through the API with an example subject works too.
+        const shape = mailSubjectShape(condition.value);
+        return shape.length > 0 && mailSubjectShape(fieldText(condition.field, message)) === shape;
+    }
     if (condition.operator === "greater-than" || condition.operator === "less-than") {
         const left = Number(fieldText(condition.field, message));
         const right = Number(condition.value);
@@ -984,6 +993,55 @@ export function mailConditionHolds(
                 return false;
             }
     }
+}
+
+/**
+ * What is left of a subject once everything that changes from one message to the
+ * next is taken out.
+ *
+ * The mail people filter most is written by a machine from a template: a CI run
+ * that failed, a package that was published, an issue somebody commented on.
+ * Two of them differ only in a repository, a version, a run number, a hash or a
+ * name - "[acme/api] Run failed: CI - main (3f2a9c1)" and "[acme/web] Run failed:
+ * CI - main (9b1e0d4)". Matching on a word misses half of them and matching on a
+ * pattern means writing a regular expression; this answers with the template
+ * both came from, so "the same as this one" is one comparison.
+ *
+ * Each variable part becomes a placeholder: what is in brackets or quotes, ids,
+ * addresses, links, paths like owner/repo and @scope/name, versions, hashes,
+ * numbers and #references, and any word with a digit in it. What is left - the
+ * fixed words of the template - is lowercased with its spacing collapsed, and a
+ * reply or forward prefix is dropped. A subject that is nothing but variable
+ * parts has no shape and matches nothing, rather than everything.
+ */
+export function mailSubjectShape(subject: string): string {
+    let text = subject.normalize("NFKC").trim();
+    // Re: Fwd: and their translations, as many as are stacked.
+    const prefix = /^\s*(?:re|fwd?|aw|wg|sv|vs|tr|rv|r|enc)\s*(?:\[\d+\])?\s*:\s*/i;
+    while (prefix.test(text)) text = text.replace(prefix, "");
+    const masked = text
+        .replace(/\[[^\]]*\]/g, " [*] ")
+        .replace(/"[^"]*"|“[^”]*”|‘[^’]*’|`[^`]*`/g, " \"*\" ")
+        .replace(/\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/gi, " * ")
+        .replace(/[^\s@]+@[^\s@]+\.[a-z]{2,}\b/gi, " * ")
+        .replace(/\bhttps?:\/\/\S+/gi, " * ")
+        .replace(/@?[\w.-]+(?:\/[\w.-]+)+(?:@\S+)?/g, " * ")
+        // A package and the version it was published at: name@1.2.3.
+        .replace(/[\w.-]*@v?\d[\w.+-]*/gi, " * ")
+        .replace(/@[\w.-]+/g, " * ")
+        .replace(/\bv?\d+(?:\.\d+)+(?:[-+][\w.]+)?\b/gi, " * ")
+        .replace(/#\d+/g, " #* ")
+        .replace(/\b[\w.-]*\d[\w.-]*\b/g, " * ")
+        .toLowerCase()
+        .replace(/\s+/g, " ")
+        .trim();
+    // Neighbouring placeholders are one variable part however it was spelled,
+    // and a placeholder sits tight inside the brackets it replaced the inside of.
+    const shape = masked
+        .replace(/\*(?:\s*\*)+/g, "*")
+        .replace(/([([{])\s+/g, "$1")
+        .replace(/\s+([)\]}])/g, "$1");
+    return /[\p{L}]/u.test(shape.replace(/\[\*\]|"\*"|#\*|\*/g, "")) ? shape : "";
 }
 
 export interface MailRule {

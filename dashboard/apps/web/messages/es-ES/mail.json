@@ -672,7 +672,8 @@
         "list": "Esto llegó como lista de correo.",
         "thisSender": "este remitente",
         "saveZip": "Guardar todo en .zip",
-        "saveMessage": "Guardar este mensaje"
+        "saveMessage": "Guardar este mensaje",
+        "filterLike": "Filtrar mensajes como este"
     },
     "spam": {
         "spf": "La dirección de la que dice venir no permite que este servidor envíe en su nombre",

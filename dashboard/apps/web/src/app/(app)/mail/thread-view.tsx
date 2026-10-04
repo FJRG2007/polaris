@@ -82,6 +82,7 @@ import {
     ChevronDown,
     Pin,
     PinOff,
+    ListFilter,
     Printer,
     CornerUpLeft,
     CornerUpRight,
@@ -310,7 +311,10 @@ export function ThreadView({
                     </Button>
                 ) : null}
                 <div className="min-w-0 flex-1">
-                    <h2 className="truncate text-[17px] font-semibold tracking-tight">
+                    {/* The whole subject, wrapped, as every mail client shows the
+                        one being read: the list is where it is cut short, and the
+                        reading pane is where somebody goes to see the rest. */}
+                    <h2 className="break-words text-[17px] font-semibold tracking-tight [overflow-wrap:anywhere]">
                         {thread.subject || t("noSubject")}
                     </h2>
                     {accounts.length > 1 && account ? (
@@ -448,6 +452,7 @@ export function ThreadView({
                     <ConversationMenu
                         thread={thread}
                         messageIds={messages.map((message) => message.id)}
+                        sender={messages[0]?.from[0]?.address ?? ""}
                     />
                 </div>
             </header>
@@ -518,8 +523,20 @@ export function ThreadView({
 }
 
 /**
+ * Where "Filter messages like this" leads: the filters screen, opened on this
+ * mailbox with a filter already written from this message - its sender, and a
+ * subject of the same shape (see `mailSubjectShape`).
+ */
+export function filterLikeHref(accountId: string, sender: string, subject: string): string {
+    const query = new URLSearchParams({ account: accountId });
+    if (sender) query.set("from", sender);
+    if (subject.trim()) query.set("similar", subject.trim());
+    return `/mail/settings/rules?${query.toString()}`;
+}
+
+/**
  * What else can be done to the conversation as a whole: pin it to the top, mute
- * it, print it.
+ * it, print it, or filter the ones like it.
  *
  * A menu rather than three more icons, because the header already carries every
  * action somebody takes several times a day and these are the ones taken now and
@@ -529,10 +546,13 @@ export function ThreadView({
  */
 function ConversationMenu({
     thread,
-    messageIds
+    messageIds,
+    sender
 }: {
     thread: MailThreadView;
     messageIds: string[];
+    /** Who started it, for the filter written from it. */
+    sender: string;
 }) {
     const { refreshMailbox } = useMail();
     const toast = useToast();
@@ -600,6 +620,12 @@ function ConversationMenu({
                 >
                     <Printer className="size-3.5 shrink-0" aria-hidden />
                     {t("print.print")}
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                    <Link href={filterLikeHref(thread.accountId, sender, thread.subject)}>
+                        <ListFilter className="size-3.5 shrink-0" aria-hidden />
+                        {t("view.filterLike")}
+                    </Link>
                 </DropdownMenuItem>
             </DropdownMenuContent>
         </DropdownMenu>

@@ -94,7 +94,10 @@ export function TemplatesView({
                                 <span className="block truncate text-[13px]" title={template.name}>
                                     {template.name}
                                 </span>
-                                <span className="block truncate text-[12px] text-foreground-subtle">
+                                <span
+                                    className="block truncate text-[12px] text-foreground-subtle"
+                                    title={template.subject || undefined}
+                                >
                                     {accountLabel(template.accountId)}
                                     {template.subject ? ` - ${template.subject}` : ""}
                                 </span>

@@ -300,7 +300,8 @@
             "endsWith": "termina en",
             "matches": "coincide con el patrón",
             "greaterThan": "es mayor que",
-            "lessThan": "es menor que"
+            "lessThan": "es menor que",
+            "similar": "es parecido a"
         },
         "title": "Filtros de {address}",
         "hint": "Se ejecutan al llegar, de arriba abajo. Una regla que detiene el resto es la última que ve un mensaje.",
@@ -351,6 +352,17 @@
         "existingLabel": "Ejecutarlo también sobre el correo que ya está aquí",
         "existing": "Ejecutarlo también sobre el correo que ya está en Recibidos",
         "saved": "Filtro guardado.",
-        "save": "Guardar el filtro"
+        "save": "Guardar el filtro",
+        "likeName": "Mensajes como {subject}",
+        "matchLabel": "Qué debe cumplirse",
+        "matchAll": "Todas",
+        "matchAny": "Cualquiera",
+        "andShort": "y",
+        "orShort": "o",
+        "similarPlaceholder": "Pega uno de los asuntos",
+        "similarShape": "Coincide con asuntos con la forma: {shape} (* es lo que cambia)",
+        "similarNothing": "Nada de ese asunto se repite de un mensaje a otro, así que no coincidiría con nada.",
+        "removeCondition": "Quitar esta condición",
+        "addCondition": "Otra condición"
     }
 }

@@ -13,9 +13,9 @@
  * built.
  */
 
-import type * as core from "@polaris/core";
-import { useRouter } from "next/navigation";
-import { Plus, Trash2 } from "lucide-react";
+import * as core from "@polaris/core";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Plus, Trash2, X } from "lucide-react";
 import { useState } from "react";
 import { useBusy } from "@/app/(app)/mail/use-busy";
 import { AccountPicker } from "../account-picker";
@@ -51,6 +51,7 @@ const OPERATORS = {
     "starts-with": "startsWith",
     "ends-with": "endsWith",
     matches: "matches",
+    similar: "similar",
     "greater-than": "greaterThan",
     "less-than": "lessThan"
 } as const;
@@ -59,8 +60,44 @@ function fieldOptions(t: NamespaceTranslator<"mailSettings">) {
     return Object.entries(FIELDS).map(([value, key]) => ({ value, label: t(`rules.fields.${key}`) }));
 }
 
-function operatorOptions(t: NamespaceTranslator<"mailSettings">) {
-    return Object.entries(OPERATORS).map(([value, key]) => ({ value, label: t(`rules.operators.${key}`) }));
+/** The comparisons that make sense for a field. "Similar" is about a subject's
+ *  shape, so it is only offered there. */
+function operatorOptions(t: NamespaceTranslator<"mailSettings">, field: string) {
+    return Object.entries(OPERATORS)
+        .filter(([value]) => value !== "similar" || field === "subject")
+        .map(([value, key]) => ({ value, label: t(`rules.operators.${key}`) }));
+}
+
+/** One condition as the form holds it, with a key of its own for the list. */
+interface DraftCondition {
+    readonly key: number;
+    readonly field: string;
+    readonly operator: string;
+    readonly value: string;
+}
+
+let nextKey = 1;
+const draft = (field: string, operator: string, value: string): DraftCondition => ({
+    key: nextKey++,
+    field,
+    operator,
+    value
+});
+
+/** What "Filter messages like this" asked for, from the address that opened
+ *  this screen - read once, when it opens. */
+export interface RuleSeed {
+    readonly accountId: string | null;
+    readonly from: string;
+    readonly similar: string;
+}
+
+export function seedFrom(params: URLSearchParams | null): RuleSeed | null {
+    if (!params) return null;
+    const from = (params.get("from") ?? "").trim().slice(0, 320);
+    const similar = (params.get("similar") ?? "").trim().slice(0, 500);
+    if (!from && !similar) return null;
+    return { accountId: params.get("account"), from, similar };
 }
 
 export function RulesView({
@@ -77,10 +114,20 @@ export function RulesView({
     const router = useRouter();
     const toast = useToast();
     const t = useTranslations("mailSettings");
-    const [accountId, setAccountId] = useState(accounts[0]!.id);
+    // Opened from "Filter messages like this": the form starts open on that
+    // mailbox, filled in from the message.
+    const params = useSearchParams();
+    const [seed] = useState(() =>
+        seedFrom(params ? new URLSearchParams(params.toString()) : null)
+    );
+    const [accountId, setAccountId] = useState(
+        seed?.accountId && accounts.some((one) => one.id === seed.accountId)
+            ? seed.accountId
+            : accounts[0]!.id
+    );
     const account = accounts.find((one) => one.id === accountId) ?? accounts[0]!;
     const mine = rules[account.id] ?? [];
-    const [adding, setAdding] = useState(false);
+    const [adding, setAdding] = useState(seed !== null);
 
     return (
         <div>
@@ -149,6 +196,8 @@ export function RulesView({
 
             {adding ? (
                 <RuleForm
+                    key={account.id}
+                    seed={seed}
                     accountId={account.id}
                     folders={folders.filter((folder) => folder.accountId === account.id)}
                     labels={labels}
@@ -216,12 +265,14 @@ function describe(
 }
 
 function RuleForm({
+    seed = null,
     accountId,
     folders,
     labels,
     onDone,
     onCancel
 }: {
+    seed?: RuleSeed | null;
     accountId: string;
     folders: MailFolderView[];
     labels: MailLabelView[];
@@ -232,10 +283,37 @@ function RuleForm({
     const t = useTranslations("mailSettings");
     const tm = useTranslations("mail");
     const tc = useTranslations("common");
-    const [name, setName] = useState("");
-    const [field, setField] = useState("from");
-    const [operator, setOperator] = useState("contains");
-    const [value, setValue] = useState("");
+    const [name, setName] = useState(() =>
+        seed?.similar ? t("rules.likeName", { subject: seed.similar }).slice(0, 80) : ""
+    );
+    const [match, setMatch] = useState<"all" | "any">("all");
+    const [conditions, setConditions] = useState<DraftCondition[]>(() => {
+        const seeded = [
+            ...(seed?.from ? [draft("from", "is", seed.from)] : []),
+            ...(seed?.similar ? [draft("subject", "similar", seed.similar)] : [])
+        ];
+        return seeded.length > 0 ? seeded : [draft("from", "contains", "")];
+    });
+    const update = (key: number, change: Partial<DraftCondition>) =>
+        setConditions((current) =>
+            current.map((one) => {
+                if (one.key !== key) return one;
+                const next = { ...one, ...change };
+                // A field that cannot be similar drops the comparison with it.
+                return next.operator === "similar" && next.field !== "subject"
+                    ? { ...next, operator: "contains" }
+                    : next;
+            })
+        );
+    /** Each condition as the server will read it, or why it will not. */
+    const checked = conditions.map((one) =>
+        core.mailRuleConditionSchema.safeParse({
+            field: one.field,
+            operator: one.operator,
+            value: one.value
+        })
+    );
+    const conditionsReady = checked.every((one) => one.success);
     const [actionKind, setActionKind] = useState("archive");
     const [folderId, setFolderId] = useState(folders[0]?.id ?? "");
     const [labelId, setLabelId] = useState(labels[0]?.id ?? "");
@@ -287,29 +365,101 @@ function RuleForm({
                 />
             </label>
 
-            <div className="flex flex-wrap items-end gap-2">
-                <span className="pb-2 text-[13px] text-muted-foreground">{t("rules.if")}</span>
-                <Select
-                    value={field}
-                    onValueChange={setField}
-                    options={fieldOptions(t)}
-                    aria-label={t("rules.fieldLabel")}
-                    className="w-44"
-                />
-                <Select
-                    value={operator}
-                    onValueChange={setOperator}
-                    options={operatorOptions(t)}
-                    aria-label={t("rules.operatorLabel")}
-                    className="w-44"
-                />
-                <Input
-                    value={value}
-                    onChange={(event) => setValue(event.target.value)}
-                    aria-label={t("rules.valueLabel")}
-                    className="w-52"
-                />
-            </div>
+            {conditions.length > 1 ? (
+                <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-[13px] text-muted-foreground">{t("rules.matchLabel")}</span>
+                    <Select
+                        value={match}
+                        onValueChange={(next) => setMatch(next === "any" ? "any" : "all")}
+                        options={[
+                            { value: "all", label: t("rules.matchAll") },
+                            { value: "any", label: t("rules.matchAny") }
+                        ]}
+                        aria-label={t("rules.matchLabel")}
+                        className="w-56"
+                    />
+                </div>
+            ) : null}
+
+            <ul className="space-y-2">
+                {conditions.map((one, index) => {
+                    const answer = checked[index];
+                    const problemHere =
+                        answer && !answer.success && one.value.trim() ? answer.error.issues[0]?.message : "";
+                    const shape =
+                        one.operator === "similar" ? core.mailSubjectShape(one.value) : "";
+                    return (
+                        <li key={one.key} className="flex flex-wrap items-end gap-2">
+                            <span className="w-8 pb-2 text-[13px] text-muted-foreground">
+                                {index === 0 ? t("rules.if") : match === "all" ? t("rules.andShort") : t("rules.orShort")}
+                            </span>
+                            <Select
+                                value={one.field}
+                                onValueChange={(next) => update(one.key, { field: next })}
+                                options={fieldOptions(t)}
+                                aria-label={t("rules.fieldLabel")}
+                                className="w-44"
+                            />
+                            <Select
+                                value={one.operator}
+                                onValueChange={(next) => update(one.key, { operator: next })}
+                                options={operatorOptions(t, one.field)}
+                                aria-label={t("rules.operatorLabel")}
+                                className="w-44"
+                            />
+                            <div className="w-52 min-w-0">
+                                <Input
+                                    value={one.value}
+                                    onChange={(event) => update(one.key, { value: event.target.value })}
+                                    aria-label={t("rules.valueLabel")}
+                                    aria-invalid={problemHere ? true : undefined}
+                                    placeholder={
+                                        one.operator === "similar" ? t("rules.similarPlaceholder") : undefined
+                                    }
+                                />
+                            </div>
+                            {conditions.length > 1 ? (
+                                <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    aria-label={t("rules.removeCondition")}
+                                    title={t("rules.removeCondition")}
+                                    onClick={() =>
+                                        setConditions((current) =>
+                                            current.filter((other) => other.key !== one.key)
+                                        )
+                                    }
+                                >
+                                    <X className="size-4 shrink-0" aria-hidden />
+                                </Button>
+                            ) : null}
+                            {/* What "similar" will actually compare, so the rule
+                                can be judged before it is saved. */}
+                            {one.operator === "similar" && one.value.trim() ? (
+                                <p className="w-full break-words pl-10 text-[12px] text-foreground-subtle [overflow-wrap:anywhere]">
+                                    {shape
+                                        ? t("rules.similarShape", { shape })
+                                        : t("rules.similarNothing")}
+                                </p>
+                            ) : problemHere ? (
+                                <p role="alert" className="w-full pl-10 text-[12px] text-danger">
+                                    {problemHere}
+                                </p>
+                            ) : null}
+                        </li>
+                    );
+                })}
+            </ul>
+            {conditions.length < 20 ? (
+                <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setConditions((current) => [...current, draft("subject", "contains", "")])}
+                >
+                    <Plus className="size-4 shrink-0" aria-hidden />
+                    {t("rules.addCondition")}
+                </Button>
+            ) : null}
 
             <div className="flex flex-wrap items-end gap-2">
                 <span className="pb-2 text-[13px] text-muted-foreground">{t("rules.then")}</span>
@@ -393,7 +543,7 @@ function RuleForm({
                     disabled={
                         saving ||
                         !name.trim() ||
-                        !value.trim() ||
+                        !conditionsReady ||
                         (forwarding && forwardAddress !== "ok")
                     }
                     onClick={() =>
@@ -402,13 +552,12 @@ function RuleForm({
                             const answer = await saveRuleAction(accountId, null, {
                                 name,
                                 enabled: true,
-                                // One condition per rule from this form, so "all"
-                                // and "any" mean the same thing. The stored
-                                // shape carries several because the engine and
-                                // the API accept them; the form asks for the
-                                // one everybody writes.
-                                match: "all",
-                                conditions: [{ field, operator, value }],
+                                match,
+                                conditions: conditions.map(({ field, operator, value }) => ({
+                                    field,
+                                    operator,
+                                    value
+                                })),
                                 actions: [action()],
                                 stop,
                                 applyToExisting

@@ -105,7 +105,10 @@ export function DraftsView({ drafts }: { drafts: MailDraftView[] }) {
                                     }
                                 >
                                     <span className="flex items-baseline gap-2">
-                                        <span className="min-w-0 flex-1 truncate text-[13px] font-medium">
+                                        <span
+                                            className="min-w-0 flex-1 truncate text-[13px] font-medium"
+                                            title={draft.subject || t("noSubject")}
+                                        >
                                             {draft.subject || t("noSubject")}
                                         </span>
                                         <span className="shrink-0 text-[11px] text-foreground-subtle">
