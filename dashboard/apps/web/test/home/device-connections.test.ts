@@ -18,9 +18,16 @@ describe("the ways in", () => {
         // A method listed with no fields is a screen asking for nothing and then
         // failing; one with no summary is a choice made blind.
         for (const connection of registry.DEVICE_CONNECTIONS) {
-            expect(connection.fields.length).toBeGreaterThan(0);
             expect(connection.summary.length).toBeGreaterThan(0);
             expect(connection.kinds.length).toBeGreaterThan(0);
+            // One listed only to say why it cannot be used asks for nothing,
+            // and says why instead.
+            if (connection.unavailable) {
+                expect(connection.fields, connection.id).toEqual([]);
+                expect(connection.unavailable.length).toBeGreaterThan(0);
+                continue;
+            }
+            expect(connection.fields.length).toBeGreaterThan(0);
         }
     });
 
@@ -195,12 +202,123 @@ describe("the recommended way in", () => {
     it("stays local for Philips, with the unofficial account second", () => {
         expect(registry.connectionsOfBrand("Philips").map((connection) => connection.id)).toEqual([
             "philips-coap",
-            "philips-cloud"
+            "philips-cloud",
+            "hue-bridge",
+            "philips-dynalite",
+            "hue-ble",
+            "philips-tv"
         ]);
         expect(registry.recommendedConnection("Philips")?.id).toBe("philips-coap");
     });
 
     it("is nothing for a brand that does not exist", () => {
         expect(registry.recommendedConnection("Nobody")).toBeNull();
+    });
+});
+
+describe("Philips' ways in", () => {
+    it("are one make, Hue included, each drawn with its own mark", () => {
+        const brands = registry.deviceBrands().map((entry) => entry.brand);
+        expect(brands).toContain("Philips");
+        expect(brands).not.toContain("Philips Hue");
+        const marks = Object.fromEntries(
+            registry.connectionsOfBrand("Philips").map((way) => [way.id, way.logo])
+        );
+        expect(marks).toMatchObject({
+            "philips-coap": "philips",
+            "hue-bridge": "philipshue",
+            "hue-ble": "philipshue",
+            "philips-dynalite": "philips",
+            "philips-tv": "philips"
+        });
+        expect(registry.searchConnections("hue").map((way) => way.id)).toEqual(
+            expect.arrayContaining(["hue-bridge", "hue-ble"])
+        );
+    });
+
+    it("never count one that cannot be used as filled in", () => {
+        for (const id of ["hue-ble", "philips-tv"]) {
+            const way = registry.deviceConnection(id)!;
+            expect(way.unavailable, id).toMatch(/^Not available: /);
+            expect(registry.fieldsComplete(way, {})).toBe(false);
+        }
+    });
+
+    it("say why in the reader's language", () => {
+        const es = placesCatalogs.translator("es-ES", "places");
+        const tv = registry.connectionWords(es, registry.deviceConnection("philips-tv")!);
+        expect(tv.unavailable).toMatch(/^No disponible: /);
+        const hue = registry.connectionWords(es, registry.deviceConnection("hue-bridge")!);
+        expect(hue.unavailable).toBeUndefined();
+    });
+});
+
+describe("what a Philips sign-in says it looked at", () => {
+    const philips = registry.deviceConnection("philips-cloud")!;
+
+    const SEEN = [
+        { where: "Air+", region: "eu-west-1", count: 0, models: [] },
+        { where: "HomeID app", count: null, models: [], failure: "HTTP 500" },
+        { where: "HomeID app sign-in", count: 1, models: ["AC1715/11"] },
+        {
+            where: "HomeID account",
+            region: "eu-west-1",
+            count: null,
+            models: [],
+            failure: "HTTP 401/403"
+        },
+        { where: "Local network", count: 0, models: [] },
+        { where: "Philips Air", count: null, models: [], failure: "network" }
+    ];
+
+    it("names each place and its answer in the reader's language", () => {
+        const said = (locale: "en-US" | "es-ES") => {
+            const t = placesCatalogs.translator(locale, "places");
+            return SEEN.map((lookup) => {
+                const words = registry.lookupWords(t, philips, lookup);
+                return [words.place, words.result];
+            });
+        };
+        expect(said("en-US")).toEqual([
+            ["Air+ app's device list (Europe)", "No devices"],
+            ["HomeID appliances", "Philips' server failed (HTTP 500)"],
+            ["HomeID appliances, signed in the way the HomeID app does", "1 device (AC1715/11)"],
+            ["Account check (Europe)", "Refused the sign-in"],
+            ["This network", "No Philips purifier answered"],
+            ["Philips cloud for fans and heaters", "No answer"]
+        ]);
+        expect(said("es-ES")).toEqual([
+            ["Lista de aparatos de la app Air+ (Europa)", "Ningún aparato"],
+            ["Aparatos de HomeID", "Falló el servidor de Philips (HTTP 500)"],
+            ["Aparatos de HomeID, accediendo como lo hace la app HomeID", "1 aparato (AC1715/11)"],
+            ["Comprobación de la cuenta (Europa)", "Rechazó el acceso"],
+            ["Esta red", "Ningún purificador respondió"],
+            ["Nube de Philips para ventiladores y calefactores", "No respondió"]
+        ]);
+    });
+
+    it("shows a place or a failure it has no words for as the server named it", () => {
+        const t = placesCatalogs.translator("en-US", "places");
+        expect(
+            registry.lookupWords(t, philips, {
+                where: "Somewhere new",
+                count: null,
+                models: [],
+                failure: "teapot"
+            })
+        ).toEqual({ place: "Somewhere new", result: "teapot", failed: true });
+        expect(
+            registry.lookupWords(t, philips, {
+                where: "HomeID",
+                region: "eu-west-1",
+                count: null,
+                models: [],
+                failure: "HTTP 404"
+            })
+        ).toEqual({
+            place: "HomeID app's device list (Europe)",
+            result: "Failed (HTTP 404)",
+            failed: true
+        });
     });
 });

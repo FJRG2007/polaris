@@ -68,6 +68,7 @@ import type {
     DiscoveredUnit,
     PairingAsked,
     PairingFoundIn,
+    PairingLookup,
     PairingNext
 } from "../lib/drivers/contract";
 import { placesRefusalText } from "../lib/refusal-text";
@@ -1491,6 +1492,10 @@ export async function pollDevicePairingAction(input: unknown): Promise<{
         summary: string;
         skippable: boolean;
         asked?: PairingAsked;
+        /** Every place looked, with what each answered. */
+        lookups?: PairingLookup[];
+        /** Units of the make found on Polaris's own network. */
+        local?: DiscoveredUnit[];
     };
     /** Model codes connected that cannot be fully operated yet. */
     unsupported?: string[];
@@ -1537,14 +1542,23 @@ export async function pollDevicePairingAction(input: unknown): Promise<{
     if (result.error) return { error: result.error };
     if (!result.value) return { waiting: true };
     if ("next" in result.value && result.value.next) {
-        const { state, summary, skippable, asked } = result.value.next;
+        const { state, summary, skippable, asked, lookups, local } = result.value.next;
         return {
             waiting: true,
             next: {
                 state: { ...state },
                 summary,
                 skippable,
-                ...(asked ? { asked: { ...asked } } : {})
+                ...(asked ? { asked: { ...asked } } : {}),
+                ...(lookups
+                    ? {
+                          lookups: lookups.map((lookup) => ({
+                              ...lookup,
+                              models: [...lookup.models]
+                          }))
+                      }
+                    : {}),
+                ...(local ? { local: local.map((unit) => ({ ...unit })) } : {})
             }
         };
     }

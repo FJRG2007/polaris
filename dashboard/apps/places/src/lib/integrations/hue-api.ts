@@ -115,13 +115,40 @@ function untrusted(caught: unknown): never {
  * and checked against what `/api/config` - which needs no key - says it is.
  */
 export async function identifyBridge(host: string): Promise<string> {
+    return (await bridgeAt(host)).bridgeId;
+}
+
+const configSchema = z
+    .object({
+        bridgeid: z.string(),
+        name: z.string().max(200).optional(),
+        modelid: z.string().max(60).optional(),
+        mac: z.string().max(40).optional()
+    })
+    .passthrough();
+
+/** A bridge as `/api/config` names it, behind a certificate that proves it. */
+export interface HueBridgeFound {
+    readonly bridgeId: string;
+    readonly name: string;
+    readonly model: string;
+    readonly mac: string | null;
+}
+
+/** The bridge at an address, as `identifyBridge` checks it, with the name and
+ *  model it gives - for the dialog to offer. */
+export async function bridgeAt(host: string, timeoutMs?: number): Promise<HueBridgeFound> {
     let response: LanResponse;
     try {
-        response = await lanRequest({ url: `https://${host}/api/config`, trust: trustFor(null) });
+        response = await lanRequest({
+            url: `https://${host}/api/config`,
+            trust: trustFor(null),
+            ...(timeoutMs ? { timeoutMs } : {})
+        });
     } catch (caught) {
         untrusted(caught);
     }
-    const said = z.object({ bridgeid: z.string() }).passthrough().safeParse(jsonOf(response));
+    const said = configSchema.safeParse(jsonOf(response));
     const presented = response.certificate?.commonName ?? "";
     if (!said.success || !presented || !isBridge(presented, said.data.bridgeid)) {
         throw new DriverError(
@@ -129,7 +156,64 @@ export async function identifyBridge(host: string): Promise<string> {
             "refused"
         );
     }
-    return presented.toLowerCase();
+    const mac = said.data.mac?.trim().toUpperCase() ?? "";
+    return {
+        bridgeId: presented.toLowerCase(),
+        name: said.data.name?.trim() || "Hue Bridge",
+        model: said.data.modelid?.trim() || "",
+        mac: /^([0-9A-F]{2}:){5}[0-9A-F]{2}$/.test(mac) ? mac : null
+    };
+}
+
+/**
+ * Signify's discovery service: the bridges that last called home from the
+ * same public address, by their address on the LAN. What Home Assistant's
+ * `aiohue.discovery.discover_nupnp` asks when mDNS finds nothing. Public, no
+ * key; Signify allows about one request in fifteen minutes from an address,
+ * so a listing - and a `429` answer, since that is the rate limit saying so
+ * itself - is kept that long. Any other failure (unreachable, a bad answer)
+ * is kept for only a minute, so a sweep is not locked out of the service for
+ * the rest of the window by one bad response.
+ */
+const NUPNP = "https://discovery.meethue.com/";
+const NUPNP_TTL_MS = 15 * 60 * 1000;
+const NUPNP_FAILED_TTL_MS = 60 * 1000;
+let nupnp: { at: number; ttl: number; addresses: string[] } | null = null;
+
+/** For tests: forget the discovery service's last answer. */
+export function resetHueDiscovery(): void {
+    nupnp = null;
+}
+
+export async function nupnpAddresses(): Promise<string[]> {
+    if (nupnp && Date.now() - nupnp.at < nupnp.ttl) return nupnp.addresses;
+    const remember = (addresses: string[], ttl: number): string[] => {
+        nupnp = { at: Date.now(), ttl, addresses };
+        return addresses;
+    };
+    try {
+        const response = await fetch(NUPNP, {
+            headers: { accept: "application/json" },
+            signal: AbortSignal.timeout(4_000)
+        });
+        if (!response.ok)
+            return remember([], response.status === 429 ? NUPNP_TTL_MS : NUPNP_FAILED_TTL_MS);
+        const parsed = z
+            .array(
+                z
+                    .object({ internalipaddress: z.string().regex(/^\d{1,3}(\.\d{1,3}){3}$/) })
+                    .passthrough()
+            )
+            .max(32)
+            .safeParse(JSON.parse(await response.text()) as unknown);
+        if (!parsed.success) return remember([], NUPNP_FAILED_TTL_MS);
+        return remember(
+            parsed.data.map((entry) => entry.internalipaddress),
+            NUPNP_TTL_MS
+        );
+    } catch {
+        return remember([], NUPNP_FAILED_TTL_MS);
+    }
 }
 
 const pairingSchema = z

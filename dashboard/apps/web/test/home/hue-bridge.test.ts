@@ -28,6 +28,15 @@ let sent: Sent[] = [];
 let buttonPressed = false;
 let keyValid = true;
 let resources: Record<string, unknown[]> = {};
+/** Where a bridge answers, for discovery; null answers everywhere. */
+let bridgeHosts: string[] | null = null;
+/** This server's /24, as the sweep sees it. */
+let subnet: string[] = [];
+
+vi.mock("@polaris-app/places/src/lib/integrations/lan-unit", async (original) => ({
+    ...(await original<object>()),
+    subnetTargets: async () => subnet
+}));
 
 vi.mock("@polaris-app/places/src/lib/integrations/lan-http", async (original) => {
     const actual =
@@ -49,6 +58,12 @@ vi.mock("@polaris-app/places/src/lib/integrations/lan-http", async (original) =>
                 trust: options.trust
             };
             sent.push(request);
+            if (bridgeHosts && !bridgeHosts.includes(new URL(options.url).hostname)) {
+                const { DriverError } = await import(
+                    "@polaris-app/places/src/lib/drivers/contract"
+                );
+                throw new DriverError("The device did not answer in time.", "unreachable");
+            }
             const reply = (status: number, body: unknown) => ({
                 status,
                 headers: {},
@@ -58,7 +73,12 @@ vi.mock("@polaris-app/places/src/lib/integrations/lan-http", async (original) =>
             });
             const path = new URL(options.url).pathname;
             if (path === "/api/config")
-                return reply(200, { name: "Hue Bridge", bridgeid: BRIDGE_ID.toUpperCase() });
+                return reply(200, {
+                    name: "Hue Bridge",
+                    bridgeid: BRIDGE_ID.toUpperCase(),
+                    modelid: "BSB002",
+                    mac: "00:17:88:6a:1b:2c"
+                });
             if (path === "/api") {
                 return buttonPressed
                     ? reply(200, [{ success: { username: "new-app-key", clientkey: "CK" } }])
@@ -93,6 +113,10 @@ const PAIRED = { host: "10.0.1.20", appKey: "stored-key", bridgeId: BRIDGE_ID };
 
 beforeEach(() => {
     sent = [];
+    bridgeHosts = null;
+    subnet = [];
+    hue.resetHueDiscovery();
+    vi.unstubAllGlobals();
     buttonPressed = false;
     keyValid = true;
     resources = {};
@@ -266,5 +290,73 @@ describe("what a bridge has", () => {
         await expect(hueBridgeDriver.list({ host: "10.0.1.20" })).rejects.toMatchObject({
             kind: "unauthorized"
         });
+    });
+});
+
+describe("finding bridges", () => {
+    /** Signify's discovery service, answering with these addresses. */
+    function nupnp(addresses: string[] | Error) {
+        const asked: string[] = [];
+        vi.stubGlobal("fetch", async (url: string) => {
+            asked.push(String(url));
+            if (addresses instanceof Error) throw addresses;
+            return new Response(
+                JSON.stringify(
+                    addresses.map((address) => ({
+                        id: BRIDGE_ID,
+                        internalipaddress: address,
+                        port: 443
+                    }))
+                )
+            );
+        });
+        return asked;
+    }
+
+    it("asks Signify's discovery service, and keeps only what proves it is a bridge", async () => {
+        const asked = nupnp(["10.0.1.20", "10.0.1.21", "127.0.0.1"]);
+        bridgeHosts = ["10.0.1.20"];
+        expect(await hueBridgeDriver.discover!()).toEqual([
+            { name: "Hue Bridge", model: "BSB002", mac: "00:17:88:6A:1B:2C", address: "10.0.1.20" }
+        ]);
+        expect(asked).toEqual(["https://discovery.meethue.com/"]);
+        // Each candidate checked with Hue's certificate, never loopback.
+        expect(sent.map((request) => request.url)).toEqual([
+            "https://10.0.1.20/api/config",
+            "https://10.0.1.21/api/config"
+        ]);
+        for (const request of sent) expect(request.trust?.authority).toBe(hue.HUE_AUTHORITIES);
+    });
+
+    it("sweeps this network when the service lists nothing or cannot be reached", async () => {
+        nupnp(new TypeError("fetch failed"));
+        subnet = ["10.0.1.2", "10.0.1.20", "10.0.1.30"];
+        bridgeHosts = ["10.0.1.20"];
+        const found = await hueBridgeDriver.discover!();
+        expect(found.map((unit) => unit.address)).toEqual(["10.0.1.20"]);
+        expect(sent).toHaveLength(3);
+    });
+
+    it("lists a bridge once, however many addresses it was found at", async () => {
+        nupnp(["10.0.1.20", "10.0.1.22"]);
+        expect(await hueBridgeDriver.discover!()).toHaveLength(1);
+    });
+
+    it("does not ask the service again straight after it refused", async () => {
+        const asked: string[] = [];
+        vi.stubGlobal("fetch", async (url: string) => {
+            asked.push(String(url));
+            return new Response("[]", { status: 429 });
+        });
+        await hueBridgeDriver.discover!();
+        await hueBridgeDriver.discover!();
+        expect(asked).toHaveLength(1);
+    });
+
+    it("asks the service at most once a quarter of an hour", async () => {
+        const asked = nupnp(["10.0.1.20"]);
+        await hueBridgeDriver.discover!();
+        await hueBridgeDriver.discover!();
+        expect(asked).toHaveLength(1);
     });
 });

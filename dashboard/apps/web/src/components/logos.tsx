@@ -117,12 +117,14 @@ const SERVICE_IMAGES: Record<string, string> = {
     // SwitchBot's own wordmark, as their site serves it (switch-bot.com). Not in
     // any vector registry; their single brand red reads on both surfaces.
     switchbot: "/logos/switchbot.svg",
-    // Gree's emblem, cut from the logo Gree's own US company serves
-    // (greecomfort.com/assets/logo/gree-logo.svg) without the wordmark, which is
-    // unreadable at icon size. Paths and colours (#033ca6, #fb671a) untouched;
-    // only the view box is narrowed to the emblem. It replaced a third-party
-    // redraw whose shape and colours were off.
-    gree: "/logos/gree.svg",
+    // The GREE+ app's own icon, the mark a Gree owner sees on their phone and the
+    // one they look for in the list: Gree's corporate emblem is a different
+    // shape. Taken from the app's Google Play listing (com.gree.greeplus,
+    // published by Gree Electric Appliances, Inc. of Zhuhai), resized to 256 px
+    // and re-encoded as WebP, colours untouched. Gree's trademark, shown only to
+    // name the make. A full-colour tile on its own blue, so it reads on both
+    // surfaces as it is.
+    gree: "/logos/gree.webp",
     // The Philips shield as Philips publish it in their 2019 annual report
     // (Wikimedia Commons, "Philips shield (2013).svg", public domain), editor
     // metadata stripped. Not in any icon registry; the wordmark is unreadable

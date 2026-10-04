@@ -120,6 +120,25 @@ export interface PairingNext {
      *  (a code, or "" for none), the AWS code of the region asked first, and
      *  whether one of the maker's own services failed on the account. */
     readonly asked?: PairingAsked;
+    /** Every place the attempt looked, in order, with what each answered: the
+     *  same as `summary`, as data the dialog can say in the reader's words. */
+    readonly lookups?: readonly PairingLookup[];
+    /** Units of the make found on Polaris's own network while looking: a way
+     *  in that needs no file, offered before the file is. */
+    readonly local?: readonly DiscoveredUnit[];
+}
+
+/** One place a pairing looked, and what it answered. Nothing private: a
+ *  name for the place, a region code, a count, model codes, a failure. */
+export interface PairingLookup {
+    readonly where: string;
+    readonly region?: string;
+    /** How many it listed, or null where it could not be read. */
+    readonly count: number | null;
+    readonly models: readonly string[];
+    /** Why it could not be read: `HTTP 500`, `HTTP 401/403`, `network` or
+     *  `format`. */
+    readonly failure?: string;
 }
 
 export interface PairingAsked {

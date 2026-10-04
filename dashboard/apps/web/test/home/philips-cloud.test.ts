@@ -100,6 +100,37 @@ vi.mock("mqtt", () => ({
     }
 }));
 
+/**
+ * Polaris's own network, as the local connection's scan sees it: the units that
+ * answer, whether the scan itself fails, and how many requests had been sent to
+ * Philips when it ran - so a test can say the network is asked only after every
+ * cloud list.
+ */
+const lan = {
+    units: [] as { address: string; model: string; name: string; deviceId: string }[],
+    fail: false,
+    scans: 0,
+    requestsBefore: -1
+};
+
+vi.mock("@polaris-app/places/src/lib/integrations/philips-api", async (importOriginal) => ({
+    ...(await importOriginal<object>()),
+    scanPhilips: async () => {
+        lan.scans += 1;
+        lan.requestsBefore = calls.length;
+        if (lan.fail) throw new Error("send EPERM");
+        return lan.units;
+    }
+}));
+vi.mock("@polaris-app/places/src/lib/integrations/lan-unit", async (importOriginal) => ({
+    ...(await importOriginal<object>()),
+    subnetTargets: async () => ["192.168.1.40"]
+}));
+vi.mock("@polaris-app/places/src/lib/integrations/mac-locate", async (importOriginal) => ({
+    ...(await importOriginal<object>()),
+    macsAt: async () => new Map([["192.168.1.40", "AA:BB:CC:DD:EE:01"]])
+}));
+
 const cloud = await import("@polaris-app/places/src/lib/integrations/philips-cloud");
 const link = await import("@polaris-app/places/src/lib/integrations/philips-cloud-link");
 const driver = await import("@polaris-app/places/src/lib/drivers/philips-cloud");
@@ -137,8 +168,16 @@ function philips(
         /** The device list's whole body, where a test needs a shape of its own. */
         deviceBody?: (client: "airplus" | "homeid") => unknown;
         /** The HomeID backend's appliances, served the way the profile embeds
-         *  them or behind its link; absent, the backend is not there. */
-        homeIdApp?: { appliances: unknown[]; embedded?: boolean };
+         *  them or behind its link; absent, the backend is not there. `shortcut`
+         *  is the status the profile answers the Philips token with instead,
+         *  and `asApp` what the space's list answers after the app's own
+         *  sign-in (`login` the status that sign-in answers instead). */
+        homeIdApp?: {
+            appliances: unknown[];
+            embedded?: boolean;
+            shortcut?: number;
+            asApp?: { appliances?: unknown[]; login?: number; list?: number };
+        };
         /** The account's id at Gigya, which the email sign-in answers; null
          *  for an answer without one. */
         uid?: string | null;
@@ -205,27 +244,64 @@ function philips(
         // The HAL chain of `get_appliances_via_homeid`, in its recorded shapes.
         route(
             (url) => url.pathname === "/.well-known/tenant/oneka",
-            () => jsonReply({ profileUrl: "/user/self/profile", spaces: [] })
+            () =>
+                jsonReply({
+                    profileUrl: "/user/self/profile",
+                    // Two of the 79 spaces, in the recorded shape.
+                    spaces: [
+                        {
+                            countryCode: "AE",
+                            spaceId: "8ab97a42-43ad-4442-b137-fdbae50a0225",
+                            backendBaseUrl:
+                                "https://www.backend.vbs.versuni.com/api/8ab97a42-43ad-4442-b137-fdbae50a0225",
+                            deviceRegion: "WO"
+                        },
+                        {
+                            countryCode: "ES",
+                            spaceId: SPACE_ES,
+                            backendBaseUrl: `https://www.backend.vbs.versuni.com/api/${SPACE_ES}`,
+                            deviceRegion: "WO"
+                        }
+                    ]
+                })
+        );
+        route(
+            (url) => url.pathname === "/api/v2/auth/Consumer/Login",
+            () =>
+                app.asApp?.login
+                    ? jsonReply({ errors: [{ status: String(app.asApp.login) }] }, app.asApp.login)
+                    : jsonReply({ data: { type: "consumer", attributes: { token: "consumer-1" } } })
+        );
+        route(
+            (url) => url.pathname === `/api/${SPACE_ES}/Profile/self/Appliance`,
+            (_url, init) =>
+                new Headers(init.headers).get("authorization") !== "Bearer consumer-1"
+                    ? jsonReply({ message: "Unauthorized" }, 401)
+                    : app.asApp?.list
+                      ? jsonReply({ message: "Internal Server Error" }, app.asApp.list)
+                      : jsonReply({ _embedded: { item: app.asApp?.appliances ?? [] } })
         );
         route(
             (url) => url.pathname === "/api/user/self/profile",
             () =>
-                jsonReply(
-                    app.embedded
-                        ? {
-                              _embedded: {
-                                  userAppliances: { _embedded: { item: app.appliances } }
-                              }
-                          }
-                        : {
-                              _links: {
-                                  userAppliances: {
-                                      href: "/user/self/appliances{?page,size}",
-                                      templated: true
-                                  }
-                              }
-                          }
-                )
+                app.shortcut
+                    ? jsonReply({ message: "Internal Server Error" }, app.shortcut)
+                    : jsonReply(
+                          app.embedded
+                              ? {
+                                    _embedded: {
+                                        userAppliances: { _embedded: { item: app.appliances } }
+                                    }
+                                }
+                              : {
+                                    _links: {
+                                        userAppliances: {
+                                            href: "/user/self/appliances{?page,size}",
+                                            templated: true
+                                        }
+                                    }
+                                }
+                      )
         );
         route(
             (url) => url.pathname === "/api/user/self/appliances",
@@ -235,6 +311,9 @@ function philips(
     route(at("/user/self/signature"), () => jsonReply({ signature: "sig-1" }));
     route(at("/user/self"), () => jsonReply({ id: "0123456789abcdef0123456789abcdef" }));
 }
+
+/** Spain's space on the HomeID backend, as its discovery document lists it. */
+const SPACE_ES = "5323efb7-2066-404a-bb2a-de2d8602e6d0";
 
 const PURIFIER = {
     uuid: "11111111-2222-3333-4444-555555555555",
@@ -249,6 +328,11 @@ const logged: unknown[][] = [];
 beforeEach(() => {
     routes = [];
     calls = [];
+    lan.units = [];
+    lan.fail = false;
+    lan.scans = 0;
+    lan.requestsBefore = -1;
+    cloud.resetHomeIdConsumers();
     broker.clients = [];
     broker.connect = "ok";
     broker.refuseShadow = false;
@@ -362,7 +446,8 @@ describe("signing in with an emailed code", () => {
             done: false,
             next: {
                 step: "file",
-                summary: "Air+ (eu-west-1): 0; HomeID (eu-west-1): 0; HomeID app: 0",
+                summary:
+                    "Air+ (eu-west-1): 0; HomeID (eu-west-1): 0; HomeID app: 0; Local network: 0",
                 skippable: false
             }
         });
@@ -382,7 +467,7 @@ describe("signing in with an emailed code", () => {
                 { vToken: "vt-1", code: "123456" }
             )
         ).rejects.toThrow(
-            "Polaris signed in to Philips as owner@example.com, and that account has no devices. It asked Philips' servers for your country (Europe) and every other region it knows. What it saw: Air+ (eu-west-1): 0; HomeID (eu-west-1): 0; HomeID app: 0. Sign in with the same email you use in the Air+ app. Emails tried: owner@example.com."
+            "Polaris signed in to Philips as owner@example.com, and that account has no devices. It asked Philips' servers for your country (Europe) and every other region it knows. What it saw: Air+ (eu-west-1): 0; HomeID (eu-west-1): 0; HomeID app: 0; Local network: 0. Sign in with the same email you use in the Air+ app. Emails tried: owner@example.com."
         );
     });
 
@@ -558,7 +643,7 @@ describe("going on to Philips' fan and heater cloud", () => {
                 { ...next.state, ...read }
             )
         ).rejects.toThrow(
-            "What it saw: Air+ (eu-west-1): 0; HomeID (eu-west-1): 0; HomeID app: 0; Philips Air: 0. Sign in with the same email you use in the Air+ app. Emails tried: owner@example.com."
+            "What it saw: Air+ (eu-west-1): 0; HomeID (eu-west-1): 0; HomeID app: 0; Local network: 0; Philips Air: 0. Sign in with the same email you use in the Air+ app. Emails tried: owner@example.com."
         );
     });
 
@@ -803,7 +888,8 @@ describe("finding the purifiers on an account", () => {
         expect(answer).toMatchObject({
             done: false,
             next: {
-                summary: "Air+ (eu-west-1): 0; HomeID (eu-west-1): 0; HomeID app: 1 (HD9880/90)",
+                summary:
+                    "Air+ (eu-west-1): 0; HomeID (eu-west-1): 0; HomeID app: 1 (HD9880/90); Local network: 0",
                 skippable: true
             }
         });
@@ -850,7 +936,7 @@ describe("finding the purifiers on an account", () => {
             done: false,
             next: {
                 summary:
-                    "Air+ (eu-west-1): 0; HomeID (eu-west-1): HTTP 403; HomeID app: 1 (AC0850/11); HomeID account (eu-west-1): HTTP 401/403",
+                    "Air+ (eu-west-1): 0; HomeID (eu-west-1): HTTP 403; HomeID app: 1 (AC0850/11); HomeID account (eu-west-1): HTTP 401/403; Local network: 0",
                 skippable: false
             }
         });
@@ -879,7 +965,7 @@ describe("finding the purifiers on an account", () => {
             reply: () => jsonReply({ message: "Forbidden" }, 403)
         });
         await expect(sign()).rejects.toThrow(
-            "What it saw: Air+ (eu-west-1): 1 (HD9280/90); HomeID (eu-west-1): 1 (HD9280/90); HomeID app: network; Air+ account (eu-west-1): HTTP 401/403; HomeID account (eu-west-1): HTTP 401/403."
+            "What it saw: Air+ (eu-west-1): 1 (HD9280/90); HomeID (eu-west-1): 1 (HD9280/90); HomeID app: network; Air+ account (eu-west-1): HTTP 401/403; HomeID account (eu-west-1): HTTP 401/403; Local network: 0."
         );
         expect(logged).toHaveLength(1);
         const line = JSON.stringify(logged);
@@ -1486,7 +1572,7 @@ describe("the account's region", () => {
             done: false,
             next: {
                 summary:
-                    "Air+ (us-east-1): 0; HomeID (us-east-1): 0; HomeID app: 0; Air+ (eu-west-1): 0; HomeID (eu-west-1): 0",
+                    "Air+ (us-east-1): 0; HomeID (us-east-1): 0; HomeID app: 0; Air+ (eu-west-1): 0; HomeID (eu-west-1): 0; Local network: 0",
                 asked: { country: "US", region: "us-east-1", homeIdBroken: false }
             }
         });
@@ -1495,17 +1581,14 @@ describe("the account's region", () => {
         );
     });
 
-    it("says the HomeID backend failed, and what fixes that, when it answers a server error", async () => {
-        philips({ homeIdApp: { appliances: [] } });
-        routes.unshift({
-            match: (url) => url.pathname === "/api/user/self/profile",
-            reply: () => jsonReply({ message: "Internal Server Error" }, 500)
-        });
+    it("says the HomeID backend failed, and what fixes that, only when the app's own sign-in fails too", async () => {
+        philips({ homeIdApp: { appliances: [], shortcut: 500, asApp: { list: 500 } } });
         const answer = await signIn("ES");
         expect(answer).toMatchObject({
             done: false,
             next: {
-                summary: "Air+ (eu-west-1): 0; HomeID (eu-west-1): 0; HomeID app: HTTP 500",
+                summary:
+                    "Air+ (eu-west-1): 0; HomeID (eu-west-1): 0; HomeID app: HTTP 500; HomeID app sign-in: HTTP 500; Local network: 0",
                 asked: { country: "ES", region: "eu-west-1", homeIdBroken: true }
             }
         });
@@ -1602,5 +1685,222 @@ describe("guessing the country", () => {
         expect(regions.isPhilipsCountry("JP")).toBe(false);
         expect(regions.philipsArea("eu-west-1")).toBe("eu");
         expect(regions.philipsArea("xx-north-9")).toBe("other");
+    });
+});
+
+// --- the paths tried before the app file ------------------------------------------
+
+describe("every way in before the app file", () => {
+    beforeEach(() => cloud.resetPhilipsRegions());
+
+    const HALL = { name: "Hall", externalDeviceId: "ext-7", ctn: "AC1715/11" };
+
+    const signIn = (country = "ES") =>
+        driver.philipsCloudDriver.pair!.poll(
+            { email: "owner@example.com", country },
+            { vToken: "vt-1", code: "123456" }
+        );
+
+    /** The places a file step says it looked, in order. */
+    function placesLooked(answer: Awaited<ReturnType<typeof signIn>>) {
+        if (answer.done || !answer.next) throw new Error("no file step");
+        return (answer.next.lookups ?? []).map((lookup) =>
+            lookup.count === null
+                ? `${lookup.where}: ${lookup.failure}`
+                : `${lookup.where}: ${lookup.count}`
+        );
+    }
+
+    it("signs in the way the HomeID app does when the backend fails the shortcut, and lists from there", async () => {
+        philips({ homeIdApp: { appliances: [], shortcut: 500, asApp: { appliances: [HALL] } } });
+        const answer = await signIn();
+        expect(answer).toMatchObject({
+            done: true,
+            credentials: { client: "homeid", source: "homeid-app", homeIdCountry: "ES" }
+        });
+        // The app's own sign-in, as the app sends it.
+        const login = calls.find((call) => call.url.pathname === "/api/v2/auth/Consumer/Login")!;
+        expect(login.init.method).toBe("POST");
+        expect(login.url.searchParams.get("requestLocation")).toBe("onboarding");
+        const headers = new Headers(login.init.headers);
+        expect(headers.get("accept")).toBe("application/vnd.api+json");
+        expect(headers.get("content-type")).toBe("application/vnd.api+json");
+        expect(headers.get("api-version")).toBe("2.0.0");
+        expect(headers.get("authorization")).toBeNull();
+        expect(JSON.parse(String(login.init.body))).toEqual({
+            data: {
+                type: "consumerLoginRequest",
+                attributes: {
+                    identityProvider: "DI",
+                    token: `access-${cloud.PHILIPS_CLIENTS.homeid.id}`,
+                    email: "owner@example.com",
+                    countryCode: "ES",
+                    spaceId: SPACE_ES,
+                    userUUID: "gigya-uid-1"
+                }
+            }
+        });
+        // Then Spain's own list, with the backend's token rather than Philips'.
+        const list = calls.find(
+            (call) => call.url.pathname === `/api/${SPACE_ES}/Profile/self/Appliance`
+        )!;
+        expect(new Headers(list.init.headers).get("authorization")).toBe("Bearer consumer-1");
+        expect(new Headers(list.init.headers).get("accept")).toBe(
+            "application/vnd.oneka.v2.0+json"
+        );
+        expect(list.url.searchParams.get("page")).toBe("1");
+        expect(list.url.searchParams.get("size")).toBe("50");
+        // Found in the cloud: the network is not asked.
+        expect(lan.scans).toBe(0);
+        expect(logged).toEqual([]);
+    });
+
+    it("lists from the app's sign-in again on a sync where the shortcut still fails", async () => {
+        philips({ homeIdApp: { appliances: [], shortcut: 500, asApp: { appliances: [HALL] } } });
+        broker.connect = new Error("connect ETIMEDOUT");
+        const answer = await signIn();
+        if (!answer.done) throw new Error("not signed in");
+        const [snapshot] = await driver.philipsCloudDriver.list(answer.credentials);
+        expect(snapshot).toMatchObject({ externalId: "ext-7", name: "Hall", model: "AC1715/11" });
+    });
+
+    it("reports the backend as unreachable on a sync where the app's sign-in is refused too", async () => {
+        const asApp: { appliances: unknown[]; login?: number } = { appliances: [HALL] };
+        philips({ homeIdApp: { appliances: [], shortcut: 500, asApp } });
+        broker.connect = new Error("connect ETIMEDOUT");
+        const answer = await signIn();
+        if (!answer.done) throw new Error("not signed in");
+        cloud.resetHomeIdConsumers();
+        asApp.login = 401;
+        await expect(driver.philipsCloudDriver.verify!(answer.credentials)).rejects.toMatchObject({
+            kind: "unreachable"
+        });
+    });
+
+    it("says what the app's sign-in found when it finds nothing, and does not blame the backend", async () => {
+        philips({ homeIdApp: { appliances: [], shortcut: 500, asApp: { appliances: [] } } });
+        const answer = await signIn();
+        expect(placesLooked(answer)).toEqual([
+            "Air+: 0",
+            "HomeID: 0",
+            "HomeID app: HTTP 500",
+            "HomeID app sign-in: 0",
+            "Local network: 0"
+        ]);
+        expect(answer).toMatchObject({ next: { asked: { homeIdBroken: false } } });
+    });
+
+    it("reports a refused app sign-in as a refusal, and the backend as failing", async () => {
+        philips({ homeIdApp: { appliances: [], shortcut: 503, asApp: { login: 401 } } });
+        const answer = await signIn();
+        expect(placesLooked(answer)).toContain("HomeID app sign-in: HTTP 401/403");
+        expect(answer).toMatchObject({ next: { asked: { homeIdBroken: true } } });
+    });
+
+    it("does not sign in as the app for a shortcut the backend refused rather than failed", async () => {
+        philips({ homeIdApp: { appliances: [], shortcut: 404 } });
+        const answer = await signIn();
+        expect(placesLooked(answer)).toContain("HomeID app: HTTP 404");
+        expect(calls.some((call) => call.url.pathname.includes("Consumer"))).toBe(false);
+    });
+
+    it("cannot sign in as the app without a country, and says the backend failed", async () => {
+        philips({ homeIdApp: { appliances: [], shortcut: 500 } });
+        const answer = await driver.philipsCloudDriver.pair!.poll(
+            { email: "owner@example.com" },
+            { vToken: "vt-1", code: "123456" }
+        );
+        expect(calls.some((call) => call.url.pathname.includes("Consumer"))).toBe(false);
+        expect(answer).toMatchObject({ next: { asked: { homeIdBroken: true } } });
+    });
+
+    it("never sends a token to a space the discovery document puts off Philips' backend", async () => {
+        philips({ homeIdApp: { appliances: [], shortcut: 500 } });
+        routes.unshift({
+            match: (url) => url.pathname === "/.well-known/tenant/oneka",
+            reply: () =>
+                jsonReply({
+                    profileUrl: "/user/self/profile",
+                    spaces: [
+                        {
+                            countryCode: "ES",
+                            spaceId: SPACE_ES,
+                            backendBaseUrl: "https://backend.elsewhere.example/api"
+                        }
+                    ]
+                })
+        });
+        const answer = await signIn();
+        expect(calls.some((call) => call.url.hostname.endsWith("elsewhere.example"))).toBe(false);
+        expect(calls.some((call) => call.url.pathname.includes("Consumer"))).toBe(false);
+        // Read as a backend that could not be used, never followed.
+        expect(answer).toMatchObject({
+            next: {
+                lookups: expect.arrayContaining([
+                    expect.objectContaining({ where: "HomeID app sign-in", count: null })
+                ])
+            }
+        });
+    });
+
+    it("asks this network once no cloud list holds an air device, and offers what answers before the file", async () => {
+        philips({ homeIdApp: { appliances: [] } });
+        lan.units = [
+            {
+                address: "192.168.1.40",
+                model: "AC2889/10",
+                name: "Living room",
+                deviceId: "unit-1"
+            }
+        ];
+        const answer = await signIn();
+        expect(answer).toMatchObject({
+            done: false,
+            next: {
+                step: "file",
+                summary:
+                    "Air+ (eu-west-1): 0; HomeID (eu-west-1): 0; HomeID app: 0; Local network: 1 (AC2889/10)",
+                local: [
+                    {
+                        name: "Living room",
+                        model: "AC2889/10",
+                        mac: "AA:BB:CC:DD:EE:01",
+                        address: "192.168.1.40"
+                    }
+                ]
+            }
+        });
+        // The network is the last place asked: nothing went to Philips after it.
+        expect(lan.scans).toBe(1);
+        expect(lan.requestsBefore).toBe(calls.length);
+    });
+
+    it("asks for the app file only after every cloud list and this network came up empty", async () => {
+        philips({ homeIdApp: { appliances: [], shortcut: 500, asApp: { list: 500 } } });
+        const answer = await signIn();
+        expect(placesLooked(answer)).toEqual([
+            "Air+: 0",
+            "HomeID: 0",
+            "HomeID app: HTTP 500",
+            "HomeID app sign-in: HTTP 500",
+            "Local network: 0"
+        ]);
+        expect(answer).toMatchObject({ done: false, next: { step: "file" } });
+        expect(answer.done || answer.next?.local).toBeFalsy();
+    });
+
+    it("does not ask this network when a cloud list holds an air device", async () => {
+        philips({ airplusDevices: [PURIFIER] });
+        lan.units = [{ address: "192.168.1.40", model: "AC2889/10", name: "", deviceId: "u" }];
+        expect(await signIn()).toMatchObject({ done: true });
+        expect(lan.scans).toBe(0);
+    });
+
+    it("notes a scan that failed as a place it could not read, and still goes on", async () => {
+        philips({ homeIdApp: { appliances: [] } });
+        lan.fail = true;
+        const answer = await signIn();
+        expect(placesLooked(answer)).toContain("Local network: network");
+        expect(answer).toMatchObject({ done: false, next: { step: "file" } });
     });
 });

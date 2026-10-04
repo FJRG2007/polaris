@@ -497,6 +497,13 @@
         "hueBusy": "El puente Hue está ocupado. Inténtalo en un momento.",
         "hueRefused": "El puente Hue rechazó la petición.",
         "hueCannot": "A una luz Hue no se le puede pedir eso",
+        "notPort": "Escribe un número de puerto del 1 al 65535",
+        "dynaliteAreas": "Indica los números de las áreas que quieres traer",
+        "dynaliteCannot": "A un área Dynalite no se le puede pedir eso",
+        "dynaliteNotArea": "Ese dispositivo no es un área Dynalite.",
+        "dynaliteAreaGone": "Esa área ya no está en esta conexión.",
+        "dynaliteSlow": "La pasarela Dynalite no respondió a tiempo.",
+        "dynaliteSilent": "Nada respondió en esa dirección y puerto. Comprueba la dirección de la pasarela y que su puerto sea el 12345 si no se cambió.",
         "dirigeraNot": "Esa dirección no respondió como un hub DIRIGERA.",
         "dirigeraNoPair": "El hub DIRIGERA no quiso vincularse con Polaris.",
         "dirigeraPress": "No se pulsó a tiempo el botón de acción del hub. Elige Conectar y pulsa el botón de acción del hub en menos de un minuto.",
@@ -784,6 +791,40 @@
                 }
             }
         },
+        "philips-dynalite": {
+            "label": "Philips Dynalite (pasarela Dynet)",
+            "summary": "Las áreas de iluminación de una red Dynalite, a través de su pasarela Ethernet. Nada pasa por la nube.",
+            "note": "Cada área que indiques se convierte en una luz: encender selecciona su escena 1 y apagar su escena 4, el encendido y apagado habituales de Dynalite. Polaris lee en qué escena está cada área al sincronizar. Los niveles de canal y las demás escenas siguen en tu programación de Dynalite.",
+            "steps": {
+                "s0": "Busca la dirección IP de la pasarela (una DDNG o PDEG) en tu router o en DLight.",
+                "s1": "Indica los números de las áreas que quieres traer, tal como están programadas en la red."
+            },
+            "fields": {
+                "host": {
+                    "label": "IP de la pasarela",
+                    "hint": "En la misma red que Polaris.",
+                    "placeholder": "192.168.1.50"
+                },
+                "port": {
+                    "label": "Puerto"
+                },
+                "areas": {
+                    "label": "Áreas",
+                    "hint": "Números de área, separados por comas.",
+                    "placeholder": "1, 2, 7"
+                }
+            }
+        },
+        "hue-ble": {
+            "label": "Hue Bluetooth",
+            "summary": "Una bombilla Hue emparejada por Bluetooth, sin puente.",
+            "unavailable": "No disponible: necesita una radio Bluetooth en el equipo donde funciona Polaris, y Polaris no usa ninguna. Añade la bombilla a un puente Hue y conecta el puente."
+        },
+        "philips-tv": {
+            "label": "Philips TV",
+            "summary": "Una Philips Android TV de tu red: encendido, volumen y entradas.",
+            "unavailable": "No disponible: los televisores Philips solo se emparejan con apps que firman la petición con una clave que Philips guarda en su propia app de mando, y Polaris no incluye valores sacados de las apps de Philips."
+        },
         "dirigera-hub": {
             "label": "Hub DIRIGERA",
             "summary": "Las luces, enchufes y sensores de tu hub IKEA DIRIGERA, con una pulsación de su botón. Nada pasa por la nube.",
@@ -915,12 +956,38 @@
                 "prompt": "Philips ha enviado un código de un solo uso a ese email. Puede tardar un minuto; mira también en spam.",
                 "file": {
                     "title": "Sube el archivo de la app Philips Air+ (.apk)",
-                    "why": "Polaris preguntó a los servidores de Philips de {country} ({area}) y de las demás regiones que conoce, y ninguna lista Air+ o HomeID tiene un aparato de aire ({summary}). Ventiladores, calefactores y algunos purificadores están en una tercera nube de Philips, que solo acepta accesos firmados con un valor que Philips guarda en su app Air+. Polaris lee ese valor del archivo sin ejecutarlo, lo guarda cifrado con esta conexión y borra el archivo.",
+                    "why": "Ninguno de estos sitios tiene un aparato de aire para {country} ({area}). Ventiladores, calefactores y algunos purificadores están en una tercera nube de Philips, que solo acepta accesos firmados con un valor que Philips guarda en su app Air+, así que este es el único paso que queda. Polaris lee ese valor del archivo sin ejecutarlo, lo guarda cifrado con esta conexión y borra el archivo.",
                     "homeid": "El servicio HomeID de Philips falló en esta cuenta. Si el aparato está en la app HomeID, quitarlo y volver a añadirlo suele arreglarlo.",
                     "where": "Descárgala (com.philips.ph.homecare) desde APKMirror en el navegador; vale cualquier versión.",
                     "link": "APKMirror",
                     "field": "Archivo app Philips Air+",
                     "skip": "Conectar sin él"
+                },
+                "tried": {
+                    "heading": "Dónde ha buscado Polaris",
+                    "places": {
+                        "airplus": "Lista de aparatos de la app Air+ ({area})",
+                        "homeid": "Lista de aparatos de la app HomeID ({area})",
+                        "homeidApp": "Aparatos de HomeID",
+                        "homeidAppSignIn": "Aparatos de HomeID, accediendo como lo hace la app HomeID",
+                        "account": "Comprobación de la cuenta ({area})",
+                        "philipsAir": "Nube de Philips para ventiladores y calefactores",
+                        "local": "Esta red"
+                    },
+                    "found": "{count, plural, =0 {Ningún aparato} one {1 aparato ({models})} other {# aparatos ({models})}}",
+                    "noneHere": "Ningún purificador respondió",
+                    "refused": "Rechazó el acceso",
+                    "silent": "No respondió",
+                    "garbled": "Respondió de una forma que Polaris no pudo leer",
+                    "serverError": "Falló el servidor de Philips (HTTP {status})",
+                    "status": "Falló (HTTP {status})"
+                },
+                "local": {
+                    "title": "Encontrados en esta red",
+                    "why": "Polaris puede conectarlos directamente, sin el archivo de la app y sin la nube de Philips.",
+                    "use": "Conectar por esta red",
+                    "reconnect": "Para usar uno de estos, cierra esto y añade Philips por la red local.",
+                    "notListed": "¿No es ninguno de estos?"
                 }
             },
             "foundIn": "Encontrado en los servidores de Philips en {found}, no en {asked}, donde suelen estar las cuentas de {country}. Polaris seguirá con {found}.",
@@ -939,6 +1006,8 @@
             "yourCountry": "tu país"
         },
         "notEmail": "Escribe un email completo, como nombre@ejemplo.com.",
+        "notPort": "Escribe un número de puerto del 1 al 65535.",
+        "notAreas": "Escribe números de área del 1 al 255, separados por comas, hasta 64.",
         "macShort": "Una MAC tiene 12 dígitos.",
         "macReserved": "Esa no es la MAC de un dispositivo."
     },
@@ -1547,6 +1616,7 @@
     "connect": {
         "reconnectTitle": "Reconectar {name}",
         "recommended": "Recomendado",
+        "unavailable": "No disponible",
         "title": "Nueva conexión",
         "reconnectIntro": "Los dispositivos conservan sus nombres, sus sitios y todo lo que han hecho. Solo cambia lo que Polaris usa para abrirlos.",
         "intro": "Elige lo que tienes y cómo debe llegar Polaris. Lo que encuentre llega como dispositivos a los que puedes dar nombre y sitio.",

@@ -199,6 +199,16 @@ const EXACT: ReadonlyMap<string, PlacesKey> = new Map<string, PlacesKey>([
     ["The Hue bridge is busy. Try again in a moment.", "refusals.hueBusy"],
     ["The Hue bridge refused the request.", "refusals.hueRefused"],
     ["A Hue light cannot be told to do that", "refusals.hueCannot"],
+    ["Type a port number from 1 to 65535", "refusals.notPort"],
+    ["List the area numbers to bring in", "refusals.dynaliteAreas"],
+    ["A Dynalite area cannot be told to do that", "refusals.dynaliteCannot"],
+    ["That device is not a Dynalite area.", "refusals.dynaliteNotArea"],
+    ["That area is no longer on this connection.", "refusals.dynaliteAreaGone"],
+    ["The Dynalite gateway did not answer in time.", "refusals.dynaliteSlow"],
+    [
+        "Nothing answered on that address and port. Check the gateway's address and that its port is 12345 unless it was changed.",
+        "refusals.dynaliteSilent"
+    ],
     ["That address did not answer as a DIRIGERA hub.", "refusals.dirigeraNot"],
     ["The DIRIGERA hub would not pair with Polaris.", "refusals.dirigeraNoPair"],
     [

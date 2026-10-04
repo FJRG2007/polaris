@@ -75,7 +75,7 @@ import { AddressInput } from "./address-input";
 import type { DiscoveredUnit } from "../../lib/drivers/contract";
 import type { PlacesTranslator } from "../../lib/i18n";
 import { philipsCountryGuess } from "../../lib/integrations/philips-regions";
-import type { PairingAsked, PairingFoundIn } from "../../lib/drivers/contract";
+import type { PairingAsked, PairingFoundIn, PairingLookup } from "../../lib/drivers/contract";
 
 const { runAction } = hostUi.runAction;
 const { IntegrationLogo } = hostUi.logos;
@@ -95,6 +95,10 @@ interface FileStep {
     readonly skippable: boolean;
     /** Where the attempt looked before asking for it. */
     readonly asked?: PairingAsked;
+    /** Every place it looked, with what each answered. */
+    readonly lookups?: readonly PairingLookup[];
+    /** Units of the make found on this network, offered before the file. */
+    readonly local?: readonly DiscoveredUnit[];
 }
 
 /** What a poll answered, as far as finishing goes. */
@@ -475,7 +479,22 @@ export function ConnectDialog({
      *  its recommended one. */
     const pickBrand = (next: string) => {
         setBrand(next);
-        setChosen(registry.recommendedConnection(next)?.id ?? "");
+        // A make found by a word only one of its ways in has - "hue" under
+        // Philips - opens on that way in rather than on the make's usual one.
+        const words = folded(query).split(/\s+/).filter(Boolean);
+        const recommended = registry.recommendedConnection(next);
+        const named = registry.connectionsOfBrand(next).filter((way) => {
+            if (way.unavailable || words.length === 0) return false;
+            const own = folded(
+                [way.label, registry.connectionWords(t, way).label, ...(way.search ?? [])].join(" ")
+            );
+            return words.every((word) => own.includes(word));
+        });
+        const opened =
+            named.length === 0 || named.some((way) => way.id === recommended?.id)
+                ? recommended
+                : named[0];
+        setChosen(opened?.id ?? "");
         setFields({});
         setMacKeys([]);
         setError("");
@@ -618,6 +637,35 @@ export function ConnectDialog({
         }
         await pollWith({ ...fileStep.state, ...uploaded.state });
         setSaving(false);
+    };
+
+    /** The make's own connection over this network, which the units a cloud
+     *  sign-in found here are connected through instead of the file. */
+    const localConnection = connection
+        ? (registry
+              .connectionsOfBrand(connection.brand)
+              .find(
+                  (entry) =>
+                      entry.discovery === true &&
+                      entry.id !== connection.id &&
+                      entry.kinds.some((kind) => connection.kinds.includes(kind))
+              ) ?? null)
+        : null;
+
+    /** Leave the file step for the local connection, with the unit picked
+     *  already filled in: its MAC where it gave one, so it is followed when
+     *  the router moves it. */
+    const connectLocally = (unit: DiscoveredUnit) => {
+        if (!localConnection || reconnect) return;
+        const field = localConnection.fields.find((entry) => entry.address === true) ?? null;
+        setChosen(localConnection.id);
+        setFields(field ? { [field.key]: unit.mac ?? unit.address } : {});
+        setMacKeys(field && unit.mac ? [field.key] : []);
+        setLabel(unit.name.slice(0, 60));
+        setError("");
+        setPairing(null);
+        setFileStep(null);
+        setChosenFile(null);
     };
 
     /** Finish with what was found before the file step. */
@@ -851,9 +899,18 @@ export function ConnectDialog({
                                                             : "text-transparent"
                                                     )}
                                                 />
+                                                <IntegrationLogo
+                                                    slug={entry.logo}
+                                                    className="mt-0.5 size-4 w-6 shrink-0 object-contain"
+                                                />
                                                 <span className="flex min-w-0 flex-col gap-0.5">
                                                     <span className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm font-medium">
                                                         {registry.connectionWords(t, entry).label}
+                                                        {entry.unavailable && (
+                                                            <Badge className="border-border bg-muted text-muted-foreground">
+                                                                {t("connect.unavailable")}
+                                                            </Badge>
+                                                        )}
                                                         {entry.recommended === true && (
                                                             <Badge className="border-accent/30 bg-accent/10 text-accent">
                                                                 {t("connect.recommended")}
@@ -886,6 +943,11 @@ export function ConnectDialog({
                                     {said?.note && (
                                         <span className="text-xs text-foreground-subtle">
                                             {said.note}
+                                        </span>
+                                    )}
+                                    {said?.unavailable && (
+                                        <span className="text-xs text-foreground" role="note">
+                                            {said.unavailable}
                                         </span>
                                     )}
                                 </div>
@@ -965,7 +1027,113 @@ export function ConnectDialog({
 
                             {pairing && fileStep && fileSpec && fileWords && (
                                 <div className="flex flex-col gap-3">
+                                    {fileStep.local && fileStep.local.length > 0 && (
+                                        <div className="flex flex-col gap-2">
+                                            <p className="text-sm font-medium">
+                                                {fileWords.local.title}
+                                            </p>
+                                            <p className="text-xs text-muted-foreground">
+                                                {reconnect || !localConnection
+                                                    ? fileWords.local.reconnect
+                                                    : fileWords.local.why}
+                                            </p>
+                                            <ul className="flex flex-col gap-1.5">
+                                                {fileStep.local.map((unit) => (
+                                                    <li
+                                                        key={unit.address}
+                                                        className="flex min-w-0 items-center gap-2 rounded-md bg-muted/50 px-3 py-2"
+                                                    >
+                                                        <span className="flex min-w-0 flex-1 flex-col">
+                                                            <span
+                                                                className="truncate text-sm"
+                                                                title={unit.name || unit.model}
+                                                            >
+                                                                {unit.name || unit.model}
+                                                            </span>
+                                                            <span
+                                                                className="truncate text-xs text-muted-foreground"
+                                                                title={[
+                                                                    unit.model,
+                                                                    unit.mac ?? unit.address
+                                                                ]
+                                                                    .filter(Boolean)
+                                                                    .join(" - ")}
+                                                            >
+                                                                {[
+                                                                    unit.model,
+                                                                    unit.mac ?? unit.address
+                                                                ]
+                                                                    .filter(Boolean)
+                                                                    .join(" - ")}
+                                                            </span>
+                                                        </span>
+                                                        {!reconnect && localConnection && (
+                                                            <Button
+                                                                size="sm"
+                                                                className="shrink-0"
+                                                                disabled={saving}
+                                                                onClick={() => connectLocally(unit)}
+                                                            >
+                                                                {fileWords.local.use}
+                                                            </Button>
+                                                        )}
+                                                    </li>
+                                                ))}
+                                            </ul>
+                                            <p className="pt-1 text-xs font-medium text-muted-foreground">
+                                                {fileWords.local.notListed}
+                                            </p>
+                                        </div>
+                                    )}
                                     <p className="text-sm font-medium">{fileWords.title}</p>
+                                    {fileStep.lookups &&
+                                        fileStep.lookups.length > 0 &&
+                                        connection && (
+                                            <div className="flex flex-col gap-1">
+                                                <p className="text-xs text-muted-foreground">
+                                                    {fileWords.tried}
+                                                </p>
+                                                <ul
+                                                    className="flex flex-col gap-0.5"
+                                                    aria-label={fileWords.tried}
+                                                >
+                                                    {fileStep.lookups.map((lookup, index) => {
+                                                        const words = registry.lookupWords(
+                                                            t,
+                                                            connection,
+                                                            lookup
+                                                        );
+                                                        return (
+                                                            <li
+                                                                key={`${lookup.where}-${lookup.region ?? ""}-${index}`}
+                                                                className="flex min-w-0 flex-wrap gap-x-1.5 text-xs"
+                                                            >
+                                                                <span className="min-w-0 text-foreground">
+                                                                    {words.place}:
+                                                                </span>
+                                                                <span
+                                                                    className={cn(
+                                                                        "min-w-0 break-words",
+                                                                        words.failed
+                                                                            ? "text-danger"
+                                                                            : "text-muted-foreground"
+                                                                    )}
+                                                                >
+                                                                    {words.result}
+                                                                </span>
+                                                            </li>
+                                                        );
+                                                    })}
+                                                </ul>
+                                            </div>
+                                        )}
+                                    {!fileStep.lookups?.length && fileStep.summary && (
+                                        // A server that sends only the summary line still
+                                        // says where it looked.
+                                        <p className="text-xs text-muted-foreground">
+                                            {fileWords.tried}: {fileStep.summary}
+                                        </p>
+                                    )}
                                     <p className="text-xs text-muted-foreground">
                                         {fileWords.why(fileStep.summary, fileStep.asked)}
                                     </p>
@@ -1118,7 +1286,7 @@ export function ConnectDialog({
                                     />
                                 ))}
 
-                            {!pairing && !choosing && (
+                            {!pairing && !choosing && !connection?.unavailable && (
                                 <label className="flex flex-col gap-1.5">
                                     <span className="text-xs text-muted-foreground">
                                         {t("connect.label")}{" "}
@@ -1204,7 +1372,7 @@ export function ConnectDialog({
                                         </Button>
                                     )}
                                 </>
-                            ) : choosing ? null : (
+                            ) : choosing || connection?.unavailable ? null : (
                                 <Button
                                     onClick={() =>
                                         void (connection?.pairing ? startPairing() : submit())
