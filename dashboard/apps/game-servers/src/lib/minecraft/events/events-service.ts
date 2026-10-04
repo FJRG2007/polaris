@@ -37,6 +37,8 @@ import * as boost from "./kinds/xp-boost";
 import { parseProperties } from "../parse";
 import { readSchedule } from "../schedule";
 import * as parkour from "./kinds/parkour";
+import * as dropper from "./kinds/dropper";
+import * as boatRace from "./kinds/boat-race";
 import { withTimeout } from "@polaris/core";
 import * as gather from "./kinds/gathering";
 import * as hunt from "./kinds/treasure-hunt";
@@ -50,6 +52,12 @@ import * as arenaService from "./kinds/arena-service";
 import * as stashService from "./kinds/stash-service";
 import * as search from "./place-search";
 import * as hillService from "./kinds/hill-service";
+import * as village from "./kinds/village-defense";
+import * as villageMessages from "./kinds/village-defense-messages";
+import * as bingo from "./kinds/bingo";
+import * as bingoMessages from "./kinds/bingo-messages";
+import * as fishing from "./kinds/boss-fishing";
+import * as fishingMessages from "./kinds/boss-fishing-messages";
 import { editionOf, type ServerContainer } from "../service";
 import { gameMessage, gameMessageIn } from "../../game-message";
 import { holdSidebar, releaseSidebar } from "../live-display-service";
@@ -74,6 +82,9 @@ const english = (text: string): string => gameMessageIn("en-US", text);
 
 /** What players read, in one language or - given `speech.EVERY` - in every one. */
 const messages = speech.spoken(written);
+const villageSay = speech.spoken(villageMessages);
+const bingoSay = speech.spoken(bingoMessages);
+const fishSay = speech.spoken(fishingMessages);
 
 const { readInstallConfig } = host.appsInstallConfig;
 
@@ -703,6 +714,20 @@ export async function startEvent(input: {
             );
         }
     }
+    // SkyWars' loot is fought over: never beside what a player brought, which
+    // only 1.17 and later put away first (`stash`).
+    if (catalog.stashesFirst(preset)) {
+        const items = await withServerContainer(row.ownerId, input.installedAppId, (server) =>
+            serverAtLeast(server, [1, 17])
+        ).catch(() => null);
+        if (items === false) {
+            throw new Error(
+                refused("needsItems", {
+                    kind: gameMessage("minecraft", `events.kinds.${preset.kind}.label`)
+                })
+            );
+        }
+    }
 
     const now = Date.now();
     // Long enough to type `join` in, for an event players join.
@@ -769,7 +794,11 @@ export async function startEvent(input: {
         doneOffered: false,
         done: [],
         buildEndsAt: null,
-        boss: null
+        game: null,
+        boss: null,
+        villager: null,
+        bingo: null,
+        fish: null
     } satisfies stored.EventRun;
 
     const written = await updateEventState(input.installedAppId, (state) => {
@@ -923,9 +952,15 @@ function startLoop(
         homes: null
     };
     loop.timer.unref?.();
-    loop.clock = setInterval(() => void showClock(loop), CLOCK_MS);
+    loop.clock = setInterval(() => void showClock(installedAppId, loop), CLOCK_MS);
     loop.clock.unref?.();
-    if (run.preset.kind === "parkour" || run.preset.kind === "team-duel") {
+    if (
+        run.preset.kind === "parkour" ||
+        run.preset.kind === "dropper" ||
+        run.preset.kind === "boat-race" ||
+        run.preset.kind === "team-duel" ||
+        arenaService.quickens(run.preset)
+    ) {
         loop.quick = setInterval(() => void quickLook(loop), QUICK_MS);
         loop.quick.unref?.();
     }
@@ -1164,7 +1199,9 @@ async function quickLook(loop: Loop): Promise<void> {
                           (loop.run.preset.options as catalog.EventOptions<"team-duel">).downHearts
                       )
                   ]
-            : stageService.quickLines(loop);
+            : catalog.playsInArena(loop.run.preset)
+              ? arenaService.quickLines(loop.run)
+              : stageService.quickLines(loop);
     if (lines.length === 0) return;
     loop.quickBusy = true;
     try {
@@ -1176,7 +1213,7 @@ async function quickLook(loop: Loop): Promise<void> {
     }
 }
 
-async function showClock(loop: Loop): Promise<void> {
+async function showClock(installedAppId: string, loop: Loop): Promise<void> {
     const server = loop.link?.server;
     if (!server || loop.finishing || !loop.announced) return;
     const { preset } = loop.run;
@@ -1226,7 +1263,24 @@ async function showClock(loop: Loop): Promise<void> {
                 options.roundMinutes * 60
             )
         );
-    } else if (preset.kind !== "world-boss" && preset.kind !== "waves") {
+    } else if (preset.kind === "boss-fishing" && loop.run.fish) {
+        // The fish's strength, with the time beside it.
+        const left = (loop.run.endsAt - now) / 1000;
+        if (left <= 0) return;
+        const { max } = loop.run.fish;
+        const strength = fishLeft(installedAppId, loop.run);
+        lines.push(
+            ...commands.barUpdate(
+                fishSay.bar(strength, max, messages.clock(left), loop.language),
+                strength,
+                max
+            )
+        );
+    } else if (
+        preset.kind !== "world-boss" &&
+        preset.kind !== "waves" &&
+        preset.kind !== "village-defense"
+    ) {
         const left = (loop.run.endsAt - now) / 1000;
         if (left <= 0) return;
         const total = (loop.run.endsAt - loop.run.startsAt) / 1000;
@@ -1285,6 +1339,8 @@ function rulesVariant(preset: catalog.EventPreset): written.RulesVariant {
             moves: options.moves
         };
     }
+    if (preset.kind === "bingo")
+        return { line: (preset.options as catalog.EventOptions<"bingo">).goal === "line" };
     return { race: isRace(preset) };
 }
 
@@ -1343,6 +1399,9 @@ async function begin(
     if (preset.kind === "xp-boost") {
         lines.push(...boost.boostSetup(preset.options as catalog.EventOptions<"xp-boost">));
     }
+    if (preset.kind === "bingo") lines.push(...(await bingoBegin(installedAppId, loop, server)));
+    if (preset.kind === "boss-fishing")
+        lines.push(...(await fishBegin(installedAppId, loop, server, now)));
     if (preset.kind === "world-boss") {
         // The boss drawn, and the rules its fight holds written down before
         // they are changed, so whatever ends it - a restart included - puts
@@ -1395,7 +1454,7 @@ async function begin(
             ...commands.happyEffects(preset.options as catalog.EventOptions<"happy-hour">, seconds)
         );
     }
-    if (preset.kind === "waves") {
+    if (preset.kind === "waves" || preset.kind === "village-defense") {
         // Nobody loses what they carry to a wave: keepInventory on for
         // exactly the event. What it was is written down before it is
         // changed, so even a restart right after puts it back.
@@ -1410,7 +1469,7 @@ async function begin(
         await persist(installedAppId, loop);
         lines.push(
             ...Object.keys(before).map((rule) => commands.setRule(rule, "true")),
-            ...waves.wavesSetup((preset.options as catalog.EventOptions<"waves">).mix)
+            ...waves.wavesSetup(waveKindsOf(preset))
         );
     }
     if (preset.kind === "meteor-shower") {
@@ -1473,7 +1532,7 @@ async function begin(
         }
         // No healing on a full belly in a duel: what the rule was written down
         // with keepInventory, and put back with it.
-        if (preset.kind === "team-duel") {
+        if (preset.kind === "team-duel" || preset.kind === "capture-the-flag") {
             for (const rule of duel.NATURAL_REGENERATION) {
                 const value =
                     loop.run.gamerules[rule] ??
@@ -1575,6 +1634,12 @@ async function play(
         case "rare-catch":
             decided = await rareCatchTick(loop, server, lines);
             break;
+        case "bingo":
+            decided = await bingoRush(installedAppId, loop, server, now, lines);
+            break;
+        case "boss-fishing":
+            decided = await bossFishing(installedAppId, loop, server, lines);
+            break;
         case "xp-boost": {
             const options = preset.options as catalog.EventOptions<"xp-boost">;
             if (loop.ticks % 2 === 0) lines.push(...boost.boostTick(options));
@@ -1586,6 +1651,7 @@ async function play(
             break;
         }
         case "waves":
+        case "village-defense":
             decided = await hordeDefense(installedAppId, loop, server, now, lines);
             break;
         case "meteor-shower":
@@ -1593,6 +1659,9 @@ async function play(
             break;
         case "parkour":
         case "spleef":
+        case "tnt-run":
+        case "dropper":
+        case "boat-race":
             decided = await stageService.stageTick(
                 loop,
                 server,
@@ -1603,6 +1672,10 @@ async function play(
             break;
         case "team-duel":
         case "build-battle":
+        case "capture-the-flag":
+        case "hide-and-seek":
+        case "hot-potato":
+        case "sky-wars":
             decided = await arenaService.arenaTick(
                 kindContext(installedAppId, loop, server, now),
                 lines
@@ -2685,6 +2758,275 @@ async function gathering(
     }
 }
 
+// ------------------------------------------------------------------ bingo rush
+
+/**
+ * A bingo rush begun: its card drawn from the run's id - only items this
+ * server's version has - and written down before anything is said of it, then
+ * counted from now and shown to everybody. A restart that comes before the
+ * start was written finds the same card.
+ */
+async function bingoBegin(
+    installedAppId: string,
+    loop: Loop,
+    server: ServerContainer
+): Promise<string[]> {
+    const options = loop.run.preset.options as catalog.EventOptions<"bingo">;
+    if (!loop.run.bingo) {
+        const version = await versionOf(server);
+        const card = bingo.drawCard(loop.run.id, options.difficulty, (since) =>
+            atLeast(version, since)
+        );
+        loop.run = { ...loop.run, bingo: { card, marked: {}, at: {}, winner: null } };
+        await persist(installedAppId, loop);
+    }
+    const { card } = loop.run.bingo!;
+    return [
+        ...bingo.bingoSetup(card),
+        commands.say(
+            messages.tag(loop.language) +
+                bingoSay.cardHeader(options.goal === "line", loop.language)
+        ),
+        ...bingo.cardLines("@a", card)
+    ];
+}
+
+/** Every few minutes each player is shown their own card again. */
+const CARD_AGAIN_TICKS = 90;
+
+/**
+ * A bingo rush's tick: every player's inventory looked at in one batch, what
+ * each has newly marked told to them with their card, and the side panel and
+ * action bars brought up to date. Answers who completed the line or the card
+ * first - never somebody seen in creative or spectator - which ends it.
+ */
+async function bingoRush(
+    installedAppId: string,
+    loop: Loop,
+    server: ServerContainer,
+    now: number,
+    lines: string[]
+): Promise<string | null> {
+    const state = loop.run.bingo;
+    if (!state) return null;
+    const { goal } = loop.run.preset.options as catalog.EventOptions<"bingo">;
+    const language = loop.language;
+    await server.sayAll(bingo.bingoTick(state.card));
+    const read = commands.readScores(await server.say([bingo.READ_MARKS]));
+    const marked = { ...state.marked };
+    const at = { ...state.at };
+    const lower = (name: string) => name.toLowerCase();
+    const known = new Map(Object.keys(marked).map((name) => [lower(name), name]));
+    const off = new Set(loop.run.offMode.map(lower));
+    const since = now - (loop.run.readyAt ?? loop.run.startsAt);
+    const done: { name: string; mask: number }[] = [];
+    const again = loop.ticks % CARD_AGAIN_TICKS === 0;
+    for (const [name, value] of read) {
+        if (!catalog.PLAYER_NAME.test(name)) continue;
+        const key = known.get(lower(name)) ?? name;
+        const before = marked[key] ?? 0;
+        // Marks only ever add up: a read that says less keeps what was marked.
+        const mask = before | (value & bingo.FULL);
+        const fresh = bingo.newCells(before, mask);
+        lines.push(bingo.progressBar(name, state.card, mask, bingoMessages.missing));
+        if (fresh.length === 0) {
+            if (again && mask > 0)
+                lines.push(
+                    `tellraw ${name} ${commands.text(bingoSay.yourCard(language))}`,
+                    ...bingo.cardLines(name, state.card, mask)
+                );
+            continue;
+        }
+        marked[key] = mask;
+        at[key] = since;
+        const count = bingo.countOf(mask);
+        lines.push(
+            commands.setScore(name, count),
+            ...fresh.map((cell) => bingo.markedLine(name, state.card[cell] ?? "air", count)),
+            `tellraw ${name} ${commands.text(bingoSay.yourCard(language))}`,
+            ...bingo.cardLines(name, state.card, mask),
+            bingo.markSound(name)
+        );
+        if (!bingo.completes(before, goal) && bingo.completes(mask, goal) && !off.has(lower(name)))
+            done.push({ name: key, mask });
+    }
+    const winner = state.winner ?? bingo.firstToComplete(done);
+    const changed = Object.keys(marked).some((name) => marked[name] !== state.marked[name]);
+    loop.run = { ...loop.run, bingo: { ...state, marked, at, winner } };
+    if (changed || winner !== state.winner) await persist(installedAppId, loop);
+    if (!winner) return null;
+    const line = goal === "line";
+    lines.push(
+        ...commands.titleCommands(
+            bingoSay.winTitle(winner, language),
+            bingoSay.winSubtitle(line, language)
+        ),
+        commands.sound(commands.SOUNDS.win)
+    );
+    return line ? `${winner} completed a line` : `${winner} filled the card`;
+}
+
+/** A bingo rush's scores: items marked, after one last look so the final
+ *  seconds are in it; everybody who marked one took part. */
+async function bingoResults(
+    server: ServerContainer,
+    run: stored.EventRun
+): Promise<{ scores: Map<string, number>; took: string[] }> {
+    const marked = { ...(run.bingo?.marked ?? {}) };
+    if (run.bingo && !run.bingo.winner) {
+        await server.sayAll(bingo.bingoTick(run.bingo.card));
+        const known = new Map(Object.keys(marked).map((name) => [name.toLowerCase(), name]));
+        for (const [name, value] of commands.readScores(await server.say([bingo.READ_MARKS]))) {
+            if (!catalog.PLAYER_NAME.test(name)) continue;
+            const key = known.get(name.toLowerCase()) ?? name;
+            marked[key] = (marked[key] ?? 0) | (value & bingo.FULL);
+        }
+    }
+    const scores = new Map(
+        Object.entries(marked).map(([name, mask]) => [name, bingo.countOf(mask)])
+    );
+    return { scores, took: [...scores].filter(([, count]) => count > 0).map(([name]) => name) };
+}
+
+// ------------------------------------------------------------------ boss fishing
+
+/** Whose catches wear the fish down for nothing (lowercased): anybody seen in
+ *  creative or spectator, and anybody AFK since it began. */
+function fishExcluded(installedAppId: string, run: stored.EventRun): Set<string> {
+    const idle = plan.idleThroughout(playing.seenOn(installedAppId), run.startsAt);
+    return new Set([...run.offMode, ...idle].map((name) => name.toLowerCase()));
+}
+
+/** How much of the fish's strength is left. */
+function fishLeft(installedAppId: string, run: stored.EventRun): number {
+    return run.fish ? fishing.strengthLeft(run.fish, fishExcluded(installedAppId, run)) : 0;
+}
+
+/** A boss fishing whose fish was still fighting when the time ran out. */
+function fishEscaped(run: stored.EventRun): boolean {
+    return run.preset.kind === "boss-fishing" && run.fish?.landed !== true;
+}
+
+/** How often, in ticks, it looks for players who have started fishing since. */
+const FISHERS_EVERY = 8;
+
+/**
+ * A boss fishing begun: the fish sized for everybody playing now - written
+ * down before it is said, so a restart keeps the same fish - its catches
+ * counted from now, and the news told.
+ */
+async function fishBegin(
+    installedAppId: string,
+    loop: Loop,
+    server: ServerContainer,
+    now: number
+): Promise<string[]> {
+    const { catches } = loop.run.preset.options as catalog.EventOptions<"boss-fishing">;
+    if (!loop.run.fish) {
+        const seen = await playing.lookAt(installedAppId, server);
+        const fishers = seen
+            ? plan
+                  .playersFor(loop.run.preset, seen, await afkMinutesFor(installedAppId), now)
+                  .map((one) => one.name)
+            : [];
+        loop.run = { ...loop.run, fish: fishing.hooked(catches, fishers) };
+        await persist(installedAppId, loop);
+    }
+    const { max } = loop.run.fish!;
+    return [
+        ...fishing.fishSetup(),
+        ...commands.titleCommands(
+            fishSay.hookedTitle(loop.language),
+            `&f${fishSay.fishName(loop.language)}`
+        ),
+        commands.say(
+            messages.tag(loop.language) +
+                fishSay.hookedLine(max, fishing.TREASURE_WORTH, loop.language)
+        ),
+        commands.sound("minecraft:entity.fishing_bobber.splash")
+    ];
+}
+
+/**
+ * A boss fishing's tick: treasures off anybody's line counted, everybody's
+ * catches added up and read in one batch, the fish grown for whoever started
+ * fishing since, and its strength told as it falls. Answers once it is landed.
+ */
+async function bossFishing(
+    installedAppId: string,
+    loop: Loop,
+    server: ServerContainer,
+    lines: string[]
+): Promise<string | null> {
+    let state = loop.run.fish;
+    if (!state) return null;
+    const { catches } = loop.run.preset.options as catalog.EventOptions<"boss-fishing">;
+    const language = loop.language;
+    await server.sayAll(fishing.treasureLook());
+    const treasures = commands
+        .readWhere(await server.say([fishing.READ_TREASURES]))
+        .map((one) => one.name)
+        .filter((name) => catalog.PLAYER_NAME.test(name));
+    await server.sayAll([
+        ...fishing.treasureCommit(),
+        ...treasures.map(fishing.treasureLine),
+        ...fishing.fishTick()
+    ]);
+    for (const name of treasures)
+        lines.push(
+            commands.say(
+                messages.tag(language) +
+                    fishSay.treasureLine(name, fishing.TREASURE_WORTH, language)
+            )
+        );
+    const read = new Map(
+        [...commands.readScores(await server.say([fishing.READ_CATCHES]))].filter(([name]) =>
+            catalog.PLAYER_NAME.test(name)
+        )
+    );
+    const before = state;
+    state = fishing.withCatches(state, read);
+    // Somebody who has started playing since it began makes it bigger.
+    if (loop.ticks % FISHERS_EVERY === 0) {
+        const seen = playing.seenOn(installedAppId);
+        if (seen) {
+            const active = plan
+                .playersFor(loop.run.preset, seen, await afkMinutesFor(installedAppId), Date.now())
+                .map((one) => one.name);
+            const { state: next, added } = fishing.grown(state, catches, active);
+            const more = next.max - state.max;
+            state = next;
+            if (added.length > 0 && more > 0)
+                lines.push(
+                    commands.say(messages.tag(language) + fishSay.strongerLine(more, language))
+                );
+        }
+    }
+    const left = fishing.strengthLeft(state, fishExcluded(installedAppId, loop.run));
+    const due = fishing.stagesDue(left, state.max);
+    if (left > 0 && due > state.told) {
+        const share = fishing.STAGES[due - 1] ?? 0;
+        lines.push(
+            commands.say(
+                messages.tag(language) + fishSay.tiringLine(Math.round(share * 100), language)
+            ),
+            commands.sound("minecraft:entity.fishing_bobber.retrieve")
+        );
+        state = { ...state, told: due };
+    }
+    if (left <= 0) state = { ...state, landed: true };
+    loop.run = { ...loop.run, fish: state };
+    if (JSON.stringify(state) !== JSON.stringify(before)) await persist(installedAppId, loop);
+    if (!state.landed) return null;
+    lines.push(
+        ...commands.titleCommands(fishSay.landedTitle(language), fishSay.landedSubtitle(language)),
+        ...fishing.landedLines()
+    );
+    return "The legendary fish was landed";
+}
+
+// ------------------------------------------------------------------ rare catch
+
 /** A rare catch's tick: whoever landed the treasure off a line since the last look wins. */
 async function rareCatchTick(
     loop: Loop,
@@ -2992,11 +3334,35 @@ export function truthRound(
 
 // ------------------------------------------------------------------ horde defense
 
+/** The monsters a horde defense or a villager defense sends: a villager
+ *  defense only ones that go for a villager (`village.VILLAGE_MOBS`). */
+function waveKindsOf(preset: catalog.EventPreset): waves.WaveKinds {
+    const { mix } = preset.options as catalog.EventOptions<"waves" | "village-defense">;
+    return preset.kind === "village-defense" ? village.VILLAGE_MOBS[mix] : mix;
+}
+
+/** Whether a horde defense is won by damage dealt rather than kills. */
+function wavesByDamage(preset: catalog.EventPreset): boolean {
+    return (
+        preset.kind === "waves" &&
+        (preset.options as catalog.EventOptions<"waves">).winner === "damage"
+    );
+}
+
+/** A villager defense whose villager died: over, with nobody winning. */
+function villagerLost(run: stored.EventRun): boolean {
+    return run.preset.kind === "village-defense" && run.villager?.lost === true;
+}
+
 /**
  * A horde defense: the point found and marked, then wave after wave summoned
  * round it once somebody is there to meet it. A wave ends when none of its
  * monsters is left, or when its time is up (what is left of it is taken away);
  * whoever is at the point then has held it. Decided when the last wave ends.
+ *
+ * A villager defense is the same, with a villager at the point (`keepVillager`):
+ * the waves are turned on it, its health is the bar, and its death ends the
+ * event there and then, with nobody winning.
  */
 async function hordeDefense(
     installedAppId: string,
@@ -3005,7 +3371,10 @@ async function hordeDefense(
     now: number,
     lines: string[]
 ): Promise<string | null> {
-    const options = loop.run.preset.options as catalog.EventOptions<"waves">;
+    const { preset } = loop.run;
+    const options = preset.options as catalog.EventOptions<"waves" | "village-defense">;
+    const villager = preset.kind === "village-defense";
+    const kinds = waveKindsOf(preset);
     const language = loop.language;
     const timing = catalog.WAVE_TIMING;
     // Players die in this one. Without keepInventory held on, a death would
@@ -3032,9 +3401,24 @@ async function hordeDefense(
         const hold = chunks.notHeld(chunks.chunksAround(found.x, found.z, waves.LOAD_REACH), held);
         loop.run = { ...loop.run, chunks: hold, round: -1, roundEndsAt: null, closedAt: now };
         await persist(installedAppId, loop);
+        await server.sayAll([...hold.map(chunks.holdChunk), commands.CLEAR_MARK]);
+        if (villager) {
+            await keepVillager(installedAppId, loop, server, found);
+            const name = loop.run.villager?.name ?? "";
+            await server.sayAll([
+                ...commands.titleCommands(
+                    villageSay.pointTitle(language),
+                    villageSay.pointSubtitle(name, language)
+                ),
+                commands.say(
+                    messages.tag(language) +
+                        villageSay.pointAt(name, found.x, found.y, found.z, language)
+                ),
+                commands.sound(commands.SOUNDS.horn)
+            ]);
+            return null;
+        }
         await server.sayAll([
-            ...hold.map(chunks.holdChunk),
-            commands.CLEAR_MARK,
             ...commands.titleCommands(
                 messages.wavesPointTitle(language),
                 `&fX ${found.x} Y ${found.y} Z ${found.z}`
@@ -3047,12 +3431,29 @@ async function hordeDefense(
         return null;
     }
     const place = loop.run.place;
+    // The villager first: dead, and nothing else of the tick matters.
+    const health = villager ? await keepVillager(installedAppId, loop, server, place) : null;
+    if (health === "lost") {
+        const name = loop.run.villager?.name ?? "";
+        lines.push(
+            ...village.lostLines(place),
+            ...commands.titleCommands(
+                villageSay.lostTitle(name, language),
+                villageSay.lostSubtitle(language)
+            )
+        );
+        return `${name} the villager died`;
+    }
     const open = loop.run.roundEndsAt !== null;
     lines.push(
         ...waves.wavesMarks(place),
         waves.leash(place),
-        ...waves.wavesTick(place, options.mix, open, options.winner === "damage")
+        ...waves.wavesTick(place, kinds, open, wavesByDamage(preset))
     );
+    // Every few ticks the wave is turned on the villager again: whatever a
+    // defender drew off and then left alone goes back for it.
+    if (villager && open && loop.run.villager?.provoke && loop.ticks % village.PROVOKE_EVERY === 0)
+        lines.push(village.provokeLine());
     /** Monsters of the wave on now still about, as far as is known. */
     let left: number | null = null;
     if (open) {
@@ -3081,7 +3482,10 @@ async function hordeDefense(
                 ),
                 commands.sound(cleared ? commands.SOUNDS.win : commands.SOUNDS.tick)
             );
-            if (wave + 1 >= options.waves) return `All ${options.waves} waves were fought`;
+            if (wave + 1 >= options.waves) {
+                if (villager) lines.push(...village.thanksLines(place));
+                return `All ${options.waves} waves were fought`;
+            }
         }
     } else if (
         now - loop.run.closedAt >=
@@ -3100,12 +3504,14 @@ async function hordeDefense(
             lines.push(
                 ...waves.summonWave(
                     place,
-                    options.mix,
+                    kinds,
                     count,
                     wave,
                     (loop.run.endsAt - now) / 1000 + 60,
                     { waves: options.waves, defenders: at.length }
                 ),
+                // Straight for the villager, the moment it is down.
+                ...(villager && loop.run.villager?.provoke ? [village.provokeLine()] : []),
                 ...commands.titleCommands(
                     messages.waveTitle(wave + 1, options.waves, language),
                     messages.waveSubtitle(count, language)
@@ -3135,26 +3541,103 @@ async function hordeDefense(
         status = messages.waveComing(number, options.waves, seconds, language);
         bar = { value: seconds, max: wait / 1000 };
     }
-    lines.push(...commands.barUpdate(status, bar.value, bar.max));
+    const name = run.villager?.name ?? "";
+    // A villager defense's bar is the villager's health, with where the waves
+    // stand beside it.
+    if (health !== null)
+        lines.push(
+            ...commands.barUpdate(
+                villageSay.bar(name, village.hearts(health), status),
+                health,
+                village.VILLAGER_HEALTH
+            )
+        );
+    else lines.push(...commands.barUpdate(status, bar.value, bar.max));
     for (const one of commands.readWhere(await server.say([commands.IN_OVERWORLD]))) {
         const center = { x: place.x + 0.5, z: place.z + 0.5 };
         const away = Math.hypot(one.x - center.x, one.z - center.z);
+        const heading = commands.headingTo(one, center);
         lines.push(
             commands.actionbarFor(
                 one.name,
                 away <= waves.AREA
                     ? status
-                    : messages.wavesGuide(
-                          Math.round(away),
-                          commands.headingTo(one, center),
-                          language
-                      )
+                    : villager
+                      ? villageSay.guide(name, Math.round(away), heading, language)
+                      : messages.wavesGuide(Math.round(away), heading, language)
             )
         );
     }
     return null;
 }
 
+/**
+ * A villager defense's villager, kept: written down before it is summoned -
+ * and, after a restart that came between the two, looked for before another
+ * is - then at each look whether it is still there, and its health. Answers
+ * its health, or `lost` once it has been missing `village.LOST_AFTER` looks in
+ * a row (written down at once).
+ */
+async function keepVillager(
+    installedAppId: string,
+    loop: Loop,
+    server: ServerContainer,
+    place: stored.Point
+): Promise<number | "lost"> {
+    let kept: village.Villager =
+        loop.run.villager ??
+        ({
+            name: village.villagerName(loop.run.id),
+            summoned: false,
+            provoke: await serverAtLeast(server, village.LURE_SINCE),
+            warned: 0,
+            missing: 0,
+            lost: false
+        } satisfies village.Villager);
+    const change = async (next: Partial<village.Villager>, save = true): Promise<void> => {
+        kept = { ...kept, ...next };
+        loop.run = { ...loop.run, villager: kept };
+        if (save) await persist(installedAppId, loop);
+    };
+    if (!loop.run.villager) await change({});
+    if (kept.lost) return "lost";
+    const there = async () => commands.readTest(await server.say([village.VILLAGER_THERE]));
+    if (!kept.summoned) {
+        if ((await there()) !== "passed") {
+            await server.sayAll(
+                village.summonVillager(place, kept.name, await serverAtLeast(server, [1, 21, 5]))
+            );
+            if ((await there()) !== "passed")
+                throw new CannotRun("The villager could not be set down at the point");
+        }
+        await change({ summoned: true });
+        return village.VILLAGER_HEALTH;
+    }
+    const seen = await there();
+    if (seen === "failed") {
+        if (kept.missing + 1 >= village.LOST_AFTER) {
+            await change({ missing: kept.missing + 1, lost: true });
+            return "lost";
+        }
+        await change({ missing: kept.missing + 1 }, false);
+    } else if (kept.missing > 0) await change({ missing: 0 }, false);
+    const health =
+        commands.readHealth(await server.say([village.VILLAGER_HEALTH_READ])) ??
+        village.VILLAGER_HEALTH;
+    // Everybody told once as it falls under half, and once under a quarter.
+    const due = village.warningsDue(health);
+    if (due > kept.warned) {
+        await change({ warned: due });
+        await server.sayAll([
+            ...commands.titleCommands(
+                villageSay.hurtTitle(loop.language),
+                villageSay.hurtSubtitle(kept.name, village.hearts(health), loop.language)
+            ),
+            commands.sound("minecraft:entity.villager.hurt")
+        ]);
+    }
+    return health;
+}
 // ------------------------------------------------------------------ meteor shower
 
 /**
@@ -3404,6 +3887,16 @@ function stageTools(
             if (loop.flavour) loop.flavour = { ...loop.flavour, items };
         },
         canStash: () => serverAtLeast(server, [1, 17]),
+        boatWay: async () => {
+            // Only a version read for certain picks a boat's entity: a guess
+            // could name one the server does not have.
+            const version = await versionOf(server);
+            if (version !== null && atLeast(version, [1, 21, 2])) return "oak_boat";
+            if (version !== null && atLeast(version, [1, 19, 4])) return "boat";
+            if (version !== null) return "item";
+            const { items } = loop.flavour ?? (loop.flavour = await stageFlavour(server));
+            return items === "components" ? "item_components" : "item";
+        },
         stashOwner: { installedAppId, runId: loop.run.id, event: loop.run.preset.name }
     };
 }
@@ -3584,19 +4077,34 @@ async function finish(
             placed =
                 preset.kind === "world-boss"
                     ? bossService.podiumOf(run, scores, disqualified, minimum)
-                    : plan.podium(
-                          scores,
-                          disqualified,
-                          minimum,
-                          // A tie on rounds won goes to whoever answered faster.
-                          preset.kind === "trivia" ? run.answerMs : undefined
-                      );
+                    : preset.kind === "bingo"
+                      ? // Whoever completed it first, whatever the least to be ranked.
+                        bingo.podiumOf(
+                            scores,
+                            disqualified,
+                            minimum,
+                            run.bingo?.winner ?? null,
+                            run.bingo?.at ?? {}
+                        )
+                      : plan.podium(
+                            scores,
+                            disqualified,
+                            minimum,
+                            // A tie on rounds won goes to whoever answered faster;
+                            // in an arena, to what the kind ranks next.
+                            preset.kind === "trivia"
+                                ? run.answerMs
+                                : catalog.playsInArena(preset)
+                                  ? arenaService.tiebreak(run)
+                                  : undefined
+                        );
             // Taking part is reaching the minimum too - one zombie is not taking part
             // in a hunt. A blood moon's is surviving it with a kill, and a horde
             // defense's holding the point, which are their own bars.
             const counted =
                 preset.kind === "blood-moon" ||
                 preset.kind === "waves" ||
+                preset.kind === "village-defense" ||
                 // A boss is fought together: any damage to it is taking part.
                 preset.kind === "world-boss"
                     ? took
@@ -3682,19 +4190,46 @@ async function finish(
             } else if (preset.kind === "treasure-hunt") {
                 const unfound = run.chests.filter((one) => !one.opened).length;
                 if (unfound > 0) lines.push(commands.say(messages.huntUnfound(unfound, language)));
-            } else if (preset.kind === "waves") {
-                const fought = run.roundEndsAt === null ? run.round + 1 : run.round;
+            } else if (preset.kind === "bingo") {
+                const line = (preset.options as catalog.EventOptions<"bingo">).goal === "line";
+                const winner = run.bingo?.winner ?? null;
                 lines.push(
                     commands.say(
-                        messages.wavesHeld(
-                            Math.max(0, fought),
-                            (preset.options as catalog.EventOptions<"waves">).waves,
+                        winner
+                            ? bingoSay.wonLine(winner, line, language)
+                            : bingoSay.timeUpLine(line, language)
+                    )
+                );
+            } else if (preset.kind === "boss-fishing") {
+                lines.push(
+                    commands.say(
+                        run.fish?.landed
+                            ? fishSay.landedLine(language)
+                            : fishSay.escapedLine(fishLeft(installedAppId, run), language)
+                    )
+                );
+            } else if (villagerLost(run)) {
+                // Why there is no podium, rather than "nobody scored".
+                lines.push(
+                    commands.say(
+                        villageSay.lostLine(
+                            run.villager?.name ?? "",
+                            Math.max(1, run.round + 1),
                             language
                         )
                     )
                 );
+            } else if (preset.kind === "waves" || preset.kind === "village-defense") {
+                const fought = run.roundEndsAt === null ? run.round + 1 : run.round;
+                const { waves: count } = preset.options as catalog.EventOptions<
+                    "waves" | "village-defense"
+                >;
+                if (preset.kind === "village-defense" && run.villager && fought >= count)
+                    lines.push(commands.say(villageSay.savedLine(run.villager.name, language)));
+                lines.push(commands.say(messages.wavesHeld(Math.max(0, fought), count, language)));
             }
-            if (placed.length === 0) lines.push(commands.say(messages.nobodyScored(language)));
+            if (placed.length === 0 && !villagerLost(run) && !fishEscaped(run))
+                lines.push(commands.say(messages.nobodyScored(language)));
             for (const one of placed) {
                 lines.push(
                     commands.say(
@@ -3723,13 +4258,19 @@ async function finish(
             if (pending.length > 0) lines.push(commands.say(messages.rewardWaiting(language)));
             const winner = placed[0];
             lines.push(
-                ...commands.titleCommands(
-                    winner
-                        ? messages.winnerTitle(winner.name, language)
-                        : messages.endedTitle(language),
-                    `&e${preset.name}`
-                ),
-                commands.sound(commands.SOUNDS.win)
+                ...(villagerLost(run)
+                    ? []
+                    : fishEscaped(run)
+                      ? commands.titleCommands(fishSay.escapedTitle(language), `&e${preset.name}`)
+                      : [
+                            ...commands.titleCommands(
+                                winner
+                                    ? messages.winnerTitle(winner.name, language)
+                                    : messages.endedTitle(language),
+                                `&e${preset.name}`
+                            ),
+                            commands.sound(commands.SOUNDS.win)
+                        ])
             );
         } else if (server && outcome === "finished" && preset.kind === "happy-hour") {
             lines.push(commands.say(messages.tag(language) + messages.happyHourOver(language)));
@@ -3840,8 +4381,14 @@ export function cleanupOf(run: stored.EventRun): string[] {
     const after: string[] = [];
     switch (run.preset.kind) {
         case "waves":
+            before.push(...waves.wavesCleanup(waveKindsOf(run.preset)));
+            break;
+        case "village-defense":
+            // The villager, and what a zombie may have turned it into, with
+            // the waves - while the chunks round the point are still held.
             before.push(
-                ...waves.wavesCleanup((run.preset.options as catalog.EventOptions<"waves">).mix)
+                ...waves.wavesCleanup(waveKindsOf(run.preset)),
+                ...village.villagerCleanup(run.place)
             );
             break;
         case "meteor-shower": {
@@ -3872,10 +4419,24 @@ export function cleanupOf(run: stored.EventRun): string[] {
         case "parkour":
             after.push(...parkour.SCORES_REMOVED);
             break;
+        case "dropper":
+            after.push(...dropper.SCORES_REMOVED);
+            break;
+        case "boat-race":
+            after.push(...boatRace.SCORES_REMOVED);
+            break;
         case "rare-catch":
             after.push(...rareCatch.catchCleanup());
             break;
+        case "bingo":
+            after.push(...bingo.bingoCleanup());
+            break;
+        case "boss-fishing":
+            after.push(...fishing.fishCleanup());
+            break;
     }
+    // An arena kind's own teams and counts (`ArenaGame.endLines`).
+    after.push(...arenaService.endLines(run.preset));
     // Operators' chat is given back last, so the tidying up does not fill it either.
     const feedback: string[] = commands.FEEDBACK_RULES.filter((rule) => rule in run.gamerules);
     const rules = Object.fromEntries(
@@ -4044,6 +4605,10 @@ async function results(
         return { scores, took: [] };
     }
     if (preset.kind === "world-boss" && !run.decidedBy) return { scores: new Map(), took: [] };
+    if (preset.kind === "bingo") return bingoResults(server, run);
+    // It got away: nobody wins, and nobody is paid for taking part.
+    if (fishEscaped(run)) return { scores: new Map(), took: [] };
+    if (preset.kind === "boss-fishing") await server.sayAll(fishing.fishTick());
     if (catalog.takesJoiners(preset)) return stageService.results(run);
     // One last count first, so the final seconds are in it.
     await server.sayAll(commands.scoreTick(preset));
@@ -4054,14 +4619,15 @@ async function results(
             )
         );
     }
-    if (preset.kind === "waves" && run.place) {
-        const options = preset.options as catalog.EventOptions<"waves">;
+    // The villager died: nobody wins, and nobody is paid for taking part.
+    if (villagerLost(run)) return { scores: new Map(), took: [] };
+    if ((preset.kind === "waves" || preset.kind === "village-defense") && run.place) {
         await server.sayAll(
             waves.wavesTick(
                 run.place,
-                options.mix,
+                waveKindsOf(preset),
                 run.roundEndsAt !== null,
-                options.winner === "damage"
+                wavesByDamage(preset)
             )
         );
     }
@@ -4080,7 +4646,7 @@ async function results(
             scores.set(who, score);
         }
     }
-    if (preset.kind === "waves") {
+    if (preset.kind === "waves" || preset.kind === "village-defense") {
         // Took part: at the point when a wave ended, and fought - a kill, or
         // at least a hit - rather than only stood there.
         const hits = commands.readScores(await server.say([waves.READ_HITS]));

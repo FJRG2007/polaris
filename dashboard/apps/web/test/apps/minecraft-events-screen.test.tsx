@@ -106,6 +106,35 @@ afterEach(() => {
 });
 
 describe("the Events tab", () => {
+    it("groups the events by where they are played", async () => {
+        render(<MinecraftEvents installedAppId="00000000-0000-4000-8000-000000000001" canManage />);
+        answerRead({
+            view: {
+                ...view,
+                config: {
+                    ...config,
+                    presets: [
+                        catalog.newPreset("fishing", "fish"),
+                        catalog.newPreset("sky-wars", "sky"),
+                        catalog.newPreset("supply-drop", "drop")
+                    ]
+                }
+            }
+        });
+        const sky = await screen.findByRole("region", { name: "Built in the sky" });
+        expect(sky.textContent).toContain("SkyWars");
+        expect(sky.textContent).not.toContain("Fishing contest");
+        const world = screen.getByRole("region", { name: "Somewhere in the world" });
+        expect(world.textContent).toContain("Supply drop");
+        const anywhere = screen.getByRole("region", { name: "Wherever players are" });
+        expect(anywhere.textContent).toContain("Fishing contest");
+        // In the order the groups are shown: the sky first.
+        const regions = screen
+            .getAllByRole("region")
+            .map((one) => one.getAttribute("aria-labelledby"));
+        expect(regions).toEqual(["held-sky", "held-world", "held-anywhere"]);
+    });
+
     it("shows a player's things an event could not give back, and gives them back from there", async () => {
         render(<MinecraftEvents installedAppId="00000000-0000-4000-8000-000000000001" canManage />);
         answerRead({
@@ -587,6 +616,86 @@ describe("the parkour and spleef editors", () => {
         expect(screen.getByText(/type join \(or unirse\) in the chat/)).toBeTruthy();
         expect(screen.getByText(/only what it placed/)).toBeTruthy();
         expect(screen.getByText(/marked shovel that only breaks the snow/)).toBeTruthy();
+    });
+});
+
+describe("the TNT run, ice boat race and dropper editors", () => {
+    type Preset = ReturnType<typeof catalog.newPreset>;
+    const edit = (preset: Preset, saved: Preset[]) =>
+        render(
+            <EventEditor
+                preset={preset}
+                open
+                onOpenChange={() => undefined}
+                onSave={(next) => saved.push(next)}
+            />
+        );
+    const field = (label: RegExp) => screen.getByLabelText(label) as HTMLInputElement;
+
+    it("saves a TNT run's floors, and holds them between two and four", async () => {
+        const saved: Preset[] = [];
+        edit(catalog.newPreset("tnt-run", "tnt"), saved);
+        expect(field(/^Floors(?! to)/).value).toBe("3");
+        fireEvent.change(field(/^Floors(?! to)/), { target: { value: "5" } });
+        await waitFor(() => expect(screen.getAllByText("At most 4").length).toBeGreaterThan(0));
+        fireEvent.change(field(/^Floors(?! to)/), { target: { value: "4" } });
+        await waitFor(() =>
+            expect((screen.getByText("Done") as HTMLButtonElement).disabled).toBe(false)
+        );
+        fireEvent.click(screen.getByText("Done"));
+        expect(saved.at(-1)!.options).toMatchObject({ layers: 4, size: 9, height: 30 });
+    });
+
+    it("saves an ice boat race's laps", async () => {
+        const saved: Preset[] = [];
+        edit(catalog.newPreset("boat-race", "boats"), saved);
+        expect(field(/^Laps/).value).toBe("2");
+        fireEvent.change(field(/^Laps/), { target: { value: "3" } });
+        await waitFor(() =>
+            expect((screen.getByText("Done") as HTMLButtonElement).disabled).toBe(false)
+        );
+        fireEvent.click(screen.getByText("Done"));
+        expect(saved.at(-1)!.options).toMatchObject({ laps: 3, height: 30 });
+    });
+
+    it("saves a dropper's floors, and holds them between five and twenty", async () => {
+        const saved: Preset[] = [];
+        edit(catalog.newPreset("dropper", "drop"), saved);
+        expect(field(/^Floors to fall through/).value).toBe("10");
+        fireEvent.change(field(/^Floors to fall through/), { target: { value: "21" } });
+        await waitFor(() => expect(screen.getAllByText("At most 20").length).toBeGreaterThan(0));
+        fireEvent.change(field(/^Floors to fall through/), { target: { value: "15" } });
+        await waitFor(() =>
+            expect((screen.getByText("Done") as HTMLButtonElement).disabled).toBe(false)
+        );
+        fireEvent.click(screen.getByText("Done"));
+        expect(saved.at(-1)!.options).toMatchObject({ levels: 15, difficulty: "medium" });
+    });
+
+    it("explains each: its map, how it is won, and what it needs", async () => {
+        const withThem = {
+            ...view,
+            config: {
+                ...config,
+                presets: [
+                    catalog.newPreset("tnt-run", "tnt"),
+                    catalog.newPreset("boat-race", "boats"),
+                    catalog.newPreset("dropper", "drop")
+                ]
+            }
+        };
+        render(<MinecraftEvents installedAppId="00000000-0000-4000-8000-000000000001" canManage />);
+        answerRead({ view: withThem });
+        await waitFor(() => expect(screen.getByLabelText("What TNT run is")).toBeTruthy());
+        fireEvent.click(screen.getByLabelText("What TNT run is"));
+        expect(screen.getByText(/3 floors of TNT, 19 by 19/)).toBeTruthy();
+        expect(screen.getByText(/Nothing explodes/)).toBeTruthy();
+        fireEvent.click(screen.getByLabelText("What Ice boat race is"));
+        expect(screen.getByText(/2 laps of an ice track/)).toBeTruthy();
+        expect(screen.getByText(/From Java 1.19.4 every racer is put in a boat/)).toBeTruthy();
+        fireEvent.click(screen.getByLabelText("What Dropper is"));
+        expect(screen.getByText(/A shaft of 10 floors, medium/)).toBeTruthy();
+        expect(screen.getByText(/Played under Slow Falling/)).toBeTruthy();
     });
 });
 

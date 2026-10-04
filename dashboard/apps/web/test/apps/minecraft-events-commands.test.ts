@@ -2065,7 +2065,12 @@ describe("a spleef floor", () => {
         // Both spellings of the function folders, the same functions in each.
         for (const folder of ["functions", "function"]) {
             expect(JSON.parse(files.get(`data/minecraft/tags/${folder}/tick.json`)!)).toEqual({
-                values: ["polaris:spleef/tick"]
+                values: [
+                    "polaris:spleef/tick",
+                    "polaris:tntrun/tick",
+                    "polaris:dropper/tick",
+                    "polaris:boat/tick"
+                ]
             });
             for (const name of ["tick", "ball", "near", "step", "probe", "hit"])
                 expect(files.get(`data/polaris/${folder}/spleef/${name}.mcfunction`)).toBe(
@@ -2280,7 +2285,8 @@ describe("what an arena sends", () => {
         expect(after).toContain("effect give Ana minecraft:resistance 10 4 true");
         expect(stage.clearMarked("Ana", "nbt")).toEqual([
             "clear Ana minecraft:iron_shovel{polaris_event:1b}",
-            "clear Ana minecraft:snowball{polaris_event:1b}"
+            "clear Ana minecraft:snowball{polaris_event:1b}",
+            "clear Ana minecraft:oak_boat{polaris_event:1b}"
         ]);
         expect(stage.markedSnowballs("Ana", "components", 16)).toEqual([
             "clear Ana minecraft:snowball[minecraft:custom_data={polaris_event:1b}]",

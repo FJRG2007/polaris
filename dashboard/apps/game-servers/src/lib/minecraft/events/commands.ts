@@ -17,6 +17,7 @@ import { stripFormatting } from "../parse";
 import { duelTeardown } from "./kinds/team-duel";
 import { COMMAND_BYTES_MAX, commandBytes } from "../command-size";
 import {
+    lastStanding,
     worldNeeds,
     type EventKind,
     type EventOptions,
@@ -205,7 +206,7 @@ export function hasScoreboard(preset: EventPreset): boolean {
     if (preset.kind === "happy-hour" || preset.kind === "supply-drop") return false;
     if (preset.kind === "rare-catch" || preset.kind === "xp-boost") return false;
     // Who is left standing is on the boss bar; there is nothing to add up.
-    if (preset.kind === "spleef") return false;
+    if (preset.kind === "spleef" || lastStanding(preset)) return false;
     if (preset.kind === "explorer")
         return (preset.options as EventOptions<"explorer">).mode === "distance";
     return true;
@@ -261,7 +262,9 @@ export type BarColor = "yellow" | "red" | "purple" | "green" | "blue";
 export function barColor(kind: EventKind): BarColor {
     if (kind === "blood-moon" || kind === "world-boss") return "red";
     if (kind === "happy-hour" || kind === "xp-boost") return "green";
-    if (kind === "trivia") return "blue";
+    if (kind === "trivia" || kind === "boss-fishing") return "blue";
+    // The villager's health is what its bar shows.
+    if (kind === "village-defense") return "red";
     return "yellow";
 }
 
@@ -1615,16 +1618,32 @@ export function bossEntity(boss: EventOptions<"world-boss">["boss"]): string {
  * boss went without a name.
  */
 export function bossNameCommand(name: string, modernText: boolean): string {
-    const component = text(`&c&l${name}`);
-    const quoted = component.replace(/\\/g, "\\\\").replace(/'/g, "\\'");
-    const value = modernText ? componentAsSnbt(name) : `'${quoted}'`;
-    return `data merge entity @e[tag=${BOSS_TAG},limit=1] {CustomName:${value}}`;
+    return `data merge entity @e[tag=${BOSS_TAG},limit=1] {CustomName:${customNameValue(name, modernText)}}`;
 }
 
-/** A plain red, bold name as an SNBT text component (1.21.5 and later). */
-function componentAsSnbt(name: string): string {
-    const escaped = asciiJson(JSON.stringify(name));
-    return `{text:${escaped},color:"red",bold:1b}`;
+/** A name's colours: the boss's red and bold, a villager's gold. */
+const NAME_STYLES = {
+    boss: { code: "&c&l", color: "red", bold: true },
+    villager: { code: "&6", color: "gold", bold: false }
+} as const;
+
+/**
+ * A `CustomName` value the way this version reads it: JSON inside a quoted
+ * SNBT string up to 1.21.4 (its escapes, `bossNameCommand`), a plain SNBT text
+ * component from 1.21.5.
+ */
+export function customNameValue(
+    name: string,
+    modernText: boolean,
+    style: keyof typeof NAME_STYLES = "boss"
+): string {
+    const { code, color, bold } = NAME_STYLES[style];
+    if (modernText) {
+        const escaped = asciiJson(JSON.stringify(name));
+        return `{text:${escaped},color:"${color}"${bold ? ",bold:1b" : ""}}`;
+    }
+    const component = text(`${code}${name}`);
+    return `'${component.replace(/\\/g, "\\\\").replace(/'/g, "\\'")}'`;
 }
 
 /** Attributes to try, newest spelling first. */

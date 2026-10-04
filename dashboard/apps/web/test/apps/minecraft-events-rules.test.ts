@@ -24,6 +24,55 @@ const at = (time: string, day = "2026-09-28") => Date.parse(`${day}T${time}:00Z`
 /** Always the same number, so a draw is decided by the test. */
 const always = (value: number) => () => value;
 
+describe("where each event is played", () => {
+    const where = (kind: catalog.EventKind) => catalog.heldWhere(catalog.newPreset(kind, "k"));
+
+    it("puts every kind in one group, and the maps built in the sky together", () => {
+        for (const kind of catalog.EVENT_KINDS) expect(catalog.HELD_WHERE).toContain(where(kind));
+        const sky = catalog.EVENT_KINDS.filter((kind) => where(kind) === "sky");
+        expect(sky).toEqual(
+            expect.arrayContaining([
+                "parkour",
+                "spleef",
+                "team-duel",
+                "build-battle",
+                "tnt-run",
+                "boat-race",
+                "dropper",
+                "capture-the-flag",
+                "hide-and-seek",
+                "hot-potato",
+                "sky-wars"
+            ])
+        );
+        for (const kind of ["supply-drop", "treasure-hunt", "waves", "village-defense"] as const)
+            expect(where(kind)).toBe("world");
+        for (const kind of ["trivia", "fishing", "bingo", "boss-fishing", "mining-rush"] as const)
+            expect(where(kind)).toBe("anywhere");
+    });
+
+    it("follows the options that move an event into the sky or onto the ground", () => {
+        const boss = catalog.newPreset("world-boss", "b") as catalog.EventPreset<"world-boss">;
+        expect(catalog.heldWhere(boss)).toBe("sky");
+        expect(catalog.heldWhere({ ...boss, options: { ...boss.options, arena: false } })).toBe(
+            "world"
+        );
+        const ring = catalog.newPreset(
+            "king-of-the-hill",
+            "r"
+        ) as catalog.EventPreset<"king-of-the-hill">;
+        expect(catalog.heldWhere(ring)).toBe("sky");
+        expect(catalog.heldWhere({ ...ring, options: { ...ring.options, fistsOnly: false } })).toBe(
+            "world"
+        );
+        const explorer = catalog.newPreset("explorer", "e") as catalog.EventPreset<"explorer">;
+        expect(catalog.heldWhere(explorer)).toBe("anywhere");
+        expect(
+            catalog.heldWhere({ ...explorer, options: { ...explorer.options, mode: "race" } })
+        ).toBe("world");
+    });
+});
+
 describe("a parkour saved before it had shapes", () => {
     it("is read as the longer course when it was on the old twenty jumps, and keeps any other length", () => {
         const old = (jumps: number) => ({

@@ -28,6 +28,10 @@ import {
 } from "../commands";
 
 export type WaveMix = EventOptions<"waves">["mix"];
+/** What a wave is made of: a mix by name, or the monsters themselves - a
+ *  villager defense sends only ones that go for a villager
+ *  (`village-defense.villageMobs`). */
+export type WaveKinds = WaveMix | readonly string[];
 
 type Point = { readonly x: number; readonly y: number; readonly z: number };
 
@@ -78,8 +82,13 @@ export const MIX_MOBS: Readonly<Record<WaveMix, readonly string[]>> = {
     mixed: ["zombie", "skeleton", "spider", "husk", "witch"]
 };
 
+/** The monsters a wave of `mix` is made of. */
+export function kindsOf(mix: WaveKinds): readonly string[] {
+    return typeof mix === "string" ? MIX_MOBS[mix] : mix;
+}
+
 /** The ones that can break a door and call for help. */
-const ZOMBIES = ["zombie", "husk"];
+const ZOMBIES = ["zombie", "husk", "zombie_villager"];
 /** The ones that fight with a bow. */
 const ARCHERS = ["skeleton", "stray"];
 /** The ones that wear armor. */
@@ -95,8 +104,8 @@ const MOB_DATA = `PersistenceRequired:1b,CanPickUpLoot:0b,CanBreakDoors:0b,${DRO
 const SUMMON_DATA = `{Tags:["${MOB_TAG}","${NEW_TAG}"],${MOB_DATA}}`;
 
 /** One kill counter per kind of monster in the mix. */
-function killObjectives(mix: WaveMix): { objective: string; criterion: string }[] {
-    return MIX_MOBS[mix].map((id, index) => ({
+function killObjectives(mix: WaveKinds): { objective: string; criterion: string }[] {
+    return kindsOf(mix).map((id, index) => ({
         objective: `pe_wk${index}`,
         criterion: `minecraft.killed:minecraft.${id}`
     }));
@@ -211,9 +220,9 @@ export type Jockey = (typeof JOCKEYS)[number];
  * from 60%, skeleton and zombie horsemen from 80%. None rides a mount that can
  * change a block.
  */
-export function jockeysFor(number: number, waves: number, mix: WaveMix): Jockey[] {
+export function jockeysFor(number: number, waves: number, mix: WaveKinds): Jockey[] {
     const share = waves <= 1 ? 1 : Math.max(0, number) / (waves - 1);
-    const has = (id: string) => MIX_MOBS[mix].includes(id);
+    const has = (id: string) => kindsOf(mix).includes(id);
     const out: Jockey[] = [];
     if (share >= 0.4 && has("spider") && has("skeleton")) out.push("spider");
     if (share >= 0.6 && has("zombie")) out.push("chicken");
@@ -284,7 +293,7 @@ function jockeySpot(point: Point, index: number): string {
 }
 
 /** The objectives the kills and hits are counted with. */
-export function wavesSetup(mix: WaveMix): string[] {
+export function wavesSetup(mix: WaveKinds): string[] {
     const lines: string[] = [];
     for (const one of killObjectives(mix)) {
         lines.push(
@@ -323,13 +332,13 @@ export interface WaveShape {
  */
 export function summonWave(
     point: Point,
-    mix: WaveMix,
+    mix: WaveKinds,
     count: number,
     number: number,
     seconds: number,
     shape: WaveShape = { waves: 5, defenders: 1 }
 ): string[] {
-    const kinds = MIX_MOBS[mix];
+    const kinds = kindsOf(mix);
     const at = `${point.x + 0.5} ${point.y} ${point.z + 0.5}`;
     const time = Math.max(60, Math.min(1_000_000, Math.ceil(seconds)));
     const jockeys = jockeysFor(number, shape.waves, mix);
@@ -421,7 +430,7 @@ export function wavesMarks(point: Point): string[] {
  * every tick either way. The game counts the damage in tenths of a health
  * point, and only what is dealt by hand.
  */
-export function wavesTick(point: Point, mix: WaveMix, open: boolean, byDamage = false): string[] {
+export function wavesTick(point: Point, mix: WaveKinds, open: boolean, byDamage = false): string[] {
     const near = `execute in minecraft:overworld positioned ${point.x + 0.5} ${point.y} ${point.z + 0.5} as @a[distance=..${REACH}] run scoreboard players operation @s`;
     const raw = [...killObjectives(mix).map((one) => one.objective), RAW_HITS];
     const lines: string[] = [];
@@ -458,7 +467,7 @@ export const KEEP_INVENTORY = ["keepInventory", "keep_inventory"] as const;
  * mount - while the chunks they are in are still held, so it goes before any
  * chunk is let go - then its objectives. Safe to send again and again.
  */
-export function wavesCleanup(mix: WaveMix): string[] {
+export function wavesCleanup(mix: WaveKinds): string[] {
     const lines = [`kill @e[tag=${MOB_TAG}]`];
     for (const one of killObjectives(mix))
         lines.push(`scoreboard objectives remove ${one.objective}`);

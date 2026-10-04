@@ -1,0 +1,346 @@
+/**
+ * Playing capture the flag (`capture-the-flag.ts`): the arena's own steps are
+ * `arena-service`'s; this is its part of them.
+ *
+ * Each tick reads what a duel's does - health, damage dealt, deaths and kills,
+ * where everybody is - and what the quick look marked since (who touched a
+ * flag, who stood at home). In that order it then: sends back whoever was
+ * brought low, crediting whoever did it, and puts any flag they carried back
+ * on its stand; hands a flag at home to whoever of the other team touched it;
+ * and counts a capture for a carrier who reached their own base while their
+ * own flag stands there. The flags are written into the run before a tick ends.
+ */
+
+import * as arena from "./arena";
+import * as duel from "./team-duel";
+import * as catalog from "../catalog";
+import * as speech from "../../speech";
+import * as written from "../messages";
+import * as commands from "../commands";
+import type * as stored from "../state";
+import * as ctf from "./capture-the-flag";
+import * as said from "./capture-the-flag-messages";
+import type { ArenaGame, KindContext } from "./arena-game";
+
+const messages = speech.spoken(written);
+const flagMessages = speech.spoken(said);
+
+const lower = (name: string) => name.toLowerCase();
+
+function optionsOf(run: stored.EventRun): catalog.EventOptions<"capture-the-flag"> {
+    return run.preset.options as catalog.EventOptions<"capture-the-flag">;
+}
+
+/** What one run keeps between ticks: nothing that must survive a restart. */
+interface Memory {
+    dealt: Map<string, number>;
+    kills: Map<string, number>;
+    lastHit: Map<string, number>;
+    shieldedUntil: Map<string, number>;
+}
+
+const memories = new Map<string, Memory>();
+
+function memoryOf(runId: string): Memory {
+    let memory = memories.get(runId);
+    if (!memory) {
+        // Only a few runs are ever on at once, one a server.
+        if (memories.size >= 16) memories.delete(memories.keys().next().value!);
+        memory = {
+            dealt: new Map(),
+            kills: new Map(),
+            lastHit: new Map(),
+            shieldedUntil: new Map()
+        };
+        memories.set(runId, memory);
+    }
+    return memory;
+}
+
+/** Where an entrant starts: their side's row, in the order they came in. */
+function spotOf(run: stored.EventRun, entrant: stored.Entrant): arena.Spot {
+    const slot = run.entrants
+        .slice(
+            0,
+            Math.max(
+                0,
+                run.entrants.findIndex((one) => one.name === entrant.name)
+            )
+        )
+        .filter((one) => one.side === entrant.side).length;
+    return ctf.startSpot(run.arena!.box, entrant.side, slot);
+}
+
+async function goLines(ctx: KindContext, syntax: { marker: stored.Marker; itemCommand: boolean }) {
+    const run = ctx.run;
+    const options = optionsOf(run);
+    const out: string[] = [];
+    for (const one of run.entrants)
+        out.push(
+            arena.moveTo(one.name, spotOf(run, one)),
+            ...duel
+                .duelKit(options.kit)
+                .map((id) =>
+                    syntax.itemCommand && id === duel.OFFHAND_ITEM
+                        ? arena.equipMarked(one.name, "weapon.offhand", id, syntax.marker)
+                        : arena.giveMarked(one.name, id, 1, syntax.marker)
+                ),
+            ...arena.titleTo(
+                one.name,
+                messages.duelEnterTitle(one.side, ctx.language),
+                flagMessages.enterSubtitle(options.captures, ctx.language)
+            )
+        );
+    return out;
+}
+
+/** Who carries a tag now, read off the game, and the tag taken off again. */
+async function marked(ctx: KindContext, tag: string): Promise<Set<string>> {
+    const names = commands
+        .readWhere(await ctx.server.say([arena.readTagged(tag)]))
+        .map((one) => lower(one.name));
+    return new Set(names);
+}
+
+async function tick(ctx: KindContext, lines: string[]): Promise<string | null> {
+    const run = ctx.run;
+    const language = ctx.language;
+    const options = optionsOf(run);
+    const box = run.arena!.box;
+    const memory = memoryOf(run.id);
+    const now = ctx.now;
+    const marker = run.marker;
+    const itemCommand = await ctx.atLeast([1, 17]);
+    const say = (line: string) => ctx.server.say([line]);
+    const health = commands.readScores(await say(duel.READ_HP));
+    const dealt = commands.readScores(await say(duel.READ_DEALT));
+    const died = commands.readScores(await say(duel.READ_DIED));
+    const killed = commands.readScores(await say(duel.READ_KILLS));
+    const here = new Map(
+        commands.readWhere(await say(commands.IN_OVERWORLD)).map((one) => [lower(one.name), one])
+    );
+    // Marked between ticks by the quick look, read once and cleared.
+    const touched = [await marked(ctx, ctf.TOUCH_TAGS[0]), await marked(ctx, ctf.TOUCH_TAGS[1])];
+    const atHome = [await marked(ctx, ctf.HOME_TAGS[0]), await marked(ctx, ctf.HOME_TAGS[1])];
+    await ctx.server.sayAll(ctf.UNTOUCH);
+
+    // Who struck and who killed since the last look; nothing on the first.
+    const killsSince = new Map<string, number>();
+    for (const [name, value] of killed) {
+        const before = memory.kills.get(name);
+        if (before !== undefined && value > before) killsSince.set(name, value - before);
+        memory.kills.set(name, value);
+    }
+    for (const [name, value] of dealt) {
+        const before = memory.dealt.get(name);
+        if (before !== undefined && value > before) memory.lastHit.set(name, now);
+        memory.dealt.set(name, value);
+    }
+
+    const before = ctf.stateOf(run.game);
+    const state: ctf.FlagState = {
+        ...before,
+        flags: [{ ...before.flags[0] }, { ...before.flags[1] }],
+        kills: { ...before.kills }
+    };
+    const points = { ...run.points };
+    const tally = { ...run.tally };
+    const everybody = `@a[tag=${arena.IN_ARENA}]`;
+    /** The flag `side` back on its stand, and its carrier no longer carrying it. */
+    const flagHome = (side: number) => {
+        const carrier = state.flags[side]!.carrier;
+        state.flags[side] = { carrier: null };
+        if (!carrier) return;
+        if (marker) lines.push(arena.clearMarked(carrier, ctf.BANNERS[side]!, marker));
+        lines.push(...ctf.droppedLines(carrier));
+    };
+    const carrying = (name: string) =>
+        [0, 1].find((side) => lower(state.flags[side]!.carrier ?? "") === lower(name));
+    const down = new Set<string>();
+
+    for (const one of run.entrants) {
+        const spot = spotOf(run, one);
+        const hearts = health.get(one.name);
+        const held = carrying(one.name);
+        // Not on: whatever they carried goes home, and nothing else until they are back.
+        if (hearts === undefined) {
+            if (held !== undefined) {
+                flagHome(held);
+                lines.push(
+                    commands.say(messages.tag(language) + flagMessages.returned(held, language))
+                );
+            }
+            continue;
+        }
+        const rivals = run.entrants
+            .filter((other) => other.side !== one.side)
+            .map((other) => other.name);
+        const dead = (died.get(one.name) ?? 0) > 0;
+        const low =
+            hearts > 0 &&
+            hearts <= options.downHearts * 2 &&
+            (memory.shieldedUntil.get(one.name) ?? 0) <= now;
+        if (dead || low) {
+            const by = duel.creditFor(rivals, killsSince, memory.lastHit, now);
+            if (by) state.kills[by] = (state.kills[by] ?? 0) + 1;
+            lines.push(
+                commands.say(messages.tag(language) + messages.duelDown(one.name, by, language))
+            );
+            if (dead) lines.push(`scoreboard players set ${one.name} ${duel.DIED} 0`);
+            if (held !== undefined) {
+                flagHome(held);
+                lines.push(
+                    commands.say(
+                        messages.tag(language) + flagMessages.dropped(one.name, held, language)
+                    )
+                );
+            }
+            down.add(lower(one.name));
+        }
+        const at = here.get(lower(one.name));
+        // Brought low, or back from a death at home, or out of it any other
+        // way: back to their side, healed and shielded for a moment - and
+        // whatever flag they carried back on its stand.
+        if (hearts > 0 && (low || !at || !arena.contains(box, at))) {
+            lines.push(...duel.sendBack(one.name, spot));
+            memory.shieldedUntil.set(one.name, now + duel.SHIELD_SECONDS * 1000);
+            const still = carrying(one.name);
+            if (still !== undefined) {
+                flagHome(still);
+                lines.push(
+                    commands.say(messages.tag(language) + flagMessages.returned(still, language))
+                );
+            }
+            down.add(lower(one.name));
+        }
+    }
+
+    // A flag at home taken by whoever of the other team touched it - in
+    // passing, as the quick look saw, or standing at it now.
+    for (const side of [0, 1]) {
+        if (state.flags[side]!.carrier !== null) continue;
+        const stand = ctf.standAt(box, side);
+        const taker = run.entrants.find((one) => {
+            const at = here.get(lower(one.name));
+            return (
+                one.side !== side &&
+                at !== undefined &&
+                health.has(one.name) &&
+                !down.has(lower(one.name)) &&
+                carrying(one.name) === undefined &&
+                (touched[side]!.has(lower(one.name)) || ctf.near(at, stand, ctf.TOUCH))
+            );
+        });
+        if (!taker) continue;
+        state.flags[side] = { carrier: taker.name };
+        if (marker)
+            lines.push(arena.wearMarked(taker.name, ctf.BANNERS[side]!, marker, itemCommand));
+        lines.push(
+            commands.say(messages.tag(language) + flagMessages.took(taker.name, side, language)),
+            commands.sound(commands.SOUNDS.tick)
+        );
+    }
+
+    // A carrier home with their own flag there: a capture.
+    let decided: string | null = null;
+    for (const side of [0, 1]) {
+        const other = 1 - side;
+        const carrier = state.flags[other]!.carrier;
+        if (!carrier || state.flags[side]!.carrier !== null) continue;
+        const one = run.entrants.find((each) => lower(each.name) === lower(carrier));
+        const at = here.get(lower(carrier));
+        if (!one || one.side !== side || !at) continue;
+        if (!atHome[side]!.has(lower(carrier)) && !ctf.near(at, ctf.standAt(box, side), ctf.HOME))
+            continue;
+        points[one.name] = (points[one.name] ?? 0) + 1;
+        tally[String(side)] = (tally[String(side)] ?? 0) + 1;
+        flagHome(other);
+        lines.push(
+            commands.setScore(one.name, points[one.name]!),
+            commands.say(
+                messages.tag(language) +
+                    flagMessages.captured(
+                        one.name,
+                        other,
+                        tally["0"] ?? 0,
+                        tally["1"] ?? 0,
+                        language
+                    )
+            ),
+            ...arena.titleTo(everybody, flagMessages.capturedTitle(side, language), one.name),
+            commands.sound(commands.SOUNDS.win)
+        );
+        if ((tally[String(side)] ?? 0) >= options.captures) decided = said.wonBy(side);
+    }
+
+    // The stands as the flags say, and each carrier seen by everybody.
+    for (const side of [0, 1]) {
+        const carrier = state.flags[side]!.carrier;
+        lines.push(...ctf.standLines(box, side, carrier === null));
+        if (carrier) lines.push(...ctf.carrierLines(carrier));
+    }
+    for (const one of run.entrants) {
+        if (!health.has(one.name)) continue;
+        const held = carrying(one.name);
+        lines.push(
+            arena.feed(one.name),
+            arena.actionbarTo(
+                one.name,
+                held !== undefined
+                    ? flagMessages.carryingBar(state.flags[one.side]!.carrier === null, language)
+                    : flagMessages.statusBar(one.side, points[one.name] ?? 0, language)
+            )
+        );
+    }
+    const left = (run.endsAt - now) / 1000;
+    lines.push(
+        `bossbar set ${commands.BAR} name ${commands.text(
+            messages.duelBar(tally["0"] ?? 0, tally["1"] ?? 0, left, language)
+        )}`,
+        ...arena.keepThrown(box)
+    );
+    if (
+        JSON.stringify(state) !== JSON.stringify(before) ||
+        JSON.stringify(points) !== JSON.stringify(run.points) ||
+        JSON.stringify(tally) !== JSON.stringify(run.tally)
+    ) {
+        ctx.run = { ...ctx.run, game: state, points, tally };
+        await ctx.persist();
+    }
+    return decided;
+}
+
+export const captureTheFlag: ArenaGame = {
+    most: () => ctf.MOST,
+    reach: () => ctf.REACH,
+    box: (_run, place) => ctf.arenaBox(place, place.y + arena.ALTITUDE),
+    built: () => ({ design: ctf.DESIGN }),
+    fills: (run, box) => ctf.arenaFills(box, ctf.coverFor(run.id)),
+    blocks: () => [...ctf.ARENA_BLOCKS],
+    kit: (run) => [...duel.duelKit(optionsOf(run).kit), ...ctf.BANNERS],
+    teams: 2,
+    side: (_run, index) => index % 2,
+    spot: spotOf,
+    beginLines: (_preset, language) =>
+        duel.duelSetup(language === "es" ? ["Rojo", "Azul"] : ["Red", "Blue"]),
+    enterLines: (_run, one) => [
+        duel.joinTeam(one.name, one.side),
+        `tag ${one.name} add ${ctf.SIDE_TAGS[one.side]}`
+    ],
+    goLines,
+    tick,
+    quickLines: (run) => [
+        duel.shieldLow(optionsOf(run).downHearts),
+        ...ctf.touchLines(run.arena!.box)
+    ],
+    results: (run) => new Map(run.entrants.map((one) => [one.name, run.points[one.name] ?? 0])),
+    tiebreak: (run) =>
+        ctf.tiebreakOf(
+            ctf.stateOf(run.game),
+            run.entrants.map((one) => one.name)
+        ),
+    resultLines: (run, language) => [
+        commands.say(messages.duelResult(run.tally["0"] ?? 0, run.tally["1"] ?? 0, language))
+    ],
+    endLines: () => [...duel.duelTeardown(), ...ctf.TAGS_OFF]
+};

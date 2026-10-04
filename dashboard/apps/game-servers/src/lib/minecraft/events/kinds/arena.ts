@@ -136,13 +136,22 @@ export function fillKeep(box: Box, block: string): string {
 /**
  * The arena taken down: every kind of block it used replaced with air, and
  * nothing else, inside its own box and nowhere else.
+ *
+ * A kind at a time over the whole box, in the order the arena lists them: a
+ * flower, a ladder or a banner listed first comes down before what holds it
+ * up. Taken the other way - every kind in the lowest slice, then the next -
+ * the ground of one slice went first, and what stood on it in the slice over
+ * it dropped as an item nobody owns.
  */
 export function teardown(arena: Arena): string[] {
-    return slices(arena.box).flatMap((piece) =>
-        arena.blocks
-            .filter((block) => ITEM_ID.test(block))
-            .map((block) => `${IN_OVERWORLD} fill ${region(piece)} minecraft:air replace ${block}`)
-    );
+    const pieces = slices(arena.box);
+    return arena.blocks
+        .filter((block) => ITEM_ID.test(block))
+        .flatMap((block) =>
+            pieces.map(
+                (piece) => `${IN_OVERWORLD} fill ${region(piece)} minecraft:air replace ${block}`
+            )
+        );
 }
 
 /** Whether a fill could not reach its blocks, and has to be tried again. */
@@ -191,6 +200,23 @@ export function giveMarked(
  *  where that slot was emptied first: whatever is in it is replaced. */
 export function equipMarked(name: string, slot: string, id: string, marker: Marker): string {
     return `item replace entity ${name} ${slot} with ${marked(id, marker)} 1`;
+}
+
+/**
+ * A marked item put on somebody's head, and only when nothing is on it: with
+ * `item replace` from 1.17, `replaceitem` before it - which, unguarded, takes
+ * the place of whatever helmet they wear, their own included.
+ */
+export function wearMarked(name: string, id: string, marker: Marker, itemCommand: boolean): string {
+    const put = itemCommand
+        ? `item replace entity ${name} armor.head with ${marked(id, marker)} 1`
+        : `replaceitem entity ${name} armor.head ${marked(id, marker)} 1`;
+    return `execute unless data entity ${name} Inventory[{Slot:103b}] run ${put}`;
+}
+
+/** Who carries a tag, read the way `commands.readWhere` reads where they are. */
+export function readTagged(tag: string): string {
+    return `execute as @a[tag=${tag}] run data get entity @s Pos`;
 }
 
 /** The kit taken back from one player: only items carrying the marker. */

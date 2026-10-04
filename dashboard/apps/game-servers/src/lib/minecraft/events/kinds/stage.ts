@@ -73,7 +73,16 @@ export const ARENA_BLOCKS = [
     "minecraft:ladder[facing=east]",
     "minecraft:vine[east=true]",
     "minecraft:vine[west=true]",
-    "minecraft:snow_block"
+    "minecraft:snow_block",
+    "minecraft:tnt",
+    "minecraft:glass",
+    "minecraft:green_concrete",
+    "minecraft:cyan_concrete",
+    "minecraft:blue_concrete",
+    "minecraft:purple_concrete",
+    "minecraft:pink_concrete",
+    "minecraft:water",
+    "minecraft:black_concrete"
 ] as const;
 
 export type ArenaBlock = (typeof ARENA_BLOCKS)[number];
@@ -513,7 +522,8 @@ export function clearMarked(name: string, items: Flavour["items"]): string[] {
         ? [`clear ${name} *[minecraft:custom_data={polaris_event:1b}]`]
         : [
               `clear ${name} minecraft:iron_shovel{polaris_event:1b}`,
-              `clear ${name} minecraft:snowball{polaris_event:1b}`
+              `clear ${name} minecraft:snowball{polaris_event:1b}`,
+              `clear ${name} minecraft:oak_boat{polaris_event:1b}`
           ];
 }
 

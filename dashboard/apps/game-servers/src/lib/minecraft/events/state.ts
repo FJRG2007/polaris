@@ -18,6 +18,9 @@ import {
 } from "./catalog";
 import { stashSchema } from "./kinds/stash";
 import { bossStateSchema } from "./kinds/boss";
+import { villagerSchema } from "./kinds/village-defense";
+import { bingoSchema } from "./kinds/bingo";
+import { fishSchema } from "./kinds/boss-fishing";
 import { stageSchema, stageLeftoverSchema } from "./kinds/stage";
 import { placeFromSchema, placeTrySchema, searchSummarySchema } from "./place-search";
 
@@ -268,8 +271,18 @@ export const runSchema = z.object({
     /** A build battle: when the building ended early, everybody done - its own
      *  time otherwise (`readyAt` and the minutes). */
     buildEndsAt: z.number().nullable().default(null),
+    /** An arena kind played through `ArenaGame` (`kinds/arena-game.ts`): its own
+     *  state - flags, who is out, who holds the potato - read with that kind's
+     *  own schema, so a run saved by an older Polaris still reads. */
+    game: z.record(z.unknown()).nullable().default(null),
     /** A world boss: which one was drawn, and how its fight stands. */
-    boss: bossStateSchema.nullable().default(null)
+    boss: bossStateSchema.nullable().default(null),
+    /** A villager defense: its villager, written down before it is summoned. */
+    villager: villagerSchema.nullable().default(null),
+    /** A bingo rush: its card, drawn as it began, and who has marked what. */
+    bingo: bingoSchema.nullable().default(null),
+    /** A boss fishing: the fish's strength, who it was sized for, and the catches. */
+    fish: fishSchema.nullable().default(null)
 });
 
 export type EventRun = z.infer<typeof runSchema> & { preset: EventPreset };

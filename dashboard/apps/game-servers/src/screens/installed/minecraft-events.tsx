@@ -27,11 +27,14 @@ import type { EventsView } from "../../lib/minecraft/events/events-service";
 import type { SearchSummary } from "../../lib/minecraft/events/place-search";
 import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
 import {
+    Cloud,
     Copy,
     Dices,
     FastForward,
+    Globe,
     Info,
     Loader2,
+    MapPin,
     Pencil,
     Play,
     Plus,
@@ -56,6 +59,60 @@ const DAYS: readonly GameKey<"minecraft">[] = [
     "schedule.days.fri",
     "schedule.days.sat"
 ];
+
+/** Where each group of events is played, with what is shown over it. */
+const HELD: Readonly<
+    Record<
+        catalog.HeldWhere,
+        { label: GameKey<"minecraft">; hint: GameKey<"minecraft">; icon: typeof Cloud }
+    >
+> = {
+    sky: { label: "events.heldWhere.sky.label", hint: "events.heldWhere.sky.hint", icon: Cloud },
+    world: {
+        label: "events.heldWhere.world.label",
+        hint: "events.heldWhere.world.hint",
+        icon: MapPin
+    },
+    anywhere: {
+        label: "events.heldWhere.anywhere.label",
+        hint: "events.heldWhere.anywhere.hint",
+        icon: Globe
+    }
+};
+
+/** Every kind a new event can be, grouped by where it is played with its
+ *  options as they start. */
+const KINDS_BY_PLACE = catalog.HELD_WHERE.map((where) => ({
+    where,
+    kinds: catalog.EVENT_KINDS.filter(
+        (kind) => catalog.heldWhere(catalog.newPreset(kind, "kind")) === where
+    )
+}));
+
+/** The saved events grouped by where they are played, in their saved order. */
+function byPlace(
+    presets: readonly catalog.EventPreset[]
+): { where: catalog.HeldWhere; list: catalog.EventPreset[] }[] {
+    return catalog.HELD_WHERE.map((where) => ({
+        where,
+        list: presets.filter((preset) => catalog.heldWhere(preset) === where)
+    })).filter((group) => group.list.length > 0);
+}
+
+/** The line over a group of events: where they are played, and what that means. */
+function HeldHeading({ where, id }: { where: catalog.HeldWhere; id?: string }) {
+    const t = useGameText("minecraft");
+    const { label, hint, icon: Icon } = HELD[where];
+    return (
+        <div className="flex min-w-0 flex-col gap-0.5">
+            <p id={id} className="flex items-center gap-1.5 text-xs font-medium">
+                <Icon className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
+                {t(label)}
+            </p>
+            <p className="text-xs text-muted-foreground">{t(hint)}</p>
+        </div>
+    );
+}
 
 const TRIGGER_LABEL: Readonly<Record<EventHistoryEntry["trigger"], GameKey<"minecraft">>> = {
     manual: "events.triggers.manual",
@@ -304,6 +361,71 @@ function DayPicker({
     );
 }
 
+/** What a stage kind is, said in one line or two: its map and how it is won. */
+function stageFacts(t: GameText<"minecraft">, preset: catalog.EventPreset): string[] {
+    switch (preset.kind) {
+        case "parkour": {
+            const options = preset.options as catalog.EventOptions<"parkour">;
+            return [
+                t("events.facts.parkour", {
+                    jumps: options.jumps,
+                    difficulty: t(
+                        `events.difficulties.${options.difficulty}` as GameKey<"minecraft">
+                    ),
+                    height: options.height
+                })
+            ];
+        }
+        case "boat-race": {
+            const options = preset.options as catalog.EventOptions<"boat-race">;
+            return [t("events.facts.boatRace", { laps: options.laps, height: options.height })];
+        }
+        case "dropper": {
+            const options = preset.options as catalog.EventOptions<"dropper">;
+            return [
+                t("events.facts.dropper", {
+                    levels: options.levels,
+                    difficulty: t(
+                        `events.difficulties.${options.difficulty}` as GameKey<"minecraft">
+                    )
+                })
+            ];
+        }
+        case "tnt-run": {
+            const options = preset.options as catalog.EventOptions<"tnt-run">;
+            return [
+                t("events.facts.tntRun", {
+                    layers: options.layers,
+                    size: options.size * 2 + 1,
+                    height: options.height
+                })
+            ];
+        }
+        default: {
+            const options = preset.options as catalog.EventOptions<"spleef">;
+            return [
+                t("events.facts.spleef", { size: options.size * 2 + 1, height: options.height })
+            ];
+        }
+    }
+}
+
+/** What a stage kind does with players' things, and the versions it needs. */
+function stageItemsFact(t: GameText<"minecraft">, preset: catalog.EventPreset): string {
+    switch (preset.kind) {
+        case "spleef":
+            return t("events.facts.spleefShovel");
+        case "tnt-run":
+            return t("events.facts.tntRunSafe");
+        case "dropper":
+            return t("events.facts.dropperSafe");
+        case "boat-race":
+            return t("events.facts.boatRaceBoats");
+        default:
+            return t("events.facts.parkourItems");
+    }
+}
+
 /**
  * What one event is, said in full: what it is, and what this one is set to -
  * how long, where it happens, what it takes to be ranked, when it will start on
@@ -406,25 +528,11 @@ function EventExplained({
         );
     }
     if (catalog.playsOnStage(preset)) {
-        const options = preset.options as { height: number };
         facts.push(
-            preset.kind === "parkour"
-                ? t("events.facts.parkour", {
-                      jumps: (preset.options as catalog.EventOptions<"parkour">).jumps,
-                      difficulty: t(
-                          `events.difficulties.${(preset.options as catalog.EventOptions<"parkour">).difficulty}` as GameKey<"minecraft">
-                      ),
-                      height: options.height
-                  })
-                : t("events.facts.spleef", {
-                      size: (preset.options as catalog.EventOptions<"spleef">).size * 2 + 1,
-                      height: options.height
-                  }),
+            ...stageFacts(t, preset),
             t("events.facts.joinCountdown", { seconds: catalog.JOIN_SECONDS }),
             t("events.facts.stageBuilt"),
-            preset.kind === "spleef"
-                ? t("events.facts.spleefShovel")
-                : t("events.facts.parkourItems")
+            stageItemsFact(t, preset)
         );
     }
     if (preset.kind === "team-duel") {
@@ -964,26 +1072,45 @@ export function MinecraftEvents({
                                     </ui.Button>
                                 </ui.DropdownMenuTrigger>
                                 <ui.DropdownMenuContent align="end" className="w-80">
-                                    {catalog.EVENT_KINDS.map((kind) => (
-                                        <ui.DropdownMenuItem
-                                            key={kind}
-                                            className="flex flex-col items-start gap-0.5"
-                                            onSelect={() =>
-                                                setEditing({
-                                                    preset: catalog.newPreset(
-                                                        kind,
-                                                        newId(),
-                                                        kindLabel(t, kind)
-                                                    ),
-                                                    isNew: true
-                                                })
-                                            }
-                                        >
-                                            <span className="text-sm">{kindLabel(t, kind)}</span>
-                                            <span className="line-clamp-2 text-xs text-muted-foreground">
-                                                {kindSummary(t, kind)}
-                                            </span>
-                                        </ui.DropdownMenuItem>
+                                    {KINDS_BY_PLACE.map(({ where, kinds }, index) => (
+                                        <ui.DropdownMenuGroup key={where}>
+                                            {index > 0 && <ui.DropdownMenuSeparator />}
+                                            <ui.DropdownMenuLabel className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+                                                {(() => {
+                                                    const Icon = HELD[where].icon;
+                                                    return (
+                                                        <Icon
+                                                            className="size-3.5 shrink-0"
+                                                            aria-hidden
+                                                        />
+                                                    );
+                                                })()}
+                                                {t(HELD[where].label)}
+                                            </ui.DropdownMenuLabel>
+                                            {kinds.map((kind) => (
+                                                <ui.DropdownMenuItem
+                                                    key={kind}
+                                                    className="flex flex-col items-start gap-0.5"
+                                                    onSelect={() =>
+                                                        setEditing({
+                                                            preset: catalog.newPreset(
+                                                                kind,
+                                                                newId(),
+                                                                kindLabel(t, kind)
+                                                            ),
+                                                            isNew: true
+                                                        })
+                                                    }
+                                                >
+                                                    <span className="text-sm">
+                                                        {kindLabel(t, kind)}
+                                                    </span>
+                                                    <span className="line-clamp-2 text-xs text-muted-foreground">
+                                                        {kindSummary(t, kind)}
+                                                    </span>
+                                                </ui.DropdownMenuItem>
+                                            ))}
+                                        </ui.DropdownMenuGroup>
                                     ))}
                                 </ui.DropdownMenuContent>
                             </ui.DropdownMenu>
@@ -1000,140 +1127,168 @@ export function MinecraftEvents({
                             {t("events.noEventsYetAddOne")}
                         </p>
                     ) : (
-                        <ul className="flex flex-col divide-y divide-border rounded-md border border-border">
-                            {presets.map((preset) => (
-                                <li key={preset.id} className="flex flex-col px-3 py-2">
-                                    <div className="flex flex-wrap items-center gap-3">
-                                        <div className="min-w-0 flex-1">
-                                            <p
-                                                className="truncate text-sm font-medium"
-                                                title={preset.name}
-                                            >
-                                                {preset.name}
-                                            </p>
-                                            <PresetDetail preset={preset} />
-                                        </div>
-                                        <ui.Switch
-                                            checked={preset.enabled}
-                                            disabled={locked}
-                                            aria-label={t("events.canComeRound", {
-                                                name: preset.name
-                                            })}
-                                            onChange={(enabled) =>
-                                                change({
-                                                    presets: presets.map((one) =>
-                                                        one.id === preset.id
-                                                            ? { ...one, enabled }
-                                                            : one
-                                                    )
-                                                })
-                                            }
-                                        />
-                                        <div className="flex items-center gap-1">
-                                            <ui.Button
-                                                variant="ghost"
-                                                size="icon-sm"
-                                                aria-label={t("events.whatIs", {
-                                                    name: preset.name
-                                                })}
-                                                title={t("events.whatIs", { name: preset.name })}
-                                                aria-expanded={explained.has(preset.id)}
-                                                onClick={() => explain(preset.id)}
-                                            >
-                                                <Info className="size-4" />
-                                            </ui.Button>
-                                            <ui.Button
-                                                variant="ghost"
-                                                size="icon-sm"
-                                                aria-label={t("events.runNow", {
-                                                    name: preset.name
-                                                })}
-                                                title={
-                                                    dirty
-                                                        ? t("events.saveFirst")
-                                                        : tooFewOn(preset)
-                                                          ? t("events.errors.tooFewPlayers", {
-                                                                count: view?.players?.online ?? 0,
-                                                                needed: neededOn(preset)
+                        <div className="flex flex-col gap-4">
+                            {byPlace(presets).map(({ where, list }) => (
+                                <section
+                                    key={where}
+                                    aria-labelledby={`held-${where}`}
+                                    className="flex flex-col gap-2"
+                                >
+                                    <HeldHeading where={where} id={`held-${where}`} />
+                                    <ul className="flex flex-col divide-y divide-border rounded-md border border-border">
+                                        {list.map((preset) => (
+                                            <li key={preset.id} className="flex flex-col px-3 py-2">
+                                                <div className="flex flex-wrap items-center gap-3">
+                                                    <div className="min-w-0 flex-1">
+                                                        <p
+                                                            className="truncate text-sm font-medium"
+                                                            title={preset.name}
+                                                        >
+                                                            {preset.name}
+                                                        </p>
+                                                        <PresetDetail preset={preset} />
+                                                    </div>
+                                                    <ui.Switch
+                                                        checked={preset.enabled}
+                                                        disabled={locked}
+                                                        aria-label={t("events.canComeRound", {
+                                                            name: preset.name
+                                                        })}
+                                                        onChange={(enabled) =>
+                                                            change({
+                                                                presets: presets.map((one) =>
+                                                                    one.id === preset.id
+                                                                        ? { ...one, enabled }
+                                                                        : one
+                                                                )
                                                             })
-                                                          : t("events.runNow", {
+                                                        }
+                                                    />
+                                                    <div className="flex items-center gap-1">
+                                                        <ui.Button
+                                                            variant="ghost"
+                                                            size="icon-sm"
+                                                            aria-label={t("events.whatIs", {
                                                                 name: preset.name
-                                                            })
-                                                }
-                                                disabled={
-                                                    locked ||
-                                                    pending ||
-                                                    running ||
-                                                    dirty ||
-                                                    tooFewOn(preset) ||
-                                                    !view?.config.presets.some(
-                                                        (one) => one.id === preset.id
-                                                    )
-                                                }
-                                                onClick={() => run(preset)}
-                                            >
-                                                <Play className="size-4" />
-                                            </ui.Button>
-                                            <ui.Button
-                                                variant="ghost"
-                                                size="icon-sm"
-                                                aria-label={t("events.editNamed", {
-                                                    name: preset.name
-                                                })}
-                                                title={t("events.editNamed", { name: preset.name })}
-                                                disabled={locked}
-                                                onClick={() => setEditing({ preset, isNew: false })}
-                                            >
-                                                <Pencil className="size-4" />
-                                            </ui.Button>
-                                            <ui.Button
-                                                variant="ghost"
-                                                size="icon-sm"
-                                                aria-label={t("events.duplicateNamed", {
-                                                    name: preset.name
-                                                })}
-                                                title={t("events.duplicateNamed", {
-                                                    name: preset.name
-                                                })}
-                                                disabled={locked}
-                                                onClick={() =>
-                                                    setEditing({
-                                                        preset: {
-                                                            ...preset,
-                                                            id: newId(),
-                                                            name: `${preset.name} 2`.slice(0, 40)
-                                                        },
-                                                        isNew: true
-                                                    })
-                                                }
-                                            >
-                                                <Copy className="size-4" />
-                                            </ui.Button>
-                                            <ui.Button
-                                                variant="ghost"
-                                                size="icon-sm"
-                                                aria-label={t("events.deleteNamed", {
-                                                    name: preset.name
-                                                })}
-                                                title={t("events.deleteNamed", {
-                                                    name: preset.name
-                                                })}
-                                                disabled={locked}
-                                                onClick={() => void remove(preset)}
-                                            >
-                                                <Trash2 className="size-4" />
-                                            </ui.Button>
-                                        </div>
-                                    </div>
-                                    {explained.has(preset.id) && (
-                                        <EventExplained
-                                            preset={preset}
-                                            settings={settings ?? null}
-                                        />
-                                    )}
-                                </li>
+                                                            })}
+                                                            title={t("events.whatIs", {
+                                                                name: preset.name
+                                                            })}
+                                                            aria-expanded={explained.has(preset.id)}
+                                                            onClick={() => explain(preset.id)}
+                                                        >
+                                                            <Info className="size-4" />
+                                                        </ui.Button>
+                                                        <ui.Button
+                                                            variant="ghost"
+                                                            size="icon-sm"
+                                                            aria-label={t("events.runNow", {
+                                                                name: preset.name
+                                                            })}
+                                                            title={
+                                                                dirty
+                                                                    ? t("events.saveFirst")
+                                                                    : tooFewOn(preset)
+                                                                      ? t(
+                                                                            "events.errors.tooFewPlayers",
+                                                                            {
+                                                                                count:
+                                                                                    view?.players
+                                                                                        ?.online ??
+                                                                                    0,
+                                                                                needed: neededOn(
+                                                                                    preset
+                                                                                )
+                                                                            }
+                                                                        )
+                                                                      : t("events.runNow", {
+                                                                            name: preset.name
+                                                                        })
+                                                            }
+                                                            disabled={
+                                                                locked ||
+                                                                pending ||
+                                                                running ||
+                                                                dirty ||
+                                                                tooFewOn(preset) ||
+                                                                !view?.config.presets.some(
+                                                                    (one) => one.id === preset.id
+                                                                )
+                                                            }
+                                                            onClick={() => run(preset)}
+                                                        >
+                                                            <Play className="size-4" />
+                                                        </ui.Button>
+                                                        <ui.Button
+                                                            variant="ghost"
+                                                            size="icon-sm"
+                                                            aria-label={t("events.editNamed", {
+                                                                name: preset.name
+                                                            })}
+                                                            title={t("events.editNamed", {
+                                                                name: preset.name
+                                                            })}
+                                                            disabled={locked}
+                                                            onClick={() =>
+                                                                setEditing({ preset, isNew: false })
+                                                            }
+                                                        >
+                                                            <Pencil className="size-4" />
+                                                        </ui.Button>
+                                                        <ui.Button
+                                                            variant="ghost"
+                                                            size="icon-sm"
+                                                            aria-label={t("events.duplicateNamed", {
+                                                                name: preset.name
+                                                            })}
+                                                            title={t("events.duplicateNamed", {
+                                                                name: preset.name
+                                                            })}
+                                                            disabled={locked}
+                                                            onClick={() =>
+                                                                setEditing({
+                                                                    preset: {
+                                                                        ...preset,
+                                                                        id: newId(),
+                                                                        name: `${preset.name} 2`.slice(
+                                                                            0,
+                                                                            40
+                                                                        )
+                                                                    },
+                                                                    isNew: true
+                                                                })
+                                                            }
+                                                        >
+                                                            <Copy className="size-4" />
+                                                        </ui.Button>
+                                                        <ui.Button
+                                                            variant="ghost"
+                                                            size="icon-sm"
+                                                            aria-label={t("events.deleteNamed", {
+                                                                name: preset.name
+                                                            })}
+                                                            title={t("events.deleteNamed", {
+                                                                name: preset.name
+                                                            })}
+                                                            disabled={locked}
+                                                            onClick={() => void remove(preset)}
+                                                        >
+                                                            <Trash2 className="size-4" />
+                                                        </ui.Button>
+                                                    </div>
+                                                </div>
+                                                {explained.has(preset.id) && (
+                                                    <EventExplained
+                                                        preset={preset}
+                                                        settings={settings ?? null}
+                                                    />
+                                                )}
+                                            </li>
+                                        ))}
+                                    </ul>
+                                </section>
                             ))}
-                        </ul>
+                        </div>
                     )}
                     <p className="text-xs text-muted-foreground">
                         {t("events.theSwitchLetsAnEvent")}

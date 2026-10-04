@@ -64,6 +64,11 @@ interface World {
     pickUp: boolean;
     /** Parkour: each racer's checkpoint as the game keeps it, and the tick they finished at. */
     checkpoint: Record<string, number>;
+    /** The dropper's and the boat race's own scores, by objective then player:
+     *  what their data pack keeps in the game. */
+    stageScores: Record<string, Record<string, number>>;
+    /** A block whose taking out finds its chunk not loaded. */
+    unloadedBlock: string | null;
     finishTick: Record<string, number>;
     /** A version that knows the game rules by their new names only. */
     renamedRules: boolean;
@@ -195,6 +200,10 @@ interface World {
     /** How far the nearest fighter stands from the boss, and whether blocks close it in on every side. */
     fighterGap: number;
     bossBoxed: boolean;
+    /** What the kinds played through the events service keep (`freshKinds`). */
+    kinds: WorldKinds;
+    /** Any other count, by objective and player: what an arena kind reads of its own. */
+    board: Record<string, Record<string, number>>;
 }
 
 const world: World = {
@@ -227,6 +236,8 @@ const world: World = {
     drops: new Map(),
     pickUp: false,
     checkpoint: {},
+    stageScores: {},
+    unloadedBlock: null,
     finishTick: {},
     renamedRules: false,
     built: false,
@@ -297,7 +308,9 @@ const world: World = {
     minionsLeft: 0,
     lift: [],
     fighterGap: 2,
-    bossBoxed: false
+    bossBoxed: false,
+    kinds: freshKinds(),
+    board: {}
 };
 let config: Record<string, unknown> = {};
 /** The kept-bag copies written to the database, by id. */
@@ -321,6 +334,7 @@ function fillAnswer(line: string): string | null {
     const [x1, y1, z1, x2, y2, z2] = fill.slice(1, 7).map(Number) as number[];
     const volume =
         (Math.abs(x2! - x1!) + 1) * (Math.abs(y2! - y1!) + 1) * (Math.abs(z2! - z1!) + 1);
+    if (fill[8] && fill[8] === world.unloadedBlock) return "That position is not loaded";
     if (fill[8]) return "Successfully filled 1 block(s)";
     if (fill[7] === "minecraft:structure_void" && world.skyTaken)
         return `Successfully filled ${volume - 7} block(s)`;
@@ -445,6 +459,57 @@ function quickAnswer(line: string): string | null {
             world.finishTick[name] = Math.floor(Date.now() / 50) % 2147483647;
     }
     return found.map((name) => `${command.split(" ")[0]} ${name}`).join("\n");
+}
+
+/**
+ * The scores a stage kind's data pack keeps for each racer (`pe_drop`, `pe_low`,
+ * `pe_back` for a dropper), as the game answers: set one by one, read with a
+ * score range for everybody inside, and set for everybody in a range.
+ */
+function stageScoreAnswer(line: string): string | null {
+    const objectives = /^pe_(drop|low|back|gate|next|last|fin|cut)$/;
+    const set = /^scoreboard players set (\w+) (\w+) (-?\d+)$/.exec(line);
+    if (set && objectives.test(set[2]!)) {
+        (world.stageScores[set[2]!] ??= {})[set[1]!] = Number(set[3]);
+        return `Set [${set[2]}] for ${set[1]} to ${set[3]}`;
+    }
+    const inRange = (score: number | undefined, range: string) => {
+        if (score === undefined) return false;
+        const [low, high] = range.includes("..") ? range.split("..") : [range, range];
+        return (low === "" || score >= Number(low)) && (high === "" || score <= Number(high));
+    };
+    const inside = world.online.filter((name) => world.inside.has(name));
+    const read =
+        /^execute as @a\[tag=pe_in,scores=\{(\w+)=([-\d.]+)\}\] run scoreboard players get @s (\w+)$/.exec(
+            line
+        );
+    if (read && objectives.test(read[1]!)) {
+        const scores = world.stageScores[read[1]!] ?? {};
+        return inside
+            .filter((name) => inRange(scores[name], read[2]!))
+            .map((name) => `${name} has ${world.stageScores[read[3]!]?.[name]} [${read[3]}]`)
+            .join("\n");
+    }
+    const each = /^execute as @a\[tag=pe_in,scores=\{(\w+)=([-\d.]+)\}\] run (.+)$/.exec(line);
+    if (each && objectives.test(each[1]!)) {
+        const scores = world.stageScores[each[1]!] ?? {};
+        return inside
+            .filter((name) => inRange(scores[name], each[2]!))
+            .map((name) => `${each[3]!.split(" ")[0]} ${name}`)
+            .join("\n");
+    }
+    const setAll =
+        /^scoreboard players set @a\[tag=pe_in,scores=\{(\w+)=([-\d.]+)\}\] (\w+) (-?\d+)$/.exec(
+            line
+        );
+    if (setAll && objectives.test(setAll[1]!)) {
+        const scores = (world.stageScores[setAll[3]!] ??= {});
+        for (const name of inside)
+            if (inRange(world.stageScores[setAll[1]!]?.[name], setAll[2]!))
+                scores[name] = Number(setAll[4]);
+        return "";
+    }
+    return null;
 }
 
 /** One stack as the game keeps it: its data is the components compound, raw. */
@@ -775,6 +840,8 @@ function answer(sent: string): string {
     } else if (/(^| run )minecraft:[a-z_]+ /.test(line)) {
         return `Unknown or incomplete command, see below for error\n...${line.slice(0, 20)}<--[HERE]`;
     }
+    const kindAnswer = worldKindsAnswer(line);
+    if (kindAnswer !== null) return kindAnswer;
     // Up to 1.21.4 a name is JSON in a string, and anything else is passed over;
     // from 1.21.5 it is a text component, which a plain string is too.
     const named = /^data merge entity @e\[tag=pe_boss,limit=1\] \{CustomName:(.*)\}$/.exec(line);
@@ -870,6 +937,8 @@ function answer(sent: string): string {
     }
     const quick = quickAnswer(line);
     if (quick !== null) return quick;
+    const kept = stageScoreAnswer(line);
+    if (kept !== null) return kept;
     const item = itemAnswer(line);
     if (item !== null) return item;
     // Several tests in one line: every one must pass.
@@ -1493,6 +1562,26 @@ function answer(sent: string): string {
     // Any other block test: whatever the protected-area switch says.
     if (line.startsWith("execute in minecraft:overworld if block "))
         return world.refuseBlocks ? "Test failed" : "Test passed";
+    // Any other count the board keeps, for whoever is on.
+    const board = /^execute as @a run scoreboard players get @s (pe_\w+)$/.exec(line);
+    if (board && world.board[board[1]!]) {
+        const table = world.board[board[1]!]!;
+        return world.online
+            .filter((name) => table[name] !== undefined)
+            .map((name) => `${name} has ${table[name]} [${board[1]}]`)
+            .join("\n");
+    }
+    // Who carries a tag, where they are.
+    const carrying = /^execute as @a\[tag=(pe_\w+)\] run data get entity @s Pos$/.exec(line);
+    if (carrying) {
+        return world.online
+            .filter((name) => tagged(carrying[1]!).has(name))
+            .map((name) => {
+                const [x, y, z] = world.at[name] ?? [0, 64, 0];
+                return `${name} has the following entity data: [${x}d, ${y}d, ${z}d]`;
+            })
+            .join("\n");
+    }
     return "";
 }
 
@@ -1762,6 +1851,7 @@ const hillService = await import(
 );
 const playing = await import("@polaris-app/game-servers/src/lib/minecraft/activity");
 const arrival = await import("@polaris-app/game-servers/src/lib/minecraft/events/kinds/arrival");
+const bingo = await import("@polaris-app/game-servers/src/lib/minecraft/events/kinds/bingo");
 
 /** What a player reads of a command's text: the words of its JSON, without the
  *  formatting that splits them into parts (a highlighted name, a number). */
@@ -1849,6 +1939,8 @@ beforeEach(() => {
     world.drops = new Map();
     world.pickUp = false;
     world.checkpoint = {};
+    world.stageScores = {};
+    world.unloadedBlock = null;
     world.finishTick = {};
     world.renamedRules = false;
     world.built = false;
@@ -1918,6 +2010,8 @@ beforeEach(() => {
     world.lift = [];
     world.fighterGap = 2;
     world.bossBoxed = false;
+    world.kinds = freshKinds();
+    world.board = {};
     speechService.forget(SERVER);
     world.stormTicks = 0;
     events.forgetPlayers();
@@ -5214,8 +5308,9 @@ function builtAndRemoved(): { built: string[]; removed: string[] } {
 
 /** The rules every one of these must keep, whatever happened: blocks go up only
  *  into air and come down only where they are still the event's; nothing is
- *  cleared but the event's marked items; nothing that burns or floods. */
-function keptTheRules(): void {
+ *  cleared but the event's marked items; nothing that burns or floods - but for
+ *  what a kind is made of (`allowed`: a TNT run's floors, a dropper's pool). */
+function keptTheRules(allowed: readonly ("tnt" | "water")[] = []): void {
     const fills = world.sent.filter((line) => line.includes(" fill "));
     // The ring is drawn again as it shrinks and moves: its floor's own block
     // painted over its own ring block and back, never anything else.
@@ -5258,13 +5353,15 @@ function keptTheRules(): void {
         expect(line).toContain("custom_data={polaris_event:1b}");
     // Never put down; asking whether a column is open water is only asking.
     expect(
-        world.sent.some(
+        world.sent.filter(
             (line) =>
-                /minecraft:(lava|fire|tnt|water)\b/.test(line) &&
+                [...line.matchAll(/minecraft:(lava|fire|tnt|water)\b/g)].some(
+                    (found) => !allowed.includes(found[1] as "tnt" | "water")
+                ) &&
                 !/ if block -?\d+ -?\d+ -?\d+ minecraft:water$/.test(line) &&
                 !/ if block ~ ~-1 ~ minecraft:water run data get entity @s Pos$/.test(line)
         )
-    ).toBe(false);
+    ).toEqual([]);
 }
 
 describe("a parkour race", () => {
@@ -6193,6 +6290,705 @@ describe("spleef", () => {
             );
         }
         expect(state().stageLeftovers).toEqual([]);
+    });
+});
+
+const tntRun = await import("@polaris-app/game-servers/src/lib/minecraft/events/kinds/tnt-run");
+const stageKit = await import("@polaris-app/game-servers/src/lib/minecraft/events/kinds/stage");
+
+describe("a TNT run", () => {
+    const run = () => ({
+        ...newPreset("tnt-run", "tnt"),
+        minutes: 5,
+        options: { place: { mode: "players" as const }, size: 6, layers: 3, height: 30 }
+    });
+    const arenaNow = () => {
+        const origin = state().run!.stage!.origin!;
+        return tntRun.arena(run().options, origin, origin.y);
+    };
+    const tntPlaced = () =>
+        world.sent.findIndex(
+            (line) => line.endsWith(" minecraft:tnt keep") && line.includes(" fill ")
+        );
+
+    it("puts its pack on before a block is built, arms it only at Go, and plays to the last one standing", async () => {
+        world.online = ["Ana", "Ben", "Cy"];
+        setUp([run()]);
+        await startArena("tnt");
+        await play(2_100);
+        chat(["Ana", "join"], ["Ben", "unirse"], ["Cy", "join"]);
+        await play(44_000);
+        expect(state().run?.stage?.racers.map((one) => one.name)).toEqual(["Ana", "Ben", "Cy"]);
+        // The pack went on before anything was built: taking it in pauses the game.
+        const enabled = world.sent.indexOf(`datapack enable "${snowballPack.PACK_ID}"`);
+        expect(enabled).toBeGreaterThan(-1);
+        expect(tntPlaced()).toBeGreaterThan(enabled);
+        expect(world.sent.some((line) => /^(minecraft:)?reload\b/.test(line))).toBe(false);
+        const arena = arenaNow();
+        // Three floors of TNT, each built only into air.
+        for (const at of arena.floors)
+            expect(world.sent).toContain(
+                `execute in minecraft:overworld run fill ${arena.center.x - 6} ${at} ${arena.center.z - 6} ${arena.center.x + 6} ${at} ${arena.center.z + 6} minecraft:tnt keep`
+            );
+        await play(8_000);
+        // Armed only after the countdown, and nothing handed out at all.
+        const one = world.sent.findIndex(
+            (line) => line.includes(" title ") && visible(line).endsWith(" title 1")
+        );
+        const armed = world.sent.indexOf("scoreboard players set #on polaris_tntrun 1");
+        expect(one).toBeGreaterThan(-1);
+        expect(armed).toBeGreaterThan(one);
+        for (const line of tntRun.armLines(arena)) expect(world.sent).toContain(line);
+        expect(world.sent.some((line) => /^give /.test(line))).toBe(false);
+        expect(
+            world.sent.some(
+                (line) => line.startsWith("title Ana title") && visible(line).endsWith("Run!")
+            )
+        ).toBe(true);
+        // A lit TNT anywhere near is put out over RCON as well, every tick.
+        expect(world.sent).toContain(tntRun.primedOut(arena.volume));
+
+        // Down to the next floor is not out; through the last one is.
+        world.at.Ben = [arena.center.x, arena.floors[1]! + 1, arena.center.z];
+        await play(2_100);
+        expect(world.inside.has("Ben")).toBe(true);
+        expect(
+            world.sent.some(
+                (line) =>
+                    line.includes("title Ben actionbar") && visible(line).includes("floor 2/3")
+            )
+        ).toBe(true);
+        world.at.Ben = [arena.center.x, arena.floors.at(-1)! - 3, arena.center.z];
+        await play(2_100);
+        expect(world.inside.has("Ben")).toBe(false);
+        world.at.Cy = [arena.center.x, arena.floors.at(-1)! - 3, arena.center.z];
+        await play(4_100);
+
+        const after = state();
+        expect(after.run).toBeNull();
+        expect(after.history[0]?.note).toBe("Ana was the last one standing");
+        expect(after.history[0]?.podium).toEqual([
+            { place: 1, name: "Ana", score: 3 },
+            { place: 2, name: "Cy", score: 2 },
+            { place: 3, name: "Ben", score: 1 }
+        ]);
+        // The pack is switched off for this arena, its fuses out, the floors gone.
+        for (const line of tntRun.stopLines(arena.boxes)) expect(world.sent).toContain(line);
+        for (const box of tntRun.floorBoxes(arena))
+            expect(world.sent).toContain(
+                `execute in minecraft:overworld run fill ${box.x1} ${box.y1} ${box.z1} ${box.x2} ${box.y2} ${box.z2} minecraft:air replace minecraft:tnt`
+            );
+        expect(world.inside.size).toBe(0);
+        keptTheRules(["tnt"]);
+        expect(after.stageLeftovers).toEqual([]);
+    });
+
+    it("is called off before anything is built, and its pack never written, when too few join", async () => {
+        setUp([run()]);
+        await startArena("tnt");
+        await play(2_100);
+        chat(["Ana", "join"]);
+        await play(34_000);
+        expect(state().history[0]).toMatchObject({
+            outcome: "cancelled",
+            note: "Only 1 joined; it needs 2"
+        });
+        expect(world.sent.some((line) => line.includes(" fill "))).toBe(false);
+        expect(world.sent.some((line) => line.includes(" tp "))).toBe(false);
+        expect(world.writes).toEqual([]);
+    });
+
+    it("is called off with nothing built and nobody moved when its pack cannot be put on", async () => {
+        world.properties = "level-name=../elsewhere\n";
+        setUp([run()]);
+        await startArena("tnt");
+        await play(2_100);
+        chat(["Ana", "join"], ["Ben", "join"]);
+        await play(36_000);
+        expect(state().history[0]).toMatchObject({
+            outcome: "cancelled",
+            note: "Its data pack could not be put on"
+        });
+        expect(world.sent.some((line) => line.includes(" fill "))).toBe(false);
+        expect(world.sent.some((line) => line.includes(" tp "))).toBe(false);
+        expect(
+            world.sent.some(
+                (line) =>
+                    line.startsWith("tellraw @a") &&
+                    visible(line).includes("TNT run cannot be played")
+            )
+        ).toBe(true);
+    });
+
+    it("called off mid-game, puts its fuses out and takes every floor down", async () => {
+        setUp([run()]);
+        await startArena("tnt");
+        await play(2_100);
+        chat(["Ana", "join"], ["Ben", "join"]);
+        await play(52_000);
+        const arena = arenaNow();
+        expect(world.sent).toContain("scoreboard players set #on polaris_tntrun 1");
+        await events.cancelEvent("owner", SERVER);
+        await play(4_200);
+        for (const line of tntRun.stopLines(arena.boxes)) expect(world.sent).toContain(line);
+        for (const box of arena.boxes)
+            expect(world.sent).toContain(
+                `execute in minecraft:overworld run fill ${box.x1} ${box.y1} ${box.z1} ${box.x2} ${box.y2} ${box.z2} minecraft:air replace ${box.block}`
+            );
+        expect(world.inside.size).toBe(0);
+        keptTheRules(["tnt"]);
+        expect(state().stageLeftovers).toEqual([]);
+    });
+
+    it("picked up after a restart mid-game, goes on to its last one standing and still switches its pack off", async () => {
+        const preset = run();
+        setUp([preset]);
+        const now = Date.now();
+        const site = { x: 300, y: 100, z: 0 };
+        const arena = tntRun.arena(preset.options, site, site.y);
+        world.inside = new Set(["Ana", "Ben"]);
+        world.at = { Ana: [301, 101, 1], Ben: [299, 101, -1] };
+        const saved = (name: string, x: number) => ({
+            name,
+            dimension: "minecraft:overworld",
+            x,
+            y: 64,
+            z: 2,
+            yaw: 0,
+            pitch: 0,
+            mode: "survival"
+        });
+        config[catalog.EVENT_STATE_KEY] = {
+            run: {
+                id: "resumed-tnt",
+                trigger: "manual",
+                startedBy: null,
+                preset,
+                phase: "running",
+                createdAt: now - 60_000,
+                startsAt: now - 30_000,
+                endsAt: now + 120_000,
+                readyAt: now - 20_000,
+                participants: ["Ana", "Ben"],
+                place: { x: 300, y: 70, z: 0 },
+                stage: {
+                    origin: site,
+                    area: stageKit.areaOf(arena.volume),
+                    boxes: arena.boxes,
+                    built: true,
+                    armed: true,
+                    goAt: now - 20_000,
+                    saved: [saved("Ana", 1), saved("Ben", 5)],
+                    racers: [
+                        { name: "Ana", since: now - 20_000 },
+                        { name: "Ben", since: now - 20_000 }
+                    ]
+                }
+            }
+        };
+        await events.sweepEvents();
+        expect(events.runningEvents()).toContain(SERVER);
+        await play(2_100);
+        // Not armed again, nor its floors built again: it goes on as it was.
+        expect(world.sent).not.toContain("scoreboard players set #on polaris_tntrun 1");
+        expect(tntPlaced()).toBe(-1);
+        world.at.Ben = [300, arena.floors.at(-1)! - 3, 0];
+        await play(4_100);
+        const after = state();
+        expect(after.run).toBeNull();
+        expect(after.history[0]?.note).toBe("Ana was the last one standing");
+        for (const line of tntRun.stopLines(arena.boxes)) expect(world.sent).toContain(line);
+        expect(world.sent).toContain(
+            "execute in minecraft:overworld run tp Ben 5.000 64.000 2.000 0.0 0.0"
+        );
+        expect(after.stageLeftovers).toEqual([]);
+    });
+});
+
+const dropperKind = await import(
+    "@polaris-app/game-servers/src/lib/minecraft/events/kinds/dropper"
+);
+
+describe("a dropper", () => {
+    const run = () => ({
+        ...newPreset("dropper", "drop"),
+        minutes: 5,
+        options: { place: { mode: "players" as const }, levels: 6, difficulty: "medium" as const }
+    });
+    const shaftNow = () => {
+        const current = state().run!;
+        const origin = current.stage!.origin!;
+        return dropperKind.shaft(run().options, current.id, origin, origin.y);
+    };
+    const scores = (objective: string) => (world.stageScores[objective] ??= {});
+
+    it("lets everybody fall at once from the middle at Go, and ranks the finish, then the deepest floor", async () => {
+        setUp([run()]);
+        await startArena("drop");
+        await play(2_100);
+        chat(["Ana", "join"], ["Ben", "unirse"]);
+        await play(44_000);
+        const shaft = shaftNow();
+        // The pack went on before anything was built; the water went in last.
+        const enabled = world.sent.indexOf(`datapack enable "${snowballPack.PACK_ID}"`);
+        const firstFill = world.sent.findIndex(
+            (line) =>
+                line.includes(" fill ") &&
+                line.endsWith(" keep") &&
+                !line.includes("structure_void")
+        );
+        expect(enabled).toBeGreaterThan(-1);
+        expect(firstFill).toBeGreaterThan(enabled);
+        const builds = world.sent.filter(
+            (line) =>
+                line.includes(" fill ") &&
+                line.endsWith(" keep") &&
+                !line.includes("structure_void")
+        );
+        expect(builds.at(-1)).toContain(" minecraft:water keep");
+        // On the lid under Slow Falling and Resistance; armed only after the countdown.
+        expect(world.sent).toContain(dropperKind.SLOW_INSIDE);
+        await play(8_000);
+        const one = world.sent.findIndex(
+            (line) => line.includes(" title ") && visible(line).endsWith(" title 1")
+        );
+        expect(one).toBeGreaterThan(-1);
+        expect(world.sent.indexOf("scoreboard players set #on polaris_drop 1")).toBeGreaterThan(
+            one
+        );
+        // At Go: over the middle, the lid gone, the pack on.
+        const spawn = dropperKind.spawn(shaft);
+        expect(world.at.Ana).toEqual([spawn.x, spawn.y, spawn.z]);
+        expect(world.at.Ben).toEqual([spawn.x, spawn.y, spawn.z]);
+        expect(world.sent).toContain(dropperKind.lidGone(shaft));
+        for (const line of dropperKind.armLines(shaft)) expect(world.sent).toContain(line);
+        expect(world.sent.indexOf(dropperKind.lidGone(shaft))).toBeLessThan(
+            world.sent.indexOf("scoreboard players set #on polaris_drop 1")
+        );
+        expect(state().run!.readyAt).not.toBeNull();
+
+        // The pack sends Ben back up: the quick look tells him, once.
+        scores("pe_back").Ben = 1;
+        await play(500);
+        expect(
+            world.sent.some(
+                (line) =>
+                    line.startsWith(
+                        "execute as @a[tag=pe_in,scores={pe_back=1..}] run tellraw @s"
+                    ) && visible(line).includes("back to the top")
+            )
+        ).toBe(true);
+        expect(scores("pe_back").Ben).toBe(0);
+
+        // Ben got through three floors; Ana through all of them, into the water.
+        world.at.Ben = [spawn.x, shaft.floors[2]! - 2, spawn.z];
+        scores("pe_low").Ben = (shaft.floors[2]! - 2) * 64;
+        world.at.Ana = [spawn.x, shaft.water, spawn.z];
+        scores("pe_low").Ana = shaft.water * 64;
+        scores("pe_drop").Ana = Math.floor(Date.now() / 50) % 2147483647;
+        await play(2_100);
+        expect(
+            world.sent.some(
+                (line) =>
+                    line.startsWith("tellraw @a") &&
+                    visible(line).includes("Ana reached the finish")
+            )
+        ).toBe(true);
+        expect(state().run!.stage!.racers.find((one) => one.name === "Ben")!.best).toBe(3);
+        chat(["Ben", "leave"]);
+        await play(4_100);
+
+        const after = state();
+        expect(after.run).toBeNull();
+        expect(after.history[0]?.note).toBe("Everybody finished or dropped out");
+        expect(after.history[0]?.podium?.[0]).toMatchObject({ place: 1, name: "Ana" });
+        expect(after.history[0]?.podium?.[1]).toEqual({ place: 2, name: "Ben", score: 3 });
+        for (const line of dropperKind.stopLines(shaft.boxes)) expect(world.sent).toContain(line);
+        for (const line of dropperKind.SCORES_REMOVED) expect(world.sent).toContain(line);
+        expect(world.inside.size).toBe(0);
+        keptTheRules(["water"]);
+        expect(after.stageLeftovers).toEqual([]);
+    });
+
+    it("is called off before anything is built when too few join", async () => {
+        setUp([run()]);
+        await startArena("drop");
+        await play(2_100);
+        chat(["Ana", "join"]);
+        await play(34_000);
+        expect(state().history[0]).toMatchObject({ outcome: "cancelled" });
+        expect(state().history[0]?.note).toMatch(/^Only 1 joined; it needs \d$/);
+        expect(world.sent.some((line) => line.includes(" fill "))).toBe(false);
+        expect(world.sent.some((line) => line.includes(" tp "))).toBe(false);
+    });
+
+    it("called off mid-fall, takes the water out before anything that holds it, and switches its pack off", async () => {
+        setUp([run()]);
+        await startArena("drop");
+        await play(2_100);
+        chat(["Ana", "join"], ["Ben", "join"]);
+        await play(52_000);
+        const shaft = shaftNow();
+        expect(world.sent).toContain("scoreboard players set #on polaris_drop 1");
+        await events.cancelEvent("owner", SERVER);
+        await play(4_200);
+        for (const line of dropperKind.stopLines(shaft.boxes)) expect(world.sent).toContain(line);
+        const removed = (block: string) =>
+            world.sent.findIndex(
+                (line) => line.endsWith(`minecraft:air replace ${block}`) && !line.includes(" ~ ")
+            );
+        const water = removed("minecraft:water");
+        expect(water).toBeGreaterThan(-1);
+        expect(water).toBeLessThan(removed("minecraft:white_concrete"));
+        expect(water).toBeLessThan(removed("minecraft:light_blue_concrete"));
+        for (const box of shaft.boxes)
+            expect(world.sent).toContain(
+                `execute in minecraft:overworld run fill ${box.x1} ${box.y1} ${box.z1} ${box.x2} ${box.y2} ${box.z2} minecraft:air replace ${box.block}`
+            );
+        expect(world.inside.size).toBe(0);
+        keptTheRules(["water"]);
+        expect(state().stageLeftovers).toEqual([]);
+    });
+
+    it("never takes the walls down from round water that would not come out, and finishes it on a later sweep", async () => {
+        setUp([run()]);
+        await startArena("drop");
+        await play(2_100);
+        chat(["Ana", "join"], ["Ben", "join"]);
+        await play(52_000);
+        const shaft = shaftNow();
+        world.unloadedBlock = "minecraft:water";
+        await events.cancelEvent("owner", SERVER);
+        await play(4_200);
+        // The water stood, so nothing that holds it in was touched.
+        expect(
+            world.sent.some((line) =>
+                line.endsWith("minecraft:air replace minecraft:white_concrete")
+            )
+        ).toBe(false);
+        expect(state().stageLeftovers[0]?.boxes).toHaveLength(shaft.boxes.length);
+        world.unloadedBlock = null;
+        await events.sweepEvents();
+        for (const box of shaft.boxes)
+            expect(world.sent).toContain(
+                `execute in minecraft:overworld run fill ${box.x1} ${box.y1} ${box.z1} ${box.x2} ${box.y2} ${box.z2} minecraft:air replace ${box.block}`
+            );
+        expect(state().stageLeftovers).toEqual([]);
+    });
+
+    it("picked up after a restart mid-fall, still counts a finish and ends", async () => {
+        const preset = run();
+        setUp([preset]);
+        const now = Date.now();
+        const site = { x: 300, y: 70, z: 0 };
+        const shaft = dropperKind.shaft(preset.options, "resumed-drop", site, site.y);
+        world.inside = new Set(["Ana"]);
+        world.at = { Ana: [300.5, shaft.floors[1]! + 3, 0.5] };
+        scores("pe_drop").Ana = 0;
+        scores("pe_low").Ana = (shaft.floors[1]! + 3) * 64;
+        config[catalog.EVENT_STATE_KEY] = {
+            run: {
+                id: "resumed-drop",
+                trigger: "manual",
+                startedBy: null,
+                preset,
+                phase: "running",
+                createdAt: now - 60_000,
+                startsAt: now - 30_000,
+                endsAt: now + 120_000,
+                readyAt: now - 20_000,
+                participants: ["Ana"],
+                place: { x: 300, y: 64, z: 0 },
+                stage: {
+                    origin: site,
+                    area: stageKit.areaOf(shaft.volume),
+                    boxes: shaft.boxes,
+                    built: true,
+                    goAt: now - 20_000,
+                    saved: [
+                        {
+                            name: "Ana",
+                            dimension: "minecraft:overworld",
+                            x: 1,
+                            y: 64,
+                            z: 2,
+                            yaw: 0,
+                            pitch: 0,
+                            mode: "survival"
+                        }
+                    ],
+                    racers: [{ name: "Ana", since: now - 20_000, best: 1 }]
+                }
+            }
+        };
+        await events.sweepEvents();
+        expect(events.runningEvents()).toContain(SERVER);
+        await play(2_100);
+        // Nothing built again, nobody let go again.
+        expect(world.sent.some((line) => line.endsWith(" keep"))).toBe(false);
+        expect(world.sent).not.toContain(dropperKind.lidGone(shaft));
+        world.at.Ana = [300.5, shaft.water, 0.5];
+        scores("pe_drop").Ana = Math.floor(Date.now() / 50) % 2147483647;
+        await play(4_100);
+        const after = state();
+        expect(after.run).toBeNull();
+        expect(after.history[0]?.podium?.[0]).toMatchObject({ place: 1, name: "Ana" });
+        expect(world.sent).toContain(
+            "execute in minecraft:overworld run tp Ana 1.000 64.000 2.000 0.0 0.0"
+        );
+        expect(after.stageLeftovers).toEqual([]);
+    });
+});
+
+const boatKind = await import("@polaris-app/game-servers/src/lib/minecraft/events/kinds/boat-race");
+
+describe("an ice boat race", () => {
+    const race = () => ({
+        ...newPreset("boat-race", "boats"),
+        minutes: 5,
+        options: { place: { mode: "players" as const }, laps: 2, height: 30 }
+    });
+    const trackNow = () => {
+        const current = state().run!;
+        const origin = current.stage!.origin!;
+        return boatKind.track(race().options, current.id, origin, origin.y);
+    };
+    const scores = (objective: string) => (world.stageScores[objective] ??= {});
+
+    it("puts everybody on the grid in a boat at Go, counts the gates in the game, and ranks the finish, then the gates", async () => {
+        setUp([race()]);
+        await startArena("boats");
+        await play(2_100);
+        chat(["Ana", "join"], ["Ben", "unirse"]);
+        await play(44_000);
+        const track = trackNow();
+        // The pack on before the track is built: blue ice gate lines over packed ice.
+        const enabled = world.sent.indexOf(`datapack enable "${snowballPack.PACK_ID}"`);
+        const built = world.sent.findIndex(
+            (line) => line.endsWith(" minecraft:packed_ice keep") && line.includes(" fill ")
+        );
+        expect(enabled).toBeGreaterThan(-1);
+        expect(built).toBeGreaterThan(enabled);
+        expect(world.sent.some((line) => line.endsWith(" minecraft:blue_ice keep"))).toBe(true);
+        await play(8_000);
+        // At Go, after the countdown: on the grid, each in an oak boat (1.21.4),
+        // and the gates counted from then on.
+        const one = world.sent.findIndex(
+            (line) => line.includes(" title ") && visible(line).endsWith(" title 1")
+        );
+        const armed = world.sent.indexOf("scoreboard players set #on polaris_boat 1");
+        expect(one).toBeGreaterThan(-1);
+        expect(armed).toBeGreaterThan(one);
+        for (const line of boatKind.armLines(track)) expect(world.sent).toContain(line);
+        const grid = boatKind.grid(track, 2);
+        expect(world.sent).toContain(
+            `execute in minecraft:overworld run tp Ana ${grid[0]!.x.toFixed(3)} ${grid[0]!.y.toFixed(3)} ${grid[0]!.z.toFixed(3)} ${grid[0]!.yaw.toFixed(1)} 0.0`
+        );
+        for (const line of [
+            ...boatKind.boatLines("Ana", "oak_boat"),
+            ...boatKind.boatLines("Ben", "oak_boat")
+        ])
+            expect(world.sent).toContain(line);
+        expect(world.sent.indexOf(boatKind.boatLines("Ana", "oak_boat")[0]!)).toBeLessThan(armed);
+        expect(state().run!.readyAt).not.toBeNull();
+        // The quick look puts back whoever fell, cut a corner or left their boat.
+        world.sent = [];
+        await play(500);
+        expect(
+            world.sent.some((line) =>
+                line.startsWith(
+                    "execute in minecraft:overworld run kill @e[type=minecraft:oak_boat,tag=polaris_boat,nbt=!{Passengers:[{}]}]"
+                )
+            )
+        ).toBe(true);
+        expect(world.sent.some((line) => line.includes("run ride @s mount"))).toBe(true);
+
+        // Ben is three gates on; Ana crosses the line a second time.
+        const total = 2 * track.gates.length + 1;
+        scores("pe_gate").Ben = 3;
+        scores("pe_gate").Ana = total;
+        scores("pe_fin").Ana = Math.floor(Date.now() / 50) % 2147483647;
+        await play(2_100);
+        expect(
+            world.sent.some(
+                (line) =>
+                    line.startsWith("tellraw @a") &&
+                    visible(line).includes("Ana reached the finish")
+            )
+        ).toBe(true);
+        expect(state().run!.stage!.racers.find((one) => one.name === "Ben")!.best).toBe(3);
+        expect(
+            world.sent.some(
+                (line) => line.includes("title Ben actionbar") && visible(line).includes("Lap 1/2")
+            )
+        ).toBe(true);
+        chat(["Ben", "leave"]);
+        await play(4_100);
+
+        const after = state();
+        expect(after.run).toBeNull();
+        expect(after.history[0]?.note).toBe("Everybody finished or dropped out");
+        expect(after.history[0]?.podium?.[0]).toMatchObject({ place: 1, name: "Ana" });
+        expect(after.history[0]?.podium?.[1]).toEqual({ place: 2, name: "Ben", score: 3 });
+        for (const line of boatKind.stopLines(track.boxes)) expect(world.sent).toContain(line);
+        for (const line of boatKind.SCORES_REMOVED) expect(world.sent).toContain(line);
+        // Its boats go before its ice.
+        const gone = world.sent.findIndex((line) =>
+            line.includes("run kill @e[type=minecraft:oak_boat,x=")
+        );
+        expect(gone).toBeGreaterThan(-1);
+        expect(gone).toBeLessThan(
+            world.sent.findIndex((line) =>
+                line.endsWith("minecraft:air replace minecraft:packed_ice")
+            )
+        );
+        expect(world.inside.size).toBe(0);
+        keptTheRules();
+        expect(after.stageLeftovers).toEqual([]);
+    });
+
+    it("gives two racers who join together after Go their own grid spots, not one shared", async () => {
+        setUp([race()]);
+        await startArena("boats");
+        await play(2_100);
+        chat(["Ana", "join"], ["Ben", "join"]);
+        await play(52_000);
+        const track = trackNow();
+        expect(world.sent).toContain("scoreboard players set #on polaris_boat 1");
+        world.online = [...world.online, "Cy", "Dan"];
+        world.sent = [];
+        chat(["Cy", "join"], ["Dan", "join"]);
+        await play(2_100);
+        const tpLine = (name: string) =>
+            world.sent.find((line) =>
+                line.startsWith(`execute in minecraft:overworld run tp ${name} `)
+            );
+        const cy = tpLine("Cy");
+        const dan = tpLine("Dan");
+        expect(cy).toBeDefined();
+        expect(dan).toBeDefined();
+        const coords = (line: string, name: string) =>
+            line.slice(`execute in minecraft:overworld run tp ${name} `.length);
+        // Each joined the race already on, in the same tick: one grid spot apiece,
+        // not both dropped on the same one (stage-service.ts admits one name at a
+        // time, so `fresh.length` is 1 per call - `grid(track, fresh.length)` then
+        // always gives back grid index 0, the same spot every time).
+        expect(coords(cy!, "Cy")).not.toBe(coords(dan!, "Dan"));
+    });
+
+    it("hands a marked boat to put down before 1.19.4, where nobody can be put in one", async () => {
+        world.version = "1.19.2";
+        setUp([race()]);
+        await startArena("boats");
+        await play(2_100);
+        chat(["Ana", "join"], ["Ben", "join"]);
+        await play(52_000);
+        expect(world.sent).toContain("give Ana minecraft:oak_boat{polaris_event:1b} 1");
+        expect(world.sent.some((line) => / ride /.test(line))).toBe(false);
+        expect(world.sent.some((line) => line.includes("summon minecraft:oak_boat"))).toBe(false);
+        await events.cancelEvent("owner", SERVER);
+        await play(4_200);
+        expect(world.sent).toContain("clear Ana minecraft:oak_boat{polaris_event:1b}");
+        expect(state().stageLeftovers).toEqual([]);
+    });
+
+    it("is called off before anything is built when too few join", async () => {
+        setUp([race()]);
+        await startArena("boats");
+        await play(2_100);
+        chat(["Ana", "join"]);
+        await play(34_000);
+        expect(state().history[0]).toMatchObject({ outcome: "cancelled" });
+        expect(state().history[0]?.note).toMatch(/^Only 1 joined; it needs \d$/);
+        expect(world.sent.some((line) => line.includes(" fill "))).toBe(false);
+        expect(world.sent.some((line) => line.includes(" tp "))).toBe(false);
+    });
+
+    it("called off mid-race, takes its boats and its track away and switches its pack off", async () => {
+        setUp([race()]);
+        await startArena("boats");
+        await play(2_100);
+        chat(["Ana", "join"], ["Ben", "join"]);
+        await play(52_000);
+        const track = trackNow();
+        expect(world.sent).toContain("scoreboard players set #on polaris_boat 1");
+        await events.cancelEvent("owner", SERVER);
+        await play(4_200);
+        for (const line of boatKind.stopLines(track.boxes)) expect(world.sent).toContain(line);
+        expect(world.sent.some((line) => line.includes("run kill @e[type=minecraft:boat,x="))).toBe(
+            true
+        );
+        for (const box of track.boxes)
+            expect(world.sent).toContain(
+                `execute in minecraft:overworld run fill ${box.x1} ${box.y1} ${box.z1} ${box.x2} ${box.y2} ${box.z2} minecraft:air replace ${box.block}`
+            );
+        expect(world.inside.size).toBe(0);
+        keptTheRules();
+        expect(state().stageLeftovers).toEqual([]);
+    });
+
+    it("picked up after a restart mid-race, still counts a finish and ends", async () => {
+        const preset = race();
+        setUp([preset]);
+        const now = Date.now();
+        const site = { x: 300, y: 100, z: 0 };
+        const track = boatKind.track(preset.options, "resumed-boats", site, site.y);
+        const spot = track.respawns[1]!;
+        world.inside = new Set(["Ana"]);
+        world.at = { Ana: [spot.x, spot.y, spot.z] };
+        scores("pe_gate").Ana = 2;
+        scores("pe_fin").Ana = 0;
+        config[catalog.EVENT_STATE_KEY] = {
+            run: {
+                id: "resumed-boats",
+                trigger: "manual",
+                startedBy: null,
+                preset,
+                phase: "running",
+                createdAt: now - 60_000,
+                startsAt: now - 30_000,
+                endsAt: now + 120_000,
+                readyAt: now - 20_000,
+                participants: ["Ana"],
+                place: { x: 300, y: 70, z: 0 },
+                stage: {
+                    origin: site,
+                    area: stageKit.areaOf(track.volume),
+                    boxes: track.boxes,
+                    built: true,
+                    goAt: now - 20_000,
+                    saved: [
+                        {
+                            name: "Ana",
+                            dimension: "minecraft:overworld",
+                            x: 1,
+                            y: 64,
+                            z: 2,
+                            yaw: 0,
+                            pitch: 0,
+                            mode: "survival"
+                        }
+                    ],
+                    racers: [{ name: "Ana", since: now - 20_000, best: 2 }]
+                }
+            }
+        };
+        await events.sweepEvents();
+        expect(events.runningEvents()).toContain(SERVER);
+        await play(2_100);
+        // Nothing built again, nobody put on the grid again.
+        expect(world.sent.some((line) => line.endsWith(" keep"))).toBe(false);
+        expect(world.sent).not.toContain("scoreboard players set #on polaris_boat 1");
+        scores("pe_gate").Ana = 2 * track.gates.length + 1;
+        scores("pe_fin").Ana = Math.floor(Date.now() / 50) % 2147483647;
+        await play(4_100);
+        const after = state();
+        expect(after.run).toBeNull();
+        expect(after.history[0]?.podium?.[0]).toMatchObject({ place: 1, name: "Ana" });
+        expect(world.sent).toContain(
+            "execute in minecraft:overworld run tp Ana 1.000 64.000 2.000 0.0 0.0"
+        );
+        expect(after.stageLeftovers).toEqual([]);
     });
 });
 
@@ -8309,5 +9105,1371 @@ describe("the list of who joined", () => {
                     line.includes("(2 joined)")
             )
         ).toBe(true);
+    });
+});
+
+// ------------------------------------------------------------------ played through the events service
+
+/** What a villager defense, a bingo rush and a boss fishing find in the world. */
+interface WorldKinds {
+    villager: {
+        alive: boolean;
+        health: number;
+        /** How many times one was summoned. */
+        summons: number;
+        /** Whether the run had it written down, not yet summoned, when it was. */
+        writtenFirst: boolean | null;
+    };
+    /** A bingo rush: each player's marks as the game adds them up, one bit a cell. */
+    bingo: { masks: Record<string, number> };
+    /** A boss fishing: fish each player caught, and treasures counted onto them. */
+    fish: { caught: Record<string, number>; treasure: Record<string, number> };
+}
+
+function freshKinds(): WorldKinds {
+    return {
+        villager: { alive: false, health: 20, summons: 0, writtenFirst: null },
+        bingo: { masks: {} },
+        fish: { caught: {}, treasure: {} }
+    };
+}
+
+/** The lines only these kinds send, as the game answers them; null for any other. */
+function worldKindsAnswer(line: string): string | null {
+    if (line === "execute as @a run scoreboard players get @s pe_bgk")
+        return world.online
+            .map((name) => `${name} has ${world.kinds.bingo.masks[name] ?? 0} [pe_bgk]`)
+            .join("\n");
+    const fish = world.kinds.fish;
+    const treasure = /^scoreboard players add (\w+) pe_fbt (\d+)$/.exec(line);
+    if (treasure) {
+        fish.treasure[treasure[1]!] = (fish.treasure[treasure[1]!] ?? 0) + Number(treasure[2]);
+        return `Added ${treasure[2]} to [pe_fbt] for ${treasure[1]}`;
+    }
+    if (line === "execute as @a run scoreboard players get @s pe_fbs")
+        return world.online
+            .map(
+                (name) =>
+                    `${name} has ${(fish.caught[name] ?? 0) + (fish.treasure[name] ?? 0)} [pe_fbs]`
+            )
+            .join("\n");
+    const villager = world.kinds.villager;
+    if (line === "execute if entity @e[type=minecraft:villager,tag=pe_villager]")
+        return villager.alive ? "Test passed, count: 1" : "Test failed";
+    if (line === "data get entity @e[type=minecraft:villager,tag=pe_villager,limit=1] Health")
+        return villager.alive
+            ? `Villager has the following entity data: ${villager.health.toFixed(1)}f`
+            : "No entity was found";
+    if (line.startsWith("execute in minecraft:overworld run summon minecraft:villager ")) {
+        villager.summons += 1;
+        villager.writtenFirst = state().run?.villager?.summoned === false;
+        villager.alive = true;
+        villager.health = 20;
+        return "Summoned new Villager";
+    }
+    if (line.startsWith("data merge entity @e[type=minecraft:villager,tag=pe_villager,limit=1]"))
+        return villager.alive ? "Modified entity data of Villager" : "No entity was found";
+    if (line === "kill @e[tag=pe_villager]") {
+        const was = villager.alive;
+        villager.alive = false;
+        return was ? "Killed Villager" : "No entity was found";
+    }
+    return null;
+}
+
+describe("a villager defense", () => {
+    const start = () =>
+        events.startEvent({
+            ownerId: "owner",
+            installedAppId: SERVER,
+            presetId: "village",
+            trigger: "manual",
+            startedBy: null
+        });
+    const preset = () => newPreset("village-defense", "village");
+    /** Every monster summoned, by id, riders and mounts included. */
+    const summonedIds = () =>
+        world.sent
+            .filter((line) => line.includes(" run summon minecraft:") && line.includes('"pe_wnew"'))
+            .flatMap((line) =>
+                [
+                    ...line.matchAll(
+                        /(?:summon minecraft:|Passengers:\[\{id:"minecraft:)([a-z_]+)/g
+                    )
+                ].map((one) => one[1]!)
+            );
+    const provoked = () =>
+        world.sent.filter((line) => / run damage @s 0\.01 minecraft:generic by /.test(line));
+    const bar = () =>
+        world.sent.filter((line) => line.startsWith("bossbar set polaris:event name")).at(-1) ?? "";
+
+    it("sets a named villager down at the point, turns every wave on it, and pays the defenders when it lives", async () => {
+        setUp([preset()]);
+        await start();
+        await play(10_100);
+        const run = state().run!;
+        expect(run.place).toEqual({ x: 300, y: 70, z: 0 });
+        // Written down before it was summoned, and summoned once.
+        expect(world.kinds.villager.writtenFirst).toBe(true);
+        expect(world.kinds.villager.summons).toBe(1);
+        expect(run.villager).toMatchObject({ summoned: true, provoke: true, lost: false });
+        const name = run.villager!.name;
+        expect(
+            world.sent.some(
+                (line) =>
+                    line.startsWith("data merge entity @e[type=minecraft:villager") &&
+                    line.includes(name)
+            )
+        ).toBe(true);
+        // Nothing lost to a death, nothing broken by what comes.
+        expect(world.sent).toContain("gamerule keepInventory true");
+        expect(world.sent).toContain("gamerule mobGriefing false");
+        expect(world.sent).toContain("time set 18000");
+        expect(
+            world.sent.some(
+                (line) =>
+                    line.startsWith("tellraw @a") &&
+                    visible(line).includes(`${name} is at X 300 Y 70 Z 0`)
+            )
+        ).toBe(true);
+        // Its health is the bar.
+        await play(2_100);
+        expect(visible(bar())).toContain(`${name} 10`);
+        expect(world.sent).toContain("bossbar set polaris:event max 20");
+
+        world.defenders = ["Ana", "Ben"];
+        await play(46_000);
+        // The classic mix: zombies and vindicators, and the zombies' mounts.
+        expect(summonedIds().length).toBeGreaterThan(0);
+        for (const id of summonedIds())
+            expect(["zombie", "vindicator", "chicken", "zombie_horse"]).toContain(id);
+        expect(provoked().length).toBeGreaterThan(0);
+        expect(
+            world.sent.some(
+                (line) => line.startsWith("title @a title") && visible(line).includes("Wave 1/5")
+            )
+        ).toBe(true);
+
+        world.kinds.villager.health = 9;
+        world.scores = { Ana: 9, Ben: 2 };
+        world.hits = { Ben: 30 };
+        await play(5 * 30_000);
+        const after = state();
+        expect(after.run).toBeNull();
+        expect(after.history[0]?.note).toBe("All 5 waves were fought");
+        expect(after.history[0]?.podium).toEqual([{ place: 1, name: "Ana", score: 9 }]);
+        expect(world.sent).toContain("give Ana minecraft:diamond 5");
+        expect(world.sent).toContain("give Ben minecraft:experience_bottle 8");
+        // Warned once as it fell under half its health.
+        expect(
+            world.sent.filter(
+                (line) =>
+                    line.startsWith("title @a title") &&
+                    visible(line).includes("The villager is hurt!")
+            )
+        ).toHaveLength(1);
+        expect(world.sent.some((line) => visible(line).includes(`${name} made it.`))).toBe(true);
+        // Everything undone: the villager, what it may have turned into, the
+        // monsters, the rule.
+        expect(world.sent).toContain("kill @e[tag=pe_villager]");
+        expect(world.sent).toContain(
+            "execute in minecraft:overworld positioned 300.5 70 0.5 run kill @e[type=minecraft:zombie_villager,distance=..1.5]"
+        );
+        expect(world.sent).toContain("kill @e[tag=pe_mob]");
+        expect(world.sent).toContain("gamerule keepInventory false");
+        expect(world.kinds.villager.alive).toBe(false);
+    });
+
+    it("ends at once with nobody winning when the villager dies, and not on one look it is missed", async () => {
+        world.defenders = ["Ana", "Ben"];
+        world.waveAlive = 3;
+        setUp([preset()]);
+        await start();
+        await play(10_100 + 46_000);
+        expect(state().run?.round).toBe(0);
+        // Missed once - loading after a restart - and back: still on.
+        world.kinds.villager.alive = false;
+        await play(2_000);
+        world.kinds.villager.alive = true;
+        await play(2_000);
+        expect(state().run).not.toBeNull();
+
+        world.scores = { Ana: 4, Ben: 2 };
+        world.hits = { Ana: 20, Ben: 30 };
+        world.kinds.villager.alive = false;
+        await play(4_000);
+        const entry = state().history[0]!;
+        expect(state().run).toBeNull();
+        expect(entry.outcome).toBe("finished");
+        expect(entry.note).toMatch(/the villager died$/);
+        expect(entry.podium).toEqual([]);
+        expect(world.sent.some((line) => line.startsWith("give "))).toBe(false);
+        expect(
+            world.sent.some(
+                (line) =>
+                    line.startsWith("tellraw @a") &&
+                    visible(line).includes("so nobody wins and there are no prizes")
+            )
+        ).toBe(true);
+        expect(world.sent.some((line) => visible(line).includes("Nobody scored this time"))).toBe(
+            false
+        );
+        expect(world.sent).toContain("kill @e[tag=pe_mob]");
+        expect(world.sent).toContain("gamerule keepInventory false");
+    });
+
+    it("called off, takes the villager and the wave away and pays nobody", async () => {
+        world.defenders = ["Ana"];
+        world.waveAlive = 3;
+        setUp([preset()]);
+        await start();
+        await play(10_100 + 46_000);
+        expect(world.kinds.villager.alive).toBe(true);
+        await events.cancelEvent("owner", SERVER);
+        await play(2_100);
+        expect(state().history[0]).toMatchObject({ outcome: "cancelled" });
+        expect(world.kinds.villager.alive).toBe(false);
+        expect(world.sent).toContain("kill @e[tag=pe_mob]");
+        expect(world.sent).toContain("gamerule keepInventory false");
+        expect(world.sent.some((line) => line.startsWith("give "))).toBe(false);
+    });
+
+    it("picks its villager back up after a restart, never summoning a second one", async () => {
+        const made = preset();
+        setUp([made]);
+        const now = Date.now();
+        world.defenders = ["Ana"];
+        world.waveAlive = 2;
+        // Polaris stopped between writing the villager down and hearing it was summoned.
+        world.kinds.villager.alive = true;
+        config[catalog.EVENT_STATE_KEY] = {
+            run: {
+                id: "resumed",
+                trigger: "manual",
+                startedBy: null,
+                preset: made,
+                phase: "running",
+                createdAt: now - 60_000,
+                startsAt: now - 60_000,
+                endsAt: now + 20_000,
+                participants: ["Ana"],
+                place: { x: 300, y: 70, z: 0 },
+                round: 0,
+                roundEndsAt: now + 60_000,
+                gamerules: { keepInventory: "false" },
+                chunks: [{ x: 18, z: 0 }],
+                villager: { name: "Petra", summoned: false, provoke: true }
+            }
+        };
+        await events.sweepEvents();
+        await play(4_100);
+        expect(world.kinds.villager.summons).toBe(0);
+        expect(state().run?.villager).toMatchObject({ name: "Petra", summoned: true });
+        expect(visible(bar())).toContain("Petra 10");
+        await play(20_000);
+        expect(state().run).toBeNull();
+        expect(state().history[0]).toMatchObject({ id: "resumed", outcome: "finished" });
+        expect(world.kinds.villager.alive).toBe(false);
+        expect(world.sent).toContain("gamerule keepInventory false");
+        expect(world.sent).toContain("execute in minecraft:overworld run forceload remove 288 0");
+    });
+
+    it.each(["1.20.6", "1.19.2"])(
+        "leaves the wave to vanilla's own aim on %s, where a touch would knock it back or cannot be given",
+        async (version) => {
+            world.version = version;
+            world.defenders = ["Ana"];
+            world.waveAlive = 3;
+            setUp([preset()]);
+            await start();
+            await play(10_100 + 46_000 + 6_100);
+            expect(state().run?.villager).toMatchObject({ summoned: true, provoke: false });
+            expect(summonedIds().length).toBeGreaterThan(0);
+            expect(provoked()).toEqual([]);
+        }
+    );
+
+    it("turns the wave on the villager from 1.21", async () => {
+        world.version = "1.21";
+        world.defenders = ["Ana"];
+        world.waveAlive = 3;
+        setUp([preset()]);
+        await start();
+        await play(10_100 + 46_000 + 6_100);
+        expect(state().run?.villager).toMatchObject({ summoned: true, provoke: true });
+        expect(provoked().length).toBeGreaterThan(0);
+    });
+
+    it("does not start with fewer players on than its minimum", async () => {
+        world.online = ["Ana"];
+        setUp([preset()]);
+        expect(await refusal(start())).toBe("Only 1 player is on the server; this event needs 2");
+        expect(state().run).toBeNull();
+        expect(world.kinds.villager.summons).toBe(0);
+    });
+
+    it("is refused on Peaceful", async () => {
+        world.difficulty = "Peaceful";
+        setUp([preset()]);
+        expect(await refusal(start())).toMatch(/Peaceful/);
+    });
+});
+
+describe("a bingo rush", () => {
+    const start = () =>
+        events.startEvent({
+            ownerId: "owner",
+            installedAppId: SERVER,
+            presetId: "bingo",
+            trigger: "manual",
+            startedBy: null
+        });
+    const made = (goal: "line" | "card", minutes = 15) => ({
+        ...newPreset("bingo", "bingo"),
+        minutes,
+        options: { goal, difficulty: "medium" as const }
+    });
+    const told = (name: string, text: string) =>
+        world.sent.some((line) => line.startsWith(`tellraw ${name} [`) && line.includes(text));
+
+    it("draws one card for everybody, marks what each comes by, and ends at the first full line", async () => {
+        setUp([made("line")]);
+        await start();
+        await play(2_100);
+        const run = state().run!;
+        const card = run.bingo!.card;
+        expect(card).toEqual(
+            bingo.drawCard(run.id, "medium", (since) => events.atLeast("1.21.4", since))
+        );
+        expect(world.sent).toContain(
+            `scoreboard objectives add pe_bgp0 minecraft.picked_up:minecraft.${card[0]}`
+        );
+        // Shown to everybody once, each item named by the game itself.
+        for (const id of card)
+            expect(
+                world.sent.filter(
+                    (line) =>
+                        line.startsWith("tellraw @a [") &&
+                        line.includes(`"translate":"${bingo.nameKey(id)}"`)
+                )
+            ).toHaveLength(1);
+        expect(
+            world.sent.some(
+                (line) =>
+                    line.startsWith("tellraw @a") &&
+                    visible(line).includes("the first full line wins")
+            )
+        ).toBe(true);
+
+        world.kinds.bingo.masks = { Ana: 0b11, Ben: 0b1 };
+        await play(2_100);
+        expect(world.sent).toContain("scoreboard players set Ana pe_score 2");
+        expect(world.sent).toContain("scoreboard players set Ben pe_score 1");
+        expect(told("Ana", " 2/9")).toBe(true);
+        expect(world.sent.some((line) => line.startsWith("title Ana actionbar "))).toBe(true);
+        expect(state().run?.bingo?.marked).toEqual({ Ana: 0b11, Ben: 0b1 });
+
+        // Ana put one away: it stays marked. Ben fills the middle row.
+        world.kinds.bingo.masks = { Ana: 0b1, Ben: 0b111001 };
+        await play(2_100);
+        expect(world.sent).not.toContain("scoreboard players set Ana pe_score 1");
+        const entry = state().history[0]!;
+        expect(state().run).toBeNull();
+        expect(entry.note).toBe("Ben completed a line");
+        // Ana's two are under the least to be ranked.
+        expect(entry.podium).toEqual([{ place: 1, name: "Ben", score: 4 }]);
+        expect(world.sent).toContain("give Ben minecraft:diamond 5");
+        expect(
+            world.sent.some(
+                (line) =>
+                    line.startsWith("tellraw @a") &&
+                    visible(line).includes("Ben completed a line first")
+            )
+        ).toBe(true);
+        // Nothing of anybody's taken, and every count taken away.
+        expect(takesItems(world.sent)).toEqual([]);
+        expect(world.sent).toContain("scoreboard objectives remove pe_bgk");
+        expect(world.sent).toContain("scoreboard objectives remove pe_bgp8");
+    });
+
+    it("ranks by items marked when the time runs out on a full card, a tie to whoever got there first", async () => {
+        setUp([made("card", 3)]);
+        await start();
+        await play(2_100);
+        world.kinds.bingo.masks = { Ana: 0b111 };
+        await play(2_100);
+        world.kinds.bingo.masks = { Ana: 0b111, Ben: 0b111000000 };
+        await play(2_100);
+        // A full line is not a full card.
+        expect(state().run).not.toBeNull();
+        await play(3 * 60_000);
+        const entry = state().history[0]!;
+        expect(entry.note).toBe("Ran its full time");
+        expect(entry.podium).toEqual([
+            { place: 1, name: "Ana", score: 3 },
+            { place: 2, name: "Ben", score: 3 }
+        ]);
+        expect(
+            world.sent.some(
+                (line) =>
+                    line.startsWith("tellraw @a") &&
+                    visible(line).includes("Nobody filled the card: the most items marked wins.")
+            )
+        ).toBe(true);
+    });
+
+    it("never lets somebody in creative win it", async () => {
+        world.creative = ["Ben"];
+        setUp([made("line")]);
+        await start();
+        await play(2_100);
+        world.kinds.bingo.masks = { Ben: 0b111 };
+        await play(2_100);
+        expect(state().run).not.toBeNull();
+        world.kinds.bingo.masks = { Ben: 0b111, Ana: 0b100010001 };
+        await play(2_100);
+        const entry = state().history[0]!;
+        expect(entry.note).toBe("Ana completed a line");
+        expect(entry.podium).toEqual([{ place: 1, name: "Ana", score: 3 }]);
+        expect(entry.disqualified).toContain("Ben");
+    });
+
+    it("called off, takes its counts away and pays nobody", async () => {
+        setUp([made("line")]);
+        await start();
+        await play(2_100);
+        world.kinds.bingo.masks = { Ana: 0b11 };
+        await play(2_100);
+        await events.cancelEvent("owner", SERVER);
+        await play(2_100);
+        expect(state().history[0]).toMatchObject({ outcome: "cancelled", podium: [] });
+        expect(world.sent).toContain("scoreboard objectives remove pe_bgm0");
+        expect(world.sent.some((line) => line.startsWith("give "))).toBe(false);
+    });
+
+    it("keeps its card and its marks across a restart", async () => {
+        const preset = made("line");
+        setUp([preset]);
+        const now = Date.now();
+        const card = bingo.drawCard("resumed", "medium", () => true);
+        config[catalog.EVENT_STATE_KEY] = {
+            run: {
+                id: "resumed",
+                trigger: "manual",
+                startedBy: null,
+                preset,
+                phase: "running",
+                createdAt: now - 60_000,
+                startsAt: now - 60_000,
+                endsAt: now + 10 * 60_000,
+                readyAt: now - 60_000,
+                participants: ["Ana", "Ben"],
+                bingo: { card, marked: { Ana: 0b11 }, at: { Ana: 20_000 } }
+            }
+        };
+        // The server's own count of Ana's marks is gone; the third of her row is new.
+        world.kinds.bingo.masks = { Ana: 0b100 };
+        await events.sweepEvents();
+        await play(4_100);
+        expect(world.sent.some((line) => line.startsWith("scoreboard objectives add pe_bg"))).toBe(
+            false
+        );
+        const entry = state().history[0]!;
+        expect(entry).toMatchObject({ id: "resumed", note: "Ana completed a line" });
+        expect(entry.podium).toEqual([{ place: 1, name: "Ana", score: 3 }]);
+    });
+
+    it("asks an old server only for what it has", async () => {
+        world.version = "1.13.2";
+        setUp([made("line")]);
+        await start();
+        await play(2_100);
+        for (const id of state().run!.bingo!.card) expect(bingo.itemOf(id).since).toBeUndefined();
+    });
+
+    it("does not start with fewer players on than its minimum", async () => {
+        world.online = ["Ana"];
+        setUp([made("line")]);
+        expect(await refusal(start())).toBe("Only 1 player is on the server; this event needs 2");
+        expect(state().run).toBeNull();
+    });
+});
+
+describe("a boss fishing", () => {
+    const start = () =>
+        events.startEvent({
+            ownerId: "owner",
+            installedAppId: SERVER,
+            presetId: "fish",
+            trigger: "manual",
+            startedBy: null
+        });
+    const made = (minutes = 10) => ({ ...newPreset("boss-fishing", "fish"), minutes });
+    const bar = () =>
+        visible(
+            world.sent.filter((line) => line.startsWith("bossbar set polaris:event name")).at(-1) ??
+                ""
+        );
+    const said = (text: string) =>
+        world.sent.some((line) => line.startsWith("tellraw @a") && visible(line).includes(text));
+
+    it("is as strong as everybody fishing, is worn down by every catch and more by a treasure, and is landed", async () => {
+        setUp([made()]);
+        await start();
+        await play(2_100);
+        expect(state().run?.fish).toMatchObject({ max: 20, fishers: ["Ana", "Ben"] });
+        expect(said("has a strength of 20")).toBe(true);
+        expect(world.sent).toContain(
+            "scoreboard objectives add pe_fbf minecraft.custom:minecraft.fish_caught"
+        );
+        await play(1_000);
+        expect(bar()).toContain("The legendary fish 20/20");
+
+        world.kinds.fish.caught = { Ana: 6, Ben: 4 };
+        await play(2_100);
+        expect(said("of its strength is left")).toBe(true);
+        await play(1_000);
+        expect(bar()).toContain("10/20");
+
+        // Ben reels in a treasure: three off the fish, and three on his count.
+        world.caught = ["Ben"];
+        world.kinds.fish.caught = { Ana: 9, Ben: 4 };
+        await play(2_100);
+        expect(said("Ben fished up a treasure: the fish loses 3.")).toBe(true);
+        await play(1_000);
+        expect(bar()).toContain("4/20");
+
+        world.kinds.fish.caught = { Ana: 13, Ben: 4 };
+        world.scores = { Ana: 13, Ben: 7 };
+        await play(2_100);
+        const entry = state().history[0]!;
+        expect(state().run).toBeNull();
+        expect(entry.note).toBe("The legendary fish was landed");
+        expect(entry.podium).toEqual([
+            { place: 1, name: "Ana", score: 13 },
+            { place: 2, name: "Ben", score: 7 }
+        ]);
+        expect(world.sent).toContain("give Ana minecraft:diamond 5");
+        expect(said("Together you landed the legendary fish.")).toBe(true);
+        expect(world.sent.some((line) => line.includes("particle minecraft:firework"))).toBe(true);
+        expect(world.sent.some((line) => line.includes(" summon minecraft:firework"))).toBe(false);
+        expect(world.sent).toContain("scoreboard objectives remove pe_fbs");
+        expect(world.sent).toContain("scoreboard objectives remove pe_rod");
+    });
+
+    it("gets away when the time runs out first, and nobody wins", async () => {
+        setUp([made(3)]);
+        await start();
+        await play(2_100);
+        world.kinds.fish.caught = { Ana: 2 };
+        world.scores = { Ana: 2 };
+        await play(3 * 60_000 + 2_000);
+        const entry = state().history[0]!;
+        expect(entry).toMatchObject({ outcome: "finished", note: "Ran its full time", podium: [] });
+        expect(world.sent.some((line) => line.startsWith("give "))).toBe(false);
+        expect(said("got away with 18 strength left. Nobody wins this time.")).toBe(true);
+        expect(said("Nobody scored this time")).toBe(false);
+        expect(
+            world.sent.some(
+                (line) =>
+                    line.startsWith("title @a title") && visible(line).includes("The fish got away")
+            )
+        ).toBe(true);
+    });
+
+    it("is not worn down by an AFK farm, which stays off the podium", async () => {
+        world.still = ["Ben"];
+        setUp([made(3)]);
+        await start();
+        await play(2_100);
+        world.kinds.fish.caught = { Ana: 3, Ben: 30 };
+        world.scores = { Ana: 3, Ben: 30 };
+        await play(20_000);
+        expect(state().run).not.toBeNull();
+        // Ben was never playing: the fish was not sized for him either.
+        expect(state().run?.fish).toMatchObject({ max: 10, fishers: ["Ana"] });
+        expect(bar()).toContain("7/10");
+        await play(3 * 60_000);
+        const entry = state().history[0]!;
+        expect(entry.podium).toEqual([]);
+        expect(said("got away with 7 strength left")).toBe(true);
+    });
+
+    it("grows for a player who starts fishing later, keeping what was already taken off it", async () => {
+        setUp([made()]);
+        await start();
+        // Only Ana is on as it starts.
+        world.online = ["Ana"];
+        await play(2_100);
+        expect(state().run?.fish).toMatchObject({ max: 10, fishers: ["Ana"] });
+        world.kinds.fish.caught = { Ana: 4 };
+        await play(2_100);
+        world.online = ["Ana", "Ben"];
+        await play(60_000);
+        expect(state().run?.fish).toMatchObject({ max: 20, fishers: ["Ana", "Ben"] });
+        expect(said("More players fishing: the fish holds out for 10 more catches.")).toBe(true);
+        await play(1_000);
+        expect(bar()).toContain("16/20");
+    });
+
+    it("called off, takes its counts away and pays nobody", async () => {
+        setUp([made()]);
+        await start();
+        await play(2_100);
+        world.kinds.fish.caught = { Ana: 5 };
+        await play(2_100);
+        await events.cancelEvent("owner", SERVER);
+        await play(2_100);
+        expect(state().history[0]).toMatchObject({ outcome: "cancelled", podium: [] });
+        expect(world.sent).toContain("scoreboard objectives remove pe_fbf");
+        expect(world.sent.some((line) => line.startsWith("give "))).toBe(false);
+    });
+
+    it("keeps its fish and every catch across a restart", async () => {
+        const preset = made();
+        setUp([preset]);
+        const now = Date.now();
+        config[catalog.EVENT_STATE_KEY] = {
+            run: {
+                id: "resumed",
+                trigger: "manual",
+                startedBy: null,
+                preset,
+                phase: "running",
+                createdAt: now - 60_000,
+                startsAt: now - 60_000,
+                endsAt: now + 5 * 60_000,
+                readyAt: now - 60_000,
+                participants: ["Ana", "Ben"],
+                fish: { max: 20, fishers: ["Ana", "Ben"], caught: { Ana: 15 }, told: 2 }
+            }
+        };
+        // The game's count of Ana's reads lower now; Ben's five land it.
+        world.kinds.fish.caught = { Ana: 1, Ben: 5 };
+        world.scores = { Ana: 15, Ben: 5 };
+        await events.sweepEvents();
+        await play(4_100);
+        expect(world.sent.some((line) => line.startsWith("scoreboard objectives add pe_fb"))).toBe(
+            false
+        );
+        const entry = state().history[0]!;
+        expect(entry).toMatchObject({ id: "resumed", note: "The legendary fish was landed" });
+        expect(entry.podium[0]).toEqual({ place: 1, name: "Ana", score: 15 });
+    });
+
+    it("does not start with fewer players on than its minimum", async () => {
+        world.online = ["Ana"];
+        setUp([made()]);
+        expect(await refusal(start())).toBe("Only 1 player is on the server; this event needs 2");
+        expect(state().run).toBeNull();
+    });
+});
+
+// ------------------------------------------------------------------ arena kinds through ArenaGame
+
+/** A stored run put back as a restarted Polaris finds it, the loop gone and
+ *  the world as it stood: what the next sweep picks up. */
+async function restartedWith(run: unknown, tags: World["tags"]): Promise<void> {
+    await events.cancelEvent("owner", SERVER);
+    await play(2_100);
+    world.tags = tags;
+    world.sent = [];
+    config[catalog.EVENT_STATE_KEY] = {
+        ...(config[catalog.EVENT_STATE_KEY] as object),
+        run,
+        arenaLeftovers: []
+    };
+    await events.sweepEvents();
+    expect(events.runningEvents()).toContain(SERVER);
+}
+
+/** A copy of who carries which tag, to put back after a restart. */
+function tagsNow(): World["tags"] {
+    return Object.fromEntries(
+        Object.entries(world.tags).map(([tag, names]) => [tag, new Set(names)])
+    );
+}
+
+/** Whether a line said to everybody reads `text` once its JSON is put together. */
+function saidToAll(text: string): boolean {
+    return world.sent.some((line) => line.startsWith("tellraw @a") && visible(line).includes(text));
+}
+
+describe("capture the flag", () => {
+    const ctfOf = (captures = 1, minutes = 5) => {
+        const preset = newPreset("capture-the-flag", "ctf");
+        return { ...preset, minutes, options: { ...preset.options, captures } };
+    };
+    const ctf = () =>
+        import("@polaris-app/game-servers/src/lib/minecraft/events/kinds/capture-the-flag");
+
+    it("splits who joined into teams, takes the other team's flag home and ends on the captures set", async () => {
+        const flag = await ctf();
+        setUp([ctfOf(1)]);
+        await joinAndStart("ctf");
+        const run = state().run!;
+        expect(run.readyAt).not.toBeNull();
+        expect(run.entrants.map((one) => [one.name, one.side])).toEqual([
+            ["Ana", 0],
+            ["Ben", 1]
+        ]);
+        const box = run.arena!.box;
+        // Built only into air, its banners on their stands, the teams set up as a duel's.
+        expect(fills().every((line) => line.endsWith(" keep"))).toBe(true);
+        expect(fills().some((line) => line.includes("minecraft:red_banner[rotation=0] keep"))).toBe(
+            true
+        );
+        expect(world.sent).toContain("team modify pe_blue friendlyFire false");
+        expect(world.sent).toContain("tag Ana add pe_ctf_s0");
+        expect(world.sent).toContain("tag Ben add pe_ctf_s1");
+        expect(world.sent).toContain("gamerule naturalRegeneration false");
+        expect(world.sent).toContain("gamerule keepInventory true");
+        expect(world.sent).toContain(
+            "give Ana minecraft:stone_sword[minecraft:custom_data={polaris_event:1b}] 1"
+        );
+        // The quick look marks touches between ticks.
+        await play(500);
+        expect(world.sent.some((line) => line.includes("add pe_ctf_t1"))).toBe(true);
+
+        // Ana at the blue flag: she has it on her head, and its stand is empty.
+        const blue = flag.standAt(box, 1);
+        const red = flag.standAt(box, 0);
+        world.at = {
+            Ana: [blue.x + 0.5, blue.y, blue.z + 0.5],
+            Ben: [red.x + 4.5, red.y, red.z + 3.5]
+        };
+        await play(2_100);
+        expect(flag.stateOf(state().run!.game).flags[1].carrier).toBe("Ana");
+        expect(world.sent).toContain(
+            "execute unless data entity Ana Inventory[{Slot:103b}] run item replace entity Ana armor.head with minecraft:blue_banner[minecraft:custom_data={polaris_event:1b}] 1"
+        );
+        expect(world.sent).toContain(
+            `execute in minecraft:overworld if block ${blue.x} ${blue.y} ${blue.z} minecraft:blue_banner run setblock ${blue.x} ${blue.y} ${blue.z} minecraft:air`
+        );
+        expect(world.sent).toContain("effect give Ana minecraft:glowing 3 0 true");
+        // Ben standing by his own takes nothing.
+        expect(flag.stateOf(state().run!.game).flags[0].carrier).toBeNull();
+
+        // Home with it, her own flag there: a capture, and the one set wins it.
+        world.at.Ana = [red.x + 1.5, red.y, red.z + 1.5];
+        await play(2_100);
+        const after = state();
+        expect(after.run).toBeNull();
+        expect(after.history[0]).toMatchObject({
+            outcome: "finished",
+            note: "The Red team reached its captures",
+            podium: [{ place: 1, name: "Ana", score: 1 }]
+        });
+        expect(world.sent).toContain(
+            "clear Ana minecraft:blue_banner[minecraft:custom_data={polaris_event:1b}]"
+        );
+        expect(world.sent).toContain(
+            `execute in minecraft:overworld run setblock ${blue.x} ${blue.y} ${blue.z} minecraft:blue_banner[rotation=8] keep`
+        );
+        expect(saidToAll("captured the Blue flag")).toBe(true);
+        // Everything down again, the teams and tags gone, everybody home.
+        for (const block of run.arena!.blocks)
+            expect(world.sent).toContain(
+                `execute in minecraft:overworld run fill ${box.x1} ${box.y1} ${box.z1} ${box.x2} ${box.y2} ${box.z2} minecraft:air replace ${block}`
+            );
+        expect(run.arena!.blocks).toContain("minecraft:blue_banner");
+        expect(world.sent).toContain("team remove pe_red");
+        expect(world.sent).toContain("tag @a remove pe_ctf_s0");
+        expect(world.sent).toContain("gamerule naturalRegeneration true");
+        expect(after.arenaLeftovers).toEqual([]);
+        onlyOurBlocks();
+    });
+
+    it("drops the flag when its carrier is brought low, back on its stand, the elimination credited", async () => {
+        const flag = await ctf();
+        setUp([ctfOf(3)]);
+        await joinAndStart("ctf");
+        const box = state().run!.arena!.box;
+        const blue = flag.standAt(box, 1);
+        world.dealt = { Ben: 10 };
+        world.at = {
+            Ana: [blue.x + 0.5, blue.y, blue.z + 0.5],
+            Ben: [blue.x + 2.5, blue.y, blue.z]
+        };
+        await play(2_100);
+        expect(flag.stateOf(state().run!.game).flags[1].carrier).toBe("Ana");
+        world.dealt = { Ben: 40 };
+        world.hp = { Ana: 4 };
+        await play(2_100);
+        world.hp = {};
+        const game = flag.stateOf(state().run!.game);
+        expect(game.flags[1].carrier).toBeNull();
+        expect(game.kills).toEqual({ Ben: 1 });
+        expect(state().run!.points).toEqual({});
+        expect(world.sent).toContain(
+            "clear Ana minecraft:blue_banner[minecraft:custom_data={polaris_event:1b}]"
+        );
+        expect(
+            world.sent.some((line) => line.startsWith("effect give Ana minecraft:resistance 5 4"))
+        ).toBe(true);
+        expect(saidToAll("dropped the Blue flag")).toBe(true);
+    });
+
+    it("picked up after a restart, keeps who carries which flag and still captures", async () => {
+        const flag = await ctf();
+        setUp([ctfOf(1)]);
+        await joinAndStart("ctf");
+        const box = state().run!.arena!.box;
+        const blue = flag.standAt(box, 1);
+        const red = flag.standAt(box, 0);
+        world.at = {
+            Ana: [blue.x + 0.5, blue.y, blue.z + 0.5],
+            Ben: [red.x + 4.5, red.y, red.z + 3.5]
+        };
+        await play(2_100);
+        const saved = state().run!;
+        expect(flag.stateOf(saved.game).flags[1].carrier).toBe("Ana");
+        const at = { ...world.at };
+        await restartedWith(saved, tagsNow());
+        world.at = { ...at, Ana: [blue.x + 0.5, blue.y, blue.z - 6.5] };
+        await play(2_100);
+        // Still Ana's: the stand kept empty, nobody else handed it.
+        expect(flag.stateOf(state().run!.game).flags[1].carrier).toBe("Ana");
+        expect(world.sent).toContain(
+            `execute in minecraft:overworld if block ${blue.x} ${blue.y} ${blue.z} minecraft:blue_banner run setblock ${blue.x} ${blue.y} ${blue.z} minecraft:air`
+        );
+        world.at.Ana = [red.x + 1.5, red.y, red.z + 1.5];
+        await play(2_100);
+        expect(state().history[0]).toMatchObject({ id: saved.id, outcome: "finished" });
+        expect(state().history[0]?.podium).toEqual([{ place: 1, name: "Ana", score: 1 }]);
+        expect(state().arenaLeftovers).toEqual([]);
+        onlyOurBlocks();
+    });
+
+    it("called off mid-game, takes back the flag a carrier wears with the rest of the kit", async () => {
+        const flag = await ctf();
+        setUp([ctfOf(3, 10)]);
+        await joinAndStart("ctf");
+        const run = state().run!;
+        const blue = flag.standAt(run.arena!.box, 1);
+        world.at = {
+            Ana: [blue.x + 0.5, blue.y, blue.z + 0.5],
+            Ben: [blue.x + 6.5, blue.y, blue.z]
+        };
+        await play(2_100);
+        await events.cancelEvent("owner", SERVER);
+        await play(2_100);
+        expect(state().run).toBeNull();
+        expect(state().history[0]).toMatchObject({ outcome: "cancelled", podium: [] });
+        expect(world.sent).toContain(
+            "clear Ana minecraft:blue_banner[minecraft:custom_data={polaris_event:1b}]"
+        );
+        expect(world.sent).toContain(
+            "clear Ben minecraft:shield[minecraft:custom_data={polaris_event:1b}]"
+        );
+        expect(world.sent).toContain("team remove pe_blue");
+        expect(state().arenaLeftovers).toEqual([]);
+        onlyOurBlocks();
+    });
+
+    it("is called off with nothing built when only one joins", async () => {
+        setUp([ctfOf()]);
+        await startArena("ctf");
+        await play(2_100);
+        chat(["Ana", "join"]);
+        await play(40_000);
+        expect(state().run).toBeNull();
+        expect(state().history[0]).toMatchObject({
+            outcome: "cancelled",
+            note: "Only 1 joined; it needs 2"
+        });
+        expect(fills()).toEqual([]);
+    });
+});
+
+describe("hot potato", () => {
+    const potatoOf = (fuseSeconds = 10, minutes = 5) => {
+        const preset = newPreset("hot-potato", "potato");
+        return { ...preset, minutes, options: { ...preset.options, fuseSeconds } };
+    };
+    const kind = () =>
+        import("@polaris-app/game-servers/src/lib/minecraft/events/kinds/hot-potato");
+    const holderNow = async () => (await kind()).stateOf(state().run!.game)?.holder ?? null;
+
+    it("passes the potato with a hit, puts its holder out when the fuse runs down, and ends on the last one", async () => {
+        const potato = await kind();
+        world.online = ["Ana", "Ben", "Cy"];
+        world.board = { pe_hpd: { Ana: 0, Ben: 0, Cy: 0 }, pe_hpt: { Ana: 0, Ben: 0, Cy: 0 } };
+        setUp([potatoOf(40)]);
+        await joinAndStart("potato", ["Ana", "Ben", "Cy"]);
+        const run = state().run!;
+        // Half a minute in at the most: the first fuse is still burning.
+        expect(Date.now() - run.readyAt!).toBeLessThan(30_000);
+        expect(run.readyAt).not.toBeNull();
+        expect(world.sent).toContain(
+            "scoreboard objectives add pe_hpd minecraft.custom:minecraft.damage_dealt"
+        );
+        // Who is left is on the boss bar: no side panel with nothing on it.
+        expect(
+            world.sent.some((line) => line.startsWith("scoreboard objectives add pe_score"))
+        ).toBe(false);
+        // Built only into air; nobody hurt, and nobody but the holder can hurt.
+        expect(fills().every((line) => line.endsWith(" keep"))).toBe(true);
+        await play(2_100);
+        const first = await holderNow();
+        expect(first).toBe(
+            potato.holderFor(
+                run.id,
+                1,
+                run.entrants.map((one) => one.name)
+            )
+        );
+        expect(world.sent).toContain(
+            `execute unless data entity ${first} Inventory[{Slot:103b}] run item replace entity ${first} armor.head with minecraft:tnt[minecraft:custom_data={polaris_event:1b}] 1`
+        );
+        const others = ["Ana", "Ben", "Cy"].filter((name) => name !== first);
+        expect(world.sent).toContain(`effect give ${others[0]} minecraft:weakness 3 100 true`);
+
+        // The holder strikes; the nearest of those hurt has it now.
+        const [near, far] = others as [string, string];
+        world.at[near] = [world.at[first!]![0] + 1, world.at[first!]![1], world.at[first!]![2]];
+        world.board.pe_hpd![first!] = 2;
+        world.board.pe_hpt![near] = 2;
+        world.board.pe_hpt![far] = 2;
+        await play(2_100);
+        expect(await holderNow()).toBe(near);
+        expect(world.sent).toContain(
+            `clear ${first} minecraft:tnt[minecraft:custom_data={polaris_event:1b}]`
+        );
+        expect(saidToAll(`${first} passed the potato to ${near}`)).toBe(true);
+        // Not straight back: whoever was just handed it stays too weak to
+        // strike until the next tick.
+        const handed =
+            world.sent.length -
+            1 -
+            [...world.sent].reverse().findIndex((line) => line.includes(`${near} armor.head`));
+        const after = world.sent.slice(handed);
+        expect(after).toContain(`effect give ${near} minecraft:weakness 3 100 true`);
+        expect(after).not.toContain(`effect clear ${near} minecraft:weakness`);
+        await play(2_100);
+        expect(world.sent.slice(handed)).toContain(`effect clear ${near} minecraft:weakness`);
+
+        // The fuse: the holder is out, with a bang, to the gallery.
+        await play(potato.stateOf(state().run!.game)!.fuseEndsAt! - Date.now() + 2_100);
+        const out = potato.stateOf(state().run?.game);
+        expect(out?.out.map((one) => one.name)).toEqual([near]);
+        expect(
+            world.sent.some(
+                (line) =>
+                    line.includes("particle minecraft:explosion_emitter") &&
+                    !line.includes("summon")
+            )
+        ).toBe(true);
+        expect(saidToAll(`Bang! ${near} is out`)).toBe(true);
+        const gallery = potato.galleryOf(run.arena!.box);
+        expect(world.at[near]![1]).toBe(gallery.y1 + 1);
+
+        // The next round, after a breath, and its fuse: one left, who wins.
+        await play(potato.ROUND_PAUSE_MS + 2_100);
+        expect(potato.stateOf(state().run!.game)!.round).toBe(2);
+        await play(42_000);
+        const done = state();
+        expect(done.run).toBeNull();
+        expect(done.history[0]).toMatchObject({
+            outcome: "finished",
+            note: "Only one player was left"
+        });
+        const podium = done.history[0]!.podium;
+        expect(podium.map((one) => one.score)).toEqual([3, 2, 1]);
+        expect(podium[2]!.name).toBe(near);
+        // Nothing of the potato left on anybody, the platform down.
+        for (const name of ["Ana", "Ben", "Cy"])
+            expect(world.sent).toContain(
+                `clear ${name} minecraft:tnt[minecraft:custom_data={polaris_event:1b}]`
+            );
+        expect(world.sent).toContain("scoreboard objectives remove pe_hpt");
+        expect(done.arenaLeftovers).toEqual([]);
+        onlyOurBlocks();
+    });
+
+    it("picked up after a restart, keeps the round, its holder and its fuse", async () => {
+        const potato = await kind();
+        world.online = ["Ana", "Ben", "Cy"];
+        setUp([potatoOf(20)]);
+        await joinAndStart("potato", ["Ana", "Ben", "Cy"]);
+        await play(2_100);
+        const saved = state().run!;
+        const before = potato.stateOf(saved.game)!;
+        const at = { ...world.at };
+        await restartedWith(saved, tagsNow());
+        world.at = at;
+        await play(2_100);
+        const after = potato.stateOf(state().run!.game)!;
+        expect(after.holder).toBe(before.holder);
+        expect(after.round).toBe(1);
+        expect(after.fuseEndsAt).toBe(before.fuseEndsAt);
+        // The fuse goes off when it was going to, not a fresh one later.
+        await play(before.fuseEndsAt! - Date.now() + 2_100);
+        expect(potato.stateOf(state().run!.game)!.out.map((one) => one.name)).toEqual([
+            before.holder
+        ]);
+    });
+
+    it("puts out somebody who left the server, rather than wait for them", async () => {
+        const potato = await kind();
+        world.online = ["Ana", "Ben", "Cy"];
+        setUp([potatoOf(30)]);
+        await joinAndStart("potato", ["Ana", "Ben", "Cy"]);
+        await play(2_100);
+        const holder = (await holderNow())!;
+        const gone = ["Ana", "Ben", "Cy"].find((name) => name !== holder)!;
+        world.online = world.online.filter((name) => name !== gone);
+        await play(4_100);
+        expect(potato.stateOf(state().run!.game)!.out.map((one) => one.name)).toEqual([gone]);
+        expect(await holderNow()).toBe(holder);
+    });
+
+    it("called off mid-round, takes the potato off its holder and the platform down", async () => {
+        world.online = ["Ana", "Ben"];
+        setUp([potatoOf(30)]);
+        await joinAndStart("potato");
+        await play(2_100);
+        const holder = (await holderNow())!;
+        await events.cancelEvent("owner", SERVER);
+        await play(2_100);
+        expect(state().run).toBeNull();
+        expect(state().history[0]).toMatchObject({ outcome: "cancelled", podium: [] });
+        expect(world.sent).toContain(
+            `clear ${holder} minecraft:tnt[minecraft:custom_data={polaris_event:1b}]`
+        );
+        expect(state().arenaLeftovers).toEqual([]);
+        onlyOurBlocks();
+    });
+
+    it("is called off with nothing built when only one joins", async () => {
+        setUp([potatoOf()]);
+        await startArena("potato");
+        await play(2_100);
+        chat(["Ana", "join"]);
+        await play(40_000);
+        expect(state().history[0]).toMatchObject({
+            outcome: "cancelled",
+            note: "Only 1 joined; it needs 2"
+        });
+        expect(fills()).toEqual([]);
+    });
+});
+
+describe("hide and seek", () => {
+    const hideOf = (hideSeconds = 15, minutes = 5) => {
+        const preset = newPreset("hide-and-seek", "hide");
+        return { ...preset, minutes, options: { ...preset.options, hideSeconds, seekers: 1 } };
+    };
+    const kind = () =>
+        import("@polaris-app/game-servers/src/lib/minecraft/events/kinds/hide-and-seek");
+    const names = ["Ana", "Ben", "Cy"];
+
+    it("lets the seeker out after the hiding time, finds hiders with a hit and ends when all are found", async () => {
+        const hs = await kind();
+        world.online = [...names];
+        world.board = {
+            pe_hsd: { Ana: 0, Ben: 0, Cy: 0 },
+            pe_hst: { Ana: 0, Ben: 0, Cy: 0 }
+        };
+        setUp([hideOf(60)]);
+        await joinAndStart("hide", names);
+        const run = state().run!;
+        expect(run.readyAt).not.toBeNull();
+        expect(Date.now() - run.readyAt!).toBeLessThan(30_000);
+        const [seeker] = hs.seekersFor(run.id, names, 1) as [string];
+        const hiders = names.filter((name) => name !== seeker) as [string, string];
+        // The sides set up, names hidden from the other, the seeker blind in the cage.
+        expect(world.sent).toContain("team modify pe_hs_seek nametagVisibility hideForOtherTeams");
+        expect(world.sent).toContain(
+            `execute if entity @a[name=${seeker},team=] run team join pe_hs_seek ${seeker}`
+        );
+        expect(world.sent).toContain(`effect give ${seeker} minecraft:blindness 3 0 true`);
+        expect(world.sent).toContain(`effect give ${hiders[0]} minecraft:weakness 3 100 true`);
+        expect(fills().every((line) => line.endsWith(" keep"))).toBe(true);
+        const layout = hs.layoutFor(run.id);
+        const cageDown = hs.cageDown(run.arena!.box, layout);
+        expect(world.sent).not.toContain(cageDown);
+        expect(hs.stateOf(state().run!.game)?.seekers).toEqual([seeker]);
+
+        // Let out once the hiding time is up, the cage down by its barrier alone.
+        await play(run.readyAt! + 60_000 - Date.now() + 2_100);
+        expect(world.sent).toContain(cageDown);
+        expect(hs.stateOf(state().run!.game)?.released).toBe(true);
+
+        // The seeker strikes beside a hider who was hurt: found, and seeking now.
+        const at = world.at[hiders[0]]!;
+        world.at[seeker] = [at[0] + 1, at[1], at[2]];
+        world.board.pe_hsd![seeker] = 2;
+        world.board.pe_hst![hiders[0]] = 2;
+        await play(2_100);
+        const game = hs.stateOf(state().run!.game)!;
+        expect(game.finds.map((one) => [one.hider, one.by])).toEqual([[hiders[0], seeker]]);
+        expect(world.sent).toContain(
+            `execute if entity @a[name=${hiders[0]},team=pe_hs_hide] run team join pe_hs_seek ${hiders[0]}`
+        );
+        expect(saidToAll(`${seeker} found ${hiders[0]}`)).toBe(true);
+        // The side panel keeps up: a find is worth its points at once.
+        expect(world.sent).toContain(`scoreboard players set ${seeker} pe_score ${hs.FIND_POINTS}`);
+        // A hider hurt with no seeker striking near: nobody found.
+        world.board.pe_hst![hiders[1]] = 2;
+        await play(2_100);
+        expect(hs.stateOf(state().run!.game)!.finds).toHaveLength(1);
+
+        // The one found finds the last: every hider found, and it ends.
+        const last = world.at[hiders[1]]!;
+        world.at[hiders[0]] = [last[0], last[1], last[2] + 1];
+        world.board.pe_hsd![hiders[0]] = 2;
+        world.board.pe_hst![hiders[1]] = 4;
+        await play(2_100);
+        const done = state();
+        expect(done.run).toBeNull();
+        expect(done.history[0]).toMatchObject({
+            outcome: "finished",
+            note: "Every hider was found"
+        });
+        // A point a second hidden, and the finds: the first found hid a
+        // minute and found the last; the last hid a few seconds longer; the
+        // seeker found one.
+        const score = (name: string) =>
+            done.history[0]!.podium.find((one) => one.name === name)?.score ?? 0;
+        expect(score(hiders[1])).toBeGreaterThanOrEqual(60);
+        expect(score(hiders[1])).toBeLessThan(80);
+        expect(score(hiders[0])).toBeGreaterThanOrEqual(60 + hs.FIND_POINTS);
+        expect(score(seeker)).toBe(hs.FIND_POINTS);
+        expect(world.sent).toContain("team remove pe_hs_hide");
+        expect(world.sent).toContain("scoreboard objectives remove pe_hsd");
+        expect(done.arenaLeftovers).toEqual([]);
+        onlyOurBlocks();
+    });
+
+    it("picked up after a restart, neither lets the seekers out early nor builds the cage again", async () => {
+        const hs = await kind();
+        world.online = [...names];
+        setUp([hideOf(60)]);
+        await joinAndStart("hide", names);
+        await play(2_100);
+        const saved = state().run!;
+        const at = { ...world.at };
+        await restartedWith(saved, tagsNow());
+        world.at = at;
+        await play(2_100);
+        const game = hs.stateOf(state().run!.game)!;
+        expect(game.released).toBe(false);
+        expect(game.seekers).toEqual(hs.stateOf(saved.game)!.seekers);
+        expect(fills()).toEqual([]);
+        // The hiding time already counted is kept, and added to.
+        const before = hs.stateOf(saved.game)!.hidden;
+        for (const [name, ms] of Object.entries(before))
+            expect(game.hidden[name]).toBeGreaterThan(ms);
+        const releaseAt = saved.readyAt! + 60_000;
+        await play(releaseAt - Date.now() + 2_100);
+        expect(hs.stateOf(state().run!.game)!.released).toBe(true);
+        expect(world.sent).toContain(hs.cageDown(saved.arena!.box, hs.layoutFor(saved.id)));
+    });
+
+    it("called off while the seekers wait, takes everything down and the sides away", async () => {
+        world.online = [...names];
+        setUp([hideOf(60)]);
+        await joinAndStart("hide", names);
+        await events.cancelEvent("owner", SERVER);
+        await play(2_100);
+        expect(state().run).toBeNull();
+        expect(state().history[0]).toMatchObject({ outcome: "cancelled", podium: [] });
+        expect(world.sent).toContain("team remove pe_hs_seek");
+        expect(state().arenaLeftovers).toEqual([]);
+        onlyOurBlocks();
+    });
+
+    it("is called off with nothing built when only one joins", async () => {
+        setUp([hideOf()]);
+        await startArena("hide");
+        await play(2_100);
+        chat(["Ana", "join"]);
+        await play(40_000);
+        expect(state().history[0]).toMatchObject({
+            outcome: "cancelled",
+            note: "Only 1 joined; it needs 2"
+        });
+        expect(fills()).toEqual([]);
+    });
+});
+
+describe("SkyWars", () => {
+    const warOf = (loot: "normal" | "rich" = "normal", minutes = 8) => {
+        const preset = newPreset("sky-wars", "war");
+        return { ...preset, minutes, options: { ...preset.options, loot } };
+    };
+    const kind = () => import("@polaris-app/game-servers/src/lib/minecraft/events/kinds/sky-wars");
+    const names = ["Ana", "Ben", "Cy"];
+    /** Where the ring stands for a run, as the arena worked it out. */
+    const placedOf = async (run: {
+        id: string;
+        place: { x: number; y: number; z: number } | null;
+    }) => {
+        const sw = await kind();
+        const layout = sw.layoutFor(run.id, names.length);
+        return {
+            layout,
+            at: { x: run.place!.x, y: sw.baseOver(layout, run.place!.y, 30), z: run.place!.z }
+        };
+    };
+
+    it("builds the islands, fills the chests, opens the cages at Go, and the last one left wins", async () => {
+        const sw = await kind();
+        world.online = [...names];
+        world.board = { pe_swt: { Ana: 0, Ben: 0, Cy: 0 }, pe_swb: { Ana: 0, Ben: 0, Cy: 0 } };
+        world.dealt = { Ana: 0, Ben: 0, Cy: 0 };
+        setUp([warOf()]);
+        await joinAndStart("war", names);
+        const run = state().run!;
+        expect(run.readyAt).not.toBeNull();
+        const { layout, at } = await placedOf(run);
+        expect(run.arena!.box).toEqual(sw.arenaBox(layout, at));
+        // Built only into air; every chest filled with marked loot, bridging
+        // blocks placeable against the islands; nothing handed out.
+        expect(
+            fills().filter(
+                (line) =>
+                    !line.endsWith(" keep") &&
+                    !line.endsWith(" minecraft:air replace minecraft:glass")
+            )
+        ).toEqual([]);
+        const loot = world.sent.filter((line) => / run item replace block /.test(line));
+        expect(loot.length).toBeGreaterThan(20);
+        expect(
+            loot.every((line) => line.includes("minecraft:custom_data={polaris_event:1b}"))
+        ).toBe(true);
+        expect(loot.some((line) => line.includes("minecraft:can_place_on="))).toBe(true);
+        expect(world.sent.some((line) => /^give (Ana|Ben|Cy) /.test(line))).toBe(false);
+        // The cages down at "Go!", by their glass alone.
+        for (const line of sw.cagesDown(layout, at)) expect(world.sent).toContain(line);
+        expect(world.sent).toContain("gamerule keepInventory true");
+        await play(500);
+        expect(world.sent.some((line) => line.endsWith(" add pe_sw_gone"))).toBe(true);
+
+        // Cy falls under the islands: out, up to the gallery, the kit taken.
+        const play0 = sw.playArea(layout, at);
+        world.at.Cy = [at.x + 0.5, play0.y1 - 3, at.z + 0.5];
+        await play(2_100);
+        const game = sw.stateOf(state().run!.game);
+        expect(game.out.map((one) => [one.name, one.why])).toEqual([["Cy", "fell"]]);
+        expect(world.sent).toContain("tag Cy add pe_sw_out");
+        expect(world.sent).toContain(
+            "clear Cy minecraft:iron_sword[minecraft:custom_data={polaris_event:1b}]"
+        );
+        expect(world.at.Cy![1]).toBe(sw.galleryFloor(layout, at).y1 + 1);
+        expect(saidToAll("Cy fell into the void")).toBe(true);
+
+        // Ana strikes Ben beside her, and Ben is brought low: Ana's elimination.
+        const ana = world.at.Ana!;
+        world.at.Ben = [ana[0] + 1.5, ana[1], ana[2]];
+        world.dealt.Ana = 30;
+        world.board.pe_swt!.Ben = 30;
+        world.hp = { Ben: 3 };
+        await play(2_100);
+        const done = state();
+        expect(done.run).toBeNull();
+        expect(done.history[0]).toMatchObject({
+            outcome: "finished",
+            note: "Only one player was left",
+            podium: [
+                { place: 1, name: "Ana", score: 3 },
+                { place: 2, name: "Ben", score: 2 },
+                { place: 3, name: "Cy", score: 1 }
+            ]
+        });
+        expect(saidToAll("Ben is out (Ana).")).toBe(true);
+        // Everything down: every island block and every bridging block, by kind,
+        // inside the box; arrows and pearls left lying gone; everybody home.
+        // The box is bigger than one fill takes: it comes down in slices.
+        for (const block of [
+            "minecraft:grass_block",
+            "minecraft:chest",
+            "minecraft:oak_planks",
+            "minecraft:white_wool"
+        ])
+            expect(fills().some((line) => line.endsWith(` minecraft:air replace ${block}`))).toBe(
+                true
+            );
+        expect(world.sent.some((line) => line.includes("kill @e[type=minecraft:arrow,x="))).toBe(
+            true
+        );
+        expect(world.sent).toContain("scoreboard objectives remove pe_swb");
+        expect(done.arenaLeftovers).toEqual([]);
+        onlyOurBlocks();
+    });
+
+    it("picked up after a restart, keeps who is out and does not put them out again", async () => {
+        const sw = await kind();
+        world.online = [...names];
+        setUp([warOf()]);
+        await joinAndStart("war", names);
+        const run = state().run!;
+        const { layout, at } = await placedOf(run);
+        const play0 = sw.playArea(layout, at);
+        world.at.Cy = [at.x + 0.5, play0.y1 - 3, at.z + 0.5];
+        await play(2_100);
+        const saved = state().run!;
+        expect(sw.stateOf(saved.game).out.map((one) => one.name)).toEqual(["Cy"]);
+        const where = { ...world.at };
+        await restartedWith(saved, tagsNow());
+        world.at = where;
+        await play(4_100);
+        expect(sw.stateOf(state().run!.game).out.map((one) => one.name)).toEqual(["Cy"]);
+        expect(world.sent.filter((line) => line === "tag Cy add pe_sw_out")).toEqual([]);
+        // The cages are not built again, the chests not filled twice.
+        expect(fills().some((line) => line.endsWith(" keep"))).toBe(false);
+        expect(world.sent.some((line) => / run item replace block /.test(line))).toBe(false);
+    });
+
+    it("refuses a server older than 1.17, where the loot would sit beside what players brought", async () => {
+        world.version = "1.16.5";
+        setUp([warOf()]);
+        const why = await refusal(
+            events.startEvent({
+                ownerId: "owner",
+                installedAppId: SERVER,
+                presetId: "war",
+                trigger: "manual",
+                startedBy: null
+            })
+        );
+        expect(why).toMatch(
+            /needs Minecraft 1\.17 or later, where what players carry is put away before they play/
+        );
+        expect(fills()).toEqual([]);
+    });
+
+    it("called off mid-game, takes the chests, the islands and everybody's loot back", async () => {
+        world.online = ["Ana", "Ben"];
+        setUp([warOf("rich")]);
+        await joinAndStart("war");
+        const run = state().run!;
+        await events.cancelEvent("owner", SERVER);
+        await play(2_100);
+        expect(state().run).toBeNull();
+        expect(state().history[0]).toMatchObject({ outcome: "cancelled", podium: [] });
+        expect(world.sent).toContain(
+            "clear Ana minecraft:diamond_sword[minecraft:custom_data={polaris_event:1b}]"
+        );
+        expect(run.arena!.blocks).toContain("minecraft:chest");
+        expect(
+            fills().some((line) => line.endsWith(" minecraft:air replace minecraft:chest"))
+        ).toBe(true);
+        expect(state().arenaLeftovers).toEqual([]);
+        onlyOurBlocks();
+    });
+
+    it("is called off with nothing built when only one joins", async () => {
+        setUp([warOf()]);
+        await startArena("war");
+        await play(2_100);
+        chat(["Ana", "join"]);
+        await play(40_000);
+        expect(state().history[0]).toMatchObject({
+            outcome: "cancelled",
+            note: "Only 1 joined; it needs 2"
+        });
+        expect(fills()).toEqual([]);
     });
 });
