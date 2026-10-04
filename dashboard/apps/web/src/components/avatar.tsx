@@ -15,7 +15,7 @@
  * four near-copies it replaced.
  */
 
-import { initials, tintFor } from "@polaris/core";
+import { initials, initialsInk, tintFor } from "@polaris/core";
 import { cn } from "@polaris/ui";
 import { createPortal } from "react-dom";
 import { useState, useCallback, type CSSProperties } from "react";
@@ -272,6 +272,7 @@ export function Avatar({
     const opens = photoOpens({ openable, hasPhoto: real, allowed: mayOpen, source });
     const shape = square ? "rounded-md" : "rounded-full";
     const pictured = real && !failed;
+    const fill = tintFor(tint ?? person.id ?? person.name);
     const arrived = useCallback(
         (image: HTMLImageElement): void => {
             setReal(image.naturalWidth > 1);
@@ -299,7 +300,7 @@ export function Avatar({
             // right-clicking a face wants is the person - see `messageTarget`.
             data-avatar=""
             className={cn(
-                "relative inline-flex shrink-0 select-none items-center justify-center overflow-hidden font-medium text-white ring-1 ring-border",
+                "relative inline-flex shrink-0 select-none items-center justify-center overflow-hidden font-medium ring-1 ring-border",
                 shape,
                 className
             )}
@@ -308,9 +309,9 @@ export function Avatar({
                 height: inner,
                 fontSize: Math.max(9, Math.round(inner * 0.4)),
                 backgroundColor:
-                    pictured && backdrop !== undefined
-                        ? (backdrop ?? "transparent")
-                        : tintFor(tint ?? person.id ?? person.name)
+                    pictured && backdrop !== undefined ? (backdrop ?? "transparent") : fill,
+                // The initials, white or black by what reads on this tint.
+                color: initialsInk(fill)
             }}
         >
             {/* Underneath until there is something to put over them, and then

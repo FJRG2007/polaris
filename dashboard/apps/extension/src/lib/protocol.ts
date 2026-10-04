@@ -267,17 +267,40 @@ export async function claimAuthorization(
 }
 
 /**
+ * What became of a refresh.
+ *
+ * `rejected` is the server saying this session is over, and the only answer
+ * that may end it: 401, 403, or the OAuth refusal Polaris's token endpoint
+ * gives a spent or unknown refresh token (400 `invalid_grant`). Everything else
+ * - no answer, a timeout, a 5xx, a 429, a body that will not parse - is
+ * `unreachable`: the server could not say, so the session is kept and asked
+ * about again later. Treating the two alike signed somebody out of their vault
+ * for being offline for a minute.
+ */
+export type RefreshOutcome =
+    | { readonly kind: "issued"; readonly token: VaultToken }
+    | { readonly kind: "rejected" }
+    | { readonly kind: "unreachable" };
+
+/** Whether a refusal from the token endpoint is the session ending. */
+async function sessionRefused(reply: Response): Promise<boolean> {
+    if (reply.status === 401 || reply.status === 403) return true;
+    if (reply.status !== 400) return false;
+    const body = (await reply.json().catch(() => null)) as Record<string, unknown> | null;
+    return body?.["error"] === "invalid_grant";
+}
+
+/**
  * Trade the refresh token for a new access token.
  *
- * The server rotates it - the one presented is revoked as the new one is issued -
- * so whatever comes back has to be stored in place of what was sent, and a
- * failure means this session is over rather than that it should be retried.
+ * The server rotates it - the one presented is revoked as the new one is
+ * issued - so whatever comes back has to be stored in place of what was sent.
  */
 export async function refresh(
     base: string,
     refreshToken: string,
     deviceName?: string
-): Promise<VaultToken | null> {
+): Promise<RefreshOutcome> {
     const reply = await ask(vaultUrl(base, "identity/connect/token"), {
         method: "POST",
         headers: { "content-type": "application/x-www-form-urlencoded" },
@@ -290,9 +313,12 @@ export async function refresh(
             deviceName
         }).toString()
     });
-    if (!reply || !reply.ok) return null;
+    if (!reply) return { kind: "unreachable" };
+    if (!reply.ok)
+        return (await sessionRefused(reply)) ? { kind: "rejected" } : { kind: "unreachable" };
     const body = (await reply.json().catch(() => null)) as Record<string, unknown> | null;
-    return body ? readToken(body) : null;
+    const token = body ? readToken(body) : null;
+    return token ? { kind: "issued", token } : { kind: "unreachable" };
 }
 
 /** Everything the account can see, still encrypted. */

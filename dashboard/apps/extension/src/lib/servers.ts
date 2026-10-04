@@ -56,6 +56,53 @@ export function serverNameProblem(name: string | null): "tooLong" | null {
     return name !== null && name.length > SERVER_NAME_MAX ? "tooLong" : null;
 }
 
+/** Whether a stored value is an origin this extension could have saved. */
+function isOrigin(value: unknown): value is string {
+    if (typeof value !== "string") return false;
+    try {
+        const url = new URL(value);
+        return (url.protocol === "https:" || url.protocol === "http:") && url.origin === value;
+    } catch {
+        return false;
+    }
+}
+
+/**
+ * The stored list as it is read back, whatever is actually in storage.
+ *
+ * Storage is not a schema: an older build, a hand-edited profile or a failed
+ * write can leave anything under the key. A row with no usable address is
+ * dropped, a second row for one address is dropped, and a name that is not text
+ * or would not pass `serverNameProblem` falls back to null - the host - rather
+ * than taking the server off the list with it.
+ */
+export function readServers(raw: unknown): SavedServer[] {
+    if (!Array.isArray(raw)) return [];
+    const read: SavedServer[] = [];
+    for (const row of raw) {
+        if (typeof row !== "object" || row === null) continue;
+        const { origin, name } = row as { origin?: unknown; name?: unknown };
+        if (!isOrigin(origin) || read.some((one) => one.origin === origin)) continue;
+        const typed = typeof name === "string" ? normalizeServerName(name) : null;
+        read.push({ origin, name: serverNameProblem(typed) ? null : typed });
+    }
+    return read;
+}
+
+/**
+ * The list a browser should hold, from the one it holds and the server in front.
+ *
+ * Run once when the worker starts. An install from before the list existed has
+ * one address under `server.origin` and nothing here, so its server is added -
+ * named nothing, kept first or last as it falls - and every credential stays
+ * exactly where it already was. Nobody is signed out by it and nothing is asked
+ * for again. Running it twice changes nothing the second time.
+ */
+export function settleServers(raw: unknown, active: string | null): SavedServer[] {
+    const read = readServers(raw);
+    return isOrigin(active) ? withServer(read, active) : read;
+}
+
 /** Add a server, keeping the list's order and never listing one twice. */
 export function withServer(saved: readonly SavedServer[], origin: string): SavedServer[] {
     if (saved.some((one) => one.origin === origin)) return [...saved];

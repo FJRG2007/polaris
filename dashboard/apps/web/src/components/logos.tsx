@@ -5,7 +5,7 @@
  */
 
 import { cn } from "@polaris/ui";
-import { tintFor } from "@polaris/core";
+import { initialsInk, tintFor } from "@polaris/core";
 import { Blocks } from "lucide-react";
 import { DymoMark } from "./dymo-mark";
 import * as brand from "./brand-icons";
@@ -165,13 +165,13 @@ function ProviderMonogram({
     return (
         <span
             aria-hidden="true"
-            style={{ backgroundColor: tintFor(slug) }}
+            style={{ backgroundColor: tintFor(slug), color: initialsInk(tintFor(slug)) }}
             // The size class is both the minimum and the maximum, as it is for
             // every mark beside it: a flex row short of room may not take the
             // space off the icon. text-[0.5em] keeps the letters inside the tile
             // at whatever size the caller asked for.
             className={cn(
-                "inline-flex shrink-0 items-center justify-center rounded-[0.25em] text-[0.5em] font-semibold leading-none text-white",
+                "inline-flex shrink-0 items-center justify-center rounded-[0.25em] text-[0.5em] font-semibold leading-none",
                 className
             )}
         >

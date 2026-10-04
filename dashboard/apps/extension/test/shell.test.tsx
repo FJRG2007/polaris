@@ -7,7 +7,8 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { VaultStatus } from "../src/lib/messages";
-import { Home, SectionBar, TopBar, vaultState } from "../src/entrypoints/popup/shell";
+import { initialsInk, tintFor } from "@polaris/core/faces";
+import { Face, Home, SectionBar, TopBar, vaultState } from "../src/entrypoints/popup/shell";
 
 const STATUS: VaultStatus = {
     server: "https://polaris.example",
@@ -16,6 +17,7 @@ const STATUS: VaultStatus = {
     linkedAccount: { id: "u1", name: "Ada Lovelace", email: "ada@example.com" },
     canVault: true,
     connected: true,
+    unreachable: false,
     polarisSession: true,
     unlocked: false,
     syncedAt: null,
@@ -93,19 +95,20 @@ describe("the home screen", () => {
         expect(vaultState({ ...STATUS, connected: false })).toBe("Not connected yet");
         expect(vaultState(STATUS)).toBe("Locked");
         expect(vaultState({ ...STATUS, unlocked: true })).toBe("Open");
+        // Signed in, only out of reach: never "not connected", never a sign-in.
+        expect(vaultState({ ...STATUS, unreachable: true })).toBe("Polaris can't be reached");
+        expect(vaultState({ ...STATUS, unlocked: true, unreachable: true })).toBe(
+            "Polaris can't be reached"
+        );
     });
 
-    it("lists the servers, naming the one in front", () => {
+    it("does not list the hosts as if they were an app", () => {
+        // Which Polaris this is lives in the account menu (host-menu.test.tsx).
         const markup = renderToStaticMarkup(<Home status={STATUS} onOpen={() => {}} />);
-        expect(markup).toContain("Servers");
-        expect(markup).toContain("polaris.example");
-        const named = renderToStaticMarkup(
-            <Home
-                status={{ ...STATUS, servers: [{ ...STATUS.servers[0]!, name: "Home lab" }] }}
-                onOpen={() => {}}
-            />
-        );
-        expect(named).toContain("Home lab");
+        expect(markup).not.toContain("Servers");
+        expect(markup).not.toContain("Hosts");
+        expect(markup).not.toContain("polaris.example");
+        expect(markup.match(/class="section"/g)).toHaveLength(1);
     });
 });
 
@@ -114,5 +117,25 @@ describe("a section", () => {
         expect(renderToStaticMarkup(<SectionBar title="Vault" onBack={() => {}} />)).toContain(
             "Back to the home screen"
         );
+    });
+});
+
+describe("a face with no picture", () => {
+    /** An id whose tint needs this ink, found rather than hard-coded. */
+    const needing = (ink: string): string => {
+        for (let n = 0; n < 10_000; n += 1) {
+            if (initialsInk(tintFor(`id-${n}`)) === ink) return `id-${n}`;
+        }
+        throw new Error(ink);
+    };
+
+    it("writes the initials in whichever ink reads on its tint", () => {
+        for (const ink of ["#000000", "#ffffff"]) {
+            const markup = renderToStaticMarkup(
+                <Face image={null} name="Ada Lovelace" tint={needing(ink)} size={30} />
+            );
+            expect(markup).toContain(`color:${ink}`);
+            expect(markup).toContain("AL");
+        }
     });
 });

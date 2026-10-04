@@ -41,8 +41,9 @@
         "nothingToCopy": "No hay nada que copiar.",
         "wentWrong": "Algo ha fallado.",
         "silentWorker": "Polaris no respondió. Vuelve a abrir esto.",
-        "unknownServer": "Ese servidor ya no está en la lista.",
-        "serverNameTooLong": "Un nombre puede tener hasta {max} caracteres."
+        "unknownServer": "Ese host ya no está en la lista.",
+        "serverNameTooLong": "Un nombre puede tener hasta {max} caracteres.",
+        "vaultUnreachable": "No se pudo contactar con Polaris. Sigues con la sesión iniciada; inténtalo de nuevo en un momento."
     },
     "menu": {
         "fill": "Rellenar el acceso de este sitio",
@@ -111,11 +112,15 @@
         "notConnected": "Aún sin conectar",
         "locked": "Bloqueada",
         "open": "Abierta",
+        "unreachable": "No se puede contactar con Polaris",
         "apps": "Apps",
         "vault": "Vault",
         "backLabel": "Volver al inicio",
         "back": "Atrás",
-        "servers": "Servidores"
+        "host": "Host",
+        "hosts": "Hosts",
+        "manageHosts": "Gestionar hosts",
+        "hostTitle": "{name} ({host})"
     },
     "popup": {
         "update": {
@@ -147,6 +152,7 @@
             "differentPolaris": "Usar otro Polaris"
         },
         "cancel": "Cancelar",
+        "unreachable": "Ahora mismo no se puede contactar con Polaris. Sigues con la sesión iniciada y la bóveda lo vuelve a intentar cada minuto.",
         "signIn": {
             "nothingUntil": "No se entrega nada hasta que alguien con la bóveda abierta diga que sí. Puedes cerrar esto; sigue sin ello.",
             "noVault": "Esta cuenta no tiene bóveda en {host}, así que aquí no hay accesos que rellenar.",
@@ -262,10 +268,10 @@
         "neverHere": "Aquí nunca"
     },
     "servers": {
-        "listLabel": "Servidores de Polaris",
+        "listLabel": "Hosts de Polaris",
         "inUse": "En uso",
         "accounts": "{count, plural, =0 {Sin sesión} one {# cuenta} other {# cuentas}}",
-        "count": "{count, plural, one {# servidor} other {# servidores}}",
+        "count": "{count, plural, one {# host} other {# hosts}}",
         "renameLabel": "Renombrar {name}",
         "rename": "Renombrar",
         "removeLabel": "Quitar {name}",
@@ -273,9 +279,9 @@
         "nameLabel": "Nombre para {host}",
         "save": "Guardar",
         "unchanged": "No hay cambios que guardar",
-        "add": "Añadir servidor",
+        "add": "Añadir host",
         "addButton": "Añadir",
-        "already": "Ese servidor ya está en la lista.",
+        "already": "Ese host ya está en la lista.",
         "removeTitle": "¿Quitar {name}?",
         "removeSignsOut": "{count, plural, one {Se cierra la sesión de su cuenta aquí y este navegador se desconecta de ella.} other {Se cierra la sesión de sus # cuentas aquí y este navegador se desconecta de ellas.}}",
         "removeOnlyList": "Nadie tiene sesión en él aquí, así que solo sale de esta lista."

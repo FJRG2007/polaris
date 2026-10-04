@@ -285,7 +285,7 @@ export function App(): React.JSX.Element {
                 <Home status={status} onOpen={setSection} />
             ) : section === "servers" ? (
                 <>
-                    <SectionBar title={t("shell.servers")} onBack={() => setSection("home")} />
+                    <SectionBar title={t("shell.hosts")} onBack={() => setSection("home")} />
                     <main>
                         <ServersPanel status={status} onChange={refresh} />
                     </main>
@@ -293,6 +293,11 @@ export function App(): React.JSX.Element {
             ) : (
                 <>
                     <SectionBar title={t("shell.vault")} onBack={() => setSection("home")} />
+                    {status.unreachable ? (
+                        <p className="notice" role="status">
+                            {t("popup.unreachable")}
+                        </p>
+                    ) : null}
                     {shown === "signIn" || (shown === "unlock" && onApproval) ? (
                         <SignIn
                             server={status.server}

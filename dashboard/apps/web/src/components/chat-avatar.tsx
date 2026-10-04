@@ -19,7 +19,7 @@
 import { cn } from "@polaris/ui";
 import { useState } from "react";
 import { chatAvatarUrl } from "@/lib/avatar-url";
-import { initials } from "@polaris/core";
+import { initials, initialsInk } from "@polaris/core";
 import { Avatar, type AvatarPerson } from "@/components/avatar";
 
 /** How many faces fit in the mosaic before the last cell becomes a count. */
@@ -71,12 +71,13 @@ export function ChatAvatar({
     const shape = square ? "rounded-md" : "rounded-full";
     const faces = members.slice(0, members.length > CELLS ? CELLS - 1 : CELLS);
     const spare = members.length - faces.length;
+    const fill = color || tintFor(id);
 
     return (
         <span
             title={name}
             className={cn(
-                "relative inline-flex shrink-0 select-none items-center justify-center overflow-hidden font-medium text-white ring-1 ring-border",
+                "relative inline-flex shrink-0 select-none items-center justify-center overflow-hidden font-medium ring-1 ring-border",
                 shape,
                 className
             )}
@@ -84,7 +85,9 @@ export function ChatAvatar({
                 width: size,
                 height: size,
                 fontSize: Math.max(9, Math.round(size * 0.4)),
-                backgroundColor: color || tintFor(id)
+                backgroundColor: fill,
+                // White or black by what reads on it - a space's own colour too.
+                color: initialsInk(fill)
             }}
         >
             {initials(name)}

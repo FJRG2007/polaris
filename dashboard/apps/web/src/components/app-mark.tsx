@@ -21,7 +21,7 @@
 
 import { cn } from "@polaris/ui";
 import type { SVGProps } from "react";
-import { tintFor } from "@polaris/core";
+import { initialsInk, tintFor } from "@polaris/core";
 import type { AppManifest } from "@/lib/apps/catalog";
 import { DiscordMark, SteamMark } from "@/components/brand-icons";
 
@@ -71,11 +71,16 @@ export function AppMark({
 
     return (
         <span
-            className={cn("grid shrink-0 place-items-center rounded-md text-white", className)}
+            className={cn("grid shrink-0 place-items-center rounded-md", className)}
             // Its own colour rather than the same grey tile for all of them: two
             // apps in a row have to be tellable apart before either name is read,
             // and the id is stable so an app is the same colour on every screen.
-            style={{ width: size, height: size, backgroundColor: tintFor(app.id) }}
+            style={{
+                width: size,
+                height: size,
+                backgroundColor: tintFor(app.id),
+                color: initialsInk(tintFor(app.id))
+            }}
         >
             <Icon style={{ width: size * 0.5, height: size * 0.5 }} />
         </span>

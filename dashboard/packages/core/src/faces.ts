@@ -6,6 +6,8 @@
  * these rules would be two colours for one face the first time either changed.
  */
 
+import { INK_LIGHT, READABLE_CONTRAST, contrastRatio } from "./contrast.js";
+
 /** "Good morning" and the rest, by the reader's own clock. */
 export function greetingFor(date: Date): string {
     const hour = date.getHours();
@@ -25,8 +27,10 @@ export function firstName(name: string): string {
  *
  * The hue comes from the id - stable, so the same person is the same colour on
  * every screen, and spread, so two people in a list are tellable apart before
- * their initials are read. Saturation and lightness are fixed so white text
- * stays legible on all of them, in both themes.
+ * their initials are read. Saturation and lightness are fixed, and the letters
+ * on it are drawn in `initialsInk` of it - white on most, black on the light
+ * ones - so every tint reads at 4.5:1. White alone did not: on the yellows it
+ * was 3.3:1.
  */
 export function tintFor(id: string): string {
     let hash = 0;
@@ -44,4 +48,24 @@ export function initials(name: string): string {
     return (
         parts.length === 1 ? parts[0]!.slice(0, 2) : `${parts[0]![0]}${parts[1]![0]}`
     ).toUpperCase();
+}
+
+/**
+ * The dark ink for initials: black.
+ *
+ * Not `INK_DARK`, the product's near-black for text on a coloured plate. At the
+ * lightness `tintFor` uses there are hues where white is under 4.5:1 and that
+ * near-black is too; only black clears the bar on every one of them.
+ */
+export const INITIALS_INK_DARK = "#000000";
+
+/**
+ * The colour to draw initials in on a tint: white where white reads at 4.5:1,
+ * black where it does not, and whichever reads better on a fill where neither
+ * does. A fill that cannot be read as a colour keeps white, as before.
+ */
+export function initialsInk(tint: string): string {
+    const light = contrastRatio(INK_LIGHT, tint);
+    if (light >= READABLE_CONTRAST) return INK_LIGHT;
+    return contrastRatio(INITIALS_INK_DARK, tint) > light ? INITIALS_INK_DARK : INK_LIGHT;
 }

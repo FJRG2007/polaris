@@ -29,7 +29,7 @@ import {
 } from "@/lib/servers";
 
 /** Ask the browser for one address, from the press that wants it. */
-async function grant(origin: string): Promise<boolean> {
+export async function grant(origin: string): Promise<boolean> {
     try {
         return await browser.permissions.request({ origins: [`${origin}/*`] });
     } catch {
@@ -427,7 +427,7 @@ export function ServersFold({
                 </span>
                 <div className="acts">
                     <button className="ghost" aria-expanded={open} onClick={() => setOpen(!open)}>
-                        {open ? t("generator.hide") : t("shell.servers")}
+                        {open ? t("generator.hide") : t("shell.hosts")}
                     </button>
                 </div>
             </div>
