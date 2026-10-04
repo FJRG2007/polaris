@@ -170,7 +170,10 @@ export async function bridgeAt(host: string, timeoutMs?: number): Promise<HueBri
  * same public address, by their address on the LAN. What Home Assistant's
  * `aiohue.discovery.discover_nupnp` asks when mDNS finds nothing. Public, no
  * key; Signify allows about one request in fifteen minutes from an address,
- * so its answer is kept that long.
+ * so a listing - and a `429` answer, since that is the rate limit saying so
+ * itself - is kept that long. Any other failure (unreachable, a bad answer)
+ * is kept for only a minute, so a sweep is not locked out of the service for
+ * the rest of the window by one bad response.
  */
 const NUPNP = "https://discovery.meethue.com/";
 const NUPNP_TTL_MS = 15 * 60 * 1000;

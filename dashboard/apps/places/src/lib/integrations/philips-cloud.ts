@@ -978,7 +978,9 @@ function homeIdServerError(caught: unknown): boolean {
 /**
  * The HomeID backend's list, the shortcut first and the app's own sign-in
  * after it where the shortcut fails on the backend's side and the account's
- * country is known. Which one answered comes back with the list.
+ * country is known. Which one answered comes back with the list. Where the
+ * app's sign-in fails too, what is thrown is the shortcut's own failure, not
+ * the fallback's: the shortcut is the one that was actually asked for.
  */
 async function homeIdAppliancesEither(
     accessToken: string,
