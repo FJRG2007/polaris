@@ -988,7 +988,11 @@ async function homeIdAppliancesEither(
         return { items: await listHomeIdAppliances(accessToken), viaApp: false };
     } catch (caught) {
         if (!account?.country || !homeIdServerError(caught)) throw caught;
-        return { items: await listHomeIdAppliancesAsApp(accessToken, account), viaApp: true };
+        try {
+            return { items: await listHomeIdAppliancesAsApp(accessToken, account), viaApp: true };
+        } catch {
+            throw caught;
+        }
     }
 }
 

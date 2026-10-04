@@ -342,6 +342,17 @@ describe("finding bridges", () => {
         expect(await hueBridgeDriver.discover!()).toHaveLength(1);
     });
 
+    it("does not ask the service again straight after it refused", async () => {
+        const asked: string[] = [];
+        vi.stubGlobal("fetch", async (url: string) => {
+            asked.push(String(url));
+            return new Response("[]", { status: 429 });
+        });
+        await hueBridgeDriver.discover!();
+        await hueBridgeDriver.discover!();
+        expect(asked).toHaveLength(1);
+    });
+
     it("asks the service at most once a quarter of an hour", async () => {
         const asked = nupnp(["10.0.1.20"]);
         await hueBridgeDriver.discover!();

@@ -174,7 +174,8 @@ export async function bridgeAt(host: string, timeoutMs?: number): Promise<HueBri
  */
 const NUPNP = "https://discovery.meethue.com/";
 const NUPNP_TTL_MS = 15 * 60 * 1000;
-let nupnp: { at: number; addresses: string[] } | null = null;
+const NUPNP_FAILED_TTL_MS = 60 * 1000;
+let nupnp: { at: number; ttl: number; addresses: string[] } | null = null;
 
 /** For tests: forget the discovery service's last answer. */
 export function resetHueDiscovery(): void {
@@ -182,13 +183,18 @@ export function resetHueDiscovery(): void {
 }
 
 export async function nupnpAddresses(): Promise<string[]> {
-    if (nupnp && Date.now() - nupnp.at < NUPNP_TTL_MS) return nupnp.addresses;
+    if (nupnp && Date.now() - nupnp.at < nupnp.ttl) return nupnp.addresses;
+    const remember = (addresses: string[], ttl: number): string[] => {
+        nupnp = { at: Date.now(), ttl, addresses };
+        return addresses;
+    };
     try {
         const response = await fetch(NUPNP, {
             headers: { accept: "application/json" },
             signal: AbortSignal.timeout(4_000)
         });
-        if (!response.ok) return [];
+        if (!response.ok)
+            return remember([], response.status === 429 ? NUPNP_TTL_MS : NUPNP_FAILED_TTL_MS);
         const parsed = z
             .array(
                 z
@@ -197,12 +203,13 @@ export async function nupnpAddresses(): Promise<string[]> {
             )
             .max(32)
             .safeParse(JSON.parse(await response.text()) as unknown);
-        if (!parsed.success) return [];
-        const addresses = parsed.data.map((entry) => entry.internalipaddress);
-        nupnp = { at: Date.now(), addresses };
-        return addresses;
+        if (!parsed.success) return remember([], NUPNP_FAILED_TTL_MS);
+        return remember(
+            parsed.data.map((entry) => entry.internalipaddress),
+            NUPNP_TTL_MS
+        );
     } catch {
-        return [];
+        return remember([], NUPNP_FAILED_TTL_MS);
     }
 }
 

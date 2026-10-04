@@ -1764,6 +1764,19 @@ describe("every way in before the app file", () => {
         expect(snapshot).toMatchObject({ externalId: "ext-7", name: "Hall", model: "AC1715/11" });
     });
 
+    it("reports the backend as unreachable on a sync where the app's sign-in is refused too", async () => {
+        const asApp: { appliances: unknown[]; login?: number } = { appliances: [HALL] };
+        philips({ homeIdApp: { appliances: [], shortcut: 500, asApp } });
+        broker.connect = new Error("connect ETIMEDOUT");
+        const answer = await signIn();
+        if (!answer.done) throw new Error("not signed in");
+        cloud.resetHomeIdConsumers();
+        asApp.login = 401;
+        await expect(driver.philipsCloudDriver.verify!(answer.credentials)).rejects.toMatchObject({
+            kind: "unreachable"
+        });
+    });
+
     it("says what the app's sign-in found when it finds nothing, and does not blame the backend", async () => {
         philips({ homeIdApp: { appliances: [], shortcut: 500, asApp: { appliances: [] } } });
         const answer = await signIn();
