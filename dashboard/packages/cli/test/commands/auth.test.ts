@@ -206,6 +206,18 @@ describe("after signing in", () => {
         await run(["logout"], context, clean);
         expect(stdout()).toContain("could not be reached to revoke");
     });
+
+    it("a profile whose token went missing can still be removed", async () => {
+        const keychain = fakeKeychain();
+        const { fetch, seen } = server(APPROVED);
+        const { context, stdout, dir } = await testContext({ fetch, run: keychain.run });
+        await run(["login", "--url", URL], context, clean);
+        keychain.entries.clear();
+        await run(["profile", "remove", "polaris.example.com"], context, clean);
+        expect(seen.some((request) => request.method === "DELETE")).toBe(false);
+        expect((await loadConfig(`${dir}/config`)).profiles).toEqual({});
+        expect(stdout()).toContain("no longer here to revoke");
+    });
 });
 
 describe("POLARIS_TOKEN", () => {

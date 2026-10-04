@@ -6,11 +6,25 @@
 
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { mkdtemp } from "node:fs/promises";
+import { afterAll } from "vitest";
+import { mkdtemp, rm } from "node:fs/promises";
 import type { Fetch } from "../../src/api.js";
 import type { Host } from "../../src/paths.js";
 import type { Context } from "../../src/context.js";
 import { secrets, type RunResult, type Runner } from "../../src/secrets.js";
+
+/** Every temporary folder a test made, removed when its file is done. */
+const made: string[] = [];
+afterAll(async () => {
+    await Promise.all(made.splice(0).map((dir) => rm(dir, { recursive: true, force: true })));
+});
+
+/** A temporary folder that is removed when the test file finishes. */
+export async function tempDir(prefix = "plr-test-"): Promise<string> {
+    const dir = await mkdtemp(join(tmpdir(), prefix));
+    made.push(dir);
+    return dir;
+}
 
 /** A keychain that lives in a map, driven through the same Runner interface the
  *  real tools are, so the store's own argument building is what is tested. */
@@ -59,7 +73,7 @@ export interface ContextOptions {
 }
 
 export async function testContext(options: ContextOptions = {}): Promise<Recorded> {
-    const dir = await mkdtemp(join(tmpdir(), "plr-test-"));
+    const dir = await tempDir();
     const host: Host = {
         platform: options.platform ?? "linux",
         env: { ...options.env },

@@ -54,7 +54,6 @@ export function CliApproveView() {
     useEffect(() => {
         if (asked.trim() !== "") void look(asked);
         // Only ever on the address it opened with.
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [asked]);
 
     const answer = async (approve: boolean): Promise<void> => {

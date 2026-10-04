@@ -190,27 +190,40 @@ export async function logout(context: Context, flags: Flags): Promise<void> {
             "POLARIS_TOKEN is set, and logout signs out a profile. Unset it; to stop that key working, revoke it under API keys."
         );
     }
-    const session = await requireSession(context, flags);
-    const name = session.profileName as string;
-    const outcome = await revokeRemotely(context, session.connection);
+    const config = await loadConfig(context.configDir);
+    const name = chosenProfileName(context, flags, config.current);
+    if (!name) throw new CliError("Not signed in, so there is nothing to sign out of.");
+    const profile = config.profiles[name];
+    if (!profile) {
+        throw new CliError(`There is no profile named "${name}". plr profile list shows yours.`);
+    }
+
+    // A profile whose token has gone missing (a keychain reset, a deleted
+    // file) is still removed: it is exactly the one somebody wants gone.
+    const token = await context.secrets.read(name, profile.storage);
+    const outcome = token ? await revokeRemotely(context, { url: profile.url, token }) : "missing";
     await context.secrets.forget(name);
 
-    const config = await loadConfig(context.configDir);
     const { [name]: _removed, ...rest } = config.profiles;
     const current = config.current === name ? (Object.keys(rest)[0] ?? null) : config.current;
     await saveConfig(context.configDir, { current, profiles: rest });
 
-    if (outcome === "revoked" || outcome === "gone")
-        line(context.io, `Signed out of ${session.connection.url} (profile ${name}).`);
-    else if (outcome === "kept") {
+    if (outcome === "revoked" || outcome === "gone") {
+        line(context.io, `Signed out of ${profile.url} (profile ${name}).`);
+    } else if (outcome === "kept") {
         line(
             context.io,
             `Removed profile ${name} from this computer. Its key was not a CLI sign-in, so it still works; revoke it under API keys.`
         );
+    } else if (outcome === "missing") {
+        line(
+            context.io,
+            `Removed profile ${name} from this computer. Its token was no longer here to revoke; revoke the key under API keys on ${profile.url}.`
+        );
     } else {
         line(
             context.io,
-            `Removed profile ${name} from this computer, but ${session.connection.url} could not be reached to revoke its key. It keeps working until you revoke it under API keys.`
+            `Removed profile ${name} from this computer, but ${profile.url} could not be reached to revoke its key. It keeps working until you revoke it under API keys.`
         );
     }
     if (current && current !== name) line(context.io, `Now using profile ${current}.`);
