@@ -14,10 +14,10 @@
  * Pure; the loop is `hill-service.ts`.
  */
 
-import type { Box, Point } from "../state";
-import { HILL_HEALTH, HILL_INSIDE, SCORE } from "../commands";
 import { seeded } from "../trivia-bank";
+import type { Box, Point } from "../state";
 import { IN_ARENA, type Spot } from "./arena";
+import { HILL_HEALTH, HILL_INSIDE, SCORE } from "../commands";
 
 /** The platform's block: plain, cheap, and nothing the sea has. */
 export const PLATFORM_BLOCK = "minecraft:smooth_stone";
