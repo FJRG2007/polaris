@@ -125,7 +125,9 @@ const NO_RULES_OF_ITS_OWN = { allowedCidrs: [], allowedCountries: [], allowedCon
 /**
  * Resolve the caller from whatever they presented.
  *
- * Two credentials, and the second is what makes this usable at all. An API key is
+ * Three credentials. An OAuth access token is an assistant its person connected
+ * through the consent screen. Of the other two, the second is what makes this
+ * usable for agents at all. An API key is
  * a person deliberately connecting their own client. A session's reporting token
  * is the agent Polaris started, which was handed these tools in its own
  * configuration before it ran - so "connect your agent to Polaris" is not a setup
