@@ -75,9 +75,10 @@ function monthGrid(weeks: number, height: number, busy: number): HTMLElement {
 
 describe("measureMonth", () => {
     it("counts the events a week's equal share holds above the more link", () => {
-        // 750 / 5 = 150 a week: 150 - 30 - (15 + 2) - 4 = 99, four events of 24.
-        expect(measureMonth(monthGrid(5, 750, 9))?.fit).toBe(4);
-        // A shorter window holds fewer: 90 - 30 - 17 - 4 = 39, one event.
+        // 750 / 5 = 150 a week: the link (17) is below an event's height (24), so
+        // it is given that instead: 150 - 30 - 24 - 4 = 92, three events of 24.
+        expect(measureMonth(monthGrid(5, 750, 9))?.fit).toBe(3);
+        // A shorter window holds fewer: 90 - 30 - 24 - 4 = 32, one event.
         expect(measureMonth(monthGrid(5, 450, 9))?.fit).toBe(1);
     });
 
