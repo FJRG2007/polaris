@@ -21,6 +21,7 @@ const LOOK_EVERY_MS = 15_000;
 
 const activity = new Map<string, Map<string, plan.Seen>>();
 const lookedAt = new Map<string, number>();
+const looking = new Map<string, Promise<Map<string, plan.Seen>>>();
 const combatReady = new Set<string>();
 
 /** What was last seen of a server's players, keyed by lowercased name. */
@@ -88,7 +89,11 @@ export async function lookIfDue(
     const last = lookedAt.get(installedAppId);
     const kept = activity.get(installedAppId);
     if (kept && last !== undefined && fresh(last, LOOK_EVERY_MS)) return kept;
-    return lookAt(installedAppId, server);
+    const running = looking.get(installedAppId);
+    if (running) return running;
+    const look = lookAt(installedAppId, server).finally(() => looking.delete(installedAppId));
+    looking.set(installedAppId, look);
+    return look;
 }
 
 /**
@@ -115,5 +120,6 @@ export function idleSince(
 export function forgetActivity(): void {
     activity.clear();
     lookedAt.clear();
+    looking.clear();
     combatReady.clear();
 }

@@ -130,3 +130,27 @@ describe("the Events tab while an event runs", () => {
         expect(screen.queryByText(/is starting/)).toBeNull();
     });
 });
+
+describe("the Events tab while an event is held back for want of players", () => {
+    it("turns Run on as soon as enough join, without a reload", async () => {
+        const build = catalog.newPreset("build-battle", "build");
+        const short = {
+            ...base,
+            players: { online: 2, active: 2 },
+            config: { ...config, presets: [build] }
+        };
+        vi.useFakeTimers({ now: NOW });
+        answers = [short];
+        render(<MinecraftEvents installedAppId="00000000-0000-4000-8000-000000000001" canManage />);
+        await tick(10);
+        const run = () => screen.getByLabelText("Run Build battle now") as HTMLButtonElement;
+        expect(run().disabled).toBe(true);
+        expect(run().title).toBe("Only 2 players are on the server; this event needs 3");
+
+        // A third joins: polled quickly while an event is short of players, so
+        // Run turns on the moment it does - no reload, no extra click.
+        answers = [{ ...short, players: { online: 3, active: 3 } }];
+        await tick(5_000);
+        expect(run().disabled).toBe(false);
+    });
+});

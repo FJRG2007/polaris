@@ -458,7 +458,11 @@ export async function fightTick(ctx: KindContext, seconds: number, lines: string
         }
         if (leader) {
             if (crowns)
-                lines.push(arena.equipMarked(leader, "armor.head", hill.CROWN, run.marker!));
+                lines.push(
+                    // A golden helmet wears out with every blow taken: the
+                    // crown has to last the whole round on the leader's head.
+                    arena.equipMarked(leader, "armor.head", hill.CROWN, run.marker!, arena.LASTS)
+                );
             lines.push(
                 commands.say(messages.tag(ctx.language) + hillMessages.leads(leader, ctx.language))
             );

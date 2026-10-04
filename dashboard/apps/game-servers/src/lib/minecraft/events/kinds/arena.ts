@@ -169,7 +169,13 @@ export interface KitExtras {
     readonly placeOn?: readonly string[];
     /** Blocks it can break in adventure mode. */
     readonly breaks?: readonly string[];
+    /** Never wears out: a crown, a sword and shield, a tool the event hands out
+     *  must last the event however much it is used. */
+    readonly unbreakable?: boolean;
 }
+
+/** What every piece of kit that can wear out is given: it lasts the event. */
+export const LASTS: KitExtras = { unbreakable: true };
 
 /** An item as the event hands it out: marked, so it is the only thing taken back. */
 export function marked(id: string, marker: Marker, extras: KitExtras = {}): string {
@@ -178,11 +184,13 @@ export function marked(id: string, marker: Marker, extras: KitExtras = {}): stri
         const parts = [`minecraft:custom_data={${MARK}}`];
         if (extras.placeOn) parts.push(`minecraft:can_place_on={blocks:${list(extras.placeOn)}}`);
         if (extras.breaks) parts.push(`minecraft:can_break={blocks:${list(extras.breaks)}}`);
+        if (extras.unbreakable) parts.push("minecraft:unbreakable={}");
         return `${id}[${parts.join(",")}]`;
     }
     const parts = [MARK];
     if (extras.placeOn) parts.push(`CanPlaceOn:${list(extras.placeOn)}`);
     if (extras.breaks) parts.push(`CanDestroy:${list(extras.breaks)}`);
+    if (extras.unbreakable) parts.push("Unbreakable:1b");
     return `${id}{${parts.join(",")}}`;
 }
 
@@ -198,8 +206,14 @@ export function giveMarked(
 
 /** A marked item put straight into one slot (`weapon.offhand`), from 1.17. Only
  *  where that slot was emptied first: whatever is in it is replaced. */
-export function equipMarked(name: string, slot: string, id: string, marker: Marker): string {
-    return `item replace entity ${name} ${slot} with ${marked(id, marker)} 1`;
+export function equipMarked(
+    name: string,
+    slot: string,
+    id: string,
+    marker: Marker,
+    extras: KitExtras = {}
+): string {
+    return `item replace entity ${name} ${slot} with ${marked(id, marker, extras)} 1`;
 }
 
 /**

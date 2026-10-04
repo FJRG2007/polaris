@@ -512,8 +512,8 @@ export function afterReturnLines(saved: Saved, items: Flavour["items"], note: st
  */
 export function markedShovel(name: string, items: Flavour["items"]): string {
     return items === "components"
-        ? `give ${name} minecraft:iron_shovel[minecraft:custom_data={polaris_event:1b},minecraft:can_break={blocks:"minecraft:snow_block"},minecraft:tool={rules:[{blocks:"minecraft:snow_block",speed:15.0f,correct_for_drops:false}]}] 1`
-        : `give ${name} minecraft:iron_shovel{polaris_event:1b,CanDestroy:["minecraft:snow_block"]} 1`;
+        ? `give ${name} minecraft:iron_shovel[minecraft:custom_data={polaris_event:1b},minecraft:can_break={blocks:"minecraft:snow_block"},minecraft:tool={rules:[{blocks:"minecraft:snow_block",speed:15.0f,correct_for_drops:false}]},minecraft:unbreakable={}] 1`
+        : `give ${name} minecraft:iron_shovel{polaris_event:1b,CanDestroy:["minecraft:snow_block"],Unbreakable:1b} 1`;
 }
 
 /** Only what the event handed out, by its marker: never anything of the player's. */

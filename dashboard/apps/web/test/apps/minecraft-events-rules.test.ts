@@ -24,6 +24,85 @@ const at = (time: string, day = "2026-09-28") => Date.parse(`${day}T${time}:00Z`
 /** Always the same number, so a draw is decided by the test. */
 const always = (value: number) => () => value;
 
+describe("a kind added in an update", () => {
+    const saved = (defaults: number | undefined, pool: { presetId: string; weight: number }[]) => ({
+        [catalog.EVENTS_KEY]: {
+            presets: [catalog.newPreset("fishing", "fish"), catalog.newPreset("trivia", "quiz")],
+            settings: {
+                ...(defaults === undefined ? {} : { defaults }),
+                language: "es",
+                random: { enabled: true, pool }
+            }
+        }
+    });
+
+    it("is given once to a server whose events were saved before it, named in its players' language", () => {
+        const read = catalog.readEventsConfig(saved(2, []));
+        const added = read.presets.filter((one) => one.id.startsWith("default-"));
+        expect(added.map((one) => one.kind)).toEqual([
+            "tnt-run",
+            "boat-race",
+            "dropper",
+            "capture-the-flag",
+            "hide-and-seek",
+            "hot-potato",
+            "sky-wars",
+            "village-defense",
+            "bingo",
+            "boss-fishing"
+        ]);
+        expect(added.find((one) => one.kind === "hot-potato")?.name).toBe("Patata bomba");
+        expect(read.settings.defaults).toBe(catalog.DEFAULTS_VERSION);
+        // Saved since: one deleted after that stays deleted.
+        expect(
+            catalog
+                .readEventsConfig(saved(catalog.DEFAULTS_VERSION, []))
+                .presets.map((one) => one.id)
+        ).toEqual(["fish", "quiz"]);
+    });
+
+    it("joins the draw only where the draw took every event the server had", () => {
+        const all = catalog.readEventsConfig(
+            saved(2, [
+                { presetId: "fish", weight: 2 },
+                { presetId: "quiz", weight: 2 }
+            ])
+        );
+        expect(all.settings.random.pool).toHaveLength(12);
+        expect(all.settings.random.pool.every((entry) => entry.weight === 2)).toBe(true);
+        const some = catalog.readEventsConfig(saved(2, [{ presetId: "fish", weight: 1 }]));
+        expect(some.settings.random.pool).toEqual([{ presetId: "fish", weight: 1 }]);
+    });
+
+    it("is given only while there is room, so the events still save", () => {
+        const presets = Array.from({ length: 35 }, (_, n) =>
+            catalog.newPreset("fishing", `fish-${n}`)
+        );
+        const read = catalog.readEventsConfig({
+            [catalog.EVENTS_KEY]: {
+                presets,
+                settings: {
+                    defaults: 2,
+                    random: {
+                        enabled: true,
+                        pool: presets.map((one) => ({ presetId: one.id, weight: 1 }))
+                    }
+                }
+            }
+        });
+        expect(read.presets).toHaveLength(40);
+        expect(read.presets.slice(35).map((one) => one.kind)).toEqual([
+            "tnt-run",
+            "boat-race",
+            "dropper",
+            "capture-the-flag",
+            "hide-and-seek"
+        ]);
+        expect(read.settings.random.pool).toHaveLength(40);
+        expect(catalog.eventsConfigSchema.safeParse(read).success).toBe(true);
+    });
+});
+
 describe("an event a server cannot play", () => {
     const of = (kind: catalog.EventKind) => catalog.newPreset(kind, "k");
 
@@ -179,7 +258,9 @@ describe("the stored settings", () => {
                 settings: { random: { enabled: true, pool: [{ presetId: "old", weight: 1 }] } }
             }
         });
-        expect(read.presets.map((one) => one.id)).toEqual(["fish"]);
+        expect(
+            read.presets.filter((one) => !one.id.startsWith("default-")).map((one) => one.id)
+        ).toEqual(["fish"]);
         expect(read.schedules.map((one) => one.id)).toEqual(["a"]);
         expect(read.settings.random.pool).toEqual([]);
     });
@@ -931,7 +1012,9 @@ describe("a saved event that no longer reads whole", () => {
         };
         // Still in the list and the draw, and said.
         const read = catalog.readEventsConfig(config);
-        expect(read.presets.map((one) => one.id)).toEqual(["fish"]);
+        expect(
+            read.presets.filter((one) => !one.id.startsWith("default-")).map((one) => one.id)
+        ).toEqual(["fish"]);
         expect(read.settings.random.pool.map((one) => one.presetId)).toEqual(["fish"]);
         expect(catalog.repairedPresets(config)).toEqual([
             { id: "fish", name: "Lake day", reset: ["minutes"] }

@@ -35,7 +35,10 @@ the same change.
    `joinersNeeded`, `awardsPrizes`. A kind that is neither `playsOnStage` nor
    `playsInArena` and is held at a place on the ground also needs its own case
    in `heldWhere`'s switch (see "Where an event is held"), or the Events
-   screen groups it as `anywhere` by default.
+   screen groups it as `anywhere` by default. Also add it to `KIND_SINCE` with
+   the current `DEFAULTS_VERSION` and bump that version: a kind missing from
+   `KIND_SINCE` reads as having always existed, so a server that saved its
+   events before the kind shipped never gets it (see "Options" below).
 2. **Options**: every field has a `.default()`, so an event saved before the
    field existed still parses. Renaming or reshaping a field needs a
    `z.preprocess` that reads the old shape (`legacyWorldBoss`,
@@ -46,7 +49,16 @@ the same change.
    events. A preset that stops parsing is repaired, not dropped
    (`repairPreset`). A run already under way keeps its own copy of its
    preset as it began (`asBegun` in `state.ts`): a migration that changes an
-   option's default must not also reach into a race in progress.
+   option's default must not also reach into a race in progress. A kind
+   added after a server already saved its events is a different case from a
+   changed option: `readEventsConfig` gives that server one of each kind
+   listed in `KIND_SINCE` at a later version than it last saved (`default-`
+   prefixed, named in the player's language), joins it to the random draw
+   only where the draw already held every event the server had, and never
+   gives back more than `eventsConfigSchema`'s own limits allow
+   (`EVENTS_AT_MOST` presets, `POOL_AT_MOST` in the pool) so the backfill
+   itself cannot fail to save. Saving once writes the new `DEFAULTS_VERSION`
+   down, so a backfilled kind the operator deletes afterwards stays deleted.
 3. **Pure and service code are kept apart**: `kinds/<kind>.ts` builds the
    commands and does the maths with no I/O, so it can be asserted in
    `minecraft-events-commands.test.ts`. `kinds/<kind>-service.ts` (or
@@ -614,6 +626,10 @@ A new kind follows all of them. A change to an old kind must not undo one.
   (never a bare `/reload`, which on Paper is Bukkit's reload), armed and
   disarmed only while the switch still belongs to that arena (`e97e732cd`,
   `d301dcbc7`).
+- **A look under way is shared, never started twice.** The Events screen and
+  the random draw's sweep can ask who is on at the same moment; `lookIfDue`
+  now hands both the one look already running instead of firing a second RCON
+  trip for the same server (`af7fbb20d`).
 
 ### Versions, loaders and plugins
 
@@ -755,6 +771,13 @@ A new kind follows all of them. A change to an old kind must not undo one.
   (`d7e0e175d`). The hill's poison stops at three hearts (`ec91d0ca2`). Kit
   that belongs in a hand goes into that hand: the duel shield into the
   offhand, from 1.17 (`d7e0e175d`).
+- **Kit that can wear out is given unbreakable** (`arena.LASTS`,
+  `minecraft:unbreakable` from 1.20.5, `Unbreakable:1b` before): the hill's
+  golden crown wore out under the very punches it is there to draw. The
+  duel's and capture the flag's sword and shield, build battle's tool and
+  spleef's shovel are unbreakable the same way; SkyWars' loot keeps the
+  game's own durability, since wearing it out is part of that game
+  (`af7fbb20d`).
 - **A layout drawn from the run's id is checked against its rules and drawn
   again until it passes**: platforms never touch, every jump has head room,
   slime pads only where the bounce lands. Its version (`parkour.DESIGN`) is
@@ -808,6 +831,13 @@ A new kind follows all of them. A change to an old kind must not undo one.
 - **A line about what was just done goes away after a few seconds.** A failed
   read is tried again on the next beat. Live reads have a time limit
   (`f7b2a8a6b`).
+- **Run turns on the moment enough players are on, without a reload.** The
+  screen used to show only what the random draw's sweep had last counted -
+  once a minute at best, and never while the draw was off - so Run stayed
+  disabled as "too few players" after one had already joined. It now reads
+  every 5 s while some saved event is held back for want of players (every
+  30 s otherwise, or while one is running), and again the moment the tab
+  comes back into view (`af7fbb20d`).
 - **Every refusal and waiting reason is written in the reader's language**,
   and the draw's state (next draw, why it waits, the last drawn event) is on
   screen (`04155e870`, `ec91d0ca2`).

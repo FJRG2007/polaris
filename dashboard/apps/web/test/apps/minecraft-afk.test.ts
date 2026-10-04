@@ -4,9 +4,14 @@
  * fight, which mobs at a farm bring to a player who is not there.
  */
 
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import * as plan from "@polaris-app/game-servers/src/lib/minecraft/events/plan";
-import { idleSince } from "@polaris-app/game-servers/src/lib/minecraft/activity";
+import type { ServerContainer } from "@polaris-app/game-servers/src/lib/minecraft/service";
+import {
+    forgetActivity,
+    idleSince,
+    lookIfDue
+} from "@polaris-app/game-servers/src/lib/minecraft/activity";
 
 const at = (name: string, x: number) => [{ name, x, y: 64, z: 0 }];
 const looking = (name: string, yaw: number) => new Map([[name, { yaw, pitch: 0 }]]);
@@ -48,5 +53,20 @@ describe("who is AFK, and since when", () => {
             seen = plan.observe(seen, at("Ana", 0.05), looking("Ana", 0.5), minute * 60_000);
         }
         expect(idleSince(seen, 5, 6 * 60_000)).toEqual({ Ana: 0 });
+    });
+});
+
+describe("looking at who is on", () => {
+    afterEach(() => forgetActivity());
+
+    it("shares a look still under way instead of starting another", async () => {
+        const say = vi.fn(() => new Promise<string>((resolve) => setTimeout(() => resolve(""), 5)));
+        const server = { say, sayAll: vi.fn(async () => "") } as unknown as ServerContainer;
+        const [first, second] = await Promise.all([
+            lookIfDue("srv-test", server),
+            lookIfDue("srv-test", server)
+        ]);
+        expect(first).toBe(second);
+        expect(say).toHaveBeenCalledTimes(5);
     });
 });

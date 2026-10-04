@@ -82,8 +82,14 @@ async function goLines(ctx: KindContext, syntax: { marker: stored.Marker; itemCo
                 .duelKit(options.kit)
                 .map((id) =>
                     syntax.itemCommand && id === duel.OFFHAND_ITEM
-                        ? arena.equipMarked(one.name, "weapon.offhand", id, syntax.marker)
-                        : arena.giveMarked(one.name, id, 1, syntax.marker)
+                        ? arena.equipMarked(
+                              one.name,
+                              "weapon.offhand",
+                              id,
+                              syntax.marker,
+                              arena.LASTS
+                          )
+                        : arena.giveMarked(one.name, id, 1, syntax.marker, arena.LASTS)
                 ),
             ...arena.titleTo(
                 one.name,
