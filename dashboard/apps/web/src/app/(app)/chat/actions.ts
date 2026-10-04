@@ -304,7 +304,8 @@ export async function searchGroupPeopleAction(
 export async function askFriendAction(personId: string): Promise<{ error?: string }> {
     const me = await actor();
     const parsed = z.string().uuid().safeParse(personId);
-    if (!parsed.success) return { error: (await getTranslations("chat"))("groupPicker.requestFailed") };
+    if (!parsed.success)
+        return { error: (await getTranslations("chat"))("groupPicker.requestFailed") };
     try {
         await requestFriend(me.id, parsed.data);
         revalidatePath("/account/friends");
@@ -351,7 +352,10 @@ export async function sendAction(input: unknown): Promise<{ id?: string; error?:
     const me = await actor();
     const parsed = core.chatSendSchema.safeParse(input);
     if (!parsed.success)
-        return { error: parsed.error.issues[0]?.message ?? (await getTranslations("chat"))("errors.notSent") };
+        return {
+            error:
+                parsed.error.issues[0]?.message ?? (await getTranslations("chat"))("errors.notSent")
+        };
 
     const result = await guard(() =>
         messages.send(
@@ -385,7 +389,10 @@ export async function replyFromNoticeAction(
         .extend({ messageId: core.chatMarkReadSchema.shape.messageId.optional() })
         .safeParse(input);
     if (!parsed.success)
-        return { error: parsed.error.issues[0]?.message ?? (await getTranslations("chat"))("errors.notSent") };
+        return {
+            error:
+                parsed.error.issues[0]?.message ?? (await getTranslations("chat"))("errors.notSent")
+        };
 
     const { channelId, body, messageId } = parsed.data;
     // Not a reason to hold the answer back: the next visit reads it.
@@ -400,7 +407,8 @@ export async function replyFromNoticeAction(
             );
     }
     const sent = await guard(() => messages.send(me, { channelId, body }, [], null));
-    if (sent.error || !sent.value) return { error: sent.error ?? (await getTranslations("chat"))("errors.notSent") };
+    if (sent.error || !sent.value)
+        return { error: sent.error ?? (await getTranslations("chat"))("errors.notSent") };
     return { id: sent.value };
 }
 
@@ -409,7 +417,11 @@ export async function forwardAction(input: unknown): Promise<{ id?: string; erro
     const me = await actor();
     const parsed = core.chatForwardSchema.safeParse(input);
     if (!parsed.success)
-        return { error: parsed.error.issues[0]?.message ?? (await getTranslations("chat"))("errors.notForwarded") };
+        return {
+            error:
+                parsed.error.issues[0]?.message ??
+                (await getTranslations("chat"))("errors.notForwarded")
+        };
 
     const result = await guard(() => messages.forward(me, parsed.data));
     if (!result.error) revalidatePath(CHAT_PATH);
@@ -420,7 +432,11 @@ export async function editAction(input: unknown): Promise<{ error?: string }> {
     const me = await actor();
     const parsed = core.chatEditSchema.safeParse(input);
     if (!parsed.success)
-        return { error: parsed.error.issues[0]?.message ?? (await getTranslations("chat"))("errors.notSaved") };
+        return {
+            error:
+                parsed.error.issues[0]?.message ??
+                (await getTranslations("chat"))("errors.notSaved")
+        };
     return guard(() => messages.edit(me, parsed.data));
 }
 
@@ -472,7 +488,11 @@ export async function reactAction(input: unknown): Promise<{ on?: boolean; error
     const me = await actor();
     const parsed = core.chatReactSchema.safeParse(input);
     if (!parsed.success)
-        return { error: parsed.error.issues[0]?.message ?? (await getTranslations("chat"))("errors.notAnEmoji") };
+        return {
+            error:
+                parsed.error.issues[0]?.message ??
+                (await getTranslations("chat"))("errors.notAnEmoji")
+        };
 
     const result = await guard(() => messages.react(me, parsed.data));
     return result.error ? { error: result.error } : { on: result.value };
@@ -490,7 +510,11 @@ export async function createPollAction(input: unknown): Promise<{ id?: string; e
     const me = await actor();
     const parsed = core.chatPollCreateSchema.safeParse(input);
     if (!parsed.success)
-        return { error: parsed.error.issues[0]?.message ?? (await getTranslations("chat"))("errors.pollNotSent") };
+        return {
+            error:
+                parsed.error.issues[0]?.message ??
+                (await getTranslations("chat"))("errors.pollNotSent")
+        };
 
     const { channelId, question, options, multiple, hideResults, hours } = parsed.data;
     const result = await guard(() =>
@@ -510,7 +534,11 @@ export async function votePollAction(input: unknown): Promise<{ error?: string }
     const me = await actor();
     const parsed = core.chatPollVoteSchema.safeParse(input);
     if (!parsed.success)
-        return { error: parsed.error.issues[0]?.message ?? (await getTranslations("chat"))("errors.voteNotCounted") };
+        return {
+            error:
+                parsed.error.issues[0]?.message ??
+                (await getTranslations("chat"))("errors.voteNotCounted")
+        };
     return guard(() => polls.vote(me, parsed.data));
 }
 
@@ -686,7 +714,8 @@ export async function markChannelsReadAction(input: unknown): Promise<{ error?: 
 export async function markUnreadAction(input: unknown): Promise<{ error?: string }> {
     const me = await actor();
     const parsed = core.chatMarkUnreadSchema.safeParse(input);
-    if (!parsed.success) return { error: (await getTranslations("chat"))("errors.notMarkedUnread") };
+    if (!parsed.success)
+        return { error: (await getTranslations("chat"))("errors.notMarkedUnread") };
     return guard(() => messages.markUnread(me, parsed.data));
 }
 
@@ -765,7 +794,8 @@ export async function setGroupOptionsAction(
 ): Promise<{ error?: string }> {
     const me = await actor();
     const parsed = groupOptionsSchema.safeParse(options);
-    if (!parsed.success) return { error: (await getTranslations("chat"))("errors.notAGroupSetting") };
+    if (!parsed.success)
+        return { error: (await getTranslations("chat"))("errors.notAGroupSetting") };
     const result = await guard(() => chat.setGroupOptions(me, channelId, parsed.data));
     return result.error ? { error: result.error } : {};
 }
@@ -849,7 +879,11 @@ export async function scheduleMessageAction(
     const me = await actor();
     const parsed = core.chatScheduleSchema.safeParse(input);
     if (!parsed.success) {
-        return { error: parsed.error.issues[0]?.message ?? (await getTranslations("chat"))("errors.notScheduled") };
+        return {
+            error:
+                parsed.error.issues[0]?.message ??
+                (await getTranslations("chat"))("errors.notScheduled")
+        };
     }
     const result = await guard(() => scheduleMessage(me, parsed.data));
     return result.error ? { error: result.error } : { id: result.value };
@@ -904,7 +938,11 @@ export async function createSpaceAction(input: unknown): Promise<{ id?: string; 
     }
     const parsed = core.chatSpaceCreateSchema.safeParse(input);
     if (!parsed.success)
-        return { error: parsed.error.issues[0]?.message ?? (await getTranslations("chat"))("errors.spaceNotMade") };
+        return {
+            error:
+                parsed.error.issues[0]?.message ??
+                (await getTranslations("chat"))("errors.spaceNotMade")
+        };
 
     const result = await guard(() => chat.createSpace(me, parsed.data));
     if (!result.error) revalidatePath(CHAT_PATH);
@@ -915,7 +953,11 @@ export async function updateSpaceAction(input: unknown): Promise<{ error?: strin
     const me = await actor();
     const parsed = core.chatSpaceUpdateSchema.safeParse(input);
     if (!parsed.success)
-        return { error: parsed.error.issues[0]?.message ?? (await getTranslations("chat"))("errors.notSaved") };
+        return {
+            error:
+                parsed.error.issues[0]?.message ??
+                (await getTranslations("chat"))("errors.notSaved")
+        };
 
     const result = await guard(() => chat.updateSpace(me, parsed.data));
     if (!result.error) revalidatePath(CHAT_PATH);
@@ -935,7 +977,11 @@ export async function createChannelAction(
     const me = await actor();
     const parsed = core.chatChannelCreateSchema.safeParse(input);
     if (!parsed.success)
-        return { error: parsed.error.issues[0]?.message ?? (await getTranslations("chat"))("errors.channelNotMade") };
+        return {
+            error:
+                parsed.error.issues[0]?.message ??
+                (await getTranslations("chat"))("errors.channelNotMade")
+        };
 
     const result = await guard(() => chat.createChannel(me, parsed.data));
     if (!result.error) revalidatePath(CHAT_PATH);
@@ -950,7 +996,9 @@ export async function duplicateChannelAction(
     const parsed = core.chatChannelDuplicateSchema.safeParse(input);
     if (!parsed.success) {
         const t = await getTranslations("chat");
-        return { error: parsed.error.issues[0]?.message ?? t("errors.channelMenu.duplicateFailed") };
+        return {
+            error: parsed.error.issues[0]?.message ?? t("errors.channelMenu.duplicateFailed")
+        };
     }
 
     const result = await guard(() => chat.duplicateChannel(me, parsed.data));
@@ -962,7 +1010,11 @@ export async function updateChannelAction(input: unknown): Promise<{ error?: str
     const me = await actor();
     const parsed = core.chatChannelUpdateSchema.safeParse(input);
     if (!parsed.success)
-        return { error: parsed.error.issues[0]?.message ?? (await getTranslations("chat"))("errors.notSaved") };
+        return {
+            error:
+                parsed.error.issues[0]?.message ??
+                (await getTranslations("chat"))("errors.notSaved")
+        };
 
     const result = await guard(() => chat.updateChannel(me, parsed.data));
     if (!result.error) revalidatePath(CHAT_PATH);
@@ -975,7 +1027,11 @@ export async function createCategoryAction(
     const me = await actor();
     const parsed = core.chatCategoryCreateSchema.safeParse(input);
     if (!parsed.success)
-        return { error: parsed.error.issues[0]?.message ?? (await getTranslations("chat"))("errors.categoryNotMade") };
+        return {
+            error:
+                parsed.error.issues[0]?.message ??
+                (await getTranslations("chat"))("errors.categoryNotMade")
+        };
 
     const result = await guard(() => chat.createCategory(me, parsed.data));
     if (!result.error) revalidatePath(CHAT_PATH);
@@ -986,7 +1042,11 @@ export async function renameCategoryAction(input: unknown): Promise<{ error?: st
     const me = await actor();
     const parsed = core.chatCategoryUpdateSchema.safeParse(input);
     if (!parsed.success)
-        return { error: parsed.error.issues[0]?.message ?? (await getTranslations("chat"))("errors.notSaved") };
+        return {
+            error:
+                parsed.error.issues[0]?.message ??
+                (await getTranslations("chat"))("errors.notSaved")
+        };
 
     const result = await guard(() => chat.renameCategory(me, parsed.data));
     if (!result.error) revalidatePath(CHAT_PATH);
@@ -1010,7 +1070,12 @@ export async function deleteChannelAction(channelId: string): Promise<{ error?: 
 export async function openDirectAction(input: unknown): Promise<{ id?: string; error?: string }> {
     const me = await actor();
     const parsed = core.chatDirectOpenSchema.safeParse(input);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? (await getTranslations("chat"))("errors.pickFirst") };
+    if (!parsed.success)
+        return {
+            error:
+                parsed.error.issues[0]?.message ??
+                (await getTranslations("chat"))("errors.pickFirst")
+        };
 
     const result = await guard(() =>
         chat.openDirect(me, parsed.data.userIds, parsed.data.name ?? "")
@@ -1022,7 +1087,12 @@ export async function openDirectAction(input: unknown): Promise<{ id?: string; e
 export async function addSpaceMembersAction(input: unknown): Promise<{ error?: string }> {
     const me = await actor();
     const parsed = core.chatMembersSchema.safeParse(input);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? (await getTranslations("chat"))("errors.pickFirst") };
+    if (!parsed.success)
+        return {
+            error:
+                parsed.error.issues[0]?.message ??
+                (await getTranslations("chat"))("errors.pickFirst")
+        };
 
     const result = await guard(() => chat.addSpaceMembers(me, parsed.data.id, parsed.data.userIds));
     if (!result.error) revalidatePath(CHAT_PATH);
@@ -1112,7 +1182,12 @@ export async function leaveSpaceAction(
 export async function addChannelMembersAction(input: unknown): Promise<{ error?: string }> {
     const me = await actor();
     const parsed = core.chatMembersSchema.safeParse(input);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? (await getTranslations("chat"))("errors.pickFirst") };
+    if (!parsed.success)
+        return {
+            error:
+                parsed.error.issues[0]?.message ??
+                (await getTranslations("chat"))("errors.pickFirst")
+        };
 
     const result = await guard(() =>
         chat.addChannelMembers(me, parsed.data.id, parsed.data.userIds)
@@ -1126,7 +1201,11 @@ export async function renameGroupAction(input: unknown): Promise<{ error?: strin
     const me = await actor();
     const parsed = core.chatGroupNameSchema.safeParse(input);
     if (!parsed.success)
-        return { error: parsed.error.issues[0]?.message ?? (await getTranslations("chat"))("errors.notSaved") };
+        return {
+            error:
+                parsed.error.issues[0]?.message ??
+                (await getTranslations("chat"))("errors.notSaved")
+        };
 
     const result = await guard(() => chat.renameGroup(me, parsed.data.channelId, parsed.data.name));
     if (!result.error) revalidatePath(CHAT_PATH);
@@ -1223,14 +1302,16 @@ export async function setPinnedAction(
 export async function reorderChannelsAction(input: unknown): Promise<{ error?: string }> {
     const me = await actor();
     const parsed = core.chatChannelReorderSchema.safeParse(input);
-    if (!parsed.success) return { error: (await getTranslations("chat"))("errors.channelsNotReordered") };
+    if (!parsed.success)
+        return { error: (await getTranslations("chat"))("errors.channelsNotReordered") };
     return guard(() => chat.reorderChannels(me, parsed.data));
 }
 
 export async function reorderCategoriesAction(input: unknown): Promise<{ error?: string }> {
     const me = await actor();
     const parsed = core.chatCategoryReorderSchema.safeParse(input);
-    if (!parsed.success) return { error: (await getTranslations("chat"))("errors.categoriesNotReordered") };
+    if (!parsed.success)
+        return { error: (await getTranslations("chat"))("errors.categoriesNotReordered") };
     return guard(() => chat.reorderCategories(me, parsed.data));
 }
 
@@ -1244,7 +1325,11 @@ export async function createInviteAction(
     const me = await actor();
     const parsed = core.chatInviteCreateSchema.safeParse(input);
     if (!parsed.success) {
-        return { error: parsed.error.issues[0]?.message ?? (await getTranslations("chat"))("errors.inviteNotMade") };
+        return {
+            error:
+                parsed.error.issues[0]?.message ??
+                (await getTranslations("chat"))("errors.inviteNotMade")
+        };
     }
     const result = await guard(() => invites.createInvite(me, parsed.data));
     return result.error ? { error: result.error } : { invite: result.value };
@@ -1302,7 +1387,8 @@ export async function inviteToDirectAction(input: {
     const me = await actor();
     const code = core.inviteCodeSchema.safeParse(input?.code);
     const userId = z.string().uuid().safeParse(input?.userId);
-    if (!code.success || !userId.success) return { error: (await getTranslations("chat"))("errors.inviteNotSent") };
+    if (!code.success || !userId.success)
+        return { error: (await getTranslations("chat"))("errors.inviteNotSent") };
 
     const result = await guard(async () => {
         const offer = await invites.readInvite(me, code.data);
@@ -1377,7 +1463,8 @@ export async function sendSavedMediaAction(
     const result = await guard(() =>
         saved.sendSavedMedia(me, String(channelId), String(savedId), quoted)
     );
-    if (result.error || !result.value) return { error: result.error ?? (await getTranslations("chat"))("errors.notSent") };
+    if (result.error || !result.value)
+        return { error: result.error ?? (await getTranslations("chat"))("errors.notSent") };
     if ("messageId" in result.value) return { id: result.value.messageId };
     return sendMediaAction(channelId, result.value.remote, null, quoted);
 }

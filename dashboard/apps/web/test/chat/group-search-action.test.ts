@@ -64,9 +64,8 @@ vi.mock("@/lib/chat/meetings", async () => {
     };
 });
 vi.mock("@/lib/friends-service", async () => {
-    const actual = await vi.importActual<typeof import("@/lib/friends-service")>(
-        "@/lib/friends-service"
-    );
+    const actual =
+        await vi.importActual<typeof import("@/lib/friends-service")>("@/lib/friends-service");
     return {
         ...actual,
         requestFriend: async () => {
@@ -109,7 +108,10 @@ describe("the group picker's search", () => {
             { id: "grace", name: "Grace" },
             { id: "turing", name: "Turing" }
         ]);
-        expect(result.results?.[4]).toMatchObject({ id: "linus", unavailable: "Not your friend yet" });
+        expect(result.results?.[4]).toMatchObject({
+            id: "linus",
+            unavailable: "Not your friend yet"
+        });
     });
 
     it("ignores a meeting id that is not one", async () => {

@@ -595,7 +595,8 @@ export async function timeOutMember(
             where: { id: where.spaceId },
             select: { ownerId: true }
         });
-        if (space?.ownerId === userId) throw new ChatRuleError({ key: "errors.spaceOwnerProtected" });
+        if (space?.ownerId === userId)
+            throw new ChatRuleError({ key: "errors.spaceOwnerProtected" });
         await prisma.chatSpaceMember.updateMany({
             where: { spaceId: where.spaceId, userId },
             data: { timeoutUntil: until }
@@ -1056,11 +1057,20 @@ export async function duplicateChannel(
         });
         if (grants.length > 0) {
             await tx.accessGrant.createMany({
-                data: grants.map(({ id: _id, createdAt: _at, updatedAt: _up, uses: _uses, lastUsedAt: _last, ...grant }) => ({
-                    ...grant,
-                    subjectId: channel.id,
-                    grantedById: actor.id
-                }))
+                data: grants.map(
+                    ({
+                        id: _id,
+                        createdAt: _at,
+                        updatedAt: _up,
+                        uses: _uses,
+                        lastUsedAt: _last,
+                        ...grant
+                    }) => ({
+                        ...grant,
+                        subjectId: channel.id,
+                        grantedById: actor.id
+                    })
+                )
             });
         }
         return channel.id;
@@ -1382,7 +1392,10 @@ export async function addChannelMembers(
             where: { channelId, userId: { in: wanted } }
         });
         if (already + wanted.length - newcomers > core.MAX_GROUP_MEMBERS) {
-            throw new ChatAccessError({ key: "errors.groupFull", params: { count: core.MAX_GROUP_MEMBERS } });
+            throw new ChatAccessError({
+                key: "errors.groupFull",
+                params: { count: core.MAX_GROUP_MEMBERS }
+            });
         }
     }
     // Somebody without the chat has no screen this channel could appear on, so

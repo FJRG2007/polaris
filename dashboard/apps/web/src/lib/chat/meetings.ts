@@ -35,7 +35,13 @@ import { getIntegrationSecret, getIntegrationState } from "@/lib/integration-ser
 import { chatAlertShelf } from "./isolation";
 import { chatWordsFor } from "./text";
 import type { NamespaceTranslator } from "@/lib/i18n/types";
-import { ChatAccessError, channelAccess, requireChannel, type ChatActor, type ChatErrorText } from "./access";
+import {
+    ChatAccessError,
+    channelAccess,
+    requireChannel,
+    type ChatActor,
+    type ChatErrorText
+} from "./access";
 
 /** How many browsers one call holds.
  *
@@ -275,7 +281,8 @@ export async function inviteToCall(
         where: { id: meetingId },
         select: { channelId: true, endedAt: true }
     });
-    if (!meeting?.channelId || meeting.endedAt) throw new ChatAccessError({ key: "errors.callEnded" });
+    if (!meeting?.channelId || meeting.endedAt)
+        throw new ChatAccessError({ key: "errors.callEnded" });
     const from = meeting.channelId;
     await requireChannel(actor, from);
 
@@ -1501,7 +1508,9 @@ async function noteCallOutcome(meetingId: string): Promise<void> {
                 return notify({
                     userId,
                     event: "chat.callMissed",
-                    title: words("notices.missedCall", { name: caller?.name || words("notices.somebody") }),
+                    title: words("notices.missedCall", {
+                        name: caller?.name || words("notices.somebody")
+                    }),
                     body: missedCallBody(meeting.channel, words),
                     href: `/chat/c/${channelId}`,
                     shelf
@@ -1570,7 +1579,8 @@ export async function createMeeting(
     if (!title) throw new ChatAccessError({ key: "errors.meetingNameRequired" });
     if (input.scheduledAt) {
         const ahead = input.scheduledAt.getTime() - Date.now();
-        if (ahead > MAX_SCHEDULE_AHEAD_MS) throw new ChatAccessError({ key: "errors.scheduleTooFar" });
+        if (ahead > MAX_SCHEDULE_AHEAD_MS)
+            throw new ChatAccessError({ key: "errors.scheduleTooFar" });
     }
 
     const guestToken = randomBytes(24).toString("base64url");
@@ -1852,7 +1862,8 @@ export async function setMeetingOptions(
 ): Promise<void> {
     await requireHost(actor, meetingId);
     const title = options.title?.trim().slice(0, MAX_MEETING_TITLE);
-    if (options.title !== undefined && !title) throw new ChatAccessError({ key: "errors.meetingNameRequired" });
+    if (options.title !== undefined && !title)
+        throw new ChatAccessError({ key: "errors.meetingNameRequired" });
 
     await prisma.meeting.update({
         where: { id: meetingId },

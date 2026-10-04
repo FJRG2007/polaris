@@ -64,7 +64,9 @@ vi.mock("@polaris/db", () => ({
                 where?.userId?.in
                     ? members.filter((id) => where.userId!.in.includes(id)).length
                     : members.length,
-            createMany: async ({ data }: { data: { userId: string }[] }) => ({ count: data.length }),
+            createMany: async ({ data }: { data: { userId: string }[] }) => ({
+                count: data.length
+            }),
             deleteMany: async () => ({ count: 1 })
         },
         chatMessage: {

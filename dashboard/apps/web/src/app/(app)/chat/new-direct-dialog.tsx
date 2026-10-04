@@ -153,7 +153,9 @@ export function NewDirectDialog({
                                 ) : (
                                     <Users className="size-3.5" />
                                 )}
-                                {option === "direct" ? t("newDirect.directMessage") : t("newDirect.group")}
+                                {option === "direct"
+                                    ? t("newDirect.directMessage")
+                                    : t("newDirect.group")}
                             </button>
                         ))}
                     </div>
@@ -190,9 +192,15 @@ export function NewDirectDialog({
                             onClick={() => file.current?.click()}
                             className="relative size-12 shrink-0 overflow-hidden rounded-full border border-border bg-muted text-muted-foreground transition-colors hover:border-primary"
                             aria-label={
-                                picture ? t("newDirect.changeTheGroupPicture") : t("newDirect.addAGroupPicture")
+                                picture
+                                    ? t("newDirect.changeTheGroupPicture")
+                                    : t("newDirect.addAGroupPicture")
                             }
-                            title={picture ? t("newDirect.changeTheGroupPicture") : t("newDirect.addAGroupPicture")}
+                            title={
+                                picture
+                                    ? t("newDirect.changeTheGroupPicture")
+                                    : t("newDirect.addAGroupPicture")
+                            }
                         >
                             {preview ? (
                                 <img src={preview} alt="" className="size-full object-cover" />
