@@ -4771,6 +4771,34 @@ describe("a horde defense", () => {
                 `execute in minecraft:overworld run forceload add ${chunk.x * 16} ${chunk.z * 16}`
         );
 
+    it("counts only the kills of the monsters it summoned, by its data pack, where the pack goes on", async () => {
+        setUp([newPreset("waves", "waves")]);
+        await start();
+        await play(10_100);
+        expect(state().run?.killsByPack).toBe(true);
+        expect(world.sent).toContain('datapack enable "file/polaris-events"');
+        expect(world.sent).toContain("scoreboard objectives add pe_wkp dummy");
+        expect(world.sent.some((line) => line.includes("minecraft.killed:"))).toBe(false);
+        expect(
+            world.files.get(
+                "/data/world/datapacks/polaris-events/data/polaris/advancement/hit/kill.json"
+            )
+        ).toContain('"nbt":"{Tags:[\\"pe_mob\\"]}"');
+    });
+
+    it("counts kills by the game's statistics where the pack cannot go on", async () => {
+        world.properties = "pvp=true\ndifficulty=normal\nlevel-name=../elsewhere\n";
+        setUp([newPreset("waves", "waves")]);
+        await start();
+        await play(10_100);
+        expect(state().run?.killsByPack).toBe(false);
+        expect(
+            world.sent.some((line) =>
+                /^scoreboard objectives add pe_wk0 minecraft\.killed:minecraft\./.test(line)
+            )
+        ).toBe(true);
+    });
+
     it("waits for defenders, sends every wave, and rewards everybody who held the point", async () => {
         setUp([newPreset("waves", "waves")]);
         await start();

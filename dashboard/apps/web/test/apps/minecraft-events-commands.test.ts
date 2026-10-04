@@ -1672,6 +1672,24 @@ describe("a horde defense", () => {
         expect(closed).toContain("scoreboard players set @a pe_wk0 0");
     });
 
+    it("by the events data pack, counts only the monsters it summoned", () => {
+        // The night's own zombie killed near the point raises the game's
+        // `killed` statistic all the same; the pack's count only for `pe_mob`.
+        const setup = waves.wavesSetup("classic", true);
+        expect(setup).toContain("scoreboard objectives add pe_wkp dummy");
+        expect(setup.some((line) => line.includes("minecraft.killed:"))).toBe(false);
+        const open = waves.wavesTick(point, "classic", true, false, true);
+        expect(open).toContain(
+            "execute in minecraft:overworld positioned 300.5 70 0.5 as @a[distance=..40] run scoreboard players operation @s pe_wkill += @s pe_wkp"
+        );
+        expect(open.some((line) => line.includes("pe_wk0"))).toBe(false);
+        expect(open).toContain("scoreboard players set @a pe_wkp 0");
+        // Whichever way it counted, everything it made comes back out.
+        const cleanup = waves.wavesCleanup("classic");
+        expect(cleanup).toContain("scoreboard objectives remove pe_wkp");
+        expect(cleanup).toContain("scoreboard objectives remove pe_wk0");
+    });
+
     it("reads how many are left", () => {
         expect(waves.readAlive("Test passed, count: 7")).toBe(7);
         expect(waves.readAlive("Test failed")).toBe(0);

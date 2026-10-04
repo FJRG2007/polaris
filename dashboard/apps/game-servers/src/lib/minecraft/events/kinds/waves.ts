@@ -16,6 +16,7 @@
  *   the same record of game rules a blood moon uses.
  */
 
+import * as hits from "./hits";
 import type { EventOptions } from "../catalog";
 import {
     DROPS_NOTHING,
@@ -103,8 +104,17 @@ const WEARERS = [...ZOMBIES, ...ARCHERS];
 const MOB_DATA = `PersistenceRequired:1b,CanPickUpLoot:0b,CanBreakDoors:0b,${DROPS_NOTHING}`;
 const SUMMON_DATA = `{Tags:["${MOB_TAG}","${NEW_TAG}"],${MOB_DATA}}`;
 
-/** One kill counter per kind of monster in the mix. */
-function killObjectives(mix: WaveKinds): { objective: string; criterion: string }[] {
+/**
+ * The raw kill counters: with the events data pack on (`byPack`), the one its
+ * advancement adds to for a monster the event summoned (`hits.WAVE_KILLS`);
+ * otherwise one per kind of monster in the mix, the game's own `killed`
+ * statistics - which count the night's own zombies just the same.
+ */
+function killObjectives(
+    mix: WaveKinds,
+    byPack = false
+): { objective: string; criterion: string }[] {
+    if (byPack) return [{ objective: hits.WAVE_KILLS, criterion: "dummy" }];
     return kindsOf(mix).map((id, index) => ({
         objective: `pe_wk${index}`,
         criterion: `minecraft.killed:minecraft.${id}`
@@ -293,9 +303,9 @@ function jockeySpot(point: Point, index: number): string {
 }
 
 /** The objectives the kills and hits are counted with. */
-export function wavesSetup(mix: WaveKinds): string[] {
+export function wavesSetup(mix: WaveKinds, byPack = false): string[] {
     const lines: string[] = [];
-    for (const one of killObjectives(mix)) {
+    for (const one of killObjectives(mix, byPack)) {
         lines.push(
             `scoreboard objectives remove ${one.objective}`,
             `scoreboard objectives add ${one.objective} ${one.criterion}`
@@ -430,14 +440,20 @@ export function wavesMarks(point: Point): string[] {
  * every tick either way. The game counts the damage in tenths of a health
  * point, and only what is dealt by hand.
  */
-export function wavesTick(point: Point, mix: WaveKinds, open: boolean, byDamage = false): string[] {
+export function wavesTick(
+    point: Point,
+    mix: WaveKinds,
+    open: boolean,
+    byDamage = false,
+    byPack = false
+): string[] {
     const near = `execute in minecraft:overworld positioned ${point.x + 0.5} ${point.y} ${point.z + 0.5} as @a[distance=..${REACH}] run scoreboard players operation @s`;
-    const raw = [...killObjectives(mix).map((one) => one.objective), RAW_HITS];
+    const raw = [...killObjectives(mix, byPack).map((one) => one.objective), RAW_HITS];
     const lines: string[] = [];
     for (const objective of [...raw, KILLS, HITS])
         lines.push(`scoreboard players add @a ${objective} 0`);
     if (open) {
-        for (const one of killObjectives(mix))
+        for (const one of killObjectives(mix, byPack))
             lines.push(`${near} ${KILLS} += @s ${one.objective}`);
         lines.push(`${near} ${HITS} += @s ${RAW_HITS}`);
     }
@@ -469,7 +485,7 @@ export const KEEP_INVENTORY = ["keepInventory", "keep_inventory"] as const;
  */
 export function wavesCleanup(mix: WaveKinds): string[] {
     const lines = [`kill @e[tag=${MOB_TAG}]`];
-    for (const one of killObjectives(mix))
+    for (const one of [...killObjectives(mix), ...killObjectives(mix, true)])
         lines.push(`scoreboard objectives remove ${one.objective}`);
     lines.push(
         `scoreboard objectives remove ${KILLS}`,

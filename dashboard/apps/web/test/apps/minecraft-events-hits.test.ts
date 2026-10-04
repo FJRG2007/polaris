@@ -47,6 +47,21 @@ describe("the events data pack's hits", () => {
         }
     });
 
+    it("counts a kill only of a monster the event summoned, and takes the advancement back", () => {
+        for (const folder of ["advancements", "advancement"]) {
+            const kill = JSON.parse(files.get(`data/polaris/${folder}/hit/kill.json`)!);
+            expect(kill.criteria.hit).toEqual({
+                trigger: "minecraft:player_killed_entity",
+                conditions: { entity: { nbt: '{Tags:["pe_mob"]}' } }
+            });
+            expect(kill.rewards).toEqual({ function: "polaris:hit/kill" });
+        }
+        expect(hits.FUNCTIONS.kill).toEqual([
+            "scoreboard players add @s pe_wkp 1",
+            "advancement revoke @s only polaris:hit/kill"
+        ]);
+    });
+
     it("tags only a player an arena took in, and takes the advancement back so the next hit fires it", () => {
         expect(hits.FUNCTIONS.hurt).toEqual([
             `tag @s[tag=${arena.IN_ARENA}] add pe_hit_hurt`,

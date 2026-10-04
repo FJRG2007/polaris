@@ -1465,11 +1465,23 @@ async function begin(
             before[rule] = value;
             break;
         }
-        loop.run = { ...loop.run, gamerules: { ...before, ...loop.run.gamerules } };
+        // The kills are counted by the events data pack, only of the
+        // monsters the event summons, wherever it can be put on: the game's
+        // own statistics count every zombie killed near the point, the
+        // night's own included.
+        const killsByPack = await snowballPackService.ensurePack(server).catch((error) => {
+            console.warn("polaris: the event pack could not be put on", String(error));
+            return false;
+        });
+        loop.run = {
+            ...loop.run,
+            killsByPack,
+            gamerules: { ...before, ...loop.run.gamerules }
+        };
         await persist(installedAppId, loop);
         lines.push(
             ...Object.keys(before).map((rule) => commands.setRule(rule, "true")),
-            ...waves.wavesSetup(waveKindsOf(preset))
+            ...waves.wavesSetup(waveKindsOf(preset), killsByPack)
         );
     }
     if (preset.kind === "meteor-shower") {
@@ -3464,7 +3476,7 @@ async function hordeDefense(
     lines.push(
         ...waves.wavesMarks(place),
         waves.leash(place),
-        ...waves.wavesTick(place, kinds, open, wavesByDamage(preset))
+        ...waves.wavesTick(place, kinds, open, wavesByDamage(preset), loop.run.killsByPack)
     );
     // Every few ticks the wave is turned on the villager again: whatever a
     // defender drew off and then left alone goes back for it.
@@ -4643,7 +4655,8 @@ async function results(
                 run.place,
                 waveKindsOf(preset),
                 run.roundEndsAt !== null,
-                wavesByDamage(preset)
+                wavesByDamage(preset),
+                run.killsByPack
             )
         );
     }

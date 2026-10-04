@@ -17,6 +17,10 @@
  * takes what was tagged since the last look in one batch (`TAKE`), so a hit
  * that lands while it reads is kept for the next.
  *
+ * A third, `player_killed_entity` on a monster a horde summoned (`pe_mob`),
+ * counts a horde defense's kills (`WAVE_KILLS`): the game's `killed`
+ * statistics count every zombie a player kills, the night's own included.
+ *
  * Who hit a player is the game's own memory of it: `execute on attacker`
  * (1.19.4) is the last living thing that hurt them in the last five seconds.
  * Before it, the nearest of those who struck is all there is.
@@ -39,8 +43,14 @@ export const ON_ATTACKER = [1, 19, 4] as const;
 
 const ADVANCEMENT = {
     hurt: "polaris:hit/hurt",
-    struck: "polaris:hit/struck"
+    struck: "polaris:hit/struck",
+    kill: "polaris:hit/kill"
 } as const;
+
+/** A horde's monster (`waves.MOB_TAG`), and the count of them a player killed:
+ *  only what the event summoned, never one of the night's own. */
+const WAVE_MOB_TAG = "pe_mob";
+export const WAVE_KILLS = "pe_wkp";
 
 /** The reward functions, by name under `polaris:hit/`. Vanilla commands every
  *  release from 1.13 reads. */
@@ -52,6 +62,10 @@ export const FUNCTIONS: Readonly<Record<string, readonly string[]>> = {
     struck: [
         `tag @s[tag=${IN_ARENA}] add ${STRUCK_TAG}`,
         `advancement revoke @s only ${ADVANCEMENT.struck}`
+    ],
+    kill: [
+        `scoreboard players add @s ${WAVE_KILLS} 1`,
+        `advancement revoke @s only ${ADVANCEMENT.kill}`
     ]
 };
 
@@ -83,6 +97,15 @@ export const ADVANCEMENTS: Readonly<Record<string, unknown>> = {
             }
         },
         rewards: { function: ADVANCEMENT.struck }
+    },
+    kill: {
+        criteria: {
+            hit: {
+                trigger: "minecraft:player_killed_entity",
+                conditions: { entity: { nbt: `{Tags:["${WAVE_MOB_TAG}"]}` } }
+            }
+        },
+        rewards: { function: ADVANCEMENT.kill }
     }
 };
 
