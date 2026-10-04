@@ -148,7 +148,7 @@ describe("plr env set", () => {
     });
 
     it("refuses an empty or abandoned value, and one a container cannot hold, naming only the variable", async () => {
-        for (const secret of [null, "", "\n", `${VALUE}\twith-a-tab`]) {
+        for (const secret of [null, "", "\n", `${VALUE}\twith-a-tab`, `${VALUE}\nline-2\n`]) {
             const { fetch, seen } = envServer();
             const { context } = await testContext({ fetch, env, secret });
             const failure = (await run(
@@ -226,6 +226,12 @@ describe("the hidden prompt", () => {
             done: false,
             interrupted: false
         });
+    });
+
+    it("keeps a pasted value of several lines whole instead of its first line", () => {
+        const pasted = "-----BEGIN KEY-----\nabc\n-----END KEY-----\n";
+        expect(typeKeys("", pasted)).toEqual({ typed: pasted, done: true, interrupted: false });
+        expect(typeKeys("abc", "\r\n")).toEqual({ typed: "abc", done: true, interrupted: false });
     });
 
     it("drops one final line break and keeps the rest", () => {

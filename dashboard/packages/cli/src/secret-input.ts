@@ -31,10 +31,14 @@ export function typeKeys(
     let current = typed;
     // Arrow keys, Home, a bracketed paste's markers: escape sequences, none of
     // them text. Dropped whole, so "[A" never ends up inside a value.
-    for (const key of chunk.replace(ESCAPE_SEQUENCE, "")) {
+    const keys = Array.from(chunk.replace(ESCAPE_SEQUENCE, ""));
+    for (const [index, key] of keys.entries()) {
         if (key === INTERRUPT) return { typed: "", done: true, interrupted: true };
-        if (ENTER.has(key) || key === END)
-            return { typed: current, done: true, interrupted: false };
+        if (ENTER.has(key) || key === END) {
+            const rest = keys.slice(index).join("");
+            const typed = rest.trim() === "" ? current : current + rest;
+            return { typed, done: true, interrupted: false };
+        }
         if (ERASE.has(key)) {
             current = Array.from(current).slice(0, -1).join("");
             continue;
