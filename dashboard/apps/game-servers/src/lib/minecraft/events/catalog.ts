@@ -1806,6 +1806,12 @@ export function playsInArena(preset: EventPreset): boolean {
     );
 }
 
+/** Played with loot found in the arena, which must never sit beside what a
+ *  player brought: only from 1.17, where their own things are put away first. */
+export function stashesFirst(preset: EventPreset): boolean {
+    return preset.kind === "sky-wars";
+}
+
 /** Played in an arena until one player is left: ranked by the order they went
  *  out in, so anybody who took part at all is ranked. */
 export function lastStanding(preset: EventPreset): boolean {

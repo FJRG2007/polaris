@@ -9522,3 +9522,183 @@ describe("hide and seek", () => {
         expect(fills()).toEqual([]);
     });
 });
+
+describe("SkyWars", () => {
+    const warOf = (loot: "normal" | "rich" = "normal", minutes = 8) => {
+        const preset = newPreset("sky-wars", "war");
+        return { ...preset, minutes, options: { ...preset.options, loot } };
+    };
+    const kind = () => import("@polaris-app/game-servers/src/lib/minecraft/events/kinds/sky-wars");
+    const names = ["Ana", "Ben", "Cy"];
+    /** Where the ring stands for a run, as the arena worked it out. */
+    const placedOf = async (run: {
+        id: string;
+        place: { x: number; y: number; z: number } | null;
+    }) => {
+        const sw = await kind();
+        const layout = sw.layoutFor(run.id, names.length);
+        return {
+            layout,
+            at: { x: run.place!.x, y: sw.baseOver(layout, run.place!.y, 30), z: run.place!.z }
+        };
+    };
+
+    it("builds the islands, fills the chests, opens the cages at Go, and the last one left wins", async () => {
+        const sw = await kind();
+        world.online = [...names];
+        world.board = { pe_swt: { Ana: 0, Ben: 0, Cy: 0 }, pe_swb: { Ana: 0, Ben: 0, Cy: 0 } };
+        world.dealt = { Ana: 0, Ben: 0, Cy: 0 };
+        setUp([warOf()]);
+        await joinAndStart("war", names);
+        const run = state().run!;
+        expect(run.readyAt).not.toBeNull();
+        const { layout, at } = await placedOf(run);
+        expect(run.arena!.box).toEqual(sw.arenaBox(layout, at));
+        // Built only into air; every chest filled with marked loot, bridging
+        // blocks placeable against the islands; nothing handed out.
+        expect(
+            fills().filter(
+                (line) =>
+                    !line.endsWith(" keep") &&
+                    !line.endsWith(" minecraft:air replace minecraft:glass")
+            )
+        ).toEqual([]);
+        const loot = world.sent.filter((line) => / run item replace block /.test(line));
+        expect(loot.length).toBeGreaterThan(20);
+        expect(
+            loot.every((line) => line.includes("minecraft:custom_data={polaris_event:1b}"))
+        ).toBe(true);
+        expect(loot.some((line) => line.includes("minecraft:can_place_on="))).toBe(true);
+        expect(world.sent.some((line) => /^give (Ana|Ben|Cy) /.test(line))).toBe(false);
+        // The cages down at "Go!", by their glass alone.
+        for (const line of sw.cagesDown(layout, at)) expect(world.sent).toContain(line);
+        expect(world.sent).toContain("gamerule keepInventory true");
+        await play(500);
+        expect(world.sent.some((line) => line.endsWith(" add pe_sw_gone"))).toBe(true);
+
+        // Cy falls under the islands: out, up to the gallery, the kit taken.
+        const play0 = sw.playArea(layout, at);
+        world.at.Cy = [at.x + 0.5, play0.y1 - 3, at.z + 0.5];
+        await play(2_100);
+        const game = sw.stateOf(state().run!.game);
+        expect(game.out.map((one) => [one.name, one.why])).toEqual([["Cy", "fell"]]);
+        expect(world.sent).toContain("tag Cy add pe_sw_out");
+        expect(world.sent).toContain(
+            "clear Cy minecraft:iron_sword[minecraft:custom_data={polaris_event:1b}]"
+        );
+        expect(world.at.Cy![1]).toBe(sw.galleryFloor(layout, at).y1 + 1);
+        expect(saidToAll("Cy fell into the void")).toBe(true);
+
+        // Ana strikes Ben beside her, and Ben is brought low: Ana's elimination.
+        const ana = world.at.Ana!;
+        world.at.Ben = [ana[0] + 1.5, ana[1], ana[2]];
+        world.dealt.Ana = 30;
+        world.board.pe_swt!.Ben = 30;
+        world.hp = { Ben: 3 };
+        await play(2_100);
+        const done = state();
+        expect(done.run).toBeNull();
+        expect(done.history[0]).toMatchObject({
+            outcome: "finished",
+            note: "Only one player was left",
+            podium: [
+                { place: 1, name: "Ana", score: 3 },
+                { place: 2, name: "Ben", score: 2 },
+                { place: 3, name: "Cy", score: 1 }
+            ]
+        });
+        expect(saidToAll("Ben is out (Ana).")).toBe(true);
+        // Everything down: every island block and every bridging block, by kind,
+        // inside the box; arrows and pearls left lying gone; everybody home.
+        // The box is bigger than one fill takes: it comes down in slices.
+        for (const block of [
+            "minecraft:grass_block",
+            "minecraft:chest",
+            "minecraft:oak_planks",
+            "minecraft:white_wool"
+        ])
+            expect(fills().some((line) => line.endsWith(` minecraft:air replace ${block}`))).toBe(
+                true
+            );
+        expect(world.sent.some((line) => line.includes("kill @e[type=minecraft:arrow,x="))).toBe(
+            true
+        );
+        expect(world.sent).toContain("scoreboard objectives remove pe_swb");
+        expect(done.arenaLeftovers).toEqual([]);
+        onlyOurBlocks();
+    });
+
+    it("picked up after a restart, keeps who is out and does not put them out again", async () => {
+        const sw = await kind();
+        world.online = [...names];
+        setUp([warOf()]);
+        await joinAndStart("war", names);
+        const run = state().run!;
+        const { layout, at } = await placedOf(run);
+        const play0 = sw.playArea(layout, at);
+        world.at.Cy = [at.x + 0.5, play0.y1 - 3, at.z + 0.5];
+        await play(2_100);
+        const saved = state().run!;
+        expect(sw.stateOf(saved.game).out.map((one) => one.name)).toEqual(["Cy"]);
+        const where = { ...world.at };
+        await restartedWith(saved, tagsNow());
+        world.at = where;
+        await play(4_100);
+        expect(sw.stateOf(state().run!.game).out.map((one) => one.name)).toEqual(["Cy"]);
+        expect(world.sent.filter((line) => line === "tag Cy add pe_sw_out")).toEqual([]);
+        // The cages are not built again, the chests not filled twice.
+        expect(fills().some((line) => line.endsWith(" keep"))).toBe(false);
+        expect(world.sent.some((line) => / run item replace block /.test(line))).toBe(false);
+    });
+
+    it("refuses a server older than 1.17, where the loot would sit beside what players brought", async () => {
+        world.version = "1.16.5";
+        setUp([warOf()]);
+        const why = await refusal(
+            events.startEvent({
+                ownerId: "owner",
+                installedAppId: SERVER,
+                presetId: "war",
+                trigger: "manual",
+                startedBy: null
+            })
+        );
+        expect(why).toMatch(
+            /needs Minecraft 1\.17 or later, where what players carry is put away before they play/
+        );
+        expect(fills()).toEqual([]);
+    });
+
+    it("called off mid-game, takes the chests, the islands and everybody's loot back", async () => {
+        world.online = ["Ana", "Ben"];
+        setUp([warOf("rich")]);
+        await joinAndStart("war");
+        const run = state().run!;
+        await events.cancelEvent("owner", SERVER);
+        await play(2_100);
+        expect(state().run).toBeNull();
+        expect(state().history[0]).toMatchObject({ outcome: "cancelled", podium: [] });
+        expect(world.sent).toContain(
+            "clear Ana minecraft:diamond_sword[minecraft:custom_data={polaris_event:1b}]"
+        );
+        expect(run.arena!.blocks).toContain("minecraft:chest");
+        expect(
+            fills().some((line) => line.endsWith(" minecraft:air replace minecraft:chest"))
+        ).toBe(true);
+        expect(state().arenaLeftovers).toEqual([]);
+        onlyOurBlocks();
+    });
+
+    it("is called off with nothing built when only one joins", async () => {
+        setUp([warOf()]);
+        await startArena("war");
+        await play(2_100);
+        chat(["Ana", "join"]);
+        await play(40_000);
+        expect(state().history[0]).toMatchObject({
+            outcome: "cancelled",
+            note: "Only 1 joined; it needs 2"
+        });
+        expect(fills()).toEqual([]);
+    });
+});

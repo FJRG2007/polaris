@@ -712,6 +712,20 @@ export async function startEvent(input: {
             );
         }
     }
+    // SkyWars' loot is fought over: never beside what a player brought, which
+    // only 1.17 and later put away first (`stash`).
+    if (catalog.stashesFirst(preset)) {
+        const items = await withServerContainer(row.ownerId, input.installedAppId, (server) =>
+            serverAtLeast(server, [1, 17])
+        ).catch(() => null);
+        if (items === false) {
+            throw new Error(
+                refused("needsItems", {
+                    kind: gameMessage("minecraft", `events.kinds.${preset.kind}.label`)
+                })
+            );
+        }
+    }
 
     const now = Date.now();
     // Long enough to type `join` in, for an event players join.

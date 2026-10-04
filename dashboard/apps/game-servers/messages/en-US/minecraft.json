@@ -1877,6 +1877,7 @@
             "peaceful": "The server is on Peaceful, where hostile mobs vanish as soon as they appear. Set the difficulty to Easy or harder under Rules first.",
             "pvpBlocked": "Player versus player is Blocked on this server, and this event needs it. Allow it under Settings first.",
             "needsNewer": "{kind} needs Minecraft 1.16 or later, and this server runs an older one.",
+            "needsItems": "{kind} needs Minecraft 1.17 or later, where what players carry is put away before they play. This server runs an older one.",
             "anotherOn": "Another event is on. Let it finish or cancel it first.",
             "noneOn": "No event is on",
             "alreadyStarted": "It has already started",

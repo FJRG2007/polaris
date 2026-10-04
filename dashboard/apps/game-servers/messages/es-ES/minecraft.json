@@ -1877,6 +1877,7 @@
             "peaceful": "El servidor está en Pacífico, donde los mobs hostiles desaparecen nada más aparecer. Pon la dificultad en Fácil o más alta en Reglas antes.",
             "pvpBlocked": "El jugador contra jugador está Bloqueado en este servidor, y este evento lo necesita. Permítelo en Ajustes antes.",
             "needsNewer": "{kind} necesita Minecraft 1.16 o posterior, y este servidor usa una versión anterior.",
+            "needsItems": "{kind} necesita Minecraft 1.17 o posterior, donde lo que llevan los jugadores se guarda antes de jugar. Este servidor usa una versión anterior.",
             "anotherOn": "Ya hay otro evento en marcha. Deja que acabe o cancélalo antes.",
             "noneOn": "Nada en marcha",
             "alreadyStarted": "Ya ha empezado",

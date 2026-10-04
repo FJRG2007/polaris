@@ -103,6 +103,7 @@ Rare catch, Bingo rush, Boss fishing) leave the world alone.
 | Capture the flag                                               | day   | clear   |
 | Hot potato                                                     | day   | clear   |
 | Hide and seek                                                  | day   | clear   |
+| SkyWars                                                        | day   | clear   |
 | Treasure hunt, Supply drop, Explorer, Gathering                | day   | clear   |
 | Horde defense, Villager defense, Mob hunt, Meteor shower       | night | clear   |
 | Blood moon                                                     | night | rain    |
@@ -344,6 +345,32 @@ left out.
   being found; a seeker scores 30 a find (`FIND_POINTS`: half a minute of
   hiding, so a seeker who finds most of a group early keeps up with a hider
   who lasts). It ends when every hider is found, or when time is up.
+- **SkyWars** needs 1.17 (`catalog.stashesFirst`): its loot is fought over,
+  so it must never sit beside what a player brought, and only from 1.17 is
+  that put away first; an older server is refused before anything starts.
+  Each player starts in a glass cage on an island of their own in a ring
+  round a bigger middle island (see "Building a map"); the cages come down
+  at "Go!", only their glass, only in their own boxes. The chests are filled
+  once the islands stand (`ArenaGame.decorate`), each stack marked as the
+  kit, in slots drawn from the run's id, `item replace block` from 1.17
+  (`replaceitem` before): an island's first chest its bridging blocks, a
+  sword and food, its second more blocks, two pieces of armor and maybe a
+  bow and arrows, snowballs or a golden apple; the middle's four better -
+  iron, pearls, golden apples. `loot: rich` puts iron and diamond where
+  `normal` has wood and leather. Bridging blocks can be placed only against
+  the islands' own blocks and other bridges (`can_place_on`), and nothing
+  can be broken. PvP is on, keepInventory held, natural regeneration left
+  on: food is in the chests. A player is out - never dead - when the duel's
+  shield catches them at two hearts (`OUT_HEALTH`), when they die anyway,
+  fall under the islands, cross the play area's edge, or are off the server
+  two ticks running; their kit is taken and they watch from a glass gallery
+  over the middle. The quick look takes whoever crosses the play area's edge
+  up to the gallery at once, and kills any arrow stuck in a block before it
+  can be picked up as nobody's. Each hit is credited to whoever struck
+  nearest (within six blocks) or else drew a bow; whoever hit someone in the
+  ten seconds before they went out has the elimination. The last one left
+  wins; everybody else is ranked by when they went out, a tie broken by
+  eliminations.
 
 ## Building a map
 
@@ -411,6 +438,29 @@ new map:
   cannot be reached (no sealed cell). Over 3,000 seeds: no rule broken, never
   the bare fallback, twenty places every time (on average 4.8 walls, 6.1
   hedges, 6.3 crates, 2.8 stacks).
+- **No island is a jump from another**: SkyWars' islands are drawn from the
+  run's id (`sky-wars.layoutFor`) - each a blob with a waving edge, grass over
+  dirt over stone narrowing to a point and flecked with andesite and ore, an
+  oak with leaves that never wither or a mossy boulder, flowers, a start and
+  two chests; the middle wider, an oak at its heart and four chests. The ring
+  is then laid out by searching: its radius starts at what the islands'
+  widths need and grows a block at a time until `layoutProblems` holds - no
+  block a player can stand on (tree tops included) is within
+  `parkour-layout.reachAcross` of any block of another island, counted the
+  long way on a diagonal; five blocks of air at the least between any two;
+  every start and chest on its island's grass and walked to from the start;
+  and no island so far that its own chests' 48 bridging blocks, with eight to
+  spare, cannot reach the middle. Over 4,100 seeds from two to eight
+  players: no rule broken; the ring 19 to 26 blocks across up to six
+  players, 24 to 31 for eight.
+- **Nothing a player places is outside the box**: a block goes only against a
+  block within reach (`sky-wars.REACH`, six with the block), so the box
+  reaches `MARGIN` (twelve) past the play area on every side - room for that
+  reach and for what a player covers in one quick look falling or running -
+  and the quick look puts out anybody past the play area's edge before they
+  could reach past the margin. Barrier walls and a barrier roof on the box are
+  the backstop: nothing can be placed against them. Teardown takes every
+  bridging block kind inside the box, with the islands.
 
 ## How the floating maps look
 
@@ -426,6 +476,7 @@ Everything below is part of the arena's own boxes: built into air with
 | Team duel        | a stone rim round the floor and a post of light at each corner                                                                      |
 | Hot potato       | a floor in orange and white stripes, glass walls on a stone rim, sea lanterns up the corners, a spruce gallery                      |
 | Hide and seek    | stone brick walls under a glass roof, sea lanterns in the floor and up the corners, a spruce gallery on log posts with a fence rail |
+| SkyWars          | grass, dirt and flecked stone islands with oaks, boulders and flowers, glass cages, a glass gallery over the middle, barrier walls  |
 | Capture the flag | the duel's rim and posts, bases in red and blue, banners on sea lanterns, cover of stone brick, spruce and chiseled stone           |
 | Boss sky arena   | glass, with a pillar of sea lantern at each corner                                                                                  |
 
