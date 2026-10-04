@@ -993,6 +993,11 @@ button.copied {
     white-space: nowrap;
 }
 
+/* The host in front: ticked, and its name in the weight the menu's head uses. */
+.menu-item[aria-checked="true"] .menu-text {
+    font-weight: 600;
+}
+
 .menu-check {
     width: 14px;
     height: 14px;

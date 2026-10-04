@@ -41,7 +41,7 @@
         "nothingToCopy": "No hay nada que copiar.",
         "wentWrong": "Algo ha fallado.",
         "silentWorker": "Polaris no respondió. Vuelve a abrir esto.",
-        "unknownServer": "Ese servidor ya no está en la lista.",
+        "unknownServer": "Ese host ya no está en la lista.",
         "serverNameTooLong": "Un nombre puede tener hasta {max} caracteres."
     },
     "menu": {
@@ -115,7 +115,10 @@
         "vault": "Vault",
         "backLabel": "Volver al inicio",
         "back": "Atrás",
-        "servers": "Servidores"
+        "host": "Host",
+        "hosts": "Hosts",
+        "manageHosts": "Gestionar hosts",
+        "hostTitle": "{name} ({host})"
     },
     "popup": {
         "update": {
@@ -262,10 +265,10 @@
         "neverHere": "Aquí nunca"
     },
     "servers": {
-        "listLabel": "Servidores de Polaris",
+        "listLabel": "Hosts de Polaris",
         "inUse": "En uso",
         "accounts": "{count, plural, =0 {Sin sesión} one {# cuenta} other {# cuentas}}",
-        "count": "{count, plural, one {# servidor} other {# servidores}}",
+        "count": "{count, plural, one {# host} other {# hosts}}",
         "renameLabel": "Renombrar {name}",
         "rename": "Renombrar",
         "removeLabel": "Quitar {name}",
@@ -273,9 +276,9 @@
         "nameLabel": "Nombre para {host}",
         "save": "Guardar",
         "unchanged": "No hay cambios que guardar",
-        "add": "Añadir servidor",
+        "add": "Añadir host",
         "addButton": "Añadir",
-        "already": "Ese servidor ya está en la lista.",
+        "already": "Ese host ya está en la lista.",
         "removeTitle": "¿Quitar {name}?",
         "removeSignsOut": "{count, plural, one {Se cierra la sesión de su cuenta aquí y este navegador se desconecta de ella.} other {Se cierra la sesión de sus # cuentas aquí y este navegador se desconecta de ellas.}}",
         "removeOnlyList": "Nadie tiene sesión en él aquí, así que solo sale de esta lista."

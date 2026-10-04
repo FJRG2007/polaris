@@ -22,12 +22,15 @@ type Theme = Record<string, string>;
 /** The custom properties declared in one block of text. */
 function tokensIn(block: string): Theme {
     const found: Theme = {};
-    for (const match of block.matchAll(/--([a-z-]+):\s*([^;]+);/g)) found[match[1]!] = match[2]!.trim();
+    for (const match of block.matchAll(/--([a-z-]+):\s*([^;]+);/g))
+        found[match[1]!] = match[2]!.trim();
     return found;
 }
 
 const rootBlock = /^:root\s*\{([^}]*)\}/m.exec(CSS)![1]!;
-const lightBlock = /@media \(prefers-color-scheme: light\)\s*\{\s*:root\s*\{([^}]*)\}/.exec(CSS)![1]!;
+const lightBlock = /@media \(prefers-color-scheme: light\)\s*\{\s*:root\s*\{([^}]*)\}/.exec(
+    CSS
+)![1]!;
 const DARK = tokensIn(rootBlock);
 const LIGHT = { ...DARK, ...tokensIn(lightBlock) };
 
@@ -49,13 +52,15 @@ function declared(selector: string, property: string): string | null {
 type Rgb = [number, number, number];
 
 function hsl(channels: string): Rgb {
-    const [h, s, l] = channels.split(/[\s%]+/).filter(Boolean).map(Number) as [number, number, number];
+    const [h, s, l] = channels
+        .split(/[\s%]+/)
+        .filter(Boolean)
+        .map(Number) as [number, number, number];
     const sat = s / 100;
     const light = l / 100;
     const k = (n: number): number => (n + h / 30) % 12;
     const a = sat * Math.min(light, 1 - light);
-    const f = (n: number): number =>
-        light - a * Math.max(-1, Math.min(k(n) - 3, 9 - k(n), 1));
+    const f = (n: number): number => light - a * Math.max(-1, Math.min(k(n) - 3, 9 - k(n), 1));
     return [f(0) * 255, f(8) * 255, f(4) * 255];
 }
 
@@ -135,7 +140,9 @@ const GRAPHICS = new Set([
 describe("every text colour on the fill it is declared with", () => {
     // Where a rule names no fill of its own, it is drawn on the panel (`surface`)
     // or inside a menu, a dialog or a hovered row (`elevated`), so both are checked.
-    const textRules = [...RULES.entries()].filter(([, body]) => /(?:^|[;\s])color:\s*hsl\(var/.test(body));
+    const textRules = [...RULES.entries()].filter(([, body]) =>
+        /(?:^|[;\s])color:\s*hsl\(var/.test(body)
+    );
 
     it("finds the rules it is meant to check", () => {
         expect(textRules.length).toBeGreaterThan(20);
@@ -156,7 +163,8 @@ describe("every text colour on the fill it is declared with", () => {
                     const text = resolve(color, tokens, fill ?? base);
                     if (!fill || !text) continue;
                     const ratio = contrast(text, fill);
-                    if (ratio < (GRAPHICS.has(selector) ? 3 : 4.5)) failing.push(`${selector} on ${panel}: ${ratio.toFixed(2)}`);
+                    if (ratio < (GRAPHICS.has(selector) ? 3 : 4.5))
+                        failing.push(`${selector} on ${panel}: ${ratio.toFixed(2)}`);
                 }
             }
             expect(failing).toEqual([]);

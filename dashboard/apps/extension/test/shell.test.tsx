@@ -95,17 +95,13 @@ describe("the home screen", () => {
         expect(vaultState({ ...STATUS, unlocked: true })).toBe("Open");
     });
 
-    it("lists the servers, naming the one in front", () => {
+    it("does not list the hosts as if they were an app", () => {
+        // Which Polaris this is lives in the account menu (host-menu.test.tsx).
         const markup = renderToStaticMarkup(<Home status={STATUS} onOpen={() => {}} />);
-        expect(markup).toContain("Servers");
-        expect(markup).toContain("polaris.example");
-        const named = renderToStaticMarkup(
-            <Home
-                status={{ ...STATUS, servers: [{ ...STATUS.servers[0]!, name: "Home lab" }] }}
-                onOpen={() => {}}
-            />
-        );
-        expect(named).toContain("Home lab");
+        expect(markup).not.toContain("Servers");
+        expect(markup).not.toContain("Hosts");
+        expect(markup).not.toContain("polaris.example");
+        expect(markup.match(/class="section"/g)).toHaveLength(1);
     });
 });
 

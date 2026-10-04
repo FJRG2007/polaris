@@ -15,7 +15,7 @@ import { WordsProvider, useWords } from "../src/entrypoints/popup/words";
 
 function Title(): React.JSX.Element {
     const t = useWords();
-    return <p>{t("shell.servers")}</p>;
+    return <p>{t("shell.manageHosts")}</p>;
 }
 
 afterEach(cleanup);
@@ -34,8 +34,8 @@ describe("the popup's words", () => {
                 <Title />
             </WordsProvider>
         );
-        expect(screen.getByText("Servers")).toBeTruthy();
+        expect(screen.getByText("Manage hosts")).toBeTruthy();
         act(() => change("es-ES"));
-        expect(screen.getByText("Servidores")).toBeTruthy();
+        expect(screen.getByText("Gestionar hosts")).toBeTruthy();
     });
 });

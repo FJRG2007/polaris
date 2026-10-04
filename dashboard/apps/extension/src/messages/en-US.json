@@ -41,7 +41,7 @@
         "nothingToCopy": "There is nothing to copy.",
         "wentWrong": "Something went wrong.",
         "silentWorker": "Polaris did not answer. Open this again.",
-        "unknownServer": "That server is not on the list any more.",
+        "unknownServer": "That host is not on the list any more.",
         "serverNameTooLong": "A name can be up to {max} characters."
     },
     "menu": {
@@ -115,7 +115,10 @@
         "vault": "Vault",
         "backLabel": "Back to the home screen",
         "back": "Back",
-        "servers": "Servers"
+        "host": "Host",
+        "hosts": "Hosts",
+        "manageHosts": "Manage hosts",
+        "hostTitle": "{name} ({host})"
     },
     "popup": {
         "update": {
@@ -262,10 +265,10 @@
         "neverHere": "Never here"
     },
     "servers": {
-        "listLabel": "Polaris servers",
+        "listLabel": "Polaris hosts",
         "inUse": "In use",
         "accounts": "{count, plural, =0 {Not signed in} one {# account} other {# accounts}}",
-        "count": "{count, plural, one {# server} other {# servers}}",
+        "count": "{count, plural, one {# host} other {# hosts}}",
         "renameLabel": "Rename {name}",
         "rename": "Rename",
         "removeLabel": "Remove {name}",
@@ -273,9 +276,9 @@
         "nameLabel": "Name for {host}",
         "save": "Save",
         "unchanged": "No changes to save",
-        "add": "Add a server",
+        "add": "Add a host",
         "addButton": "Add",
-        "already": "That server is already on the list.",
+        "already": "That host is already on the list.",
         "removeTitle": "Remove {name}?",
         "removeSignsOut": "{count, plural, one {The account signed in on it here is signed out and this browser is disconnected from it.} other {The # accounts signed in on it here are signed out and this browser is disconnected from them.}}",
         "removeOnlyList": "Nobody is signed in on it here, so it only leaves this list."

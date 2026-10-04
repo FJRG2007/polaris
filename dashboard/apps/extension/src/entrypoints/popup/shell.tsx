@@ -12,15 +12,21 @@
  * extension, and it has a way back out.
  */
 
-import { describeServer } from "@/lib/servers";
+import { grant } from "./servers";
+import { useWords } from "./words";
 import { describeAccount, accountHost } from "@/lib/accounts";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { firstName, initials, tintFor } from "@polaris/core/faces";
-import { useWords } from "./words";
+import { describeServer, type ServerRef } from "@/lib/servers";
 import { ENGLISH, type Words } from "@/lib/words";
 import { askBackground, type Request, type VaultStatus } from "@/lib/messages";
 
-/** The sections the home screen offers. */
+/**
+ * The sections the popup can show. `servers` is the hosts screen, opened from
+ * the account menu rather than listed on the home screen - it is where this
+ * extension points, not something it does. The value keeps its old spelling so
+ * a popup that was closed on that screen opens on it again.
+ */
 export type Section = "home" | "vault" | "servers";
 
 const SECTION_KEY = "polaris.section";
@@ -222,12 +228,60 @@ function ShelfPicker({
     );
 }
 
+/** What a host's row says on hover: its whole name, and where it points. */
+function hostTitle(t: Words, server: ServerRef): string {
+    return server.name
+        ? t("shell.hostTitle", { name: server.name, host: server.host })
+        : server.origin;
+}
+
+/**
+ * The Polaris hosts in the account menu: the one in front ticked, any other a
+ * press away, and the screen that adds, renames and removes them under it.
+ *
+ * Each row is the host's name or its address, cut to the menu's width with the
+ * whole of it in the tooltip.
+ */
+export function HostEntries({
+    hosts,
+    onSwitch,
+    onManage
+}: {
+    hosts: readonly ServerRef[];
+    onSwitch: (server: ServerRef) => void;
+    onManage: () => void;
+}): React.JSX.Element {
+    const t = useWords();
+    return (
+        <>
+            <p className="menu-label">{t("shell.host")}</p>
+            {hosts.map((server) => (
+                <button
+                    key={server.origin}
+                    className="menu-item"
+                    role="menuitemradio"
+                    aria-checked={server.active}
+                    title={hostTitle(t, server)}
+                    onClick={() => onSwitch(server)}
+                >
+                    <span className="menu-text">{describeServer(server)}</span>
+                    {server.active ? <Check /> : null}
+                </button>
+            ))}
+            <button className="menu-item" role="menuitem" onClick={onManage}>
+                <span className="menu-text">{t("shell.manageHosts")}</span>
+            </button>
+        </>
+    );
+}
+
 /**
  * The account's face, and what the account can do from it.
  *
  * Where the dashboard keeps them: switching to another account signed in here,
- * adding one, opening Polaris, and ending this browser's connection - the same
- * act as Disconnect on the account's Sessions screen.
+ * adding one, opening Polaris, which Polaris this browser is pointed at, and
+ * ending this browser's connection - the same act as Disconnect on the
+ * account's Sessions screen.
  */
 function AccountMenu({
     status,
@@ -252,6 +306,18 @@ function AccountMenu({
         await onChange();
     };
 
+    const switchHost = async (server: ServerRef): Promise<void> => {
+        setOpen(false);
+        if (server.active) return;
+        // Asked before anything else is awaited: the press is what lets it ask.
+        if (!(await grant(server.origin))) {
+            setRefused(t("errors.noPermission"));
+            return;
+        }
+        await act({ kind: "switchServer", origin: server.origin });
+    };
+    const active = status.servers.find((one) => one.active) ?? null;
+
     return (
         <div className="anchor">
             <button
@@ -270,7 +336,12 @@ function AccountMenu({
                     <div className="menu-who">
                         <span className="menu-text strong">{name}</span>
                         {status.server ? (
-                            <span className="muted small">{accountHost(status.server)}</span>
+                            <span
+                                className="menu-text muted small"
+                                title={active ? hostTitle(t, active) : status.server}
+                            >
+                                {active ? describeServer(active) : accountHost(status.server)}
+                            </span>
                         ) : null}
                     </div>
                 </div>
@@ -287,17 +358,16 @@ function AccountMenu({
                         <span className="menu-text">{t("shell.openPolaris")}</span>
                     </button>
                 ) : null}
-                <button
-                    className="menu-item"
-                    role="menuitem"
-                    onClick={() => {
+                <hr />
+                <HostEntries
+                    hosts={status.servers}
+                    onSwitch={(server) => void switchHost(server)}
+                    onManage={() => {
                         setOpen(false);
                         onOpen("servers");
                     }}
-                >
-                    <span className="menu-text">{t("shell.servers")}</span>
-                    <span className="muted small">{status.servers.length}</span>
-                </button>
+                />
+                {others.length > 0 || status.activeId ? <hr /> : null}
                 {others.map((one) => (
                     <button
                         key={one.id}
@@ -403,34 +473,9 @@ export function Home({
                         </svg>
                     </button>
                 </li>
-                <li className="section-row">
-                    <button className="section" onClick={() => onOpen("servers")}>
-                        <span className="section-mark" aria-hidden="true">
-                            <svg viewBox="0 0 24 24">
-                                <rect x="3" y="4" width="18" height="7" rx="2" />
-                                <rect x="3" y="13" width="18" height="7" rx="2" />
-                                <path d="M7 7.5h.01M7 16.5h.01" />
-                            </svg>
-                        </span>
-                        <span className="section-text">
-                            <span className="strong">{t("shell.servers")}</span>
-                            <span className="muted small section-sub">{activeServer(status)}</span>
-                        </span>
-                        <svg className="chevron-right" viewBox="0 0 24 24" aria-hidden="true">
-                            <path d="m9 18 6-6-6-6" />
-                        </svg>
-                    </button>
-                </li>
             </ul>
         </main>
     );
-}
-
-/** The server in front, as its row in the list names it. */
-function activeServer(status: VaultStatus): string {
-    const active = status.servers.find((one) => one.active);
-    if (active) return describeServer(active);
-    return status.server ? accountHost(status.server) : "";
 }
 
 /** The line above a section, with the way back to the home screen. */

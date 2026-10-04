@@ -285,7 +285,7 @@ export function App(): React.JSX.Element {
                 <Home status={status} onOpen={setSection} />
             ) : section === "servers" ? (
                 <>
-                    <SectionBar title={t("shell.servers")} onBack={() => setSection("home")} />
+                    <SectionBar title={t("shell.hosts")} onBack={() => setSection("home")} />
                     <main>
                         <ServersPanel status={status} onChange={refresh} />
                     </main>
