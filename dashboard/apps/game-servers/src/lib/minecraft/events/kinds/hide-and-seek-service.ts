@@ -71,20 +71,45 @@ function firstSeekers(run: stored.EventRun): string[] {
     );
 }
 
-function spotOf(run: stored.EventRun, entrant: stored.Entrant): arena.Spot {
+/** The design that built a run's hall, as written into it then. */
+function designOf(run: stored.EventRun): number {
+    return hs.stateSchema.shape.design
+        .catch(hs.DESIGN)
+        .parse((run.game as { design?: unknown } | null)?.design);
+}
+
+/**
+ * Which way a run's hall is mirrored: its layout's, or - built by an older
+ * design, whose layout is not drawn any more - read back from the world.
+ */
+async function mirrorOf(ctx: KindContext): Promise<hs.Mirror> {
+    const run = ctx.run;
+    const design = designOf(run);
+    if (design >= hs.DESIGN) return layoutOf(run.id);
+    for (const test of hs.mirrorTests(run.arena!.box, design))
+        if (commands.readTest(await ctx.server.say([test.line])) === "passed") return test.mirror;
+    return layoutOf(run.id);
+}
+
+function spotOf(
+    run: stored.EventRun,
+    entrant: stored.Entrant,
+    mirror: hs.Mirror = layoutOf(run.id)
+): arena.Spot {
     const box = run.arena!.box;
-    const layout = layoutOf(run.id);
+    const design = designOf(run);
     const seekers = firstSeekers(run).map(lower);
     const at = seekers.indexOf(lower(entrant.name));
-    if (at >= 0) return hs.seekerSpot(box, layout, at);
+    if (at >= 0) return hs.seekerSpot(box, mirror, at, design);
     const hiders = run.entrants.filter((one) => !seekers.includes(lower(one.name)));
     return hs.hiderSpot(
         box,
-        layout,
+        mirror,
         Math.max(
             0,
             hiders.findIndex((one) => one.name === entrant.name)
-        )
+        ),
+        design
     );
 }
 
@@ -93,11 +118,12 @@ async function goLines(ctx: KindContext): Promise<string[]> {
     const language = ctx.language;
     const seconds = optionsOf(run).hideSeconds;
     const seekers = firstSeekers(run).map(lower);
+    const mirror = await mirrorOf(ctx);
     const out: string[] = [];
     for (const one of run.entrants) {
         const seeking = seekers.includes(lower(one.name));
         out.push(
-            arena.moveTo(one.name, spotOf(run, one)),
+            arena.moveTo(one.name, spotOf(run, one, mirror)),
             ...hs.joinSide(one.name, seeking),
             ...(seeking
                 ? [
@@ -265,7 +291,7 @@ export const hideAndSeek: ArenaGame = {
     blocks: () => [...hs.HALL_BLOCKS],
     kit: () => [],
     side: (_run, index) => index,
-    spot: spotOf,
+    spot: (run, entrant) => spotOf(run, entrant),
     beginLines: (_preset, language) => hs.setupLines(said.teamNames(language)),
     goLines,
     tick,

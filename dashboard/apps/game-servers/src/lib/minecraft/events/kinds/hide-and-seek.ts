@@ -19,7 +19,8 @@
  *   reached by a ladder - seekers look ahead, not up - with crates on it, and
  *   more under it.
  * - **Cover**: walls, hedges, crates and stacks of them to crouch behind, in
- *   rooms lit by one lamp each, so their corners are dim.
+ *   rooms lit by four lamps in their floor and no more, so their corners are
+ *   dim.
  *
  * Nametags are hidden from the other side (`setupLines`) and no effect shows
  * particles, so a hider is found by looking, never by a label through a wall.
@@ -255,7 +256,7 @@ function loftWall(loft: Loft): number {
 }
 
 /** The lamp set in a loft's floor: halfway along it, by the wall, lighting
- *  the loft and the room under it, which the room's own lamp does not reach. */
+ *  the loft and the room under it, which the room's floor lamps do not reach. */
 function loftLamp(loft: Loft): { x: number; z: number } {
     const wall = loftWall(loft);
     return loft.across === "x"
@@ -554,97 +555,92 @@ export function layoutFor(seed: string): Layout {
 
 /** One draw of a run's house, unchecked: what `layoutFor` tries in turn. */
 export function drawLayout(seed: string, draw: number): Layout {
-    {
-        const random = seeded(`${seed}-hide-${draw}`);
-        const pick = (from: number, to: number) => from + Math.floor(random() * (to - from + 1));
-        const choose = <T>(list: readonly T[]): T => list[Math.floor(random() * list.length)]!;
-        const doorways = drawDoorways(pick);
-        const lofts = drawLofts(random, pick);
-        const fixed = fixtures({ doorways, lofts });
-        const pieces: Piece[] = [];
-        const tryPlace = (piece: Piece) => {
-            if (pieceProblems(piece, lofts).length > 0) return false;
-            if (
-                piece.kind === "pit" &&
-                LAMPS.some((lamp) => lamp.x === piece.x && lamp.z === piece.z)
-            )
-                return false;
-            if ([...fixed, ...pieces].some((one) => gapOf(one, piece) < 1)) return false;
-            pieces.push(piece);
-            return true;
-        };
-        const tries = (wanted: number, make: () => Piece) => {
-            let placed = 0;
-            for (let attempt = 0; attempt < 400 && placed < wanted; attempt += 1)
-                if (tryPlace(make())) placed += 1;
-        };
-        // Closets first: they need a wall, and a stretch of it free.
-        tries(WANTED.closet, () => {
-            const side = choose(SIDES);
-            const across = side === "west" || side === "east";
-            const room = { x: choose(SPANS), z: choose(SPANS) };
-            const w = across ? 2 : 3;
-            const d = across ? 3 : 2;
-            const x =
-                side === "west"
-                    ? room.x[0]
-                    : side === "east"
-                      ? room.x[1] - 1
-                      : pick(room.x[0], room.x[1] - 2);
-            const z =
-                side === "north"
-                    ? room.z[0]
-                    : side === "south"
-                      ? room.z[1] - 1
-                      : pick(room.z[0], room.z[1] - 2);
-            return { kind: "closet", x, z, level: 1, w, d, h: 3, side };
-        });
-        tries(WANTED.bush, () => ({
-            kind: "bush",
-            x: pick(1, LAST - 2),
-            z: pick(1, LAST - 2),
-            level: 1,
-            w: 3,
-            d: 3,
-            h: 3,
-            side: choose(SIDES)
-        }));
-        tries(WANTED.pit, () => ({
-            kind: "pit",
-            x: pick(1, LAST),
-            z: pick(1, LAST),
-            level: 1,
-            w: 1,
-            d: 1,
-            h: 1
-        }));
-        for (const zone of ["floor", "under", "over"] as const)
-            tries(WANTED[zone], () => {
-                const shape = choose(SHAPES[zone]);
-                if (zone === "floor")
-                    return {
-                        ...shape,
-                        x: pick(1, LAST - shape.w + 1),
-                        z: pick(1, LAST - shape.d + 1),
-                        level: 1
-                    };
-                const loft = choose(lofts);
+    const random = seeded(`${seed}-hide-${draw}`);
+    const pick = (from: number, to: number) => from + Math.floor(random() * (to - from + 1));
+    const choose = <T>(list: readonly T[]): T => list[Math.floor(random() * list.length)]!;
+    const doorways = drawDoorways(pick);
+    const lofts = drawLofts(random, pick);
+    const fixed = fixtures({ doorways, lofts });
+    const pieces: Piece[] = [];
+    const tryPlace = (piece: Piece) => {
+        if (pieceProblems(piece, lofts).length > 0) return false;
+        if (piece.kind === "pit" && LAMPS.some((lamp) => lamp.x === piece.x && lamp.z === piece.z))
+            return false;
+        if ([...fixed, ...pieces].some((one) => gapOf(one, piece) < 1)) return false;
+        pieces.push(piece);
+        return true;
+    };
+    const tries = (wanted: number, make: () => Piece) => {
+        let placed = 0;
+        for (let attempt = 0; attempt < 400 && placed < wanted; attempt += 1)
+            if (tryPlace(make())) placed += 1;
+    };
+    // Closets first: they need a wall, and a stretch of it free.
+    tries(WANTED.closet, () => {
+        const side = choose(SIDES);
+        const across = side === "west" || side === "east";
+        const room = { x: choose(SPANS), z: choose(SPANS) };
+        const w = across ? 2 : 3;
+        const d = across ? 3 : 2;
+        const x =
+            side === "west"
+                ? room.x[0]
+                : side === "east"
+                  ? room.x[1] - 1
+                  : pick(room.x[0], room.x[1] - 2);
+        const z =
+            side === "north"
+                ? room.z[0]
+                : side === "south"
+                  ? room.z[1] - 1
+                  : pick(room.z[0], room.z[1] - 2);
+        return { kind: "closet", x, z, level: 1, w, d, h: 3, side };
+    });
+    tries(WANTED.bush, () => ({
+        kind: "bush",
+        x: pick(1, LAST - 2),
+        z: pick(1, LAST - 2),
+        level: 1,
+        w: 3,
+        d: 3,
+        h: 3,
+        side: choose(SIDES)
+    }));
+    tries(WANTED.pit, () => ({
+        kind: "pit",
+        x: pick(1, LAST),
+        z: pick(1, LAST),
+        level: 1,
+        w: 1,
+        d: 1,
+        h: 1
+    }));
+    for (const zone of ["floor", "under", "over"] as const)
+        tries(WANTED[zone], () => {
+            const shape = choose(SHAPES[zone]);
+            if (zone === "floor")
                 return {
                     ...shape,
-                    x: pick(loft.x1, loft.x2 - shape.w + 1),
-                    z: pick(loft.z1, loft.z2 - shape.d + 1),
-                    level: zone === "under" ? 1 : LOFT + 1
+                    x: pick(1, LAST - shape.w + 1),
+                    z: pick(1, LAST - shape.d + 1),
+                    level: 1
                 };
-            });
-        return {
-            flipX: random() < 0.5,
-            flipZ: random() < 0.5,
-            doorways,
-            lofts,
-            pieces,
-            bare: false
-        };
-    }
+            const loft = choose(lofts);
+            return {
+                ...shape,
+                x: pick(loft.x1, loft.x2 - shape.w + 1),
+                z: pick(loft.z1, loft.z2 - shape.d + 1),
+                level: zone === "under" ? 1 : LOFT + 1
+            };
+        });
+    return {
+        flipX: random() < 0.5,
+        flipZ: random() < 0.5,
+        doorways,
+        lofts,
+        pieces,
+        bare: false
+    };
 }
 
 // ------------------------------------------------------------------ the blocks
@@ -878,25 +874,26 @@ function blocksOf(layout: Layout): Blocks {
 
 /** Where the hiders start: round the cage, a block out from its wall, spread
  *  evenly - as many as the house takes. */
-function hiderCells(): { x: number; z: number }[] {
+function hiderCells(middle = MIDDLE): { x: number; z: number }[] {
     const ring: { x: number; z: number }[] = [];
     const r = MIDDLE - CAGE.x1 + 1;
     for (let x = MIDDLE - r; x <= MIDDLE + r; x += 1)
         for (let z = MIDDLE - r; z <= MIDDLE + r; z += 1)
-            if (Math.max(Math.abs(x - MIDDLE), Math.abs(z - MIDDLE)) === r) ring.push({ x, z });
+            if (Math.max(Math.abs(x - MIDDLE), Math.abs(z - MIDDLE)) === r)
+                ring.push({ x: x - MIDDLE + middle, z: z - MIDDLE + middle });
     ring.sort(
-        (a, b) => Math.atan2(a.z - MIDDLE, a.x - MIDDLE) - Math.atan2(b.z - MIDDLE, b.x - MIDDLE)
+        (a, b) => Math.atan2(a.z - middle, a.x - middle) - Math.atan2(b.z - middle, b.x - middle)
     );
     const step = ring.length / MOST;
     return Array.from({ length: MOST }, (_, index) => ring[Math.floor(index * step)]!);
 }
 
 /** The seekers' cells inside the cage. */
-function seekerCells(): { x: number; z: number }[] {
+function seekerCells(middle = MIDDLE): { x: number; z: number }[] {
     return [
-        { x: MIDDLE, z: MIDDLE },
-        { x: MIDDLE - 1, z: MIDDLE },
-        { x: MIDDLE + 1, z: MIDDLE }
+        { x: middle, z: middle },
+        { x: middle - 1, z: middle },
+        { x: middle + 1, z: middle }
     ];
 }
 
@@ -1098,13 +1095,36 @@ function facing(block: string, layout: Layout): string {
     });
 }
 
+/** Which way a hall is mirrored. */
+export type Mirror = Pick<Layout, "flipX" | "flipZ">;
+
+/** Where a hall's cage stands, by the design that built it: the first was 27
+ *  across, its cage round 15 and its floor a block over the barrier. Only that
+ *  much of it is kept, so a run built before an update still starts in its own
+ *  cage. */
+interface Starts {
+    readonly size: number;
+    readonly middle: number;
+    readonly base: number;
+}
+const STARTS: Starts = { size: SIZE, middle: MIDDLE, base: BASE };
+const FIRST_STARTS: Starts = { size: 27, middle: 15, base: 1 };
+
+function startsOf(design: number): Starts {
+    return design < DESIGN ? FIRST_STARTS : STARTS;
+}
+
+function startAt(box: Box, mirror: Mirror, starts: Starts, x: number, level: number, z: number) {
+    return {
+        x: box.x1 + (mirror.flipX ? starts.size - 1 - x : x),
+        y: box.y1 + starts.base + level,
+        z: box.z1 + (mirror.flipZ ? starts.size - 1 - z : z)
+    };
+}
+
 /** A place in the house's own terms, in the world. */
 function worldOf(box: Box, layout: Layout, x: number, level: number, z: number) {
-    return {
-        x: box.x1 + (layout.flipX ? SIZE - 1 - x : x),
-        y: box.y1 + BASE + level,
-        z: box.z1 + (layout.flipZ ? SIZE - 1 - z : z)
-    };
+    return startAt(box, layout, STARTS, x, level, z);
 }
 
 function placed(
@@ -1163,20 +1183,43 @@ export function hallFills(box: Box, layout: Layout): Fill[] {
     return fills;
 }
 
-/** Where the `index`th hider starts, and where the `index`th seeker waits. */
-export function hiderSpot(box: Box, layout: Layout, index: number): Spot {
-    const cell = hiderCells()[index % MOST]!;
-    const at = worldOf(box, layout, cell.x, 1, cell.z);
-    const middle = worldOf(box, layout, MIDDLE, 1, MIDDLE);
+/**
+ * How a hall an older design built is mirrored, which its run never wrote
+ * down: the barrier over the middle of its cage is under exactly one of the
+ * four. Each is a test to send, `Test passed` for the mirror it stands for.
+ */
+export function mirrorTests(box: Box, design: number): { mirror: Mirror; line: string }[] {
+    const starts = startsOf(design);
+    return [false, true].flatMap((flipX) =>
+        [false, true].map((flipZ) => {
+            const mirror = { flipX, flipZ };
+            const lid = startAt(box, mirror, starts, starts.middle, 4, starts.middle);
+            return {
+                mirror,
+                line: `execute in minecraft:overworld if block ${lid.x} ${lid.y} ${lid.z} ${BARRIER}`
+            };
+        })
+    );
+}
+
+/** Where the `index`th hider starts, and where the `index`th seeker waits, in
+ *  a hall built by `design`. */
+export function hiderSpot(box: Box, mirror: Mirror, index: number, design = DESIGN): Spot {
+    const starts = startsOf(design);
+    const cell = hiderCells(starts.middle)[index % MOST]!;
+    const at = startAt(box, mirror, starts, cell.x, 1, cell.z);
+    const middle = startAt(box, mirror, starts, starts.middle, 1, starts.middle);
     return {
         ...at,
         yaw: Math.round((-Math.atan2(at.x - middle.x, at.z - middle.z) * 180) / Math.PI)
     };
 }
 
-export function seekerSpot(box: Box, layout: Layout, index: number): Spot {
-    const cell = seekerCells()[index % seekerCells().length]!;
-    return { ...worldOf(box, layout, cell.x, 1, cell.z), yaw: 0 };
+export function seekerSpot(box: Box, mirror: Mirror, index: number, design = DESIGN): Spot {
+    const starts = startsOf(design);
+    const cells = seekerCells(starts.middle);
+    const cell = cells[index % cells.length]!;
+    return { ...startAt(box, mirror, starts, cell.x, 1, cell.z), yaw: 0 };
 }
 // ------------------------------------------------------------------ the game
 

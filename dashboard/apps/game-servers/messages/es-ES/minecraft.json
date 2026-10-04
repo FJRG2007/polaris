@@ -1728,7 +1728,7 @@
             },
             "hide-and-seek": {
                 "label": "Escondite",
-                "summary": "Se construye en el cielo una arena llena de escondites: muros, setos, cajas y un segundo piso. Los buscadores esperan cegados mientras los demás se esconden; si un buscador golpea a alguien lo encuentra, y este pasa a buscar. Los escondidos puntúan por cada segundo oculto y los buscadores por cada uno encontrado; los nombres no se ven entre bandos.",
+                "summary": "Se construye en el cielo una casa de nueve salas llena de escondites: armarios donde encerrarse, trampillas en el suelo, arbustos huecos y altillos bajo el techo. Los buscadores esperan cegados mientras los demás se esconden; si un buscador golpea a alguien lo encuentra, y este pasa a buscar. Los escondidos puntúan por cada segundo oculto y los buscadores por cada uno encontrado; los nombres no se ven entre bandos.",
                 "unit": "puntos"
             },
             "hot-potato": {
@@ -2316,7 +2316,7 @@
         "capturesToWin": "Capturas para ganar",
         "capturesToWinHint": "De 1 a 10. Si no, gana el equipo con más al acabar el tiempo.",
         "hideSeconds": "Para esconderse (segundos)",
-        "hideSecondsHint": "De 15 a 60, antes de que los buscadores puedan moverse.",
+        "hideSecondsHint": "De 15 a 90, antes de que los buscadores puedan moverse.",
         "seekers": "Buscadores al empezar",
         "seekersHint": "De 1 a 3. Todos los encontrados buscan con ellos.",
         "fuseSeconds": "Mecha (segundos)",

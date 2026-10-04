@@ -1728,7 +1728,7 @@
             },
             "hide-and-seek": {
                 "label": "Hide and seek",
-                "summary": "An arena full of hiding places - walls, hedges, crates and a second floor - is built in the sky. The seekers wait, blinded, while the others hide; a seeker's hit finds a hider, who then seeks too. Hiders score for every second hidden and seekers for every hider found; names are hidden from the other side.",
+                "summary": "A house of nine rooms is built in the sky, full of hiding places: closets to shut yourself in, hatches in the floor, hollow bushes and lofts under the roof. The seekers wait, blinded, while the others hide; a seeker's hit finds a hider, who then seeks too. Hiders score for every second hidden and seekers for every hider found; names are hidden from the other side.",
                 "unit": "points"
             },
             "hot-potato": {
@@ -2316,7 +2316,7 @@
         "capturesToWin": "Captures to win",
         "capturesToWinHint": "1 to 10. Otherwise the team with more when time is up wins.",
         "hideSeconds": "Time to hide (seconds)",
-        "hideSecondsHint": "15 to 60, before the seekers can move.",
+        "hideSecondsHint": "15 to 90, before the seekers can move.",
         "seekers": "Seekers at the start",
         "seekersHint": "1 to 3. Everybody found seeks with them.",
         "fuseSeconds": "Fuse (seconds)",

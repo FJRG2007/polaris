@@ -224,6 +224,33 @@ describe("hide and seek's house in the world", () => {
         }
         expect(starts.size).toBe(hs.MOST);
     });
+
+    it("starts a run built by the first design in that hall's own cage", () => {
+        // The first design's hall: 27 across, its cage round 15 (11 mirrored),
+        // its floor a block over the barrier and the cage's lid four over that.
+        const first = { x1: 0, y1: 100, z1: 0, x2: 26, y2: 110, z2: 26 };
+        const design = hs.DESIGN - 1;
+        const tests = hs.mirrorTests(first, design);
+        expect(tests).toHaveLength(4);
+        for (const { mirror, line } of tests) {
+            const cx = mirror.flipX ? 11 : 15;
+            const cz = mirror.flipZ ? 11 : 15;
+            expect(line).toBe(
+                `execute in minecraft:overworld if block ${cx} 105 ${cz} minecraft:barrier`
+            );
+            for (let index = 0; index < 3; index += 1) {
+                const spot = hs.seekerSpot(first, mirror, index, design);
+                expect(Math.abs(spot.x - cx)).toBeLessThan(2);
+                expect(spot.z).toBe(cz);
+                expect(spot.y).toBe(102);
+            }
+            for (let index = 0; index < hs.MOST; index += 1) {
+                const spot = hs.hiderSpot(first, mirror, index, design);
+                expect(Math.max(Math.abs(spot.x - cx), Math.abs(spot.z - cz))).toBe(3);
+                expect(spot.y).toBe(102);
+            }
+        }
+    });
 });
 describe("hide and seek's rules", () => {
     const names = ["Ana", "Ben", "Cy", "Dee"];
