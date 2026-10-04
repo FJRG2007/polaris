@@ -125,7 +125,10 @@ export function AuthorizedBy({
     const t = useTranslations("components");
     const authorizer = session.authorizedBy;
     if (!authorizer) return null;
-    const how = session.signIn.method === "qr-code" ? t("sessionsTable.scannedBy") : t("sessionsTable.allowedBy");
+    const how =
+        session.signIn.method === "qr-code"
+            ? t("sessionsTable.scannedBy")
+            : t("sessionsTable.allowedBy");
     return (
         <p className="flex flex-wrap items-center gap-1 truncate text-xs text-muted-foreground">
             <KeyRound className="size-3 shrink-0" aria-hidden />
@@ -140,8 +143,12 @@ export function AuthorizedBy({
             ) : (
                 <span className="min-w-0 truncate">{authorizer.device}</span>
             )}
-            {authorizer.current ? <Badge variant="neutral">{t("sessionsTable.thisDevice")}</Badge> : null}
-            {!authorizer.live ? <Badge variant="warning">{t("sessionsTable.signedOutSince")}</Badge> : null}
+            {authorizer.current ? (
+                <Badge variant="neutral">{t("sessionsTable.thisDevice")}</Badge>
+            ) : null}
+            {!authorizer.live ? (
+                <Badge variant="warning">{t("sessionsTable.signedOutSince")}</Badge>
+            ) : null}
         </p>
     );
 }
@@ -255,14 +262,18 @@ export function SessionsTable({
                             nowrap text and sets a floor under the column that no
                             amount of truncating gets below, so the table spills
                             sideways. Capped, the column takes what is left instead. */}
-                        <th className="w-full max-w-0 px-3 py-2 font-medium">{t("sessionsTable.device")}</th>
+                        <th className="w-full max-w-0 px-3 py-2 font-medium">
+                            {t("sessionsTable.device")}
+                        </th>
                         {compact ? null : (
                             <>
                                 {/* The two halves of what the device claims to be,
                                     each its own column so a list can be scanned down
                                     one of them. They arrive before the address: what
                                     it is is asked more often than where it was. */}
-                                <th className="hidden px-3 py-2 font-medium md:table-cell">{t("sessionsTable.app")}</th>
+                                <th className="hidden px-3 py-2 font-medium md:table-cell">
+                                    {t("sessionsTable.app")}
+                                </th>
                                 <th className="hidden px-3 py-2 font-medium md:table-cell">
                                     {t("sessionsTable.system")}
                                 </th>
@@ -317,20 +328,31 @@ export function SessionsTable({
                                                     {session.device}
                                                 </span>
                                                 {session.current ? (
-                                                    <Badge variant="primary">{t("sessionsTable.thisDevice")}</Badge>
+                                                    <Badge variant="primary">
+                                                        {t("sessionsTable.thisDevice")}
+                                                    </Badge>
                                                 ) : null}
                                                 {inUseNow(session, now) ? <ActiveNowBadge /> : null}
-                                                {session.locked ? <Badge>{t("sessionsTable.locked")}</Badge> : null}
+                                                {session.locked ? (
+                                                    <Badge>{t("sessionsTable.locked")}</Badge>
+                                                ) : null}
                                                 {/* How it got in, beside what it is: the two questions a
                                                     person scanning this list is asking at once. */}
-                                                <Badge className="max-w-full" title={signInText(t, session.signIn)}>
-                                                    <span className="min-w-0 truncate">{signInText(t, session.signIn)}</span>
+                                                <Badge
+                                                    className="max-w-full"
+                                                    title={signInText(t, session.signIn)}
+                                                >
+                                                    <span className="min-w-0 truncate">
+                                                        {signInText(t, session.signIn)}
+                                                    </span>
                                                 </Badge>
                                                 {/* Only where it is actually on. A
                                                     badge on every row saying a session
                                                     is not pinned is a column of "no". */}
                                                 {(session.pinToAddress ?? session.pinnedByRule) ? (
-                                                    <Badge title={t("sessionsTable.sessionLockedHint")}>
+                                                    <Badge
+                                                        title={t("sessionsTable.sessionLockedHint")}
+                                                    >
                                                         {t("sessionsTable.addressLocked")}
                                                     </Badge>
                                                 ) : null}
@@ -342,7 +364,10 @@ export function SessionsTable({
                                                     !compact && "lg:hidden"
                                                 )}
                                             >
-                                                {sessionOrigin(session, t("sessionsTable.unknownLocation"))}
+                                                {sessionOrigin(
+                                                    session,
+                                                    t("sessionsTable.unknownLocation")
+                                                )}
                                             </p>
                                             {compact ? (
                                                 <p className="truncate text-xs text-muted-foreground">
@@ -397,7 +422,9 @@ export function SessionsTable({
                                                 <Link
                                                     href={activityHref(session)}
                                                     title={t("sessionsTable.activity")}
-                                                    aria-label={t("sessionsTable.activityFrom", { device: session.device })}
+                                                    aria-label={t("sessionsTable.activityFrom", {
+                                                        device: session.device
+                                                    })}
                                                 >
                                                     <History className="size-4" />
                                                 </Link>
@@ -416,7 +443,9 @@ export function SessionsTable({
                                             variant="ghost"
                                             size="icon"
                                             title={t("sessionsTable.signOut")}
-                                            aria-label={t("sessionsTable.signOutNamed", { device: session.device })}
+                                            aria-label={t("sessionsTable.signOutNamed", {
+                                                device: session.device
+                                            })}
                                             disabled={busyId !== null}
                                             onClick={() => onRevoke(session)}
                                         >
@@ -449,10 +478,14 @@ export function SessionsTable({
                                             <span className="min-w-0 truncate text-muted-foreground">
                                                 {extension.os}
                                             </span>
-                                            <Badge variant="neutral">{t("sessionsTable.extension")}</Badge>
+                                            <Badge variant="neutral">
+                                                {t("sessionsTable.extension")}
+                                            </Badge>
                                             {inUseNow(extension, now) ? <ActiveNowBadge /> : null}
                                             {(extension.pinToAddress ?? extension.pinnedByRule) ? (
-                                                <Badge title={t("sessionsTable.extensionLockedHint")}>
+                                                <Badge
+                                                    title={t("sessionsTable.extensionLockedHint")}
+                                                >
                                                     {t("sessionsTable.addressLocked")}
                                                 </Badge>
                                             ) : null}
@@ -464,7 +497,9 @@ export function SessionsTable({
                                             )}
                                         >
                                             {t.rich("sessionsTable.whereAndWhen", {
-                                                where: extension.ip ?? t("sessionsTable.addressNotRecorded"),
+                                                where:
+                                                    extension.ip ??
+                                                    t("sessionsTable.addressNotRecorded"),
                                                 time: timeTag(extension.lastSeenAt)
                                             })}
                                         </p>
@@ -504,7 +539,9 @@ export function SessionsTable({
                                 <div className="flex justify-end gap-1">
                                     {onPinExtension ? (
                                         <PinButton
-                                            label={t("sessionsTable.extensionNamed", { browser: extension.browser })}
+                                            label={t("sessionsTable.extensionNamed", {
+                                                browser: extension.browser
+                                            })}
                                             pinToAddress={extension.pinToAddress}
                                             pinnedByRule={extension.pinnedByRule}
                                             busy={busyId !== null}
@@ -516,7 +553,9 @@ export function SessionsTable({
                                             variant="ghost"
                                             size="icon"
                                             title={t("sessionsTable.disconnect")}
-                                            aria-label={t("sessionsTable.disconnectNamed", { browser: extension.browser })}
+                                            aria-label={t("sessionsTable.disconnectNamed", {
+                                                browser: extension.browser
+                                            })}
                                             disabled={busyId !== null}
                                             onClick={() => onDisconnect(extension)}
                                         >
@@ -561,7 +600,11 @@ export function SessionsTable({
                                                         {device.os}
                                                     </span>
                                                 ) : null}
-                                                <Badge variant="neutral" className="max-w-full" title={kind}>
+                                                <Badge
+                                                    variant="neutral"
+                                                    className="max-w-full"
+                                                    title={kind}
+                                                >
                                                     <span className="min-w-0 truncate">{kind}</span>
                                                 </Badge>
                                             </p>
@@ -608,7 +651,9 @@ export function SessionsTable({
                                             {t("sessionsTable.notRecorded")}
                                         </td>
                                         <td className="hidden max-w-[12rem] px-3 py-2 text-xs text-muted-foreground xl:table-cell">
-                                            <span className="block truncate">{t("sessionsTable.notRecorded")}</span>
+                                            <span className="block truncate">
+                                                {t("sessionsTable.notRecorded")}
+                                            </span>
                                         </td>
                                         <td className="hidden whitespace-nowrap px-3 py-2 text-xs text-muted-foreground lg:table-cell">
                                             <LastActive iso={client.lastSeenAt} />
@@ -625,7 +670,9 @@ export function SessionsTable({
                                             <Link
                                                 href="/vault/clients"
                                                 title={t("sessionsTable.manageApps")}
-                                                aria-label={t("sessionsTable.manageNamed", { name: device.browser })}
+                                                aria-label={t("sessionsTable.manageNamed", {
+                                                    name: device.browser
+                                                })}
                                             >
                                                 <PanelRightOpen className="size-4" />
                                             </Link>

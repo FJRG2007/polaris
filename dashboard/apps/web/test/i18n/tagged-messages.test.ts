@@ -13,7 +13,13 @@ import { readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import { createTranslator, type Catalog } from "@polaris/core";
-import { indexCatalog, indexCatalogFolder, scanFolder, scanSource, type TagIndex } from "./tagged-calls";
+import {
+    indexCatalog,
+    indexCatalogFolder,
+    scanFolder,
+    scanSource,
+    type TagIndex
+} from "./tagged-calls";
 
 const APPS = resolve(__dirname, "../../..");
 const web = indexCatalogFolder(join(APPS, "web", "messages", "en-US"));
@@ -29,7 +35,8 @@ const INDEX: TagIndex = new Map([
     ["admin", new Map<string, readonly string[]>([["title", []]])]
 ]);
 
-const problems = (source: string) => scanSource("screen.tsx", source, INDEX).map((finding) => finding.problem);
+const problems = (source: string) =>
+    scanSource("screen.tsx", source, INDEX).map((finding) => finding.problem);
 
 describe("the tagged-call scan", () => {
     it("finds a tagged message given an element instead of a function", () => {
@@ -99,7 +106,9 @@ describe("the tagged-call scan", () => {
     });
 
     it("finds the real call sites, so this cannot pass by reading nothing", () => {
-        const tagged = [...web.values()].flatMap((keys) => [...keys.values()]).filter((tags) => tags.length > 0);
+        const tagged = [...web.values()]
+            .flatMap((keys) => [...keys.values()])
+            .filter((tags) => tags.length > 0);
         expect(tagged.length).toBeGreaterThan(50);
     });
 });
@@ -107,9 +116,15 @@ describe("the tagged-call scan", () => {
 describe("the formatter this guards", () => {
     // What the reader saw: the failure the scan exists to keep off a screen.
     it("prints the raw message when a tag is given an element, and the time when given a function", () => {
-        const t = createTranslator("en-US", { at: "Last active <time></time>" }, { onProblem: () => {} });
+        const t = createTranslator(
+            "en-US",
+            { at: "Last active <time></time>" },
+            { onProblem: () => {} }
+        );
         expect(t.rich("at", { time: "3 minutes ago" })).toEqual(["Last active <time></time>"]);
-        expect(t.rich("at", { time: () => "3 minutes ago" }).join("")).toBe("Last active 3 minutes ago");
+        expect(t.rich("at", { time: () => "3 minutes ago" }).join("")).toBe(
+            "Last active 3 minutes ago"
+        );
     });
 });
 
@@ -129,7 +144,12 @@ describe("every tagged message in every app", () => {
                 [
                     "extension",
                     indexCatalog(
-                        JSON.parse(readFileSync(join(APPS, "extension", "src", "messages", "en-US.json"), "utf8")) as Catalog
+                        JSON.parse(
+                            readFileSync(
+                                join(APPS, "extension", "src", "messages", "en-US.json"),
+                                "utf8"
+                            )
+                        ) as Catalog
                     )
                 ]
             ])
@@ -138,7 +158,8 @@ describe("every tagged message in every app", () => {
 
     it.each(roots)("is formatted so its tags render, in $name", ({ source, index }) => {
         const findings = scanFolder(source, index, APPS).map(
-            (finding) => `${finding.file}:${finding.line} ${finding.namespace}.${finding.key}: ${finding.problem}`
+            (finding) =>
+                `${finding.file}:${finding.line} ${finding.namespace}.${finding.key}: ${finding.problem}`
         );
         expect(findings).toEqual([]);
     });

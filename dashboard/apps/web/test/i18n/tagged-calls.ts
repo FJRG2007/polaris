@@ -34,7 +34,10 @@ export interface TaggedCallFinding {
 }
 
 /** The tags of every message in one locale's folder of catalogs, by namespace. */
-export function indexCatalogFolder(folder: string, into = new Map<string, Map<string, readonly string[]>>()) {
+export function indexCatalogFolder(
+    folder: string,
+    into = new Map<string, Map<string, readonly string[]>>()
+) {
     if (!existsSync(folder)) return into;
     for (const file of readdirSync(folder).filter((name) => name.endsWith(".json"))) {
         const namespace = file.slice(0, -".json".length);
@@ -62,7 +65,8 @@ export function sourceFiles(root: string): string[] {
             if (entry === "node_modules" || entry.startsWith(".")) continue;
             const path = join(folder, entry);
             if (statSync(path).isDirectory()) walk(path);
-            else if (/\.tsx?$/.test(entry) && !/\.d\.ts$|\.test\.tsx?$/.test(entry)) found.push(path);
+            else if (/\.tsx?$/.test(entry) && !/\.d\.ts$|\.test\.tsx?$/.test(entry))
+                found.push(path);
         }
     };
     walk(root);
@@ -96,7 +100,11 @@ function namespaceArgument(call: ts.CallExpression, index: TagIndex): string | u
 function namespacesInType(type: ts.TypeNode, index: TagIndex): string[] {
     const named: string[] = [];
     const visit = (node: ts.Node) => {
-        if (ts.isLiteralTypeNode(node) && ts.isStringLiteral(node.literal) && index.has(node.literal.text))
+        if (
+            ts.isLiteralTypeNode(node) &&
+            ts.isStringLiteral(node.literal) &&
+            index.has(node.literal.text)
+        )
             named.push(node.literal.text);
         ts.forEachChild(node, visit);
     };
@@ -119,10 +127,13 @@ function bindings(file: ts.SourceFile, index: TagIndex): Map<string, Set<string>
                 const namespace = namespaceArgument(value, index);
                 if (namespace) bind(node.name.text, namespace);
             }
-            if (node.type) for (const namespace of namespacesInType(node.type, index)) bind(node.name.text, namespace);
+            if (node.type)
+                for (const namespace of namespacesInType(node.type, index))
+                    bind(node.name.text, namespace);
         }
         if (ts.isParameter(node) && ts.isIdentifier(node.name) && node.type) {
-            for (const namespace of namespacesInType(node.type, index)) bind(node.name.text, namespace);
+            for (const namespace of namespacesInType(node.type, index))
+                bind(node.name.text, namespace);
         }
         ts.forEachChild(node, visit);
     };
@@ -174,7 +185,9 @@ function tagProblem(
     }
     const property = value.properties.find(
         (entry) =>
-            (ts.isPropertyAssignment(entry) || ts.isShorthandPropertyAssignment(entry) || ts.isMethodDeclaration(entry)) &&
+            (ts.isPropertyAssignment(entry) ||
+                ts.isShorthandPropertyAssignment(entry) ||
+                ts.isMethodDeclaration(entry)) &&
             entry.name !== undefined &&
             (ts.isIdentifier(entry.name) || ts.isStringLiteral(entry.name)) &&
             entry.name.text === tag
@@ -183,7 +196,9 @@ function tagProblem(
         return value.properties.some(ts.isSpreadAssignment) ? null : `<${tag}> is given nothing`;
     }
     if (ts.isMethodDeclaration(property)) return null;
-    let given: ts.Expression = ts.isPropertyAssignment(property) ? unwrap(property.initializer) : property.name;
+    let given: ts.Expression = ts.isPropertyAssignment(property)
+        ? unwrap(property.initializer)
+        : property.name;
     // A constant of the same file is judged by what it was set to.
     if (ts.isIdentifier(given)) given = constants.get(given.text) ?? given;
     if (ts.isArrowFunction(given) || ts.isFunctionExpression(given)) return null;
@@ -234,7 +249,14 @@ function judgeCall(
             const at = { file, line, key, namespace };
             if (!rich) {
                 perKey.push(
-                    tags.length > 0 ? [{ ...at, problem: `has tags (${tags.join(", ")}) but is formatted with plain t()` }] : []
+                    tags.length > 0
+                        ? [
+                              {
+                                  ...at,
+                                  problem: `has tags (${tags.join(", ")}) but is formatted with plain t()`
+                              }
+                          ]
+                        : []
                 );
                 continue;
             }
@@ -256,7 +278,12 @@ function judgeCall(
 }
 
 /** The translator call sites in one file that would print a tag as text. */
-export function scanSource(path: string, source: string, index: TagIndex, label = path): TaggedCallFinding[] {
+export function scanSource(
+    path: string,
+    source: string,
+    index: TagIndex,
+    label = path
+): TaggedCallFinding[] {
     const file = ts.createSourceFile(
         path,
         source,
@@ -286,7 +313,16 @@ export function scanSource(path: string, source: string, index: TagIndex, label 
             }
             const { line } = file.getLineAndCharacterOfPosition(node.getStart());
             findings.push(
-                ...judgeCall(node, rich, namespaces, ts.isIdentifier(callee), index, constants, label, line + 1)
+                ...judgeCall(
+                    node,
+                    rich,
+                    namespaces,
+                    ts.isIdentifier(callee),
+                    index,
+                    constants,
+                    label,
+                    line + 1
+                )
             );
         }
         ts.forEachChild(node, visit);
@@ -298,6 +334,11 @@ export function scanSource(path: string, source: string, index: TagIndex, label 
 /** Every finding under a source folder, with paths relative to `base`. */
 export function scanFolder(root: string, index: TagIndex, base: string): TaggedCallFinding[] {
     return sourceFiles(root).flatMap((path) =>
-        scanSource(path, readFileSync(path, "utf8"), index, relative(base, path).replace(/\\/g, "/"))
+        scanSource(
+            path,
+            readFileSync(path, "utf8"),
+            index,
+            relative(base, path).replace(/\\/g, "/")
+        )
     );
 }

@@ -403,7 +403,9 @@ describe("a browser extension's connection", () => {
     it("says where and when it was last seen, without the message's markup", () => {
         const markup = renderWithExtension();
         expect(markup).not.toContain("&lt;time&gt;");
-        expect(markup).toMatch(/10\.0\.1\.131 - last active <time dateTime="2026-09-17T10:00:00.000Z">/);
+        expect(markup).toMatch(
+            /10\.0\.1\.131 - last active <time dateTime="2026-09-17T10:00:00.000Z">/
+        );
     });
 });
 
@@ -429,7 +431,9 @@ describe("when each row was last active", () => {
         // What an administrator read on somebody's sessions: "Last active <time></time>".
         const markup = renderCompact([session()]);
         expect(markup).not.toContain("&lt;time&gt;");
-        expect(markup).toMatch(/Last active <time dateTime="2026-08-03T10:00:00.000Z"><relative-time/);
+        expect(markup).toMatch(
+            /Last active <time dateTime="2026-08-03T10:00:00.000Z"><relative-time/
+        );
     });
 
     it("says it in Spanish too", () => {
@@ -460,7 +464,12 @@ describe("the sessions in use right now", () => {
             { id: "old-2", lastSeenAt: minutesAgo(60) },
             { id: "mine", lastSeenAt: minutesAgo(2), current: true }
         ];
-        expect(inUseFirst(rows, Date.now()).map((row) => row.id)).toEqual(["mine", "live", "old-1", "old-2"]);
+        expect(inUseFirst(rows, Date.now()).map((row) => row.id)).toEqual([
+            "mine",
+            "live",
+            "old-1",
+            "old-2"
+        ]);
     });
 
     it("marks a session in use and lists it before an idle one", () => {
