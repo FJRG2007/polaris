@@ -178,7 +178,8 @@ with one thing does not get the rest.
 - **Places** - the places you own, their cameras and their smart devices: live
   views, clips, events, detections and alerts that arrive as messages; switches,
   plugs, lights, locks, air conditioners and air purifiers from Tuya, TP-Link,
-  Shelly, Hue, IKEA, Gree, Philips, Home Assistant and SwitchBot; automations
+  Shelly, Hue, IKEA, Gree, Philips (Air+, HomeID and Dynalite lighting), Home
+  Assistant and SwitchBot; automations
   that react to any of them; plus a notice the moment
   a camera itself stops answering.
 
