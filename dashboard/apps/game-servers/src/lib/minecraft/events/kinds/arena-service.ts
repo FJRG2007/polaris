@@ -1215,8 +1215,18 @@ export async function closeArena(
             // Whoever is still up there - somebody who walked in, a pet - floats down.
             await server.sayAll(stage.fallProofOver(left.arena.box));
             let whole = true;
-            for (const line of arena.teardown(left.arena)) {
-                if (arena.notLoaded(await server.say([line]))) whole = false;
+            // Every kind of block in every slice of the box: hundreds of fills
+            // for a SkyWars arena. Asked one at a time they held the podium back
+            // for many seconds after the winner was known, so they go in one
+            // trip, in order (`sayEach`); a fill whose answer did not come back
+            // is asked again on its own, never taken for done.
+            const lines = arena.teardown(left.arena);
+            const replies = server.sayEach
+                ? await server.sayEach(lines.map((line) => [line])).catch(() => null)
+                : null;
+            for (const [at, line] of lines.entries()) {
+                const answer = replies?.[at] ?? (await server.say([line]));
+                if (arena.notLoaded(answer)) whole = false;
             }
             // Its chunks were not in yet: kept loaded, and tried again.
             if (!whole) return { ...left, entrants: [], gamerules: {} };
