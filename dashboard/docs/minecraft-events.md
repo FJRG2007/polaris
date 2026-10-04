@@ -36,9 +36,14 @@ the same change.
 2. **Options**: every field has a `.default()`, so an event saved before the
    field existed still parses. Renaming or reshaping a field needs a
    `z.preprocess` that reads the old shape (`legacyWorldBoss`,
-   `legacySpleef`). A changed default needs `migratePreset` or a bump of
-   `DEFAULTS_VERSION`, never a silent change to saved events. A preset that
-   stops parsing is repaired, not dropped (`repairPreset`).
+   `legacySpleef`, `legacyParkour`). A changed default needs `migratePreset`,
+   a bump of `DEFAULTS_VERSION`, or - when only the values on the old default
+   should move, and anything already chosen must keep it - a `z.preprocess`
+   of its own (`legacyParkour`'s jumps); never a silent change to saved
+   events. A preset that stops parsing is repaired, not dropped
+   (`repairPreset`). A run already under way keeps its own copy of its
+   preset as it began (`asBegun` in `state.ts`): a migration that changes an
+   option's default must not also reach into a race in progress.
 3. **Pure and service code are kept apart**: `kinds/<kind>.ts` builds the
    commands and does the maths with no I/O, so it can be asserted in
    `minecraft-events-commands.test.ts`. `kinds/<kind>-service.ts` (or
@@ -237,6 +242,11 @@ new map:
   none), how many fall back to the plain layout, how tall they get, and how
   many traps survive. The tests in `minecraft-events-parkour-layout.test.ts`
   assert the first; the others decide whether it is any fun.
+- **A found layout is kept, not searched again**: the backtracking search is
+  not cheap, and every tick and every quick look would otherwise redo it.
+  `walkedOnce` keeps the last `WALKS_KEPT` (16) courses by run id, shape,
+  difficulty and jump count - enough for a race, its preview, and a few
+  other runs asked about meanwhile.
 - **Enforced in the game too**: a checkpoint is reached only from the one
   before it (`quickSelectors`), and a racer seen past their next checkpoint
   (an ender pearl, a push) is sent back to their own with "No shortcuts".
@@ -461,6 +471,13 @@ A new kind follows all of them. A change to an old kind must not undo one.
   cut. The layout now proves nothing past the next platform is within a jump
   (`skipProblems`), and checkpoints count only in order (see "Building a
   map" above).
+- **Raising the saved jump count moved a race already running.** The same
+  migration that reads an old twenty-jump event as the new thirty read a
+  run's own copy of its preset the same way, so a race already under way had
+  platforms added past a course its players were already climbing. A run's
+  preset is read with `asBegun` (`state.ts`) instead, which only fills in
+  the fields a run from before shapes was missing and leaves its length as
+  it was (`30036f9f8`).
 
 ### The Events screen
 
