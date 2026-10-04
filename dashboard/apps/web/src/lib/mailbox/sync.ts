@@ -34,6 +34,7 @@ import { ACCOUNT_COLUMNS } from "./access";
 import { decodePart, unflow } from "./decode";
 import { rememberContacts } from "./contacts";
 import { applyRulesToMessage } from "./rules";
+import { heldFlags } from "./pending-flags";
 import { MailAuthError } from "./credentials";
 import { addressesFrom, asJson } from "./json";
 import { recordAccountState } from "./accounts";
@@ -1157,7 +1158,7 @@ export async function refreshThreads(accountId: string): Promise<void> {
  * since last time; where it does not, the flags of the window are asked for
  * outright, which is one command and a few kilobytes.
  */
-async function reconcileFlags(
+export async function reconcileFlags(
     client: ImapFlow,
     folder: FolderRow,
     highestModseq: bigint | null
@@ -1205,10 +1206,14 @@ async function reconcileFlags(
     for (const row of held) {
         const flags = changed.get(Number(row.uid));
         if (!flags) continue;
-        const seen = flags.has("\\Seen");
-        const flagged = flags.has("\\Flagged");
+        // A flag written here whose push to the server has not finished keeps
+        // its value: the server has not been told yet, and what it says now is
+        // what it said before - see `pending-flags`.
+        const local = heldFlags(row.id);
+        const seen = local.seen ?? flags.has("\\Seen");
+        const flagged = local.flagged ?? flags.has("\\Flagged");
         const answered = flags.has("\\Answered");
-        const important = importantFrom(flags, keywords, row.important);
+        const important = local.important ?? importantFrom(flags, keywords, row.important);
         if (
             seen === row.seen &&
             flagged === row.flagged &&

@@ -46,7 +46,15 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import type { MailMessageView, MailThreadView } from "@/lib/mailbox/views";
 import { mailPageParams, type MailPageNarrow } from "@/lib/mailbox/page-params";
 import { warmSanitizer } from "./sanitize";
-import { optimistically, stillOwed, withPatch, type ThreadPatch } from "./optimistic";
+import { optimistically, type ThreadPatch } from "./optimistic";
+import {
+    beginChange,
+    overlaysFor,
+    pendingChanges,
+    pendingChangesVersion,
+    subscribePendingChanges,
+    type PendingHandle
+} from "./pending-changes";
 import { useMailList, useMailThread, warmThread, type MailListAnswer } from "./use-mail-list";
 import { leavesTheView, runBetween, scopeOf, MAIL_DRAG_TYPE } from "./mail-actions";
 import {
@@ -55,6 +63,7 @@ import {
     useMemo,
     useRef,
     useState,
+    useSyncExternalStore,
     type ComponentPropsWithRef,
     type RefObject
 } from "react";
@@ -351,12 +360,9 @@ export function MailView({
      * arrives after: a refusal puts it back and says why, and a success is
      * simply the server agreeing with a screen that already showed it.
      *
-     * Cleared whenever the server's own answer arrives, which is what
-     * `threads` becoming a new array means. Keeping a patch past that would
-     * mean the screen quietly disagreeing with the server for ever - except
-     * for the one an action is still waiting on, which is held in `inFlight`
-     * and laid back over the new list, because a list that arrived is not
-     * necessarily the answer to what was asked.
+     * How long a change is laid over what the server sends is decided by when
+     * that answer was asked for, not by when it arrived - see `patched` below
+     * and `pending-changes`.
      */
     /**
      * The pages fetched below the first one.
@@ -406,43 +412,30 @@ export function MailView({
     );
     const openMessages = opened.answer?.messages ?? EMPTY_MESSAGES;
 
-    const [patched, setPatched] = useState<Record<string, ThreadPatch>>({});
     /**
-     * The overlay belonging to an action the mail server has not answered yet.
+     * What the reader has just done, laid over every answer that could not know
+     * it yet - see `pending-changes`, which holds the rule: an answer may say
+     * otherwise only if it was asked for after the server confirmed the change.
      *
-     * Held apart from `patched` because a new `threads` is not always the
-     * server's answer to what was just done. Filing the conversation that is
-     * open closes the reading pane first, and closing it is a navigation: these
-     * routes are dynamic, so the list comes back in a few tens of milliseconds
-     * with the row still in it, seconds before the mail server has moved
-     * anything. Clearing everything on that would put the row somebody just
-     * archived back on screen until the action landed, which is the one moment
-     * the overlay exists for.
+     * That replaced dropping the overlay whenever a new list arrived. A list is
+     * not the answer to what was just done: the copy this tab or the device
+     * kept, a refresh the live channel started a moment earlier and the one
+     * closing the reading pane triggers were all asked for before, and on each
+     * of them a message opened and left at once went back to bold, and a
+     * conversation just deleted came back.
      */
-    const inFlight = useRef<Record<string, ThreadPatch>>({});
-    /** Both together, always: an overlay that outlives the array under it has to
-     *  be dropped from both or it comes back on the next list. */
-    const clearPatches = useCallback(() => {
-        inFlight.current = {};
-        setPatched({});
-    }, []);
-    useEffect(() => {
-        // An overlay saying a conversation has LEFT is needed exactly as long as
-        // the list still sends it, which is longer than the action takes.
-        //
-        // A list is not re-read from the server the moment one is asked for: the
-        // copy this tab already holds is painted first and the request lands
-        // behind it. So dropping the overlay when the mail server answered put
-        // the row somebody had just deleted back on screen - out of a list
-        // fetched before the delete - until the new one arrived. It came back,
-        // and then it went, which is the screen twice disagreeing with itself.
-        //
-        // Dropped per conversation rather than all at once, so a list that has
-        // stopped sending one is the end of hiding it and nothing else is.
-        const held = stillOwed(inFlight.current, new Set(threads.map((thread) => thread.id)));
-        inFlight.current = held;
-        setPatched(held);
-    }, [threads]);
+    const ledgerVersion = useSyncExternalStore(
+        subscribePendingChanges,
+        pendingChangesVersion,
+        pendingChangesVersion
+    );
+    const patched = useMemo(
+        () => overlaysFor(pendingChanges(), list.requestedAt, Date.now()),
+        // The ledger is read through its version: a change begun, settled or
+        // abandoned is a new number.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+        [ledgerVersion, list.requestedAt]
+    );
 
     /**
      * Ask for the next page.
@@ -481,24 +474,15 @@ export function MailView({
         })();
     }, [cursor, firstPage, loadingMore, page]);
 
-    const patch = useCallback((ids: readonly string[], change: ThreadPatch) => {
-        setPatched((held) => withPatch(held, ids, change));
-    }, []);
+    /** Draw a change now, until the server's answer and every list asked for
+     *  before it are behind us. Settle it on a yes, abandon it on a no. */
+    const patchUntilAnswered = useCallback(
+        (ids: readonly string[], change: ThreadPatch): PendingHandle => beginChange(ids, change),
+        []
+    );
 
-    /** The same, for a change the mail server has been asked for and has not
-     *  answered yet, so it survives a list arriving in between - see
-     *  `inFlight`. Only an action uses this: a read mark is the server catching
-     *  up with a screen rather than something being waited on. */
     /** Whether the question about emptying this folder is on screen. */
     const [emptying, setEmptying] = useState(false);
-
-    const patchUntilAnswered = useCallback(
-        (ids: readonly string[], change: ThreadPatch) => {
-            inFlight.current = withPatch(inFlight.current, ids, change);
-            patch(ids, change);
-        },
-        [patch]
-    );
 
     /** The row as the reader should see it: what the server sent, with anything
      *  they have just done laid over it. */
@@ -755,13 +739,35 @@ export function MailView({
         // message unread, which is the truth, and the next list brings the bold
         // row back on its own.
         nudgeUnread(unreadNudges([row]));
-        patch([row.id], { unreadCount: 0 });
+        const pending = patchUntilAnswered([row.id], { unreadCount: 0 });
+        // Carried on past this conversation closing - leaving at once is most of
+        // what triaging is - and the list read again once the server has it, so
+        // a list asked for in the meantime cannot put the bold row back.
         void actOnAction({
             messageIds: [row.leadMessageId],
             action: "read",
             scope: "conversation"
-        });
-    }, [nudgeUnread, openThread, patch, preferences.markRead, readOnOpen, shown, unreadNudges]);
+        }).then(
+            (outcome) => {
+                if (refusalOf(outcome)) {
+                    pending.abandon();
+                    return;
+                }
+                pending.settle();
+                refreshMailbox();
+            },
+            () => pending.abandon()
+        );
+    }, [
+        nudgeUnread,
+        openThread,
+        patchUntilAnswered,
+        preferences.markRead,
+        readOnOpen,
+        refreshMailbox,
+        shown,
+        unreadNudges
+    ]);
 
     const act = useCallback(
         (action: MailAction, messageIds: readonly string[], announce: string) => {
@@ -770,7 +776,7 @@ export function MailView({
             const ahead = optimistically(action);
             // The row moves now. A mail server is slow enough that waiting for it
             // reads as the screen having ignored the click.
-            if (ahead) patchUntilAnswered(aimed, ahead);
+            const pending = ahead ? patchUntilAnswered(aimed, ahead) : null;
             // And so does the number in the rail beside it. Measured off what
             // the reader can already see rather than off the server's last word,
             // so marking an already-read conversation read again takes nothing
@@ -819,7 +825,7 @@ export function MailView({
                 // costs one question rather than the action being lost.
                 const missing = missingFolderRole(outcome);
                 if (missing) {
-                    clearPatches();
+                    pending?.abandon();
                     if (reopen) openAgain(reopen);
                     askFolderRole(missing, () => act(action, messageIds, announce));
                     return;
@@ -830,7 +836,7 @@ export function MailView({
                     // the change after the server refused it would be lying about
                     // somebody's mail - and a reader taken out of a conversation
                     // that was never filed has to be put back in it.
-                    clearPatches();
+                    pending?.abandon();
                     if (reopen) openAgain(reopen);
                     toast.show({ title: said });
                     return;
@@ -843,9 +849,7 @@ export function MailView({
                 // overlay. The list on screen was fetched before this happened
                 // and still has the row in it - the effect on `threads` above is
                 // what lets it go, the first time a list comes back without it.
-                inFlight.current = Object.fromEntries(
-                    Object.entries(inFlight.current).filter(([, over]) => over.gone)
-                );
+                pending?.settle();
                 setSelected([]);
                 toast.show({ title: announce });
                 // Done from the list, but it may have been aimed at whatever is
@@ -876,7 +880,6 @@ export function MailView({
         },
         [
             askFolderRole,
-            clearPatches,
             closeOpen,
             nudgeUnread,
             openAgain,
@@ -917,7 +920,7 @@ export function MailView({
             // The rows move now. A mail server is slow enough that waiting for
             // it reads as the drop having been ignored - and a drop that looks
             // ignored is one somebody does again.
-            if (leaves) patchUntilAnswered(aimed, { gone: true });
+            const pending = leaves ? patchUntilAnswered(aimed, { gone: true }) : null;
 
             const aimedRows = aimed.flatMap((id) => {
                 const row = threads.find((thread) => thread.id === id);
@@ -949,7 +952,7 @@ export function MailView({
                 if (said) {
                     // Both halves back: the rows, and the reader who was taken
                     // out of a conversation that was never actually filed.
-                    clearPatches();
+                    pending?.abandon();
                     if (reopen) openAgain(reopen);
                     toast.show({ title: said });
                     return;
@@ -957,9 +960,7 @@ export function MailView({
                 // A conversation that LEFT keeps its overlay: the list on screen
                 // was fetched before this and still holds the row, so it is let
                 // go the first time a list comes back without it.
-                inFlight.current = Object.fromEntries(
-                    Object.entries(inFlight.current).filter(([, over]) => over.gone)
-                );
+                pending?.settle();
                 setSelected([]);
                 toast.show({
                     title: t("shell.moved", { count: messageIds.length, folder: folderName })
@@ -972,7 +973,6 @@ export function MailView({
             });
         },
         [
-            clearPatches,
             closeOpen,
             nudgeUnread,
             openAgain,
@@ -1018,7 +1018,7 @@ export function MailView({
             announce: string
         ) => {
             if (messageIds.length === 0) return;
-            patchUntilAnswered(threadsOf(messageIds), state);
+            const pending = patchUntilAnswered(threadsOf(messageIds), state);
             startBusy(async () => {
                 const outcome = await setConversationStateAction({
                     messageIds: [...messageIds],
@@ -1026,17 +1026,17 @@ export function MailView({
                 });
                 const said = refusalOf(outcome);
                 if (said) {
-                    clearPatches();
+                    pending.abandon();
                     toast.show({ title: said });
                     return;
                 }
-                inFlight.current = {};
+                pending.settle();
                 setSelected([]);
                 toast.show({ title: announce });
                 refreshMailbox();
             });
         },
-        [clearPatches, patchUntilAnswered, refreshMailbox, threadsOf, toast]
+        [patchUntilAnswered, refreshMailbox, threadsOf, toast]
     );
 
     const snooze = useCallback(
@@ -1792,7 +1792,7 @@ export function MailView({
                         // command that walks a whole folder on somebody else's
                         // server, which is the slowest thing in this app.
                         const here = threads.map((thread) => thread.id);
-                        patchUntilAnswered(here, { gone: true });
+                        const pending = patchUntilAnswered(here, { gone: true });
                         if (openThread) closeOpen();
                         void (async () => {
                             const outcome = await emptyFolderAction({
@@ -1809,10 +1809,11 @@ export function MailView({
                             });
                             const said = refusalOf(outcome);
                             if (said) {
-                                clearPatches();
+                                pending.abandon();
                                 toast.show({ title: said });
                                 return;
                             }
+                            pending.settle();
                             toast.show({ title: t("list.emptied", { name: context.title }) });
                             refreshMailbox();
                         })();
@@ -1838,7 +1839,10 @@ export function MailView({
                         // takes a round trip. The row stops being bold now.
                         onRead={() => {
                             nudgeUnread(unreadNudges([openThread]));
-                            patch([openThread.id], { unreadCount: 0 });
+                            const pending = patchUntilAnswered([openThread.id], {
+                                unreadCount: 0
+                            });
+                            return (accepted) => (accepted ? pending.settle() : pending.abandon());
                         }}
                         // Filed or thrown away from its own header. Same reason
                         // as above, from the other side of the screen.
@@ -1856,14 +1860,15 @@ export function MailView({
                         // beside the empty space where they had been reading it,
                         // which reads as the delete not having happened.
                         onGone={() => {
-                            patchUntilAnswered([openThread.id], { gone: true });
+                            const pending = patchUntilAnswered([openThread.id], { gone: true });
                             if (preferences.afterFiling === "next") openNext([openThread.id]);
                             else closeOpen();
+                            return (accepted) => (accepted ? pending.settle() : pending.abandon());
                         }}
                         // Refused. Both halves go back: the row returns to the
-                        // list and the reader returns to the conversation.
+                        // list (the change is abandoned in `onGone`'s answer) and
+                        // the reader returns to the conversation.
                         onStayed={() => {
-                            clearPatches();
                             openAgain(openThread.id);
                         }}
                         // The same block the list's own menu offers, from an

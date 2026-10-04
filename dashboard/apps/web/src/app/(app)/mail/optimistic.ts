@@ -63,20 +63,3 @@ export function withPatch(
     for (const id of ids) next[id] = { ...next[id], ...change };
     return next;
 }
-
-/**
- * The overlays still owed after a new list arrived.
- *
- * A list is painted from what the tab already held before the request behind it
- * lands, so a list arriving is not proof the server has done anything. An
- * overlay saying a row has LEFT is kept exactly as long as the list still sends
- * that row; everything else is the server's to say from here.
- */
-export function stillOwed(
-    inFlight: Readonly<Record<string, ThreadPatch>>,
-    listed: ReadonlySet<string>
-): Record<string, ThreadPatch> {
-    return Object.fromEntries(
-        Object.entries(inFlight).filter(([id, over]) => !over.gone || listed.has(id))
-    );
-}

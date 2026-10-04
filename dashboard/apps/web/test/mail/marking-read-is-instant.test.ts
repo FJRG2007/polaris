@@ -56,10 +56,14 @@ describe("marking it read on the way in", () => {
         const mark = view.slice(view.indexOf("const [readOnOpen, setReadOnOpen]"));
         const body = mark.slice(0, mark.indexOf("const act = useCallback"));
         expect(body).toContain("nudgeUnread(unreadNudges([row]))");
-        expect(body).toContain("patch([row.id], { unreadCount: 0 })");
-        // Nobody waits on the answer: a refusal leaves it unread, which is the
-        // truth, and the next list brings the bold row back on its own.
+        expect(body).toContain("patchUntilAnswered([row.id], { unreadCount: 0 })");
+        // Nobody waits on the answer, and it is carried on past the pane closing:
+        // a refusal takes the change back, and a yes is settled and the list
+        // read again, so a list asked for in between cannot put the bold row back.
         expect(body).toContain("void actOnAction({");
+        expect(body).toContain("pending.abandon();");
+        expect(body).toContain("pending.settle();");
+        expect(body).toContain("refreshMailbox();");
     });
 
     it("belongs to the conversation that was open, and to no other", async () => {

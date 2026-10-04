@@ -17,6 +17,7 @@
  * told to make one rather than silently doing nothing.
  */
 
+import { holdFlag } from "./pending-flags";
 import { teachSpam } from "./spam";
 import { after } from "next/server";
 import { prisma } from "@polaris/db";
@@ -480,12 +481,26 @@ async function setFlag(
         folderId: string;
         seen: boolean;
     }[],
-    flag: { flag: string; add: boolean; column: string }
+    flag: { flag: string; add: boolean; column: "seen" | "flagged" | "important" }
 ): Promise<number> {
-    await prisma.mailMessage.updateMany({
-        where: { id: { in: messages.map((message) => message.id) } },
-        data: { [flag.column]: flag.add }
-    });
+    // Held from before the row is written until the mail server has been told,
+    // so a sync between the two keeps this value rather than the server's old
+    // one - see `pending-flags`.
+    const release = holdFlag(
+        messages.map((message) => message.id),
+        flag.column,
+        flag.add
+    );
+    try {
+        await prisma.mailMessage.updateMany({
+            where: { id: { in: messages.map((message) => message.id) } },
+            data: { [flag.column]: flag.add }
+        });
+    } catch (caught) {
+        // Nothing was written, so there is nothing to hold.
+        release();
+        throw caught;
+    }
     const accountIds = [...new Set(messages.map((message) => message.accountId))];
     // The conversation's own counts, which is what the list draws: a message
     // marked read whose thread still says one unread is a row that stays bold.
@@ -542,12 +557,19 @@ async function setFlag(
             }).catch(() => undefined);
         }
     };
+    const pushThenRelease = async (): Promise<void> => {
+        try {
+            await push();
+        } finally {
+            release();
+        }
+    };
     try {
-        after(push);
+        after(pushThenRelease);
     } catch {
         // No request to be after - a rule firing on a sync, a sweep - so there is
         // nothing waiting on this to be kind to.
-        void push();
+        void pushThenRelease();
     }
     return messages.length;
 }

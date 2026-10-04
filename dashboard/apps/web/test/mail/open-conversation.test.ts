@@ -93,7 +93,7 @@ describe("the address stops naming what was moved", () => {
     it("closes the pane from the conversation's own header", async () => {
         const thread = await readFile(`${SCREENS}thread-view.tsx`, "utf8");
         expect(thread).toContain("const leaving = leavesTheView(action);");
-        expect(thread).toContain("onGone?.();");
+        expect(thread).toContain("const answered = leaving ? onGone?.() : undefined;");
         const view = await readFile(`${SCREENS}mail-view.tsx`, "utf8");
         // And the list is what it is told to do, or the pane calls into nothing.
         // Which of the two it does is the reader's own answer - back to the list,
@@ -107,6 +107,10 @@ describe("the address stops naming what was moved", () => {
         // space where they were reading it, which reads as nothing having
         // happened.
         expect(view).toContain("patchUntilAnswered([openThread.id], { gone: true })");
+        // And the answer reaches it, so the overlay is settled or taken back.
+        expect(view).toContain(
+            "return (accepted) => (accepted ? pending.settle() : pending.abandon());"
+        );
     });
 
     it("closes it before the mail server answers, and puts it back if it refuses", async () => {
@@ -116,18 +120,20 @@ describe("the address stops naming what was moved", () => {
         // watching nothing happen.
         const thread = await readFile(`${SCREENS}thread-view.tsx`, "utf8");
         const act = thread.slice(thread.indexOf("const act = useCallback"));
-        const leaves = act.indexOf("if (leaving) onGone?.();");
+        const leaves = act.indexOf("const answered = leaving ? onGone?.() : undefined;");
         const asks = act.indexOf("startBusy(");
         expect(leaves, "the pane closes inside the action").toBeGreaterThan(0);
         expect(leaves, "the pane closes before the server is asked").toBeLessThan(asks);
         // And the other half, without which leaving early is a lie: a refusal puts
         // the reader back where they were.
         expect(act).toContain("if (leaving) onStayed?.();");
+        expect(act).toContain("answered?.(false);");
+        expect(act).toContain("answered?.(true);");
 
         const view = await readFile(`${SCREENS}mail-view.tsx`, "utf8");
         expect(view).toContain("openAgain(openThread.id);");
         // Both halves go back on a refusal, not only the reader.
-        expect(view).toContain("clearPatches();");
+        expect(view).toContain("pending?.abandon();");
         expect(view).toContain("mailAddress({ open: threadId })");
     });
 
@@ -164,31 +170,26 @@ describe("the address stops naming what was moved", () => {
         expect(view).not.toContain("router.push(window.location.pathname");
     });
 
-    it("keeps the row hidden until a list comes back without it", async () => {
+    it("keeps the row hidden from every list asked for before the delete was confirmed", async () => {
         const view = await readFile(`${SCREENS}mail-view.tsx`, "utf8");
         // Closing the pane is a navigation, and these routes are dynamic: a
         // fresh list arrives in a few tens of milliseconds with the row still in
-        // it, seconds before the mail server has moved anything. Clearing every
-        // overlay on a new list put the conversation somebody had just deleted
-        // back on screen for as long as the delete took - which is the one
-        // moment the overlay exists for.
-        expect(view).toContain("patchUntilAnswered(aimed, ahead)");
-        // Nor when the mail server answers, which is the same bug one step
-        // later: the list on screen was fetched BEFORE the delete and is
-        // repainted from the copy this tab holds while the new one is asked
-        // for, so a row let go of at the answer comes back and then goes.
-        expect(view).toContain("Object.entries(inFlight.current).filter(([, over]) => over.gone)");
-        // What lets it go is the list itself, per conversation: the first one
-        // that no longer has the row.
-        // The rule itself is `stillOwed` (see `optimistic-rows.test.ts`); here,
-        // only that the list hands it every row it still sends.
-        expect(view).toContain(
-            "stillOwed(inFlight.current, new Set(threads.map((thread) => thread.id)))"
-        );
-        // A flag the server has written is still dropped at the answer: the next
-        // list says it too, and holding it would be the screen disagreeing with
-        // the mailbox for ever.
-        expect(view).toContain("inFlight.current = held;");
+        // it, seconds before the mail server has moved anything - and the copy
+        // this tab or this device kept is painted before any of them. Dropping
+        // the overlay on any of those put the conversation somebody had just
+        // deleted back on screen.
+        expect(view).toContain("const pending = ahead ? patchUntilAnswered(aimed, ahead) : null;");
+        // The rule is time: an answer may contradict the change only if it was
+        // asked for after the change was confirmed. It lives in
+        // `pending-changes` (see `pending-changes.test.ts`); here, only that the
+        // screen hands it the moment what it is drawing was asked for.
+        expect(view).toContain("overlaysFor(pendingChanges(), list.requestedAt, Date.now())");
+        const list = await readFile(`${SCREENS}use-mail-list.ts`, "utf8");
+        expect(list).toContain("const requestedAt = Date.now();");
+        // Settled at the answer, taken back at a refusal - never cleared because
+        // a list happened to arrive.
+        expect(view).toContain("pending?.settle();");
+        expect(view).not.toContain("inFlight");
     });
 
     /**

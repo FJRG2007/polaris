@@ -128,11 +128,14 @@ export function ThreadView({
      *  a time, or on a phone - because then this is the only way back to it. */
     onBack?: () => void;
     /** Told the moment a message here is marked read, so the row in the list
-     *  stops being bold now rather than after the round trip. */
-    onRead?: () => void;
+     *  stops being bold now rather than after the round trip. May answer with
+     *  what to call once the server has said yes or no, which is what lets the
+     *  list keep the row read over answers asked for before it was. */
+    onRead?: () => ((accepted: boolean) => void) | void;
     /** Told when this conversation has been filed or thrown away from here, so
-     *  the address stops naming something the server no longer has. */
-    onGone?: () => void;
+     *  the address stops naming something the server no longer has. May answer
+     *  the same way as `onRead`. */
+    onGone?: () => ((accepted: boolean) => void) | void;
     /** Put the reader back, for a filing the server refused after this pane had
      *  already stepped out of the way. */
     onStayed?: () => void;
@@ -188,7 +191,7 @@ export function ThreadView({
             // the reader sat inside a message they had just deleted, watching
             // nothing happen. If it is refused, they are put back and told.
             const leaving = leavesTheView(action);
-            if (leaving) onGone?.();
+            const answered = leaving ? onGone?.() : undefined;
             startBusy(async () => {
                 const outcome = await actOnAction({ messageIds, action, scope: scopeOf(action) });
                 const missing = missingFolderRole(outcome);
@@ -196,16 +199,19 @@ export function ThreadView({
                     // Back where they were, so the question is answered with the
                     // conversation in front of them rather than about a message
                     // they can no longer see.
+                    answered?.(false);
                     if (leaving) onStayed?.();
                     askFolderRole(missing, () => act(action));
                     return;
                 }
                 const said = refusalOf(outcome);
                 if (said) {
+                    answered?.(false);
                     if (leaving) onStayed?.();
                     toast.show({ title: said });
                     return;
                 }
+                answered?.(true);
                 // Archived, trashed or deleted: this pane was looking at messages
                 // the server has now moved out from under it, and it closed
                 // before the round trip.
@@ -757,7 +763,7 @@ function MessageCard({
     accountId: string;
     onBlock?: (accountId: string, address: string) => void;
     onToggle: () => void;
-    onRead?: () => void;
+    onRead?: () => ((accepted: boolean) => void) | void;
 }) {
     const format = useDisplayFormat();
     const t = useTranslations("mail");
@@ -868,14 +874,23 @@ function MessageCard({
             marked.current = true;
             // The list stops being bold now. The server is told in the same
             // breath, and the round trip is no longer something anybody watches.
-            onRead?.();
+            // Carried on past this pane closing: leaving at once is most of
+            // what triaging a mailbox is, and the answer still has to land.
+            const answered = onRead?.();
             void (async () => {
-                const outcome = await actOnAction({ messageIds: [message.id], action: "read" });
+                let accepted = false;
+                try {
+                    const outcome = await actOnAction({ messageIds: [message.id], action: "read" });
+                    accepted = !refusalOf(outcome);
+                } catch {
+                    accepted = false;
+                }
                 // A server that refused leaves it unread, which is the truth.
                 // Nothing is said about it: nobody asked for this, so a failure is
-                // not news - and the next refresh brings the bold row back on its
-                // own.
-                if (!refusalOf(outcome)) refreshMailbox();
+                // not news - and the row goes back to bold with the change taken
+                // away. Accepted, the list is read again so it says so itself.
+                answered?.(accepted);
+                if (accepted) refreshMailbox();
             })();
         };
 

@@ -151,7 +151,8 @@ describe("emptying it", () => {
         expect(body.indexOf("patchUntilAnswered(here, { gone: true });")).toBeLessThan(
             body.indexOf("await emptyFolderAction(")
         );
-        expect(body).toContain("clearPatches();");
+        expect(body).toContain("pending.abandon();");
+        expect(body).toContain("pending.settle();");
     });
 
     it("empties the mailboxes on screen rather than every mailbox there is", async () => {
