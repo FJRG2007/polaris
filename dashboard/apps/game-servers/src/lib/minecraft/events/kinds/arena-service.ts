@@ -580,8 +580,8 @@ function goLines(run: stored.EventRun, language: speech.Speech, offhand: boolean
                 arena.moveTo(one.name, spots.get(lower(one.name))!),
                 ...run.kit.map((id) =>
                     offhand && id === duel.OFFHAND_ITEM
-                        ? arena.equipMarked(one.name, "weapon.offhand", id, marker)
-                        : arena.giveMarked(one.name, id, 1, marker)
+                        ? arena.equipMarked(one.name, "weapon.offhand", id, marker, arena.LASTS)
+                        : arena.giveMarked(one.name, id, 1, marker, arena.LASTS)
                 ),
                 ...arena.titleTo(
                     one.name,

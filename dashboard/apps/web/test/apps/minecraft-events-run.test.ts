@@ -7901,6 +7901,17 @@ describe("a king of the hill", () => {
                     /^item replace entity Ana armor\.head with minecraft:golden_helmet/.test(line)
                 )
         ).toBe(true);
+        // A golden helmet wears out: the crown never does.
+        expect(
+            world.sent
+                .slice(from)
+                .some(
+                    (line) =>
+                        line.startsWith(
+                            "item replace entity Ana armor.head with minecraft:golden_helmet"
+                        ) && /minecraft:unbreakable=\{\}|Unbreakable:1b/.test(line)
+                )
+        ).toBe(true);
         expect(world.sent.slice(from).some((line) => line.includes("wears the crown"))).toBe(true);
         // Overtaken: the crown changes heads.
         world.scores = { Ana: 10, Ben: 20 };
@@ -8072,7 +8083,7 @@ describe("a team duel", () => {
         ).toBe(false);
         expect(world.sent).toContain("gamemode adventure Ana");
         expect(world.sent).toContain(
-            "give Ana minecraft:stone_sword[minecraft:custom_data={polaris_event:1b}] 1"
+            "give Ana minecraft:stone_sword[minecraft:custom_data={polaris_event:1b},minecraft:unbreakable={}] 1"
         );
         expect(world.sent).toContain(
             "execute if entity @a[name=Ana,team=] run team join pe_red Ana"
@@ -8083,7 +8094,7 @@ describe("a team duel", () => {
         // Nobody heals on a full belly, and the shield is already in the off hand.
         expect(world.sent).toContain("gamerule naturalRegeneration false");
         expect(world.sent).toContain(
-            "item replace entity Ana weapon.offhand with minecraft:shield[minecraft:custom_data={polaris_event:1b}] 1"
+            "item replace entity Ana weapon.offhand with minecraft:shield[minecraft:custom_data={polaris_event:1b},minecraft:unbreakable={}] 1"
         );
         expect(world.sent.some((line) => line.startsWith("give Ana minecraft:shield"))).toBe(false);
 
@@ -9844,7 +9855,7 @@ describe("capture the flag", () => {
         expect(world.sent).toContain("gamerule naturalRegeneration false");
         expect(world.sent).toContain("gamerule keepInventory true");
         expect(world.sent).toContain(
-            "give Ana minecraft:stone_sword[minecraft:custom_data={polaris_event:1b}] 1"
+            "give Ana minecraft:stone_sword[minecraft:custom_data={polaris_event:1b},minecraft:unbreakable={}] 1"
         );
         // The quick look marks touches between ticks.
         await play(500);

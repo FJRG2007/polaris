@@ -533,7 +533,7 @@ export async function eventsView(installedAppId: string): Promise<EventsView> {
             "slow"
         ).catch(() => []);
     }
-    const seen = playing.seenOn(installedAppId);
+    const seen = await playersNow(row.ownerId, installedAppId);
     return {
         config,
         run: run
@@ -4819,6 +4819,29 @@ async function knownVersion(ownerId: string, installedAppId: string): Promise<st
 }
 
 // ------------------------------------------------------------------ who is playing
+
+/**
+ * Who is on for the Events screen: looked at again unless somebody looked a
+ * moment ago (`lookIfDue`), never waited on for long, and the last look when
+ * the server is off or slow.
+ *
+ * The screen used to show only what the random draw's sweep had last seen -
+ * once a minute at best, and never while the draw was off - so a player who
+ * joined left Run disabled as "too few players" until the page was reloaded.
+ */
+async function playersNow(
+    ownerId: string,
+    installedAppId: string
+): Promise<ReadonlyMap<string, plan.Seen> | null> {
+    const looked = await withTimeout(
+        withServerContainer(ownerId, installedAppId, async (server) =>
+            server.running ? playing.lookIfDue(installedAppId, server) : null
+        ),
+        3_000,
+        "slow"
+    ).catch(() => null);
+    return looked ?? playing.seenOn(installedAppId);
+}
 
 /** Look at who is on and which way they are facing, and remember it. Null when
  *  the server is not running. */

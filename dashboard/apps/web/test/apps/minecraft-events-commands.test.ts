@@ -2310,8 +2310,10 @@ describe("what an arena sends", () => {
         expect(modern).toContain("minecraft:custom_data={polaris_event:1b}");
         expect(modern).toContain('minecraft:can_break={blocks:"minecraft:snow_block"}');
         expect(modern).toContain("correct_for_drops:false");
+        // It lasts the whole game, however much snow is dug.
+        expect(modern).toContain("minecraft:unbreakable={}");
         expect(stage.markedShovel("Ana", "nbt")).toBe(
-            'give Ana minecraft:iron_shovel{polaris_event:1b,CanDestroy:["minecraft:snow_block"]} 1'
+            'give Ana minecraft:iron_shovel{polaris_event:1b,CanDestroy:["minecraft:snow_block"],Unbreakable:1b} 1'
         );
     });
 

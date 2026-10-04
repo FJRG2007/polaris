@@ -273,7 +273,7 @@ export function kitCommands(name: string, marker: Marker, palette: Palette = "gl
     const blocks = PALETTES[palette].blocks;
     const placeOn = [FLOOR, ...blocks];
     return [
-        giveMarked(name, TOOL, 1, marker, { breaks: blocks }),
+        giveMarked(name, TOOL, 1, marker, { breaks: blocks, unbreakable: true }),
         ...blocks.map((id) => giveMarked(name, id, STACK, marker, { placeOn }))
     ];
 }

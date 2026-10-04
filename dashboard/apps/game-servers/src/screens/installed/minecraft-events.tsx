@@ -696,6 +696,16 @@ export function MinecraftEvents({
     // clock and the standings move; slowly otherwise, so an event that starts
     // on its own shows up. An edit in progress is never overwritten by a read.
     const running = view?.run !== null && view?.run !== undefined;
+    // Some saved event cannot be run for want of players on the server.
+    const waitingForPlayers =
+        view?.players != null &&
+        view.config.presets.some(
+            (preset) =>
+                view.players!.online <
+                (catalog.takesJoiners(preset)
+                    ? catalog.joinersNeeded(preset)
+                    : catalog.minPlayersOf(preset))
+        );
     useEffect(() => {
         let alive = true;
         const read = () =>
@@ -714,12 +724,23 @@ export function MinecraftEvents({
                     // connection - is tried again on the next beat.
                 });
         read();
-        const timer = setInterval(read, running ? 5_000 : 30_000);
+        // Quickly too while an event is held back for want of players, so the
+        // moment one joins Run turns on, without a reload.
+        const timer = setInterval(read, running || waitingForPlayers ? 5_000 : 30_000);
+        // And at once when the tab comes back into view: the players may have
+        // changed while it was away.
+        const back = () => {
+            if (document.visibilityState === "visible") read();
+        };
+        document.addEventListener("visibilitychange", back);
+        window.addEventListener("focus", back);
         return () => {
             alive = false;
             clearInterval(timer);
+            document.removeEventListener("visibilitychange", back);
+            window.removeEventListener("focus", back);
         };
-    }, [installedAppId, running]);
+    }, [installedAppId, running, waitingForPlayers]);
 
     // A line about what was just done is said once and goes: "Blood moon is
     // starting" left on screen until a reload read as the event never moving on.
