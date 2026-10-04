@@ -37,13 +37,17 @@
  * The seekers wait in a cage of barrier in the middle, blinded and unable to
  * move, for `hideSeconds`; the cage then comes down (only its barrier, only in
  * its own box). Everybody is unhurt the whole game. A seeker's hit finds a
- * hider (`foundBy`): only seekers can strike, so a hider hurt beside a seeker
- * who struck was found by them. Whoever is found seeks too.
+ * hider (`foundBy`): the events data pack (`hits.ts`) says who was hurt by a
+ * player - never by a fall off the gallery, four blocks up - and the game who
+ * hurt them, where it can; before that, only seekers can strike, so a hider
+ * hurt beside a seeker who struck was found by them. Whoever is found seeks
+ * too.
  *
  * Pure; the loop is `hide-and-seek-service.ts`.
  */
 
 import { z } from "zod";
+import * as hits from "./hits";
 import type { Box } from "../state";
 import type { Spot } from "./arena";
 import type { Fill } from "./arena-game";
@@ -1232,14 +1236,21 @@ export function seekersFor(seed: string, names: readonly string[], wanted: numbe
 }
 
 /**
- * Who found a hider who was hurt: of the seekers who struck since the last
- * look, the nearest within `FIND_REACH`. Nobody else can strike, and no fall in
- * the hall hurts, so a hit near a seeker who struck is theirs.
+ * Who found a hider who was hurt. Where the game was asked who hurt them
+ * (`attacker`, from 1.19.4), that one, if they seek - and nobody when nothing
+ * did, as after a fall. Otherwise, of the seekers who struck since the last
+ * look, the nearest within `FIND_REACH`: nobody else can strike, so a hit near
+ * a seeker who struck is theirs.
  */
 export function foundBy(
     hider: { x: number; y: number; z: number },
-    struck: readonly { name: string; x: number; y: number; z: number }[]
+    struck: readonly { name: string; x: number; y: number; z: number }[],
+    attacker?: string | null,
+    seekers: readonly string[] = struck.map((one) => one.name)
 ): string | null {
+    if (attacker === null) return null;
+    if (attacker !== undefined)
+        return seekers.find((one) => one.toLowerCase() === attacker.toLowerCase()) ?? null;
     let best: string | null = null;
     let nearest = FIND_REACH;
     for (const one of struck) {
@@ -1327,7 +1338,8 @@ export function setupLines(names: readonly [string, string]): string[] {
 
 export const TEARDOWN = [
     ...TEAMS.map((team) => `team remove ${team}`),
-    ...[DEALT, TAKEN].map((objective) => `scoreboard objectives remove ${objective}`)
+    ...[DEALT, TAKEN].map((objective) => `scoreboard objectives remove ${objective}`),
+    ...hits.TAGS_OFF
 ];
 
 /** Onto a side's team, only if they are on none of the server's own - or, found,

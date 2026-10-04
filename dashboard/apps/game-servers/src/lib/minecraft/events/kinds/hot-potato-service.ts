@@ -2,15 +2,18 @@
  * Playing hot potato (`hot-potato.ts`): the arena's own steps are
  * `arena-service`'s; this is its part of them.
  *
- * Each tick reads the damage dealt and taken since the last one and where
- * everybody is. In that order it then: puts out whoever has been gone from the
+ * Each tick reads where everybody is and the hits since the last one - the
+ * events data pack's (`hits.ts`), or the damage dealt and taken where the pack
+ * is not on. In that order it then: puts out whoever has been gone from the
  * server two looks running; passes the potato when its holder struck and
- * somebody was hurt (the nearest of them); sets off a fuse that has run out -
+ * somebody was hurt - by the holder, where the game says who hurt them, and
+ * the nearest of them; sets off a fuse that has run out -
  * its holder out, to the gallery - and after a breath draws the next round's
  * holder. The rounds are written into the run before a tick ends, their times
  * as clock times, so a restart picks the fuse up where it was.
  */
 
+import * as hits from "./hits";
 import * as arena from "./arena";
 import * as catalog from "../catalog";
 import * as potato from "./hot-potato";
@@ -18,6 +21,7 @@ import * as speech from "../../speech";
 import * as written from "../messages";
 import * as commands from "../commands";
 import type * as stored from "../state";
+import * as hitsService from "./hits-service";
 import * as said from "./hot-potato-messages";
 import type { ArenaGame, ItemSyntax, KindContext } from "./arena-game";
 
@@ -32,8 +36,8 @@ function optionsOf(run: stored.EventRun): catalog.EventOptions<"hot-potato"> {
 
 /** What one run keeps between ticks: nothing that must survive a restart. */
 interface Memory {
-    dealt: Map<string, number>;
-    taken: Map<string, number>;
+    dealt: hits.Tally;
+    taken: hits.Tally;
     /** Looks running each player was not on the server. */
     missing: Map<string, number>;
 }
@@ -44,7 +48,7 @@ function memoryOf(runId: string): Memory {
     let memory = memories.get(runId);
     if (!memory) {
         if (memories.size >= 16) memories.delete(memories.keys().next().value!);
-        memory = { dealt: new Map(), taken: new Map(), missing: new Map() };
+        memory = { dealt: hits.tally(), taken: hits.tally(), missing: new Map() };
         memories.set(runId, memory);
     }
     return memory;
@@ -134,23 +138,19 @@ async function tick(ctx: KindContext, lines: string[]): Promise<string | null> {
     const marker = run.marker;
     const itemCommand = await ctx.atLeast([1, 17]);
     const say = (line: string) => ctx.server.say([line]);
-    const dealt = commands.readScores(await say(potato.READ_DEALT));
-    const taken = commands.readScores(await say(potato.READ_TAKEN));
     const here = new Map(
         commands.readWhere(await say(commands.IN_OVERWORLD)).map((one) => [lower(one.name), one])
     );
-    // Who struck, and who was hurt, since the last look; nothing on the first.
-    const since = (scores: Map<string, number>, kept: Map<string, number>) => {
-        const fresh = new Set<string>();
-        for (const [name, value] of scores) {
-            const before = kept.get(name);
-            if (before !== undefined && value > before) fresh.add(lower(name));
-            kept.set(name, value);
-        }
-        return fresh;
-    };
-    const struck = since(dealt, memory.dealt);
-    const hurt = since(taken, memory.taken);
+    // Who struck, and who was hurt, since the last look: the pack's, or else
+    // what the damage counts say - nothing on the first look after a restart.
+    const taken = await hitsService.take(ctx);
+    const on = new Set(here.keys());
+    const struck =
+        taken?.struck ??
+        hits.roseFor(memory.dealt, commands.readScores(await say(potato.READ_DEALT)), on);
+    const hurt =
+        taken?.hurt ??
+        hits.roseFor(memory.taken, commands.readScores(await say(potato.READ_TAKEN)), on);
 
     const before = potato.stateOf(run.game);
     const state = structuredClone(before ?? firstRound(run, now));
@@ -183,7 +183,8 @@ async function tick(ctx: KindContext, lines: string[]): Promise<string | null> {
         );
     }
 
-    // Passed: the holder struck and somebody was hurt - the nearest of them.
+    // Passed: the holder struck and somebody was hurt - by the holder, where
+    // the game says who hurt them - the nearest of them.
     const holder = state.holder;
     if (
         holder &&
@@ -192,16 +193,21 @@ async function tick(ctx: KindContext, lines: string[]): Promise<string | null> {
         struck.has(lower(holder))
     ) {
         const from = here.get(lower(holder));
+        const victims = alive().filter(
+            (one) =>
+                lower(one.name) !== lower(holder) &&
+                hurt.has(lower(one.name)) &&
+                here.has(lower(one.name))
+        );
+        const by = await hitsService.attackers(
+            ctx,
+            victims.map((one) => one.name)
+        );
         const hit = from
             ? potato.hitBy(
                   from,
-                  alive()
-                      .filter(
-                          (one) =>
-                              lower(one.name) !== lower(holder) &&
-                              hurt.has(lower(one.name)) &&
-                              here.has(lower(one.name))
-                      )
+                  victims
+                      .filter((one) => potato.hurtByHolder(by.get(lower(one.name)), holder))
                       .map((one) => ({ ...here.get(lower(one.name))!, name: one.name }))
               )
             : null;
@@ -332,6 +338,7 @@ export const hotPotato: ArenaGame = {
     fills: (_run, box) => potato.platformFills(box),
     blocks: () => [...potato.PLATFORM_BLOCKS],
     kit: () => [potato.POTATO],
+    hits: true,
     side: (_run, index) => index,
     spot: spotOf,
     beginLines: () => potato.setupLines(),

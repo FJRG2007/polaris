@@ -37,6 +37,7 @@ import * as build from "./build-battle";
 import * as arrival from "./arrival";
 import * as hill from "./hill";
 import * as hillService from "./hill-service";
+import * as hitsService from "./hits-service";
 import * as stashService from "./stash-service";
 import * as commands from "../commands";
 import * as speech from "../../speech";
@@ -149,7 +150,10 @@ export async function arenaTick(ctx: KindContext, lines: string[]): Promise<stri
     if (ctx.run.arena) lines.push(...commands.hostilesOut(ctx.run.arena.box));
     if (ctx.run.readyAt === null) {
         if (!ctx.run.enrolled) await enroll(ctx, lines);
-        else if (!ctx.run.arena) await raise(ctx);
+        else if (!ctx.run.arena) {
+            if (gameOf(ctx.run.preset.kind)?.hits) await hitsService.ensure(ctx);
+            await raise(ctx);
+        }
         // Nothing counts until everybody brought in is there (`arrival`).
         else if (arrival.isOpen(ctx.run.id)) await arrivalTick(ctx, lines);
         else await bringIn(ctx);
