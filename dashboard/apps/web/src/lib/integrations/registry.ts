@@ -34,24 +34,24 @@ export type IntegrationCategory =
  *  first because it is the one group that is about refusing things rather than
  *  reaching them. */
 export const INTEGRATION_CATEGORIES: ReadonlyArray<{ name: IntegrationCategory; hint: string }> = [
-    // i18n-ignore the Integrations screen says it through lib/integrations/registry-words.ts
     {
         name: "Security",
+        // i18n-ignore the Integrations screen says it through lib/integrations/registry-words.ts
         hint: "What checks a file, an address or a visitor before Polaris trusts it."
     },
-    // i18n-ignore the Integrations screen says it through lib/integrations/registry-words.ts
     {
         name: "OAuth apps",
+        // i18n-ignore the Integrations screen says it through lib/integrations/registry-words.ts
         hint: "Applications you register with a provider so people here can link that account or sign in with it."
     },
-    // i18n-ignore the Integrations screen says it through lib/integrations/registry-words.ts
     {
         name: "Networking",
+        // i18n-ignore the Integrations screen says it through lib/integrations/registry-words.ts
         hint: "How a deployment is reached from outside: names, records and tunnels."
     },
-    // i18n-ignore the Integrations screen says it through lib/integrations/registry-words.ts
     {
         name: "Games",
+        // i18n-ignore the Integrations screen says it through lib/integrations/registry-words.ts
         hint: "The stores and accounts a game server needs to install, update and let people in."
     },
     // i18n-ignore the Integrations screen says it through lib/integrations/registry-words.ts
