@@ -7,7 +7,7 @@
 import type { Language } from "../catalog";
 
 export function enterTitle(language: Language): string {
-    return language === "es" ? "&6Rey de la colina" : "&6King of the hill";
+    return language === "es" ? "&6Rey del ring" : "&6King of the ring";
 }
 
 export function enterSubtitle(language: Language): string {
@@ -23,7 +23,7 @@ export function enterLine(language: Language): string {
 }
 
 export function backOnHill(language: Language): string {
-    return language === "es" ? "&eDe vuelta a la colina" : "&eBack on the hill";
+    return language === "es" ? "&eDe vuelta al ring" : "&eBack in the ring";
 }
 
 export function goTitle(language: Language): string {

@@ -63,7 +63,7 @@ lesson is a bug that reached a player.
 
 - **On the ground** (supply drop, treasure, a boss without its sky arena): only
   on the world's own walkable ground, clear of every bed, never on a build.
-- **In the air** (spleef, parkour, build battle, team duel, king of the hill,
+- **In the air** (spleef, parkour, build battle, team duel, king of the ring,
   the boss's sky arena): only the air it takes counts. The highest thing in its
   footprint - a roof, a tree, the sea - is read with the `motion_blocking`
   heightmap, and the arena floats above it and below the build limit; its whole
@@ -94,7 +94,7 @@ Rare catch) leave the world alone.
 
 | Kind                                                           | Time  | Weather |
 | -------------------------------------------------------------- | ----- | ------- |
-| Build battle, Spleef, Parkour, King of the hill, Team duel     | day   | clear   |
+| Build battle, Spleef, Parkour, King of the ring, Team duel     | day   | clear   |
 | Treasure hunt, Supply drop, Explorer, Gathering                | day   | clear   |
 | Horde defense, Mob hunt, Meteor shower                         | night | clear   |
 | Blood moon                                                     | night | rain    |
@@ -140,12 +140,13 @@ left out.
   editor (`variants`, all three by default): shovels (break the snow), a
   vanishing floor (the snow underfoot turns red, then goes on the next look -
   Fall Guys' Hex-A-Gone), or snowballs (each one breaks the snow it hits).
-- **King of the hill** with fists only is a platform floating `hill.LIFT` over
-  whatever is under it. Off the circle Poison wears a player down, only while
-  they have more than three hearts; in it Regeneration mends them; Resistance
-  IV makes a punch a fifth of one and keeps its knockback; a fall off the
-  platform is slow, so nobody can die. Three minutes. Walked to (fists only
-  off), it stays on the ground.
+- **King of the ring** (`king-of-the-hill` in code and saved settings; it was
+  called King of the hill before it moved into the air) with fists only is a
+  platform floating `hill.LIFT` over whatever is under it. Off the circle
+  Poison wears a player down, only while they have more than three hearts; in
+  it Regeneration mends them; Resistance IV makes a punch a fifth of one and
+  keeps its knockback; a fall off the platform is slow, so nobody can die.
+  Three minutes. Walked to (fists only off), it stays on the ground.
 - **Treasure hunt** hides one treasure, a bastion's treasure room by default,
   under a column of light, with every player's action bar giving its distance
   and direction for the whole hunt.
@@ -182,7 +183,7 @@ Everything below is part of the arena's own boxes: built into air with
 | ---------------- | ----------------------------------------------------------------------------- |
 | Spleef           | each floor walled in its own color, a sea lantern on every corner post        |
 | Parkour          | the course's theme, a light under every checkpoint                            |
-| King of the hill | polished stone edge, sea lanterns at the corners, the circle drawn in yellow  |
+| King of the ring | polished stone edge, sea lanterns at the corners, the circle drawn in yellow  |
 | Build battle     | a stone curb between plots and glowstone where the lines meet, at floor level |
 | Team duel        | a stone rim round the floor and a post of light at each corner                |
 | Boss sky arena   | glass, with a pillar of sea lantern at each corner                            |

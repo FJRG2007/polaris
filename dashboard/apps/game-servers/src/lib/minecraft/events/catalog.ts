@@ -716,7 +716,7 @@ export const KIND_NAMES: Readonly<Record<EventKind, Readonly<Record<Language, st
     trivia: { en: "Trivia", es: "Trivia" },
     explorer: { en: "Explorer", es: "Explorador" },
     "happy-hour": { en: "Happy hour", es: "Hora feliz" },
-    "king-of-the-hill": { en: "King of the hill", es: "Rey de la colina" },
+    "king-of-the-hill": { en: "King of the ring", es: "Rey del ring" },
     "treasure-hunt": { en: "Treasure hunt", es: "Búsqueda del tesoro" },
     gathering: { en: "Gathering", es: "Recolección" },
     "rare-catch": { en: "Rare catch", es: "Pesca rara" },
@@ -927,6 +927,13 @@ export const DEFAULT_PRIZES: Readonly<Record<EventKind, Rewards>> = {
     "build-battle": EPIC
 };
 
+/** The names a king of the ring was given by default while it was a hill, and
+ *  what each reads as now. */
+const OLD_HILL_NAMES: ReadonlyMap<unknown, string> = new Map([
+    ["King of the hill", "King of the ring"],
+    ["Rey de la colina", "Rey del ring"]
+]);
+
 /** A king of the hill's length: three minutes of pushing is plenty. */
 export const HILL_MINUTES = 3;
 
@@ -973,14 +980,22 @@ export function oldDefaultMinutes(kind: EventKind): number {
  */
 export function migratePreset(entry: unknown): unknown {
     if (typeof entry !== "object" || entry === null) return entry;
-    const raw = entry as { kind?: unknown; minutes?: unknown; options?: unknown };
-    if (raw.kind !== "king-of-the-hill") return entry;
+    const named = entry as { kind?: unknown; name?: unknown };
+    if (named.kind !== "king-of-the-hill") return entry;
+    // Named "King of the hill" when it was added, before it became a ring
+    // floating in the air: the name it was given, not one anybody chose.
+    const renamed = OLD_HILL_NAMES.get(named.name);
+    const raw = (renamed ? { ...entry, name: renamed } : entry) as {
+        kind?: unknown;
+        minutes?: unknown;
+        options?: unknown;
+    };
     // Four was the length every hill started with until it was shortened to
     // three: nobody's choice either.
     if (raw.minutes === 4) return { ...raw, minutes: HILL_MINUTES };
-    if (raw.minutes !== 10) return entry;
+    if (raw.minutes !== 10) return raw;
     const options = raw.options;
-    if (typeof options === "object" && options !== null && "fistsOnly" in options) return entry;
+    if (typeof options === "object" && options !== null && "fistsOnly" in options) return raw;
     return { ...raw, minutes: HILL_MINUTES };
 }
 

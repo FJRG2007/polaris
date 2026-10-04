@@ -6779,6 +6779,36 @@ describe("a king of the hill", () => {
         expect((read.presets[0]!.options as { fistsOnly: boolean }).fistsOnly).toBe(true);
     });
 
+    it("is called King of the ring now, and one saved under the old default name reads as the new one", () => {
+        expect(catalog.KIND_NAMES["king-of-the-hill"]).toEqual({
+            en: "King of the ring",
+            es: "Rey del ring"
+        });
+        const named = (id: string, name: string) => ({
+            ...catalog.newPreset("king-of-the-hill", id),
+            name
+        });
+        const read = catalog.readEventsConfig({
+            [catalog.EVENTS_KEY]: {
+                settings: {},
+                presets: [
+                    named("en", "King of the hill"),
+                    named("es", "Rey de la colina"),
+                    named("own", "Friday hill"),
+                    { ...catalog.newPreset("mining-rush", "rush"), name: "King of the hill" }
+                ],
+                schedules: []
+            }
+        });
+        // A name the operator typed, or another kind's, is left as it is.
+        expect(read.presets.map((one) => [one.id, one.name])).toEqual([
+            ["en", "King of the ring"],
+            ["es", "Rey del ring"],
+            ["own", "Friday hill"],
+            ["rush", "King of the hill"]
+        ]);
+    });
+
     it("with fists only: who joined is brought to the circle empty-handed, cannot die, and gets it all back", async () => {
         world.online = ["Ana", "Ben", "Cy"];
         world.inv = {

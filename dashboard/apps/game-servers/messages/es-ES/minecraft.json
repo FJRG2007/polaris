@@ -1654,7 +1654,7 @@
                 "summary": "Prisa, suerte y otros efectos para todos durante un rato. Sin ganador - un buen relleno entre competiciones."
             },
             "king-of-the-hill": {
-                "label": "Rey de la colina",
+                "label": "Rey del ring",
                 "summary": "Aparece un círculo marcado. Gana quien más tiempo pase dentro - así que vale la pena defenderlo.",
                 "unit": "segundos"
             },

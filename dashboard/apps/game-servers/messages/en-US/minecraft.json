@@ -1654,7 +1654,7 @@
                 "summary": "Haste, luck and other effects for everybody for a while. No winner - a good filler between competitions."
             },
             "king-of-the-hill": {
-                "label": "King of the hill",
+                "label": "King of the ring",
                 "summary": "A marked circle appears. The longest time spent inside it wins - so it is worth defending.",
                 "unit": "seconds"
             },
