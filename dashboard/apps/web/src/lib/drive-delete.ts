@@ -42,6 +42,53 @@ export async function deleteDriveEntry(driver: StorageDriver, path: string): Pro
 }
 
 /**
+ * Whether a failure says the thing is simply not there.
+ *
+ * Drivers answer that with `not_found` - except the local driver's delete, which
+ * hands Node's own ENOENT back as it came.
+ */
+export function isMissingError(caught: unknown): boolean {
+    if (caught instanceof StorageError) return caught.code === "not_found";
+    const code = (caught as { code?: unknown } | null)?.code;
+    return code === "ENOENT" || code === "ENOTDIR";
+}
+
+/**
+ * Delete one entry and everything under it, where "it is already gone" is the
+ * outcome that was asked for rather than a failure.
+ *
+ * That is what somebody removing a drop point usually meets: they deleted its
+ * folder themselves first. A backend that answers a delete of something missing
+ * with an error of its own is asked directly whether it is there, and only a
+ * folder that still exists turns the failure into one.
+ *
+ * @returns "deleted" when it was removed now, "absent" when there was nothing to
+ *     remove.
+ */
+export async function deleteDriveEntryIfPresent(
+    driver: StorageDriver,
+    path: string
+): Promise<"deleted" | "absent"> {
+    try {
+        await deleteDriveEntry(driver, path);
+        return "deleted";
+    } catch (caught) {
+        if (isMissingError(caught)) return "absent";
+        // A refusal that is about the path itself - the root, Polaris's own
+        // folder - is never a question of whether it exists.
+        if (caught instanceof StorageError && caught.code === "permission_denied") throw caught;
+        let present = true;
+        try {
+            await driver.stat(normalizeRelPath(path));
+        } catch (asked) {
+            present = !isMissingError(asked);
+        }
+        if (!present) return "absent";
+        throw caught;
+    }
+}
+
+/**
  * The children of a folder that a delete or a move to the recycle bin may touch.
  *
  * The caller emptying a folder does not know which folder it was handed - the root,

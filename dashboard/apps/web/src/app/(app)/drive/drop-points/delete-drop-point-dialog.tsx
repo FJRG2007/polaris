@@ -60,10 +60,15 @@ export function DeleteDropPointDialog({
     const ownFolder = Boolean(target && normalizeRelPath(target.destinationPath) !== "");
 
     // Each drop point is a fresh decision: an operator who kept one folder should
-    // not silently keep the next one because the switch remembered.
+    // not silently keep the next one because the switch remembered. Keyed on which
+    // drop point it is, not on the object: a caller that builds the target inline
+    // hands a new one on every render, and the switch was put back on the moment
+    // anybody turned it off.
+    const targetId = target?.id ?? null;
+    const destination = target?.destinationPath ?? "";
     useEffect(() => {
-        if (target) setDeleteFolder(normalizeRelPath(target.destinationPath) !== "");
-    }, [target]);
+        if (targetId) setDeleteFolder(normalizeRelPath(destination) !== "");
+    }, [targetId, destination]);
 
     return (
         <Dialog open={target !== null} onOpenChange={(open) => !open && onCancel()}>

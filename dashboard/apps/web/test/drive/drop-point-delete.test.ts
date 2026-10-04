@@ -21,6 +21,7 @@ const getForOwner = vi.fn();
 const deleteForOwner = vi.fn(async () => true);
 const authorizeDrive = vi.fn(async () => undefined);
 const driverDelete = vi.fn(async () => undefined);
+const driverStat = vi.fn(async () => ({ kind: "dir" }));
 const dispose = vi.fn(async () => undefined);
 const recordAudit = vi.fn(async () => undefined);
 const invalidateFolderSizes = vi.fn(async () => undefined);
@@ -45,7 +46,7 @@ vi.mock("@/lib/rate-limit-service", () => ({
     resetRateLimit: async () => undefined
 }));
 vi.mock("@/lib/storage-service", () => ({
-    getDriverForConnection: async () => ({ delete: driverDelete, dispose }),
+    getDriverForConnection: async () => ({ delete: driverDelete, stat: driverStat, dispose }),
     SmbShareRequiredError: class extends Error {}
 }));
 vi.mock("@/lib/drive-authz", () => ({ authorizeDrive, DriveAccessError, DriveLockedError }));
@@ -62,6 +63,7 @@ beforeEach(() => {
     vi.clearAllMocks();
     deleteForOwner.mockResolvedValue(true);
     driverDelete.mockResolvedValue(undefined);
+    driverStat.mockResolvedValue({ kind: "dir" });
     authorizeDrive.mockResolvedValue(undefined);
     getForOwner.mockResolvedValue({
         id: REQUEST,
@@ -126,6 +128,35 @@ describe("deleting a drop point", () => {
 
         expect(await deleteFileRequestAction(REQUEST, true)).toEqual({});
         expect(deleteForOwner).toHaveBeenCalledWith(OWNER, REQUEST);
+    });
+
+    it("still deletes the drop point when the local disk says the folder is not there", async () => {
+        // The local driver's delete hands Node's own error back rather than a
+        // not_found, and that reached the screen as "ENOENT: no such file".
+        driverDelete.mockRejectedValue(
+            Object.assign(new Error("ENOENT: no such file or directory, rm"), { code: "ENOENT" })
+        );
+
+        expect(await deleteFileRequestAction(REQUEST, true)).toEqual({});
+        expect(deleteForOwner).toHaveBeenCalledWith(OWNER, REQUEST);
+    });
+
+    it("asks the backend whether the folder is there when the delete fails another way", async () => {
+        driverDelete.mockRejectedValue(new StorageError("io_error", "the server said 500"));
+        driverStat.mockRejectedValue(new StorageError("not_found", "nothing here"));
+
+        expect(await deleteFileRequestAction(REQUEST, true)).toEqual({});
+        expect(driverStat).toHaveBeenCalledWith(FOLDER);
+        expect(deleteForOwner).toHaveBeenCalledWith(OWNER, REQUEST);
+    });
+
+    it("keeps the failure when the folder is still there after it", async () => {
+        driverDelete.mockRejectedValue(new StorageError("io_error", "the server said 500"));
+
+        const result = await deleteFileRequestAction(REQUEST, true);
+
+        expect(result.error).toContain("could not be deleted");
+        expect(deleteForOwner).not.toHaveBeenCalled();
     });
 
     it("says so when the drop point is not the caller's, and touches no storage", async () => {

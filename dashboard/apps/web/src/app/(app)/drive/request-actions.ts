@@ -15,12 +15,12 @@ import { revalidatePath } from "next/cache";
 import { requirePermission } from "@/lib/session";
 import { recordAudit } from "@/lib/audit-service";
 import { sharingBaseUrl } from "@/lib/domain-service";
-import { deleteDriveEntry } from "@/lib/drive-delete";
+import { deleteDriveEntryIfPresent, isMissingError } from "@/lib/drive-delete";
 import * as dropPoints from "@/lib/file-request-service";
 import { ensureShareReachability } from "@/lib/public-reach";
 import { clientIp, hashForLog } from "@/lib/request-context";
 import { invalidateFolderSizes } from "@/lib/drive-folder-size";
-import { StorageError, type StorageDriver } from "@polaris/storage";
+import type { StorageDriver } from "@polaris/storage";
 import { rateLimit, resetRateLimit } from "@/lib/rate-limit-service";
 import { getDriverForConnection, SmbShareRequiredError } from "@/lib/storage-service";
 import { authorizeDrive, DriveAccessError, DriveLockedError } from "@/lib/drive-authz";
@@ -352,7 +352,9 @@ export async function deleteFileRequestAction(
             );
             const driver = await getDriverForConnection(request.destinationConnectionId);
             try {
-                await deleteDriveEntry(driver, request.destinationPath);
+                // Already gone is what was asked for: most often its owner deleted
+                // the folder before deleting the drop point.
+                await deleteDriveEntryIfPresent(driver, request.destinationPath);
             } finally {
                 await driver.dispose();
             }
@@ -361,8 +363,7 @@ export async function deleteFileRequestAction(
             if (caught instanceof DriveAccessError)
                 return { error: (await getTranslations("drive"))("errors.folderDeleteDenied") };
             if (caught instanceof DriveLockedError) return { error: (await getTranslations("drive"))("errors.folderLocked") };
-            const code = caught instanceof StorageError ? caught.code : null;
-            if (code !== "not_found") {
+            if (!isMissingError(caught)) {
                 return {
                     error:
                         caught instanceof Error
