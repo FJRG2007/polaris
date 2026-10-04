@@ -30,6 +30,7 @@ import {
     verifySharePassword
 } from "@/lib/share-service";
 import { recordAudit } from "@/lib/audit-service";
+import { DriveAccessError, DriveLockedError, authorizeDrive } from "@/lib/drive-authz";
 import { rateLimit, resetRateLimit } from "@/lib/rate-limit-service";
 import { clientIp, hashForLog } from "@/lib/request-context";
 
@@ -73,6 +74,23 @@ export async function createShareAction(input: unknown): Promise<{ url?: string;
                 parsed.error.issues[0]?.message ??
                 (await getTranslations("drive"))("errors.invalidShare")
         };
+    // A share link serves the path through the connection itself, with no
+    // second look at who made it - so the person making it has to be able to
+    // download it now, through the same check the Drive screens make. Holding
+    // shares.create is permission to share what you can read, not anything a
+    // connection id can name.
+    try {
+        await authorizeDrive(user.id, parsed.data.connectionId, parsed.data.path, "download");
+        // A link that takes uploads writes into the folder for whoever holds it.
+        if (parsed.data.allowUpload) {
+            await authorizeDrive(user.id, parsed.data.connectionId, parsed.data.path, "write");
+        }
+    } catch (caught) {
+        const t = await getTranslations("drive");
+        if (caught instanceof DriveLockedError) return { error: t("errors.locationLocked") };
+        if (caught instanceof DriveAccessError) return { error: t("errors.locationDenied") };
+        throw caught;
+    }
     const { id, token } = await createShare(user.id, parsed.data);
     await recordAudit({
         actorId: user.id,
