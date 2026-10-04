@@ -4,13 +4,16 @@
  *
  * Each tick reads what a duel's does - health, damage dealt, deaths and kills,
  * where everybody is - and what the quick look marked since (who touched a
- * flag, who stood at home). In that order it then: sends back whoever was
- * brought low, crediting whoever did it, and puts any flag they carried back
- * on its stand; hands a flag at home to whoever of the other team touched it;
- * and counts a capture for a carrier who reached their own base while their
- * own flag stands there. The flags are written into the run before a tick ends.
+ * flag, who stood at home), taken in one batch. In that order it then: sends
+ * back whoever was brought low, crediting whoever the game says hurt them,
+ * puts any flag they carried back on its stand and wipes what the quick look
+ * marked on them before the move; hands a flag at home to whoever of the
+ * other team, alive, touched it; and counts a capture for a carrier who
+ * reached their own base while their own flag stands there. The flags are
+ * written into the run before a tick ends.
  */
 
+import * as hits from "./hits";
 import * as arena from "./arena";
 import * as duel from "./team-duel";
 import * as catalog from "../catalog";
@@ -19,6 +22,7 @@ import * as written from "../messages";
 import * as commands from "../commands";
 import type * as stored from "../state";
 import * as ctf from "./capture-the-flag";
+import * as hitsService from "./hits-service";
 import * as said from "./capture-the-flag-messages";
 import type { ArenaGame, KindContext } from "./arena-game";
 
@@ -33,8 +37,8 @@ function optionsOf(run: stored.EventRun): catalog.EventOptions<"capture-the-flag
 
 /** What one run keeps between ticks: nothing that must survive a restart. */
 interface Memory {
-    dealt: Map<string, number>;
-    kills: Map<string, number>;
+    dealt: hits.Tally;
+    kills: hits.Tally;
     lastHit: Map<string, number>;
     shieldedUntil: Map<string, number>;
 }
@@ -47,8 +51,8 @@ function memoryOf(runId: string): Memory {
         // Only a few runs are ever on at once, one a server.
         if (memories.size >= 16) memories.delete(memories.keys().next().value!);
         memory = {
-            dealt: new Map(),
-            kills: new Map(),
+            dealt: hits.tally(),
+            kills: hits.tally(),
             lastHit: new Map(),
             shieldedUntil: new Map()
         };
@@ -100,10 +104,10 @@ async function goLines(ctx: KindContext, syntax: { marker: stored.Marker; itemCo
     return out;
 }
 
-/** Who carries a tag now, read off the game, and the tag taken off again. */
+/** Who carried a quick look's mark when the tick took them (`TAKE_MARKS`). */
 async function marked(ctx: KindContext, tag: string): Promise<Set<string>> {
     const names = commands
-        .readWhere(await ctx.server.say([arena.readTagged(tag)]))
+        .readWhere(await ctx.server.say([arena.readTagged(ctf.takenTag(tag))]))
         .map((one) => lower(one.name));
     return new Set(names);
 }
@@ -118,30 +122,42 @@ async function tick(ctx: KindContext, lines: string[]): Promise<string | null> {
     const marker = run.marker;
     const itemCommand = await ctx.atLeast([1, 17]);
     const say = (line: string) => ctx.server.say([line]);
-    const health = commands.readScores(await say(duel.READ_HP));
+    const hp = commands.readScores(await say(duel.READ_HP));
     const dealt = commands.readScores(await say(duel.READ_DEALT));
     const died = commands.readScores(await say(duel.READ_DIED));
     const killed = commands.readScores(await say(duel.READ_KILLS));
     const here = new Map(
         commands.readWhere(await say(commands.IN_OVERWORLD)).map((one) => [lower(one.name), one])
     );
-    // Marked between ticks by the quick look, read once and cleared.
+    const health = duel.healthOf(
+        hp,
+        run.entrants.map((one) => one.name).filter((name) => here.has(lower(name)))
+    );
+    // Marked between ticks by the quick look, taken in one batch and read.
+    await ctx.server.sayAll(ctf.TAKE_MARKS);
     const touched = [await marked(ctx, ctf.TOUCH_TAGS[0]), await marked(ctx, ctf.TOUCH_TAGS[1])];
     const atHome = [await marked(ctx, ctf.HOME_TAGS[0]), await marked(ctx, ctf.HOME_TAGS[1])];
-    await ctx.server.sayAll(ctf.UNTOUCH);
 
-    // Who struck and who killed since the last look; nothing on the first.
-    const killsSince = new Map<string, number>();
-    for (const [name, value] of killed) {
-        const before = memory.kills.get(name);
-        if (before !== undefined && value > before) killsSince.set(name, value - before);
-        memory.kills.set(name, value);
-    }
-    for (const [name, value] of dealt) {
-        const before = memory.dealt.get(name);
-        if (before !== undefined && value > before) memory.lastHit.set(name, now);
-        memory.dealt.set(name, value);
-    }
+    // Who struck and who killed since the last look; nothing on the first
+    // after a restart, and a first score counted from 0.
+    const on = new Set(here.keys());
+    const killsSince = hits.rose(memory.kills, killed, on);
+    for (const name of hits.rose(memory.dealt, dealt, on).keys()) memory.lastHit.set(name, now);
+    // Whom the game says last hurt whoever is brought low (from 1.19.4).
+    const attackers = await hitsService.attackers(
+        ctx,
+        run.entrants
+            .filter((one) => {
+                const hearts = health.get(one.name);
+                return (
+                    hearts !== undefined &&
+                    hearts > 0 &&
+                    hearts <= options.downHearts * 2 &&
+                    (memory.shieldedUntil.get(one.name) ?? 0) <= now
+                );
+            })
+            .map((one) => one.name)
+    );
 
     const before = ctf.stateOf(run.game);
     const state: ctf.FlagState = {
@@ -187,7 +203,15 @@ async function tick(ctx: KindContext, lines: string[]): Promise<string | null> {
             hearts <= options.downHearts * 2 &&
             (memory.shieldedUntil.get(one.name) ?? 0) <= now;
         if (dead || low) {
-            const by = duel.creditFor(rivals, killsSince, memory.lastHit, now);
+            // A death is credited by the game's kill count: whoever comes back
+            // from one is a new player, and the game forgets who hurt them.
+            const by = duel.creditFor(
+                rivals,
+                killsSince,
+                memory.lastHit,
+                now,
+                dead ? undefined : attackers.get(lower(one.name))
+            );
             if (by) state.kills[by] = (state.kills[by] ?? 0) + 1;
             lines.push(
                 commands.say(messages.tag(language) + messages.duelDown(one.name, by, language))
@@ -208,7 +232,7 @@ async function tick(ctx: KindContext, lines: string[]): Promise<string | null> {
         // way: back to their side, healed and shielded for a moment - and
         // whatever flag they carried back on its stand.
         if (hearts > 0 && (low || !at || !arena.contains(box, at))) {
-            lines.push(...duel.sendBack(one.name, spot));
+            lines.push(...duel.sendBack(one.name, spot), ...ctf.unmarkLines(one.name));
             memory.shieldedUntil.set(one.name, now + duel.SHIELD_SECONDS * 1000);
             const still = carrying(one.name);
             if (still !== undefined) {
@@ -222,7 +246,9 @@ async function tick(ctx: KindContext, lines: string[]): Promise<string | null> {
     }
 
     // A flag at home taken by whoever of the other team touched it - in
-    // passing, as the quick look saw, or standing at it now.
+    // passing, as the quick look saw, or standing at it now - alive: a
+    // player dead by the flag is marked there until they come back.
+    const alive = (name: string) => (health.get(name) ?? 0) > 0;
     for (const side of [0, 1]) {
         if (state.flags[side]!.carrier !== null) continue;
         const stand = ctf.standAt(box, side);
@@ -231,7 +257,7 @@ async function tick(ctx: KindContext, lines: string[]): Promise<string | null> {
             return (
                 one.side !== side &&
                 at !== undefined &&
-                health.has(one.name) &&
+                alive(one.name) &&
                 !down.has(lower(one.name)) &&
                 carrying(one.name) === undefined &&
                 (touched[side]!.has(lower(one.name)) || ctf.near(at, stand, ctf.TOUCH))
@@ -255,7 +281,8 @@ async function tick(ctx: KindContext, lines: string[]): Promise<string | null> {
         if (!carrier || state.flags[side]!.carrier !== null) continue;
         const one = run.entrants.find((each) => lower(each.name) === lower(carrier));
         const at = here.get(lower(carrier));
-        if (!one || one.side !== side || !at) continue;
+        if (!one || one.side !== side || !at || !alive(one.name) || down.has(lower(carrier)))
+            continue;
         if (!atHome[side]!.has(lower(carrier)) && !ctf.near(at, ctf.standAt(box, side), ctf.HOME))
             continue;
         points[one.name] = (points[one.name] ?? 0) + 1;
@@ -331,6 +358,7 @@ export const captureTheFlag: ArenaGame = {
         duel.duelSetup(language === "es" ? ["Rojo", "Azul"] : ["Red", "Blue"]),
     enterLines: (_run, one) => [
         duel.joinTeam(one.name, one.side),
+        ...ctf.TAGS.map((tag) => `tag ${one.name} remove ${tag}`),
         `tag ${one.name} add ${ctf.SIDE_TAGS[one.side]}`
     ],
     goLines,

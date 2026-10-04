@@ -7,8 +7,10 @@
 import { describe, expect, it } from "vitest";
 import * as hits from "@polaris-app/game-servers/src/lib/minecraft/events/kinds/hits";
 import * as arena from "@polaris-app/game-servers/src/lib/minecraft/events/kinds/arena";
+import * as duel from "@polaris-app/game-servers/src/lib/minecraft/events/kinds/team-duel";
 import * as hs from "@polaris-app/game-servers/src/lib/minecraft/events/kinds/hide-and-seek";
 import * as potato from "@polaris-app/game-servers/src/lib/minecraft/events/kinds/hot-potato";
+import * as ctf from "@polaris-app/game-servers/src/lib/minecraft/events/kinds/capture-the-flag";
 import * as snowballPack from "@polaris-app/game-servers/src/lib/minecraft/events/kinds/snowball-pack";
 
 describe("the events data pack's hits", () => {
@@ -122,5 +124,40 @@ describe("who a hit is credited to", () => {
         expect(hs.foundBy(hider, [near, far], null, ["Ana", "Ben"])).toBeNull();
         expect(hs.foundBy(hider, [near, far])).toBe("Ana");
         expect(hs.foundBy(hider, [{ ...far, x: 9 }])).toBeNull();
+    });
+
+    it("a duel or capture the flag: to the rival the game names, over a kill or whoever struck last", () => {
+        const now = 100_000;
+        const lastHit = new Map([["Cy", now - 500]]);
+        expect(duel.creditFor(["Ben", "Cy"], new Map(), lastHit, now, "ben")).toBe("Ben");
+        // A teammate or anything else named is nobody's credit; nor is a fall.
+        expect(duel.creditFor(["Ben", "Cy"], new Map(), lastHit, now, "Dee")).toBeNull();
+        expect(duel.creditFor(["Ben", "Cy"], new Map(), lastHit, now, null)).toBeNull();
+        // Somebody else's kill this look is not this player's.
+        expect(duel.creditFor(["Ben", "Cy"], new Map([["Cy", 1]]), lastHit, now, "Ben")).toBe(
+            "Ben"
+        );
+        // Not asked (a death, or before 1.19.4): the kill the game counted,
+        // else whoever struck last, within a few seconds.
+        expect(duel.creditFor(["Ben", "Cy"], new Map([["Ben", 1]]), lastHit, now)).toBe("Ben");
+        expect(duel.creditFor(["Ben", "Cy"], new Map(), lastHit, now)).toBe("Cy");
+    });
+});
+
+describe("capture the flag's marks and health", () => {
+    it("takes the quick look's marks in one batch: copied before they are cleared", () => {
+        for (const tag of [...ctf.TOUCH_TAGS, ...ctf.HOME_TAGS]) {
+            const copy = ctf.TAKE_MARKS.indexOf(`tag @a[tag=${tag}] add ${tag}_r`);
+            expect(copy).toBeGreaterThan(ctf.TAKE_MARKS.indexOf(`tag @a remove ${tag}_r`));
+            expect(ctf.TAKE_MARKS.indexOf(`tag @a remove ${tag}`)).toBeGreaterThan(copy);
+            expect(ctf.unmarkLines("Ana")).toContain(`tag Ana remove ${tag}`);
+            expect(ctf.TAGS_OFF).toContain(`tag @a remove ${tag}_r`);
+        }
+    });
+
+    it("reads a player on with no health score yet as whole, and one not on as not there", () => {
+        const health = duel.healthOf(new Map([["Ben", 6]]), ["Ana", "Ben"]);
+        expect(Object.fromEntries(health)).toEqual({ Ana: duel.FULL_HEALTH, Ben: 6 });
+        expect(duel.healthOf(new Map(), []).has("Ana")).toBe(false);
     });
 });
