@@ -16,6 +16,7 @@ import { prisma } from "@polaris/db";
 import { host } from "@polaris/app-host";
 import type { ServerContainer } from "./service";
 import { ROSTER, rosterNames } from "./events/replies";
+import { fresh } from "../fresh";
 
 /** How long a look at who is on, and what each reads, holds. */
 const HEAR_EVERY_MS = 10_000;
@@ -76,7 +77,7 @@ export async function hear(
     force = false
 ): Promise<speech.Audience> {
     const held = heard.get(installedAppId);
-    if (!force && held && held.audience.home === home && Date.now() - held.at < HEAR_EVERY_MS)
+    if (!force && held && held.audience.home === home && fresh(held.at, HEAR_EVERY_MS))
         return held.audience;
     let names: string[];
     try {

@@ -17,7 +17,15 @@
  */
 
 import { z } from "zod";
-import { admitsBuild, entryReleaseType, modrinthApi, modrinthJson, projectSlug, type ReleaseType } from "./modrinth";
+import {
+    admitsBuild,
+    entryReleaseType,
+    modrinthApi,
+    modrinthJson,
+    projectSlug,
+    type ReleaseType
+} from "./modrinth";
+import { fresh } from "../fresh";
 
 /** Modrinth's own answers move about as often as Minecraft is released, so one
  *  lookup covers every dialog opened for the rest of the day. */
@@ -36,7 +44,9 @@ const versionsSchema = z
     )
     .max(500);
 
-const tagSchema = z.array(z.object({ version: z.string().max(32), version_type: z.string().max(32) })).max(2000);
+const tagSchema = z
+    .array(z.object({ version: z.string().max(32), version_type: z.string().max(32) }))
+    .max(2000);
 
 /** What a project supports, and which of Minecraft's versions are releases,
  *  remembered for as long as they are worth remembering. */
@@ -46,7 +56,7 @@ const cache = new Map<string, { at: number; versions: string[] }>();
  *  as "nothing is known about this" rather than as "this supports nothing". */
 async function cached(key: string, load: () => Promise<string[]>): Promise<string[]> {
     const hit = cache.get(key);
-    if (hit && Date.now() - hit.at < CACHE_MS) return hit.versions;
+    if (hit && fresh(hit.at, CACHE_MS)) return hit.versions;
     const versions = await load().catch(() => []);
     // A failed lookup is not cached: the next caller should get to try again
     // rather than inherit six hours of an outage that has since ended.
@@ -65,7 +75,11 @@ async function cached(key: string, load: () => Promise<string[]>): Promise<strin
  * nothing to install. Which is the failure this module exists to prevent, arrived
  * at from the other end.
  */
-async function projectVersions(slug: string, loader: string, wanted: ReleaseType): Promise<string[]> {
+async function projectVersions(
+    slug: string,
+    loader: string,
+    wanted: ReleaseType
+): Promise<string[]> {
     return cached(`project:${loader}:${wanted}:${slug}`, async () => {
         const parsed = versionsSchema.safeParse(
             await modrinthJson(
@@ -92,7 +106,9 @@ async function releases(): Promise<string[]> {
     return cached("releases", async () => {
         const parsed = tagSchema.safeParse(await modrinthJson(`${modrinthApi}/tag/game_version`));
         return parsed.success
-            ? parsed.data.filter((entry) => entry.version_type === "release").map((entry) => entry.version)
+            ? parsed.data
+                  .filter((entry) => entry.version_type === "release")
+                  .map((entry) => entry.version)
             : [];
     });
 }
@@ -110,7 +126,10 @@ async function releases(): Promise<string[]> {
  * their players are on, and a picker built from anything wider would offer the
  * releases that produce the silent nothing this module exists to prevent.
  */
-export async function commonVersions(projects: readonly string[], loader = DEFAULT_LOADER): Promise<string[]> {
+export async function commonVersions(
+    projects: readonly string[],
+    loader = DEFAULT_LOADER
+): Promise<string[]> {
     // Each entry carries its own answer to "how finished does a build have to be",
     // so each is asked about the builds it would actually accept.
     const asked = projects

@@ -72,6 +72,13 @@ const THEME_LABELS: Readonly<
     nether: "editor.labels.course.nether"
 };
 
+const SHAPE_LABELS: Readonly<
+    Record<(typeof catalog.PARKOUR_SHAPES)[number], GameKey<"minecraft">>
+> = {
+    rows: "editor.labels.parkourShape.rows",
+    tower: "editor.labels.parkourShape.tower"
+};
+
 const SPLEEF_LABELS: Readonly<
     Record<(typeof catalog.SPLEEF_VARIANTS)[number], GameKey<"minecraft">>
 > = {
@@ -877,13 +884,13 @@ function OptionsFields({
                     <div className="grid grid-cols-2 gap-3">
                         <Field
                             label={t("editor.jumps")}
-                            hint={t("editor.10To40ACheckpoint")}
+                            hint={t("editor.10To60ACheckpoint")}
                             problem={problemAt(issues, "options", "jumps")}
                         >
                             <Input
                                 type="number"
                                 min={10}
-                                max={40}
+                                max={60}
                                 value={Number.isFinite(value.jumps) ? value.jumps : ""}
                                 onChange={(event) =>
                                     onChange({ ...value, jumps: numberOf(event.target.value) })
@@ -922,6 +929,40 @@ function OptionsFields({
                             aria-label={t("editor.difficulty")}
                         />
                     </Field>
+                    <fieldset className="flex flex-col gap-2 text-sm">
+                        <legend className="font-medium">{t("editor.parkourShapes")}</legend>
+                        <span className="text-xs text-muted-foreground">
+                            {t("editor.parkourShapesHint")}
+                        </span>
+                        {catalog.PARKOUR_SHAPES.map((shape) => {
+                            const on = value.shapes.includes(shape);
+                            return (
+                                <label
+                                    key={shape}
+                                    className="flex items-center justify-between gap-3"
+                                >
+                                    <span className="min-w-0">{t(SHAPE_LABELS[shape])}</span>
+                                    <Switch
+                                        checked={on}
+                                        // Never none: the last shape switched on stays on.
+                                        disabled={on && value.shapes.length === 1}
+                                        onChange={(next) =>
+                                            onChange({
+                                                ...value,
+                                                shapes: catalog.PARKOUR_SHAPES.filter((one) =>
+                                                    one === shape
+                                                        ? next
+                                                        : value.shapes.includes(one)
+                                                )
+                                            })
+                                        }
+                                        aria-label={t(SHAPE_LABELS[shape])}
+                                    />
+                                </label>
+                            );
+                        })}
+                        <Problem text={problemAt(issues, "options", "shapes")} />
+                    </fieldset>
                     <Field label={t("editor.courseLook")}>
                         <Select
                             value={value.theme}

@@ -26,6 +26,7 @@ import {
     readChatLink,
     type ChatLink
 } from "./chat-link";
+import { fresh } from "../fresh";
 
 const { readInstallConfig } = host.appsInstallConfig;
 
@@ -64,7 +65,7 @@ export function forgetLinkedServers(): void {
  * second record to keep in step with the first.
  */
 function linkedServers(): Promise<LinkedServer[]> {
-    if (linkedCache && Date.now() - linkedCache.at < LINKED_TTL_MS) return linkedCache.servers;
+    if (linkedCache && fresh(linkedCache.at, LINKED_TTL_MS)) return linkedCache.servers;
     const servers = readLinkedServers();
     const entry = { at: Date.now(), servers };
     linkedCache = entry;

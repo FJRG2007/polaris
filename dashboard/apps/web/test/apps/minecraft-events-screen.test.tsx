@@ -533,17 +533,25 @@ describe("the parkour and spleef editors", () => {
                 onSave={(preset) => saved.push(preset)}
             />
         );
-        const jumps = screen.getByDisplayValue("20");
+        const jumps = screen.getByLabelText(/^Jumps/) as HTMLInputElement;
+        expect(jumps.value).toBe("30");
         expect(screen.getByText("Difficulty")).toBeTruthy();
         fireEvent.change(jumps, { target: { value: "5" } });
         await waitFor(() => expect(screen.getAllByText("At least 10").length).toBeGreaterThan(0));
         expect((screen.getByText("Done") as HTMLButtonElement).disabled).toBe(true);
-        fireEvent.change(jumps, { target: { value: "30" } });
+        fireEvent.change(jumps, { target: { value: "35" } });
         await waitFor(() =>
             expect((screen.getByText("Done") as HTMLButtonElement).disabled).toBe(false)
         );
+        // Both shapes on; the last one left cannot be switched off.
+        const tower = screen.getByLabelText("A tower climbed round and round") as HTMLButtonElement;
+        expect(tower.getAttribute("aria-checked")).toBe("true");
+        fireEvent.click(screen.getByLabelText("Rows climbing back and forth"));
+        expect(tower.disabled).toBe(true);
         fireEvent.click(screen.getByText("Done"));
-        expect((saved[0] as { options: { jumps: number } }).options.jumps).toBe(30);
+        const options = (saved[0] as { options: { jumps: number; shapes: string[] } }).options;
+        expect(options.jumps).toBe(35);
+        expect(options.shapes).toEqual(["tower"]);
     });
 
     it("says how big a spleef floor comes out", async () => {

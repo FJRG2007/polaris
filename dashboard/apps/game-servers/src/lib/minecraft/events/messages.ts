@@ -1093,6 +1093,13 @@ export function checkpointTitle(
         : `&aCheckpoint ${checkpoint}/${checkpoints}`;
 }
 
+/** Seen past the next checkpoint without reaching it: part of the course skipped. */
+export function noShortcut(language: Language): string {
+    return language === "es"
+        ? `${BAD}Sin atajos: ${REASON}de vuelta a tu último control.`
+        : `${BAD}No shortcuts: ${REASON}back to your last checkpoint.`;
+}
+
 export function backToCheckpoint(language: Language): string {
     return language === "es"
         ? `${INFO}De vuelta a tu último control.`

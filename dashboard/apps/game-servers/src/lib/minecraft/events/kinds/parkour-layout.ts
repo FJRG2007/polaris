@@ -23,8 +23,8 @@
  * same run's seed, so a run still always gets the same course.
  */
 
-import { seeded } from "../trivia-bank";
-import type { EventOptions } from "../catalog";
+import { seeded, shuffled } from "../trivia-bank";
+import type { EventOptions, PARKOUR_SHAPES } from "../catalog";
 import type { Platform, Role, Trap } from "./parkour";
 
 /** How far a row runs before it turns. */
@@ -143,7 +143,8 @@ function solidsOf(one: Platform): Solid[] {
     const own = footprint(one);
     const under = one.climb ? 2 : one.role === "checkpoint" || one.role === "finish" ? 1 : 0;
     const out: Solid[] = [{ ...own, y1: own.y1 - under }];
-    if (one.trap === "shift") out.push({ ...own, z1: own.z1 - SHIFT_STEP, z2: own.z2 - SHIFT_STEP });
+    if (one.trap === "shift")
+        out.push({ ...own, z1: own.z1 - SHIFT_STEP, z2: own.z2 - SHIFT_STEP });
     if (one.climb) {
         const at = one.climb > 0 ? one.x - 1 : one.x + one.size;
         out.push({ x1: at, y1: one.y - 2, z1: own.z1, x2: at, y2: one.y, z2: own.z2 });
@@ -164,12 +165,7 @@ function gapOf(a: Solid, b: Solid): number {
 
 function overlap(a: Solid, b: Solid): boolean {
     return (
-        a.x1 <= b.x2 &&
-        b.x1 <= a.x2 &&
-        a.y1 <= b.y2 &&
-        b.y1 <= a.y2 &&
-        a.z1 <= b.z2 &&
-        b.z1 <= a.z2
+        a.x1 <= b.x2 && b.x1 <= a.x2 && a.y1 <= b.y2 && b.y1 <= a.y2 && a.z1 <= b.z2 && b.z1 <= a.z2
     );
 }
 
@@ -233,7 +229,8 @@ export function layoutProblems(platforms: readonly Platform[]): string[] {
     for (let at = 1; at < marks.length; at += 1) {
         const between = marks[at]! - marks[at - 1]!;
         const least = marks[at] === platforms.length - 1 ? FINISH_AFTER : CHECK_EVERY;
-        if (between < least) problems.push(`checkpoints ${marks[at - 1]} and ${marks[at]} too close`);
+        if (between < least)
+            problems.push(`checkpoints ${marks[at - 1]} and ${marks[at]} too close`);
     }
     platforms.forEach((one, index) => {
         if (!special(one)) return;
@@ -368,6 +365,434 @@ function drawn(options: EventOptions<"parkour">, seed: string, specials: boolean
             ...(trap ? { trap } : {})
         });
         after = trap ? platforms[platforms.length - 1]! : null;
+    }
+    return platforms;
+}
+// ------------------------------------------------------------------ nothing skipped (design 4)
+
+/**
+ * How far a player carries across in one jump, as air between two platforms
+ * the way `gapOf` counts it, by how much higher the landing is than the
+ * take-off. What a sprint jump does in Java Edition - four blocks of air on the
+ * level, three one up, none two up - and a little more falling: generous on
+ * purpose, since anything a player could reach past the next platform is a
+ * part of the course skipped, and erring long only spreads a course out.
+ */
+export function reachAcross(rise: number): number {
+    if (rise >= 2) return -1;
+    if (rise === 1) return 3;
+    if (rise === 0) return 4;
+    if (rise === -1) return 5;
+    return 5 + Math.min(2, -rise - 1);
+}
+
+/** Where a platform can be stood on: a moving one at either of its places. */
+function places(one: Platform): Solid[] {
+    const own = footprint(one);
+    return one.trap === "shift"
+        ? [own, { ...own, z1: own.z1 - SHIFT_STEP, z2: own.z2 - SHIFT_STEP }]
+        : [own];
+}
+
+/**
+ * Whether whoever stands on `from` can land on `to` in one jump. Off a slime
+ * pad (landed on from `before`) the bounce lifts them first, and carries them
+ * a block further.
+ */
+export function reaches(from: Platform, to: Platform, before?: Platform): boolean {
+    let lift = 0;
+    let further = 0;
+    if (from.trap === "slime" && before) {
+        lift = Math.floor(bounce(before.y - from.y, 0).apex);
+        further = 1;
+    }
+    for (const a of places(from))
+        for (const b of places(to)) {
+            const reach = reachAcross(b.y1 - a.y1 - lift);
+            if (reach >= 0 && gapOf(a, b) <= reach + further) return true;
+        }
+    return false;
+}
+
+/**
+ * Every platform that can be reached from one more than a step before it:
+ * a part of the course that can be skipped. Empty for a course that keeps
+ * every player on every platform.
+ */
+export function skipProblems(platforms: readonly Platform[]): string[] {
+    const problems: string[] = [];
+    for (let i = 0; i < platforms.length; i += 1)
+        for (let j = i + 2; j < platforms.length; j += 1)
+            if (reaches(platforms[i]!, platforms[j]!, platforms[i - 1]))
+                problems.push(`platform ${j} can be reached from ${i}`);
+    return problems;
+}
+
+/** The shapes a course can take (`PARKOUR_SHAPES`). */
+export type Shape = (typeof PARKOUR_SHAPES)[number];
+
+/** How far a tower's side runs before it turns the corner. */
+export const TOWER_SIDE = 10;
+
+type Heading = "east" | "south" | "west" | "north";
+
+/** The heading after a tower's corner, turning the same way every time. */
+const NEXT_HEADING: Readonly<Record<Heading, Heading>> = {
+    east: "south",
+    south: "west",
+    west: "north",
+    north: "east"
+};
+
+/**
+ * How much higher each jump lands, drawn: a rows course climbs, levels off and
+ * now and then drops a block; a tower only climbs or levels off, so each lap
+ * stands clear over the one under it.
+ */
+const RISES: Readonly<Record<Shape, readonly number[]>> = {
+    rows: [1, 1, 1, 1, 0, 0, 0, 0, -1, -1],
+    tower: [1, 1, 1, 1, 1, 1, 0, 0, 0, 0]
+};
+
+/**
+ * The air a jump that is meant to be made may leave, by how much higher it
+ * lands: two blocks on the level or down (three on the hard course), two going
+ * a block up (one on the easy course) - well inside `reachAcross`, so every
+ * jump is one a player makes without a perfect run.
+ */
+function doable(rise: number, difficulty: EventOptions<"parkour">["difficulty"]): number {
+    if (rise >= 2) return -1;
+    if (rise === 1) return difficulty === "easy" ? 1 : 2;
+    return difficulty === "hard" ? 3 : 2;
+}
+
+/** The problems a course has that involve its last platform: the rules, checked as it is laid. */
+function problemsOfLast(platforms: readonly Platform[]): boolean {
+    const last = platforms.length - 1;
+    const one = platforms[last]!;
+    const mine = solidsOf(one);
+    for (let i = 0; i < last; i += 1) {
+        const climbing = i === last - 1 && one.climb;
+        for (const a of solidsOf(platforms[i]!))
+            for (const [m, b] of mine.entries()) {
+                if (climbing && m === 1) continue;
+                if (gapOf(a, b) < 1 && apart(a.y1, a.y2, b.y1, b.y2) < HEAD_ROOM) return true;
+            }
+    }
+    // Nothing in the way of the new jump, and nothing new in the way of an old one.
+    if (last >= 1) {
+        const room = corridor(platforms[last - 1]!, one);
+        for (let k = 0; k < last - 1; k += 1)
+            if (solidsOf(platforms[k]!).some((box) => overlap(box, room))) return true;
+    }
+    for (let i = 0; i + 1 < last; i += 1) {
+        const room = corridor(platforms[i]!, platforms[i + 1]!);
+        if (mine.some((box) => overlap(box, room))) return true;
+    }
+    // Out of reach from everything but the platform before it.
+    for (let i = 0; i < last - 1; i += 1)
+        if (reaches(platforms[i]!, one, platforms[i - 1])) return true;
+    // Thrown onto by the slime pad before it, when there is one.
+    const pad = platforms[last - 1];
+    if (pad?.trap === "slime" && !bounceReaches(platforms[last - 2]!, pad, one)) return true;
+    return false;
+}
+
+/**
+ * A course laid out the way design 4 does it, a jump at a time: each jump
+ * tried at every gap, rise and step aside the difficulty allows, in an order
+ * drawn from the seed, and kept only where it breaks no rule - nothing
+ * touches, nothing in the way, nothing but the next platform within a jump of
+ * any platform. A jump with nowhere to go takes back the one before and tries
+ * that one's next place (a corner or a turn often needs the jump before it to
+ * have climbed), within a budget; past it, the course is drawn again.
+ */
+export function walked(options: EventOptions<"parkour">, seed: string, shape: Shape): Platform[] {
+    for (let draw = 0; draw < WALK_DRAWS; draw += 1) {
+        const platforms = walk(options, draw === 0 ? seed : `${seed}#${draw}`, shape, true);
+        if (platforms && keepsEveryRule(platforms, options.jumps)) return platforms;
+    }
+    return staircase(options, seed, shape);
+}
+
+/** Whether a whole course keeps the layout rules and leaves nothing to skip. */
+function keepsEveryRule(platforms: readonly Platform[], jumps: number): boolean {
+    return (
+        platforms.length === jumps + 1 &&
+        layoutProblems(platforms).length === 0 &&
+        skipProblems(platforms).length === 0
+    );
+}
+
+/** How many times a course is drawn again before it is laid out as a staircase. */
+const WALK_DRAWS = 8;
+/** How many places a draw may try in all before it is given up. */
+const WALK_BUDGET = 20_000;
+
+/**
+ * The course nothing can go wrong with, for a seed that never draws one: every
+ * jump a block up, so the platform after next is always two up - out of
+ * anybody's reach. Laid out as design 3 did, should even that break a rule.
+ */
+export function staircase(
+    options: EventOptions<"parkour">,
+    seed: string,
+    shape: Shape
+): Platform[] {
+    const plain = { ...options, difficulty: "easy" as const };
+    const stairs = walk(plain, "staircase", shape, false, [1]);
+    return stairs && keepsEveryRule(stairs, options.jumps) ? stairs : laidOut(options, seed);
+}
+
+/** The line each side of a tower runs along: z going east or west, x going south or north. */
+const TOWER_LINE: Readonly<Record<Heading, number>> = {
+    east: 0,
+    south: TOWER_SIDE,
+    west: TOWER_SIDE,
+    north: 0
+};
+
+/** Where the walk stands before a jump: which way it goes, and what it must do next. */
+interface WalkState {
+    readonly heading: Heading;
+    /** A rows course: the z its row runs along, and which way the row runs. */
+    readonly rowLine: number;
+    readonly row: "east" | "west";
+    /** A rows course: the steps of its turn still to take. */
+    readonly turnLeft: number;
+    /** The special jump just laid, which the next one must follow plainly. */
+    readonly after: Platform | null;
+}
+
+interface Candidate {
+    readonly platform: Platform;
+    readonly next: WalkState;
+}
+
+function walk(
+    options: EventOptions<"parkour">,
+    seed: string,
+    shape: Shape,
+    specials: boolean,
+    rises: readonly number[] = RISES[shape]
+): Platform[] | null {
+    const random = seeded(`parkour-${shape}-${seed}`);
+    const step = STEPS[options.difficulty];
+    const total = options.jumps;
+    const roleOf = (index: number): Role => {
+        if (index === total) return "finish";
+        if (index % CHECK_EVERY === 0 && index <= total - FINISH_AFTER) return "checkpoint";
+        return "jump";
+    };
+    const sizeOf = (role: Role) => (role === "jump" ? step.size : 3);
+    const once = <T>(list: readonly T[]): T[] =>
+        shuffled(list, random).filter((one, at, all) => all.indexOf(one) === at);
+    const gaps = [...new Set([...step.gaps, 1, 2])].filter((gap) => gap <= 3);
+
+    const lineOf = (state: WalkState, way: Heading) =>
+        shape === "tower" ? TOWER_LINE[way] : state.rowLine;
+    const along = (
+        current: Platform,
+        state: WalkState,
+        size: number,
+        role: Role,
+        gap: number,
+        rise: number,
+        aside: number,
+        way: Heading
+    ): Platform => {
+        const y = current.y + rise;
+        const cross = lineOf(state, way) - Math.floor(size / 2) + aside;
+        if (way === "east") return { x: current.x + current.size + gap, y, z: cross, size, role };
+        if (way === "west") return { x: current.x - gap - size, y, z: cross, size, role };
+        if (way === "south") return { x: cross, y, z: current.z + current.size + gap, size, role };
+        return { x: cross, y, z: current.z - gap - size, size, role };
+    };
+    const inside = (one: Platform, way: Heading): boolean => {
+        if (shape === "rows") return one.x >= 0 && one.x + one.size - 1 <= ROW;
+        if (way === "east") return one.x + one.size - 1 <= TOWER_SIDE;
+        if (way === "south") return one.z + one.size - 1 <= TOWER_SIDE;
+        if (way === "west") return one.x >= 0;
+        return one.z >= 0;
+    };
+    /** Far enough along its row or side to turn: never a row of a jump or two. */
+    const farAlong = (current: Platform, state: WalkState): boolean => {
+        const half = (shape === "rows" ? ROW : TOWER_SIDE) / 2;
+        if (state.heading === "east") return current.x + current.size >= half;
+        if (state.heading === "west") return current.x <= half;
+        if (state.heading === "south") return current.z + current.size >= half;
+        return current.z <= half;
+    };
+
+    /** A step of a rows course's turn: along +z, lined up with the end of the row. */
+    const turnSteps = (current: Platform, state: WalkState, size: number, role: Role) => {
+        const out: Candidate[] = [];
+        const left = state.turnLeft > 0 ? state.turnLeft : 2;
+        for (const rise of once([1, 1, 0].filter((one) => rises.includes(one))))
+            for (const gap of once([1, 2])) {
+                if (gap > doable(rise, options.difficulty)) continue;
+                const platform: Platform = {
+                    x: state.row === "east" ? current.x + current.size - size : current.x,
+                    y: current.y + rise,
+                    z: current.z + current.size + gap,
+                    size,
+                    role,
+                    turn: true
+                };
+                const done = left === 1;
+                const row = done ? (state.row === "east" ? "west" : "east") : state.row;
+                out.push({
+                    platform,
+                    next: {
+                        heading: done ? row : "south",
+                        row,
+                        rowLine: done ? platform.z + Math.floor(size / 2) : state.rowLine,
+                        turnLeft: left - 1,
+                        after: null
+                    }
+                });
+            }
+        return out;
+    };
+
+    const candidatesFor = (index: number, current: Platform, state: WalkState): Candidate[] => {
+        const role = roleOf(index);
+        const size = sizeOf(role);
+        if (shape === "rows" && state.turnLeft > 0) return turnSteps(current, state, size, role);
+        const slimeAfter = state.after?.trap === "slime";
+        const plain: Candidate[] = [];
+        // After a slime pad: where its bounce carries, level with it or a block down.
+        const tryRises = slimeAfter ? once([0, -1]) : once(rises);
+        const tryGaps = slimeAfter ? once([1, 2]) : once(gaps);
+        const asides =
+            state.after === null && role === "jump" && step.shift > 0 && shape === "rows"
+                ? once([0, 0, -1, 1])
+                : [0];
+        const next: WalkState = { ...state, after: null };
+        for (const rise of tryRises)
+            for (const gap of tryGaps) {
+                if (!slimeAfter && gap > doable(rise, options.difficulty)) continue;
+                for (const aside of asides) {
+                    const one = along(current, state, size, role, gap, rise, aside, state.heading);
+                    if (inside(one, state.heading)) plain.push({ platform: one, next });
+                }
+            }
+        // A special jump keeps a plain one after it, in its row.
+        const turns: Candidate[] = [];
+        if (state.after === null && (plain.length === 0 || farAlong(current, state))) {
+            if (shape === "rows") turns.push(...turnSteps(current, state, size, role));
+            else {
+                const way = NEXT_HEADING[state.heading];
+                for (const rise of once(rises))
+                    for (const gap of once(gaps)) {
+                        if (gap > doable(rise, options.difficulty)) continue;
+                        const one = along(current, state, size, role, gap, rise, 0, way);
+                        if (inside(one, way))
+                            turns.push({
+                                platform: { ...one, turn: true },
+                                next: { ...next, heading: way }
+                            });
+                    }
+            }
+        }
+        // Now and then a plain jump in the middle of a row is more than a jump:
+        // tried first, the plain ones after.
+        const mayBeSpecial =
+            specials &&
+            state.after === null &&
+            role === "jump" &&
+            index >= 2 &&
+            plainJump(current) &&
+            index + 1 < total &&
+            roleOf(index + 1) === "jump";
+        const special: Candidate[] = [];
+        if (mayBeSpecial && plain.length > 0) {
+            const sideways =
+                shape === "rows" && (state.heading === "east" || state.heading === "west");
+            const roll = random();
+            if (sideways && roll < CLIMB_CHANCE) {
+                const up: Platform = {
+                    ...along(current, state, size, role, 1, 3, 0, state.heading),
+                    climb: state.heading === "east" ? 1 : -1
+                };
+                if (inside(up, state.heading))
+                    special.push({ platform: up, next: { ...next, after: up } });
+            } else {
+                const pick = random();
+                const shifting = sideways ? SHIFT_CHANCE[options.difficulty] : 0;
+                const trap: Trap | undefined =
+                    pick < step.vanish
+                        ? "vanish"
+                        : pick < step.vanish + step.slime
+                          ? "slime"
+                          : pick < step.vanish + step.slime + shifting
+                            ? "shift"
+                            : undefined;
+                if (trap)
+                    for (const one of plain) {
+                        const base = one.platform;
+                        // A pad level with the jump before it would leave the
+                        // platform after it in reach from there: one a block up.
+                        if (trap === "slime" && base.y - current.y !== 1) continue;
+                        if (
+                            trap === "shift" &&
+                            base.z !== lineOf(state, state.heading) - Math.floor(size / 2)
+                        )
+                            continue;
+                        const changed: Platform = { ...base, trap };
+                        special.push({ platform: changed, next: { ...next, after: changed } });
+                    }
+            }
+        }
+        return [...special, ...plain, ...turns];
+    };
+
+    const platforms: Platform[] = [
+        shape === "tower"
+            ? { x: -6, y: 0, z: -2, size: 5, role: "start" }
+            : { x: -6, y: 0, z: 0, size: 5, role: "start" }
+    ];
+    const states: WalkState[] = [
+        {
+            heading: "east",
+            row: "east",
+            rowLine: shape === "tower" ? 0 : 2,
+            turnLeft: 0,
+            after: null
+        }
+    ];
+    const levels: ({ list: Candidate[]; at: number } | undefined)[] = [];
+    let budget = WALK_BUDGET;
+    let index = 1;
+    while (index <= total) {
+        const current = platforms[index - 1]!;
+        const level = (levels[index] ??= {
+            list: candidatesFor(index, current, states[index - 1]!),
+            at: 0
+        });
+        let placed = false;
+        while (level.at < level.list.length) {
+            budget -= 1;
+            if (budget < 0) return null;
+            const candidate = level.list[level.at]!;
+            level.at += 1;
+            platforms.push(candidate.platform);
+            if (!problemsOfLast(platforms)) {
+                states[index] = candidate.next;
+                placed = true;
+                break;
+            }
+            platforms.pop();
+        }
+        if (placed) {
+            index += 1;
+            continue;
+        }
+        // Nowhere to go from here: the jump before takes its next place.
+        levels[index] = undefined;
+        if (index === 1) return null;
+        platforms.pop();
+        index -= 1;
     }
     return platforms;
 }

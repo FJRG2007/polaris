@@ -14,6 +14,7 @@
 import * as plan from "./events/plan";
 import * as commands from "./events/commands";
 import type { ServerContainer } from "./service";
+import { fresh } from "../fresh";
 
 /** The least time between two looks at one server, however many ask. */
 const LOOK_EVERY_MS = 15_000;
@@ -86,7 +87,7 @@ export async function lookIfDue(
 ): Promise<ReadonlyMap<string, plan.Seen>> {
     const last = lookedAt.get(installedAppId);
     const kept = activity.get(installedAppId);
-    if (kept && last !== undefined && Date.now() - last < LOOK_EVERY_MS) return kept;
+    if (kept && last !== undefined && fresh(last, LOOK_EVERY_MS)) return kept;
     return lookAt(installedAppId, server);
 }
 

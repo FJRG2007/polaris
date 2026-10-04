@@ -11,6 +11,7 @@ import { z } from "zod";
 import {
     EVENT_KINDS,
     EVENT_STATE_KEY,
+    PARKOUR_SHAPES,
     presetSchema,
     rewardSchema,
     type EventPreset
@@ -103,13 +104,26 @@ export type Entrant = z.infer<typeof entrantSchema>;
 export const MARKERS = ["components", "tag"] as const;
 export type Marker = (typeof MARKERS)[number];
 
+/**
+ * A run's copy of its event is the event as it began: a parkour from before
+ * shapes is read with them, so it keeps the length its course was built with
+ * instead of the longer one an old saved event now reads as.
+ */
+function asBegun(value: unknown): unknown {
+    if (typeof value !== "object" || value === null || Array.isArray(value)) return value;
+    const { kind, options } = value as { kind?: unknown; options?: unknown };
+    if (kind !== "parkour" || typeof options !== "object" || options === null) return value;
+    if ("shapes" in options) return value;
+    return { ...value, options: { ...options, shapes: [...PARKOUR_SHAPES] } };
+}
+
 export const runSchema = z.object({
     id: z.string(),
     trigger: z.enum(TRIGGERS),
     /** Who pressed Run, for a manual one. */
     startedBy: z.string().nullable(),
     /** A copy, so editing the event while it runs changes the next one, not this. */
-    preset: presetSchema,
+    preset: z.preprocess(asBegun, presetSchema),
     phase: z.enum(["countdown", "running"]),
     createdAt: z.number(),
     startsAt: z.number(),

@@ -5279,6 +5279,80 @@ describe("a parkour race", () => {
         }
     });
 
+    it("counts a checkpoint only from the one before it, and sends back whoever got past the next", async () => {
+        world.online = ["Ana", "Ben"];
+        setUp([race()]);
+        await startArena("race");
+        await play(2_100);
+        chat(["Ana", "join"], ["Ben", "join"]);
+        await play(42_100);
+        const run = state().run!;
+        const origin = run.stage!.origin!;
+        const course = parkour.course(race().options, run.id, origin, origin.y);
+        expect(course.checkpoints.length).toBeGreaterThanOrEqual(2);
+        const top = (index: number): [number, number, number] => {
+            const one = course.platforms[index]!;
+            return [one.x + one.size / 2, one.y + 1, one.z + one.size / 2];
+        };
+        const [first, second] = course.checkpoints as [number, number];
+        // Ana on the second checkpoint without the first: not counted, and back
+        // to her own (the start) with the reason.
+        world.at.Ana = top(second);
+        world.at.Ben = top(0);
+        const from = world.sent.length;
+        await play(2_100);
+        expect(world.checkpoint.Ana).toBe(0);
+        const start = parkour.spotOn(course, 0);
+        expect(world.at.Ana).toEqual([start.x, start.y, start.z]);
+        expect(
+            world.sent
+                .slice(from)
+                .some((line) => line.startsWith("tellraw Ana") && line.includes("No shortcuts"))
+        ).toBe(true);
+        // Through the first, then the second: both count.
+        world.at.Ana = top(first);
+        await play(450);
+        expect(world.checkpoint.Ana).toBe(first);
+        world.at.Ana = top(second);
+        await play(450);
+        expect(world.checkpoint.Ana).toBe(second);
+        // The quick look's selector asks for exactly the checkpoint before.
+        expect(parkour.quickSelectors(course).reached[1]!.selector).toContain(
+            `scores={pe_cp=${first}}`
+        );
+    });
+
+    it("counts a checkpoint crossed between two looks from the platform right after it", async () => {
+        world.online = ["Ana", "Ben"];
+        setUp([race()]);
+        await startArena("race");
+        await play(2_100);
+        chat(["Ana", "join"], ["Ben", "join"]);
+        await play(42_100);
+        const run = state().run!;
+        const origin = run.stage!.origin!;
+        const course = parkour.course(race().options, run.id, origin, origin.y);
+        const first = course.checkpoints[0]!;
+        const one = course.platforms[first + 1]!;
+        const past: [number, number, number] = [
+            one.x + one.size / 2,
+            one.y + 1,
+            one.z + one.size / 2
+        ];
+        world.at.Ana = past;
+        const start = course.platforms[0]!;
+        world.at.Ben = [start.x + start.size / 2, start.y + 1, start.z + start.size / 2];
+        const from = world.sent.length;
+        await play(2_100);
+        expect(world.checkpoint.Ana).toBe(first);
+        expect(world.at.Ana).toEqual(past);
+        expect(
+            world.sent
+                .slice(from)
+                .some((line) => line.startsWith("tellraw Ana") && line.includes("No shortcuts"))
+        ).toBe(false);
+    });
+
     it("takes only who joins, builds in the air, sends a fall back to its checkpoint and everybody home", async () => {
         world.online = ["Ana", "Ben", "Cy"];
         setUp([race()]);
@@ -5339,7 +5413,7 @@ describe("a parkour race", () => {
             quick.some(
                 (line) =>
                     line.startsWith(
-                        "execute in minecraft:overworld as @a[tag=pe_in,scores={pe_cp=.."
+                        "execute in minecraft:overworld as @a[tag=pe_in,scores={pe_cp=0},"
                     ) &&
                     line.includes(" run title @s title ") &&
                     line.includes("Checkpoint 1/")

@@ -36,9 +36,14 @@ the same change.
 2. **Options**: every field has a `.default()`, so an event saved before the
    field existed still parses. Renaming or reshaping a field needs a
    `z.preprocess` that reads the old shape (`legacyWorldBoss`,
-   `legacySpleef`). A changed default needs `migratePreset` or a bump of
-   `DEFAULTS_VERSION`, never a silent change to saved events. A preset that
-   stops parsing is repaired, not dropped (`repairPreset`).
+   `legacySpleef`, `legacyParkour`). A changed default needs `migratePreset`,
+   a bump of `DEFAULTS_VERSION`, or - when only the values on the old default
+   should move, and anything already chosen must keep it - a `z.preprocess`
+   of its own (`legacyParkour`'s jumps); never a silent change to saved
+   events. A preset that stops parsing is repaired, not dropped
+   (`repairPreset`). A run already under way keeps its own copy of its
+   preset as it began (`asBegun` in `state.ts`): a migration that changes an
+   option's default must not also reach into a race in progress.
 3. **Pure and service code are kept apart**: `kinds/<kind>.ts` builds the
    commands and does the maths with no I/O, so it can be asserted in
    `minecraft-events-commands.test.ts`. `kinds/<kind>-service.ts` (or
@@ -182,7 +187,12 @@ left out.
   language, so either is accepted, as is the plural or the `minecraft:` id.
   Nothing repeats inside a game, and the questions asked in the last games
   (`RECENT_KEPT`) come after all the others.
-- **Parkour** is laid out from the run's id, so every run is a new course.
+- **Parkour** is laid out from the run's id, so every run is a new course,
+  30 jumps by default (10 to 60). It takes one of two shapes, drawn among
+  those switched on (`shapes`, both by default): rows climbing back and forth,
+  or a tower climbed round its four sides (`parkour-layout.TOWER_SIDE`). From
+  any platform only the next one is within a jump (see "Building a map"
+  below), and a checkpoint counts only straight after the one before it.
   Past easy, some plain jumps are traps: slime pads that throw the player up
   again, and orange platforms that vanish for two seconds in every six
   (`parkour.blinkLines`). Never two in a row, never a checkpoint; a fall is only
@@ -197,6 +207,52 @@ left out.
   with - no climb, moving platform or checkpoint light appears on a course
   that was placed without them, so a race running across the update is never
   changed under the players mid-run.
+
+## Building a map
+
+Anything a player moves over - a parkour course, an arena, a platform - is
+laid out by a pure function from the run's id, checked against rules in code,
+and only then built. The rules a parkour course keeps
+(`parkour-layout.layoutProblems` and `skipProblems`) are the model for any
+new map:
+
+- **Nothing can be skipped.** From any platform, only the next one is within a
+  jump; nothing two or more ahead is (`skipProblems`). A jump's reach is
+  `reachAcross(rise)`: blocks of air across, counted the long way on a
+  diagonal - 4 on the level, 3 a block up, none two up, 5 a block down and up
+  to 7 falling further. It errs long on purpose: a course that is a block
+  wider than it had to be costs nothing, a platform in reach past the next
+  one is a part of the course nobody has to play. Off a slime pad the bounce
+  adds its height and a block; a moving platform counts at both of its places.
+- **Every jump is one a player makes** without a perfect run: two blocks of
+  air on the level or down (three on hard), two a block up (one on easy).
+- **Nothing touches, nothing is in the way**: a block of air between any two
+  pieces unless one is `HEAD_ROOM` over the other, and head room over every
+  jump.
+- **Laid out by searching, not by chance**: design 4 places a jump at a time,
+  tries every gap, rise and step aside in an order drawn from the seed, keeps
+  the first that breaks no rule, and when a jump has nowhere to go takes the
+  one before it back and tries its next place (`walked`). A corner or a turn
+  often needs the jump before it to have climbed, which only backtracking
+  finds. Placing at random and rejecting the whole course does not converge
+  on long courses: before backtracking, nearly every 60-jump course fell back
+  to a plain staircase.
+- **Measure a generator before shipping it**: over thousands of seeds per
+  shape, difficulty and length, count how many courses break a rule (must be
+  none), how many fall back to the plain layout, how tall they get, and how
+  many traps survive. The tests in `minecraft-events-parkour-layout.test.ts`
+  assert the first; the others decide whether it is any fun.
+- **A found layout is kept, not searched again**: the backtracking search is
+  not cheap, and every tick and every quick look would otherwise redo it.
+  `walkedOnce` keeps the last `WALKS_KEPT` (16) courses by run id, shape,
+  difficulty and jump count - enough for a race, its preview, and a few
+  other runs asked about meanwhile.
+- **Enforced in the game too**: a checkpoint is reached only from the one
+  before it (`quickSelectors`), and a racer seen past their next checkpoint
+  (an ender pearl, a push) is sent back to their own with "No shortcuts".
+- **A layout change bumps `parkour.DESIGN`**, written onto the stage when it
+  is built, so a course standing across an update keeps the layout it was
+  built with.
 
 ## How the floating maps look
 
@@ -398,6 +454,30 @@ A new kind follows all of them. A change to an old kind must not undo one.
   the run's id (`trivia-bank.seeded`), never `Math.random()`, and a change to
   what can be drawn keeps the draw of a run saved before it
   (`spleef.variantFor`).
+
+### Caches and clocks
+
+- **A cached look is fresh only for an age from zero to its time**
+  (`lib/fresh.ts`). `Date.now() - at < ttl` alone takes a look stamped in the
+  future - after the clock is set back - as fresh for as long as the clock is
+  behind: the language cache then spoke to a Spanish-linked player in the
+  server's language, and a trivia test failed one run in three under load
+  (`f9f59295c`).
+
+### Building a map
+
+- **Parts of a parkour course could be skipped**: platforms close enough to
+  reach one past the next, a climb's top level with the next row, a corner
+  cut. The layout now proves nothing past the next platform is within a jump
+  (`skipProblems`), and checkpoints count only in order (see "Building a
+  map" above).
+- **Raising the saved jump count moved a race already running.** The same
+  migration that reads an old twenty-jump event as the new thirty read a
+  run's own copy of its preset the same way, so a race already under way had
+  platforms added past a course its players were already climbing. A run's
+  preset is read with `asBegun` (`state.ts`) instead, which only fills in
+  the fields a run from before shapes was missing and leaves its length as
+  it was (`30036f9f8`).
 
 ### The Events screen
 

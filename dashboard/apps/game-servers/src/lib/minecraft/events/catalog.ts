@@ -202,6 +202,8 @@ export const METEOR_ORES = ["common", "precious", "diamond", "debris"] as const;
 export const PARKOUR_DIFFICULTIES = ["easy", "medium", "hard"] as const;
 /** How a parkour course looks: its blocks, and whether it is climbed by ladder or vine. */
 export const PARKOUR_THEMES = ["classic", "frost", "jungle", "nether"] as const;
+/** The shapes a parkour course takes: rows snaking up, or a tower climbed round. */
+export const PARKOUR_SHAPES = ["rows", "tower"] as const;
 /** The sword a team duel hands everybody, alike for all. */
 export const DUEL_KITS = ["wood", "stone", "iron"] as const;
 /** Where a build battle's theme comes from: the built-in list or the operator's. */
@@ -222,6 +224,21 @@ function legacyWorldBoss(value: unknown): unknown {
     if (typeof value !== "object" || value === null || Array.isArray(value)) return value;
     if ("choice" in value || !("boss" in value)) return value;
     return { choice: "chosen", difficulty: "normal", arena: false, ...value };
+}
+
+/** How many jumps a parkour course has unless the operator says otherwise. */
+export const PARKOUR_JUMPS = 30;
+
+/**
+ * A parkour saved before it could take more than one shape, and still on the
+ * twenty jumps every course had then - nobody's choice - is read as the longer
+ * course it has now. One saved since carries its shapes, and keeps its length.
+ */
+function legacyParkour(value: unknown): unknown {
+    if (typeof value !== "object" || value === null || Array.isArray(value)) return value;
+    if ("shapes" in value) return value;
+    const jumps = (value as { jumps?: unknown }).jumps;
+    return jumps === 20 ? { ...value, jumps: PARKOUR_JUMPS } : value;
 }
 
 /** A spleef saved with one `variant` - "random", or always one way - reads as
@@ -429,25 +446,35 @@ export const optionsSchemas = {
             .default(4),
         ores: z.enum(METEOR_ORES).default("precious")
     }),
-    parkour: z.object({
-        place: placeSchema.default({ mode: "players" }),
-        jumps: z
-            .number()
-            .int()
-            .min(10, problem("atLeast", { count: 10 }))
-            .max(40, problem("atMost", { count: 40 }))
-            .default(20),
-        difficulty: z.enum(PARKOUR_DIFFICULTIES).default("medium"),
-        /** Drawn for each run, or always one. */
-        theme: z.enum(["random", ...PARKOUR_THEMES]).default("random"),
-        /** How far above the ground it is built. */
-        height: z
-            .number()
-            .int()
-            .min(25, problem("atLeast", { count: 25 }))
-            .max(40, problem("atMost", { count: 40 }))
-            .default(30)
-    }),
+    parkour: z.preprocess(
+        legacyParkour,
+        z.object({
+            place: placeSchema.default({ mode: "players" }),
+            jumps: z
+                .number()
+                .int()
+                .min(10, problem("atLeast", { count: 10 }))
+                .max(60, problem("atMost", { count: 60 }))
+                .default(PARKOUR_JUMPS),
+            /** The shapes it may take (`kinds/parkour-layout`): one is drawn for each run. */
+            shapes: z
+                .array(z.enum(PARKOUR_SHAPES))
+                .min(1, problem("chooseParkourShape"))
+                .max(PARKOUR_SHAPES.length)
+                .transform((shapes) => PARKOUR_SHAPES.filter((shape) => shapes.includes(shape)))
+                .default([...PARKOUR_SHAPES]),
+            difficulty: z.enum(PARKOUR_DIFFICULTIES).default("medium"),
+            /** Drawn for each run, or always one. */
+            theme: z.enum(["random", ...PARKOUR_THEMES]).default("random"),
+            /** How far above the ground it is built. */
+            height: z
+                .number()
+                .int()
+                .min(25, problem("atLeast", { count: 25 }))
+                .max(40, problem("atMost", { count: 40 }))
+                .default(30)
+        })
+    ),
     spleef: z.preprocess(
         legacySpleef,
         z.object({

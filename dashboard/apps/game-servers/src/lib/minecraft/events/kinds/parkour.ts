@@ -22,7 +22,7 @@
  */
 
 import { seeded } from "../trivia-bank";
-import { PARKOUR_THEMES, type EventOptions } from "../catalog";
+import { PARKOUR_SHAPES, PARKOUR_THEMES, type EventOptions } from "../catalog";
 import { shuffled } from "../trivia-bank";
 import { IN_ARENA, type Box, type Spot, type Volume } from "./stage";
 import * as layout from "./parkour-layout";
@@ -100,11 +100,12 @@ export const SHIFT_STEP = layout.SHIFT_STEP;
 
 /**
  * How courses are laid out now. A course placed before climbs, moving
- * platforms and looks (design 1), or before the layout rules
- * (`parkour-layout`, design 2), is laid out the way it was then, so a race
- * running across an update keeps the course it was built as.
+ * platforms and looks (design 1), before the layout rules (`parkour-layout`,
+ * design 2), or before shapes and the rule that nothing past the next platform
+ * is in reach (design 3), is laid out the way it was then, so a race running
+ * across an update keeps the course it was built as.
  */
-export const DESIGN = 3;
+export const DESIGN = 4;
 
 const TRAP_BLOCKS: Readonly<Record<Trap, Box["block"]>> = {
     slime: "minecraft:slime_block",
@@ -164,6 +165,16 @@ const ROLE_BLOCKS: Readonly<Record<"checkpoint" | "finish", Box["block"]>> = {
     finish: "minecraft:yellow_concrete"
 };
 
+/** A run's shape: drawn from its id among those the event allows. */
+export function shapeFor(options: EventOptions<"parkour">, seed: string): layout.Shape {
+    const allowed = options.shapes ?? PARKOUR_SHAPES;
+    const shapes = PARKOUR_SHAPES.filter((shape) => allowed.includes(shape));
+    return shuffled(
+        shapes.length > 0 ? shapes : PARKOUR_SHAPES,
+        seeded(`parkour-shape-${seed}`)
+    )[0]!;
+}
+
 /** A run's theme: the one chosen, or drawn from its id. */
 export function themeFor(options: EventOptions<"parkour">, seed: string): Theme {
     const chosen = options.theme ?? "random";
@@ -181,7 +192,11 @@ function climbBlock(kind: "ladder" | "vine", direction: 1 | -1): Box["block"] {
 const NET: Box["block"] = "minecraft:white_stained_glass";
 
 /** A course placed before design 3, laid out the way it was then. */
-function laidOutBefore(options: EventOptions<"parkour">, seed: string, legacy: boolean): Platform[] {
+function laidOutBefore(
+    options: EventOptions<"parkour">,
+    seed: string,
+    legacy: boolean
+): Platform[] {
     const random = seeded(`parkour-${seed}`);
     const step = STEPS[options.difficulty];
     const pick = <T>(list: readonly T[]): T => list[Math.floor(random() * list.length)] as T;
@@ -267,6 +282,25 @@ function laidOutBefore(options: EventOptions<"parkour">, seed: string, legacy: b
     return platforms;
 }
 
+/** How many design-4 layouts are kept: a race, its preview and a few run ids. */
+const WALKS_KEPT = 16;
+const walks = new Map<string, Platform[]>();
+
+/**
+ * A design-4 layout, searched for once per run and options: the search can
+ * take a while, and every tick and quick look asks for the course again.
+ */
+function walkedOnce(options: EventOptions<"parkour">, seed: string): Platform[] {
+    const shape = shapeFor(options, seed);
+    const key = JSON.stringify([seed, shape, options.difficulty, options.jumps]);
+    const kept = walks.get(key);
+    if (kept) return kept;
+    const platforms = layout.walked(options, seed, shape);
+    walks.set(key, platforms);
+    if (walks.size > WALKS_KEPT) walks.delete(walks.keys().next().value!);
+    return platforms;
+}
+
 /**
  * The course over a site: its middle over the column, its start at `y`. The
  * same options and run id give the same course, wherever it is put.
@@ -279,7 +313,12 @@ export function course(
     design: number = DESIGN
 ): Course {
     const legacy = design < 2;
-    const raw = design >= 3 ? layout.laidOut(options, seed) : laidOutBefore(options, seed, legacy);
+    const raw =
+        design >= 4
+            ? walkedOnce(options, seed)
+            : design >= 3
+              ? layout.laidOut(options, seed)
+              : laidOutBefore(options, seed, legacy);
     const theme = legacy ? "classic" : themeFor(options, seed);
     const look = THEMES[theme];
     const minX = Math.min(...raw.map((one) => one.x)) - 2;
@@ -513,6 +552,11 @@ export function holdLines(course: Course): string[] {
     ];
 }
 
+/** The checkpoint after `checkpoint` (a platform index): the next one a racer must reach. */
+export function nextCheckpoint(course: Course, checkpoint: number): number {
+    return course.checkpoints.find((at) => at > checkpoint) ?? course.platforms.length - 1;
+}
+
 /** How many checkpoints lie at or before a platform - the finish counted as the last. */
 export function checkpointsBy(course: Course, index: number): number {
     return course.checkpoints.filter((at) => at <= index).length;
@@ -575,8 +619,9 @@ const FALL_DEPTH = 64;
  * - `fell`: one per checkpoint a racer can be sent back to (the start and every
  *   checkpoint but the finish) - whoever with that checkpoint is under the
  *   lowest platform's top, with where they go;
- * - `reached`: one per checkpoint and the finish - whoever with an earlier one
- *   is standing over it (or in the block above it).
+ * - `reached`: one per checkpoint and the finish - whoever has the checkpoint
+ *   right before it (the start for the first) and is standing over it. One
+ *   further back has skipped part of the course, and it does not count.
  * A racer standing on the lowest platforms has their feet a block over `floor`;
  * a box whose top is `floor` catches them only once they are under that.
  */
@@ -600,11 +645,12 @@ export function quickSelectors(course: Course): {
             selector: `@a[tag=${IN_ARENA},scores={${CHECKPOINT_SCORE}=${checkpoint}},${below}]`,
             spot: spotOn(course, checkpoint)
         })),
-        reached: course.checkpoints.map((checkpoint) => {
+        reached: course.checkpoints.map((checkpoint, at) => {
             const one = course.platforms[checkpoint]!;
+            const before = at === 0 ? 0 : course.checkpoints[at - 1]!;
             return {
                 checkpoint,
-                selector: `@a[tag=${IN_ARENA},scores={${CHECKPOINT_SCORE}=..${checkpoint - 1}},x=${one.x},y=${one.y + 1},z=${one.z},dx=${one.size - 1},dy=0,dz=${one.size - 1}]`,
+                selector: `@a[tag=${IN_ARENA},scores={${CHECKPOINT_SCORE}=${before}},x=${one.x},y=${one.y + 1},z=${one.z},dx=${one.size - 1},dy=0,dz=${one.size - 1}]`,
                 finish: checkpoint === finish
             };
         })

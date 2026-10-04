@@ -30,6 +30,12 @@ the code. If a rule changes, change it in the doc.
 - Every command: run through the version gates, with both gamerule names, and
   safe on Paper/EssentialsX. Assume the server is a real one, with builds,
   beds, an island, a crowd, an old version and a restart in the middle.
+- A map or anything players move over: follow "Building a map" in the doc.
+  It is laid out by a pure function from the run's id and checked against
+  rules before it is built. Nothing past the next step can be reached
+  (`parkour-layout.reaches`), the order is enforced in the game as well, and
+  the generator is measured over thousands of seeds before it ships. A layout
+  change bumps its design version.
 
 ## Before calling it done
 

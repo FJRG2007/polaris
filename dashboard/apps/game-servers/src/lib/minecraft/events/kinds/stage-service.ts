@@ -800,21 +800,33 @@ async function parkourTick(
             next = { ...next, checkpoint: game, best: Math.max(next.best, game) };
             if (game === jumps) next = { ...next, finishedAt: await finishedAt(racer) };
         }
-        // Anything it missed, from where they stand.
+        // Anything it missed, from where they stand. The platform right after
+        // the next checkpoint is reached only from it, so standing there is
+        // having crossed it between two looks. Anything further got round part
+        // of the course (an ender pearl, a push) and goes back to their own.
         const on = parkour.platformUnder(course, at);
+        const ahead = parkour.nextCheckpoint(course, next.checkpoint);
+        if (on !== null && on > ahead + 1 && next.finishedAt === null) {
+            lines.push(
+                stage.moveLine(racer.name, parkour.spotOn(course, next.checkpoint)),
+                tell(racer.name, messages.tag(language) + messages.noShortcut(language))
+            );
+            continue;
+        }
         let sounded = next.finishedAt !== null;
-        if (on !== null && on > next.best) {
-            next = { ...next, best: on };
-            const role = course.platforms[on]!.role;
-            if ((role === "checkpoint" || role === "finish") && on > next.checkpoint) {
-                next = { ...next, checkpoint: on };
-                const reached = parkour.checkpointsBy(course, on);
+        if (on !== null && on > next.best) next = { ...next, best: on };
+        const crossed = on !== null && on > ahead ? ahead : on;
+        if (crossed !== null && crossed > next.checkpoint) {
+            const role = course.platforms[crossed]!.role;
+            if (role === "checkpoint" || role === "finish") {
+                next = { ...next, checkpoint: crossed };
+                const reached = parkour.checkpointsBy(course, crossed);
                 lines.push(
                     `title ${racer.name} times 5 30 10`,
                     `title ${racer.name} subtitle ${commands.text(" ")}`,
                     `title ${racer.name} title ${commands.text(messages.checkpointTitle(reached, checkpoints, language))}`,
                     soundFor(racer.name, commands.SOUNDS.tick),
-                    `scoreboard players set ${racer.name} ${parkour.CHECKPOINT_SCORE} ${on}`
+                    `scoreboard players set ${racer.name} ${parkour.CHECKPOINT_SCORE} ${crossed}`
                 );
             }
             if (role === "finish" && next.finishedAt === null) {

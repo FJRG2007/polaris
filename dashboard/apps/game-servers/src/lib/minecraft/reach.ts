@@ -20,6 +20,7 @@ import { pingJava } from "./slp";
 import { pingBedrock } from "./raknet";
 import { host } from "@polaris/app-host";
 import type { AppHostTypes } from "@polaris/app-host";
+import { fresh } from "../fresh";
 
 const { getLocalEnvironment } = host.networkService;
 const { getHostLanIp, isLanAddress } = host.hostAddress;
@@ -33,7 +34,10 @@ const { patchInstallConfig, readInstallConfig } = host.appsInstallConfig;
 /** The ports a game install actually publishes, from what its deploy pinned. */
 export async function gamePorts(applicationId: string | null): Promise<GamePort[]> {
     if (!applicationId) return [];
-    const app = await prisma.application.findUnique({ where: { id: applicationId }, select: { sourceConfig: true } });
+    const app = await prisma.application.findUnique({
+        where: { id: applicationId },
+        select: { sourceConfig: true }
+    });
     if (!app) return [];
     let config: {
         hostPort?: unknown;
@@ -47,13 +51,19 @@ export async function gamePorts(applicationId: string | null): Promise<GamePort[
     }
     const ports: GamePort[] = [];
     if (typeof config.hostPort === "number") {
-        ports.push({ port: config.hostPort, protocol: config.hostProtocol === "udp" ? "udp" : "tcp" });
+        ports.push({
+            port: config.hostPort,
+            protocol: config.hostProtocol === "udp" ? "udp" : "tcp"
+        });
     }
     if (Array.isArray(config.extraPorts)) {
         for (const entry of config.extraPorts) {
             const extra = entry as { host?: unknown; protocol?: unknown };
             if (typeof extra.host === "number") {
-                ports.push({ port: extra.host, protocol: extra.protocol === "udp" ? "udp" : "tcp" });
+                ports.push({
+                    port: extra.host,
+                    protocol: extra.protocol === "udp" ? "udp" : "tcp"
+                });
             }
         }
     }
@@ -117,9 +127,10 @@ export async function noteReachedFrom(installedAppId: string, address: string): 
  * threading a catalog id through every caller of this.
  */
 function answersOnUdp(host: string, port: number, timeoutMs: number): Promise<boolean> {
-    return Promise.all([pingBedrock(host, port, timeoutMs), pingSteamQuery(host, port, timeoutMs)]).then(
-        (answers) => answers.some(Boolean)
-    );
+    return Promise.all([
+        pingBedrock(host, port, timeoutMs),
+        pingSteamQuery(host, port, timeoutMs)
+    ]).then((answers) => answers.some(Boolean));
 }
 
 /** A ping that crosses no router is answered at once or not at all. Short enough
@@ -150,7 +161,10 @@ const LOCAL_PROBE_TIMEOUT_MS = 700;
  * Null when there is nothing to ask about, so a caller with no ports is not handed
  * a verdict about them.
  */
-export async function probeListening(ports: readonly GamePort[], lanIp: string | null): Promise<boolean | null> {
+export async function probeListening(
+    ports: readonly GamePort[],
+    lanIp: string | null
+): Promise<boolean | null> {
     if (ports.length === 0) return null;
     const host = lanIp ?? "127.0.0.1";
     // Every port at once: a game publishes several and only one of them answers,
@@ -203,7 +217,7 @@ export async function probeReach(pending: readonly PendingReach[]): Promise<stri
     const reached: string[] = [];
     for (const entry of pending) {
         const last = probedAt.get(entry.installedAppId) ?? 0;
-        if (Date.now() - last < PROBE_EVERY_MS) continue;
+        if (fresh(last, PROBE_EVERY_MS)) continue;
         probedAt.set(entry.installedAppId, Date.now());
         // Every port of one server at once. Only one of them tends to answer - a
         // game's own port says nothing to a stranger, while the query port beside
@@ -231,7 +245,10 @@ export async function probeReach(pending: readonly PendingReach[]): Promise<stri
  * `probe` is off for a render and on for a poll: knocking on a port costs seconds
  * against a router that drops the packet, and a page must not wait on it to paint.
  */
-export async function reachAdviceFor(installedAppId: string, probe = false): Promise<GameReachAdvice> {
+export async function reachAdviceFor(
+    installedAppId: string,
+    probe = false
+): Promise<GameReachAdvice> {
     const install = await prisma.installedApp.findUnique({
         where: { id: installedAppId },
         select: { applicationId: true, config: true }
