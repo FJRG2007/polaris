@@ -639,6 +639,18 @@ export function MinecraftEvents({
         });
     }
 
+    /** The fewest on the server it can start with: for an event players join,
+     *  as many as must join it. The server refuses it the same way. */
+    function neededOn(preset: catalog.EventPreset): number {
+        return catalog.takesJoiners(preset)
+            ? catalog.joinersNeeded(preset)
+            : catalog.minPlayersOf(preset);
+    }
+
+    function tooFewOn(preset: catalog.EventPreset): boolean {
+        return view?.players != null && view.players.online < neededOn(preset);
+    }
+
     function run(preset: catalog.EventPreset): void {
         setError(null);
         setNote(null);
@@ -1039,13 +1051,21 @@ export function MinecraftEvents({
                                                 title={
                                                     dirty
                                                         ? t("events.saveFirst")
-                                                        : t("events.runNow", { name: preset.name })
+                                                        : tooFewOn(preset)
+                                                          ? t("events.errors.tooFewPlayers", {
+                                                                count: view?.players?.online ?? 0,
+                                                                needed: neededOn(preset)
+                                                            })
+                                                          : t("events.runNow", {
+                                                                name: preset.name
+                                                            })
                                                 }
                                                 disabled={
                                                     locked ||
                                                     pending ||
                                                     running ||
                                                     dirty ||
+                                                    tooFewOn(preset) ||
                                                     !view?.config.presets.some(
                                                         (one) => one.id === preset.id
                                                     )

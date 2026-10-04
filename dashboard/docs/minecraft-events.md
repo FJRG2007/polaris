@@ -263,6 +263,11 @@ A new kind follows all of them. A change to an old kind must not undo one.
   (`DEFAULT_MIN_SCORE`). A build battle needs three builders, because with
   two each vote can only go to the other build (`BUILD_BATTLE_FLOOR`)
   (`f7b2a8a6b`, `ec91d0ca2`).
+- **Never open an event that cannot reach its own minimum**, even when the
+  operator presses Run: an event players join needs at least
+  `joinersNeeded` players on the server before its countdown starts, or it
+  only gets called off once the countdown is over. The Run button is disabled
+  for the same reason, so the screen and the server agree.
 - **Nobody wins by standing still, in creative, or with a farm.** Players
   seen in creative or spectator, AFK players where `afkCounts`, and players
   caught by Anti X-Ray or the anti-cheat are left off the podium. Ore placed

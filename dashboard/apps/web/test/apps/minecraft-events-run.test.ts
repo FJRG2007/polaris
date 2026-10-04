@@ -2328,6 +2328,24 @@ describe("the minute sweep", () => {
         expect(state().run?.trigger).toBe("random");
     });
 
+    it("does not open an event players join with fewer on the server than must join it", async () => {
+        world.online = ["Ana", "Ben"];
+        setUp([{ ...newPreset("build-battle", "build"), minutes: 10 }]);
+        const refused = await refusal(
+            events.startEvent({
+                ownerId: "owner",
+                installedAppId: SERVER,
+                presetId: "build",
+                trigger: "manual",
+                startedBy: null
+            })
+        );
+        // Three builders at the least: with two on, nobody is asked to join.
+        expect(refused).toBe("Only 2 players are on the server; this event needs 3");
+        expect(state().run).toBeNull();
+        expect(world.sent.some((line) => line.includes("bossbar add"))).toBe(false);
+    });
+
     it("does not start with fewer players on than its minimum, and says why", async () => {
         world.online = ["Ana"];
         setUp([{ ...newPreset("mining-rush", "rush"), minutes: 3 }]);

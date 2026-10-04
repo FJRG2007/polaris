@@ -631,10 +631,14 @@ export async function startEvent(input: {
     const seen = await sample(row.ownerId, input.installedAppId);
     if (seen === null) throw new Error(refused("notRunning"));
     if (seen.size === 0) throw new Error(refused("nobodyOn"));
-    // Its own minimum, counted on the server as it starts - or, for an event
-    // players join, on who joined when the countdown ends.
-    const fewest = catalog.minPlayersOf(preset);
-    if (!catalog.takesJoiners(preset) && seen.size < fewest) {
+    // Its own minimum, counted on the server as it starts. An event players
+    // join is counted again on who joined when the countdown ends, but is never
+    // opened with fewer on the server than could ever join it: a build battle
+    // for three with two on would only be called off after its countdown.
+    const fewest = catalog.takesJoiners(preset)
+        ? catalog.joinersNeeded(preset)
+        : catalog.minPlayersOf(preset);
+    if (seen.size < fewest) {
         throw new Error(refused("tooFewPlayers", { count: seen.size, needed: fewest }));
     }
     // The chunks somebody already keeps loaded - a farm, a spawn - before the

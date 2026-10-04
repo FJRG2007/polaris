@@ -133,6 +133,24 @@ describe("the Events tab", () => {
         retried.length = 0;
     });
 
+    it("does not offer to run an event with fewer on the server than it needs, and says why", async () => {
+        const build = catalog.newPreset("build-battle", "build");
+        render(<MinecraftEvents installedAppId="00000000-0000-4000-8000-000000000001" canManage />);
+        answerRead({
+            view: {
+                ...view,
+                players: { online: 2, active: 2 },
+                config: { ...config, presets: [build, catalog.newPreset("fishing", "fish")] }
+            }
+        });
+        const run = (await screen.findByLabelText("Run Build battle now")) as HTMLButtonElement;
+        expect(run.disabled).toBe(true);
+        expect(run.title).toBe("Only 2 players are on the server; this event needs 3");
+        expect(
+            (screen.getByLabelText("Run Fishing contest now") as HTMLButtonElement).disabled
+        ).toBe(false);
+    });
+
     it("explains an event from its row", async () => {
         render(<MinecraftEvents installedAppId="00000000-0000-4000-8000-000000000001" canManage />);
         answerRead({ view });
