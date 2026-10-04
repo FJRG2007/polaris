@@ -696,16 +696,20 @@ export function MinecraftEvents({
     // clock and the standings move; slowly otherwise, so an event that starts
     // on its own shows up. An edit in progress is never overwritten by a read.
     const running = view?.run !== null && view?.run !== undefined;
+    /** The fewest on the server it can start with: for an event players join,
+     *  as many as must join it. The server refuses it the same way. */
+    function neededOn(preset: catalog.EventPreset): number {
+        return catalog.takesJoiners(preset)
+            ? catalog.joinersNeeded(preset)
+            : catalog.minPlayersOf(preset);
+    }
+
+    function tooFewOn(preset: catalog.EventPreset): boolean {
+        return view?.players != null && view.players.online < neededOn(preset);
+    }
+
     // Some saved event cannot be run for want of players on the server.
-    const waitingForPlayers =
-        view?.players != null &&
-        view.config.presets.some(
-            (preset) =>
-                view.players!.online <
-                (catalog.takesJoiners(preset)
-                    ? catalog.joinersNeeded(preset)
-                    : catalog.minPlayersOf(preset))
-        );
+    const waitingForPlayers = view?.config.presets.some(tooFewOn) ?? false;
     useEffect(() => {
         let alive = true;
         const read = () =>
@@ -780,21 +784,9 @@ export function MinecraftEvents({
         });
     }
 
-    /** The fewest on the server it can start with: for an event players join,
-     *  as many as must join it. The server refuses it the same way. */
-    function neededOn(preset: catalog.EventPreset): number {
-        return catalog.takesJoiners(preset)
-            ? catalog.joinersNeeded(preset)
-            : catalog.minPlayersOf(preset);
-    }
-
     /** Why this server cannot play it, or null - only ever said when true. */
     function cannotOn(preset: catalog.EventPreset): string | null {
         return incompatibleText(t, preset, view?.version ?? null);
-    }
-
-    function tooFewOn(preset: catalog.EventPreset): boolean {
-        return view?.players != null && view.players.online < neededOn(preset);
     }
 
     function run(preset: catalog.EventPreset): void {

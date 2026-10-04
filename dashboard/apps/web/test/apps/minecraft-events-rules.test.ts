@@ -73,6 +73,34 @@ describe("a kind added in an update", () => {
         const some = catalog.readEventsConfig(saved(2, [{ presetId: "fish", weight: 1 }]));
         expect(some.settings.random.pool).toEqual([{ presetId: "fish", weight: 1 }]);
     });
+
+    it("is given only while there is room, so the events still save", () => {
+        const presets = Array.from({ length: 35 }, (_, n) =>
+            catalog.newPreset("fishing", `fish-${n}`)
+        );
+        const read = catalog.readEventsConfig({
+            [catalog.EVENTS_KEY]: {
+                presets,
+                settings: {
+                    defaults: 2,
+                    random: {
+                        enabled: true,
+                        pool: presets.map((one) => ({ presetId: one.id, weight: 1 }))
+                    }
+                }
+            }
+        });
+        expect(read.presets).toHaveLength(40);
+        expect(read.presets.slice(35).map((one) => one.kind)).toEqual([
+            "tnt-run",
+            "boat-race",
+            "dropper",
+            "capture-the-flag",
+            "hide-and-seek"
+        ]);
+        expect(read.settings.random.pool).toHaveLength(40);
+        expect(catalog.eventsConfigSchema.safeParse(read).success).toBe(true);
+    });
 });
 
 describe("an event a server cannot play", () => {

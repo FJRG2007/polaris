@@ -832,6 +832,10 @@ export const scheduleEntrySchema = z.object({
 
 export type EventScheduleEntry = z.infer<typeof scheduleEntrySchema>;
 
+/** The most events one server keeps, and the most the random draw picks from. */
+const EVENTS_AT_MOST = 40;
+const POOL_AT_MOST = 50;
+
 export const randomSchema = z
     .object({
         enabled: z.boolean().default(false),
@@ -860,7 +864,7 @@ export const randomSchema = z
                     weight: z.number().int().min(1).max(10)
                 })
             )
-            .max(50)
+            .max(POOL_AT_MOST)
             .default([])
     })
     .refine((value) => value.maxGap >= value.minGap, {
@@ -924,7 +928,9 @@ export type EventSettings = z.infer<typeof settingsSchema>;
 export const eventsConfigSchema = z
     .object({
         settings: settingsSchema.default({}),
-        presets: z.array(presetSchema).max(40, problem("eventsAtMost", { count: 40 })),
+        presets: z
+            .array(presetSchema)
+            .max(EVENTS_AT_MOST, problem("eventsAtMost", { count: EVENTS_AT_MOST })),
         schedules: z
             .array(scheduleEntrySchema)
             .max(40, problem("schedulesAtMost", { count: 40 }))
@@ -1513,14 +1519,14 @@ export function readEventsConfig(
     // language its players read.
     const had = new Set(kept.map((preset) => preset.kind));
     const taken = new Set(kept.map((preset) => preset.id));
-    const added = EVENT_KINDS.filter(
-        (kind) => (KIND_SINCE[kind] ?? 1) > saved && !had.has(kind)
-    ).map((kind) => {
-        let id = `default-${kind}`;
-        while (taken.has(id)) id = `${id}-2`;
-        taken.add(id);
-        return newPreset(kind, id, KIND_NAMES[kind][read.language]);
-    });
+    const added = EVENT_KINDS.filter((kind) => (KIND_SINCE[kind] ?? 1) > saved && !had.has(kind))
+        .slice(0, Math.max(0, EVENTS_AT_MOST - kept.length))
+        .map((kind) => {
+            let id = `default-${kind}`;
+            while (taken.has(id)) id = `${id}-2`;
+            taken.add(id);
+            return newPreset(kind, id, KIND_NAMES[kind][read.language]);
+        });
     const presets = [...kept, ...added];
     const ids = new Set(presets.map((preset) => preset.id));
     const schedules = (Array.isArray(value.schedules) ? value.schedules : []).flatMap((entry) => {
@@ -1541,7 +1547,12 @@ export function readEventsConfig(
             random: {
                 ...read.random,
                 pool: everything
-                    ? [...pool, ...added.map((preset) => ({ presetId: preset.id, weight }))]
+                    ? [
+                          ...pool,
+                          ...added
+                              .slice(0, Math.max(0, POOL_AT_MOST - pool.length))
+                              .map((preset) => ({ presetId: preset.id, weight }))
+                      ]
                     : pool
             }
         },
