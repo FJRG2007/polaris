@@ -45,7 +45,7 @@ import {
     type ScheduledMessageView
 } from "@/lib/chat/scheduled";
 import { searchMessages, type ChatSearchHit } from "@/lib/chat/search";
-import { voicePresence, type VoicePresence } from "@/lib/chat/meetings";
+import { callConversationMembers, voicePresence, type VoicePresence } from "@/lib/chat/meetings";
 import type { ChatInviteOffer, ChatInviteView } from "@/lib/chat/invites";
 import { fetchRemoteMedia, searchTenor, tenorConfigured, type TenorResult } from "@/lib/chat/tenor";
 import type {
@@ -253,12 +253,22 @@ export interface GroupCandidate {
  * the fold by the ones that cannot.
  */
 export async function searchGroupPeopleAction(
-    query: string
+    query: string,
+    meetingId?: string
 ): Promise<{ results?: GroupCandidate[]; withheld?: number; error?: string }> {
     const me = await actor();
-    const found = await searchForConversation(me, String(query ?? ""));
+    const call = z.string().uuid().optional().safeParse(meetingId);
+    const [found, inside] = await Promise.all([
+        searchForConversation(me, String(query ?? "")),
+        call.success && call.data
+            ? callConversationMembers(me, call.data).catch(() => new Set<string>())
+            : new Set<string>()
+    ]);
     const ids = found.people.map((person) => person.id);
-    const standings = await groupStandings(me.id, ids);
+    const standings = await groupStandings(
+        me.id,
+        ids.filter((id) => !inside.has(id))
+    );
     const strangers = ids.filter((id) => standings.get(id) === "stranger");
     const askable =
         strangers.length > 0
@@ -273,7 +283,7 @@ export async function searchGroupPeopleAction(
 
     const results: GroupCandidate[] = found.people.map((person) => {
         const standing = standings.get(person.id) ?? "stranger";
-        if (mayJoinGroup(standing)) return person;
+        if (inside.has(person.id) || mayJoinGroup(standing)) return person;
         return {
             ...person,
             unavailable: reason[standing as keyof typeof reason],
@@ -300,7 +310,9 @@ export async function askFriendAction(personId: string): Promise<{ error?: strin
         revalidatePath("/account/friends");
         return {};
     } catch (caught) {
-        if (caught instanceof FriendError) return { error: caught.message };
+        if (caught instanceof FriendError) {
+            return { error: (await getTranslations("chat"))("groupPicker.cannotAsk") };
+        }
         console.error("polaris: a friend request from the group picker failed:", caught);
         return { error: (await getTranslations("chat"))("groupPicker.requestFailed") };
     }

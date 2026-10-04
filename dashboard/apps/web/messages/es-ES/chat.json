@@ -1230,6 +1230,7 @@
         "sendRequest": "Añadir amigo",
         "sendRequestTo": "Enviar una solicitud de amistad a {name}",
         "requestSent": "Solicitud enviada",
+        "cannotAsk": "No puedes enviar esa solicitud",
         "requestFailed": "No se pudo enviar la solicitud. Inténtalo de nuevo."
     },
     "addPeople": {

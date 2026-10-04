@@ -2605,6 +2605,7 @@ function InviteToCallDialog({
                 {mayInvite && (
                     <ChatPeoplePicker
                         forGroup={forGroup}
+                        meetingId={meetingId}
                         picked={picked}
                         onChange={setPicked}
                         exclude={already}

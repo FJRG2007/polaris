@@ -11,6 +11,7 @@
  * offering them and letting the server refuse.
  */
 
+import { useCallback } from "react";
 import { AskFriendButton } from "./ask-friend-button";
 import { PeoplePicker, type PickedPerson } from "@/components/people-picker";
 import { searchGroupPeopleAction, searchPeopleAction, type GroupCandidate } from "./actions";
@@ -20,7 +21,8 @@ export function ChatPeoplePicker({
     picked,
     onChange,
     exclude,
-    label
+    label,
+    meetingId
 }: {
     /** Whether the people picked end up in a group. */
     forGroup: boolean;
@@ -28,7 +30,14 @@ export function ChatPeoplePicker({
     onChange: (picked: readonly PickedPerson[]) => void;
     exclude?: readonly string[];
     label?: string;
+    /** The call the people are being brought into, whose conversation's own
+     *  members may be picked whatever their standing - nobody adds them. */
+    meetingId?: string;
 }) {
+    const searchGroup = useCallback(
+        (query: string) => searchGroupPeopleAction(query, meetingId),
+        [meetingId]
+    );
     if (!forGroup) {
         return (
             <PeoplePicker
@@ -46,7 +55,7 @@ export function ChatPeoplePicker({
             onChange={onChange}
             exclude={exclude}
             label={label}
-            search={searchGroupPeopleAction}
+            search={searchGroup}
             unavailableAction={(person) =>
                 person.requestable ? (
                     <AskFriendButton personId={person.id} name={person.name} />

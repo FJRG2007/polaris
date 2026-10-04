@@ -216,6 +216,29 @@ export async function startOrJoin(
 }
 
 /**
+ * Who is in the conversation a call lives in, for somebody who is in it too.
+ *
+ * The people `inviteToCall` rings without adding anybody - they are already
+ * there - so a picker can offer them on the same terms the server takes them.
+ */
+export async function callConversationMembers(
+    actor: ChatActor,
+    meetingId: string
+): Promise<Set<string>> {
+    const meeting = await prisma.meeting.findUnique({
+        where: { id: meetingId },
+        select: { channelId: true }
+    });
+    if (!meeting?.channelId) return new Set();
+    await requireChannel(actor, meeting.channelId);
+    const rows = await prisma.chatChannelMember.findMany({
+        where: { channelId: meeting.channelId },
+        select: { userId: true }
+    });
+    return new Set(rows.map((row) => row.userId));
+}
+
+/**
  * Bring somebody else into a call that is already running.
  *
  * In a group or a channel this is what it sounds like: they are added to the
