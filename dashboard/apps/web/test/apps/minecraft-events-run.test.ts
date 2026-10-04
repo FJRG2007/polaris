@@ -1908,6 +1908,7 @@ async function play(ms: number): Promise<void> {
 
 beforeEach(() => {
     vi.useFakeTimers({ now: Date.parse("2026-09-28T20:00:00Z") });
+    events.forgetFreshPacks();
     world.online = ["Ana", "Ben"];
     world.pressed = {};
     world.scores = {};
@@ -6067,6 +6068,38 @@ describe("spleef", () => {
         expect(world.sent.filter((line) => line.startsWith("datapack enable")).length).toBe(
             enables
         );
+    });
+
+    it("brings the data pack up to date in the minute sweep, so a game's start never pauses to take it in", async () => {
+        world.online = ["Ana", "Ben"];
+        setUp([floor("snowballs")]);
+        // Nothing on: the sweep writes the pack and takes it in now.
+        await events.sweepEvents();
+        expect(world.packsOn.has(snowballPack.PACK_ID)).toBe(true);
+        const enables = () =>
+            world.sent.filter((line) => line.startsWith("datapack enable")).length;
+        expect(enables()).toBe(1);
+        // The next sweeps leave it be: the files are not even read again.
+        world.writes = [];
+        await events.sweepEvents();
+        expect(enables()).toBe(1);
+        // The game then finds it current: nothing written, nothing reloaded.
+        await startArena("floor");
+        await play(2_100);
+        chat(["Ana", "join"], ["Ben", "join"]);
+        await play(52_000);
+        expect(
+            world.sent.filter((line) => line.startsWith("give Ana minecraft:snowball")).length
+        ).toBeGreaterThan(0);
+        expect(world.writes).toEqual([]);
+        expect(enables()).toBe(1);
+    });
+
+    it("leaves a server with no event played by the pack without it", async () => {
+        world.online = ["Ana", "Ben"];
+        setUp([floor("shovel")]);
+        await events.sweepEvents();
+        expect(world.sent.some((line) => line.startsWith("datapack enable"))).toBe(false);
     });
 
     it("is called off before anything is built when too few join, and moves nobody", async () => {
