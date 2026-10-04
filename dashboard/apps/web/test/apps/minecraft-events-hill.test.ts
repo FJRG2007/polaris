@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import * as hill from "@polaris-app/game-servers/src/lib/minecraft/events/kinds/hill";
+import * as messages from "@polaris-app/game-servers/src/lib/minecraft/events/messages";
 import * as search from "@polaris-app/game-servers/src/lib/minecraft/events/place-search";
 import * as duel from "@polaris-app/game-servers/src/lib/minecraft/events/kinds/team-duel";
 
@@ -254,5 +255,35 @@ describe("a team duel between two looks", () => {
     it("hands the shield over to go in the off hand", () => {
         expect(duel.duelKit("iron")).toEqual(["minecraft:iron_sword", duel.OFFHAND_ITEM]);
         expect(duel.OFFHAND_ITEM).toBe("minecraft:shield");
+    });
+});
+
+describe("the ring's rules", () => {
+    const ring = (variant: messages.RulesVariant) =>
+        messages.rules("king-of-the-hill", "en", { ring: true, ...variant });
+
+    it("say only what the ring does this game", () => {
+        expect(ring({ rounds: 3, shrinks: true, moves: true })).toBe(
+            "Hold the ring alone: two in it and neither scores. It shrinks and moves, and the end of each round counts double."
+        );
+        expect(ring({ rounds: 3, shrinks: false, moves: true })).toContain(" It moves, and ");
+        expect(ring({ rounds: 3, shrinks: true, moves: false })).toContain(" It shrinks, and ");
+        expect(ring({ rounds: 3, shrinks: false, moves: false })).toBe(
+            "Hold the ring alone: two in it and neither scores. The end of each round counts double."
+        );
+    });
+
+    it("speak of one end when there is one round", () => {
+        expect(ring({ rounds: 1, shrinks: false, moves: false })).toBe(
+            "Hold the ring alone: two in it and neither scores. The end counts double."
+        );
+        expect(messages.rules("king-of-the-hill", "es", { ring: true, rounds: 1 })).toBe(
+            "Aguanta en el ring a solas: si hay dos dentro, nadie suma. El final puntúa doble."
+        );
+    });
+
+    it("count time alone on the event's own score", () => {
+        expect(hill.scoreLines({ x: 0, y: 64, z: 0 }, 3, 1).at(-1)).toContain("add @s pe_score 1");
+        expect(hill.INSIDE_SCORE).toBe("pe_kin");
     });
 });

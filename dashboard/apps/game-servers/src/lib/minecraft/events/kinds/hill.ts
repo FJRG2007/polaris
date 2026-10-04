@@ -15,6 +15,7 @@
  */
 
 import type { Box, Point } from "../state";
+import { HILL_HEALTH, HILL_INSIDE, SCORE } from "../commands";
 import { seeded } from "../trivia-bank";
 import { IN_ARENA, type Spot } from "./arena";
 
@@ -208,7 +209,7 @@ export function strayed(
 }
 
 /** Each entrant's health, kept by the game as it changes (`health` criterion). */
-export const HEALTH_SCORE = "pe_khp";
+export const HEALTH_SCORE = HILL_HEALTH;
 
 /** Health under which the hill stops wearing anybody down: three hearts. */
 const DRAIN_FLOOR = 6;
@@ -391,7 +392,7 @@ export function ringCenter(place: Point, ring: Pick<Ring, "dx" | "dz">): Point {
 }
 
 /** Kept by the game: how many stand in the ring this look. */
-export const INSIDE_SCORE = "pe_kin";
+export const INSIDE_SCORE = HILL_INSIDE;
 const INSIDE_HOLDER = "#inside";
 
 /**
@@ -405,12 +406,9 @@ export function scoreLines(center: Point, radius: number, seconds: number): stri
     return [
         `scoreboard objectives add ${INSIDE_SCORE} dummy`,
         `execute ${at} store result score ${INSIDE_HOLDER} ${INSIDE_SCORE} if entity ${inRing}`,
-        `execute if score ${INSIDE_HOLDER} ${INSIDE_SCORE} matches 1 ${at} as ${inRing} run scoreboard players add @s pe_score ${seconds}`
+        `execute if score ${INSIDE_HOLDER} ${INSIDE_SCORE} matches 1 ${at} as ${inRing} run scoreboard players add @s ${SCORE} ${seconds}`
     ];
 }
-
-/** The count of who stands in the ring, gone with the event. */
-export const INSIDE_OFF = `scoreboard objectives remove ${INSIDE_SCORE}`;
 
 /** Every block of the drawn ring: those whose middle is within half a block of its edge. */
 export function ringBlocks(center: Point, radius: number): { x: number; z: number }[] {

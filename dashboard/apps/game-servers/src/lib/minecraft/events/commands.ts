@@ -37,6 +37,9 @@ const SHOTS = ["pe_shot", "pe_shotc", "pe_shott"] as const;
 const SHOT_ITEMS = ["bow", "crossbow", "trident"] as const;
 const DAMAGE = "pe_acc";
 export const BAR = "polaris:event";
+/** A king of the hill's: each entrant's health, and how many stand in the ring. */
+export const HILL_HEALTH = "pe_khp";
+export const HILL_INSIDE = "pe_kin";
 
 export const MOB_TAG = "pe_mob";
 const NEW_TAG = "pe_new";
@@ -2146,7 +2149,10 @@ export function cleanup(
         `scoreboard objectives remove ${JOIN_TRIGGER}`,
         `scoreboard objectives remove ${JOIN_LIST}`,
         ...(preset.kind === "king-of-the-hill"
-            ? ["scoreboard objectives remove pe_khp", "scoreboard objectives remove pe_kin"]
+            ? [
+                  `scoreboard objectives remove ${HILL_HEALTH}`,
+                  `scoreboard objectives remove ${HILL_INSIDE}`
+              ]
             : []),
         CLEAR_MARK
     ];

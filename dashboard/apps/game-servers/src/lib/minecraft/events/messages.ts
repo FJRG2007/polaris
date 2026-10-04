@@ -156,6 +156,10 @@ export interface RulesVariant {
     readonly byDamage?: boolean;
     /** A king of the ring with fists only: time alone in it, in rounds. */
     readonly ring?: boolean;
+    /** The ring's rounds, and whether it shrinks and moves over each. */
+    readonly rounds?: number;
+    readonly shrinks?: boolean;
+    readonly moves?: boolean;
 }
 
 export function rules(kind: EventKind, language: Language, variant: RulesVariant = {}): string {
@@ -177,9 +181,35 @@ export function rules(kind: EventKind, language: Language, variant: RulesVariant
         return `${goal} ${es ? "Camina hasta el haz de luz para subir a la arena." : "Walk into the beam of light to go up to the arena."}`;
     }
     if (kind === "king-of-the-hill" && variant.ring) {
-        return es
-            ? "Aguanta en el ring a solas: si hay dos dentro, nadie suma. Se encoge y se mueve, y el final de cada ronda puntúa doble."
-            : "Hold the ring alone: two in it and neither scores. It shrinks and moves, and the end of each round counts double.";
+        const hold = es
+            ? "Aguanta en el ring a solas: si hay dos dentro, nadie suma."
+            : "Hold the ring alone: two in it and neither scores.";
+        const end =
+            (variant.rounds ?? 1) > 1
+                ? es
+                    ? "el final de cada ronda puntúa doble."
+                    : "the end of each round counts double."
+                : es
+                  ? "el final puntúa doble."
+                  : "the end counts double.";
+        const does =
+            variant.shrinks && variant.moves
+                ? es
+                    ? "Se encoge y se mueve"
+                    : "It shrinks and moves"
+                : variant.shrinks
+                  ? es
+                      ? "Se encoge"
+                      : "It shrinks"
+                  : variant.moves
+                    ? es
+                        ? "Se mueve"
+                        : "It moves"
+                    : null;
+        const tail = does
+            ? `${does}, ${es ? "y " : "and "}${end}`
+            : `${end.charAt(0).toUpperCase()}${end.slice(1)}`;
+        return `${hold} ${tail}`;
     }
     if (kind === "waves" && variant.byDamage) {
         return es
@@ -581,6 +611,17 @@ export function hillInside(language: Language): string {
     return language === "es"
         ? "&aEstás en el círculo: aguanta"
         : "&aYou are in the circle - hold it";
+}
+
+/** How far the ring is from a player, and which way: the fists-only hill. */
+export function ringGuide(meters: number, heading: Heading, language: Language): string {
+    return language === "es"
+        ? `&eRing: &f${meters} m &eal &f${HEADING_ES[heading]}`
+        : `&eRing: &f${meters} m &e${heading}`;
+}
+
+export function ringInside(language: Language): string {
+    return language === "es" ? "&aEstás en el ring: aguanta" : "&aYou are in the ring - hold it";
 }
 
 export function happyHourOver(language: Language): string {

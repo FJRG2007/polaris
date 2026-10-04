@@ -2005,7 +2005,7 @@
         "fistsOnly": "Solo puños, nadie muere",
         "fistsOnlyHint": "Quien se apunta entra sin nada: sus cosas se guardan y se devuelven, nadie puede morir y se gana a empujones.",
         "ringRounds": "Rondas",
-        "ringRoundsHint": "De 1 a 5. El tiempo se reparte entre ellas; cada una empieza con el ring entero, todos en su sitio, y sus últimos 20 segundos puntúan doble.",
+        "ringRoundsHint": "De 1 a 5. El tiempo se reparte entre ellas; cada una empieza con el ring entero, todos en su sitio, y su final puntúa doble.",
         "ringShrinks": "El ring se encoge",
         "ringShrinksHint": "Un bloque cada vez a lo largo de la ronda, hasta lo que necesitan los jugadores: dos bloques de radio para dos, cuatro para dieciséis.",
         "ringMoves": "El ring se mueve",

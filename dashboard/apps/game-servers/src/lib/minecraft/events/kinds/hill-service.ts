@@ -411,8 +411,8 @@ export async function fightTick(ctx: KindContext, seconds: number, lines: string
                     : commands.inHill(at, center, ring.radius)
                       ? inside > 1
                           ? hillMessages.contested(ctx.language)
-                          : messages.hillInside(ctx.language)
-                      : messages.hillGuide(
+                          : messages.ringInside(ctx.language)
+                      : messages.ringGuide(
                             Math.round(
                                 Math.hypot(at.x - (center.x + 0.5), at.z - (center.z + 0.5))
                             ),
