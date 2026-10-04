@@ -1,13 +1,13 @@
 /**
  * `plr status`: everything worth knowing before filing "it does not work" -
  * which CLI this is, which Polaris and account it is pointed at, whether that
- * sign-in still works, and whether the Polaris serves a newer CLI than this one.
+ * sign-in still works, and whether a newer CLI has been released.
  *
  * Never fails for the things it reports on: an unreachable server or a revoked
  * key is a line in the report, not an exit.
  */
 
-import { call, send } from "../api.js";
+import { call } from "../api.js";
 import { CliError } from "../errors.js";
 import type { Flags } from "../args.js";
 import { meSchema } from "../schemas.js";
@@ -15,6 +15,7 @@ import { configFile } from "../config.js";
 import { readFile } from "node:fs/promises";
 import { CLI_VERSION } from "../version.js";
 import { line, printJson } from "../output.js";
+import { DEFAULT_REPO, newestRelease } from "../releases.js";
 import { bundlePath, readMarker, sha256 } from "./install.js";
 import { requireSession, type Context, type Session } from "../context.js";
 
@@ -27,19 +28,15 @@ interface Report {
     problem: string | null;
 }
 
-/** Whether the Polaris serves a different CLI from this one; null when it
- *  cannot be told (not installed, or the server could not be asked). */
-async function updateAvailable(context: Context, url: string): Promise<boolean | null> {
+/** Whether a newer CLI release is out than this copy; null when it cannot be
+ *  told (not installed with the install line, or GitHub could not be asked). */
+async function updateAvailable(context: Context): Promise<boolean | null> {
     const bundle = bundlePath();
-    if (!(await readMarker(bundle))) return null;
+    const marker = await readMarker(bundle);
+    if (!marker) return null;
     try {
-        const response = await send({ url, token: null }, "HEAD", "/cli/polaris.mjs", {
-            fetch: context.fetch,
-            timeoutMs: 10_000
-        });
-        const served = response.ok ? response.headers.get("x-content-sha256") : null;
-        if (!served) return null;
-        return served !== sha256(new Uint8Array(await readFile(bundle)));
+        const release = await newestRelease(context.fetch, marker.repo ?? DEFAULT_REPO);
+        return release.sha256 !== sha256(new Uint8Array(await readFile(bundle)));
     } catch {
         return null;
     }
@@ -80,8 +77,8 @@ export async function status(context: Context, flags: Flags): Promise<void> {
             if (!(caught instanceof CliError)) throw caught;
             report.problem = caught.message;
         }
-        report.cli.updateAvailable = await updateAvailable(context, session.connection.url);
     }
+    report.cli.updateAvailable = await updateAvailable(context);
 
     if (flags.json) return printJson(context.io, report);
 
@@ -99,7 +96,6 @@ export async function status(context: Context, flags: Flags): Promise<void> {
         line(context.io, `Signed in as ${who}`);
         line(context.io, `Allowed to: ${report.signedIn.scopes.join(", ") || "nothing"}`);
     }
-    if (report.cli.updateAvailable)
-        line(context.io, "This Polaris serves a newer CLI. Run plr update.");
+    if (report.cli.updateAvailable) line(context.io, "A newer CLI is out. Run plr update.");
     if (report.problem) line(context.io, report.problem);
 }

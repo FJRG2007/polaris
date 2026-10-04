@@ -3,7 +3,7 @@
  *
  * Sign in once with `plr login` (in the browser, or with a code on a machine
  * that has none) and every command after that uses that sign-in. One file, run
- * by the developer's own Node, handed out by each Polaris at `/cli`.
+ * by the developer's own Node, installed from the project's GitHub releases.
  */
 
 import { env } from "./commands/env.js";
@@ -61,7 +61,7 @@ Environment variables (values are never shown)
 Other
   plr open [home|deploy|keys|downloads]
                          Open the dashboard in your browser
-  plr update             Get the CLI your Polaris serves
+  plr update [--url URL] Get the newest CLI, or the one a Polaris serves
   plr uninstall [--yes]  Sign out everywhere and remove the CLI
 
 SERVICE is project/service, project/environment/service, or its id.

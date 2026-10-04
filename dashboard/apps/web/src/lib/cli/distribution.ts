@@ -1,13 +1,14 @@
 /**
- * Handing out the command-line client from this Polaris.
+ * The command-line client as this Polaris still hands it out.
  *
- * Three files, served without a session at `/cli/<file>`: the bundle itself and
- * the two install scripts, which carry this deployment's address so the line on
- * the downloads screen needs nothing filled in. Served from the instance rather
- * than a registry for the same reasons the agent runtime is: the CLI a developer
- * installs is the one built with the server it talks to, there is no third
- * party in the path, and an instance nobody can reach from the internet still
- * hands it out.
+ * The CLI is installed from the project's GitHub releases now (the downloads
+ * screen shows that line), but these three files stay served without a session
+ * at `/cli/<file>` so that what was published before keeps working: install
+ * lines pasted from older docs (`/cli/install.sh`, `/cli/install.ps1`, which
+ * now fetch the release from GitHub and name this Polaris as the one to sign in
+ * to), and `plr update --url`, which takes the bundle built into this image
+ * (`/cli/polaris.mjs`) - the way to get a CLI that matches an older Polaris, or
+ * one for a computer that cannot reach GitHub.
  *
  * Server-only.
  */

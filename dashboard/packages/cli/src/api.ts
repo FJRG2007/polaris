@@ -12,6 +12,7 @@ import type { z } from "zod";
 import { CliError } from "./errors.js";
 import { userAgent } from "./version.js";
 import { refusalSchema } from "./schemas.js";
+import { PROTOCOL_HEADER, compatibilityProblem } from "./compat.js";
 
 export interface Connection {
     /** The Polaris address, without a trailing slash. */
@@ -149,6 +150,10 @@ export async function call<Schema extends z.ZodTypeAny>(
     options: CallOptions = {}
 ): Promise<z.infer<Schema>> {
     const response = await send(connection, method, path, options);
+    // First: a server on a different API can answer anything at all, and the
+    // only useful thing to say then is how to get the two back in step.
+    const mismatch = compatibilityProblem(connection.url, response.headers.get(PROTOCOL_HEADER));
+    if (mismatch) throw new CliError(mismatch);
     if (response.status >= 300 && response.status < 400)
         throw new CliError(redirectMessage(connection.url, response));
     if (!response.ok)
@@ -158,7 +163,7 @@ export async function call<Schema extends z.ZodTypeAny>(
     const parsed = schema.safeParse(await response.json().catch(() => undefined));
     if (!parsed.success) {
         throw new CliError(
-            `${connection.url} answered in a shape this CLI does not understand. Check that it is a Polaris address; if it is, run plr update to get the CLI that matches it.`
+            `${connection.url} answered in a shape this CLI does not understand. Check that it is a Polaris address; if it is, run plr update.`
         );
     }
     return parsed.data;

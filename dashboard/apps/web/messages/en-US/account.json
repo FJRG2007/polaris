@@ -1007,11 +1007,11 @@
             "description": "Deploy, read logs and restart your apps from a terminal. Sign in once from your browser; every command after that uses that sign-in.",
             "install": "Install",
             "system": "Which system you are installing on",
-            "hint": "Paste it into {shell}. It needs Node.js 20 or newer and installs the version that matches this Polaris, as plr and polaris.",
-            "signIn": "Then sign in",
-            "signInHint": "Opens this Polaris in your browser to approve it. On a machine with no browser it shows a code to type here instead.",
+            "hint": "Paste it into {shell}. Needs Node.js 20 or newer. Installs the latest release from GitHub as plr and polaris; plr update keeps it current.",
+            "signIn": "Sign in",
+            "signInHint": "Points the CLI at this Polaris and opens it in your browser to approve. With no browser, it shows a code to enter here.",
             "server": "It will not install on a computer that runs a Polaris server: both answer to plr and polaris.",
-            "next": "Then try"
+            "next": "Try"
         }
     },
     "cli": {

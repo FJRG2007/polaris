@@ -39,6 +39,11 @@ const PLAYER_ORIGINS = [
     "https://player.kick.com"
 ];
 
+/** The CLI protocol versions this server speaks, oldest-newest. Written out
+ *  rather than imported for the same reason as the list above; a test holds
+ *  it to the CLI's own `CLI_PROTOCOL`. */
+export const CLI_PROTOCOL_RANGE = "1-1";
+
 /** @type {import("next").NextConfig} */
 const nextConfig = {
     output: "standalone",
@@ -194,7 +199,18 @@ const nextConfig = {
                 },
                 { key: "X-Frame-Options", value: "DENY" }
             ]
-        }
+        },
+        // The CLI protocol versions this Polaris answers, `<oldest>-<newest>`,
+        // on everything the CLI calls. The CLI is installed from GitHub and
+        // updated on its own schedule, so it compares its own version with this
+        // on every call and says whether to run `plr update` or update Polaris
+        // (`packages/cli/src/compat.ts`). Raise the newest only for a change an
+        // older CLI would misread; raise the oldest only when the server stops
+        // answering an old CLI the old way.
+        ...["/api/cli/:path*", "/api/v1/:path*"].map((source) => ({
+            source,
+            headers: [{ key: "X-Polaris-Cli-Protocol", value: CLI_PROTOCOL_RANGE }]
+        }))
     ],
     rewrites: async () => [
         { source: "/vault/api/:path*", destination: "/api/bw/api/:path*" },

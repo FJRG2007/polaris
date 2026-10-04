@@ -1,9 +1,15 @@
 #!/bin/sh
-# Polaris CLI installer for macOS and Linux. Each Polaris serves this at
-# /cli/install.sh with its own address filled in below, so the line on its
-# Account > Downloads screen installs the CLI that matches that server:
+# Polaris CLI installer for macOS and Linux. It installs the newest CLI release
+# from the project's GitHub repository, the way the browser extension is
+# installed, and you point it at your Polaris afterwards:
 #
-#   curl -fsSL https://your-polaris/cli/install.sh | sh
+#   curl -fsSL https://raw.githubusercontent.com/FJRG2007/polaris/main/dashboard/packages/cli/scripts/install.sh | sh
+#   plr login --url https://your-polaris
+#
+# The download is checked against the SHA-256 digest GitHub publishes for it.
+# A Polaris also serves this script at /cli/install.sh with its own address
+# filled in, so the last line it prints names that Polaris; the CLI itself still
+# comes from GitHub.
 #
 # It puts the bundle in ${XDG_DATA_HOME:-~/.local/share}/polaris-cli and two
 # launchers, plr and polaris, in ~/.local/bin. Nothing outside your home folder
@@ -16,6 +22,11 @@
 # script.
 set -eu
 
+REPO="${POLARIS_REPO:-FJRG2007/polaris}"
+# Where GitHub's API is. Only ever changed to test this script against a stand-in.
+API="${POLARIS_GITHUB_API:-https://api.github.com}"
+# The Polaris to sign in to next, when a Polaris served this script; anything
+# that is not an address (the placeholder, unfilled) means none.
 POLARIS_URL="${POLARIS_URL:-__POLARIS_URL__}"
 # Written into every file this installs, so `plr uninstall` and the server's
 # installer can tell them apart from anything else called polaris.
@@ -53,6 +64,27 @@ server_install() {
     return 1
 }
 
+fetch() { curl -fsSL -H "User-Agent: polaris-cli-installer" -H "Accept: application/vnd.github+json" "$@"; }
+
+# "<url> <digest>" of the bundle on the newest CLI release, or nothing. This
+# repository releases the dashboard and the extension too, so the tag prefix is
+# what tells them apart; drafts and prereleases are skipped. GitHub prints one
+# field per line, and in an asset the digest comes before the download address.
+newest_bundle() {
+    fetch "$API/repos/$REPO/releases?per_page=100" | awk '
+        /"tag_name":/ { tag = $0; sub(/.*"tag_name": *"/, "", tag); sub(/".*/, "", tag); skip = 0 }
+        /"draft": *true/ || /"prerelease": *true/ { skip = 1 }
+        /"digest":/ { digest = $0; sub(/.*"digest": *"/, "", digest); sub(/".*/, "", digest) }
+        /"digest": *null/ { digest = "" }
+        /"browser_download_url":/ {
+            url = $0; sub(/.*"browser_download_url": *"/, "", url); sub(/".*/, "", url)
+            name = url; sub(/.*\//, "", name)
+            if (tag ~ /^cli-v/ && !skip && name == "polaris.mjs" && digest ~ /^sha256:/) { print url " " digest; exit }
+            digest = ""
+        }
+    '
+}
+
 # The startup file of the user's shell, where ~/.local/bin is put on PATH.
 shell_rc() {
     case "$(basename "${SHELL:-sh}")" in
@@ -65,11 +97,7 @@ shell_rc() {
 main() {
     case "$POLARIS_URL" in
         http://* | https://*) ;;
-        *)
-            err "this script does not know which Polaris it came from."
-            err "copy the install line from Account > Downloads on your Polaris instead."
-            exit 1
-            ;;
+        *) POLARIS_URL="" ;;
     esac
 
     # Git Bash, MSYS and Cygwin run Windows' own Node, which keeps its files in
@@ -78,7 +106,7 @@ main() {
     case "$(uname -s 2>/dev/null)" in
         MINGW* | MSYS* | CYGWIN*)
             err "this is the installer for macOS and Linux. On Windows, run this in PowerShell instead:"
-            err "  irm $POLARIS_URL/cli/install.ps1 | iex"
+            err "  irm https://raw.githubusercontent.com/$REPO/main/dashboard/packages/cli/scripts/install.ps1 | iex"
             exit 1
             ;;
     esac
@@ -104,28 +132,34 @@ main() {
     bin="$HOME/.local/bin"
     mkdir -p "$data" "$bin"
 
+    found_bundle=$(newest_bundle || true)
+    if [ -z "$found_bundle" ]; then
+        err "could not find a CLI release on github.com/$REPO. Check that this computer can open github.com, then try again."
+        exit 1
+    fi
+    url=${found_bundle% *}
+    expected=${found_bundle#* sha256:}
+
     tmp=$(mktemp "$data/polaris.mjs.XXXXXX")
-    headers=$(mktemp)
-    trap 'rm -f "$tmp" "$headers"' EXIT
-    log "downloading the CLI from $POLARIS_URL"
-    if ! curl -fsSL -D "$headers" -o "$tmp" "$POLARIS_URL/cli/polaris.mjs"; then
-        err "could not download it from $POLARIS_URL/cli/polaris.mjs. Check that this computer can open $POLARIS_URL."
+    trap 'rm -f "$tmp"' EXIT
+    log "downloading the CLI from $url"
+    if ! curl -fsSL -H "User-Agent: polaris-cli-installer" -o "$tmp" "$url"; then
+        err "could not download it from $url. Check that this computer can open github.com, then try again."
         exit 1
     fi
 
-    # Checked against the digest the server sent with it, so a truncated or
-    # rewritten download is never installed.
-    expected=$(tr -d '\r' <"$headers" | sed -n 's/^[Xx]-[Cc]ontent-[Ss]ha256: *//p' | tail -n1)
+    # Checked against the digest GitHub published for it, so a truncated or
+    # swapped download is never installed.
     actual=$(node -e 'process.stdout.write(require("crypto").createHash("sha256").update(require("fs").readFileSync(process.argv[1])).digest("hex"))' "$tmp")
-    if [ -z "$expected" ] || [ "$expected" != "$actual" ]; then
+    if [ "$(printf '%s' "$expected" | tr 'A-F' 'a-f')" != "$actual" ]; then
         err "the download did not match its checksum; nothing was installed. Try again."
         exit 1
     fi
 
     chmod 755 "$tmp"
     mv "$tmp" "$data/polaris.mjs"
-    printf '{\n    "marker": "%s",\n    "origin": "%s",\n    "sha256": "%s",\n    "installedAt": "%s"\n}\n' \
-        "$MARKER" "$POLARIS_URL" "$actual" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" >"$data/polaris-cli.json"
+    printf '{\n    "marker": "%s",\n    "origin": "https://github.com/%s",\n    "repo": "%s",\n    "sha256": "%s",\n    "installedAt": "%s"\n}\n' \
+        "$MARKER" "$REPO" "$REPO" "$actual" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" >"$data/polaris-cli.json"
 
     for name in plr polaris; do
         target="$bin/$name"
@@ -151,7 +185,7 @@ main() {
     fi
 
     log "installed plr (also polaris)."
-    log "next: plr login --url $POLARIS_URL"
+    log "next: plr login --url ${POLARIS_URL:-https://your-polaris}"
 }
 
 main "$@"

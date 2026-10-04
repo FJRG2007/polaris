@@ -1,10 +1,12 @@
 /**
  * The installed copy looking after itself: `plr update` and `plr uninstall`.
  *
- * `update` fetches the bundle the Polaris serves (`/cli/polaris.mjs`), checks it
- * against the digest the server sends with it, and swaps it in with a rename -
- * so the CLI is always the one built with the server it talks to, and a
- * truncated download never replaces a working one.
+ * `update` fetches the newest CLI release from the project's GitHub repository
+ * (the one the install line used), checks it against the digest GitHub
+ * publishes for it, and swaps it in with a rename - so a truncated download
+ * never replaces a working one. `--url` takes the CLI a particular Polaris
+ * serves instead (`/cli/polaris.mjs`), for a Polaris that is older than the
+ * newest CLI or a computer that cannot reach GitHub.
  *
  * `uninstall` signs every profile out (revoking each key on its server where it
  * can be reached), deletes the CLI's config and the launchers it installed, and
@@ -23,6 +25,7 @@ import { CliError, usage } from "../errors.js";
 import { normalizeUrl, type Flags } from "../args.js";
 import { spawnRunner, type Runner } from "../secrets.js";
 import { readFile, rename, rm, writeFile } from "node:fs/promises";
+import { DEFAULT_REPO, installCommand, newestRelease, type CliRelease } from "../releases.js";
 import { CLI_MARKER, INSTALL_MARKER_FILE, binDir, installDir, launcherNames } from "../paths.js";
 
 /** Bigger than any bundle this will ever be, small enough to refuse a page of junk. */
@@ -31,7 +34,12 @@ const MAX_BUNDLE_BYTES = 20 * 1024 * 1024;
 /** What the installer writes beside the bundle. */
 interface InstallMarker {
     readonly marker: string;
+    /** Where the bundle came from: the repository's page, or a Polaris address
+     *  for a copy installed from (or updated with --url against) a server. */
     readonly origin: string;
+    /** The GitHub repository it updates from; absent on a copy installed from a
+     *  Polaris before the CLI was released on GitHub. */
+    readonly repo?: string;
     readonly sha256?: string;
 }
 
@@ -51,6 +59,7 @@ export async function readMarker(bundle: string): Promise<InstallMarker | null> 
         return {
             marker: parsed.marker,
             origin: parsed.origin,
+            repo: typeof parsed.repo === "string" ? parsed.repo : undefined,
             sha256: typeof parsed.sha256 === "string" ? parsed.sha256 : undefined
         };
     } catch {
@@ -60,6 +69,20 @@ export async function readMarker(bundle: string): Promise<InstallMarker | null> 
 
 export function sha256(bytes: Uint8Array): string {
     return createHash("sha256").update(bytes).digest("hex");
+}
+
+/** A downloaded bundle, refused unless it is a CLI and matches its digest. */
+function checkedBundle(bytes: Uint8Array, expected: string | null): Uint8Array {
+    if (bytes.byteLength === 0 || bytes.byteLength > MAX_BUNDLE_BYTES)
+        throw new CliError("The download was not a CLI. Nothing was changed.");
+    if (!expected || sha256(bytes) !== expected.trim().toLowerCase())
+        throw new CliError(
+            "The download did not match its checksum. Nothing was changed; try again."
+        );
+    if (!new TextDecoder().decode(bytes.slice(0, 32)).startsWith("#!/usr/bin/env node")) {
+        throw new CliError("The download was not a CLI. Nothing was changed.");
+    }
+    return bytes;
 }
 
 /** The bundle a Polaris serves, verified against the digest it sends. */
@@ -73,18 +96,28 @@ export async function fetchBundle(context: Context, origin: string): Promise<Uin
             `${origin} did not hand out the CLI (HTTP ${response.status}). Its Polaris may predate the CLI; update it from Settings first.`
         );
     }
-    const bytes = new Uint8Array(await response.arrayBuffer());
-    const expected = response.headers.get("x-content-sha256");
-    if (bytes.byteLength === 0 || bytes.byteLength > MAX_BUNDLE_BYTES)
-        throw new CliError("The download was not a CLI. Nothing was changed.");
-    if (!expected || sha256(bytes) !== expected)
+    return checkedBundle(
+        new Uint8Array(await response.arrayBuffer()),
+        response.headers.get("x-content-sha256")
+    );
+}
+
+/** A release's bundle, verified against the digest GitHub published for it. */
+export async function fetchRelease(context: Context, release: CliRelease): Promise<Uint8Array> {
+    let response: Response;
+    try {
+        response = await context.fetch(release.url, { signal: AbortSignal.timeout(120_000) });
+    } catch {
         throw new CliError(
-            "The download did not match its checksum. Nothing was changed; try again."
+            "Could not download the CLI from GitHub. Nothing was changed; try again."
         );
-    if (!new TextDecoder().decode(bytes.slice(0, 32)).startsWith("#!/usr/bin/env node")) {
-        throw new CliError("The download was not a CLI. Nothing was changed.");
     }
-    return bytes;
+    if (!response.ok) {
+        throw new CliError(
+            `GitHub did not hand out the CLI (HTTP ${response.status}). Nothing was changed; try again.`
+        );
+    }
+    return checkedBundle(new Uint8Array(await response.arrayBuffer()), release.sha256);
 }
 
 export async function update(context: Context, flags: Flags): Promise<void> {
@@ -92,20 +125,28 @@ export async function update(context: Context, flags: Flags): Promise<void> {
     const marker = await readMarker(bundle);
     if (!marker) {
         throw new CliError(
-            "This copy was not installed with the install line, so it cannot update itself. Install it from Account > Downloads on your Polaris."
+            `This copy was not installed with the install line, so it cannot update itself. Install it with: ${installCommand(context.host.platform)}`
         );
     }
-    let origin = flags.url ? normalizeUrl(flags.url) : null;
-    if (!origin) {
-        const config = await loadConfig(context.configDir);
-        origin = (config.current ? config.profiles[config.current]?.url : null) ?? marker.origin;
+    const repo = marker.repo ?? DEFAULT_REPO;
+    let bytes: Uint8Array;
+    let origin: string;
+    let named: string;
+    if (flags.url) {
+        origin = normalizeUrl(flags.url);
+        bytes = await fetchBundle(context, origin);
+        named = `the CLI ${origin} serves`;
+    } else {
+        const release = await newestRelease(context.fetch, repo);
+        bytes = await fetchRelease(context, release);
+        origin = `https://github.com/${repo}`;
+        named = `CLI ${release.version}`;
     }
 
-    const bytes = await fetchBundle(context, origin);
     const digest = sha256(bytes);
     const current = sha256(new Uint8Array(await readFile(bundle)));
     if (digest === current) {
-        line(context.io, `Already the CLI ${origin} serves.`);
+        line(context.io, `Already up to date (${named}).`);
         return;
     }
     // Written beside the old one and renamed over it: the rename is atomic, so
@@ -115,9 +156,10 @@ export async function update(context: Context, flags: Flags): Promise<void> {
     await rename(next, bundle);
     await writeFile(
         join(dirname(bundle), INSTALL_MARKER_FILE),
-        `${JSON.stringify({ marker: CLI_MARKER, origin, sha256: digest, installedAt: new Date().toISOString() }, null, 4)}\n`
+        `${JSON.stringify({ marker: CLI_MARKER, origin, repo, sha256: digest, installedAt: new Date().toISOString() }, null, 4)}
+`
     );
-    line(context.io, `Updated to the CLI ${origin} serves.`);
+    line(context.io, `Updated to ${named}.`);
 }
 
 /** Lines the installer added to a shell startup file, which carry the marker. */

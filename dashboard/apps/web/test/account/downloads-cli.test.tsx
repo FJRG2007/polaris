@@ -3,9 +3,9 @@
 /**
  * The command line on the downloads screen, and the marks on its pickers.
  *
- * The install line has to carry the address the page is open on - the one the
- * reader has just proven reaches this Polaris - and the right shell for the
- * system picked. And every system and browser in the pickers is shown with its
+ * The install line is the official one from the repository's releases, the
+ * same on every Polaris, in the right shell for the system picked; only the
+ * sign-in line carries this Polaris's address. And every system and browser in the pickers is shown with its
  * own official mark, which is what somebody scanning a list looks for first.
  */
 
@@ -28,18 +28,19 @@ const picked = vi.fn();
 
 const SRC = `${join(__dirname, "..", "..", "src")}/`;
 
+const REPO = "example/polaris";
+const SCRIPTS = `https://raw.githubusercontent.com/${REPO}/main/dashboard/packages/cli/scripts`;
+
 describe("the install line", () => {
-    it("is the shell line everywhere but Windows, against this Polaris", () => {
-        expect(cliInstallLine("linux", "https://polaris.example.com/")).toEqual({
+    it("is the repository's own script, the shell one everywhere but Windows", () => {
+        expect(cliInstallLine("linux", REPO)).toEqual({
             shell: "Terminal",
-            command: "curl -fsSL https://polaris.example.com/cli/install.sh | sh"
+            command: `curl -fsSL ${SCRIPTS}/install.sh | sh`
         });
-        expect(cliInstallLine("macos", "https://polaris.example.com").command).toBe(
-            "curl -fsSL https://polaris.example.com/cli/install.sh | sh"
-        );
-        expect(cliInstallLine("windows", "https://polaris.example.com")).toEqual({
+        expect(cliInstallLine("macos", REPO).command).toBe(`curl -fsSL ${SCRIPTS}/install.sh | sh`);
+        expect(cliInstallLine("windows", REPO)).toEqual({
             shell: "PowerShell",
-            command: "irm https://polaris.example.com/cli/install.ps1 | iex"
+            command: `irm ${SCRIPTS}/install.ps1 | iex`
         });
         expect(cliLoginLine("http://polaris.local/")).toBe("plr login --url http://polaris.local");
     });
@@ -54,28 +55,52 @@ describe("the install line", () => {
 });
 
 describe("the CLI card", () => {
-    it("shows the install and sign-in lines for the address the page is open on", () => {
-        render(<CliSection />, { wrapper: MessagesWrapper });
-        const origin = window.location.origin;
+    it("shows the official install line, then signs in to this Polaris's configured address", () => {
+        render(<CliSection repo={REPO} serverUrl="https://polaris.example.com/" />, {
+            wrapper: MessagesWrapper
+        });
         expect(screen.getByText("Command line")).toBeTruthy();
         // The reader's own system is picked first - which one depends on where
         // this test runs, so the expected line is built the same way.
         const platform = detectPlatform(navigator.userAgent);
-        expect(screen.getByText(cliInstallLine(platform, origin).command)).toBeTruthy();
-        expect(screen.getByText(`plr login --url ${origin}`)).toBeTruthy();
+        expect(screen.getByText(cliInstallLine(platform, REPO).command)).toBeTruthy();
+        expect(screen.getByText("Install")).toBeTruthy();
+        expect(screen.getByText("Sign in")).toBeTruthy();
+        expect(screen.getByText("Try")).toBeTruthy();
+        expect(screen.getByText("plr login --url https://polaris.example.com")).toBeTruthy();
+        expect(screen.getByText("plr projects")).toBeTruthy();
         // Every line can be copied with one press.
-        expect(screen.getAllByRole("button", { name: /copy/i }).length).toBeGreaterThanOrEqual(3);
+        expect(screen.getAllByRole("button", { name: /copy/i })).toHaveLength(3);
+    });
+
+    it("signs in to the address the page is open on when none is configured", () => {
+        render(<CliSection repo={REPO} serverUrl={null} />, { wrapper: MessagesWrapper });
+        expect(screen.getByText(`plr login --url ${window.location.origin}`)).toBeTruthy();
+    });
+
+    it("draws the install line on the server, before anything is read in the browser", () => {
+        const html = renderToStaticMarkup(
+            withMessages(<CliSection repo={REPO} serverUrl="https://polaris.example.com" />)
+        );
+        expect(html).toContain(`curl -fsSL ${SCRIPTS}/install.sh | sh`);
+        expect(html).toContain("plr login --url https://polaris.example.com");
+        expect(html).not.toContain("/cli/install");
     });
 
     it("says it in Spanish too", () => {
-        const html = renderToStaticMarkup(withMessages(<CliSection />, "es-ES"));
+        const html = renderToStaticMarkup(
+            withMessages(
+                <CliSection repo={REPO} serverUrl="https://polaris.example.com" />,
+                "es-ES"
+            )
+        );
         expect(html).toContain("Despliega, lee registros y reinicia tus apps");
         expect(html).toContain("No se instala en un equipo que ejecuta un servidor Polaris");
     });
 
     it("is on the downloads page, and the CLI is no longer listed as coming later", async () => {
         const page = await readFile(`${SRC}app/(app)/account/downloads/page.tsx`, "utf8");
-        expect(page).toContain("<CliSection />");
+        expect(page).toContain("<CliSection repo={repo} serverUrl={serverUrl} />");
         expect(page).not.toContain("downloads.later.cli");
     });
 });
