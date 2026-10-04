@@ -376,6 +376,10 @@ function stageFacts(t: GameText<"minecraft">, preset: catalog.EventPreset): stri
                 })
             ];
         }
+        case "boat-race": {
+            const options = preset.options as catalog.EventOptions<"boat-race">;
+            return [t("events.facts.boatRace", { laps: options.laps, height: options.height })];
+        }
         case "dropper": {
             const options = preset.options as catalog.EventOptions<"dropper">;
             return [
@@ -415,6 +419,8 @@ function stageItemsFact(t: GameText<"minecraft">, preset: catalog.EventPreset): 
             return t("events.facts.tntRunSafe");
         case "dropper":
             return t("events.facts.dropperSafe");
+        case "boat-race":
+            return t("events.facts.boatRaceBoats");
         default:
             return t("events.facts.parkourItems");
     }

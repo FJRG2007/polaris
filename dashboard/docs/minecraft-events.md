@@ -104,7 +104,7 @@ Rare catch, Bingo rush, Boss fishing) leave the world alone.
 | Hot potato                                                     | day   | clear   |
 | Hide and seek                                                  | day   | clear   |
 | SkyWars                                                        | day   | clear   |
-| TNT run, Dropper                                               | day   | clear   |
+| TNT run, Dropper, Ice boat race                                | day   | clear   |
 | Treasure hunt, Supply drop, Explorer, Gathering                | day   | clear   |
 | Horde defense, Villager defense, Mob hunt, Meteor shower       | night | clear   |
 | Blood moon                                                     | night | rain    |
@@ -180,6 +180,20 @@ left out.
   (twenty floors would need over five hundred blocks). Its water is built last
   and taken out first, and nothing built before a box that would not come out
   is taken out after it, so the walls never go from round the water.
+- **Ice boat race** (`boat-race`) is one closed loop of packed ice, `WIDTH`
+  (5) across, walled two blocks high on both sides, laid out from the run's id
+  (`boat-race.track`), with gates (blue ice lines under an arch, the start
+  chequered) to pass in order, `laps` times. At "Go!" every racer is put on
+  the grid behind the start line and, from 1.19.4, in a boat (`ride`; an
+  `oak_boat` entity from 1.21.2, a `boat` of type oak before); before 1.19.4
+  they are handed a marked boat to put down, topped up whenever they have none
+  and are in none. The events data pack counts a gate only straight after the
+  one before and marks anybody seen at another (but the last one passed) once
+  over the start line; the quick look sends whoever fell, cut a corner or (with
+  `ride`) left their boat back to their last gate in a new one, one racer a
+  look at a time so two never share a boat, and takes away the boats nobody
+  is in. Ranked by finish time, then by gates passed. Its boats - summoned or
+  put down - go with the track.
 - **King of the ring** (`king-of-the-hill` in code and saved settings; it was
   called King of the hill before it moved into the air) with fists only is a
   platform floating `hill.LIFT` over whatever is under it. Off the ring Poison
@@ -441,6 +455,18 @@ new map:
   `walkedOnce` keeps the last `WALKS_KEPT` (16) courses by run id, shape,
   difficulty and jump count - enough for a race, its preview, and a few
   other runs asked about meanwhile.
+- **A loop is laid out as an outline.** The boat race's track is the outline of
+  a shape of squares grown from the run's id - no holes, no two squares
+  meeting only at a corner - drawn at twice its size, so it never turns twice
+  in a row and two parts of it are always apart. The rules it is checked
+  against (`boat-race.trackProblems`), from the blocks: one closed loop, the
+  ice of parts more than three steps apart never within three blocks, the same
+  width across every straight, a wall beside every block of ice, every turn a
+  right angle with a straight between, and gates on straights that cut the
+  track into exactly one stretch per gate, each touching only the gate before
+  it and the one after - so no gate can be reached but through the one before.
+  Measured over 3,000 runs: none breaks a rule, none falls back to the plain
+  track.
 - **A fall is a move too.** A map a player falls through (the dropper) is
   checked the same way: every hole is reached from where the one above was
   passed by a cautious player - walking, never sprinting, setting off still
@@ -522,6 +548,7 @@ Everything below is part of the arena's own boxes: built into air with
 | Spleef           | each floor walled in its own color, a sea lantern on every corner post                                                              |
 | TNT run          | TNT floors, a rim in its own color at each one, glass walls, corner lanterns                                                        |
 | Dropper          | white walls banded by each floor's color, a ring of light round every hole                                                          |
+| Ice boat race    | packed ice, white walls with a glass rail and lights, an arch over each gate                                                        |
 | Parkour          | the course's theme, a light under every checkpoint                                                                                  |
 | King of the ring | polished stone edge, sea lanterns at the corners, the circle drawn in yellow                                                        |
 | Build battle     | a stone curb between plots and glowstone where the lines meet, at floor level                                                       |

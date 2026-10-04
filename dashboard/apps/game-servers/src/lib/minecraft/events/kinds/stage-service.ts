@@ -18,6 +18,8 @@ import * as tntRun from "./tnt-run";
 import * as tntRunSaid from "./tnt-run-messages";
 import * as dropper from "./dropper";
 import * as dropperSaid from "./dropper-messages";
+import * as boatRace from "./boat-race";
+import * as boatRaceSaid from "./boat-race-messages";
 import * as stash from "./stash";
 import * as arrival from "./arrival";
 import * as stashService from "./stash-service";
@@ -33,6 +35,7 @@ import type { PlaceRefusal } from "../place-search";
 const messages = speech.spoken(written);
 const tntRunMessages = speech.spoken(tntRunSaid);
 const dropperMessages = speech.spoken(dropperSaid);
+const boatMessages = speech.spoken(boatRaceSaid);
 
 /** The event cannot go ahead - too few joined, the structure would not stand -
  *  and ends as called off, with everything undone. */
@@ -45,6 +48,8 @@ export interface StageLoop {
     readonly language: speech.Speech;
     /** Whether the snowball pack is on, once it has been looked at this run. */
     snowballPack?: boolean;
+    /** How a boat race hands out boats on this server, once looked at. */
+    boatWay?: boatRace.BoatWay;
 }
 
 export interface StageTools {
@@ -64,6 +69,8 @@ export interface StageTools {
     itemsWork(items: stage.Flavour["items"]): void;
     /** Whether this server can keep what players carry (`item`, from 1.17). */
     canStash(): Promise<boolean>;
+    /** How this server's version hands a racer a boat (`boat-race.BoatWay`). */
+    boatWay(): Promise<boatRace.BoatWay>;
     /** Whose run a kept bag belongs to, for its database copy. */
     readonly stashOwner: stashService.StashOwner;
 }
@@ -119,6 +126,13 @@ type Layout =
           readonly boxes: readonly stage.Box[];
           readonly volume: stage.Volume;
           readonly reach: number;
+      }
+    | {
+          readonly kind: "boat-race";
+          readonly track: boatRace.Track;
+          readonly boxes: readonly stage.Box[];
+          readonly volume: stage.Volume;
+          readonly reach: number;
       };
 
 function layoutAt(run: EventRun, site: { x: number; z: number }, y: number): Layout {
@@ -136,6 +150,21 @@ function layoutAt(run: EventRun, site: { x: number; z: number }, y: number): Lay
             boxes: course.boxes,
             volume: course.volume,
             reach: course.reach
+        };
+    }
+    if (run.preset.kind === "boat-race") {
+        const track = boatRace.track(
+            run.preset.options as catalog.EventOptions<"boat-race">,
+            run.id,
+            site,
+            y
+        );
+        return {
+            kind: "boat-race",
+            track,
+            boxes: track.boxes,
+            volume: track.volume,
+            reach: track.reach
         };
     }
     if (run.preset.kind === "dropper") {
@@ -267,6 +296,8 @@ export async function stageTick(
             );
         case "dropper":
             return dropperTick(loop, server, tools, layout.shaft, layout.volume, heard, now, lines);
+        case "boat-race":
+            return boatTick(loop, server, tools, layout.track, layout.volume, heard, now, lines);
         default:
             return spleefTick(loop, server, tools, layout.arena, layout.volume, heard, now, lines);
     }
@@ -316,7 +347,9 @@ async function raise(
                     messages.tag(language) +
                         (preset.kind === "dropper"
                             ? dropperMessages.cannotPlay(language)
-                            : tntRunMessages.cannotPlay(language))
+                            : preset.kind === "boat-race"
+                              ? boatMessages.cannotPlay(language)
+                              : tntRunMessages.cannotPlay(language))
                 )
             ]);
             throw new CalledOff("Its data pack could not be put on");
@@ -343,7 +376,12 @@ async function raise(
         // lets go of it.
         change(loop, {
             origin: { x: ground.x, y, z: ground.z },
-            design: preset.kind === "dropper" ? dropper.DESIGN : parkour.DESIGN,
+            design:
+                preset.kind === "dropper"
+                    ? dropper.DESIGN
+                    : preset.kind === "boat-race"
+                      ? boatRace.DESIGN
+                      : parkour.DESIGN,
             area,
             waits: 0
         });
@@ -439,6 +477,8 @@ function readySubtitle(loop: StageLoop, layout: Layout): string {
             return tntRunMessages.readySubtitle(language);
         case "dropper":
             return dropperMessages.readySubtitle(language);
+        case "boat-race":
+            return boatMessages.readySubtitle(language);
         case "spleef":
             return messages.spleefReadySubtitle(
                 spleef.variantFor(
@@ -519,9 +559,20 @@ async function admit(
                 holding(loop)
                   ? dropper.spots(layout.shaft, fresh.length)
                   : fresh.map(() => dropper.spawn(layout.shaft))
-              : [];
+              : layout.kind === "boat-race"
+                ? // On the grid before "Go!"; a late racer at the back of it.
+                  holding(loop)
+                    ? boatRace.grid(layout.track, fresh.length)
+                    : fresh.map(() => boatRace.grid(layout.track, 1)[0]!)
+                : [];
     if (layout.kind === "parkour") await server.sayAll(parkour.SCORES_ADDED);
     if (layout.kind === "dropper") await server.sayAll(dropper.SCORES_ADDED);
+    if (layout.kind === "boat-race") await server.sayAll(boatRace.SCORES_ADDED);
+    // A late racer in a race already on gets a boat on the spot.
+    const way =
+        layout.kind === "boat-race" && !holding(loop)
+            ? (loop.boatWay ??= await tools.boatWay())
+            : null;
     const brought: string[] = [];
     for (const [index, one] of fresh.entries()) {
         if (stashing && !(await stashSaved(loop, server, tools, one.name, false))) continue;
@@ -537,14 +588,19 @@ async function admit(
             // "Go!" only to a late racer joining a race already on; everybody
             // else waits for the rest, and the countdown.
             `title ${one.name} title ${commands.text(
-                (layout.kind === "parkour" || layout.kind === "dropper") && !holding(loop)
+                (layout.kind === "parkour" ||
+                    layout.kind === "dropper" ||
+                    layout.kind === "boat-race") &&
+                    !holding(loop)
                     ? messages.goTitle(loop.language)
                     : messages.spleefReadyTitle(loop.language)
             )}`,
             // Their checkpoint, once they are on it, for the quick look; a
             // dropper's racer, nowhere yet.
             ...(layout.kind === "parkour" ? parkour.racerScores(one.name, racer.checkpoint) : []),
-            ...(layout.kind === "dropper" ? dropper.racerScores(one.name, layout.shaft) : [])
+            ...(layout.kind === "dropper" ? dropper.racerScores(one.name, layout.shaft) : []),
+            ...(layout.kind === "boat-race" ? boatRace.racerScores(one.name) : []),
+            ...(way ? boatRace.boatLines(one.name, way) : [])
         ]);
         brought.push(one.name);
     }
@@ -704,6 +760,7 @@ function holding(loop: StageLoop): boolean {
 function inPlace(layout: Layout, at: { x: number; y: number; z: number }): boolean {
     if (layout.kind === "parkour") return parkour.onStart(layout.course, at);
     if (layout.kind === "dropper") return dropper.onLid(layout.shaft, at);
+    if (layout.kind === "boat-race") return boatRace.onGrid(layout.track, at);
     const { center, size, floor } = layout.arena;
     return (
         at.y >= floor + 0.5 &&
@@ -802,6 +859,31 @@ async function holdTick(
         change(loop, {
             racers: state(loop).racers.map((one) =>
                 one.outAt === null ? { ...one, since: go, best: 0, checkpoint: 0 } : one
+            )
+        });
+    } else if (layout.kind === "boat-race") {
+        // Everybody on their own spot of the grid, in a boat, the pack counting
+        // gates - all of it said before the start is written down, so the
+        // quick look never finds a racer between their spot and their boat.
+        const way = (loop.boatWay ??= await tools.boatWay());
+        const places = boatRace.grid(layout.track, racing.length);
+        const go: string[] = [...boatRace.SCORES_ADDED];
+        racing.forEach((racer, index) =>
+            go.push(
+                stage.moveLine(racer.name, places[index]!),
+                ...boatRace.racerScores(racer.name),
+                ...boatRace.boatLines(racer.name, way),
+                `title ${racer.name} times 5 40 10`,
+                `title ${racer.name} subtitle ${commands.text(boatMessages.goSubtitle(layout.track.laps, language))}`,
+                `title ${racer.name} title ${commands.text(messages.goTitle(language))}`,
+                soundFor(racer.name, commands.SOUNDS.start)
+            )
+        );
+        await server.sayAll([...go, ...boatRace.armLines(layout.track)]);
+        const started = Date.now();
+        change(loop, {
+            racers: state(loop).racers.map((one) =>
+                one.outAt === null ? { ...one, since: started, best: 0 } : one
             )
         });
     } else if (layout.kind === "dropper") {
@@ -1030,6 +1112,17 @@ export function quickLines(loop: StageLoop): string[] {
                       messages.tag(loop.language) + dropperMessages.backToTop(loop.language)
                   )
               );
+    // A boat race: whoever fell, cut a corner or left their boat, put back.
+    if (layout.kind === "boat-race") {
+        if (holding(loop) || !loop.boatWay) return [];
+        const language = loop.language;
+        const told = (line: string) => commands.text(messages.tag(language) + line);
+        return boatRace.quickLines(layout.track, loop.boatWay, {
+            fell: told(boatMessages.fell(language)),
+            cut: told(boatMessages.cut(language)),
+            lost: told(boatMessages.lost(language))
+        });
+    }
     if (layout.kind !== "parkour") return [];
     // Before the start: nobody off the start pad.
     if (holding(loop)) return parkour.holdLines(layout.course);
@@ -1071,7 +1164,7 @@ export function quickLines(loop: StageLoop): string[] {
 
 /** The kinds the events data pack plays a part of (`snowball-pack.ts`). */
 function needsPack(kind: catalog.EventKind): boolean {
-    return kind === "tnt-run" || kind === "dropper";
+    return kind === "tnt-run" || kind === "dropper" || kind === "boat-race";
 }
 
 /**
@@ -1194,6 +1287,127 @@ async function dropperTick(
     if (racers.length > 0 && racers.every((one) => one.finishedAt !== null || one.outAt !== null)) {
         // Nothing left for the pack to watch.
         lines.push(...dropper.stopLines(shaft.boxes));
+        lines.push(commands.say(messages.tag(language) + messages.everybodyDone(language)));
+        return "Everybody finished or dropped out";
+    }
+    return null;
+}
+// ------------------------------------------------------------------ boat race
+
+/**
+ * One tick of a boat race. The pack counts the gates and notes each finish to
+ * the tick, and the quick look puts back whoever fell, cut a corner or left
+ * their boat; this reads what the pack counted - each racer's gates and lap,
+ * their finish - and who strayed. A late joiner starts at the back of the grid,
+ * their time counted from then.
+ */
+async function boatTick(
+    loop: StageLoop,
+    server: ServerContainer,
+    tools: StageTools,
+    track: boatRace.Track,
+    volume: stage.Volume,
+    heard: readonly { name: string; call: stage.Call }[],
+    now: number,
+    lines: string[]
+): Promise<string | null> {
+    const language = loop.language;
+    loop.boatWay ??= await tools.boatWay();
+    let dirty = false;
+    for (const { name, call } of heard) {
+        const racer = state(loop).racers.find((one) => same(one.name, name));
+        const inside = racer !== undefined && racer.outAt === null;
+        if (call === "join" && !inside) {
+            if (racer?.finishedAt) continue;
+            await admit(loop, server, tools, [name], now, lines);
+        } else if (call === "leave" && inside) {
+            await sendHome(loop, server, tools, name);
+            markOut(loop, name, now, 0);
+            lines.push(tell(name, messages.tag(language) + messages.leftYou(language)));
+            dirty = true;
+        }
+    }
+    const where = commands.readWhere(await server.say([stage.ARENA_WHERE]));
+    const dimensions = commands.readDimensions(await server.say([stage.ARENA_DIMENSIONS]));
+    const passed = lowered(commands.readScores(await server.say([boatRace.READ_PASSED])));
+    const finished = lowered(commands.readScores(await server.say([boatRace.READ_FINISHED])));
+    // The game's own tick, asked only when somebody has finished.
+    let gameNow: number | null | undefined;
+    const gates = track.gates.length;
+    const total = track.laps * gates + 1;
+    for (const racer of state(loop).racers) {
+        if (racer.outAt !== null) continue;
+        const at = where.find((one) => same(one.name, racer.name));
+        if (!at) continue;
+        if (strayed(at, dimensions.get(at.name), volume)) {
+            await sendHome(loop, server, tools, racer.name);
+            markOut(loop, racer.name, now, 0);
+            dirty = true;
+            continue;
+        }
+        if (racer.finishedAt !== null) {
+            lines.push(
+                commands.actionbarFor(
+                    racer.name,
+                    messages.finishedBar(
+                        messages.clock((racer.finishedAt - racer.since) / 1000),
+                        language
+                    )
+                )
+            );
+            continue;
+        }
+        let next = racer;
+        const count = passed.get(racer.name.toLowerCase());
+        if (count !== undefined && count > next.best)
+            next = { ...next, best: Math.min(count, total) };
+        const tick = finished.get(racer.name.toLowerCase());
+        if (tick !== undefined) {
+            if (gameNow === undefined)
+                gameNow = commands.readDaytime(await server.say([parkour.READ_GAME_TIME]));
+            const when =
+                gameNow === null
+                    ? now
+                    : Math.max(racer.since, Math.min(now, now - Math.max(0, gameNow - tick) * 50));
+            next = { ...next, best: total, finishedAt: when };
+            const place = state(loop).racers.filter((one) => one.finishedAt !== null).length + 1;
+            lines.push(
+                commands.say(
+                    messages.tag(language) +
+                        messages.finishedLine(
+                            racer.name,
+                            messages.clock((when - racer.since) / 1000),
+                            place,
+                            language
+                        )
+                ),
+                `title ${racer.name} times 5 40 10`,
+                `title ${racer.name} subtitle ${commands.text(" ")}`,
+                `title ${racer.name} title ${commands.text(messages.checkpointTitle(gates, gates, language))}`,
+                soundFor(racer.name, commands.SOUNDS.win)
+            );
+        } else {
+            const progress = boatRace.progressOf(track, next.best);
+            lines.push(
+                commands.actionbarFor(
+                    racer.name,
+                    boatMessages.bar(progress.lap, track.laps, progress.gate, gates, language)
+                )
+            );
+        }
+        if (next !== racer) {
+            change(loop, {
+                racers: state(loop).racers.map((one) => (same(one.name, racer.name) ? next : one))
+            });
+            lines.push(commands.setScore(racer.name, next.best));
+            dirty = true;
+        }
+    }
+    if (dirty) await tools.persist();
+    const racers = state(loop).racers;
+    if (racers.length > 0 && racers.every((one) => one.finishedAt !== null || one.outAt !== null)) {
+        // Nothing left for the pack to count.
+        lines.push(...boatRace.stopLines(track.boxes));
         lines.push(commands.say(messages.tag(language) + messages.everybodyDone(language)));
         return "Everybody finished or dropped out";
     }
@@ -1406,7 +1620,8 @@ export async function settle(
         const stop = [
             ...snowballPack.stopLines(boxes),
             ...tntRun.stopLines(boxes),
-            ...dropper.stopLines(boxes)
+            ...dropper.stopLines(boxes),
+            ...boatRace.stopLines(boxes)
         ];
         if (area || stop.length > 0)
             await server.sayAll([...(area ? [stage.holdArea(area)] : []), ...stop]);
@@ -1414,7 +1629,12 @@ export async function settle(
         // rather than falls when it goes.
         const bounds = stage.boundsOf(boxes);
         if (bounds)
-            await server.sayAll([stage.floatDown(bounds, 60), ...stage.fallProofOver(bounds)]);
+            await server.sayAll([
+                stage.floatDown(bounds, 60),
+                ...stage.fallProofOver(bounds),
+                // A boat race's boats - summoned or put down - go with its track.
+                ...(boatRace.isTrack(boxes) ? boatRace.boatsGone(bounds) : [])
+            ]);
         // Latest first, and nothing after a box that would not come out: what
         // is built later can rest on - or, a dropper's water, be held in by -
         // what was built before it, so nothing goes before what it needs.
@@ -1439,8 +1659,12 @@ export function results(run: EventRun): { scores: Map<string, number>; took: str
     const racers = run.stage?.racers ?? [];
     const scores = new Map<string, number>();
     for (const one of racers) {
-        if (run.preset.kind === "parkour" || run.preset.kind === "dropper") {
-            // A time to the finish, then how far they got: jumps, or floors.
+        if (
+            run.preset.kind === "parkour" ||
+            run.preset.kind === "dropper" ||
+            run.preset.kind === "boat-race"
+        ) {
+            // A time to the finish, then how far they got: jumps, floors or gates.
             scores.set(
                 one.name,
                 one.finishedAt !== null
@@ -1456,18 +1680,24 @@ export function results(run: EventRun): { scores: Map<string, number>; took: str
 
 /** The standings for the screen while it runs: jumps made, or points so far. */
 export function standings(run: EventRun): { name: string; score: number }[] {
-    const course = run.preset.kind === "parkour" ? built(run) : null;
+    const course =
+        run.preset.kind === "parkour" || run.preset.kind === "boat-race" ? built(run) : null;
+    // A finish counts as every jump, floor or gate there is.
     const jumps =
         course?.kind === "parkour"
             ? course.course.platforms.length - 1
-            : run.preset.kind === "dropper"
-              ? (run.preset.options as catalog.EventOptions<"dropper">).levels
-              : 0;
+            : course?.kind === "boat-race"
+              ? course.track.laps * course.track.gates.length + 1
+              : run.preset.kind === "dropper"
+                ? (run.preset.options as catalog.EventOptions<"dropper">).levels
+                : 0;
     return (run.stage?.racers ?? [])
         .map((one) => ({
             name: one.name,
             score:
-                run.preset.kind === "parkour" || run.preset.kind === "dropper"
+                run.preset.kind === "parkour" ||
+                run.preset.kind === "dropper" ||
+                run.preset.kind === "boat-race"
                     ? one.finishedAt !== null
                         ? jumps
                         : one.best
@@ -1487,6 +1717,16 @@ export function scoreText(
     if (kind === "parkour") {
         if (parkour.isFinish(score)) return messages.clock(parkour.FINISH_BASE - score);
         return speech.pickIn({ en: `${score} jumps`, es: `${score} saltos` }, language);
+    }
+    if (kind === "boat-race") {
+        if (parkour.isFinish(score)) return messages.clock(parkour.FINISH_BASE - score);
+        return speech.pickIn(
+            {
+                en: `${score} ${score === 1 ? "gate" : "gates"}`,
+                es: `${score} ${score === 1 ? "puerta" : "puertas"}`
+            },
+            language
+        );
     }
     if (kind === "dropper") {
         if (parkour.isFinish(score)) return messages.clock(parkour.FINISH_BASE - score);

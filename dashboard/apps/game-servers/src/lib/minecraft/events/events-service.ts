@@ -38,6 +38,7 @@ import { parseProperties } from "../parse";
 import { readSchedule } from "../schedule";
 import * as parkour from "./kinds/parkour";
 import * as dropper from "./kinds/dropper";
+import * as boatRace from "./kinds/boat-race";
 import { withTimeout } from "@polaris/core";
 import * as gather from "./kinds/gathering";
 import * as hunt from "./kinds/treasure-hunt";
@@ -956,6 +957,7 @@ function startLoop(
     if (
         run.preset.kind === "parkour" ||
         run.preset.kind === "dropper" ||
+        run.preset.kind === "boat-race" ||
         run.preset.kind === "team-duel" ||
         arenaService.quickens(run.preset)
     ) {
@@ -1659,6 +1661,7 @@ async function play(
         case "spleef":
         case "tnt-run":
         case "dropper":
+        case "boat-race":
             decided = await stageService.stageTick(
                 loop,
                 server,
@@ -3884,6 +3887,16 @@ function stageTools(
             if (loop.flavour) loop.flavour = { ...loop.flavour, items };
         },
         canStash: () => serverAtLeast(server, [1, 17]),
+        boatWay: async () => {
+            // Only a version read for certain picks a boat's entity: a guess
+            // could name one the server does not have.
+            const version = await versionOf(server);
+            if (version !== null && atLeast(version, [1, 21, 2])) return "oak_boat";
+            if (version !== null && atLeast(version, [1, 19, 4])) return "boat";
+            if (version !== null) return "item";
+            const { items } = loop.flavour ?? (loop.flavour = await stageFlavour(server));
+            return items === "components" ? "item_components" : "item";
+        },
         stashOwner: { installedAppId, runId: loop.run.id, event: loop.run.preset.name }
     };
 }
@@ -4408,6 +4421,9 @@ export function cleanupOf(run: stored.EventRun): string[] {
             break;
         case "dropper":
             after.push(...dropper.SCORES_REMOVED);
+            break;
+        case "boat-race":
+            after.push(...boatRace.SCORES_REMOVED);
             break;
         case "rare-catch":
             after.push(...rareCatch.catchCleanup());

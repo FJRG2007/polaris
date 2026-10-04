@@ -467,7 +467,7 @@ function quickAnswer(line: string): string | null {
  * score range for everybody inside, and set for everybody in a range.
  */
 function stageScoreAnswer(line: string): string | null {
-    const objectives = /^pe_(drop|low|back|gate|lap|race)$/;
+    const objectives = /^pe_(drop|low|back|gate|next|last|fin|cut)$/;
     const set = /^scoreboard players set (\w+) (\w+) (-?\d+)$/.exec(line);
     if (set && objectives.test(set[2]!)) {
         (world.stageScores[set[2]!] ??= {})[set[1]!] = Number(set[3]);
@@ -6729,6 +6729,229 @@ describe("a dropper", () => {
         expect(world.sent).not.toContain(dropperKind.lidGone(shaft));
         world.at.Ana = [300.5, shaft.water, 0.5];
         scores("pe_drop").Ana = Math.floor(Date.now() / 50) % 2147483647;
+        await play(4_100);
+        const after = state();
+        expect(after.run).toBeNull();
+        expect(after.history[0]?.podium?.[0]).toMatchObject({ place: 1, name: "Ana" });
+        expect(world.sent).toContain(
+            "execute in minecraft:overworld run tp Ana 1.000 64.000 2.000 0.0 0.0"
+        );
+        expect(after.stageLeftovers).toEqual([]);
+    });
+});
+
+const boatKind = await import("@polaris-app/game-servers/src/lib/minecraft/events/kinds/boat-race");
+
+describe("an ice boat race", () => {
+    const race = () => ({
+        ...newPreset("boat-race", "boats"),
+        minutes: 5,
+        options: { place: { mode: "players" as const }, laps: 2, height: 30 }
+    });
+    const trackNow = () => {
+        const current = state().run!;
+        const origin = current.stage!.origin!;
+        return boatKind.track(race().options, current.id, origin, origin.y);
+    };
+    const scores = (objective: string) => (world.stageScores[objective] ??= {});
+
+    it("puts everybody on the grid in a boat at Go, counts the gates in the game, and ranks the finish, then the gates", async () => {
+        setUp([race()]);
+        await startArena("boats");
+        await play(2_100);
+        chat(["Ana", "join"], ["Ben", "unirse"]);
+        await play(44_000);
+        const track = trackNow();
+        // The pack on before the track is built: blue ice gate lines over packed ice.
+        const enabled = world.sent.indexOf(`datapack enable "${snowballPack.PACK_ID}"`);
+        const built = world.sent.findIndex(
+            (line) => line.endsWith(" minecraft:packed_ice keep") && line.includes(" fill ")
+        );
+        expect(enabled).toBeGreaterThan(-1);
+        expect(built).toBeGreaterThan(enabled);
+        expect(world.sent.some((line) => line.endsWith(" minecraft:blue_ice keep"))).toBe(true);
+        await play(8_000);
+        // At Go, after the countdown: on the grid, each in an oak boat (1.21.4),
+        // and the gates counted from then on.
+        const one = world.sent.findIndex(
+            (line) => line.includes(" title ") && visible(line).endsWith(" title 1")
+        );
+        const armed = world.sent.indexOf("scoreboard players set #on polaris_boat 1");
+        expect(one).toBeGreaterThan(-1);
+        expect(armed).toBeGreaterThan(one);
+        for (const line of boatKind.armLines(track)) expect(world.sent).toContain(line);
+        const grid = boatKind.grid(track, 2);
+        expect(world.sent).toContain(
+            `execute in minecraft:overworld run tp Ana ${grid[0]!.x.toFixed(3)} ${grid[0]!.y.toFixed(3)} ${grid[0]!.z.toFixed(3)} ${grid[0]!.yaw.toFixed(1)} 0.0`
+        );
+        for (const line of [
+            ...boatKind.boatLines("Ana", "oak_boat"),
+            ...boatKind.boatLines("Ben", "oak_boat")
+        ])
+            expect(world.sent).toContain(line);
+        expect(world.sent.indexOf(boatKind.boatLines("Ana", "oak_boat")[0]!)).toBeLessThan(armed);
+        expect(state().run!.readyAt).not.toBeNull();
+        // The quick look puts back whoever fell, cut a corner or left their boat.
+        world.sent = [];
+        await play(500);
+        expect(
+            world.sent.some((line) =>
+                line.startsWith(
+                    "execute in minecraft:overworld run kill @e[type=minecraft:oak_boat,tag=polaris_boat,nbt=!{Passengers:[{}]}]"
+                )
+            )
+        ).toBe(true);
+        expect(world.sent.some((line) => line.includes("run ride @s mount"))).toBe(true);
+
+        // Ben is three gates on; Ana crosses the line a second time.
+        const total = 2 * track.gates.length + 1;
+        scores("pe_gate").Ben = 3;
+        scores("pe_gate").Ana = total;
+        scores("pe_fin").Ana = Math.floor(Date.now() / 50) % 2147483647;
+        await play(2_100);
+        expect(
+            world.sent.some(
+                (line) =>
+                    line.startsWith("tellraw @a") &&
+                    visible(line).includes("Ana reached the finish")
+            )
+        ).toBe(true);
+        expect(state().run!.stage!.racers.find((one) => one.name === "Ben")!.best).toBe(3);
+        expect(
+            world.sent.some(
+                (line) => line.includes("title Ben actionbar") && visible(line).includes("Lap 1/2")
+            )
+        ).toBe(true);
+        chat(["Ben", "leave"]);
+        await play(4_100);
+
+        const after = state();
+        expect(after.run).toBeNull();
+        expect(after.history[0]?.note).toBe("Everybody finished or dropped out");
+        expect(after.history[0]?.podium?.[0]).toMatchObject({ place: 1, name: "Ana" });
+        expect(after.history[0]?.podium?.[1]).toEqual({ place: 2, name: "Ben", score: 3 });
+        for (const line of boatKind.stopLines(track.boxes)) expect(world.sent).toContain(line);
+        for (const line of boatKind.SCORES_REMOVED) expect(world.sent).toContain(line);
+        // Its boats go before its ice.
+        const gone = world.sent.findIndex((line) =>
+            line.includes("run kill @e[type=minecraft:oak_boat,x=")
+        );
+        expect(gone).toBeGreaterThan(-1);
+        expect(gone).toBeLessThan(
+            world.sent.findIndex((line) =>
+                line.endsWith("minecraft:air replace minecraft:packed_ice")
+            )
+        );
+        expect(world.inside.size).toBe(0);
+        keptTheRules();
+        expect(after.stageLeftovers).toEqual([]);
+    });
+
+    it("hands a marked boat to put down before 1.19.4, where nobody can be put in one", async () => {
+        world.version = "1.19.2";
+        setUp([race()]);
+        await startArena("boats");
+        await play(2_100);
+        chat(["Ana", "join"], ["Ben", "join"]);
+        await play(52_000);
+        expect(world.sent).toContain("give Ana minecraft:oak_boat{polaris_event:1b} 1");
+        expect(world.sent.some((line) => / ride /.test(line))).toBe(false);
+        expect(world.sent.some((line) => line.includes("summon minecraft:oak_boat"))).toBe(false);
+        await events.cancelEvent("owner", SERVER);
+        await play(4_200);
+        expect(world.sent).toContain("clear Ana minecraft:oak_boat{polaris_event:1b}");
+        expect(state().stageLeftovers).toEqual([]);
+    });
+
+    it("is called off before anything is built when too few join", async () => {
+        setUp([race()]);
+        await startArena("boats");
+        await play(2_100);
+        chat(["Ana", "join"]);
+        await play(34_000);
+        expect(state().history[0]).toMatchObject({ outcome: "cancelled" });
+        expect(state().history[0]?.note).toMatch(/^Only 1 joined; it needs \d$/);
+        expect(world.sent.some((line) => line.includes(" fill "))).toBe(false);
+        expect(world.sent.some((line) => line.includes(" tp "))).toBe(false);
+    });
+
+    it("called off mid-race, takes its boats and its track away and switches its pack off", async () => {
+        setUp([race()]);
+        await startArena("boats");
+        await play(2_100);
+        chat(["Ana", "join"], ["Ben", "join"]);
+        await play(52_000);
+        const track = trackNow();
+        expect(world.sent).toContain("scoreboard players set #on polaris_boat 1");
+        await events.cancelEvent("owner", SERVER);
+        await play(4_200);
+        for (const line of boatKind.stopLines(track.boxes)) expect(world.sent).toContain(line);
+        expect(world.sent.some((line) => line.includes("run kill @e[type=minecraft:boat,x="))).toBe(
+            true
+        );
+        for (const box of track.boxes)
+            expect(world.sent).toContain(
+                `execute in minecraft:overworld run fill ${box.x1} ${box.y1} ${box.z1} ${box.x2} ${box.y2} ${box.z2} minecraft:air replace ${box.block}`
+            );
+        expect(world.inside.size).toBe(0);
+        keptTheRules();
+        expect(state().stageLeftovers).toEqual([]);
+    });
+
+    it("picked up after a restart mid-race, still counts a finish and ends", async () => {
+        const preset = race();
+        setUp([preset]);
+        const now = Date.now();
+        const site = { x: 300, y: 100, z: 0 };
+        const track = boatKind.track(preset.options, "resumed-boats", site, site.y);
+        const spot = track.respawns[1]!;
+        world.inside = new Set(["Ana"]);
+        world.at = { Ana: [spot.x, spot.y, spot.z] };
+        scores("pe_gate").Ana = 2;
+        scores("pe_fin").Ana = 0;
+        config[catalog.EVENT_STATE_KEY] = {
+            run: {
+                id: "resumed-boats",
+                trigger: "manual",
+                startedBy: null,
+                preset,
+                phase: "running",
+                createdAt: now - 60_000,
+                startsAt: now - 30_000,
+                endsAt: now + 120_000,
+                readyAt: now - 20_000,
+                participants: ["Ana"],
+                place: { x: 300, y: 70, z: 0 },
+                stage: {
+                    origin: site,
+                    area: stageKit.areaOf(track.volume),
+                    boxes: track.boxes,
+                    built: true,
+                    goAt: now - 20_000,
+                    saved: [
+                        {
+                            name: "Ana",
+                            dimension: "minecraft:overworld",
+                            x: 1,
+                            y: 64,
+                            z: 2,
+                            yaw: 0,
+                            pitch: 0,
+                            mode: "survival"
+                        }
+                    ],
+                    racers: [{ name: "Ana", since: now - 20_000, best: 2 }]
+                }
+            }
+        };
+        await events.sweepEvents();
+        expect(events.runningEvents()).toContain(SERVER);
+        await play(2_100);
+        // Nothing built again, nobody put on the grid again.
+        expect(world.sent.some((line) => line.endsWith(" keep"))).toBe(false);
+        expect(world.sent).not.toContain("scoreboard players set #on polaris_boat 1");
+        scores("pe_gate").Ana = 2 * track.gates.length + 1;
+        scores("pe_fin").Ana = Math.floor(Date.now() / 50) % 2147483647;
         await play(4_100);
         const after = state();
         expect(after.run).toBeNull();
