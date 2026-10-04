@@ -60,7 +60,23 @@ export const GRID_CSS = `
 /* Events: filled, with the state drawn by edge, stripes and lines. */
 .pc-grid .fc .fc-h-event,
 .pc-grid .fc .fc-v-event { border-width: 1px; }
-.pc-grid .fc .fc-timegrid-event .fc-event-main { padding: 1px 4px; }
+/* Room inside the colored box: FullCalendar's own 1px left the text against
+   its left edge. A bar in the month grid or the all-day row, and a block in a
+   day or a week, both keep the text 6px in, and the time apart from the title. */
+.pc-grid .fc .fc-daygrid-block-event .fc-event-main { padding: 1px 6px; }
+.pc-grid .fc .fc-daygrid-block-event .fc-event-time,
+.pc-grid .fc .fc-daygrid-block-event .fc-event-title { padding: 1px 0; }
+.pc-grid .fc .fc-daygrid-block-event .fc-event-main-frame { gap: 4px; }
+.pc-grid .fc .fc-timegrid-event .fc-event-main { padding: 2px 6px; }
+/* A block too short for two lines (15 or 30 minutes) puts the time and the
+   title on one line; its room is on the sides only, so the line is not cut.
+   The title comes first, as in Google, so a narrow column still names it. */
+.pc-grid .fc .fc-timegrid-event-short .fc-event-main { padding: 0 6px; }
+.pc-grid .fc .fc-timegrid-event-short .fc-event-main-frame { align-items: center; gap: 4px; line-height: 1.15; }
+.pc-grid .fc .fc-timegrid-event-short .fc-event-title-container { order: -1; flex: 0 1 auto; min-width: 0; }
+.pc-grid .fc .fc-timegrid-event-short .fc-event-title { white-space: nowrap; text-overflow: ellipsis; }
+.pc-grid .fc .fc-timegrid-event-short .fc-event-time { flex: 0 1000 auto; min-width: 0; text-overflow: ellipsis; opacity: 0.85; }
+.pc-grid .fc .fc-timegrid-event-short .fc-event-time::after { content: none; }
 .pc-grid .fc .fc-timegrid-event .fc-event-title { font-weight: 500; }
 .pc-grid .fc .fc-v-event.pc-accepted,
 .pc-grid .fc .fc-v-event.pc-task { box-shadow: 0 0 0 1px hsl(var(--card)); }
