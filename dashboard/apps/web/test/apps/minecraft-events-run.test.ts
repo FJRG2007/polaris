@@ -8054,11 +8054,21 @@ describe("each player reads their own language", () => {
         world.sent.some(
             (line) => line.startsWith(`tellraw ${selector} `) && visible(line).includes(words)
         );
+    /** The run's random id shuffles the bank: with every true-or-false item
+     *  asked lately, the first round is a question whatever the id comes out as. */
+    const questionFirst = () => {
+        config[catalog.EVENT_STATE_KEY] = {
+            triviaSeen: triviaBank.BANK.filter((one) => triviaBank.truthOf(one.en) !== null).map(
+                (one) => one.id
+            )
+        };
+    };
 
     it("asks a Spanish account's player in Spanish and everybody else in English, and takes either answer", async () => {
         world.links = { Ana: "user-es" };
         world.locales = { "user-es": "es-ES" };
         setUp([quiz()]);
+        questionFirst();
         await startArena("quiz");
         await play(4_100);
         // Each player carries the tag of the language they read.
@@ -8155,6 +8165,7 @@ describe("each player reads their own language", () => {
         const settings = (config[catalog.EVENTS_KEY] as { settings: Record<string, unknown> })
             .settings;
         delete settings.language;
+        questionFirst();
         await startArena("quiz");
         await play(4_100);
         // Nobody linked: everybody reads the owner's language, sent to all at once.
