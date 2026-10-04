@@ -17,12 +17,14 @@ import { useEffect, useState } from "react";
 import { runAction } from "@/lib/run-action";
 import { useSearchParams } from "next/navigation";
 import { formatUserCode } from "@/lib/device-code";
-import { Button, Card, CardBody, Input } from "@polaris/ui";
+import { Globe, Info, Network, Puzzle } from "lucide-react";
 import type { PendingConnection } from "@/lib/extension/sessions";
 import { answerConnectionAction, describeConnectionAction } from "./actions";
 import { useTranslations } from "@/components/i18n/i18n-provider";
+import { BrowserMark, SystemMark } from "@/components/client-marks";
+import { ConsentCard, ConsentCodeEntry, ConsentFacts } from "@/components/consent-card";
 
-export function ExtensionConnectView() {
+export function ExtensionConnectView({ account }: { account?: string }) {
     const asked = useSearchParams().get("code") ?? "";
     const t = useTranslations("account");
     const [typed, setTyped] = useState(asked);
@@ -70,102 +72,98 @@ export function ExtensionConnectView() {
         setAnswered(approve ? "in" : "away");
     };
 
+    const requester = pending ? (
+        <BrowserMark browser={pending.browser} />
+    ) : (
+        <Puzzle className="text-muted-foreground" />
+    );
+
     if (answered) {
         return (
-            <Card>
-                <CardBody className="flex flex-col gap-2">
-                    <p className="text-sm font-medium">
-                        {answered === "in" ? t("extension.connected") : t("extension.turnedAway")}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                        {answered === "in" ? t("extension.connectedHint") : t("extension.turnedAwayHint")}
-                    </p>
-                </CardBody>
-            </Card>
+            <ConsentCard
+                requester={requester}
+                title={answered === "in" ? t("extension.connected") : t("extension.turnedAway")}
+                subtitle={
+                    answered === "in" ? t("extension.connectedHint") : t("extension.turnedAwayHint")
+                }
+            />
+        );
+    }
+
+    if (!pending) {
+        return (
+            <ConsentCard
+                requester={requester}
+                title={t("extension.codeLabel")}
+                account={account}
+                error={error}
+            >
+                <ConsentCodeEntry
+                    value={typed}
+                    onChange={setTyped}
+                    onSubmit={() => void look(typed)}
+                    label={t("extension.codeLabel")}
+                    submit={busy ? t("extension.looking") : t("extension.find")}
+                    busy={busy}
+                />
+            </ConsentCard>
         );
     }
 
     return (
-        <Card>
-            <CardBody className="flex flex-col gap-3">
-                {pending ? (
-                    <>
-                        <div className="flex flex-col gap-1">
-                            <p className="text-sm font-medium">{pending.device}</p>
-                            <p className="text-xs text-muted-foreground">
-                                {t("extension.code", { code: formatUserCode(pending.userCode) })}
-                            </p>
-                        </div>
-                        <dl className="flex flex-col gap-1 text-xs">
-                            <Row label={t("extension.browser")} value={t("extension.browserOn", { browser: pending.browser, os: pending.os })} />
-                            {/* The whole address, because this is half the
-                                decision and an IPv6 one does not fit the row. */}
-                            <Row label={t("extension.askedFrom")} value={pending.requestIp ?? t("extension.unknown")} />
-                            {/* And the whole name it was asked on: which of a
-                                deployment's addresses saw the request is the
-                                other half, and the tail is where they differ. */}
-                            <Row label={t("extension.on")} value={pending.host ?? t("extension.unknown")} />
-                        </dl>
-                        <p className="text-xs text-muted-foreground">
-                            {t("extension.consent")}
-                        </p>
-                        {error ? (
-                            <p role="alert" className="text-sm text-danger">
-                                {error}
-                            </p>
-                        ) : null}
-                        <div className="flex items-center gap-2">
-                            <Button size="sm" disabled={busy} onClick={() => void answer(true)}>
-                                {busy ? t("extension.working") : t("extension.connect")}
-                            </Button>
-                            <Button
-                                size="sm"
-                                variant="ghost"
-                                disabled={busy}
-                                onClick={() => void answer(false)}
-                            >
-                                {t("extension.turnAway")}
-                            </Button>
-                        </div>
-                    </>
-                ) : (
-                    <>
-                        <Input
-                            autoFocus
-                            value={typed}
-                            maxLength={16}
-                            aria-label={t("extension.codeLabel")}
-                            // i18n-ignore: the shape of the code
-                            placeholder="XXXX-XXXX"
-                            onChange={(event) => setTyped(event.target.value)}
-                            onKeyDown={(event) => event.key === "Enter" && void look(typed)}
-                        />
-                        {error ? (
-                            <p role="alert" className="text-sm text-danger">
-                                {error}
-                            </p>
-                        ) : null}
-                        <Button
-                            size="sm"
-                            disabled={busy || typed.trim() === ""}
-                            onClick={() => void look(typed)}
-                        >
-                            {busy ? t("extension.looking") : t("extension.find")}
-                        </Button>
-                    </>
-                )}
-            </CardBody>
-        </Card>
-    );
-}
-
-function Row({ label, value }: { label: string; value: string }) {
-    return (
-        <div className="flex justify-between gap-3">
-            <dt className="text-muted-foreground">{label}</dt>
-            <dd className="truncate" title={value}>
-                {value}
-            </dd>
-        </div>
+        <ConsentCard
+            requester={requester}
+            title={t("extension.title", { device: pending.device })}
+            subtitle={
+                <span className="font-mono">
+                    {t("extension.code", { code: formatUserCode(pending.userCode) })}
+                </span>
+            }
+            account={account}
+            error={error}
+            deny={{
+                label: t("extension.turnAway"),
+                disabled: busy,
+                onClick: () => void answer(false)
+            }}
+            allow={{
+                label: busy ? t("extension.working") : t("extension.connect"),
+                disabled: busy,
+                onClick: () => void answer(true)
+            }}
+            footer={
+                <>
+                    <Info className="mt-0.5 size-3 shrink-0" aria-hidden />
+                    {t("extension.consent")}
+                </>
+            }
+        >
+            {/* The whole address and the whole name it was asked on: which
+                address asked, and which of a deployment's names saw it, are
+                the two halves of the decision. Truncated rows keep the full
+                value on hover. */}
+            <ConsentFacts
+                facts={[
+                    {
+                        icon: <SystemMark os={pending.os} />,
+                        label: t("extension.browser"),
+                        value: t("extension.browserOn", {
+                            browser: pending.browser,
+                            os: pending.os
+                        })
+                    },
+                    {
+                        icon: <Network />,
+                        label: t("extension.askedFrom"),
+                        value: pending.requestIp ?? t("extension.unknown")
+                    },
+                    {
+                        icon: <Globe />,
+                        label: t("extension.on"),
+                        value: pending.host ?? t("extension.unknown")
+                    }
+                ]}
+            />
+        </ConsentCard>
     );
 }

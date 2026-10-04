@@ -20,11 +20,12 @@ import { useSearchParams } from "next/navigation";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import * as vaultCrypto from "@/lib/vault/crypto";
 import { useVaultSession } from "../vault-session";
-import { Button, Card, CardBody, Input } from "@polaris/ui";
+import { Blocks, Globe, KeyRound, Network } from "lucide-react";
+import { ConsentCard, ConsentCodeEntry, ConsentFacts } from "@/components/consent-card";
 import { answerAuthorizationAction, describeAuthorizationAction } from "./actions";
 import { formatUserCode, type PendingAuthorization } from "@/lib/vault/authorization-code";
 
-export function AuthorizeView() {
+export function AuthorizeView({ account }: { account?: string }) {
     const t = useTranslations("vault");
     const { key } = useVaultSession();
     const asked = useSearchParams().get("code") ?? "";
@@ -99,98 +100,79 @@ export function AuthorizeView() {
         setAnswered(approve ? "in" : "away");
     };
 
+    const card = { requester: <Blocks className="text-muted-foreground" /> };
+
     if (answered) {
         return (
-            <Card>
-                <CardBody className="flex flex-col gap-2">
-                    <p className="text-sm font-medium">
-                        {answered === "in" ? t("authorize.letIn") : t("authorize.turnedAway")}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                        {answered === "in" ? t("authorize.letInHint") : t("authorize.turnedAwayHint")}
-                    </p>
-                </CardBody>
-            </Card>
+            <ConsentCard
+                {...card}
+                title={answered === "in" ? t("authorize.letIn") : t("authorize.turnedAway")}
+                subtitle={
+                    answered === "in" ? t("authorize.letInHint") : t("authorize.turnedAwayHint")
+                }
+            />
+        );
+    }
+
+    if (!pending) {
+        return (
+            <ConsentCard {...card} title={t("authorize.codeLabel")} account={account} error={error}>
+                <ConsentCodeEntry
+                    value={typed}
+                    onChange={setTyped}
+                    onSubmit={() => void look(typed)}
+                    label={t("authorize.codeLabel")}
+                    submit={busy ? t("authorize.looking") : t("authorize.findIt")}
+                    busy={busy}
+                />
+            </ConsentCard>
         );
     }
 
     return (
-        <Card>
-            <CardBody className="flex flex-col gap-3">
-                {pending ? (
-                    <>
-                        <div className="flex flex-col gap-1">
-                            <p className="text-sm font-medium">{pending.device}</p>
-                            <p className="text-xs text-muted-foreground">
-                                {t("authorize.code", { code: formatUserCode(pending.userCode) })}
-                            </p>
-                        </div>
-                        <dl className="flex flex-col gap-1 text-xs">
-                            <div className="flex justify-between gap-3">
-                                <dt className="text-muted-foreground">{t("authorize.askedFrom")}</dt>
-                                {/* The whole address, because this is half the
-                                    decision and an IPv6 one does not fit the row. */}
-                                <dd className="truncate" title={pending.requestIp ?? t("authorize.unknown")}>
-                                    {pending.requestIp ?? t("authorize.unknown")}
-                                </dd>
-                            </div>
-                            <div className="flex justify-between gap-3">
-                                <dt className="text-muted-foreground">{t("authorize.on")}</dt>
-                                {/* And the whole name it was asked on: which of a
-                                    deployment's addresses saw the request is the
-                                    other half, and the tail is where they differ. */}
-                                <dd className="truncate" title={pending.host ?? t("authorize.unknown")}>
-                                    {pending.host ?? t("authorize.unknown")}
-                                </dd>
-                            </div>
-                        </dl>
-                        <p className="text-xs text-muted-foreground">{t("authorize.warning")}</p>
-                        {error ? (
-                            <p role="alert" className="text-sm text-danger">
-                                {error}
-                            </p>
-                        ) : null}
-                        <div className="flex items-center gap-2">
-                            <Button size="sm" disabled={busy} onClick={() => void answer(true)}>
-                                {busy ? t("authorize.working") : t("authorize.letItIn")}
-                            </Button>
-                            <Button
-                                size="sm"
-                                variant="ghost"
-                                disabled={busy}
-                                onClick={() => void answer(false)}
-                            >
-                                {t("authorize.turnItAway")}
-                            </Button>
-                        </div>
-                    </>
-                ) : (
-                    <>
-                        <Input
-                            autoFocus
-                            value={typed}
-                            maxLength={16}
-                            aria-label={t("authorize.codeLabel")}
-                            // i18n-ignore: the shape of the code, not words
-                            placeholder="XXXX-XXXX"
-                            onChange={(event) => setTyped(event.target.value)}
-                            onKeyDown={(event) => event.key === "Enter" && void look(typed)}
-                        />
-                        {error ? (
-                            <p role="alert" className="text-sm text-danger">
-                                {error}
-                            </p>
-                        ) : null}
-                        <Button
-                            size="sm"
-                            disabled={busy || typed.trim() === ""}
-                            onClick={() => void look(typed)}
-                        >
-                            {busy ? t("authorize.looking") : t("authorize.findIt")}
-                        </Button>
-                    </>
-                )}
-            </CardBody>
-        </Card>
+        <ConsentCard
+            {...card}
+            title={t("authorize.titleFor", { device: pending.device })}
+            subtitle={
+                <span className="font-mono">
+                    {t("authorize.code", { code: formatUserCode(pending.userCode) })}
+                </span>
+            }
+            account={account}
+            error={error}
+            deny={{
+                label: t("authorize.turnItAway"),
+                disabled: busy,
+                onClick: () => void answer(false)
+            }}
+            allow={{
+                label: busy ? t("authorize.working") : t("authorize.letItIn"),
+                disabled: busy,
+                onClick: () => void answer(true)
+            }}
+        >
+            {/* The whole address and the whole name it was asked on: which
+                address asked, and which of a deployment's names saw it, are
+                the two halves of the decision. Truncated rows keep the full
+                value on hover. */}
+            <ConsentFacts
+                facts={[
+                    {
+                        icon: <Network />,
+                        label: t("authorize.askedFrom"),
+                        value: pending.requestIp ?? t("authorize.unknown")
+                    },
+                    {
+                        icon: <Globe />,
+                        label: t("authorize.on"),
+                        value: pending.host ?? t("authorize.unknown")
+                    }
+                ]}
+            />
+            <p className="flex gap-2 rounded-md border border-warning-edge bg-warning-soft p-3 text-xs text-warning-ink">
+                <KeyRound className="size-4 shrink-0" aria-hidden />
+                <span>{t("authorize.warning")}</span>
+            </p>
+        </ConsentCard>
     );
 }

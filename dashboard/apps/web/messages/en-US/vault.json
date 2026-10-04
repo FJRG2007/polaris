@@ -122,7 +122,9 @@
         "turnItAway": "Turn it away",
         "codeLabel": "The code the app is showing",
         "looking": "Looking",
-        "findIt": "Find it"
+        "findIt": "Find it",
+        "titleFor": "Let {device} into your vault",
+        "signedInAs": "Signed in as {name}"
     },
     "clients": {
         "title": "Connect an app",

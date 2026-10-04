@@ -587,7 +587,9 @@
             "notACode": "Eso no es un código de la extensión de Polaris.",
             "nothingWaiting": "No hay nada esperando con ese código. Pide uno nuevo a la extensión.",
             "cannotAnswer": "No se puede responder a esa solicitud."
-        }
+        },
+        "title": "Conectar {device} a Polaris",
+        "signedInAs": "Sesión iniciada como {name}"
     },
     "friends": {
         "page": {
@@ -1045,6 +1047,8 @@
             "nothingWaiting": "No hay nada esperando con ese código. Vuelve a ejecutar plr login para obtener uno nuevo.",
             "cannotAnswer": "No se puede responder a esa solicitud.",
             "noScopes": "Tu cuenta no puede usar Deploy, que es todo lo que hace la línea de comandos. Pide acceso a un administrador."
-        }
+        },
+        "title": "Iniciar sesión en {device}",
+        "signedInAs": "Sesión iniciada como {name}"
     }
 }
