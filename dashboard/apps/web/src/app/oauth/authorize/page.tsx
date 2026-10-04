@@ -40,7 +40,11 @@ const WINDOW_MS = 10 * 60 * 1000;
 
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;
 
-async function ConsentError({ reason }: { reason: "client" | "redirect" | "viewingAs" | "tooMany" }) {
+async function ConsentError({
+    reason
+}: {
+    reason: "client" | "redirect" | "viewingAs" | "tooMany";
+}) {
     const t = await getTranslations("mcp");
     return (
         <main className="grid min-h-screen place-items-center p-4">

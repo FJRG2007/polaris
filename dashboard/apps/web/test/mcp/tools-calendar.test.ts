@@ -26,7 +26,12 @@ type ToolResult = { content: { text: string }[]; isError?: boolean; structuredCo
 
 function call(args: Record<string, unknown>, scopes: string[] = ["calendar.use"]) {
     return handleMcpMessage(
-        { jsonrpc: "2.0", id: 1, method: "tools/call", params: { name: "calendar_upcoming", arguments: args } },
+        {
+            jsonrpc: "2.0",
+            id: 1,
+            method: "tools/call",
+            params: { name: "calendar_upcoming", arguments: args }
+        },
         MCP_TOOLS,
         { userId: "user-1", isAdmin: false, scopes: scopes as never, keyId: "key-1" },
         SERVER
@@ -40,7 +45,9 @@ beforeEach(() => {
 describe("the calendar tool", () => {
     it("is in the catalogue, read-only, asking for calendar.use", () => {
         expect(MCP_TOOLS.map((tool) => tool.name)).toContain("calendar_upcoming");
-        expect(CALENDAR_TOOLS.every((tool) => tool.readOnly && tool.scope === "calendar.use")).toBe(true);
+        expect(CALENDAR_TOOLS.every((tool) => tool.readOnly && tool.scope === "calendar.use")).toBe(
+            true
+        );
     });
 
     it("refuses a key without calendar.use before asking the app", async () => {
@@ -56,12 +63,21 @@ describe("the calendar tool", () => {
 
     it("asks as the key's account and returns only what a model needs", async () => {
         mocks.upcomingEventsFor.mockResolvedValue([
-            { id: "e1", title: "Standup", start: "2026-10-05T09:00:00.000Z", allDay: false, color: "#fff", href: "/calendar/e1" }
+            {
+                id: "e1",
+                title: "Standup",
+                start: "2026-10-05T09:00:00.000Z",
+                allDay: false,
+                color: "#fff",
+                href: "/calendar/e1"
+            }
         ]);
         const result = (await call({ limit: 5 }))?.result as ToolResult;
         expect(mocks.upcomingEventsFor).toHaveBeenCalledWith("user-1", 5);
         expect(result.structuredContent).toEqual({
-            events: [{ id: "e1", title: "Standup", start: "2026-10-05T09:00:00.000Z", allDay: false }]
+            events: [
+                { id: "e1", title: "Standup", start: "2026-10-05T09:00:00.000Z", allDay: false }
+            ]
         });
     });
 

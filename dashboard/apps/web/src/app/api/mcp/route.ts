@@ -149,7 +149,12 @@ async function callerFor(request: Request): Promise<McpCaller | null> {
         const decision = await evaluateAccountAccess(access.userId, ip, NO_RULES_OF_ITS_OWN);
         if (!decision.allowed) return null;
         await touchGrant(access.grantId, ip);
-        return { userId: access.userId, isAdmin: access.isAdmin, scopes: access.scopes, grantId: access.grantId };
+        return {
+            userId: access.userId,
+            isAdmin: access.isAdmin,
+            scopes: access.scopes,
+            grantId: access.grantId
+        };
     }
 
     const principal = await authenticateApiKey(request);
@@ -202,13 +207,19 @@ async function overBudget(
     // Every tool, for every credential: a model in a loop is the ordinary way
     // this gets called far too often, and each call reaches the database.
     const credential =
-        caller.keyId ?? caller.grantId ?? (caller.sessionId ? `session:${caller.sessionId}` : `user:${caller.userId}`);
+        caller.keyId ??
+        caller.grantId ??
+        (caller.sessionId ? `session:${caller.sessionId}` : `user:${caller.userId}`);
     for (const [bucket, limit] of [
         [`mcp-call:${credential}`, CALLS_PER_MINUTE],
         ...(tool.readOnly ? [] : [[`mcp-change:${credential}`, CHANGES_PER_MINUTE] as const])
     ] as const) {
         const throttle = await rateLimit(bucket, limit, 60_000);
-        if (!throttle.ok) return toolFailure(id, tooManyCalls(Math.max(1, Math.ceil(throttle.retryAfterMs / 1000))));
+        if (!throttle.ok)
+            return toolFailure(
+                id,
+                tooManyCalls(Math.max(1, Math.ceil(throttle.retryAfterMs / 1000)))
+            );
     }
 
     // And the deploy tools spend the Deploy API's own budgets on top, keyed the
@@ -275,7 +286,10 @@ function unauthorized(request: Request, hadToken: boolean): Response {
     return Response.json(
         // i18n-ignore read by a machine, not shown to a person
         { error: "Unauthorized" },
-        { status: 401, headers: { "WWW-Authenticate": wwwAuthenticate(origin, mcpScopes(), hadToken) } }
+        {
+            status: 401,
+            headers: { "WWW-Authenticate": wwwAuthenticate(origin, mcpScopes(), hadToken) }
+        }
     );
 }
 
@@ -285,9 +299,14 @@ export async function POST(request: Request): Promise<Response> {
     // protocol, and an MCP client that sees a 401 knows to fix its credential
     // rather than reporting a tool failure to the model.
     // It carries the challenge that tells an assistant where to sign in.
-    if (!caller) return unauthorized(request, /^bearer\s+\S/i.test(request.headers.get("authorization") ?? ""));
+    if (!caller)
+        return unauthorized(
+            request,
+            /^bearer\s+\S/i.test(request.headers.get("authorization") ?? "")
+        );
 
-    const tooLarge = () => jsonRpcError(RPC_INVALID_REQUEST, `A request is at most ${BODY_MAX / 1024 ** 2} MB`, 413);
+    const tooLarge = () =>
+        jsonRpcError(RPC_INVALID_REQUEST, `A request is at most ${BODY_MAX / 1024 ** 2} MB`, 413);
     const declared = Number(request.headers.get("content-length"));
     if (Number.isFinite(declared) && declared > BODY_MAX) return tooLarge();
     const bytes = await readCappedBody(request, BODY_MAX);

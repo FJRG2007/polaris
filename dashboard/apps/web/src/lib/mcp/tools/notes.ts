@@ -75,7 +75,9 @@ const listInput = z.object({
         .trim()
         .max(80)
         .default("")
-        .describe('Limit to one notebook, by name or id. "private" is your own notes. Empty is every notebook.'),
+        .describe(
+            'Limit to one notebook, by name or id. "private" is your own notes. Empty is every notebook.'
+        ),
     ...pageFields
 });
 
@@ -97,28 +99,34 @@ const listNotesTool: McpTool<z.infer<typeof listInput>> = {
         const chosen = wanted
             ? shelves.filter((shelf) =>
                   shelf.space
-                      ? shelf.space.id === input.notebook || shelf.space.name.toLowerCase() === wanted
+                      ? shelf.space.id === input.notebook ||
+                        shelf.space.name.toLowerCase() === wanted
                       : wanted === "private"
               )
             : shelves;
         if (wanted && chosen.length === 0) {
-            throw new McpRefusal(`No notebook called "${input.notebook}" that this account can open.`);
+            throw new McpRefusal(
+                `No notebook called "${input.notebook}" that this account can open.`
+            );
         }
 
         const listed = await Promise.all(
             chosen.map(async (shelf) =>
-                (await notes.listNotes({ userId: caller.userId, spaceId: shelf.space?.id ?? null })).map(
-                    (note) => ({
-                        id: note.id,
-                        title: note.title,
-                        excerpt: note.excerpt,
-                        notebook: shelf.space?.name ?? "private",
-                        notebookId: shelf.space?.id ?? null,
-                        parentId: note.parentId,
-                        pinned: note.pinned,
-                        updatedAt: note.updatedAt
+                (
+                    await notes.listNotes({
+                        userId: caller.userId,
+                        spaceId: shelf.space?.id ?? null
                     })
-                )
+                ).map((note) => ({
+                    id: note.id,
+                    title: note.title,
+                    excerpt: note.excerpt,
+                    notebook: shelf.space?.name ?? "private",
+                    notebookId: shelf.space?.id ?? null,
+                    parentId: note.parentId,
+                    pinned: note.pinned,
+                    updatedAt: note.updatedAt
+                }))
             )
         );
         const needle = input.query.toLowerCase();
@@ -131,11 +139,13 @@ const listNotesTool: McpTool<z.infer<typeof listInput>> = {
                     note.excerpt.toLowerCase().includes(needle)
             );
         const page = pageOf(matched, input.offset, input.limit);
-        if (page.items.length === 0) return { text: "No notes matched.", structured: { notes: [], nextOffset: null } };
+        if (page.items.length === 0)
+            return { text: "No notes matched.", structured: { notes: [], nextOffset: null } };
         return {
             text:
-                page.items.map((note) => `${note.id}  ${note.title}  [${note.notebook}]`).join("\n") +
-                moreLine(page),
+                page.items
+                    .map((note) => `${note.id}  ${note.title}  [${note.notebook}]`)
+                    .join("\n") + moreLine(page),
             structured: { notes: page.items, nextOffset: page.nextOffset }
         };
     }
@@ -234,11 +244,14 @@ const updateInput = z
         title: core.noteTitle.optional().describe("A new title."),
         body: core.noteBody
             .optional()
-            .describe("The whole new text, in Markdown. Replaces what is there; read it first with notes_get."),
+            .describe(
+                "The whole new text, in Markdown. Replaces what is there; read it first with notes_get."
+            ),
         pinned: z.boolean().optional().describe("Keep it at the top of its notebook.")
     })
     .refine(
-        (value) => value.title !== undefined || value.body !== undefined || value.pinned !== undefined,
+        (value) =>
+            value.title !== undefined || value.body !== undefined || value.pinned !== undefined,
         // i18n-ignore read by the calling model, not shown to a person
         { message: "Send at least one of title, body or pinned" }
     );

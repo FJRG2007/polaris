@@ -24,9 +24,8 @@ vi.mock("@/lib/safe-fetch", () => ({
 }));
 
 const { checkAuthorizationRequest, readParams } = await import("@/lib/mcp/oauth/authorize");
-const { checkMetadataDocument, checkRegistration, cleanClientName, metadataDocumentUrl } = await import(
-    "@/lib/mcp/oauth/clients"
-);
+const { checkMetadataDocument, checkRegistration, cleanClientName, metadataDocumentUrl } =
+    await import("@/lib/mcp/oauth/clients");
 const { requestedScopes } = await import("@/lib/mcp/oauth/scopes");
 
 const ORIGIN = "https://polaris.example.test";
@@ -75,7 +74,10 @@ describe("an authorization request", () => {
     });
 
     it("never redirects for an unknown client or an unregistered address (no open redirect)", async () => {
-        expect(await check({ client_id: "pmc_unknown" })).toEqual({ kind: "unsafe", reason: "client" });
+        expect(await check({ client_id: "pmc_unknown" })).toEqual({
+            kind: "unsafe",
+            reason: "client"
+        });
         expect(await check({ client_id: undefined })).toEqual({ kind: "unsafe", reason: "client" });
         for (const redirect of [
             "https://attacker.example/cb",
@@ -83,10 +85,15 @@ describe("an authorization request", () => {
             "https://app.example/cb?x=1",
             "javascript:alert(1)"
         ]) {
-            expect(await check({ redirect_uri: redirect }), redirect).toEqual({ kind: "unsafe", reason: "redirect" });
+            expect(await check({ redirect_uri: redirect }), redirect).toEqual({
+                kind: "unsafe",
+                reason: "redirect"
+            });
         }
         // And even a broken request with a bad address is not sent anywhere.
-        expect(await check({ redirect_uri: "https://attacker.example/cb", code_challenge: undefined })).toEqual({
+        expect(
+            await check({ redirect_uri: "https://attacker.example/cb", code_challenge: undefined })
+        ).toEqual({
             kind: "unsafe",
             reason: "redirect"
         });
@@ -112,10 +119,15 @@ describe("an authorization request", () => {
     });
 
     it("refuses a token for any other resource (audience confusion)", async () => {
-        for (const resource of ["https://other.example/api/mcp", `${ORIGIN}/api/v1`, `${ORIGIN}/api/mcp#x`]) {
+        for (const resource of [
+            "https://other.example/api/mcp",
+            `${ORIGIN}/api/v1`,
+            `${ORIGIN}/api/mcp#x`
+        ]) {
             const result = await check({ resource });
             expect(result.kind).toBe("redirect");
-            if (result.kind === "redirect") expect(new URL(result.url).searchParams.get("error")).toBe("invalid_target");
+            if (result.kind === "redirect")
+                expect(new URL(result.url).searchParams.get("error")).toBe("invalid_target");
         }
         // Left out, it defaults to this endpoint.
         const result = await check({ resource: undefined });
@@ -149,8 +161,12 @@ describe("an authorization request", () => {
 
 describe("requested scopes", () => {
     it("keeps the ones on offer, drops the rest, and offers everything when none match", () => {
-        expect(requestedScopes("tasks.read offline_access openid", [...SUPPORTED])).toEqual(["tasks.read"]);
-        expect(requestedScopes("users.manage system.manage", [...SUPPORTED])).toEqual([...SUPPORTED]);
+        expect(requestedScopes("tasks.read offline_access openid", [...SUPPORTED])).toEqual([
+            "tasks.read"
+        ]);
+        expect(requestedScopes("users.manage system.manage", [...SUPPORTED])).toEqual([
+            ...SUPPORTED
+        ]);
         expect(requestedScopes(undefined, [...SUPPORTED])).toEqual([...SUPPORTED]);
     });
 });
@@ -185,7 +201,10 @@ describe("dynamic client registration", () => {
             { redirect_uris: ["https://ok.example/cb"], grant_types: ["client_credentials"] },
             { redirect_uris: ["https://ok.example/cb"], grant_types: ["implicit"] },
             { redirect_uris: ["https://ok.example/cb"], response_types: ["token"] },
-            { redirect_uris: ["https://ok.example/cb"], token_endpoint_auth_method: "private_key_jwt" },
+            {
+                redirect_uris: ["https://ok.example/cb"],
+                token_endpoint_auth_method: "private_key_jwt"
+            },
             "not an object",
             null
         ]) {
@@ -223,7 +242,12 @@ describe("client metadata documents", () => {
     });
 
     it("refuses one that claims to be another app, uses keys, or registers unsafe addresses", () => {
-        expect(checkMetadataDocument(address, { client_id: "https://evil.example/meta", redirect_uris: ["https://a.example/cb"] })).toBeNull();
+        expect(
+            checkMetadataDocument(address, {
+                client_id: "https://evil.example/meta",
+                redirect_uris: ["https://a.example/cb"]
+            })
+        ).toBeNull();
         expect(
             checkMetadataDocument(address, {
                 client_id: address,
@@ -231,7 +255,12 @@ describe("client metadata documents", () => {
                 token_endpoint_auth_method: "private_key_jwt"
             })
         ).toBeNull();
-        expect(checkMetadataDocument(address, { client_id: address, redirect_uris: ["http://evil.example/cb"] })).toBeNull();
+        expect(
+            checkMetadataDocument(address, {
+                client_id: address,
+                redirect_uris: ["http://evil.example/cb"]
+            })
+        ).toBeNull();
         expect(checkMetadataDocument(address, "nope")).toBeNull();
     });
 });

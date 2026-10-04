@@ -269,7 +269,10 @@ async function callTool(
     // Scope before shape. A caller who may not use the tool at all should not
     // learn its argument names by being told which of them they got wrong.
     if (tool.scope && !caller.scopes.includes(tool.scope)) {
-        return toolFailure(id, `This connection cannot ${tool.name}. It needs the ${tool.scope} scope.`);
+        return toolFailure(
+            id,
+            `This connection cannot ${tool.name}. It needs the ${tool.scope} scope.`
+        );
     }
 
     const args = tool.input.safeParse(params.arguments ?? {});

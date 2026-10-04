@@ -23,7 +23,12 @@ import { prisma } from "@polaris/db";
 import * as fetcher from "@/lib/safe-fetch";
 import { parseStringList, stringifyList } from "@polaris/core";
 import { generateToken, hashToken, tokenMatchesHash } from "@polaris/core/tokens";
-import { MAX_URI_LENGTH, TOKEN_AUTH_METHODS, acceptableRedirectUri, type TokenAuthMethod } from "./urls";
+import {
+    MAX_URI_LENGTH,
+    TOKEN_AUTH_METHODS,
+    acceptableRedirectUri,
+    type TokenAuthMethod
+} from "./urls";
 
 /** A client as the rest of the flow reads it. */
 export interface OAuthClientRecord {
@@ -143,10 +148,14 @@ const GRANT_TYPES = new Set(["authorization_code", "refresh_token"]);
  * Check a registration request. Pure: what is stored is decided here, and the
  * caller only writes it.
  */
-export function checkRegistration(
-    body: unknown
-):
-    | { ok: true; name: string; clientUri: string | null; redirectUris: string[]; method: TokenAuthMethod }
+export function checkRegistration(body: unknown):
+    | {
+          ok: true;
+          name: string;
+          clientUri: string | null;
+          redirectUris: string[];
+          method: TokenAuthMethod;
+      }
     | { ok: false; refusal: RegistrationRefusal } {
     const parsed = registrationSchema.safeParse(body);
     if (!parsed.success) {
@@ -173,7 +182,8 @@ export function checkRegistration(
                 refusal: {
                     error: "invalid_redirect_uri",
                     // i18n-ignore read by the registering app, not shown to a person
-                    description: "Every redirect URI must be https, or http to localhost, 127.0.0.1 or [::1], with no fragment"
+                    description:
+                        "Every redirect URI must be https, or http to localhost, 127.0.0.1 or [::1], with no fragment"
                 }
             };
         }
@@ -314,7 +324,11 @@ async function fetchMetadataDocument(url: URL): Promise<unknown> {
     try {
         const response = await fetcher.configuredRequest(
             url.toString(),
-            { method: "GET", headers: { accept: "application/json" }, timeoutMs: fetcher.FETCH_TIMEOUT_MS },
+            {
+                method: "GET",
+                headers: { accept: "application/json" },
+                timeoutMs: fetcher.FETCH_TIMEOUT_MS
+            },
             { allowPrivate: false }
         );
         // No redirects: the document is the one at the address the app named.

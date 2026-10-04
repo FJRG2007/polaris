@@ -54,7 +54,11 @@ export type TokenOutcome =
               scope: string;
           };
       }
-    | { ok: false; error: "invalid_grant" | "invalid_request" | "invalid_scope" | "invalid_target"; description: string };
+    | {
+          ok: false;
+          error: "invalid_grant" | "invalid_request" | "invalid_scope" | "invalid_target";
+          description: string;
+      };
 
 function refused(
     error: "invalid_grant" | "invalid_request" | "invalid_scope" | "invalid_target",
@@ -89,7 +93,10 @@ async function endGrant(grantId: string): Promise<void> {
     await prisma.$transaction([
         prisma.oAuthToken.deleteMany({ where: { grantId } }),
         prisma.oAuthCode.deleteMany({ where: { grantId } }),
-        prisma.oAuthGrant.updateMany({ where: { id: grantId, revokedAt: null }, data: { revokedAt: new Date() } })
+        prisma.oAuthGrant.updateMany({
+            where: { id: grantId, revokedAt: null },
+            data: { revokedAt: new Date() }
+        })
     ]);
 }
 
@@ -110,14 +117,21 @@ export async function approve(input: {
     const scopes = stringifyList([...input.scopes]);
     const grant = await prisma.oAuthGrant.upsert({
         where: { userId_clientId: { userId: input.userId, clientId: input.client.id } },
-        create: { userId: input.userId, clientId: input.client.id, scopes, resource: input.resource },
+        create: {
+            userId: input.userId,
+            clientId: input.client.id,
+            scopes,
+            resource: input.resource
+        },
         update: { scopes, resource: input.resource, revokedAt: null },
         select: { id: true }
     });
     const code = `${CODE_PREFIX}${generateToken()}`;
     const now = Date.now();
     await prisma.$transaction([
-        prisma.oAuthCode.deleteMany({ where: { grantId: grant.id, expiresAt: { lt: new Date(now) } } }),
+        prisma.oAuthCode.deleteMany({
+            where: { grantId: grant.id, expiresAt: { lt: new Date(now) } }
+        }),
         prisma.oAuthCode.create({
             data: {
                 codeHash: hashToken(code),
@@ -135,7 +149,11 @@ export async function approve(input: {
 
 /** Mint an access and refresh token pair under a grant, and tidy what has
  *  expired under it while there. */
-async function issue(grantId: string, scopes: readonly string[], resource: string): Promise<TokenOutcome> {
+async function issue(
+    grantId: string,
+    scopes: readonly string[],
+    resource: string
+): Promise<TokenOutcome> {
     const access = `${ACCESS_TOKEN_PREFIX}${generateToken()}`;
     const refresh = `${REFRESH_TOKEN_PREFIX}${generateToken()}`;
     const now = Date.now();
@@ -184,7 +202,10 @@ async function issue(grantId: string, scopes: readonly string[], resource: strin
 }
 
 /** Whether a grant's person can still be acted for at all. */
-async function grantStands(grant: { revokedAt: Date | null; user: { bannedAt: Date | null } }): Promise<boolean> {
+async function grantStands(grant: {
+    revokedAt: Date | null;
+    user: { bannedAt: Date | null };
+}): Promise<boolean> {
     return grant.revokedAt === null && grant.user.bannedAt === null;
 }
 
@@ -204,10 +225,22 @@ export async function exchangeCode(input: {
     }
     const row = await prisma.oAuthCode.findUnique({
         where: { codeHash: hashToken(input.code) },
-        include: { grant: { select: { id: true, clientId: true, revokedAt: true, user: { select: { bannedAt: true } } } } }
+        include: {
+            grant: {
+                select: {
+                    id: true,
+                    clientId: true,
+                    revokedAt: true,
+                    user: { select: { bannedAt: true } }
+                }
+            }
+        }
     });
     // One answer for every way a code can be wrong, so a guess learns nothing.
-    const invalid = refused("invalid_grant", "The code is not valid, has expired, or was already used");
+    const invalid = refused(
+        "invalid_grant",
+        "The code is not valid, has expired, or was already used"
+    );
     if (!row || row.grant.clientId !== input.client.id) return invalid;
     if (row.usedAt) {
         // Exchanged once already: whoever is presenting it now, one of the two
@@ -246,11 +279,22 @@ export async function refresh(input: {
 }): Promise<TokenOutcome> {
     if (!input.refreshToken) return refused("invalid_request", "refresh_token is required");
     const invalid = refused("invalid_grant", "The refresh token is not valid or has expired");
-    if (input.refreshToken.length > 200 || !input.refreshToken.startsWith(REFRESH_TOKEN_PREFIX)) return invalid;
+    if (input.refreshToken.length > 200 || !input.refreshToken.startsWith(REFRESH_TOKEN_PREFIX))
+        return invalid;
 
     const row = await prisma.oAuthToken.findUnique({
         where: { tokenHash: hashToken(input.refreshToken) },
-        include: { grant: { select: { id: true, clientId: true, revokedAt: true, scopes: true, user: { select: { bannedAt: true } } } } }
+        include: {
+            grant: {
+                select: {
+                    id: true,
+                    clientId: true,
+                    revokedAt: true,
+                    scopes: true,
+                    user: { select: { bannedAt: true } }
+                }
+            }
+        }
     });
     if (!row || row.kind !== "refresh" || row.grant.clientId !== input.client.id) return invalid;
     if (row.usedAt) {
@@ -322,7 +366,10 @@ export interface VerifiedAccess {
  * key to anything else in Polaris, and one minted for another address of this
  * instance does not open this one.
  */
-export async function verifyAccessToken(token: string, resource: string): Promise<VerifiedAccess | null> {
+export async function verifyAccessToken(
+    token: string,
+    resource: string
+): Promise<VerifiedAccess | null> {
     if (!token.startsWith(ACCESS_TOKEN_PREFIX) || token.length > 200) return null;
     const row = await prisma.oAuthToken.findUnique({
         where: { tokenHash: hashToken(token) },
@@ -352,12 +399,19 @@ export async function verifyAccessToken(token: string, resource: string): Promis
     // person may have connected the app again with fewer boxes ticked) and then
     // to what the person holds right now.
     const approved = new Set(parseStringList(row.grant.scopes));
-    const requested = (parseStringList(row.scopes) as Permission[]).filter((scope) => approved.has(scope));
+    const requested = (parseStringList(row.scopes) as Permission[]).filter((scope) =>
+        approved.has(scope)
+    );
     const granted = await getUserPermissions(row.grant.userId);
     const scopes = row.grant.user.isAdmin
         ? requested
         : requested.filter((scope) => hasPermission(granted, scope));
-    return { grantId: row.grant.id, userId: row.grant.userId, isAdmin: row.grant.user.isAdmin, scopes };
+    return {
+        grantId: row.grant.id,
+        userId: row.grant.userId,
+        isAdmin: row.grant.user.isAdmin,
+        scopes
+    };
 }
 
 /** Stamp a grant as used, at most once a minute. Never throws. */
@@ -366,7 +420,10 @@ export async function touchGrant(grantId: string, ip: string | undefined): Promi
         await prisma.oAuthGrant.updateMany({
             where: {
                 id: grantId,
-                OR: [{ lastUsedAt: null }, { lastUsedAt: { lt: new Date(Date.now() - TOUCH_INTERVAL_MS) } }]
+                OR: [
+                    { lastUsedAt: null },
+                    { lastUsedAt: { lt: new Date(Date.now() - TOUCH_INTERVAL_MS) } }
+                ]
             },
             data: { lastUsedAt: new Date(), lastUsedIp: ip ?? null }
         });

@@ -23,11 +23,13 @@ function matches(row: Row, where: Row | undefined, relations: (row: Row) => Row)
     if (!where) return true;
     for (const [key, condition] of Object.entries(where)) {
         if (key === "OR") {
-            if (!(condition as Row[]).some((branch) => matches(row, branch, relations))) return false;
+            if (!(condition as Row[]).some((branch) => matches(row, branch, relations)))
+                return false;
             continue;
         }
         if (key === "AND") {
-            if (!(condition as Row[]).every((branch) => matches(row, branch, relations))) return false;
+            if (!(condition as Row[]).every((branch) => matches(row, branch, relations)))
+                return false;
             continue;
         }
         if (key === "userId_clientId") {
@@ -37,7 +39,8 @@ function matches(row: Row, where: Row | undefined, relations: (row: Row) => Row)
         }
         if (key === "grants") {
             const related = relations(row).grants as Row[];
-            if ((condition as Row).none === undefined) throw new Error("fake-db: unsupported grants filter");
+            if ((condition as Row).none === undefined)
+                throw new Error("fake-db: unsupported grants filter");
             if (related.length > 0) return false;
             continue;
         }
@@ -46,7 +49,11 @@ function matches(row: Row, where: Row | undefined, relations: (row: Row) => Row)
             const ops = condition as Row;
             for (const [op, operand] of Object.entries(ops)) {
                 if (op === "lt") {
-                    if (!(value instanceof Date) || !(value.getTime() < (operand as Date).getTime())) return false;
+                    if (
+                        !(value instanceof Date) ||
+                        !(value.getTime() < (operand as Date).getTime())
+                    )
+                        return false;
                 } else if (op === "in") {
                     if (!(operand as unknown[]).includes(value)) return false;
                 } else {
@@ -93,9 +100,25 @@ export function createFakeDb(users: FakeUser[]) {
     function defaults(model: string, data: Row): Row {
         const now = new Date();
         const base: Row = { id: randomUUID(), createdAt: now };
-        if (model === "oAuthClient") Object.assign(base, { clientUri: null, secretHash: null, fetchedAt: null, redirectUris: "[]", tokenAuthMethod: "none", source: "registered" });
-        if (model === "oAuthGrant") Object.assign(base, { scopes: "[]", lastUsedAt: null, lastUsedIp: null, revokedAt: null, updatedAt: now });
-        if (model === "oAuthCode" || model === "oAuthToken") Object.assign(base, { usedAt: null, scopes: "[]" });
+        if (model === "oAuthClient")
+            Object.assign(base, {
+                clientUri: null,
+                secretHash: null,
+                fetchedAt: null,
+                redirectUris: "[]",
+                tokenAuthMethod: "none",
+                source: "registered"
+            });
+        if (model === "oAuthGrant")
+            Object.assign(base, {
+                scopes: "[]",
+                lastUsedAt: null,
+                lastUsedIp: null,
+                revokedAt: null,
+                updatedAt: now
+            });
+        if (model === "oAuthCode" || model === "oAuthToken")
+            Object.assign(base, { usedAt: null, scopes: "[]" });
         return { ...base, ...data };
     }
 
@@ -106,7 +129,8 @@ export function createFakeDb(users: FakeUser[]) {
             oAuthToken: ["tokenHash"]
         };
         for (const key of keys[model] ?? []) {
-            if (tables[model]!.some((row) => row[key] === data[key])) throw new Error(`fake-db: unique ${model}.${key}`);
+            if (tables[model]!.some((row) => row[key] === data[key]))
+                throw new Error(`fake-db: unique ${model}.${key}`);
         }
     }
 
@@ -115,10 +139,16 @@ export function createFakeDb(users: FakeUser[]) {
         const relations = (row: Row) => relationsOf(model, row);
         return {
             async findUnique({ where }: { where: Row }) {
-                return view(model, rows().find((row) => matches(row, where, relations)));
+                return view(
+                    model,
+                    rows().find((row) => matches(row, where, relations))
+                );
             },
             async findFirst({ where }: { where: Row }) {
-                return view(model, rows().find((row) => matches(row, where, relations)));
+                return view(
+                    model,
+                    rows().find((row) => matches(row, where, relations))
+                );
             },
             async findMany({ where, take }: { where?: Row; take?: number }) {
                 const found = rows().filter((row) => matches(row, where, relations));
@@ -133,7 +163,11 @@ export function createFakeDb(users: FakeUser[]) {
             async upsert({ where, create, update }: { where: Row; create: Row; update: Row }) {
                 const found = rows().find((row) => matches(row, where, relations));
                 if (found) {
-                    Object.assign(found, update, model === "oAuthGrant" ? { updatedAt: new Date() } : {});
+                    Object.assign(
+                        found,
+                        update,
+                        model === "oAuthGrant" ? { updatedAt: new Date() } : {}
+                    );
                     return view(model, found);
                 }
                 const row = defaults(model, create);

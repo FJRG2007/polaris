@@ -81,7 +81,12 @@ beforeEach(() => {
         { space: null, folders: [] },
         { space: { id: SPACE_ID, name: "Team", role: "member" }, folders: [] }
     ]);
-    mocks.requireNote.mockResolvedValue({ noteId: NOTE_ID, spaceId: null, folderId: null, ownerId: "user-1" });
+    mocks.requireNote.mockResolvedValue({
+        noteId: NOTE_ID,
+        spaceId: null,
+        folderId: null,
+        ownerId: "user-1"
+    });
     mocks.requirePlacement.mockResolvedValue(undefined);
 });
 
@@ -97,7 +102,8 @@ describe("the notes tools", () => {
     });
 
     it("refuse a key without notes.use before reaching the notes", async () => {
-        const result = (await call("notes_create", { title: "x" }, ["tasks.read"]))?.result as ToolResult;
+        const result = (await call("notes_create", { title: "x" }, ["tasks.read"]))
+            ?.result as ToolResult;
         expect(result.isError).toBe(true);
         expect(result.content[0]?.text).toContain("notes.use");
         expect(mocks.requirePlacement).not.toHaveBeenCalled();
@@ -114,7 +120,8 @@ describe("the notes tools", () => {
 
     it("write a note as the key's own account, after the placement check", async () => {
         mocks.createNote.mockResolvedValue(NOTE_ID);
-        const result = (await call("notes_create", { title: "Plan", body: "- a" }))?.result as ToolResult;
+        const result = (await call("notes_create", { title: "Plan", body: "- a" }))
+            ?.result as ToolResult;
         expect(mocks.requirePlacement).toHaveBeenCalledWith(
             { id: "user-1", isAdmin: false },
             { spaceId: null, folderId: null }
@@ -137,7 +144,11 @@ describe("the notes tools", () => {
     it("check for write access before changing a note", async () => {
         mocks.updateNote.mockResolvedValue(true);
         await call("notes_update", { noteId: NOTE_ID, pinned: true });
-        expect(mocks.requireNote).toHaveBeenCalledWith({ id: "user-1", isAdmin: false }, NOTE_ID, "member");
+        expect(mocks.requireNote).toHaveBeenCalledWith(
+            { id: "user-1", isAdmin: false },
+            NOTE_ID,
+            "member"
+        );
         expect(mocks.updateNote).toHaveBeenCalledWith({ noteId: NOTE_ID, pinned: true });
     });
 
@@ -150,7 +161,16 @@ describe("the notes tools", () => {
         expect(result.structuredContent.notes).toHaveLength(10);
         expect(result.structuredContent.nextOffset).toBe(10);
         expect(Object.keys(result.structuredContent.notes[0]).sort()).toEqual(
-            ["excerpt", "id", "notebook", "notebookId", "parentId", "pinned", "title", "updatedAt"].sort()
+            [
+                "excerpt",
+                "id",
+                "notebook",
+                "notebookId",
+                "parentId",
+                "pinned",
+                "title",
+                "updatedAt"
+            ].sort()
         );
 
         const filtered = (await call("notes_list", { query: "meeting" }))?.result as ToolResult;
@@ -159,7 +179,8 @@ describe("the notes tools", () => {
     });
 
     it("refuse a notebook the account cannot open", async () => {
-        const result = (await call("notes_list", { notebook: "Someone else's" }))?.result as ToolResult;
+        const result = (await call("notes_list", { notebook: "Someone else's" }))
+            ?.result as ToolResult;
         expect(result.isError).toBe(true);
         expect(mocks.listNotes).not.toHaveBeenCalled();
     });

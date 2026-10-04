@@ -42,7 +42,9 @@ export function ConnectedApps({ apps: initial }: { apps: ConnectedAppView[] }) {
         setError(null);
         const before = apps;
         setApps((current) => current.filter((entry) => entry.id !== app.id));
-        const result = await disconnectAppAction(app.id).catch(() => ({ error: t("connectedApps.failed") }));
+        const result = await disconnectAppAction(app.id).catch(() => ({
+            error: t("connectedApps.failed")
+        }));
         if (result.error) {
             setApps(before);
             setError(result.error);
@@ -68,21 +70,32 @@ export function ConnectedApps({ apps: initial }: { apps: ConnectedAppView[] }) {
                 ) : null}
                 {apps.length === 0 ? (
                     <p className="text-muted-foreground">
-                        <Link href="/account/downloads" className="underline-offset-2 hover:underline">
+                        <Link
+                            href="/account/downloads"
+                            className="underline-offset-2 hover:underline"
+                        >
                             {t("connectedApps.empty")}
                         </Link>
                     </p>
                 ) : (
                     <ul className="flex flex-col divide-y divide-border/60">
                         {apps.map((app) => (
-                            <li key={app.id} className="flex min-w-0 items-start gap-3 py-3 first:pt-0 last:pb-0">
+                            <li
+                                key={app.id}
+                                className="flex min-w-0 items-start gap-3 py-3 first:pt-0 last:pb-0"
+                            >
                                 <div className="flex min-w-0 flex-1 flex-col gap-1">
                                     <p className="truncate font-medium" title={app.name}>
                                         {app.name || t("consent.unnamed")}
                                     </p>
                                     {app.redirectHost ? (
-                                        <p className="truncate text-xs text-muted-foreground" title={app.redirectHost}>
-                                            {t("connectedApps.returnsTo", { host: app.redirectHost })}
+                                        <p
+                                            className="truncate text-xs text-muted-foreground"
+                                            title={app.redirectHost}
+                                        >
+                                            {t("connectedApps.returnsTo", {
+                                                host: app.redirectHost
+                                            })}
                                         </p>
                                     ) : null}
                                     <p className="text-xs text-muted-foreground">
@@ -93,17 +106,29 @@ export function ConnectedApps({ apps: initial }: { apps: ConnectedAppView[] }) {
                                         {app.lastUsedAt
                                             ? app.lastUsedIp
                                                 ? t.rich("connectedApps.lastUsedFrom", {
-                                                      time: <RelativeTime key="time" iso={app.lastUsedAt} />,
+                                                      time: (
+                                                          <RelativeTime
+                                                              key="time"
+                                                              iso={app.lastUsedAt}
+                                                          />
+                                                      ),
                                                       ip: app.lastUsedIp
                                                   })
                                                 : t.rich("connectedApps.lastUsed", {
-                                                      time: <RelativeTime key="time" iso={app.lastUsedAt} />
+                                                      time: (
+                                                          <RelativeTime
+                                                              key="time"
+                                                              iso={app.lastUsedAt}
+                                                          />
+                                                      )
                                                   })
                                             : t("connectedApps.neverUsed")}
                                     </p>
                                     <ul
                                         className="flex flex-wrap gap-1 pt-1"
-                                        aria-label={t("connectedApps.scopeCount", { count: app.scopes.length })}
+                                        aria-label={t("connectedApps.scopeCount", {
+                                            count: app.scopes.length
+                                        })}
                                     >
                                         {app.scopes.map((scope) => (
                                             <li key={scope}>

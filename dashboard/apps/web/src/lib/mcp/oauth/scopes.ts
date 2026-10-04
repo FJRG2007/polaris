@@ -31,7 +31,10 @@ const MAX_SCOPE_PARAM = 4096;
  * at all, asks for everything on offer, which the consent screen then lets the
  * person narrow.
  */
-export function requestedScopes(param: string | null | undefined, supported: readonly Permission[]): Permission[] {
+export function requestedScopes(
+    param: string | null | undefined,
+    supported: readonly Permission[]
+): Permission[] {
     const offered = new Set<string>(supported);
     const asked = new Set<Permission>();
     for (const token of (param ?? "").slice(0, MAX_SCOPE_PARAM).split(/\s+/)) {

@@ -29,7 +29,11 @@ vi.mock("@/lib/safe-fetch", () => ({
             return null;
         }
     },
-    configuredRequest: async (address: string, _init: unknown, options: { allowPrivate: boolean }) => {
+    configuredRequest: async (
+        address: string,
+        _init: unknown,
+        options: { allowPrivate: boolean }
+    ) => {
         expect(options.allowPrivate).toBe(false);
         state.fetches.push(address);
         return new Response(JSON.stringify(state.document), { status: state.status });

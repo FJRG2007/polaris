@@ -23,7 +23,9 @@ export function validChallenge(challenge: string): boolean {
  *  length of. */
 export function verifierMatches(verifier: string, challenge: string): boolean {
     if (!VERIFIER.test(verifier) || !validChallenge(challenge)) return false;
-    const computed = Buffer.from(createHash("sha256").update(verifier, "ascii").digest("base64url"));
+    const computed = Buffer.from(
+        createHash("sha256").update(verifier, "ascii").digest("base64url")
+    );
     const expected = Buffer.from(challenge);
     return computed.length === expected.length && timingSafeEqual(computed, expected);
 }

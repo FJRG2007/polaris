@@ -47,7 +47,9 @@ vi.mock("@/lib/storage-service", () => ({
 vi.mock("@/lib/workspace-scope", () => ({ scopeOrgIdFor: async () => null }));
 vi.mock("@/lib/share-service", () => ({ createShare: mocks.createShare }));
 vi.mock("@/lib/audit-service", () => ({ recordAudit: mocks.recordAudit }));
-vi.mock("@/lib/domain-service", () => ({ sharingBaseUrl: async () => "https://share.example.test" }));
+vi.mock("@/lib/domain-service", () => ({
+    sharingBaseUrl: async () => "https://share.example.test"
+}));
 vi.mock("@/lib/public-reach", () => ({ ensureShareReachability: async () => undefined }));
 
 const { DRIVE_TOOLS } = await import("@/lib/mcp/tools/drive");
@@ -99,21 +101,27 @@ describe("the drive tools", () => {
     });
 
     it("offer no way to read a file's bytes or change one", () => {
-        expect(DRIVE_TOOLS.some((tool) => /read_file|download|content|delete|upload|rename|move/.test(tool.name))).toBe(
-            false
-        );
+        expect(
+            DRIVE_TOOLS.some((tool) =>
+                /read_file|download|content|delete|upload|rename|move/.test(tool.name)
+            )
+        ).toBe(false);
     });
 
     it("refuse a key without drive.read before opening anything", async () => {
-        const result = (await call("drive_list", { source: "c1" }, ["notes.use"]))?.result as ToolResult;
+        const result = (await call("drive_list", { source: "c1" }, ["notes.use"]))
+            ?.result as ToolResult;
         expect(result.isError).toBe(true);
         expect(result.content[0]?.text).toContain("drive.read");
         expect(mocks.authorizeDrive).not.toHaveBeenCalled();
     });
 
     it("refuse a link to a key that may share but not read", async () => {
-        const result = (await call("drive_share_create", { source: "c1", path: "docs/a.pdf" }, ["shares.create"]))
-            ?.result as ToolResult;
+        const result = (
+            await call("drive_share_create", { source: "c1", path: "docs/a.pdf" }, [
+                "shares.create"
+            ])
+        )?.result as ToolResult;
         expect(result.isError).toBe(true);
         expect(mocks.authorizeDrive).not.toHaveBeenCalled();
         expect(mocks.createShare).not.toHaveBeenCalled();
@@ -136,7 +144,8 @@ describe("the drive tools", () => {
 
     it("say the same thing for a folder that is not there and one that is not theirs", async () => {
         mocks.authorizeDrive.mockRejectedValue(new mocks.DriveAccessError());
-        const denied = (await call("drive_list", { source: "c1", path: "hr" }))?.result as ToolResult;
+        const denied = (await call("drive_list", { source: "c1", path: "hr" }))
+            ?.result as ToolResult;
         expect(denied.content[0]?.text).toBe("No such location that this account can open.");
         expect(mocks.getDriverForConnection).not.toHaveBeenCalled();
     });
@@ -149,12 +158,15 @@ describe("the drive tools", () => {
                 entry("secret", "dir"),
                 entry("a.txt"),
                 entry("photos", "dir"),
-                ...Array.from({ length: 30 }, (_, index) => entry(`z${String(index).padStart(2, "0")}.txt`))
+                ...Array.from({ length: 30 }, (_, index) =>
+                    entry(`z${String(index).padStart(2, "0")}.txt`)
+                )
             ]
         });
         mocks.drivePathFilter.mockResolvedValue(async (path: string) => path !== "docs/secret");
 
-        const result = (await call("drive_list", { source: "c1", path: "docs", limit: 3 }))?.result as ToolResult;
+        const result = (await call("drive_list", { source: "c1", path: "docs", limit: 3 }))
+            ?.result as ToolResult;
         expect(mocks.authorizeDrive).toHaveBeenCalledWith("user-1", "c1", "docs", "read");
         expect(result.structuredContent.entries.map((row: { name: string }) => row.name)).toEqual([
             "photos",
@@ -174,11 +186,18 @@ describe("the drive tools", () => {
 
     it("name the storages and nothing about how they are reached", async () => {
         mocks.listAccessibleConnections.mockResolvedValue([
-            { id: "host:9", name: "Box", kind: "sftp", config: '{"host":"10.0.0.9","password":"hunter2"}' }
+            {
+                id: "host:9",
+                name: "Box",
+                kind: "sftp",
+                config: '{"host":"10.0.0.9","password":"hunter2"}'
+            }
         ]);
         const result = (await call("drive_sources", {}))?.result as ToolResult;
         expect(mocks.listAccessibleConnections).toHaveBeenCalledWith("user-1", null);
-        expect(result.structuredContent).toEqual({ sources: [{ id: "host:9", name: "Box", kind: "sftp" }] });
+        expect(result.structuredContent).toEqual({
+            sources: [{ id: "host:9", name: "Box", kind: "sftp" }]
+        });
         expect(result.content[0]?.text).not.toContain("10.0.0.9");
     });
 
@@ -186,18 +205,28 @@ describe("the drive tools", () => {
         mocks.driver.stat.mockResolvedValue(entry("a.pdf"));
         mocks.createShare.mockResolvedValue({ id: "share-1", token: "tok" });
         const result = (
-            await call("drive_share_create", { source: "c1", path: "docs/a.pdf", expiresInDays: 7 }, [
-                "drive.read",
-                "shares.create"
-            ])
+            await call(
+                "drive_share_create",
+                { source: "c1", path: "docs/a.pdf", expiresInDays: 7 },
+                ["drive.read", "shares.create"]
+            )
         )?.result as ToolResult;
         expect(mocks.authorizeDrive).toHaveBeenCalledWith("user-1", "c1", "docs/a.pdf", "download");
         expect(mocks.createShare).toHaveBeenCalledWith(
             "user-1",
-            expect.objectContaining({ connectionId: "c1", path: "docs/a.pdf", kind: "public", allowUpload: false })
+            expect.objectContaining({
+                connectionId: "c1",
+                path: "docs/a.pdf",
+                kind: "public",
+                allowUpload: false
+            })
         );
         expect(mocks.recordAudit).toHaveBeenCalledWith(
-            expect.objectContaining({ actorId: "user-1", action: "share.create", targetId: "share-1" })
+            expect.objectContaining({
+                actorId: "user-1",
+                action: "share.create",
+                targetId: "share-1"
+            })
         );
         expect(result.structuredContent.url).toBe("https://share.example.test/s/tok");
         expect(result.structuredContent.expiresAt).not.toBeNull();
@@ -206,7 +235,10 @@ describe("the drive tools", () => {
     it("refuse a locked folder rather than asking for its password", async () => {
         mocks.authorizeDrive.mockRejectedValue(new mocks.DriveLockedError());
         const result = (
-            await call("drive_share_create", { source: "c1", path: "vault/x" }, ["drive.read", "shares.create"])
+            await call("drive_share_create", { source: "c1", path: "vault/x" }, [
+                "drive.read",
+                "shares.create"
+            ])
         )?.result as ToolResult;
         expect(result.isError).toBe(true);
         expect(result.content[0]?.text).toContain("locked");

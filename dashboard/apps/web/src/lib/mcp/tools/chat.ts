@@ -106,7 +106,10 @@ const listConversationsTool: McpTool<z.infer<typeof listInput>> = {
             }));
         const page = pageOf(matched, input.offset, input.limit);
         if (page.items.length === 0) {
-            return { text: "No conversations matched.", structured: { conversations: [], nextOffset: null } };
+            return {
+                text: "No conversations matched.",
+                structured: { conversations: [], nextOffset: null }
+            };
         }
         return {
             text:
@@ -127,8 +130,16 @@ const readInput = z.object({
         .string()
         .uuid()
         .optional()
-        .describe("Read the messages before this one. Send the olderThan of the previous call to go further back."),
-    limit: z.number().int().min(1).max(50).default(25).describe("How many messages to return, newest last.")
+        .describe(
+            "Read the messages before this one. Send the olderThan of the previous call to go further back."
+        ),
+    limit: z
+        .number()
+        .int()
+        .min(1)
+        .max(50)
+        .default(25)
+        .describe("How many messages to return, newest last.")
 });
 
 const readMessagesTool: McpTool<z.infer<typeof readInput>> = {
@@ -169,7 +180,10 @@ const readMessagesTool: McpTool<z.infer<typeof readInput>> = {
             };
         });
         if (rows.length === 0) {
-            return { text: "Nothing has been said here yet.", structured: { messages: [], olderThan: null } };
+            return {
+                text: "Nothing has been said here yet.",
+                structured: { messages: [], olderThan: null }
+            };
         }
         const lines = rows.map((row) => {
             const said = row.deleted

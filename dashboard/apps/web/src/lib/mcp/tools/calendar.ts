@@ -55,7 +55,10 @@ const upcomingTool: McpTool<z.infer<typeof upcomingInput>> = {
         }
         return {
             text: rows
-                .map((row) => `${row.allDay ? row.start.slice(0, 10) : row.start}  ${row.title}${row.allDay ? " (all day)" : ""}`)
+                .map(
+                    (row) =>
+                        `${row.allDay ? row.start.slice(0, 10) : row.start}  ${row.title}${row.allDay ? " (all day)" : ""}`
+                )
                 .join("\n"),
             structured: { events: rows }
         };

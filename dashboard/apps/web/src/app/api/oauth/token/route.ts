@@ -12,7 +12,14 @@ import { clientIp } from "@/lib/request-context";
 import { rateLimit } from "@/lib/rate-limit-service";
 import { authenticateClient } from "@/lib/mcp/oauth/clients";
 import { exchangeCode, refresh } from "@/lib/mcp/oauth/grants";
-import { clientCredentials, oauthError, oauthJson, preflight, readParameters, slowDown } from "@/lib/mcp/oauth/http";
+import {
+    clientCredentials,
+    oauthError,
+    oauthJson,
+    preflight,
+    readParameters,
+    slowDown
+} from "@/lib/mcp/oauth/http";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -26,7 +33,8 @@ export async function POST(request: Request): Promise<Response> {
     if (!throttle.ok) return slowDown(throttle.retryAfterMs);
 
     const params = await readParameters(request, BODY_MAX);
-    if (!params) return oauthError("invalid_request", "Send the parameters form-encoded, under 16 KB");
+    if (!params)
+        return oauthError("invalid_request", "Send the parameters form-encoded, under 16 KB");
 
     const credentials = clientCredentials(request, params);
     const client = await authenticateClient(credentials);
@@ -52,7 +60,9 @@ export async function POST(request: Request): Promise<Response> {
             verifier: params.get("code_verifier") ?? null,
             resource
         });
-        return outcome.ok ? oauthJson(outcome.body) : oauthError(outcome.error, outcome.description);
+        return outcome.ok
+            ? oauthJson(outcome.body)
+            : oauthError(outcome.error, outcome.description);
     }
     if (grantType === "refresh_token") {
         const outcome = await refresh({
@@ -61,9 +71,14 @@ export async function POST(request: Request): Promise<Response> {
             scope: params.get("scope") ?? null,
             resource
         });
-        return outcome.ok ? oauthJson(outcome.body) : oauthError(outcome.error, outcome.description);
+        return outcome.ok
+            ? oauthJson(outcome.body)
+            : oauthError(outcome.error, outcome.description);
     }
-    return oauthError("unsupported_grant_type", "grant_type must be authorization_code or refresh_token");
+    return oauthError(
+        "unsupported_grant_type",
+        "grant_type must be authorization_code or refresh_token"
+    );
 }
 
 export function OPTIONS(): Response {

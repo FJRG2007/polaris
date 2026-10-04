@@ -35,7 +35,9 @@ export default async function ApiKeysPage() {
         // nobody can compare.
         <div className="mx-auto flex max-w-6xl flex-col gap-4">
             <div>
-                <h1 className="text-[1.0625rem] font-semibold tracking-tight">{t("apiKeys.page.title")}</h1>
+                <h1 className="text-[1.0625rem] font-semibold tracking-tight">
+                    {t("apiKeys.page.title")}
+                </h1>
                 <p className="text-sm text-muted-foreground">{t("apiKeys.page.intro")}</p>
             </div>
             <ApiKeysView keys={keys} />

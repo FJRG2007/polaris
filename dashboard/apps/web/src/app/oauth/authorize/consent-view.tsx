@@ -55,7 +55,9 @@ export function ConsentView({
 
     function toggle(scope: Permission, checked: boolean) {
         setError(null);
-        setSelected((current) => (checked ? [...current, scope] : current.filter((entry) => entry !== scope)));
+        setSelected((current) =>
+            checked ? [...current, scope] : current.filter((entry) => entry !== scope)
+        );
     }
 
     async function answer(allow: boolean) {
@@ -66,7 +68,11 @@ export function ConsentView({
         setPending(allow ? "allow" : "deny");
         setError(null);
         try {
-            const result = await answerAuthorizationAction({ query, allow, scopes: [...effective] });
+            const result = await answerAuthorizationAction({
+                query,
+                allow,
+                scopes: [...effective]
+            });
             if (result.redirectTo) {
                 // A full navigation, not the router: the address is the app's,
                 // often on another origin or on this computer.
@@ -96,15 +102,22 @@ export function ConsentView({
                     <dl className="flex flex-col gap-2 rounded-md bg-muted/50 p-3">
                         <div className="flex min-w-0 items-center gap-2">
                             <Undo2 className="size-4 shrink-0 text-muted-foreground" aria-hidden />
-                            <dt className="shrink-0 text-muted-foreground">{t("consent.returnsTo")}</dt>
+                            <dt className="shrink-0 text-muted-foreground">
+                                {t("consent.returnsTo")}
+                            </dt>
                             <dd className="min-w-0 truncate font-medium" title={app.returnsTo}>
                                 {app.returnsTo}
                             </dd>
                         </div>
                         {app.website ? (
                             <div className="flex min-w-0 items-center gap-2">
-                                <Globe className="size-4 shrink-0 text-muted-foreground" aria-hidden />
-                                <dt className="shrink-0 text-muted-foreground">{t("consent.website")}</dt>
+                                <Globe
+                                    className="size-4 shrink-0 text-muted-foreground"
+                                    aria-hidden
+                                />
+                                <dt className="shrink-0 text-muted-foreground">
+                                    {t("consent.website")}
+                                </dt>
                                 <dd className="min-w-0 truncate" title={app.website}>
                                     {app.website}
                                 </dd>
@@ -123,10 +136,13 @@ export function ConsentView({
                     {offered.length > 0 ? (
                         <fieldset className="flex flex-col gap-2">
                             <legend className="mb-1 font-medium">{t("consent.scopesTitle")}</legend>
-                            <p className="text-xs text-muted-foreground">{t("consent.scopesHint")}</p>
+                            <p className="text-xs text-muted-foreground">
+                                {t("consent.scopesHint")}
+                            </p>
                             <ul className="flex flex-col gap-1.5">
                                 {offered.map((scope) => {
-                                    const implied = effective.has(scope) && !selected.includes(scope);
+                                    const implied =
+                                        effective.has(scope) && !selected.includes(scope);
                                     const source = implied
                                         ? selected.find((entry) => impliedBy(entry).includes(scope))
                                         : undefined;
@@ -136,14 +152,18 @@ export function ConsentView({
                                                 <Checkbox
                                                     checked={effective.has(scope)}
                                                     disabled={implied || pending !== null}
-                                                    onChange={(event) => toggle(scope, event.target.checked)}
+                                                    onChange={(event) =>
+                                                        toggle(scope, event.target.checked)
+                                                    }
                                                     className="mt-0.5"
                                                 />
                                                 <span className="flex min-w-0 flex-col">
                                                     <span>{t(scopeLabelKey(scope))}</span>
                                                     <span className="truncate font-mono text-xs text-muted-foreground">
                                                         {source
-                                                            ? t("consent.impliedBy", { scope: t(scopeLabelKey(source)) })
+                                                            ? t("consent.impliedBy", {
+                                                                  scope: t(scopeLabelKey(source))
+                                                              })
                                                             : scope}
                                                     </span>
                                                 </span>

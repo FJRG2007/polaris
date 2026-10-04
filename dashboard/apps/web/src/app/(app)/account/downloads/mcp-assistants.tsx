@@ -29,7 +29,9 @@ import { ClaudeMark, CursorMark, OpenAiMark } from "@/components/model-marks";
 function Copyable({ value, label }: { value: string; label: string }) {
     return (
         <div className="flex items-start gap-2 rounded-md border border-border bg-background px-3 py-2">
-            <code className="min-w-0 flex-1 overflow-x-auto whitespace-pre text-xs text-foreground">{value}</code>
+            <code className="min-w-0 flex-1 overflow-x-auto whitespace-pre text-xs text-foreground">
+                {value}
+            </code>
             <CopyButton value={value} label={label} />
         </div>
     );
@@ -52,7 +54,9 @@ function Client({
         <details className="group border-t border-border/60 first:border-t-0">
             <summary className="flex cursor-pointer list-none items-center gap-3 py-3 [&::-webkit-details-marker]:hidden">
                 <span className="grid size-6 shrink-0 place-items-center">{mark}</span>
-                <span className="min-w-0 flex-1 truncate font-medium" title={name}>{name}</span>
+                <span className="min-w-0 flex-1 truncate font-medium" title={name}>
+                    {name}
+                </span>
                 <ChevronRight
                     className="size-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-90"
                     aria-hidden
@@ -105,10 +109,17 @@ export async function McpAssistants() {
                         guideLabel={guide}
                     >
                         <p>{t("assistants.claudeCode.step1")}</p>
-                        <Copyable value={setup.claudeCodeCommand(url)} label={t("assistants.commandLabel")} />
+                        <Copyable
+                            value={setup.claudeCodeCommand(url)}
+                            label={t("assistants.commandLabel")}
+                        />
                         <p>
                             {t.rich("assistants.claudeCode.step2", {
-                                command: <code key="command" className="text-xs">/mcp</code>
+                                command: (
+                                    <code key="command" className="text-xs">
+                                        /mcp
+                                    </code>
+                                )
                             })}
                         </p>
                     </Client>
@@ -125,12 +136,18 @@ export async function McpAssistants() {
                             <li>{t("assistants.claude.step3")}</li>
                         </ol>
                         <Button asChild variant="outline" size="sm" className="w-fit">
-                            <a href={setup.CLAUDE_CONNECTORS_URL} target="_blank" rel="noreferrer noopener">
+                            <a
+                                href={setup.CLAUDE_CONNECTORS_URL}
+                                target="_blank"
+                                rel="noreferrer noopener"
+                            >
                                 {t("assistants.claude.open")}
                                 <ExternalLink className="size-3.5" aria-hidden />
                             </a>
                         </Button>
-                        <p className="text-xs text-muted-foreground">{t("assistants.claude.teams")}</p>
+                        <p className="text-xs text-muted-foreground">
+                            {t("assistants.claude.teams")}
+                        </p>
                     </Client>
 
                     <Client
@@ -144,7 +161,9 @@ export async function McpAssistants() {
                             <li>{t("assistants.chatgpt.step2")}</li>
                             <li>{t("assistants.chatgpt.step3")}</li>
                         </ol>
-                        <p className="text-xs text-muted-foreground">{t("assistants.chatgpt.plans")}</p>
+                        <p className="text-xs text-muted-foreground">
+                            {t("assistants.chatgpt.plans")}
+                        </p>
                     </Client>
 
                     <Client
@@ -154,11 +173,18 @@ export async function McpAssistants() {
                         guideLabel={guide}
                     >
                         <Button asChild variant="outline" size="sm" className="w-fit">
-                            <a href={setup.cursorInstallLink(url)}>{t("assistants.cursor.install")}</a>
+                            <a href={setup.cursorInstallLink(url)}>
+                                {t("assistants.cursor.install")}
+                            </a>
                         </Button>
                         <p>{t("assistants.cursor.manual")}</p>
-                        <Copyable value={setup.cursorConfig(url)} label={t("assistants.configLabel")} />
-                        <p className="text-xs text-muted-foreground">{t("assistants.cursor.signIn")}</p>
+                        <Copyable
+                            value={setup.cursorConfig(url)}
+                            label={t("assistants.configLabel")}
+                        />
+                        <p className="text-xs text-muted-foreground">
+                            {t("assistants.cursor.signIn")}
+                        </p>
                     </Client>
 
                     <Client
@@ -171,11 +197,18 @@ export async function McpAssistants() {
                         guideLabel={guide}
                     >
                         <Button asChild variant="outline" size="sm" className="w-fit">
-                            <a href={setup.vscodeInstallLink(url)}>{t("assistants.vscode.install")}</a>
+                            <a href={setup.vscodeInstallLink(url)}>
+                                {t("assistants.vscode.install")}
+                            </a>
                         </Button>
                         <p>{t("assistants.vscode.manual")}</p>
-                        <Copyable value={setup.vscodeConfig(url)} label={t("assistants.configLabel")} />
-                        <p className="text-xs text-muted-foreground">{t("assistants.vscode.signIn")}</p>
+                        <Copyable
+                            value={setup.vscodeConfig(url)}
+                            label={t("assistants.configLabel")}
+                        />
+                        <p className="text-xs text-muted-foreground">
+                            {t("assistants.vscode.signIn")}
+                        </p>
                     </Client>
 
                     <Client
@@ -184,7 +217,10 @@ export async function McpAssistants() {
                         guideLabel={guide}
                     >
                         <p>{t("assistants.other.body")}</p>
-                        <Copyable value={setup.codexCommands(url)} label={t("assistants.commandLabel")} />
+                        <Copyable
+                            value={setup.codexCommands(url)}
+                            label={t("assistants.commandLabel")}
+                        />
                         <p className="text-xs text-muted-foreground">
                             {t.rich("assistants.other.key", {
                                 header: (
@@ -194,7 +230,11 @@ export async function McpAssistants() {
                                     </code>
                                 ),
                                 link: (chunks) => (
-                                    <Link key="link" href="/account/api-keys/new" className="underline">
+                                    <Link
+                                        key="link"
+                                        href="/account/api-keys/new"
+                                        className="underline"
+                                    >
                                         {chunks}
                                     </Link>
                                 )

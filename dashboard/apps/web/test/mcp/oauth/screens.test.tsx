@@ -14,12 +14,18 @@ const locale = vi.hoisted(() => ({ current: "en-US" as "en-US" | "es-ES" }));
 
 vi.mock("@polaris/db", () => ({ prisma: {} }));
 vi.mock("@/app/oauth/authorize/actions", () => ({ answerAuthorizationAction: vi.fn() }));
-vi.mock("@/app/(app)/account/api-keys/connected-app-actions", () => ({ disconnectAppAction: vi.fn() }));
+vi.mock("@/app/(app)/account/api-keys/connected-app-actions", () => ({
+    disconnectAppAction: vi.fn()
+}));
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: vi.fn() }) }));
-vi.mock("@/lib/mcp/oauth/origin", () => ({ currentOrigin: async () => "https://polaris.example.test" }));
+vi.mock("@/lib/mcp/oauth/origin", () => ({
+    currentOrigin: async () => "https://polaris.example.test"
+}));
 vi.mock("@/lib/i18n/request", async () => {
     const { translatorFor } = await import("@/lib/i18n/translate");
-    return { getTranslations: async (namespace: "mcp") => translatorFor(locale.current, namespace) };
+    return {
+        getTranslations: async (namespace: "mcp") => translatorFor(locale.current, namespace)
+    };
 });
 
 const { ConsentView } = await import("@/app/oauth/authorize/consent-view");
@@ -49,7 +55,12 @@ describe("the consent card", () => {
 
     it("warns about an app on this computer, and falls back for an unnamed one", () => {
         const html = renderToStaticMarkup(
-            withMessages(<ConsentView {...props} app={{ ...props.app, name: "", loopback: true, returnsTo: "127.0.0.1" }} />)
+            withMessages(
+                <ConsentView
+                    {...props}
+                    app={{ ...props.app, name: "", loopback: true, returnsTo: "127.0.0.1" }}
+                />
+            )
         );
         expect(html).toContain("This app runs on this computer");
         expect(html).toContain("Connect An unnamed app to Polaris");
@@ -103,10 +114,18 @@ describe("the downloads section", () => {
         const url = "https://polaris.example.test/api/mcp";
         expect(html).toContain(url);
         expect(html).toContain(`claude mcp add --transport http polaris ${url}`);
-        expect(html).toContain('href="cursor://anysphere.cursor-deeplink/mcp/install?name=polaris&amp;config=');
+        expect(html).toContain(
+            'href="cursor://anysphere.cursor-deeplink/mcp/install?name=polaris&amp;config='
+        );
         expect(html).toContain('href="vscode:mcp/install?');
         expect(html).toContain('href="https://claude.ai/customize/connectors"');
-        for (const name of ["Claude Code", "Claude (web and desktop)", "ChatGPT", "Cursor", "Visual Studio Code"]) {
+        for (const name of [
+            "Claude Code",
+            "Claude (web and desktop)",
+            "ChatGPT",
+            "Cursor",
+            "Visual Studio Code"
+        ]) {
             expect(html).toContain(name);
         }
         expect(html).toContain('src="/logos/vscode.svg"');

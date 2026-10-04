@@ -120,7 +120,9 @@ async function openFor(
         return await storage.getDriverForConnection(connectionId);
     } catch (caught) {
         if (caught instanceof storage.SmbShareRequiredError) {
-            throw new McpRefusal("That storage is not finished being set up. Open it in Drive to finish it.");
+            throw new McpRefusal(
+                "That storage is not finished being set up. Open it in Drive to finish it."
+            );
         }
         // Anything else names a host or a share; the protocol logs it and says
         // only that it could not be done.
@@ -179,7 +181,9 @@ const listInput = z.object({
         .trim()
         .max(200)
         .default("")
-        .describe("Only entries whose name contains this. Searches this folder, not the ones inside it."),
+        .describe(
+            "Only entries whose name contains this. Searches this folder, not the ones inside it."
+        ),
     ...pageFields
 });
 
@@ -212,7 +216,8 @@ const listTool: McpTool<z.infer<typeof listInput>> = {
             }
             visible.sort(
                 (a, b) =>
-                    Number(b.kind === "dir") - Number(a.kind === "dir") || a.name.localeCompare(b.name)
+                    Number(b.kind === "dir") - Number(a.kind === "dir") ||
+                    a.name.localeCompare(b.name)
             );
             const page = pageOf(visible, input.offset, input.limit);
             const entries = page.items.map((entry) => ({
@@ -307,7 +312,9 @@ const shareInput = z.object({
         .min(1)
         .max(365)
         .optional()
-        .describe("Stop the link working after this many days. Absent keeps it working until revoked."),
+        .describe(
+            "Stop the link working after this many days. Absent keeps it working until revoked."
+        ),
     maxDownloads: z
         .number()
         .int()
@@ -398,4 +405,9 @@ const shareTool: McpTool<z.infer<typeof shareInput>> = {
     }
 };
 
-export const DRIVE_TOOLS = [sourcesTool, listTool, statTool, shareTool] as unknown as McpTool<never>[];
+export const DRIVE_TOOLS = [
+    sourcesTool,
+    listTool,
+    statTool,
+    shareTool
+] as unknown as McpTool<never>[];

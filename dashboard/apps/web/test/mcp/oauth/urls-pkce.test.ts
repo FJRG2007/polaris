@@ -51,7 +51,11 @@ describe("redirect addresses an app may register", () => {
 });
 
 describe("matching a presented redirect address", () => {
-    const registered = ["https://claude.ai/api/mcp/auth_callback", "http://localhost/callback", "http://127.0.0.1:33418/"];
+    const registered = [
+        "https://claude.ai/api/mcp/auth_callback",
+        "http://localhost/callback",
+        "http://127.0.0.1:33418/"
+    ];
 
     it("matches an https address exactly and nothing near it", () => {
         expect(redirectMatches(registered, "https://claude.ai/api/mcp/auth_callback")).toBe(true);
@@ -78,7 +82,9 @@ describe("matching a presented redirect address", () => {
     });
 
     it("keeps the app's own query when the answer is appended", () => {
-        const url = new URL(withParams("https://app.example/cb?keep=1", { code: "abc", state: "s t" }));
+        const url = new URL(
+            withParams("https://app.example/cb?keep=1", { code: "abc", state: "s t" })
+        );
         expect(url.searchParams.get("keep")).toBe("1");
         expect(url.searchParams.get("code")).toBe("abc");
         expect(url.searchParams.get("state")).toBe("s t");
@@ -127,7 +133,11 @@ describe("the metadata documents", () => {
         expect(server.authorization_response_iss_parameter_supported).toBe(true);
         expect(server.grant_types_supported).toEqual(["authorization_code", "refresh_token"]);
         expect(server.response_types_supported).toEqual(["code"]);
-        for (const endpoint of [server.authorization_endpoint, server.token_endpoint, server.registration_endpoint]) {
+        for (const endpoint of [
+            server.authorization_endpoint,
+            server.token_endpoint,
+            server.registration_endpoint
+        ]) {
             expect(endpoint.startsWith(`${ORIGIN}/`)).toBe(true);
         }
     });

@@ -101,25 +101,37 @@ describe("the chat tools", () => {
     });
 
     it("refuse a key without chat.use before reaching the conversation", async () => {
-        const result = (await call("chat_send", { conversationId: CHANNEL, body: "hi" }, ["notes.use"]))
-            ?.result as ToolResult;
+        const result = (
+            await call("chat_send", { conversationId: CHANNEL, body: "hi" }, ["notes.use"])
+        )?.result as ToolResult;
         expect(result.isError).toBe(true);
         expect(result.content[0]?.text).toContain("chat.use");
         expect(mocks.send).not.toHaveBeenCalled();
     });
 
     it("reject arguments of the wrong shape", async () => {
-        expect((await call("chat_send", { conversationId: CHANNEL, body: "   " }))?.error?.code).toBe(-32602);
-        expect((await call("chat_send", { conversationId: "general", body: "hi" }))?.error?.code).toBe(-32602);
-        expect((await call("chat_messages", { conversationId: CHANNEL, limit: 51 }))?.error?.code).toBe(-32602);
+        expect(
+            (await call("chat_send", { conversationId: CHANNEL, body: "   " }))?.error?.code
+        ).toBe(-32602);
+        expect(
+            (await call("chat_send", { conversationId: "general", body: "hi" }))?.error?.code
+        ).toBe(-32602);
+        expect(
+            (await call("chat_messages", { conversationId: CHANNEL, limit: 51 }))?.error?.code
+        ).toBe(-32602);
         expect(mocks.send).not.toHaveBeenCalled();
         expect(mocks.readChannel).not.toHaveBeenCalled();
     });
 
     it("send through the composer's own path, as the key's account", async () => {
         mocks.send.mockResolvedValue("m-new");
-        const result = (await call("chat_send", { conversationId: CHANNEL, body: "on my way", replyToId: REPLY_TO }))
-            ?.result as ToolResult;
+        const result = (
+            await call("chat_send", {
+                conversationId: CHANNEL,
+                body: "on my way",
+                replyToId: REPLY_TO
+            })
+        )?.result as ToolResult;
         expect(mocks.send).toHaveBeenCalledWith(
             { id: "user-1" },
             expect.objectContaining({ channelId: CHANNEL, body: "on my way", replyToId: REPLY_TO }),
@@ -130,8 +142,11 @@ describe("the chat tools", () => {
     });
 
     it("pass the chat's refusal to the model as written", async () => {
-        mocks.send.mockRejectedValue(new mocks.ChatAccessError("You are not in that conversation."));
-        const result = (await call("chat_send", { conversationId: CHANNEL, body: "hi" }))?.result as ToolResult;
+        mocks.send.mockRejectedValue(
+            new mocks.ChatAccessError("You are not in that conversation.")
+        );
+        const result = (await call("chat_send", { conversationId: CHANNEL, body: "hi" }))
+            ?.result as ToolResult;
         expect(result.isError).toBe(true);
         expect(result.content[0]?.text).toBe("You are not in that conversation.");
     });
@@ -143,10 +158,17 @@ describe("the chat tools", () => {
             ),
             olderThan: "m-0"
         });
-        const result = (await call("chat_messages", { conversationId: CHANNEL, limit: 5 }))?.result as ToolResult;
+        const result = (await call("chat_messages", { conversationId: CHANNEL, limit: 5 }))
+            ?.result as ToolResult;
         expect(mocks.readChannel).toHaveBeenCalledWith({ id: "user-1" }, CHANNEL, undefined);
         const rows = result.structuredContent.messages;
-        expect(rows.map((row: { id: string }) => row.id)).toEqual(["m-45", "m-46", "m-47", "m-48", "m-49"]);
+        expect(rows.map((row: { id: string }) => row.id)).toEqual([
+            "m-45",
+            "m-46",
+            "m-47",
+            "m-48",
+            "m-49"
+        ]);
         expect(result.structuredContent.olderThan).toBe("m-45");
         // What somebody this account blocked wrote is not handed to the model.
         expect(rows[4].body).toBe("");
@@ -164,7 +186,8 @@ describe("the chat tools", () => {
         expect(result.structuredContent.nextOffset).toBe(10);
         expect(result.structuredContent.conversations[0]).not.toHaveProperty("mayAdminister");
 
-        const unread = (await call("chat_conversations", { unreadOnly: true, limit: 100 }))?.result as ToolResult;
+        const unread = (await call("chat_conversations", { unreadOnly: true, limit: 100 }))
+            ?.result as ToolResult;
         expect(unread.structuredContent.conversations).toHaveLength(10);
         expect(unread.structuredContent.nextOffset).toBeNull();
     });

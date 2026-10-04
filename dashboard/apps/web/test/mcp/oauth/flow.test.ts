@@ -41,7 +41,12 @@ const ADA: FakeUser = {
     isAdmin: false,
     bannedAt: null
 };
-const BOB: FakeUser = { ...ADA, id: "0190a5b8-0000-7000-8000-000000000b0b", name: "Bob", username: "bob" };
+const BOB: FakeUser = {
+    ...ADA,
+    id: "0190a5b8-0000-7000-8000-000000000b0b",
+    name: "Bob",
+    username: "bob"
+};
 
 vi.mock("@polaris/db", () => ({
     get prisma() {
@@ -61,7 +66,9 @@ vi.mock("@/lib/request-context", () => ({ clientIp: async () => "203.0.113.5" })
 vi.mock("@/lib/rate-limit-service", () => ({
     rateLimit: async (bucket: string) => {
         state.buckets.push(bucket);
-        return state.rateLimited ? { ok: false, retryAfterMs: 30_000 } : { ok: true, retryAfterMs: 0 };
+        return state.rateLimited
+            ? { ok: false, retryAfterMs: 30_000 }
+            : { ok: true, retryAfterMs: 0 };
     }
 }));
 vi.mock("@/lib/audit-service", () => ({
@@ -71,7 +78,8 @@ vi.mock("@/lib/audit-service", () => ({
 }));
 vi.mock("@/lib/network-rules", () => ({ evaluateAccountAccess: async () => ({ allowed: true }) }));
 vi.mock("@/lib/agents/session-service", () => ({
-    sessionForToken: async (token: string) => (token.startsWith("session-token-") ? { id: token.slice(14) } : null),
+    sessionForToken: async (token: string) =>
+        token.startsWith("session-token-") ? { id: token.slice(14) } : null,
     sessionOwner: async () => ADA.id
 }));
 vi.mock("@/lib/api-key-auth", () => ({
@@ -87,12 +95,16 @@ vi.mock("@/lib/mcp/oauth/origin", () => ({
 vi.mock("@/lib/session", () => ({ requireUser: async () => state.user }));
 vi.mock("@/lib/device-grace", () => ({ newDeviceRefusal: async () => null }));
 vi.mock("@/lib/i18n/request", () => ({ getTranslations: async () => (key: string) => key }));
-vi.mock("@/app/(app)/account/security/action-messages", () => ({ localized: async (result: unknown) => result }));
+vi.mock("@/app/(app)/account/security/action-messages", () => ({
+    localized: async (result: unknown) => result
+}));
 vi.mock("@/lib/notes/access", () => ({
     NoteAccessError: class extends Error {},
     requirePlacement: async () => undefined
 }));
-vi.mock("@/lib/notes/note-service", () => ({ createNote: async () => "33333333-3333-4333-8333-333333333333" }));
+vi.mock("@/lib/notes/note-service", () => ({
+    createNote: async () => "33333333-3333-4333-8333-333333333333"
+}));
 vi.mock("@/lib/notes/shelf-service", () => ({}));
 
 const { createFakeDb: makeDb } = await import("./fake-db");
@@ -100,8 +112,12 @@ const register = await import("@/app/api/oauth/register/route");
 const token = await import("@/app/api/oauth/token/route");
 const revoke = await import("@/app/api/oauth/revoke/route");
 const mcp = await import("@/app/api/mcp/route");
-const resourceMetadata = await import("@/app/.well-known/oauth-protected-resource/[[...path]]/route");
-const serverMetadata = await import("@/app/.well-known/oauth-authorization-server/[[...path]]/route");
+const resourceMetadata = await import(
+    "@/app/.well-known/oauth-protected-resource/[[...path]]/route"
+);
+const serverMetadata = await import(
+    "@/app/.well-known/oauth-authorization-server/[[...path]]/route"
+);
 const { answerAuthorizationAction } = await import("@/app/oauth/authorize/actions");
 const { listConnectedApps, revokeConnectedApp } = await import("@/lib/mcp/oauth/grants");
 
@@ -169,11 +185,18 @@ async function mcpCall(accessToken: string | null, message: Record<string, unkno
         })
     );
     const text = await response.text();
-    return { status: response.status, headers: response.headers, body: text ? (JSON.parse(text) as Record<string, any>) : null };
+    return {
+        status: response.status,
+        headers: response.headers,
+        body: text ? (JSON.parse(text) as Record<string, any>) : null
+    };
 }
 
 /** The whole happy path: register, consent, exchange. */
-async function connect(scopes: string[] = ["tasks.read", "deploy.read"], requested = "tasks.read deploy.read") {
+async function connect(
+    scopes: string[] = ["tasks.read", "deploy.read"],
+    requested = "tasks.read deploy.read"
+) {
     const client = (await registerClient()).body;
     const { verifier, challenge } = pkce();
     const query = authorizeQuery(client.client_id!, challenge, { scope: requested });
@@ -215,7 +238,10 @@ describe("discovery", () => {
             const response = await resourceMetadata.GET(new Request(`${ORIGIN}/x`), {
                 params: Promise.resolve({ path })
             });
-            const body = (await response.json()) as { resource: string; authorization_servers: string[] };
+            const body = (await response.json()) as {
+                resource: string;
+                authorization_servers: string[];
+            };
             expect(body.resource).toBe(`${ORIGIN}/api/mcp`);
             expect(body.authorization_servers).toEqual([ORIGIN]);
         }
@@ -226,7 +252,9 @@ describe("discovery", () => {
     });
 
     it("serves authorization server metadata whose issuer is the origin", async () => {
-        const response = await serverMetadata.GET(new Request(`${ORIGIN}/x`), { params: Promise.resolve({}) });
+        const response = await serverMetadata.GET(new Request(`${ORIGIN}/x`), {
+            params: Promise.resolve({})
+        });
         const body = (await response.json()) as Record<string, unknown>;
         expect(body.issuer).toBe(ORIGIN);
         expect(body.token_endpoint).toBe(`${ORIGIN}/api/oauth/token`);
@@ -291,7 +319,10 @@ describe("consent and code exchange", () => {
 
     it("grants only what was ticked and what the person holds, with what it implies", async () => {
         state.permissions = new Set(["tasks.read", "tasks.manage"]);
-        const { tokens } = await connect(["tasks.manage", "deploy.read", "users.manage"], "tasks.manage deploy.read users.manage");
+        const { tokens } = await connect(
+            ["tasks.manage", "deploy.read", "users.manage"],
+            "tasks.manage deploy.read users.manage"
+        );
         expect(tokens.body.scope).toBe("tasks.read tasks.manage");
     });
 
@@ -313,7 +344,11 @@ describe("consent and code exchange", () => {
         const query = authorizeQuery(client.client_id!, pkce().challenge, {
             redirect_uri: "https://attacker.example/steal"
         });
-        const answer = await answerAuthorizationAction({ query, allow: true, scopes: ["tasks.read"] });
+        const answer = await answerAuthorizationAction({
+            query,
+            allow: true,
+            scopes: ["tasks.read"]
+        });
         expect(answer.redirectTo).toBeUndefined();
         expect(answer.error).toBe("consent.errors.redirect");
         expect(state.db.tables.oAuthCode).toHaveLength(0);
@@ -345,16 +380,31 @@ describe("consent and code exchange", () => {
             redirect_uri: "http://127.0.0.1:49200/callback",
             client_id: client.client_id!
         };
-        expect((await tokenCall({ ...base, code_verifier: pkce().verifier })).body.error).toBe("invalid_grant");
-        expect((await tokenCall({ ...base, code_verifier: verifier, redirect_uri: "http://127.0.0.1:1/other" })).body.error).toBe(
-            "invalid_grant"
-        );
-        const other = (await registerClient()).body;
-        expect((await tokenCall({ ...base, code_verifier: verifier, client_id: other.client_id! })).body.error).toBe(
+        expect((await tokenCall({ ...base, code_verifier: pkce().verifier })).body.error).toBe(
             "invalid_grant"
         );
         expect(
-            (await tokenCall({ ...base, code_verifier: verifier, resource: "https://other.example/api/mcp" })).body.error
+            (
+                await tokenCall({
+                    ...base,
+                    code_verifier: verifier,
+                    redirect_uri: "http://127.0.0.1:1/other"
+                })
+            ).body.error
+        ).toBe("invalid_grant");
+        const other = (await registerClient()).body;
+        expect(
+            (await tokenCall({ ...base, code_verifier: verifier, client_id: other.client_id! }))
+                .body.error
+        ).toBe("invalid_grant");
+        expect(
+            (
+                await tokenCall({
+                    ...base,
+                    code_verifier: verifier,
+                    resource: "https://other.example/api/mcp"
+                })
+            ).body.error
         ).toBe("invalid_target");
         expect((await tokenCall({ ...base, code_verifier: verifier })).status).toBe(200);
     });
@@ -369,7 +419,9 @@ describe("consent and code exchange", () => {
             client_id: client.client_id!
         });
         expect(replay.body.error).toBe("invalid_grant");
-        expect((await mcpCall(String(tokens.body.access_token), { method: "tools/list" })).status).toBe(401);
+        expect(
+            (await mcpCall(String(tokens.body.access_token), { method: "tools/list" })).status
+        ).toBe(401);
         expect(state.audit.map((entry) => entry.action)).toContain("account.oauth.replay-detected");
     });
 
@@ -427,7 +479,9 @@ describe("calling /api/mcp with the token", () => {
     it("narrows tokens already issued when the person connects the app again with less", async () => {
         const { client, tokens } = await connect();
         const again = await answerAuthorizationAction({
-            query: authorizeQuery(client.client_id!, pkce().challenge, { scope: "tasks.read deploy.read" }),
+            query: authorizeQuery(client.client_id!, pkce().challenge, {
+                scope: "tasks.read deploy.read"
+            }),
             allow: true,
             scopes: ["tasks.read"]
         });
@@ -455,12 +509,19 @@ describe("calling /api/mcp with the token", () => {
 
     it("is refused once expired, once its person is banned, and for a refresh token", async () => {
         const first = await connect();
-        expect((await mcpCall(String(first.tokens.body.refresh_token), { method: "tools/list" })).status).toBe(401);
+        expect(
+            (await mcpCall(String(first.tokens.body.refresh_token), { method: "tools/list" }))
+                .status
+        ).toBe(401);
         ADA.bannedAt = new Date();
-        expect((await mcpCall(String(first.tokens.body.access_token), { method: "tools/list" })).status).toBe(401);
+        expect(
+            (await mcpCall(String(first.tokens.body.access_token), { method: "tools/list" })).status
+        ).toBe(401);
         ADA.bannedAt = null;
         for (const row of state.db.tables.oAuthToken!) row.expiresAt = new Date(Date.now() - 1);
-        expect((await mcpCall(String(first.tokens.body.access_token), { method: "tools/list" })).status).toBe(401);
+        expect(
+            (await mcpCall(String(first.tokens.body.access_token), { method: "tools/list" })).status
+        ).toBe(401);
     });
 
     it("holds back tool calls over the credential's budget", async () => {
@@ -492,10 +553,14 @@ describe("calling /api/mcp with the token", () => {
 
     it("advertises read-only and destructive hints on every tool", async () => {
         const answer = await mcpCall("plk_test.good", { method: "tools/list" });
-        for (const tool of answer.body?.result.tools as { name: string; annotations: Record<string, boolean> }[]) {
+        for (const tool of answer.body?.result.tools as {
+            name: string;
+            annotations: Record<string, boolean>;
+        }[]) {
             expect(typeof tool.annotations.readOnlyHint, tool.name).toBe("boolean");
             expect(typeof tool.annotations.destructiveHint, tool.name).toBe("boolean");
-            if (tool.annotations.readOnlyHint) expect(tool.annotations.destructiveHint, tool.name).toBe(false);
+            if (tool.annotations.readOnlyHint)
+                expect(tool.annotations.destructiveHint, tool.name).toBe(false);
         }
     });
 });
@@ -510,7 +575,9 @@ describe("refresh", () => {
         });
         expect(next.status).toBe(200);
         expect(next.body.refresh_token).not.toBe(tokens.body.refresh_token);
-        expect((await mcpCall(String(next.body.access_token), { method: "tools/list" })).status).toBe(200);
+        expect(
+            (await mcpCall(String(next.body.access_token), { method: "tools/list" })).status
+        ).toBe(200);
 
         const replay = await tokenCall({
             grant_type: "refresh_token",
@@ -519,7 +586,9 @@ describe("refresh", () => {
         });
         expect(replay.body.error).toBe("invalid_grant");
         // Everything under the grant is gone - the thief's copy and the app's.
-        expect((await mcpCall(String(next.body.access_token), { method: "tools/list" })).status).toBe(401);
+        expect(
+            (await mcpCall(String(next.body.access_token), { method: "tools/list" })).status
+        ).toBe(401);
         const again = await tokenCall({
             grant_type: "refresh_token",
             refresh_token: String(next.body.refresh_token),
@@ -552,10 +621,14 @@ describe("refresh", () => {
     });
 
     it("checks a confidential client's secret, and says invalid_client when it is wrong", async () => {
-        const client = (await registerClient({ token_endpoint_auth_method: "client_secret_basic" })).body;
+        const client = (await registerClient({ token_endpoint_auth_method: "client_secret_basic" }))
+            .body;
         const basic = (secret: string) =>
             `Basic ${Buffer.from(`${encodeURIComponent(client.client_id!)}:${encodeURIComponent(secret)}`).toString("base64")}`;
-        const wrong = await tokenCall({ grant_type: "refresh_token", refresh_token: "pmr_x" }, { authorization: basic("pms_wrong") });
+        const wrong = await tokenCall(
+            { grant_type: "refresh_token", refresh_token: "pmr_x" },
+            { authorization: basic("pms_wrong") }
+        );
         expect(wrong.status).toBe(401);
         expect(wrong.body.error).toBe("invalid_client");
         expect(wrong.headers.get("www-authenticate")).toContain("Basic");
@@ -581,10 +654,14 @@ describe("revocation and the connected-apps list", () => {
         // Another app cannot revoke it, and is told nothing either way.
         const other = (await registerClient()).body;
         expect((await post(String(tokens.body.access_token), other.client_id!)).status).toBe(200);
-        expect((await mcpCall(String(tokens.body.access_token), { method: "tools/list" })).status).toBe(200);
+        expect(
+            (await mcpCall(String(tokens.body.access_token), { method: "tools/list" })).status
+        ).toBe(200);
 
         expect((await post(String(tokens.body.access_token))).status).toBe(200);
-        expect((await mcpCall(String(tokens.body.access_token), { method: "tools/list" })).status).toBe(401);
+        expect(
+            (await mcpCall(String(tokens.body.access_token), { method: "tools/list" })).status
+        ).toBe(401);
         expect(await listConnectedApps(ADA.id)).toHaveLength(1);
 
         expect((await post(String(tokens.body.refresh_token))).status).toBe(200);
@@ -601,9 +678,13 @@ describe("revocation and the connected-apps list", () => {
         expect(await listConnectedApps(BOB.id)).toHaveLength(0);
 
         expect(await revokeConnectedApp(BOB.id, apps[0]!.id)).toBe(false);
-        expect((await mcpCall(String(tokens.body.access_token), { method: "tools/list" })).status).toBe(200);
+        expect(
+            (await mcpCall(String(tokens.body.access_token), { method: "tools/list" })).status
+        ).toBe(200);
         expect(await revokeConnectedApp(ADA.id, apps[0]!.id)).toBe(true);
-        expect((await mcpCall(String(tokens.body.access_token), { method: "tools/list" })).status).toBe(401);
+        expect(
+            (await mcpCall(String(tokens.body.access_token), { method: "tools/list" })).status
+        ).toBe(401);
     });
 
     it("audits a change made through a tool, naming the connection", async () => {
@@ -611,7 +692,10 @@ describe("revocation and the connected-apps list", () => {
         const written = await connect(["notes.use"], "notes.use");
         const created = await mcpCall(String(written.tokens.body.access_token), {
             method: "tools/call",
-            params: { name: "notes_create", arguments: { title: "From an assistant", body: "Hello" } }
+            params: {
+                name: "notes_create",
+                arguments: { title: "From an assistant", body: "Hello" }
+            }
         });
         expect(created.body?.result.isError).toBeUndefined();
         expect(state.audit.filter((entry) => entry.action === "mcp.tool.called")).toEqual([

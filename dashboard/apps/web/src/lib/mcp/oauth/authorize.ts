@@ -17,7 +17,14 @@ import { validChallenge } from "./pkce";
 import { requestedScopes } from "./scopes";
 import type { Permission } from "@polaris/core";
 import { resolveClient, type OAuthClientRecord } from "./clients";
-import { MAX_URI_LENGTH, canonicalResource, mcpResource, redirectMatches, sameResource, withParams } from "./urls";
+import {
+    MAX_URI_LENGTH,
+    canonicalResource,
+    mcpResource,
+    redirectMatches,
+    sameResource,
+    withParams
+} from "./urls";
 
 /** The parameters, as they arrived. */
 export type AuthorizationParams = Readonly<Record<string, string | undefined>>;
@@ -90,7 +97,8 @@ export async function checkAuthorizationRequest(
         })
     });
 
-    if (state !== undefined && state.length > MAX_STATE) return back("invalid_request", "state is too long");
+    if (state !== undefined && state.length > MAX_STATE)
+        return back("invalid_request", "state is too long");
     if (params.response_type !== "code") {
         return back("unsupported_response_type", "Only the authorization code flow is supported");
     }

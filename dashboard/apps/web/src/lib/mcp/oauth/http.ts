@@ -20,7 +20,11 @@ export const CORS_HEADERS: Readonly<Record<string, string>> = {
  *  asks that proxy next (RFC 6749 section 5.1). */
 const NO_STORE = { "Cache-Control": "no-store", Pragma: "no-cache" };
 
-export function oauthJson(body: unknown, status = 200, headers: Record<string, string> = {}): Response {
+export function oauthJson(
+    body: unknown,
+    status = 200,
+    headers: Record<string, string> = {}
+): Response {
     return Response.json(body, { status, headers: { ...CORS_HEADERS, ...NO_STORE, ...headers } });
 }
 
@@ -36,7 +40,9 @@ export function oauthError(
 
 /** A metadata document: public, the same for everyone, worth caching briefly. */
 export function metadataJson(body: unknown): Response {
-    return Response.json(body, { headers: { ...CORS_HEADERS, "Cache-Control": "public, max-age=300" } });
+    return Response.json(body, {
+        headers: { ...CORS_HEADERS, "Cache-Control": "public, max-age=300" }
+    });
 }
 
 export function preflight(): Response {
@@ -57,7 +63,10 @@ export function slowDown(retryAfterMs: number): Response {
  * or unreadable. A parameter that appears twice is dropped, as section 3.2
  * requires.
  */
-export async function readParameters(request: Request, most: number): Promise<Map<string, string> | null> {
+export async function readParameters(
+    request: Request,
+    most: number
+): Promise<Map<string, string> | null> {
     const declared = Number(request.headers.get("content-length"));
     if (Number.isFinite(declared) && declared > most) return null;
     const bytes = await readCappedBody(request, most);
@@ -108,5 +117,8 @@ export function clientCredentials(
             return { clientId: null, secret: null };
         }
     }
-    return { clientId: params.get("client_id") ?? null, secret: params.get("client_secret") ?? null };
+    return {
+        clientId: params.get("client_id") ?? null,
+        secret: params.get("client_secret") ?? null
+    };
 }

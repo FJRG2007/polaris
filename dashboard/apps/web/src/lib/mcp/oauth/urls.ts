@@ -118,7 +118,10 @@ export function redirectMatches(registered: readonly string[], presented: string
 
 /** Append the answer to an authorization to the app's redirect address, keeping
  *  any query it registered with. */
-export function withParams(redirectUri: string, params: Record<string, string | undefined>): string {
+export function withParams(
+    redirectUri: string,
+    params: Record<string, string | undefined>
+): string {
     const url = new URL(redirectUri);
     for (const [key, value] of Object.entries(params)) {
         if (value !== undefined) url.searchParams.set(key, value);
@@ -170,7 +173,11 @@ export function authorizationServerMetadata(origin: string, scopes: readonly str
  * section 5.1): where to find the resource metadata, and the scopes a client
  * should ask for when it has nothing better to go on.
  */
-export function wwwAuthenticate(origin: string, scopes: readonly string[], invalidToken = false): string {
+export function wwwAuthenticate(
+    origin: string,
+    scopes: readonly string[],
+    invalidToken = false
+): string {
     const parts = [`resource_metadata="${resourceMetadataUrl(origin)}"`];
     if (scopes.length > 0) parts.push(`scope="${scopes.join(" ")}"`);
     if (invalidToken) parts.push(`error="invalid_token"`);
