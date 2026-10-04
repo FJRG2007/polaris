@@ -248,6 +248,9 @@ async function tick(ctx: KindContext, lines: string[]): Promise<string | null> {
         state,
         run.entrants.map((one) => one.name)
     );
+    // The side panel, where a score changed.
+    for (const [name, score] of scores)
+        if (run.points[name] !== score) lines.push(commands.setScore(name, score));
     ctx.run = { ...ctx.run, game: state, points: Object.fromEntries(scores) };
     await ctx.persist();
     return hiders.length === 0 ? said.ALL_FOUND : null;

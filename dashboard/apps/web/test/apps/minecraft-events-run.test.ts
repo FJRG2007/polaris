@@ -9239,6 +9239,10 @@ describe("hot potato", () => {
         expect(world.sent).toContain(
             "scoreboard objectives add pe_hpd minecraft.custom:minecraft.damage_dealt"
         );
+        // Who is left is on the boss bar: no side panel with nothing on it.
+        expect(
+            world.sent.some((line) => line.startsWith("scoreboard objectives add pe_score"))
+        ).toBe(false);
         // Built only into air; nobody hurt, and nobody but the holder can hurt.
         expect(fills().every((line) => line.endsWith(" keep"))).toBe(true);
         await play(2_100);
@@ -9439,6 +9443,8 @@ describe("hide and seek", () => {
             `execute if entity @a[name=${hiders[0]},team=pe_hs_hide] run team join pe_hs_seek ${hiders[0]}`
         );
         expect(saidToAll(`${seeker} found ${hiders[0]}`)).toBe(true);
+        // The side panel keeps up: a find is worth its points at once.
+        expect(world.sent).toContain(`scoreboard players set ${seeker} pe_score ${hs.FIND_POINTS}`);
         // A hider hurt with no seeker striking near: nobody found.
         world.board.pe_hst![hiders[1]] = 2;
         await play(2_100);

@@ -17,6 +17,7 @@ import { stripFormatting } from "../parse";
 import { duelTeardown } from "./kinds/team-duel";
 import { COMMAND_BYTES_MAX, commandBytes } from "../command-size";
 import {
+    lastStanding,
     worldNeeds,
     type EventKind,
     type EventOptions,
@@ -205,7 +206,7 @@ export function hasScoreboard(preset: EventPreset): boolean {
     if (preset.kind === "happy-hour" || preset.kind === "supply-drop") return false;
     if (preset.kind === "rare-catch" || preset.kind === "xp-boost") return false;
     // Who is left standing is on the boss bar; there is nothing to add up.
-    if (preset.kind === "spleef") return false;
+    if (preset.kind === "spleef" || lastStanding(preset)) return false;
     if (preset.kind === "explorer")
         return (preset.options as EventOptions<"explorer">).mode === "distance";
     return true;
