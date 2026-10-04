@@ -71,7 +71,10 @@ export function refusalMessage(
     refusal: { error: string; requiredScope?: string } | null
 ): string {
     if (status === 401) {
-        return `Your sign-in to ${url} is no longer valid: it was revoked or it expired. Run plr login.`;
+        // Said the same way whichever it was: signed out from Sessions or API
+        // keys, locked to an address it was used away from, or simply expired.
+        // The server does not say which, and the answer is the same.
+        return `You were signed out from Polaris at ${url} (the sign-in was ended there, or it expired). Run plr login to sign in again.`;
     }
     if (status === 403) {
         const needs = refusal?.requiredScope

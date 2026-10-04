@@ -207,6 +207,25 @@ describe("after signing in", () => {
         expect(stdout()).toContain("could not be reached to revoke");
     });
 
+    it("signed out from Polaris (Sessions or API keys), the next command says so and how to sign in again", async () => {
+        let revoked = false;
+        const { fetch } = scriptedFetch({
+            "POST /api/cli/authorize": () => Response.json(AUTHORIZED),
+            "POST /api/cli/authorize/claim": () => Response.json(APPROVED),
+            "GET /api/v1/deploy/projects": () =>
+                revoked
+                    ? Response.json({ error: "Unauthorized" }, { status: 401 })
+                    : Response.json({ projects: [] })
+        });
+        const { context } = await testContext({ fetch });
+        await run(["login", "--url", URL], context, clean);
+        await run(["projects"], context, clean);
+        revoked = true;
+        const error = await failure(run(["projects"], context, clean));
+        expect(error.message).toContain("signed out from Polaris");
+        expect(error.message).toContain("plr login");
+    });
+
     it("a profile whose token went missing can still be removed", async () => {
         const keychain = fakeKeychain();
         const { fetch, seen } = server(APPROVED);

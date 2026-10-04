@@ -73,10 +73,12 @@ describe("an answer in the wrong shape", () => {
 });
 
 describe("a refusal", () => {
-    it("401 says to sign in again", async () => {
+    it("401 says it was signed out from Polaris, and to sign in again", async () => {
         const { fetch } = answering(Response.json({ error: "Unauthorized" }, { status: 401 }));
         const error = await failure(call(connection, "GET", "/api/v1/me", z.object({}), { fetch }));
-        expect(error.message).toContain("plr login");
+        expect(error.message).toBe(
+            "You were signed out from Polaris at https://polaris.example.com (the sign-in was ended there, or it expired). Run plr login to sign in again."
+        );
     });
 
     it("403 names the permission that was missing", async () => {
