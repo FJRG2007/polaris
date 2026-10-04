@@ -311,6 +311,28 @@ describe("the Events tab", () => {
         await waitFor(() => expect(started).toEqual(["fish"]));
     });
 
+    it("shows a race's history finish as the time it took, never as its raw score", async () => {
+        const raced = {
+            ...view,
+            history: [
+                {
+                    ...view.history[0]!,
+                    id: "h2",
+                    presetId: "fish",
+                    kind: "boat-race" as const,
+                    name: "Ice boat race",
+                    // A finish is kept as FINISH_BASE minus the seconds it
+                    // took, so 83 seconds is scored 99917.
+                    podium: [{ place: 1, name: "Ana", score: 99_917 }]
+                }
+            ]
+        };
+        render(<MinecraftEvents installedAppId="00000000-0000-4000-8000-000000000001" canManage />);
+        answerRead({ view: raced });
+        expect(await screen.findByText("1. Ana (1.4 min)")).toBeTruthy();
+        expect(screen.queryByText(/laps/)).toBeNull();
+    });
+
     it("will not run an event from changes that are not saved", async () => {
         render(<MinecraftEvents installedAppId="00000000-0000-4000-8000-000000000001" canManage />);
         answerRead({ view });
@@ -441,6 +463,35 @@ describe("setting up a horde defense", () => {
         expect((screen.getByText("Done") as HTMLButtonElement).disabled).toBe(true);
         fireEvent.change(waves, { target: { value: "7" } });
         expect((screen.getByText("Done") as HTMLButtonElement).disabled).toBe(false);
+    });
+
+    it("lets Done save a new event as it opens, before anything is changed", () => {
+        const saved: catalog.EventPreset[] = [];
+        const preset = catalog.newPreset("waves", "waves");
+        render(
+            <EventEditor
+                preset={preset}
+                isNew
+                open
+                onOpenChange={() => undefined}
+                onSave={(next) => saved.push(next)}
+            />
+        );
+        expect((screen.getByText("Done") as HTMLButtonElement).disabled).toBe(false);
+        fireEvent.click(screen.getByText("Done"));
+        expect(saved).toEqual([preset]);
+    });
+
+    it("holds Done for an existing event until something changes", () => {
+        render(
+            <EventEditor
+                preset={catalog.newPreset("waves", "waves")}
+                open
+                onOpenChange={() => undefined}
+                onSave={() => undefined}
+            />
+        );
+        expect((screen.getByText("Done") as HTMLButtonElement).disabled).toBe(true);
     });
 });
 
