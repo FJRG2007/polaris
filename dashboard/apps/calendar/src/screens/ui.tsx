@@ -2,8 +2,8 @@
 
 /** Small pieces the calendar's screens share. */
 
-import { linkify } from "./editor-model";
 import { hexOfHslChannels } from "./ui-color";
+import { LinkedText } from "./contact-links";
 import { cn, Dialog, DialogFloating, DialogTitle } from "@polaris/ui";
 import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
 
@@ -62,25 +62,11 @@ export function useNow(intervalMs: number): Date {
     return now;
 }
 
-/** Plain text with its web links clickable. */
+/** Plain text with its web links and email addresses made into links. */
 export function Linkified({ text, className }: { text: string; className?: string }) {
     return (
         <p className={cn("whitespace-pre-wrap break-words", className)}>
-            {linkify(text).map((part, index) =>
-                part.href ? (
-                    <a
-                        key={index}
-                        href={part.href}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-foreground underline underline-offset-2 hover:text-muted-foreground"
-                    >
-                        {part.text}
-                    </a>
-                ) : (
-                    <span key={index}>{part.text}</span>
-                )
-            )}
+            <LinkedText text={text} />
         </p>
     );
 }

@@ -70,9 +70,21 @@ export const GOOGLE_DRIVE_SCOPES = [
  */
 export const GOOGLE_MAIL_SCOPES = ["openid", "email", "https://mail.google.com/"];
 
+/** Reading and writing every calendar an account holds. */
+export const GOOGLE_CALENDAR_SCOPE = "https://www.googleapis.com/auth/calendar";
+
+/**
+ * Reading and writing the account's Google Tasks: the Calendar draws them on
+ * their due day, as Google Calendar does, and ticking one off there ticks it
+ * off in Google. An account linked before this was asked for lacks it, and the
+ * Calendar's accounts screen offers to grant it.
+ */
+export const GOOGLE_TASKS_SCOPE = "https://www.googleapis.com/auth/tasks";
+
 /**
  * What linking a calendar to the Calendar app asks for: reading and writing
- * every calendar the account holds, which is what syncing both ways means.
+ * every calendar the account holds, which is what syncing both ways means, and
+ * its tasks, which Google Calendar shows beside the events.
  *
  * Asked for on its own consent screen, like mail: somebody who linked Google to
  * see their week beside their tasks agreed to a read-only view, and a token that
@@ -81,7 +93,8 @@ export const GOOGLE_MAIL_SCOPES = ["openid", "email", "https://mail.google.com/"
 export const GOOGLE_CALENDAR_SCOPES = [
     "openid",
     "email",
-    "https://www.googleapis.com/auth/calendar"
+    GOOGLE_CALENDAR_SCOPE,
+    GOOGLE_TASKS_SCOPE
 ];
 
 export interface GoogleOAuthClient {

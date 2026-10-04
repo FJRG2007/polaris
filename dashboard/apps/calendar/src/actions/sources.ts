@@ -9,7 +9,7 @@ import { z } from "zod";
 import * as sync from "../lib/sync";
 import { host } from "@polaris/app-host";
 import { GOOGLE_APIS, googleApiEnableUrl } from "@polaris/core";
-import { readGoogleCalendarApi } from "../lib/google-api-state";
+import { readGoogleCalendarApi, readGoogleTasksApi } from "../lib/google-api-state";
 import * as sources from "../lib/sources";
 import * as schemas from "../lib/schemas";
 import type { SourceView } from "../lib/wire";
@@ -22,6 +22,9 @@ export interface LinkView {
     readonly provider: "google" | "microsoft";
     readonly label: string;
     readonly grantsCalendar: boolean;
+    /** Whether its tasks can be read: false for a Google account linked
+     *  before tasks were asked for, which is offered the grant. */
+    readonly grantsTasks: boolean;
     /** Already read as a calendar source here. */
     readonly used: boolean;
 }
@@ -41,11 +44,19 @@ export interface AccountsView {
     /** Where an administrator switches the Google Calendar API on, while a
      *  source here waits on it. Null for everybody else, and while none does. */
     readonly googleSetup: { readonly enableUrl: string; readonly project: string | null } | null;
+    /** The Google Tasks API is off for this Polaris, so no Google account's
+     *  tasks are shown. `enableUrl` is where an administrator switches it on;
+     *  null for everybody else, who is told to ask. Null while it is not off. */
+    readonly tasksApiOff: {
+        readonly enableUrl: string | null;
+        readonly project: string | null;
+    } | null;
     readonly presets: typeof sync.CALDAV_PRESETS;
     readonly holidays: typeof sync.HOLIDAY_CALENDARS;
 }
 
 const CALENDAR_API = GOOGLE_APIS.find((api) => api.id === "calendar")!;
+const TASKS_API = GOOGLE_APIS.find((api) => api.id === "tasks")!;
 
 export async function loadAccountsAction(): Promise<Outcome<{ accounts: AccountsView }>> {
     return outcome(async () => {
@@ -71,6 +82,13 @@ export async function loadAccountsAction(): Promise<Outcome<{ accounts: Accounts
         const [apiState, clientProject] = waiting
             ? await Promise.all([readGoogleCalendarApi(), host.calendarHost.googleClientProject()])
             : [null, null];
+        const tasksState = list.some((source) => source.kind === "google")
+            ? await readGoogleTasksApi()
+            : null;
+        const tasksProject =
+            tasksState?.state === "disabled" && user.isAdmin
+                ? (tasksState.project ?? (await host.calendarHost.googleClientProject()))
+                : null;
         return {
             accounts: {
                 sources: list,
@@ -89,6 +107,15 @@ export async function loadAccountsAction(): Promise<Outcome<{ accounts: Accounts
                           project: apiState?.project ?? clientProject
                       }
                     : null,
+                tasksApiOff:
+                    tasksState?.state === "disabled"
+                        ? {
+                              enableUrl: user.isAdmin
+                                  ? googleApiEnableUrl(TASKS_API.service, tasksState, tasksProject)
+                                  : null,
+                              project: user.isAdmin ? tasksProject : null
+                          }
+                        : null,
                 presets: sync.CALDAV_PRESETS,
                 holidays: sync.HOLIDAY_CALENDARS
             }

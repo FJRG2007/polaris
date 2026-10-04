@@ -85,6 +85,11 @@ describe("googleApiHealth", () => {
                 "https://console.cloud.google.com/apis/library/calendar-json.googleapis.com?project=100000000001"
             ],
             [
+                "tasks",
+                "unknown",
+                "https://console.cloud.google.com/apis/library/tasks.googleapis.com?project=100000000001"
+            ],
+            [
                 "drive",
                 "unknown",
                 "https://console.cloud.google.com/apis/library/drive.googleapis.com?project=100000000001"

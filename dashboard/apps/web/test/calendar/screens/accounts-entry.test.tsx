@@ -119,6 +119,7 @@ describe("the Add calendar menu", () => {
                     provider: "google",
                     label: "me@example.test",
                     grantsCalendar: true,
+                    grantsTasks: true,
                     used: false
                 }
             ]
@@ -197,6 +198,7 @@ describe("the Accounts section of the settings", () => {
                     provider: "google",
                     label: "me@example.test",
                     grantsCalendar: true,
+                    grantsTasks: true,
                     used: true
                 }
             ]

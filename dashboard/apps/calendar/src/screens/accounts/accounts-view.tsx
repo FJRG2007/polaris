@@ -15,7 +15,7 @@ import { FieldRow, GroupHeading } from "../ui";
 import { ProviderLinkButton, ProviderUnavailable } from "./provider-link";
 import { addressSchema } from "../../lib/schemas";
 import { StatusNote, useIssueText } from "../public/kit";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { SourceView } from "../../lib/wire";
 import * as sources from "../../actions/sources";
 import { hostUi } from "@polaris/app-host/client";
@@ -158,6 +158,25 @@ export function AccountsView({
         section?.querySelector<HTMLElement>("input, button[role='combobox']")?.focus();
     }, []);
 
+    // Back from granting more on an account (tasks, calendars): its sources are
+    // read again now, so what it grants is on the calendar without waiting for
+    // the next scheduled pass. Once per return.
+    const resynced = useRef(false);
+    useEffect(() => {
+        if (linked !== "linked" || resynced.current || !accounts.data) return;
+        resynced.current = true;
+        const linkedSources = accounts.data.sources.filter(
+            (source) => source.kind === "google" || source.kind === "microsoft"
+        );
+        if (linkedSources.length === 0) return;
+        void Promise.allSettled(
+            linkedSources.map((source) => sources.refreshSourceAction(source.id))
+        ).then(() => {
+            dropCached("accounts");
+            accounts.refresh();
+        });
+    }, [linked, accounts]);
+
     const data = accounts.data;
     const allow = instance.data?.settings.allowSubscriptions ?? true;
     const subscribed = data?.subscribed ?? [];
@@ -211,6 +230,8 @@ export function AccountsView({
                                 }
                                 canManage={data.canManage}
                                 googleSetup={data.googleSetup}
+                                link={data.links.find((link) => link.id === source.connectionId)}
+                                tasksApiOff={data.tasksApiOff}
                                 onReplace={(next) =>
                                     accounts.replace({
                                         ...data,
@@ -467,11 +488,69 @@ function SetupNote({
     );
 }
 
+/**
+ * Why a Google account's tasks are not on the calendar, and the one thing that
+ * fixes it: an account linked before tasks were asked for grants them (the
+ * consent screen again, adding them to what it holds); a Tasks API switched off
+ * for this Polaris is the administrator's to turn on.
+ */
+function TasksNote({
+    link,
+    reconnectUrl,
+    tasksApiOff,
+    syncing,
+    onRetry
+}: {
+    link: Accounts["links"][number] | undefined;
+    reconnectUrl: string | null;
+    tasksApiOff: Accounts["tasksApiOff"];
+    syncing: boolean;
+    onRetry: () => void;
+}) {
+    const t = useCalendarT();
+    if (link && !link.grantsTasks && reconnectUrl)
+        return (
+            <StatusNote tone="neutral" className="flex flex-wrap items-center gap-2">
+                <span className="min-w-0 flex-1 basis-56">{t("accounts.tasks.grant")}</span>
+                <Button size="sm" variant="outline" asChild>
+                    <a href={reconnectUrl}>{t("accounts.tasks.grantButton")}</a>
+                </Button>
+            </StatusNote>
+        );
+    if (!link?.grantsTasks || !tasksApiOff) return null;
+    if (!tasksApiOff.enableUrl)
+        return <StatusNote tone="neutral">{t("accounts.tasks.apiMember")}</StatusNote>;
+    return (
+        <StatusNote tone="warning" className="flex flex-col gap-2">
+            <span>{t("accounts.tasks.apiAdmin")}</span>
+            {tasksApiOff.project ? (
+                <span className="text-xs">
+                    {t("accounts.setup.project", { project: tasksApiOff.project })}
+                </span>
+            ) : null}
+            <span className="flex flex-wrap items-center gap-2">
+                <Button size="sm" variant="outline" asChild>
+                    <a href={tasksApiOff.enableUrl} target="_blank" rel="noopener noreferrer">
+                        {t("accounts.setup.open")}
+                        <ExternalLink aria-hidden />
+                    </a>
+                </Button>
+                <Button size="sm" variant="ghost" disabled={syncing} onClick={onRetry}>
+                    {syncing ? <Loader2 className="animate-spin" aria-hidden /> : null}
+                    {t("accounts.retry")}
+                </Button>
+            </span>
+        </StatusNote>
+    );
+}
+
 function SourceRow({
     source,
     reconnectUrl,
     canManage,
     googleSetup,
+    link,
+    tasksApiOff,
     onReplace,
     onRemoved
 }: {
@@ -480,6 +559,9 @@ function SourceRow({
     reconnectUrl: string | null;
     canManage: boolean;
     googleSetup: Accounts["googleSetup"];
+    /** The linked account it reads through, for a Google or Microsoft source. */
+    link: Accounts["links"][number] | undefined;
+    tasksApiOff: Accounts["tasksApiOff"];
     onReplace: (next: SourceView) => void;
     /** true: take it off the list now; false: the removal was refused, read the list again. */
     onRemoved: (gone: boolean) => void;
@@ -670,6 +752,15 @@ function SourceRow({
             ) : null}
             {source.status === "setup" ? (
                 <SetupNote setup={googleSetup} syncing={syncing} onRetry={() => void syncNow()} />
+            ) : null}
+            {source.kind === "google" && source.status !== "auth" && source.status !== "consent" ? (
+                <TasksNote
+                    link={link}
+                    reconnectUrl={reconnectUrl}
+                    tasksApiOff={tasksApiOff}
+                    syncing={syncing}
+                    onRetry={() => void syncNow()}
+                />
             ) : null}
             {(source.status === "auth" || source.status === "consent") &&
             !reconnectUrl &&

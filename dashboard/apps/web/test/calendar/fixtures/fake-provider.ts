@@ -15,6 +15,7 @@ import {
 import type {
     ChangeSet,
     CalendarProvider,
+    ListingGap,
     PullState,
     RemoteCalendar
 } from "@polaris-app/calendar/src/lib/sync/provider";
@@ -46,6 +47,7 @@ export function createFakeProvider() {
     const writes: Write[] = [];
     const pulls: PullState[] = [];
     let gate: Promise<void> | null = null;
+    let gaps: ListingGap[] = [];
 
     const collection = (remoteId: string) => {
         let found = objects.get(remoteId);
@@ -63,6 +65,7 @@ export function createFakeProvider() {
     };
 
     const provider: CalendarProvider = {
+        listingGaps: () => gaps,
         async listCalendars() {
             fail("list");
             return calendars.map((calendar) => ({
@@ -152,6 +155,15 @@ export function createFakeProvider() {
                 ...calendar
             });
             collection(calendar.remoteId);
+        },
+        /** A calendar the next listings no longer return. */
+        dropCalendar(remoteId: string) {
+            const at = calendars.findIndex((calendar) => calendar.remoteId === remoteId);
+            if (at >= 0) calendars.splice(at, 1);
+        },
+        /** What the next listings say they could not reach. */
+        setGaps(next: ListingGap[]) {
+            gaps = next;
         },
         /** A change made at the provider by somebody else. */
         remoteWrite(remoteId: string, href: string, ics: string): string {

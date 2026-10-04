@@ -11,6 +11,7 @@ import { PAGE_BLEED } from "@polaris/ui";
 import { calendarT } from "../../../lib/i18n";
 import { requireCalendarUser } from "../../../lib/access";
 import { CalendarShell } from "../../../screens/shell";
+import { SignedInContactLinks } from "../../../screens/contact-links";
 import { CalendarScreen } from "../../../screens/calendar-screen";
 
 export const dynamic = "force-dynamic";
@@ -36,7 +37,9 @@ export default async function CalendarPage({
                     }}
                 />
             </div>
-            <CalendarScreen path={path} />
+            <SignedInContactLinks>
+                <CalendarScreen path={path} />
+            </SignedInContactLinks>
         </div>
     );
 }

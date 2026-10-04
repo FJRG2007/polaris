@@ -26,7 +26,8 @@ vi.mock("@/lib/connections/store", () => ({
 vi.mock("@/lib/google-calendar/service", () => {
     class GoogleAuthExpiredError extends Error {}
     return {
-        GOOGLE_CALENDAR_SCOPES: ["https://www.googleapis.com/auth/calendar"],
+        GOOGLE_CALENDAR_SCOPE: "https://www.googleapis.com/auth/calendar",
+        GOOGLE_TASKS_SCOPE: "https://www.googleapis.com/auth/tasks",
         GoogleAuthExpiredError,
         getGoogleOAuthClient: async () => ({ clientId: "client", clientSecret: "secret" }),
         googleAccessToken: async () => {
@@ -53,7 +54,9 @@ vi.mock("@/lib/rich-text/mention-service", () => ({
 }));
 vi.mock("@/lib/display-prefs-service", () => ({ resolveDisplayPreferencesFor: vi.fn() }));
 
-const { calendarAccessToken, CalendarLinkExpiredError } = await import("@/lib/calendar-host");
+const { calendarAccessToken, CalendarLinkExpiredError, grantsCalendar, grantsTasks } = await import(
+    "@/lib/calendar-host"
+);
 
 describe("a linked account's calendar access token", () => {
     it("asks for the link again when Google refuses it", async () => {
@@ -74,5 +77,30 @@ describe("a linked account's calendar access token", () => {
         const attempt = calendarAccessToken("user-1", "microsoft-link");
         await expect(attempt).rejects.not.toBeInstanceOf(CalendarLinkExpiredError);
         await expect(attempt).rejects.toThrow("(503)");
+    });
+});
+
+describe("what a linked account was granted", () => {
+    const BEFORE = "openid email https://www.googleapis.com/auth/calendar";
+    const NOW = `${BEFORE} https://www.googleapis.com/auth/tasks`;
+
+    it("tells a Google account linked before tasks from one that holds them", () => {
+        expect(grantsTasks("google", BEFORE)).toBe(false);
+        expect(grantsTasks("google", NOW)).toBe(true);
+        // Read-only tasks are not what syncing them both ways needs.
+        expect(
+            grantsTasks("google", `${BEFORE} https://www.googleapis.com/auth/tasks.readonly`)
+        ).toBe(false);
+    });
+
+    it("never asks a Microsoft account for tasks it has no use for here", () => {
+        expect(grantsTasks("microsoft", "Calendars.ReadWrite")).toBe(true);
+    });
+
+    it("still reads the calendar grant whatever else the account holds", () => {
+        expect(grantsCalendar("google", NOW)).toBe(true);
+        expect(grantsCalendar("google", "openid email https://www.googleapis.com/auth/tasks")).toBe(
+            false
+        );
     });
 });

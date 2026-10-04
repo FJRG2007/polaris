@@ -26,9 +26,10 @@ import * as eventActions from "../actions/events";
 import { useEffect, useId, useState } from "react";
 import { useBookingSwitch } from "./booking/reads";
 import { AnchoredPanel, ColorDot, Linkified } from "./ui";
+import { LocationLine } from "./contact-links";
 import { Button, Input, SegmentedControl, Select } from "@polaris/ui";
 import type { CalendarSummary, EventDetail, OccurrenceView } from "../lib/wire";
-import { CalendarClock, Copy, Download, MapPin, Pencil, Trash2, Video } from "lucide-react";
+import { CalendarClock, Copy, Download, Pencil, Trash2, Video } from "lucide-react";
 import { dueText, TaskListField, useTaskCreation, type CreatedTask } from "./new-task-dialog";
 
 export function whenOf(occurrence: OccurrenceView, locale: string, zone: string): string {
@@ -137,10 +138,12 @@ export function EventCard({
                     </div>
                 </div>
                 {occurrence.location ? (
-                    <p className="flex items-start gap-1.5 text-xs">
-                        <MapPin aria-hidden className="mt-px size-3.5 text-foreground-subtle" />
-                        <span className="min-w-0 break-words">{occurrence.location}</span>
-                    </p>
+                    <LocationLine
+                        location={occurrence.location}
+                        conference={occurrence.conference}
+                        className="text-xs"
+                        iconClassName="mt-px size-3.5"
+                    />
                 ) : null}
                 {occurrence.conference && isWebLink(occurrence.conference) ? (
                     <Button asChild size="sm" variant="outline" className="self-start">

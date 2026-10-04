@@ -262,6 +262,13 @@ export const GOOGLE_APIS = [
         probe: "https://www.googleapis.com/calendar/v3/users/me/calendarList?maxResults=1&fields=kind"
     },
     {
+        id: "tasks",
+        service: "tasks.googleapis.com",
+        title: "Google Tasks API",
+        scope: "https://www.googleapis.com/auth/tasks",
+        probe: "https://tasks.googleapis.com/tasks/v1/users/@me/lists?maxResults=1&fields=kind"
+    },
+    {
         id: "drive",
         service: "drive.googleapis.com",
         title: "Google Drive API",
@@ -279,6 +286,9 @@ export function googleApiStateKey(api: GoogleApiId): string {
 
 /** The setting the Google Calendar API's state is kept under. */
 export const GOOGLE_CALENDAR_API_STATE_KEY = googleApiStateKey("calendar");
+
+/** The setting the Google Tasks API's state is kept under. */
+export const GOOGLE_TASKS_API_STATE_KEY = googleApiStateKey("tasks");
 
 /** The API's page in the Cloud console, opened on this project. */
 export function googleApiLibraryUrl(service: string, project: string | null): string {

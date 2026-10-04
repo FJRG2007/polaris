@@ -10,6 +10,7 @@
 import { useState } from "react";
 import * as engine from "../engine";
 import { useCalendarT } from "./i18n";
+import { EmailLink, emailHref, useContactLinks } from "./contact-links";
 import { calendarSlots } from "./slots";
 import { hostUi } from "@polaris/app-host/client";
 import { Button, Select, Switch } from "@polaris/ui";
@@ -41,6 +42,27 @@ function PartstatIcon({ partstat, label }: { partstat: engine.PartStat; label: s
     );
 }
 
+/** A sentinel no translation contains, standing in for the organizer's name so
+ *  the sentence can be cut around a link in either language. */
+const NAME_SLOT = "⁣";
+
+/** "Organized by X", with X a link to write to them. */
+function OrganizerLine({ organizer }: { organizer: engine.Person }) {
+    const t = useCalendarT();
+    const [before, after = ""] = t("attendeeEditor.organizer", { name: NAME_SLOT }).split(
+        NAME_SLOT
+    );
+    return (
+        <p className="text-xs text-muted-foreground">
+            {before}
+            <EmailLink address={organizer.email} className="text-muted-foreground">
+                {organizer.name || organizer.email}
+            </EmailLink>
+            {after}
+        </p>
+    );
+}
+
 export function AttendeesEditor({
     value,
     onChange,
@@ -61,6 +83,7 @@ export function AttendeesEditor({
     } | null;
 }) {
     const t = useCalendarT();
+    const links = useContactLinks();
     const [typed, setTyped] = useState("");
     const [problem, setProblem] = useState<string | null>(null);
     const [findOpen, setFindOpen] = useState(false);
@@ -110,11 +133,7 @@ export function AttendeesEditor({
 
     return (
         <div className="flex flex-col gap-2">
-            {organizer ? (
-                <p className="text-xs text-muted-foreground">
-                    {t("attendeeEditor.organizer", { name: organizer.name || organizer.email })}
-                </p>
-            ) : null}
+            {organizer ? <OrganizerLine organizer={organizer} /> : null}
 
             {value.length > 0 ? (
                 <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground tabular-nums">
@@ -133,7 +152,7 @@ export function AttendeesEditor({
                         />
                         <Button asChild size="icon-sm" variant="ghost">
                             <a
-                                href={`mailto:${emails.map(encodeURIComponent).join(",")}`}
+                                href={emailHref(emails, links.compose)}
                                 aria-label={t("attendeeEditor.emailAll")}
                                 title={t("attendeeEditor.emailAll")}
                             >
@@ -163,7 +182,21 @@ export function AttendeesEditor({
                                         className="block truncate text-xs text-foreground-subtle"
                                         title={attendee.email}
                                     >
-                                        {attendee.email}
+                                        {readOnly ? (
+                                            <EmailLink
+                                                address={attendee.email}
+                                                className="text-foreground-subtle no-underline hover:underline"
+                                            />
+                                        ) : (
+                                            attendee.email
+                                        )}
+                                    </span>
+                                ) : readOnly ? (
+                                    <span className="block truncate text-xs text-foreground-subtle">
+                                        <EmailLink
+                                            address={attendee.email}
+                                            className="text-foreground-subtle no-underline hover:underline"
+                                        />
                                     </span>
                                 ) : null}
                             </span>

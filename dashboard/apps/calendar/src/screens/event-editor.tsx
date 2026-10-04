@@ -17,6 +17,7 @@ import * as engine from "../engine";
 import { unwrap } from "./cached-read";
 import * as model from "./editor-model";
 import { ZonePicker } from "./zone-picker";
+import { LocationLine, WebLink } from "./contact-links";
 import { ZoneComparison } from "./clock/zone-compare";
 import { useScopeChoice } from "./scope-dialog";
 import { editorShortcutFor } from "./shortcuts";
@@ -1140,10 +1141,12 @@ function ViewMode({
                 <RespondBar detail={detail} zone={zone} onChanged={onChanged} />
             ) : null}
             {event.location ? (
-                <p className="flex items-start gap-2 text-[0.8125rem]">
-                    <MapPin aria-hidden className="mt-0.5 size-4 text-foreground-subtle" />
-                    <span className="min-w-0 break-words">{event.location}</span>
-                </p>
+                <LocationLine
+                    location={event.location}
+                    conference={event.conference}
+                    className="gap-2 text-[0.8125rem]"
+                    iconClassName="mt-0.5 size-4"
+                />
             ) : null}
             {event.conference && model.isWebLink(event.conference) ? (
                 <Button asChild variant="outline" size="sm" className="self-start">
@@ -1189,14 +1192,10 @@ function ViewMode({
                 </section>
             ) : null}
             {event.url && model.isWebLink(event.url) ? (
-                <a
+                <WebLink
                     href={event.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
                     className="truncate text-xs text-muted-foreground underline underline-offset-2"
-                >
-                    {event.url}
-                </a>
+                />
             ) : null}
             {!allDay ? (
                 <p className="text-xs text-foreground-subtle">

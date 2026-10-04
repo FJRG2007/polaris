@@ -349,6 +349,12 @@ export const INTEGRATIONS: readonly IntegrationCatalogEntry[] = [
             },
             {
                 // i18n-ignore the Integrations screen says it through lib/integrations/registry-words.ts
+                label: "Enable the Tasks API",
+                url: "https://console.cloud.google.com/apis/library/tasks.googleapis.com",
+                help: "Same project. It puts each person's Google Tasks on their calendar; without it the calendars still sync, with no tasks."
+            },
+            {
+                // i18n-ignore the Integrations screen says it through lib/integrations/registry-words.ts
                 label: "Publish the app",
                 url: "https://console.cloud.google.com/auth/audience",
                 help: "A new client is in Testing, where only the accounts listed as test users may authorize and everybody else is refused with access_denied. Publishing lifts that. Until you are ready to, add each person as a test user instead."

@@ -144,7 +144,8 @@ export function viewWindow(
         case "days":
             return { start: anchor, end: addDays(anchor, customDays) };
         case "month": {
-            // Six whole weeks from the week the 1st falls in, as the month grid draws.
+            // Six whole weeks from the week the 1st falls in: every week the
+            // month grid draws (five most months, six at most).
             const start = weekStartOf(firstOfMonth(anchor), firstDay);
             return { start, end: addDays(start, 42) };
         }

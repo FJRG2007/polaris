@@ -281,6 +281,17 @@
         "dismiss": "Ocultar consejo",
         "text": "Trae tus otros calendarios: Google, Microsoft, iCloud o cualquier servidor CalDAV o enlace .ics."
     },
+    "links": {
+        "copiedEmail": "Dirección copiada",
+        "copiedLink": "Enlace copiado",
+        "copyEmail": "Copiar dirección",
+        "copyFailed": "No se pudo copiar. Selecciona el texto y cópialo.",
+        "copyLink": "Copiar URL",
+        "emailMenu": "Acciones para esta dirección",
+        "linkMenu": "Acciones para este enlace",
+        "openLink": "Abrir enlace",
+        "sendEmail": "Enviar correo"
+    },
     "newTask": {
         "create": "Crear tarea",
         "created": "{reference} creada",

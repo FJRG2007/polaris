@@ -455,20 +455,90 @@ export function isWebLink(text: string): boolean {
     }
 }
 
-/** Text cut into plain runs and web links, for a description in view mode. */
-export function linkify(text: string): { readonly text: string; readonly href: string | null }[] {
-    const parts: { text: string; href: string | null }[] = [];
-    const pattern = /https?:\/\/[^\s<>"')\]]+/g;
+/** One run of a text in view mode: plain, a web link, or an email address. */
+export interface LinkedPart {
+    readonly text: string;
+    /** Where it leads: an http(s) address, or `mailto:` and the address. */
+    readonly href: string | null;
+    readonly kind: "web" | "email" | null;
+    /** The address alone, lowercased, for an email. */
+    readonly email: string | null;
+}
+
+/** A web link written out, an address that starts with `www.`, or an email
+ *  address (with or without `mailto:` in front), in that order of preference at
+ *  one position - so the address inside a link stays part of the link. */
+const LINKABLE =
+    /https?:\/\/[^\s<>"')\]]+|www\.[^\s<>"')\]]+|(?:mailto:)?[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,}/gi;
+
+/** An address as a message can be sent to, or null. */
+function emailOf(raw: string): string | null {
+    const address = raw.replace(/^mailto:/i, "").toLowerCase();
+    return /^[a-z0-9._%+-]+@[a-z0-9-]+(\.[a-z0-9-]+)*\.[a-z]{2,}$/.test(address) &&
+        !address.startsWith(".") &&
+        !address.includes("..")
+        ? address
+        : null;
+}
+
+/**
+ * Text cut into plain runs, web links and email addresses, for a description or
+ * a location in view mode. Only `http:`, `https:` and `mailto:` hrefs ever come
+ * out: anything else stays text.
+ */
+export function linkify(text: string): LinkedPart[] {
+    const parts: LinkedPart[] = [];
+    const plain = (run: string) => parts.push({ text: run, href: null, kind: null, email: null });
     let last = 0;
-    for (const match of text.matchAll(pattern)) {
+    for (const match of text.matchAll(LINKABLE)) {
         const index = match.index ?? 0;
+        // "awww.example.com" is a word, not a link that starts halfway into it.
+        if (/^www\./i.test(match[0]) && /[\w.-]/.test(text[index - 1] ?? "")) continue;
         const raw = match[0].replace(/[.,;:!?]+$/, "");
-        if (index > last) parts.push({ text: text.slice(last, index), href: null });
-        parts.push({ text: raw, href: isWebLink(raw) ? raw : null });
+        if (index > last) plain(text.slice(last, index));
+        const lower = raw.toLowerCase();
+        if (
+            lower.startsWith("http://") ||
+            lower.startsWith("https://") ||
+            lower.startsWith("www.")
+        ) {
+            const href = lower.startsWith("www.") ? `https://${raw}` : raw;
+            if (isWebLink(href)) parts.push({ text: raw, href, kind: "web", email: null });
+            else plain(raw);
+        } else {
+            const email = emailOf(raw);
+            if (email) parts.push({ text: raw, href: `mailto:${email}`, kind: "email", email });
+            else plain(raw);
+        }
         last = index + raw.length;
     }
-    if (last < text.length) parts.push({ text: text.slice(last), href: null });
+    if (last < text.length) plain(text.slice(last));
     return parts;
+}
+
+/** Hosts that hold video meetings: a location that is one of these is a place
+ *  to join, not a place to go. */
+const MEETING_HOSTS = [
+    "meet.google.com",
+    "zoom.us",
+    "zoom.com",
+    "teams.microsoft.com",
+    "teams.live.com",
+    "webex.com",
+    "whereby.com",
+    "meet.jit.si",
+    "gotomeeting.com",
+    "chime.aws"
+];
+
+/** The meeting a location is, when the whole location is a link to one. */
+export function meetingLink(location: string): string | null {
+    const text = location.trim();
+    if (!isWebLink(text)) return null;
+    const host = new URL(text).hostname.toLowerCase();
+    return MEETING_HOSTS.some((known) => host === known || host.endsWith(`.${known}`))
+        ? text
+        : null;
 }
 
 /** The addresses a person answers to among the attendees. */

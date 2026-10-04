@@ -307,10 +307,35 @@ export async function refreshCalendars(
     }
     if (remote.length === 0) return;
     const still = new Set(remote.map((calendar) => calendar.remoteId));
+    // What the listing could not reach this time is not gone: it is kept as it is.
+    const held = heldBack(provider);
     const gone = local
-        .filter((calendar) => !still.has(calendar.remoteId))
+        .filter((calendar) => !still.has(calendar.remoteId) && !held(calendar.remoteId))
         .map((calendar) => calendar.id);
     if (gone.length > 0) await prisma.calendar.deleteMany({ where: { id: { in: gone } } });
+}
+
+/** Whether a calendar is under what the provider's last listing left out. */
+function heldBack(provider: sync.CalendarProvider): (remoteId: string) => boolean {
+    const gaps = provider.listingGaps?.() ?? [];
+    return (remoteId) => gaps.some((gap) => remoteId.startsWith(gap.prefix));
+}
+
+/**
+ * Keep what listing a Google account's tasks found about the Tasks API: off,
+ * with where to switch it on, or working. A grant without the tasks says
+ * nothing about the API, and the account's own screen asks for that grant.
+ */
+async function recordTasksApi(provider: sync.CalendarProvider, now: Date): Promise<void> {
+    const gap = provider.listingGaps?.().find((entry) => entry.prefix === sync.TASKS_PREFIX);
+    if (!gap) return googleApi.recordGoogleTasksApi(null, now);
+    if (gap.cause instanceof sync.SyncSetupError)
+        return googleApi.recordGoogleTasksApi(gap.cause.setup, now);
+    if (gap.cause instanceof sync.SyncConsentError) return;
+    console.error(
+        "polaris: a Google account's tasks were not listed:",
+        gap.cause instanceof Error ? gap.cause.message : gap.cause
+    );
 }
 
 /** Pull one calendar's changes and store them. */
@@ -468,8 +493,13 @@ export async function syncSource(sourceId: string, now = new Date()): Promise<vo
             where: { sourceId: source.id, trashedAt: null },
             select: { id: true, remoteId: true, syncToken: true, ctag: true, timezone: true }
         });
-        for (const calendar of calendars) await pullCalendar(provider, calendar);
-        if (source.kind === "google") await googleApi.recordGoogleCalendarApiOn(now);
+        const held = heldBack(provider);
+        for (const calendar of calendars)
+            if (!held(calendar.remoteId)) await pullCalendar(provider, calendar);
+        if (source.kind === "google") {
+            await googleApi.recordGoogleCalendarApiOn(now);
+            await recordTasksApi(provider, now);
+        }
         await prisma.calendarSource.update({
             where: { id: source.id },
             data: {

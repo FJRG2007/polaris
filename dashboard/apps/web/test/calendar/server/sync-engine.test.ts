@@ -575,4 +575,88 @@ describe("calendar sync engine", () => {
         expect(db.byId("calendar", String(family.id))).toBeUndefined();
         expect(db.byId("calendar", String(calendar.id))).toBeDefined();
     });
+
+    describe("a Google account's tasks", () => {
+        const TASKS_SETUP = {
+            provider: "google" as const,
+            service: "tasks.googleapis.com",
+            project: "100000000001",
+            activationUrl: null
+        };
+        const tasksState = () =>
+            JSON.parse(fake.settings.get("google-api.tasks") ?? "null") as Record<
+                string,
+                unknown
+            > | null;
+        const todoIcs = engine.serializeItem(
+            engine.todoItem(
+                engine.newTodo({
+                    uid: "t1@tasks.google.com",
+                    summary: "Pay rent",
+                    due: { date: "2026-10-12" }
+                })
+            )
+        );
+        const tasksCalendar = () =>
+            db.rows("calendar").find((row) => row.remoteId === "tasks:list-1");
+
+        beforeEach(() => {
+            remote.addCalendar({
+                remoteId: "tasks:list-1",
+                name: "My Tasks",
+                components: ["VTODO"]
+            });
+            remote.remoteWrite("tasks:list-1", "t1", todoIcs);
+        });
+
+        it("syncs a task list as a calendar of tasks, and says the Tasks API works", async () => {
+            await firstPull();
+            expect(tasksCalendar()).toMatchObject({ name: "My Tasks", components: "VTODO" });
+            expect(objectAt("t1")).toMatchObject({
+                uid: "t1@tasks.google.com",
+                component: "VTODO"
+            });
+            expect(tasksState()).toMatchObject({ state: "enabled" });
+        });
+
+        it("keeps the calendars syncing, and the task list as it was, when the tasks were not granted", async () => {
+            await firstPull();
+            const pulled = () =>
+                remote.pulls.filter((pull) => pull.remoteId === "tasks:list-1").length;
+            const before = pulled();
+            remote.dropCalendar("tasks:list-1");
+            remote.setGaps([
+                {
+                    prefix: "tasks:",
+                    cause: new SyncConsentError("Google needs more permission", 403)
+                }
+            ]);
+            remote.remoteWrite("primary", "gym", icsFor("gym@google", "Gym", "2026-10-15"));
+            await syncEngine.syncSource(sourceId);
+            expect(db.byId("calendarSource", sourceId)?.status).toBe("ok");
+            expect(objectAt("gym")).toBeDefined();
+            expect(tasksCalendar()).toBeDefined();
+            expect(objectAt("t1")?.deletedAt ?? null).toBeNull();
+            expect(pulled()).toBe(before);
+            expect(fake.notices).toEqual([]);
+        });
+
+        it("records the Tasks API as off, apart from the Calendar API, and the calendars still sync", async () => {
+            await firstPull();
+            remote.setGaps([
+                {
+                    prefix: "tasks:",
+                    cause: new SyncSetupError("Google needs an API switched on", 403, TASKS_SETUP)
+                }
+            ]);
+            await syncEngine.syncSource(sourceId);
+            expect(db.byId("calendarSource", sourceId)?.status).toBe("ok");
+            expect(tasksState()).toMatchObject({ state: "disabled", project: "100000000001" });
+            expect(fake.settings.get("google-api.calendar")).toContain('"enabled"');
+
+            remote.setGaps([]);
+            await syncEngine.syncSource(sourceId);
+            expect(tasksState()).toMatchObject({ state: "enabled" });
+        });
+    });
 });

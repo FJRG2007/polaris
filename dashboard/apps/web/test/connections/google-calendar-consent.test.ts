@@ -33,6 +33,10 @@ describe("the calendar consent screen", () => {
         );
         expect(url.searchParams.get("scope")?.split(" ")).toEqual(GOOGLE_CALENDAR_SCOPES);
         expect(url.searchParams.get("scope")).toContain("https://www.googleapis.com/auth/calendar");
+        // The account's tasks, shown on the calendar beside its events.
+        expect(url.searchParams.get("scope")?.split(" ")).toContain(
+            "https://www.googleapis.com/auth/tasks"
+        );
         expect(url.searchParams.get("include_granted_scopes")).toBe("true");
         expect(url.searchParams.get("access_type")).toBe("offline");
         expect(url.searchParams.get("redirect_uri")).toBe(

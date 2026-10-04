@@ -5,6 +5,7 @@ import { notFound } from "next/navigation";
 import { calendarT } from "../../../../lib/i18n";
 import { uuidSchema } from "../../../../lib/schemas";
 import { requireCalendarUser } from "../../../../lib/access";
+import { SignedInContactLinks } from "../../../../screens/contact-links";
 import { BookingPageEditor } from "../../../../screens/booking/booking-page-editor";
 
 export const dynamic = "force-dynamic";
@@ -22,7 +23,9 @@ export default async function BookingPageEditPage({
     return (
         <div className="mx-auto flex w-full max-w-3xl flex-col">
             <PageHeader title={t("bookingPage.editTitle")} />
-            <BookingPageEditor pageId={parsed.data} />
+            <SignedInContactLinks>
+                <BookingPageEditor pageId={parsed.data} />
+            </SignedInContactLinks>
         </div>
     );
 }

@@ -44,6 +44,30 @@ export async function recordGoogleCalendarApiOff(
     return next;
 }
 
+/** Whether the Google Tasks API is on, in the same project, kept the same way.
+ *  A source never waits on it: the calendars sync without the tasks. */
+export async function readGoogleTasksApi(): Promise<core.ProviderApiState | null> {
+    const raw = await host.settingStore
+        .getSetting(core.GOOGLE_TASKS_API_STATE_KEY)
+        .catch(() => null);
+    return core.readProviderApiState(raw);
+}
+
+/** Record what listing the tasks found: off (with where to switch it on), or on. */
+export async function recordGoogleTasksApi(setup: ProviderSetup | null, now: Date): Promise<void> {
+    const previous = await readGoogleTasksApi();
+    // Written on a change only: every sync of every account passes through here.
+    if (!setup && previous?.state === "enabled") return;
+    const next = core.nextProviderApiState(
+        previous,
+        setup
+            ? { state: "disabled", project: setup.project, activationUrl: setup.activationUrl }
+            : { state: "enabled" },
+        now
+    );
+    await host.settingStore.setSetting(core.GOOGLE_TASKS_API_STATE_KEY, JSON.stringify(next));
+}
+
 /**
  * Record that a Google call went through. When the API had been off, every
  * source still waiting on it is made due now instead of at its next gap.
