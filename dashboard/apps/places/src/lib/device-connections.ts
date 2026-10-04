@@ -84,8 +84,9 @@ export interface ConnectionField {
      */
     readonly secret?: boolean;
     readonly optional?: boolean;
-    /** A shape the value has to have, checked as it is typed. */
-    readonly format?: "email";
+    /** A shape the value has to have, checked as it is typed: an email
+     *  address, a TCP port, or a list of Dynalite area numbers. */
+    readonly format?: "email" | "port" | "areas";
     /**
      * Where the device is: an IP address or a name - or its hardware (MAC)
      * address instead, for a device whose app shows only that.
@@ -192,7 +193,17 @@ export interface DeviceConnection {
     /** Other words somebody might search for - the product it is part of, the
      *  name on the box, the way it is written in a forum. */
     readonly search?: readonly string[];
+    /**
+     * Why this way in cannot be used from Polaris, where it is listed anyway so
+     * somebody looking for it learns why rather than wondering: a sentence the
+     * picker shows in place of its fields. A connection with it has no driver,
+     * and the server refuses it like any other unbuilt one.
+     */
+    readonly unavailable?: string;
 }
+
+/** The TCP port a Dynalite Ethernet gateway listens on unless it was changed. */
+export const DEFAULT_DYNALITE_PORT = 12345;
 
 const NUKI_TOKEN_PAGE = "https://web.nuki.io/#/admin/web-api";
 const TUYA_CONSOLE = "https://iot.tuya.com/";
@@ -776,8 +787,7 @@ export const DEVICE_CONNECTIONS: readonly DeviceConnection[] = [
     },
     {
         id: "hue-bridge",
-        brand: "Philips Hue",
-        recommended: true,
+        brand: "Philips",
         logo: "philipshue",
         label: en("connections.hue-bridge.label"),
         reach: "same-network",
@@ -807,8 +817,10 @@ export const DEVICE_CONNECTIONS: readonly DeviceConnection[] = [
             }
         ],
         kinds: ["light", "outlet"],
+        discovery: true,
         search: [
             "hue",
+            "philips hue",
             "philips",
             "signify",
             "bridge",
@@ -818,6 +830,80 @@ export const DEVICE_CONNECTIONS: readonly DeviceConnection[] = [
             "zigbee",
             "local"
         ]
+    },
+    // Philips Dynalite: lighting control over a Dynet gateway's TCP port, the
+    // way Home Assistant's dynalite integration (python-dynalite-devices) does.
+    // Areas are not announced by the network, so they are typed.
+    {
+        id: "philips-dynalite",
+        brand: "Philips",
+        logo: "philips",
+        label: en("connections.philips-dynalite.label"),
+        reach: "same-network",
+        summary: en("connections.philips-dynalite.summary"),
+        note: en("connections.philips-dynalite.note"),
+        steps: [
+            en("connections.philips-dynalite.steps.s0"),
+            en("connections.philips-dynalite.steps.s1")
+        ],
+        fields: [
+            {
+                key: "host",
+                address: true,
+                label: en("connections.philips-dynalite.fields.host.label"),
+                hint: en("connections.philips-dynalite.fields.host.hint"),
+                placeholder: en("connections.philips-dynalite.fields.host.placeholder"),
+                maxLength: 200
+            },
+            {
+                key: "port",
+                label: en("connections.philips-dynalite.fields.port.label"),
+                placeholder: String(DEFAULT_DYNALITE_PORT),
+                defaultValue: String(DEFAULT_DYNALITE_PORT),
+                optional: true,
+                format: "port",
+                maxLength: 5
+            },
+            {
+                key: "areas",
+                label: en("connections.philips-dynalite.fields.areas.label"),
+                hint: en("connections.philips-dynalite.fields.areas.hint"),
+                placeholder: en("connections.philips-dynalite.fields.areas.placeholder"),
+                format: "areas",
+                maxLength: 400
+            }
+        ],
+        kinds: ["light"],
+        search: ["dynalite", "dynet", "philips dynalite", "lighting control", "area", "preset"]
+    },
+    // Listed so somebody looking for them learns why they are not here. A Hue
+    // bulb over Bluetooth needs a Bluetooth radio on the machine Polaris runs
+    // on, which nothing in Polaris drives. A Philips TV (JointSpace API v6)
+    // only pairs with a signature keyed by a value Philips ships inside its own
+    // TV remote app, which Polaris does not carry.
+    {
+        id: "hue-ble",
+        brand: "Philips",
+        logo: "philipshue",
+        label: en("connections.hue-ble.label"),
+        reach: "same-network",
+        summary: en("connections.hue-ble.summary"),
+        unavailable: en("connections.hue-ble.unavailable"),
+        fields: [],
+        kinds: ["light"],
+        search: ["hue", "philips hue", "bluetooth", "ble", "bulb"]
+    },
+    {
+        id: "philips-tv",
+        brand: "Philips",
+        logo: "philips",
+        label: en("connections.philips-tv.label"),
+        reach: "same-network",
+        summary: en("connections.philips-tv.summary"),
+        unavailable: en("connections.philips-tv.unavailable"),
+        fields: [],
+        kinds: ["switch"],
+        search: ["philips tv", "television", "tv", "jointspace", "android tv", "ambilight"]
     },
     // IKEA: the DIRIGERA hub's local API is the only way in with no cloud at all,
     // and the most convenient - one button press brings the whole hub. Pairing
@@ -1067,7 +1153,39 @@ export function fieldIssue(
     if (field.format === "email" && !emailField.safeParse(trimmed).success) {
         return t("connections.notEmail");
     }
+    if (field.format === "port" && portOf(trimmed) === null) return t("connections.notPort");
+    if (field.format === "areas" && dynaliteAreas(trimmed) === null) {
+        return t("connections.notAreas");
+    }
     return null;
+}
+
+/** A TCP port as typed, or null for anything that is not one. */
+export function portOf(typed: string): number | null {
+    if (!/^\d{1,5}$/.test(typed.trim())) return null;
+    const port = Number(typed.trim());
+    return port >= 1 && port <= 65535 ? port : null;
+}
+
+/** The most areas one Dynalite connection reads: each is asked on every sync. */
+export const MAX_DYNALITE_AREAS = 64;
+
+/**
+ * Dynalite area numbers as typed - "1, 2, 7" or "1 2 7" - in order and once
+ * each, or null when anything in it is not an area (1 to 255, Dynet's one-byte
+ * area with 0 kept for broadcast) or there are more than the connection reads.
+ */
+export function dynaliteAreas(typed: string): number[] | null {
+    const parts = typed.split(/[\s,;]+/).filter(Boolean);
+    if (parts.length === 0 || parts.length > MAX_DYNALITE_AREAS) return null;
+    const areas: number[] = [];
+    for (const part of parts) {
+        if (!/^\d{1,3}$/.test(part)) return null;
+        const area = Number(part);
+        if (area < 1 || area > 255) return null;
+        if (!areas.includes(area)) areas.push(area);
+    }
+    return areas;
 }
 
 /** Whether everything a connection needs has been given, and given validly. The
@@ -1080,6 +1198,7 @@ export function fieldsComplete(
      *  one is half typed. A whole MAC is recognised without it. */
     macKeys: readonly string[] = []
 ): boolean {
+    if (connection.unavailable) return false;
     return connection.fields.every((field) => {
         const value = (fields[field.key] ?? field.defaultValue ?? "").trim();
         if (!value) return field.optional === true;
@@ -1235,6 +1354,9 @@ export function connectionWords(t: PlacesTranslator, connection: DeviceConnectio
             ? { ...connection.link, label: say(`${base}.link`) ?? connection.link.label }
             : undefined,
         reach: t(`connections.reach.${connection.reach}`),
+        unavailable: connection.unavailable
+            ? (say(`${base}.unavailable`) ?? connection.unavailable)
+            : undefined,
         pairingPrompt: connection.pairing ? say(`${base}.pairing.prompt`) : undefined,
         pairingFile: connection.pairing?.file
             ? {

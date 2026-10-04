@@ -497,6 +497,13 @@
         "hueBusy": "The Hue bridge is busy. Try again in a moment.",
         "hueRefused": "The Hue bridge refused the request.",
         "hueCannot": "A Hue light cannot be told to do that",
+        "notPort": "Type a port number from 1 to 65535",
+        "dynaliteAreas": "List the area numbers to bring in",
+        "dynaliteCannot": "A Dynalite area cannot be told to do that",
+        "dynaliteNotArea": "That device is not a Dynalite area.",
+        "dynaliteAreaGone": "That area is no longer on this connection.",
+        "dynaliteSlow": "The Dynalite gateway did not answer in time.",
+        "dynaliteSilent": "Nothing answered on that address and port. Check the gateway's address and that its port is 12345 unless it was changed.",
         "dirigeraNot": "That address did not answer as a DIRIGERA hub.",
         "dirigeraNoPair": "The DIRIGERA hub would not pair with Polaris.",
         "dirigeraPress": "The hub's action button was not pressed in time. Select Connect, then press the action button on the hub within a minute.",
@@ -784,6 +791,40 @@
                 }
             }
         },
+        "philips-dynalite": {
+            "label": "Philips Dynalite (Dynet gateway)",
+            "summary": "The lighting areas on a Dynalite network, switched through its Ethernet gateway. Nothing goes through the cloud.",
+            "note": "Each area you list becomes a light: on selects its preset 1 and off its preset 4, Dynalite's usual on and off. Polaris reads which preset each area is in when it syncs. Channel levels and other presets stay in your Dynalite programming.",
+            "steps": {
+                "s0": "Find the gateway's IP address (a DDNG or PDEG) in your router or in DLight.",
+                "s1": "List the area numbers to bring in, as they are programmed on the network."
+            },
+            "fields": {
+                "host": {
+                    "label": "Gateway address",
+                    "hint": "On the same network as Polaris.",
+                    "placeholder": "192.168.1.50"
+                },
+                "port": {
+                    "label": "Port"
+                },
+                "areas": {
+                    "label": "Areas",
+                    "hint": "Area numbers, separated by commas.",
+                    "placeholder": "1, 2, 7"
+                }
+            }
+        },
+        "hue-ble": {
+            "label": "Hue Bluetooth",
+            "summary": "A Hue bulb paired over Bluetooth, without a bridge.",
+            "unavailable": "Not available: this needs a Bluetooth radio on the machine Polaris runs on, and Polaris does not use one. Add the bulb to a Hue Bridge and connect the bridge instead."
+        },
+        "philips-tv": {
+            "label": "Philips TV",
+            "summary": "A Philips Android TV on your network: power, volume and inputs.",
+            "unavailable": "Not available: Philips TVs only pair with apps that sign the request with a key Philips keeps inside its own TV remote app, and Polaris does not ship values taken from Philips' apps."
+        },
         "dirigera-hub": {
             "label": "DIRIGERA hub",
             "summary": "The lights, outlets and sensors on your IKEA DIRIGERA hub, from one press of its button. Nothing goes through the cloud.",
@@ -965,6 +1006,8 @@
             "yourCountry": "your country"
         },
         "notEmail": "Type a whole email address, like name@example.com.",
+        "notPort": "Type a port number from 1 to 65535.",
+        "notAreas": "Type area numbers from 1 to 255, separated by commas, up to 64 of them.",
         "macShort": "A MAC address has 12 digits.",
         "macReserved": "That is not a device's MAC address."
     },
@@ -1573,6 +1616,7 @@
     "connect": {
         "reconnectTitle": "Reconnect {name}",
         "recommended": "Recommended",
+        "unavailable": "Not available",
         "title": "Connect devices",
         "reconnectIntro": "The devices keep their names, their places and everything they have done. Only what Polaris opens them with changes.",
         "intro": "Pick what you have and how Polaris should reach it. What it finds arrives as devices you can name and place.",

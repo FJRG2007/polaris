@@ -479,7 +479,22 @@ export function ConnectDialog({
      *  its recommended one. */
     const pickBrand = (next: string) => {
         setBrand(next);
-        setChosen(registry.recommendedConnection(next)?.id ?? "");
+        // A make found by a word only one of its ways in has - "hue" under
+        // Philips - opens on that way in rather than on the make's usual one.
+        const words = folded(query).split(/\s+/).filter(Boolean);
+        const recommended = registry.recommendedConnection(next);
+        const named = registry.connectionsOfBrand(next).filter((way) => {
+            if (way.unavailable || words.length === 0) return false;
+            const own = folded(
+                [way.label, registry.connectionWords(t, way).label, ...(way.search ?? [])].join(" ")
+            );
+            return words.every((word) => own.includes(word));
+        });
+        const opened =
+            named.length === 0 || named.some((way) => way.id === recommended?.id)
+                ? recommended
+                : named[0];
+        setChosen(opened?.id ?? "");
         setFields({});
         setMacKeys([]);
         setError("");
@@ -879,9 +894,18 @@ export function ConnectDialog({
                                                             : "text-transparent"
                                                     )}
                                                 />
+                                                <IntegrationLogo
+                                                    slug={entry.logo}
+                                                    className="mt-0.5 size-4 w-6 shrink-0 object-contain"
+                                                />
                                                 <span className="flex min-w-0 flex-col gap-0.5">
                                                     <span className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm font-medium">
                                                         {registry.connectionWords(t, entry).label}
+                                                        {entry.unavailable && (
+                                                            <Badge className="border-border bg-muted text-muted-foreground">
+                                                                {t("connect.unavailable")}
+                                                            </Badge>
+                                                        )}
                                                         {entry.recommended === true && (
                                                             <Badge className="border-accent/30 bg-accent/10 text-accent">
                                                                 {t("connect.recommended")}
@@ -914,6 +938,11 @@ export function ConnectDialog({
                                     {said?.note && (
                                         <span className="text-xs text-foreground-subtle">
                                             {said.note}
+                                        </span>
+                                    )}
+                                    {said?.unavailable && (
+                                        <span className="text-xs text-foreground" role="note">
+                                            {said.unavailable}
                                         </span>
                                     )}
                                 </div>
@@ -1252,7 +1281,7 @@ export function ConnectDialog({
                                     />
                                 ))}
 
-                            {!pairing && !choosing && (
+                            {!pairing && !choosing && !connection?.unavailable && (
                                 <label className="flex flex-col gap-1.5">
                                     <span className="text-xs text-muted-foreground">
                                         {t("connect.label")}{" "}
@@ -1338,7 +1367,7 @@ export function ConnectDialog({
                                         </Button>
                                     )}
                                 </>
-                            ) : choosing ? null : (
+                            ) : choosing || connection?.unavailable ? null : (
                                 <Button
                                     onClick={() =>
                                         void (connection?.pairing ? startPairing() : submit())

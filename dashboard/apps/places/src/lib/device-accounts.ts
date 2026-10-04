@@ -30,6 +30,7 @@ import { SWITCHBOT_CLOUD, switchBotCloudDriver } from "./drivers/switchbot-cloud
 import { HOME_ASSISTANT, homeAssistantDriver } from "./drivers/home-assistant";
 import { DIRIGERA_HUB, dirigeraHubDriver } from "./drivers/dirigera-hub";
 import { HUE_BRIDGE, hueBridgeDriver } from "./drivers/hue-bridge";
+import { PHILIPS_DYNALITE, philipsDynaliteDriver } from "./drivers/philips-dynalite";
 import { SHELLY_LOCAL, shellyLocalDriver } from "./drivers/shelly-local";
 import { GREE_LOCAL, greeLocalDriver } from "./drivers/gree-local";
 import { PHILIPS_COAP, philipsCoapDriver } from "./drivers/philips-coap";
@@ -66,7 +67,8 @@ const BUILT: Readonly<Record<string, DeviceDriver>> = {
     [SWITCHBOT_CLOUD]: switchBotCloudDriver,
     [GREE_LOCAL]: greeLocalDriver,
     [PHILIPS_COAP]: philipsCoapDriver,
-    [PHILIPS_CLOUD]: philipsCloudDriver
+    [PHILIPS_CLOUD]: philipsCloudDriver,
+    [PHILIPS_DYNALITE]: philipsDynaliteDriver
 };
 
 /** The drivers as everything here uses them: an address field may hold a MAC,

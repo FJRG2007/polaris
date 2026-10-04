@@ -18,7 +18,15 @@ import { HomeError } from "../home-error";
 import * as hue from "../integrations/hue-api";
 import type { DeviceKind } from "../device-kinds";
 import { deviceHost } from "../integrations/lan-http";
-import { DriverError, type Credentials, type DeviceDriver, type DeviceSnapshot } from "./contract";
+import { subnetTargets } from "../integrations/lan-unit";
+import { forbiddenAddress } from "../integrations/lan-address";
+import {
+    DriverError,
+    type Credentials,
+    type DeviceDriver,
+    type DeviceSnapshot,
+    type DiscoveredUnit
+} from "./contract";
 
 export const HUE_BRIDGE = "hue-bridge";
 
@@ -51,8 +59,52 @@ function kindOf(light: hue.HueLight, device: hue.HueDevice | undefined): DeviceK
         : "light";
 }
 
+/** How long one address of the sweep is given to answer as a bridge. */
+const SWEEP_TIMEOUT_MS = 1_500;
+/** How many addresses are asked at once. */
+const SWEEP_PARALLEL = 32;
+
+/**
+ * The bridges on the network, the way Home Assistant's hue integration finds
+ * them (home-assistant.io/integrations/hue, aiohue's discovery): Signify's
+ * discovery service first, then - where it lists none, or the server cannot
+ * reach it - every address of this server's /24, since mDNS from a container's
+ * bridge network never reaches the LAN. Every candidate has to prove it is a
+ * bridge the way pairing does, with Hue's certificate, so a name the service
+ * hands back is never trusted on its own.
+ */
+export async function findBridges(): Promise<DiscoveredUnit[]> {
+    const listed = (await hue.nupnpAddresses()).filter((address) => !forbiddenAddress(address));
+    const candidates =
+        listed.length > 0
+            ? listed
+            : (await subnetTargets()).filter((address) => !forbiddenAddress(address));
+    const found: DiscoveredUnit[] = [];
+    const seen = new Set<string>();
+    for (let at = 0; at < candidates.length; at += SWEEP_PARALLEL) {
+        const batch = candidates.slice(at, at + SWEEP_PARALLEL);
+        const answers = await Promise.allSettled(
+            batch.map((address) => hue.bridgeAt(address, SWEEP_TIMEOUT_MS))
+        );
+        answers.forEach((answer, index) => {
+            if (answer.status !== "fulfilled") return;
+            if (seen.has(answer.value.bridgeId)) return;
+            seen.add(answer.value.bridgeId);
+            found.push({
+                name: answer.value.name.slice(0, 120),
+                model: answer.value.model.slice(0, 120),
+                mac: answer.value.mac,
+                address: batch[index]!
+            });
+        });
+    }
+    return found;
+}
+
 export const hueBridgeDriver: DeviceDriver = {
     connection: HUE_BRIDGE,
+
+    discover: findBridges,
 
     /**
      * Find the bridge, pair with it unless a key was given, and prove the key

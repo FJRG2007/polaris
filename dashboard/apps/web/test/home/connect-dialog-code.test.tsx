@@ -440,3 +440,55 @@ describe("the Philips account's country", () => {
         expect(onConnected).toHaveBeenCalledWith({ devices: [{ id: "d1" }], accounts: [] });
     });
 });
+
+describe("every Philips way in, under Philips", () => {
+    function opened(query: string) {
+        render(
+            withMessages(
+                <ConnectDialog open reconnect={null} onClose={() => {}} onConnected={vi.fn()} />
+            )
+        );
+        fireEvent.change(screen.getByRole("searchbox"), { target: { value: query } });
+        fireEvent.click(screen.getByRole("button", { name: /^Philips/ }));
+    }
+
+    const way = (pattern: RegExp) =>
+        screen
+            .getAllByRole("button")
+            .find(
+                (button) =>
+                    button.getAttribute("aria-pressed") !== null &&
+                    pattern.test(button.textContent ?? "")
+            )!;
+
+    it("opens on the Hue Bridge when Hue is what was searched for", () => {
+        opened("hue");
+        expect(screen.queryByRole("button", { name: /^Philips Hue/ })).toBeNull();
+        expect(way(/^Hue Bridge/).getAttribute("aria-pressed")).toBe("true");
+        expect(way(/^Philips Air\+ \(local network\)/).getAttribute("aria-pressed")).toBe("false");
+    });
+
+    it("lists Dynalite with its fields, and starts on the gateway's port", () => {
+        opened("dynalite");
+        expect(way(/^Philips Dynalite/).getAttribute("aria-pressed")).toBe("true");
+        expect(
+            (screen.getByRole("textbox", { name: "Port" }) as HTMLInputElement).placeholder
+        ).toBe("12345");
+        expect(screen.getByRole("textbox", { name: "Areas" })).toBeTruthy();
+    });
+
+    it("says why a TV or a Bluetooth bulb cannot be connected, and offers nothing to send", () => {
+        opened("philips");
+        fireEvent.click(way(/^Philips TV/));
+        expect(
+            screen.getByText(/^Not available: Philips TVs only pair with apps that sign/)
+        ).toBeTruthy();
+        expect(screen.queryByRole("button", { name: "Connect" })).toBeNull();
+        expect(screen.queryByRole("textbox", { name: "Name for this connection" })).toBeNull();
+
+        fireEvent.click(way(/^Hue Bluetooth/));
+        expect(screen.getByText(/^Not available: this needs a Bluetooth radio/)).toBeTruthy();
+        expect(screen.queryByRole("button", { name: "Connect" })).toBeNull();
+        expect(way(/^Hue Bluetooth/).textContent).toContain("Not available");
+    });
+});

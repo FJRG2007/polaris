@@ -18,9 +18,16 @@ describe("the ways in", () => {
         // A method listed with no fields is a screen asking for nothing and then
         // failing; one with no summary is a choice made blind.
         for (const connection of registry.DEVICE_CONNECTIONS) {
-            expect(connection.fields.length).toBeGreaterThan(0);
             expect(connection.summary.length).toBeGreaterThan(0);
             expect(connection.kinds.length).toBeGreaterThan(0);
+            // One listed only to say why it cannot be used asks for nothing,
+            // and says why instead.
+            if (connection.unavailable) {
+                expect(connection.fields, connection.id).toEqual([]);
+                expect(connection.unavailable.length).toBeGreaterThan(0);
+                continue;
+            }
+            expect(connection.fields.length).toBeGreaterThan(0);
         }
     });
 
@@ -195,13 +202,54 @@ describe("the recommended way in", () => {
     it("stays local for Philips, with the unofficial account second", () => {
         expect(registry.connectionsOfBrand("Philips").map((connection) => connection.id)).toEqual([
             "philips-coap",
-            "philips-cloud"
+            "philips-cloud",
+            "hue-bridge",
+            "philips-dynalite",
+            "hue-ble",
+            "philips-tv"
         ]);
         expect(registry.recommendedConnection("Philips")?.id).toBe("philips-coap");
     });
 
     it("is nothing for a brand that does not exist", () => {
         expect(registry.recommendedConnection("Nobody")).toBeNull();
+    });
+});
+
+describe("Philips' ways in", () => {
+    it("are one make, Hue included, each drawn with its own mark", () => {
+        const brands = registry.deviceBrands().map((entry) => entry.brand);
+        expect(brands).toContain("Philips");
+        expect(brands).not.toContain("Philips Hue");
+        const marks = Object.fromEntries(
+            registry.connectionsOfBrand("Philips").map((way) => [way.id, way.logo])
+        );
+        expect(marks).toMatchObject({
+            "philips-coap": "philips",
+            "hue-bridge": "philipshue",
+            "hue-ble": "philipshue",
+            "philips-dynalite": "philips",
+            "philips-tv": "philips"
+        });
+        expect(registry.searchConnections("hue").map((way) => way.id)).toEqual(
+            expect.arrayContaining(["hue-bridge", "hue-ble"])
+        );
+    });
+
+    it("never count one that cannot be used as filled in", () => {
+        for (const id of ["hue-ble", "philips-tv"]) {
+            const way = registry.deviceConnection(id)!;
+            expect(way.unavailable, id).toMatch(/^Not available: /);
+            expect(registry.fieldsComplete(way, {})).toBe(false);
+        }
+    });
+
+    it("say why in the reader's language", () => {
+        const es = placesCatalogs.translator("es-ES", "places");
+        const tv = registry.connectionWords(es, registry.deviceConnection("philips-tv")!);
+        expect(tv.unavailable).toMatch(/^No disponible: /);
+        const hue = registry.connectionWords(es, registry.deviceConnection("hue-bridge")!);
+        expect(hue.unavailable).toBeUndefined();
     });
 });
 
