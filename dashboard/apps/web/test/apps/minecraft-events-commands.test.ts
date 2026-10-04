@@ -26,6 +26,7 @@ import * as chunks from "@polaris-app/game-servers/src/lib/minecraft/events/kind
 import * as spleef from "@polaris-app/game-servers/src/lib/minecraft/events/kinds/spleef";
 import * as snowballPack from "@polaris-app/game-servers/src/lib/minecraft/events/kinds/snowball-pack";
 import * as parkour from "@polaris-app/game-servers/src/lib/minecraft/events/kinds/parkour";
+import * as parkourLayout from "@polaris-app/game-servers/src/lib/minecraft/events/kinds/parkour-layout";
 import * as meteors from "@polaris-app/game-servers/src/lib/minecraft/events/kinds/meteor-shower";
 import {
     atLeast,
@@ -1833,8 +1834,9 @@ describe("a parkour course", () => {
         }
     });
 
-    it("only asks for jumps a player can make: one block up, or a climb of three", () => {
+    it("only asks for jumps a player can make: a block up or down, or a climb of three", () => {
         const widest = { easy: 2, medium: 2, hard: 3 };
+        const widestUp = { easy: 1, medium: 2, hard: 2 };
         for (const { difficulty, jumps, seed } of shapes) {
             const course = parkour.course(
                 { place: { mode: "players" }, jumps, difficulty, height: 30 },
@@ -1852,32 +1854,29 @@ describe("a parkour course", () => {
                     expect(gapBetween(before, next)).toBe(1);
                     continue;
                 }
-                expect(rise === 0 || rise === 1).toBe(true);
+                expect(rise >= -1 && rise <= 1).toBe(true);
                 const gap = gapBetween(before, next);
                 expect(gap).toBeGreaterThanOrEqual(1);
-                expect(gap).toBeLessThanOrEqual(rise === 1 ? 1 : Math.hypot(widest[difficulty], 1));
+                expect(gap).toBeLessThanOrEqual(
+                    Math.hypot(rise === 1 ? widestUp[difficulty] : widest[difficulty], 1)
+                );
             }
         }
     });
 
-    it("climbs row by row, so no later row can be jumped to from an earlier one", () => {
-        for (const { difficulty, jumps, seed } of shapes) {
-            const course = parkour.course(
-                { place: { mode: "players" }, jumps, difficulty, height: 30 },
-                seed,
-                { x: 0, z: 0 },
-                80
-            );
-            // Every height a row stands at is one stretch of the course: a
-            // player who reaches it has come through every platform before.
-            const byHeight = new Map<number, number[]>();
-            course.platforms.forEach((one, index) =>
-                byHeight.set(one.y, [...(byHeight.get(one.y) ?? []), index])
-            );
-            for (const indexes of byHeight.values()) {
-                expect(indexes.at(-1)! - indexes[0]!).toBe(indexes.length - 1);
+    it("leaves nothing in reach but the next platform, in rows and in a tower", () => {
+        for (const shape of ["rows", "tower"] as const)
+            for (const { difficulty, jumps, seed } of shapes) {
+                const course = parkour.course(
+                    { place: { mode: "players" }, jumps, difficulty, height: 30, shapes: [shape] },
+                    seed,
+                    { x: 0, z: 0 },
+                    80
+                );
+                // A player on any platform can land on the next one, and on no
+                // platform past it: nothing of the course can be skipped.
+                expect(parkourLayout.skipProblems(course.platforms)).toEqual([]);
             }
-        }
     });
 
     it("leaves head room over every platform and keeps everything in its volume, net at the bottom", () => {
@@ -3140,7 +3139,7 @@ describe("a parkour course's climbs, moving platforms and looks", () => {
         }
         expect(changed).toBeGreaterThan(0);
         expect(stage.EMPTY_STAGE.design).toBe(1);
-        expect(parkour.DESIGN).toBe(3);
+        expect(parkour.DESIGN).toBe(4);
     });
 
     it("draws one of four looks for a run, or the one chosen, keeping checkpoints lime", () => {

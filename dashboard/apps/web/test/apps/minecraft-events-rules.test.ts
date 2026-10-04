@@ -24,6 +24,33 @@ const at = (time: string, day = "2026-09-28") => Date.parse(`${day}T${time}:00Z`
 /** Always the same number, so a draw is decided by the test. */
 const always = (value: number) => () => value;
 
+describe("a parkour saved before it had shapes", () => {
+    it("is read as the longer course when it was on the old twenty jumps, and keeps any other length", () => {
+        const old = (jumps: number) => ({
+            place: { mode: "players" },
+            jumps,
+            difficulty: "medium",
+            height: 30
+        });
+        expect(catalog.optionsSchemas.parkour.parse(old(20))).toMatchObject({
+            jumps: 30,
+            shapes: ["rows", "tower"]
+        });
+        expect(catalog.optionsSchemas.parkour.parse(old(25)).jumps).toBe(25);
+        // Saved since, with its shapes: twenty is a choice.
+        expect(
+            catalog.optionsSchemas.parkour.parse({ ...old(20), shapes: ["tower"] })
+        ).toMatchObject({
+            jumps: 20,
+            shapes: ["tower"]
+        });
+        expect(catalog.optionsSchemas.parkour.safeParse({ ...old(30), shapes: [] }).success).toBe(
+            false
+        );
+        expect(catalog.optionsSchemas.parkour.safeParse(old(61)).success).toBe(false);
+    });
+});
+
 describe("the stored settings", () => {
     it("give a server that never opened the screen one of every event", () => {
         const read = catalog.readEventsConfig({}, "Europe/Madrid");

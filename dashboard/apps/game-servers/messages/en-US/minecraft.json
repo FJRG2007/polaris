@@ -1688,7 +1688,7 @@
             },
             "parkour": {
                 "label": "Parkour race",
-                "summary": "A jump course is built high in the air. Players type join in the chat to take part and are taken to the start; the fastest to the finish wins, and a fall only sends you back to your last checkpoint.",
+                "summary": "A jump course is built high in the air: rows climbing back and forth, or a tower climbed round and round. Players type join in the chat to take part and are taken to the start; the fastest to the finish wins, a fall only sends you back to your last checkpoint, and no platform can be reached but the next one.",
                 "unit": "jumps"
             },
             "spleef": {
@@ -1909,6 +1909,7 @@
             "witherArenaOnly": "The Wither fights only in the sky arena",
             "chooseBoss": "Choose at least one boss that can fight here",
             "chooseSpleefWay": "Choose at least one way to play",
+            "chooseParkourShape": "Choose at least one shape",
             "killsOrOres": "Give something for kills, ores or both",
             "wavesAtLeast": "{count, plural, one {At least # wave} other {At least # waves}}",
             "wavesAtMost": "{count, plural, one {At most # wave} other {At most # waves}}",
@@ -2024,7 +2025,9 @@
         "3To12": "3 to 12",
         "madeOf": "Made of",
         "jumps": "Jumps",
-        "10To40ACheckpoint": "10 to 40, a checkpoint every 6.",
+        "10To60ACheckpoint": "10 to 60, a checkpoint every 6.",
+        "parkourShapes": "Shapes",
+        "parkourShapesHint": "One of those switched on is drawn each time it runs.",
         "heightBlocks": "Height (blocks)",
         "25To40AboveThe": "25 to 40 above the ground.",
         "difficulty": "Difficulty",
@@ -2135,6 +2138,10 @@
                 "shovel": "Shovels: dig the snow",
                 "decay": "Vanishing floor",
                 "snowballs": "Snowballs: break their floor"
+            },
+            "parkourShape": {
+                "rows": "Rows climbing back and forth",
+                "tower": "A tower climbed round and round"
             },
             "course": {
                 "random": "A different one each time",

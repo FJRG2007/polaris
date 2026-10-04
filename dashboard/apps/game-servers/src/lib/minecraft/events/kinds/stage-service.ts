@@ -800,8 +800,18 @@ async function parkourTick(
             next = { ...next, checkpoint: game, best: Math.max(next.best, game) };
             if (game === jumps) next = { ...next, finishedAt: await finishedAt(racer) };
         }
-        // Anything it missed, from where they stand.
+        // Anything it missed, from where they stand. Nothing past the next
+        // checkpoint counts: whoever stands there got round part of the course
+        // (an ender pearl, a push) and goes back to their own.
         const on = parkour.platformUnder(course, at);
+        const ahead = parkour.nextCheckpoint(course, next.checkpoint);
+        if (on !== null && on > ahead && next.finishedAt === null) {
+            lines.push(
+                stage.moveLine(racer.name, parkour.spotOn(course, next.checkpoint)),
+                tell(racer.name, messages.tag(language) + messages.noShortcut(language))
+            );
+            continue;
+        }
         let sounded = next.finishedAt !== null;
         if (on !== null && on > next.best) {
             next = { ...next, best: on };

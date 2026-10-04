@@ -1688,7 +1688,7 @@
             },
             "parkour": {
                 "label": "Parkour",
-                "summary": "Se construye un recorrido de saltos en lo alto. Los jugadores escriben join en el chat para participar y se les lleva a la salida; gana el más rápido hasta la meta, y una caída solo te devuelve a tu último punto de control.",
+                "summary": "Se construye un recorrido de saltos en lo alto: filas que suben en zigzag o una torre en espiral. Los jugadores escriben join en el chat para participar y se les lleva a la salida; gana el más rápido hasta la meta, una caída solo te devuelve a tu último punto de control y desde cada plataforma solo se llega a la siguiente.",
                 "unit": "saltos"
             },
             "spleef": {
@@ -1909,6 +1909,7 @@
             "witherArenaOnly": "El Wither solo lucha en la arena aérea",
             "chooseBoss": "Elige al menos un jefe que pueda luchar aquí",
             "chooseSpleefWay": "Elige al menos una forma de jugar",
+            "chooseParkourShape": "Elige al menos una forma",
             "killsOrOres": "Da algo por muertes, por menas o por ambas",
             "wavesAtLeast": "{count, plural, one {Al menos # oleada} other {Al menos # oleadas}}",
             "wavesAtMost": "{count, plural, one {Como máximo # oleada} other {Como máximo # oleadas}}",
@@ -2024,7 +2025,9 @@
         "3To12": "3 a 12",
         "madeOf": "Hecho de",
         "jumps": "Saltos",
-        "10To40ACheckpoint": "De 10 a 40, un punto de control cada 6.",
+        "10To60ACheckpoint": "De 10 a 60, un punto de control cada 6.",
+        "parkourShapes": "Formas",
+        "parkourShapesHint": "Cada vez que se juega sale una de las activadas.",
         "heightBlocks": "Altura (bloques)",
         "25To40AboveThe": "De 25 a 40 sobre el suelo.",
         "difficulty": "Dificultad",
@@ -2135,6 +2138,10 @@
                 "shovel": "Palas: rompe la nieve",
                 "decay": "Suelo fugaz",
                 "snowballs": "Bolas: rompe su suelo"
+            },
+            "parkourShape": {
+                "rows": "Filas que suben en zigzag",
+                "tower": "Torre en espiral"
             },
             "course": {
                 "random": "Distinto cada vez",
