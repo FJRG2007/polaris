@@ -560,10 +560,8 @@ async function admit(
                   ? dropper.spots(layout.shaft, fresh.length)
                   : fresh.map(() => dropper.spawn(layout.shaft))
               : layout.kind === "boat-race"
-                ? // On the grid before "Go!"; a late racer at the back of it.
-                  holding(loop)
-                    ? boatRace.grid(layout.track, fresh.length)
-                    : fresh.map(() => boatRace.grid(layout.track, 1)[0]!)
+                ? // On the grid, before "Go!" or after it.
+                  boatRace.grid(layout.track, fresh.length)
                 : [];
     if (layout.kind === "parkour") await server.sayAll(parkour.SCORES_ADDED);
     if (layout.kind === "dropper") await server.sayAll(dropper.SCORES_ADDED);
