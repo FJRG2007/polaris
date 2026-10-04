@@ -1705,6 +1705,56 @@
                 "label": "Construcción",
                 "summary": "Quienes escriben join reciben cada uno una parcela en el cielo, un tema y un kit de cristal de colores. Al acabar el tiempo todos recorren las parcelas y votan la mejor en el chat. Solo se puede construir con el kit; no se usa ni se quita nada de nadie.",
                 "unit": "votos"
+            },
+            "tnt-run": {
+                "label": "TNT run",
+                "summary": "Se apilan pisos de TNT en lo alto, y cada bloque que pisas desaparece un instante después. No dejes de correr: si caes por un piso aterrizas en el de abajo, y si caes por el último quedas fuera. Gana el último en pie; nada explota.",
+                "unit": "puntos"
+            },
+            "boat-race": {
+                "label": "Carrera de barcos",
+                "summary": "Se construye en el aire una pista de hielo con muros y cada corredor recibe un barco en la salida. Pasa por cada puerta en orden (saltarse una no cuenta) y gana el primero en completar las vueltas. Si caes o pierdes el barco, vuelves a tu última puerta con uno nuevo.",
+                "unit": "vueltas"
+            },
+            "dropper": {
+                "label": "Dropper",
+                "summary": "Se construye en el aire un pozo profundo con pisos agujereados y una piscina de agua al fondo. Se cae desde arriba por los huecos; si aterrizas en un piso vuelves arriba, y gana el más rápido en llegar al agua. Nadie recibe daño por caída.",
+                "unit": "pisos"
+            },
+            "capture-the-flag": {
+                "label": "Captura la bandera",
+                "summary": "Quienes escriben join se reparten en dos equipos en una arena en el cielo, con una base y una bandera en cada extremo y cobertura en medio. Lleva la bandera rival a tu base mientras la tuya esté en casa para capturarla; quien la lleva brilla y la suelta si le dejan sin vida. Gana quien llegue a las capturas fijadas, o quien tenga más al acabar el tiempo. Nadie pierde nada.",
+                "unit": "capturas"
+            },
+            "hide-and-seek": {
+                "label": "Escondite",
+                "summary": "Se construye en el cielo una arena llena de escondites: muros, setos, cajas y un segundo piso. Los buscadores esperan cegados mientras los demás se esconden; si un buscador golpea a alguien lo encuentra, y este pasa a buscar. Los escondidos puntúan por cada segundo oculto y los buscadores por cada uno encontrado; los nombres no se ven entre bandos.",
+                "unit": "puntos"
+            },
+            "hot-potato": {
+                "label": "Patata bomba",
+                "summary": "Quienes se unen están en una pequeña plataforma en el cielo y uno recibe la patata: TNT en la cabeza, brillando. Golpea a alguien para pasársela. Cuando se acaba la mecha, quien la tiene queda fuera y empieza otra ronda; gana el último que queda. Nadie sale herido.",
+                "unit": "puntos"
+            },
+            "sky-wars": {
+                "label": "SkyWars",
+                "summary": "Cada jugador que se une empieza solo en su propia isla flotante, con cofres de equipo y bloques; una isla mayor en el centro guarda mejor botín. Tiende puentes, lucha y sé el último en pie. Caer o morir solo te deja fuera: las cosas de cada uno se guardan y se devuelven.",
+                "unit": "puntos"
+            },
+            "village-defense": {
+                "label": "Defensa del aldeano",
+                "summary": "Se coloca un aldeano en un punto del terreno y llegan oleadas de monstruos a por él. Mantenlo vivo hasta la última oleada: si muere, el evento termina y nadie gana. Las más muertes encabezan el podio, y si mueres no pierdes nada.",
+                "unit": "muertes"
+            },
+            "bingo": {
+                "label": "Bingo exprés",
+                "summary": "Todos reciben el mismo cartón de nueve objetos, sorteado para la partida. Un objeto cuenta cuando está en tu inventario, y cada uno puntúa; la primera línea o el primer cartón completo (lo que se elija) lo termina. Los cartones fáciles tienen cosas de los primeros minutos; los difíciles piden un viaje.",
+                "unit": "objetos"
+            },
+            "boss-fishing": {
+                "label": "Pesca del jefe",
+                "summary": "Un pez legendario muerde el anzuelo y todos los que pescan lo agotan: cada captura le quita fuerza en la barra del jefe, y un tesoro le quita más. Sacadlo a tiempo y gana quien más haya pescado; si se escapa, no gana nadie.",
+                "unit": "capturas"
             }
         },
         "triggers": {
@@ -1962,7 +2012,21 @@
         "drawAll": "Todos",
         "drawNone": "Ninguno",
         "repairedTitle": "Algunos eventos tenían ajustes que Polaris no pudo leer",
-        "repairedOne": "{name}: {count, plural, one {# ajuste vuelve} other {# ajustes vuelven}} al valor por defecto. Revísalo y guarda."
+        "repairedOne": "{name}: {count, plural, one {# ajuste vuelve} other {# ajustes vuelven}} al valor por defecto. Revísalo y guarda.",
+        "heldWhere": {
+            "sky": {
+                "label": "Mapa en el cielo",
+                "hint": "Se construye un mapa en lo alto y se retira al acabar; quienes se unen van allí y vuelven después."
+            },
+            "world": {
+                "label": "En un punto del mundo",
+                "hint": "Se juega en un sitio del propio terreno del mundo, cerca de los jugadores. No se construye en el terreno de nadie."
+            },
+            "anywhere": {
+                "label": "Donde esté cada jugador",
+                "hint": "No se construye nada ni se mueve a nadie: cada uno juega donde está."
+            }
+        }
     },
     "editor": {
         "where": "Dónde",
@@ -2149,6 +2213,14 @@
                 "frost": "Hielo (resbala)",
                 "jungle": "Selva (lianas)",
                 "nether": "Nether"
+            },
+            "skyWarsLoot": {
+                "normal": "Equipo básico",
+                "rich": "Rico: hierro, diamante y más"
+            },
+            "bingoGoal": {
+                "line": "La primera línea",
+                "card": "El cartón entero"
             }
         },
         "place": {
@@ -2160,7 +2232,11 @@
             "meteor": "Cada meteorito cae hasta la distancia de abajo alrededor de un jugador que esté en el mundo normal cuando empiece.",
             "openGround": "Se construye sobre terreno abierto cerca de un jugador que esté en el mundo normal cuando empiece.",
             "arena": "La arena se construye 30 bloques en alto, a unos 30 bloques de un jugador que esté en el mundo normal cuando empiece.",
-            "plots": "Las parcelas se construyen 30 bloques en alto, a unos 30 bloques de un jugador que esté en el mundo normal cuando empiece."
+            "plots": "Las parcelas se construyen 30 bloques en alto, a unos 30 bloques de un jugador que esté en el mundo normal cuando empiece.",
+            "track": "La pista se construye 30 bloques en alto, a unos 30 bloques de un jugador que esté en el mundo normal cuando empiece.",
+            "shaft": "El pozo se construye en el aire, a unos 30 bloques de un jugador que esté en el mundo normal cuando empiece.",
+            "islands": "Las islas se construyen 30 bloques en alto, a unos 30 bloques de un jugador que esté en el mundo normal cuando empiece.",
+            "villager": "El aldeano se coloca a unos 50 bloques de un jugador que esté en el mundo normal cuando empiece."
         },
         "floorSizeHint": "De 5 a 15: este mide {size} por {size}.",
         "range": "De {min} a {max}",
@@ -2209,7 +2285,27 @@
         "roundMinutes": "Minutos por ronda",
         "spleefWays": "Formas de jugar",
         "spleefWaysHint": "Cada vez que se juega sale una de las activadas.",
-        "courseLook": "Aspecto"
+        "courseLook": "Aspecto",
+        "floors": "Pisos",
+        "floorsHint": "De 2 a 4, uno debajo de otro.",
+        "laps": "Vueltas",
+        "lapsHint": "De 1 a 5 vueltas a la pista.",
+        "dropFloors": "Pisos que atravesar",
+        "dropFloorsHint": "De 5 a 20. Más difícil: huecos más pequeños y más separados.",
+        "capturesToWin": "Capturas para ganar",
+        "capturesToWinHint": "De 1 a 10. Si no, gana el equipo con más al acabar el tiempo.",
+        "hideSeconds": "Para esconderse (segundos)",
+        "hideSecondsHint": "De 15 a 60, antes de que los buscadores puedan moverse.",
+        "seekers": "Buscadores al empezar",
+        "seekersHint": "De 1 a 3. Todos los encontrados buscan con ellos.",
+        "fuseSeconds": "Mecha (segundos)",
+        "fuseSecondsHint": "De 10 a 40 hasta que explota la patata.",
+        "chestLoot": "Qué hay en los cofres",
+        "bingoGoal": "Qué gana",
+        "bingoItems": "Objetos del cartón",
+        "bingoItemsHint": "Fácil: se encuentran en los primeros minutos. Difícil: piden ir al Nether.",
+        "fishCatches": "Capturas para sacarlo",
+        "fishCatchesHint": "De 3 a 30 por cada jugador que pesca: más jugadores, pez más grande."
     },
     "moderation": {
         "announcements": {

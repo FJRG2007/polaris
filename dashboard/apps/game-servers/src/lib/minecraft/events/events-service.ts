@@ -1285,6 +1285,8 @@ function rulesVariant(preset: catalog.EventPreset): written.RulesVariant {
             moves: options.moves
         };
     }
+    if (preset.kind === "bingo")
+        return { line: (preset.options as catalog.EventOptions<"bingo">).goal === "line" };
     return { race: isRace(preset) };
 }
 

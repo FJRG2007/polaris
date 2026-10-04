@@ -1705,6 +1705,56 @@
                 "label": "Build battle",
                 "summary": "Players who type join each get a plot in the sky, a theme and a kit of colored glass. When the time is up everybody tours the plots and votes for the best in the chat. Only the kit can be built with; nothing of anybody's is used or taken.",
                 "unit": "votes"
+            },
+            "tnt-run": {
+                "label": "TNT run",
+                "summary": "Floors of TNT are stacked high in the air, and every block a player steps on vanishes a moment later. Keep running: fall through a floor and you land on the one below, fall through the last and you are out. The last one standing wins; nothing explodes.",
+                "unit": "points"
+            },
+            "boat-race": {
+                "label": "Ice boat race",
+                "summary": "A walled track of ice is built in the air and every racer gets a boat at the start. Pass every gate in order - a gate missed does not count - and the first to finish the laps wins. Fall off or lose the boat and you are put back at your last gate with a new one.",
+                "unit": "laps"
+            },
+            "dropper": {
+                "label": "Dropper",
+                "summary": "A deep shaft is built in the air with floors that have holes in them and a pool of water at the bottom. Players fall from the top through the holes; landing on a floor sends you back to the top, and the fastest into the water wins. Nobody takes fall damage.",
+                "unit": "floors"
+            },
+            "capture-the-flag": {
+                "label": "Capture the flag",
+                "summary": "Players who type join are split into two teams in an arena built in the sky, with a base and a banner at each end and cover in between. Carry the other team's banner home while yours is there to capture it; the carrier glows, and drops it when brought low. The captures set win it early, or the most when time is up. Nothing of anybody's is lost.",
+                "unit": "captures"
+            },
+            "hide-and-seek": {
+                "label": "Hide and seek",
+                "summary": "An arena full of hiding places - walls, hedges, crates and a second floor - is built in the sky. The seekers wait, blinded, while the others hide; a seeker's hit finds a hider, who then seeks too. Hiders score for every second hidden and seekers for every hider found; names are hidden from the other side.",
+                "unit": "points"
+            },
+            "hot-potato": {
+                "label": "Hot potato",
+                "summary": "Players who join stand on a small platform in the sky, and one is handed the potato: TNT on their head, glowing. Hit somebody to pass it on. When the fuse runs out whoever holds it is out and the next round starts; the last one left wins. Nobody is hurt.",
+                "unit": "points"
+            },
+            "sky-wars": {
+                "label": "SkyWars",
+                "summary": "Each player who joins starts alone on an island of their own floating in the sky, with chests of gear and blocks; a bigger island in the middle holds better loot. Bridge across, fight, and be the last one left. Falling or dying only puts you out - everybody's own things are kept and given back.",
+                "unit": "points"
+            },
+            "village-defense": {
+                "label": "Villager defense",
+                "summary": "A villager is set at a point on the ground and waves of monsters come for it. Keep it alive to the last wave: if it dies the event ends and nobody wins. The most kills top the podium, and nothing is lost if you die.",
+                "unit": "kills"
+            },
+            "bingo": {
+                "label": "Bingo rush",
+                "summary": "Everybody gets the same card of nine items, drawn for the run. An item counts once it is in your inventory, and each one scores; the first full line or full card - whichever is set - ends it. Easy cards hold things found in the first minutes, hard ones take a trip.",
+                "unit": "items"
+            },
+            "boss-fishing": {
+                "label": "Boss fishing",
+                "summary": "A legendary fish takes the line and everybody fishing wears it down: each catch takes a share of its strength off the boss bar, and treasure takes more. Land it in time and whoever caught the most wins; let it get away and nobody does.",
+                "unit": "catches"
             }
         },
         "triggers": {
@@ -1962,7 +2012,21 @@
         "drawAll": "All",
         "drawNone": "None",
         "repairedTitle": "Some saved events had settings Polaris could not read",
-        "repairedOne": "{name}: {count, plural, one {# setting is} other {# settings are}} back to the default. Check it and save."
+        "repairedOne": "{name}: {count, plural, one {# setting is} other {# settings are}} back to the default. Check it and save.",
+        "heldWhere": {
+            "sky": {
+                "label": "Built in the sky",
+                "hint": "A map is built for it high in the air and taken down after; players who join are taken there and brought back."
+            },
+            "world": {
+                "label": "Somewhere in the world",
+                "hint": "Held at a spot found on the world's own ground, near the players. Nothing is built on anybody's land."
+            },
+            "anywhere": {
+                "label": "Wherever players are",
+                "hint": "Nothing is built and nobody is moved: each player plays where they are."
+            }
+        }
     },
     "editor": {
         "where": "Where",
@@ -2149,6 +2213,14 @@
                 "frost": "Frost (slippery ice)",
                 "jungle": "Jungle (vines)",
                 "nether": "Nether"
+            },
+            "skyWarsLoot": {
+                "normal": "Plain survival gear",
+                "rich": "Rich: iron, diamond and more"
+            },
+            "bingoGoal": {
+                "line": "The first full line",
+                "card": "The whole card"
             }
         },
         "place": {
@@ -2160,7 +2232,11 @@
             "meteor": "Each meteor lands up to the distance below around a player who is in the Overworld when it starts.",
             "openGround": "It is built over open ground around a player who is in the Overworld when it starts.",
             "arena": "The arena is built 30 blocks up, about 30 blocks around a player who is in the Overworld when it starts.",
-            "plots": "The plots are built 30 blocks up, about 30 blocks around a player who is in the Overworld when it starts."
+            "plots": "The plots are built 30 blocks up, about 30 blocks around a player who is in the Overworld when it starts.",
+            "track": "The track is built 30 blocks up, about 30 blocks around a player who is in the Overworld when it starts.",
+            "shaft": "The shaft is built in the air, about 30 blocks around a player who is in the Overworld when it starts.",
+            "islands": "The islands are built 30 blocks up, about 30 blocks around a player who is in the Overworld when it starts.",
+            "villager": "The villager is set about 50 blocks around a player who is in the Overworld when it starts."
         },
         "floorSizeHint": "5 to 15: this one is {size} by {size}.",
         "range": "{min} to {max}",
@@ -2209,7 +2285,27 @@
         "roundMinutes": "Minutes a round",
         "spleefWays": "Ways it is played",
         "spleefWaysHint": "One of those switched on is drawn each time it runs.",
-        "courseLook": "Look"
+        "courseLook": "Look",
+        "floors": "Floors",
+        "floorsHint": "2 to 4, one under the other.",
+        "laps": "Laps",
+        "lapsHint": "1 to 5 times round the track.",
+        "dropFloors": "Floors to fall through",
+        "dropFloorsHint": "5 to 20. Harder means smaller holes, further apart.",
+        "capturesToWin": "Captures to win",
+        "capturesToWinHint": "1 to 10. Otherwise the team with more when time is up wins.",
+        "hideSeconds": "Time to hide (seconds)",
+        "hideSecondsHint": "15 to 60, before the seekers can move.",
+        "seekers": "Seekers at the start",
+        "seekersHint": "1 to 3. Everybody found seeks with them.",
+        "fuseSeconds": "Fuse (seconds)",
+        "fuseSecondsHint": "10 to 40 before the potato goes off.",
+        "chestLoot": "What the chests hold",
+        "bingoGoal": "What wins",
+        "bingoItems": "Items on the card",
+        "bingoItemsHint": "Easy: found in the first minutes. Hard: needs a trip to the Nether.",
+        "fishCatches": "Catches to land it",
+        "fishCatchesHint": "3 to 30 for each player fishing: more players, a bigger fish."
     },
     "moderation": {
         "announcements": {

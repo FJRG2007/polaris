@@ -47,7 +47,17 @@ export const EVENT_KINDS = [
     "parkour",
     "spleef",
     "team-duel",
-    "build-battle"
+    "build-battle",
+    "tnt-run",
+    "boat-race",
+    "dropper",
+    "capture-the-flag",
+    "hide-and-seek",
+    "hot-potato",
+    "sky-wars",
+    "village-defense",
+    "bingo",
+    "boss-fishing"
 ] as const;
 
 export type EventKind = (typeof EVENT_KINDS)[number];
@@ -208,6 +218,10 @@ export const PARKOUR_SHAPES = ["rows", "tower"] as const;
 export const DUEL_KITS = ["wood", "stone", "iron"] as const;
 /** Where a build battle's theme comes from: the built-in list or the operator's. */
 export const THEME_MODES = ["random", "mine"] as const;
+/** A bingo card won by its first full line, or only by the whole card. */
+export const BINGO_GOALS = ["line", "card"] as const;
+/** What a SkyWars island's chests hold: plain survival gear, or rich. */
+export const SKY_WARS_LOOT = ["normal", "rich"] as const;
 
 export type Language = (typeof LANGUAGES)[number];
 
@@ -534,7 +548,138 @@ export const optionsSchemas = {
         .refine((value) => value.themeMode === "random" || value.themes.length > 0, {
             message: problem("writeTheme"),
             path: ["themes"]
-        })
+        }),
+    "tnt-run": z.object({
+        place: placeSchema.default({ mode: "players" }),
+        /** Blocks from the middle of each floor to its edge. */
+        size: z
+            .number()
+            .int()
+            .min(5, problem("atLeast", { count: 5 }))
+            .max(15, problem("atMost", { count: 15 }))
+            .default(9),
+        /** Floors stacked one under the other: falling through one lands on the next. */
+        layers: z
+            .number()
+            .int()
+            .min(2, problem("atLeast", { count: 2 }))
+            .max(4, problem("atMost", { count: 4 }))
+            .default(3),
+        height: z
+            .number()
+            .int()
+            .min(25, problem("atLeast", { count: 25 }))
+            .max(40, problem("atMost", { count: 40 }))
+            .default(30)
+    }),
+    "boat-race": z.object({
+        place: placeSchema.default({ mode: "players" }),
+        /** Times round the ice track to finish. */
+        laps: z
+            .number()
+            .int()
+            .min(1, problem("atLeast", { count: 1 }))
+            .max(5, problem("atMost", { count: 5 }))
+            .default(2),
+        height: z
+            .number()
+            .int()
+            .min(25, problem("atLeast", { count: 25 }))
+            .max(40, problem("atMost", { count: 40 }))
+            .default(30)
+    }),
+    dropper: z.object({
+        place: placeSchema.default({ mode: "players" }),
+        /** Floors with holes to fall through on the way down to the water. */
+        levels: z
+            .number()
+            .int()
+            .min(5, problem("atLeast", { count: 5 }))
+            .max(20, problem("atMost", { count: 20 }))
+            .default(10),
+        difficulty: z.enum(PARKOUR_DIFFICULTIES).default("medium")
+    }),
+    "capture-the-flag": z.object({
+        place: placeSchema.default({ mode: "players" }),
+        kit: z.enum(DUEL_KITS).default("stone"),
+        /** Flags brought home that win it outright, before the time is up. */
+        captures: z
+            .number()
+            .int()
+            .min(1, problem("atLeast", { count: 1 }))
+            .max(10, problem("atMost", { count: 10 }))
+            .default(3),
+        /** As in a duel: hearts left at which a player is sent back to their base. */
+        downHearts: z.number().int().min(1).max(6).default(3)
+    }),
+    "hide-and-seek": z.object({
+        place: placeSchema.default({ mode: "players" }),
+        /** How long the hiders have before the seekers can move. */
+        hideSeconds: z
+            .number()
+            .int()
+            .min(15, problem("atLeast", { count: 15 }))
+            .max(60, problem("atMost", { count: 60 }))
+            .default(30),
+        /** Seekers at the start; everybody found becomes one. */
+        seekers: z
+            .number()
+            .int()
+            .min(1, problem("atLeast", { count: 1 }))
+            .max(3, problem("atMost", { count: 3 }))
+            .default(1)
+    }),
+    "hot-potato": z.object({
+        place: placeSchema.default({ mode: "players" }),
+        /** Seconds before the potato goes off in whoever holds it. */
+        fuseSeconds: z
+            .number()
+            .int()
+            .min(10, problem("atLeast", { count: 10 }))
+            .max(40, problem("atMost", { count: 40 }))
+            .default(20)
+    }),
+    "sky-wars": z.object({
+        place: placeSchema.default({ mode: "players" }),
+        loot: z.enum(SKY_WARS_LOOT).default("normal"),
+        height: z
+            .number()
+            .int()
+            .min(25, problem("atLeast", { count: 25 }))
+            .max(40, problem("atMost", { count: 40 }))
+            .default(30)
+    }),
+    "village-defense": z.object({
+        place: placeSchema.default({ mode: "players" }),
+        waves: z
+            .number()
+            .int()
+            .min(3, problem("wavesAtLeast", { count: 3 }))
+            .max(10, problem("wavesAtMost", { count: 10 }))
+            .default(5),
+        /** As in a horde defense: monsters in the first wave for one defender. */
+        size: z
+            .number()
+            .int()
+            .min(2, problem("atLeast", { count: 2 }))
+            .max(12, problem("atMost", { count: 12 }))
+            .default(4),
+        mix: z.enum(WAVE_MIXES).default("classic")
+    }),
+    bingo: z.object({
+        goal: z.enum(BINGO_GOALS).default("card"),
+        /** Which items the card is drawn from: easy ones, or rarer. */
+        difficulty: z.enum(PARKOUR_DIFFICULTIES).default("medium")
+    }),
+    "boss-fishing": z.object({
+        /** Catches it takes to land the fish, for each player fishing. */
+        catches: z
+            .number()
+            .int()
+            .min(3, problem("atLeast", { count: 3 }))
+            .max(30, problem("atMost", { count: 30 }))
+            .default(10)
+    })
 } as const satisfies Record<EventKind, z.ZodTypeAny>;
 
 export type EventOptions<K extends EventKind> = z.output<(typeof optionsSchemas)[K]>;
@@ -626,6 +771,46 @@ export const presetSchema = z
         presetBase.extend({
             kind: z.literal("build-battle"),
             options: optionsSchemas["build-battle"]
+        }),
+        presetBase.extend({
+            kind: z.literal("tnt-run"),
+            options: optionsSchemas["tnt-run"]
+        }),
+        presetBase.extend({
+            kind: z.literal("boat-race"),
+            options: optionsSchemas["boat-race"]
+        }),
+        presetBase.extend({
+            kind: z.literal("dropper"),
+            options: optionsSchemas["dropper"]
+        }),
+        presetBase.extend({
+            kind: z.literal("capture-the-flag"),
+            options: optionsSchemas["capture-the-flag"]
+        }),
+        presetBase.extend({
+            kind: z.literal("hide-and-seek"),
+            options: optionsSchemas["hide-and-seek"]
+        }),
+        presetBase.extend({
+            kind: z.literal("hot-potato"),
+            options: optionsSchemas["hot-potato"]
+        }),
+        presetBase.extend({
+            kind: z.literal("sky-wars"),
+            options: optionsSchemas["sky-wars"]
+        }),
+        presetBase.extend({
+            kind: z.literal("village-defense"),
+            options: optionsSchemas["village-defense"]
+        }),
+        presetBase.extend({
+            kind: z.literal("bingo"),
+            options: optionsSchemas["bingo"]
+        }),
+        presetBase.extend({
+            kind: z.literal("boss-fishing"),
+            options: optionsSchemas["boss-fishing"]
         })
     ])
     .transform((value) => value as EventPreset);
@@ -766,7 +951,17 @@ export const KIND_NAMES: Readonly<Record<EventKind, Readonly<Record<Language, st
     parkour: { en: "Parkour race", es: "Carrera de parkour" },
     spleef: { en: "Spleef", es: "El suelo es lava" },
     "team-duel": { en: "Team duel", es: "Duelo por equipos" },
-    "build-battle": { en: "Build battle", es: "Construcción rápida" }
+    "build-battle": { en: "Build battle", es: "Construcción rápida" },
+    "tnt-run": { en: "TNT run", es: "TNT run" },
+    "boat-race": { en: "Ice boat race", es: "Carrera de barcos" },
+    dropper: { en: "Dropper", es: "Dropper" },
+    "capture-the-flag": { en: "Capture the flag", es: "Captura la bandera" },
+    "hide-and-seek": { en: "Hide and seek", es: "Escondite" },
+    "hot-potato": { en: "Hot potato", es: "Patata bomba" },
+    "sky-wars": { en: "SkyWars", es: "SkyWars" },
+    "village-defense": { en: "Villager defense", es: "Defensa del aldeano" },
+    bingo: { en: "Bingo rush", es: "Bingo exprés" },
+    "boss-fishing": { en: "Boss fishing", es: "Pesca del jefe" }
 };
 
 /** What an event of each kind is. Its name and summary on a screen are the
@@ -857,6 +1052,46 @@ export const KIND_INFO: Readonly<Record<EventKind, KindInfo>> = {
     },
     "build-battle": {
         unit: "votes",
+        competitive: true
+    },
+    "tnt-run": {
+        unit: "points",
+        competitive: true
+    },
+    "boat-race": {
+        unit: "laps",
+        competitive: true
+    },
+    dropper: {
+        unit: "levels",
+        competitive: true
+    },
+    "capture-the-flag": {
+        unit: "captures",
+        competitive: true
+    },
+    "hide-and-seek": {
+        unit: "points",
+        competitive: true
+    },
+    "hot-potato": {
+        unit: "points",
+        competitive: true
+    },
+    "sky-wars": {
+        unit: "points",
+        competitive: true
+    },
+    "village-defense": {
+        unit: "kills",
+        competitive: true
+    },
+    bingo: {
+        unit: "items",
+        competitive: true
+    },
+    "boss-fishing": {
+        unit: "catches",
         competitive: true
     }
 };
@@ -964,7 +1199,17 @@ export const DEFAULT_PRIZES: Readonly<Record<EventKind, Rewards>> = {
     parkour: QUICK,
     spleef: QUICK,
     "team-duel": HARD,
-    "build-battle": EPIC
+    "build-battle": EPIC,
+    "tnt-run": QUICK,
+    "boat-race": QUICK,
+    dropper: QUICK,
+    "capture-the-flag": HARD,
+    "hide-and-seek": STANDARD,
+    "hot-potato": QUICK,
+    "sky-wars": HARD,
+    "village-defense": EPIC,
+    bingo: STANDARD,
+    "boss-fishing": STANDARD
 };
 
 /** The names a king of the ring was given by default while it was a hill, and
@@ -1002,7 +1247,17 @@ export const DEFAULT_MINUTES: Readonly<Record<EventKind, number>> = {
     parkour: 4,
     spleef: 4,
     "team-duel": 5,
-    "build-battle": 8
+    "build-battle": 8,
+    "tnt-run": 4,
+    "boat-race": 5,
+    dropper: 4,
+    "capture-the-flag": 8,
+    "hide-and-seek": 5,
+    "hot-potato": 5,
+    "sky-wars": 8,
+    "village-defense": 10,
+    bingo: 15,
+    "boss-fishing": 10
 };
 
 /** What every kind ran for before `DEFAULT_MINUTES`: an event still on exactly
@@ -1310,7 +1565,17 @@ export const DEFAULT_MIN_SCORE: Readonly<Record<EventKind, number>> = {
     parkour: 1,
     spleef: 1,
     "team-duel": 1,
-    "build-battle": 1
+    "build-battle": 1,
+    "tnt-run": 1,
+    "boat-race": 1,
+    dropper: 1,
+    "capture-the-flag": 1,
+    "hide-and-seek": 1,
+    "hot-potato": 1,
+    "sky-wars": 1,
+    "village-defense": 3,
+    bingo: 3,
+    "boss-fishing": 2
 };
 
 /** Whether the minimum is something an operator can set for this event. A
@@ -1319,7 +1584,7 @@ export function hasMinScore(preset: EventPreset): boolean {
     if (!KIND_INFO[preset.kind].competitive) return false;
     if (preset.kind === "supply-drop" || preset.kind === "rare-catch") return false;
     // Ranked by the finish and by who is left standing: anybody who took part at all is.
-    if (playsOnStage(preset)) return false;
+    if (playsOnStage(preset) || lastStanding(preset)) return false;
     return !(
         preset.kind === "explorer" && (preset.options as EventOptions<"explorer">).mode === "race"
     );
@@ -1347,6 +1612,10 @@ export function needsOverworld(preset: EventPreset): boolean {
         case "meteor-shower":
         case "parkour":
         case "spleef":
+        case "tnt-run":
+        case "boat-race":
+        case "dropper":
+        case "village-defense":
             return true;
         case "explorer":
             return (preset.options as EventOptions<"explorer">).mode === "race";
@@ -1361,7 +1630,8 @@ export function needsHostileMobs(preset: EventPreset): boolean {
         preset.kind === "blood-moon" ||
         preset.kind === "world-boss" ||
         preset.kind === "mob-hunt" ||
-        preset.kind === "waves"
+        preset.kind === "waves" ||
+        preset.kind === "village-defense"
     );
 }
 
@@ -1380,6 +1650,9 @@ export function afkCounts(preset: EventPreset): boolean {
         case "gathering":
         case "rare-catch":
         case "waves":
+        case "village-defense":
+        case "bingo":
+        case "boss-fishing":
             return true;
         case "explorer":
             return (preset.options as EventOptions<"explorer">).mode === "distance";
@@ -1412,6 +1685,7 @@ export function readyToPlay(run: {
         case "supply-drop":
         case "world-boss":
         case "waves":
+        case "village-defense":
             return run.place !== null;
         case "explorer":
             return (
@@ -1426,10 +1700,17 @@ export function readyToPlay(run: {
             return run.round >= 0;
         case "parkour":
         case "spleef":
+        case "tnt-run":
+        case "boat-race":
+        case "dropper":
             // Once everybody brought in is there and the start given (`arrival`).
             return (run.stage?.racers.length ?? 0) > 0 && (run.stage?.goAt ?? null) !== null;
         case "team-duel":
         case "build-battle":
+        case "capture-the-flag":
+        case "hide-and-seek":
+        case "hot-potato":
+        case "sky-wars":
             // The arena writes its own start when everybody is in it.
             return run.readyAt !== null;
         default:
@@ -1442,10 +1723,10 @@ export function runMinutes(preset: EventPreset): number {
         const options = preset.options as EventOptions<"trivia">;
         return Math.ceil((options.rounds * (options.seconds + ROUND_PAUSE_SECONDS)) / 60);
     }
-    if (preset.kind === "waves") {
+    if (preset.kind === "waves" || preset.kind === "village-defense") {
         // Time to reach the point, every wave fought to its limit with the
         // breath after it, and a minute to find the place.
-        const options = preset.options as EventOptions<"waves">;
+        const options = preset.options as EventOptions<"waves" | "village-defense">;
         const seconds =
             WAVE_TIMING.firstSeconds +
             options.waves * (WAVE_TIMING.limitSeconds + WAVE_TIMING.pauseSeconds) +
@@ -1499,15 +1780,65 @@ export function takesJoiners(preset: EventPreset): boolean {
 }
 
 /** Played on a stage built in the sky for each to play alone - a parkour
- *  course, a spleef floor (`kinds/stage-service.ts`). */
+ *  course, a spleef or TNT run floor, an ice track, a dropper's shaft
+ *  (`kinds/stage-service.ts`). */
 export function playsOnStage(preset: EventPreset): boolean {
-    return preset.kind === "parkour" || preset.kind === "spleef";
+    return (
+        preset.kind === "parkour" ||
+        preset.kind === "spleef" ||
+        preset.kind === "tnt-run" ||
+        preset.kind === "boat-race" ||
+        preset.kind === "dropper"
+    );
 }
 
-/** Played in an arena built in the sky, by sides - two teams, a plot each - with
- *  a marked kit (`kinds/arena-service.ts`). */
+/** Played in an arena built in the sky, by sides - two teams, a plot each, an
+ *  island each - with a marked kit (`kinds/arena-service.ts`). */
 export function playsInArena(preset: EventPreset): boolean {
-    return preset.kind === "team-duel" || preset.kind === "build-battle" || hillFistsOnly(preset);
+    return (
+        preset.kind === "team-duel" ||
+        preset.kind === "build-battle" ||
+        preset.kind === "capture-the-flag" ||
+        preset.kind === "hide-and-seek" ||
+        preset.kind === "hot-potato" ||
+        preset.kind === "sky-wars" ||
+        hillFistsOnly(preset)
+    );
+}
+
+/** Played in an arena until one player is left: ranked by the order they went
+ *  out in, so anybody who took part at all is ranked. */
+export function lastStanding(preset: EventPreset): boolean {
+    return preset.kind === "hot-potato" || preset.kind === "sky-wars";
+}
+
+/**
+ * Where an event is played, as the Events screen groups them: on a map built
+ * for it in the sky (`sky`), at a place found on the world's own ground
+ * (`world`), or wherever the players already are (`anywhere`).
+ */
+export const HELD_WHERE = ["sky", "world", "anywhere"] as const;
+export type HeldWhere = (typeof HELD_WHERE)[number];
+
+export function heldWhere(preset: EventPreset): HeldWhere {
+    if (playsOnStage(preset) || playsInArena(preset)) return "sky";
+    switch (preset.kind) {
+        case "world-boss":
+            return (preset.options as EventOptions<"world-boss">).arena ? "sky" : "world";
+        case "supply-drop":
+        case "king-of-the-hill":
+        case "treasure-hunt":
+        case "waves":
+        case "meteor-shower":
+        case "village-defense":
+            return "world";
+        case "explorer":
+            return (preset.options as EventOptions<"explorer">).mode === "race"
+                ? "world"
+                : "anywhere";
+        default:
+            return "anywhere";
+    }
 }
 
 /** A king of the hill played with fists only: by who joins, in an arena of its own. */
@@ -1564,7 +1895,17 @@ export const WORLD_NEEDS: Readonly<Record<EventKind, WorldNeeds>> = {
     parkour: { time: "day", weather: "clear" },
     spleef: { time: "day", weather: "clear" },
     "team-duel": { time: "day", weather: "clear" },
-    "build-battle": { time: "day", weather: "clear" }
+    "build-battle": { time: "day", weather: "clear" },
+    "tnt-run": { time: "day", weather: "clear" },
+    "boat-race": { time: "day", weather: "clear" },
+    dropper: { time: "day", weather: "clear" },
+    "capture-the-flag": { time: "day", weather: "clear" },
+    "hide-and-seek": { time: "day", weather: "clear" },
+    "hot-potato": { time: "day", weather: "clear" },
+    "sky-wars": { time: "day", weather: "clear" },
+    "village-defense": { time: "night", weather: "clear" },
+    bingo: { time: null, weather: null },
+    "boss-fishing": { time: null, weather: null }
 };
 
 export function worldNeeds(preset: Pick<EventPreset, "kind">): WorldNeeds {
@@ -1592,7 +1933,10 @@ function joinersFloor(preset: EventPreset): number {
 
 export function joinersNeeded(preset: EventPreset): number {
     const floor =
-        preset.kind === "spleef" || playsInArena(preset) || awardsPrizes(preset)
+        preset.kind === "spleef" ||
+        preset.kind === "tnt-run" ||
+        playsInArena(preset) ||
+        awardsPrizes(preset)
             ? PRIZE_COMPETITION_FLOOR
             : 1;
     return Math.max(
@@ -1605,13 +1949,23 @@ export function joinersNeeded(preset: EventPreset): number {
  *  off while they run (`commands.GRIEF_RULES`). A world boss holds it itself,
  *  only where its fight could change a block (`holdsGriefing`). */
 export function summonsMobs(preset: EventPreset): boolean {
-    return preset.kind === "blood-moon" || preset.kind === "waves";
+    return (
+        preset.kind === "blood-moon" || preset.kind === "waves" || preset.kind === "village-defense"
+    );
 }
 
 /** The events players fight each other in, which a server with PvP off cannot run. */
 export function needsPvp(preset: EventPreset): boolean {
     // Pushing is punching: with PvP off, nobody on the hill could move anybody.
-    return preset.kind === "team-duel" || hillFistsOnly(preset);
+    // A flag is defended, a hider found and a potato passed with a blow too.
+    return (
+        preset.kind === "team-duel" ||
+        preset.kind === "capture-the-flag" ||
+        preset.kind === "hide-and-seek" ||
+        preset.kind === "hot-potato" ||
+        preset.kind === "sky-wars" ||
+        hillFistsOnly(preset)
+    );
 }
 
 /** An item id as a player reads it: `minecraft:shulker_box` is "shulker box". */

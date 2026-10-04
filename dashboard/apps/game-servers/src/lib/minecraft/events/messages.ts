@@ -130,6 +130,46 @@ const RULES: Readonly<Record<EventKind, Text>> = {
     "build-battle": {
         en: "Build the theme on your plot with the glass you are given - only it can be placed. Then vote for the best plot.",
         es: "Construye el tema en tu parcela con el cristal que recibes: solo ese se puede colocar. Luego vota la mejor parcela."
+    },
+    "tnt-run": {
+        en: "The floor falls away right behind you. Keep running; the last one standing wins.",
+        es: "El suelo desaparece justo detrás de ti. No dejes de correr; gana el último en pie."
+    },
+    "boat-race": {
+        en: "Race your boat round the ice track through every gate. The first to finish the laps wins.",
+        es: "Recorre en barco la pista de hielo pasando por cada puerta. Gana el primero en completar las vueltas."
+    },
+    dropper: {
+        en: "Fall through the holes in every floor down to the water. Land on a floor and you start again from the top.",
+        es: "Cae por los huecos de cada piso hasta el agua. Si aterrizas en un piso, vuelves arriba."
+    },
+    "capture-the-flag": {
+        en: "Two teams. Take the other team's flag and carry it to yours. Brought low, you drop it. Nothing of yours is lost.",
+        es: "Dos equipos. Coge la bandera rival y llévala a tu base. Si te dejan sin vida, la sueltas. No pierdes nada tuyo."
+    },
+    "hide-and-seek": {
+        en: "Hide before the seekers are let go. A seeker's hit finds you, and then you seek too.",
+        es: "Escóndete antes de que suelten a los buscadores. Si un buscador te golpea, te encuentra y pasas a buscar."
+    },
+    "hot-potato": {
+        en: "Hit somebody to pass them the potato before it goes off. Holding it then, you are out; the last one left wins.",
+        es: "Golpea a alguien para pasarle la patata antes de que explote. Si la tienes entonces, quedas fuera; gana el último."
+    },
+    "sky-wars": {
+        en: "An island each. Loot your chests, bridge to the others and be the last one left. Nothing of yours is lost.",
+        es: "Una isla para cada uno. Saquea tus cofres, tiende puentes hacia los demás y sé el último en pie. No pierdes nada tuyo."
+    },
+    "village-defense": {
+        en: "Keep the villager alive through every wave. If it dies, nobody wins. Nothing is lost if you die.",
+        es: "Mantén vivo al aldeano en cada oleada. Si muere, nadie gana. Si mueres no pierdes nada."
+    },
+    bingo: {
+        en: "Get every item on the card into your inventory. Each one counts; the first full card wins.",
+        es: "Consigue en tu inventario cada objeto del cartón. Cada uno cuenta; gana el primero en completarlo."
+    },
+    "boss-fishing": {
+        en: "A legendary fish is on the line. Every catch wears it down; whoever caught the most when it is landed wins.",
+        es: "Hay un pez legendario enganchado. Cada captura lo agota; gana quien más haya pescado cuando lo saquéis."
     }
 };
 
@@ -160,6 +200,8 @@ export interface RulesVariant {
     readonly rounds?: number;
     readonly shrinks?: boolean;
     readonly moves?: boolean;
+    /** A bingo won by its first full line rather than the whole card. */
+    readonly line?: boolean;
 }
 
 export function rules(kind: EventKind, language: Language, variant: RulesVariant = {}): string {
@@ -210,6 +252,11 @@ export function rules(kind: EventKind, language: Language, variant: RulesVariant
             ? `${does}, ${es ? "y " : "and "}${end}`
             : `${end.charAt(0).toUpperCase()}${end.slice(1)}`;
         return `${hold} ${tail}`;
+    }
+    if (kind === "bingo" && variant.line) {
+        return es
+            ? "Consigue en tu inventario objetos del cartón. Cada uno cuenta; gana la primera línea completa."
+            : "Get items on the card into your inventory. Each one counts; the first full line wins.";
     }
     if (kind === "waves" && variant.byDamage) {
         return es

@@ -34,6 +34,16 @@ import { XpBoostOptions } from "./event-options-xp-boost";
 import { BuildBattleFields, TeamDuelFields } from "./event-options-arena";
 import { ItemSlots } from "./item-slots";
 import { WorldBossOptions } from "./event-options-world-boss";
+import {
+    BoatRaceFields,
+    CaptureTheFlagFields,
+    DropperFields,
+    HideAndSeekFields,
+    HotPotatoFields,
+    SkyWarsFields,
+    TntRunFields
+} from "./event-options-sky";
+import { BingoFields, BossFishingFields, VillageDefenseFields } from "./event-options-anywhere";
 
 const MINING_LABELS: Readonly<
     Record<(typeof catalog.MINING_TARGETS)[number], GameKey<"minecraft">>
@@ -95,12 +105,13 @@ const INTENSITY_LABELS: Readonly<
     high: "editor.labels.intensity.high"
 };
 
-const WAVE_MIX_LABELS: Readonly<Record<(typeof catalog.WAVE_MIXES)[number], GameKey<"minecraft">>> =
-    {
-        classic: "editor.labels.waveMix.classic",
-        undead: "editor.labels.waveMix.undead",
-        mixed: "editor.labels.waveMix.mixed"
-    };
+export const WAVE_MIX_LABELS: Readonly<
+    Record<(typeof catalog.WAVE_MIXES)[number], GameKey<"minecraft">>
+> = {
+    classic: "editor.labels.waveMix.classic",
+    undead: "editor.labels.waveMix.undead",
+    mixed: "editor.labels.waveMix.mixed"
+};
 
 const WAVE_WINNER_LABELS: Readonly<
     Record<(typeof catalog.WAVE_WINNERS)[number], GameKey<"minecraft">>
@@ -125,7 +136,7 @@ const TRIVIA_LABELS: Readonly<Record<(typeof catalog.TRIVIA_MODES)[number], Game
         mixed: "editor.labels.trivia.mixed"
     };
 
-const DIFFICULTY_LABELS: Readonly<
+export const DIFFICULTY_LABELS: Readonly<
     Record<(typeof catalog.PARKOUR_DIFFICULTIES)[number], GameKey<"minecraft">>
 > = {
     easy: "editor.labels.difficulty.easy",
@@ -1076,6 +1087,85 @@ function OptionsFields({
                     issues={issues}
                 />
             );
+        case "tnt-run":
+            return (
+                <TntRunFields
+                    value={preset.options as catalog.EventOptions<"tnt-run">}
+                    onChange={onChange}
+                    issues={issues}
+                />
+            );
+        case "boat-race":
+            return (
+                <BoatRaceFields
+                    value={preset.options as catalog.EventOptions<"boat-race">}
+                    onChange={onChange}
+                    issues={issues}
+                />
+            );
+        case "dropper":
+            return (
+                <DropperFields
+                    value={preset.options as catalog.EventOptions<"dropper">}
+                    onChange={onChange}
+                    issues={issues}
+                />
+            );
+        case "capture-the-flag":
+            return (
+                <CaptureTheFlagFields
+                    value={preset.options as catalog.EventOptions<"capture-the-flag">}
+                    onChange={onChange}
+                    issues={issues}
+                />
+            );
+        case "hide-and-seek":
+            return (
+                <HideAndSeekFields
+                    value={preset.options as catalog.EventOptions<"hide-and-seek">}
+                    onChange={onChange}
+                    issues={issues}
+                />
+            );
+        case "hot-potato":
+            return (
+                <HotPotatoFields
+                    value={preset.options as catalog.EventOptions<"hot-potato">}
+                    onChange={onChange}
+                    issues={issues}
+                />
+            );
+        case "sky-wars":
+            return (
+                <SkyWarsFields
+                    value={preset.options as catalog.EventOptions<"sky-wars">}
+                    onChange={onChange}
+                    issues={issues}
+                />
+            );
+        case "village-defense":
+            return (
+                <VillageDefenseFields
+                    value={preset.options as catalog.EventOptions<"village-defense">}
+                    onChange={onChange}
+                    issues={issues}
+                />
+            );
+        case "bingo":
+            return (
+                <BingoFields
+                    value={preset.options as catalog.EventOptions<"bingo">}
+                    onChange={onChange}
+                />
+            );
+        case "boss-fishing":
+            return (
+                <BossFishingFields
+                    value={preset.options as catalog.EventOptions<"boss-fishing">}
+                    onChange={onChange}
+                    issues={issues}
+                />
+            );
         default:
             return null;
     }
@@ -1124,6 +1214,7 @@ export function EventEditor({
                         </Field>
                         {draft.kind !== "trivia" &&
                             draft.kind !== "waves" &&
+                            draft.kind !== "village-defense" &&
                             draft.kind !== "gathering" && (
                                 <Field
                                     label={
@@ -1243,11 +1334,14 @@ export function EventEditor({
                                     hint={
                                         draft.kind === "blood-moon"
                                             ? t("editor.everybodyWhoSurvivedTheNight")
-                                            : draft.kind === "waves"
+                                            : draft.kind === "waves" ||
+                                                draft.kind === "village-defense"
                                               ? t("editor.everybodyWhoHeldThePoint")
                                               : draft.kind === "parkour"
                                                 ? t("editor.everybodyWhoJoinedAndCleared")
-                                                : draft.kind === "spleef"
+                                                : draft.kind === "spleef" ||
+                                                    draft.kind === "tnt-run" ||
+                                                    catalog.lastStanding(draft)
                                                   ? t("editor.everybodyWhoJoined")
                                                   : draft.kind === "supply-drop" ||
                                                       draft.kind === "rare-catch" ||
