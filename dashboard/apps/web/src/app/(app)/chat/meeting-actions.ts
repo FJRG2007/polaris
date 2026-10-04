@@ -130,7 +130,7 @@ export async function inviteToCallAction(
             parsed.data.meetingId,
             parsed.data.userIds,
             (channelId, userIds) => chat.addChannelMembers({ id: user.id }, channelId, userIds),
-            (userIds) => chat.openDirect({ id: user.id }, userIds)
+            (userIds, kept) => chat.openDirect({ id: user.id }, userIds, "", kept)
         )
     );
     return result.error ? { error: result.error } : { ...result.value! };

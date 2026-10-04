@@ -241,8 +241,9 @@ export async function inviteToCall(
      *  module's neighbours, and a cycle between the two is the one thing that
      *  would make either untestable. */
     addMembers: (channelId: string, userIds: readonly string[]) => Promise<void>,
-    /** Opening the group the call moves into. Same reason. */
-    openGroup: (userIds: readonly string[]) => Promise<string>
+    /** Opening the group the call moves into. Same reason. `kept` is who was
+     *  already in the conversation, who are not being added by anybody. */
+    openGroup: (userIds: readonly string[], kept: readonly string[]) => Promise<string>
 ): Promise<{ meetingId: string; channelId: string; moved: boolean }> {
     const wanted = [...new Set(userIds)].filter((id) => id !== actor.id);
     if (wanted.length === 0) throw new ChatAccessError({ key: "errors.pickSomebodyToAdd" });
@@ -283,8 +284,12 @@ export async function inviteToCall(
     // conversation rather than from the call: somebody who stepped out a minute
     // ago is still part of it, and a group that left them behind would be a
     // second conversation nobody asked for.
-    const everyone = [...new Set([...channel.members.map((row) => row.userId), ...wanted])];
-    const groupId = await openGroup(everyone.filter((id) => id !== actor.id));
+    const talking = channel.members.map((row) => row.userId);
+    const everyone = [...new Set([...talking, ...wanted])];
+    const groupId = await openGroup(
+        everyone.filter((id) => id !== actor.id),
+        talking
+    );
 
     const seat = await startOrJoin(actor, groupId);
     // The person still sitting in the old room, told where it went. Their own

@@ -31,6 +31,9 @@ import { storeAttachment } from "@/lib/chat/attachments";
 import type { SavedMediaView } from "@/lib/chat/saved-media";
 import type { LinkPreviewView } from "@/lib/chat/link-preview";
 import { listBlocked } from "@/lib/blocks";
+import { allowedBy } from "@/lib/privacy-service";
+import { FriendError, requestFriend } from "@/lib/friends-service";
+import { groupStandings, mayJoinGroup } from "@/lib/chat/group-reach";
 import { MAX_NICKNAME, setNickname } from "@/lib/contact-names";
 import { messageToasts, type MessageToast } from "@/lib/chat/toasts";
 import { chatProfile, type ChatProfile } from "@/lib/chat/profiles";
@@ -228,6 +231,79 @@ export async function searchPeopleAction(
     // than as an account that cannot receive a message. A number and nothing
     // else - naming them would say more than the search was asked.
     return { results: found.people, withheld: found.withheld };
+}
+
+/** Somebody the group picker found, and why they cannot be added when they
+ *  cannot. `requestable` is whether a friend request to them would be taken -
+ *  asked of their own setting, so the button is never offered and then refused. */
+export interface GroupCandidate {
+    readonly id: string;
+    readonly name: string;
+    readonly unavailable?: string;
+    readonly requestable?: boolean;
+}
+
+/**
+ * The people a group picker may offer - the same search, with the group rule
+ * applied to every result (`group-reach.ts`): friends and colleagues can be
+ * picked, anybody else is shown greyed out with the reason, and the server
+ * refuses them again however the request arrives.
+ *
+ * Who may be picked first, so the names that can be used are not pushed below
+ * the fold by the ones that cannot.
+ */
+export async function searchGroupPeopleAction(
+    query: string
+): Promise<{ results?: GroupCandidate[]; withheld?: number; error?: string }> {
+    const me = await actor();
+    const found = await searchForConversation(me, String(query ?? ""));
+    const ids = found.people.map((person) => person.id);
+    const standings = await groupStandings(me.id, ids);
+    const strangers = ids.filter((id) => standings.get(id) === "stranger");
+    const askable =
+        strangers.length > 0
+            ? await allowedBy({ id: me.id, isAdmin: false }, "friendRequests", strangers)
+            : new Set<string>();
+    const t = await getTranslations("chat");
+    const reason = {
+        pending: t("groupPicker.pending"),
+        stranger: t("groupPicker.stranger"),
+        blocked: t("groupPicker.blocked")
+    } as const;
+
+    const results: GroupCandidate[] = found.people.map((person) => {
+        const standing = standings.get(person.id) ?? "stranger";
+        if (mayJoinGroup(standing)) return person;
+        return {
+            ...person,
+            unavailable: reason[standing as keyof typeof reason],
+            requestable: standing === "stranger" && askable.has(person.id)
+        };
+    });
+    results.sort((left, right) => Number(!!left.unavailable) - Number(!!right.unavailable));
+    return { results, withheld: found.withheld };
+}
+
+/**
+ * Ask somebody the group picker greyed out to be friends.
+ *
+ * A way in, not a second implementation: every refusal - a block, their own
+ * setting - belongs to the friends service and is said by it. Anything else is
+ * logged and replaced, because those messages name internals.
+ */
+export async function askFriendAction(personId: string): Promise<{ error?: string }> {
+    const me = await actor();
+    const parsed = z.string().uuid().safeParse(personId);
+    if (!parsed.success) return { error: (await getTranslations("chat"))("groupPicker.requestFailed") };
+    try {
+        await requestFriend(me.id, parsed.data);
+        revalidatePath("/account/friends");
+        return {};
+    } catch (caught) {
+        if (caught instanceof FriendError) return { error: caught.message };
+        console.error("polaris: a friend request from the group picker failed:", caught);
+        return { error: (await getTranslations("chat"))("groupPicker.requestFailed") };
+    }
 }
 
 /**

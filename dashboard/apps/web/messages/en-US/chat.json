@@ -96,6 +96,7 @@
         "groupFull": "A group holds {count} people. Make a channel instead.",
         "chatOff": "Somebody there does not have the chat turned on",
         "cannotStartConversation": "You cannot start that conversation",
+        "groupNotFriends": "{others, plural, =0 {{name} is not your friend yet.} one {{name} and one other person are not your friends yet.} other {{name} and # others are not your friends yet.}} Only friends and people in your organization can be added to a group. Send a friend request first.",
         "meetingSignInFirst": "This meeting is only open to people signed in to Polaris",
         "voiceChannelFull": "This voice channel is full. It holds {count, plural, one {# person} other {# people}} at a time.",
         "blockedRecipient": "You blocked {name}. Unblock them to send a message.",
@@ -1221,6 +1222,15 @@
         "noReasonGiven": "No reason given",
         "letBackIn": "Let back in",
         "title": "Kept out of {name}"
+    },
+    "groupPicker": {
+        "stranger": "Not your friend yet",
+        "pending": "Friend request pending",
+        "blocked": "Cannot be added",
+        "sendRequest": "Add friend",
+        "sendRequestTo": "Send {name} a friend request",
+        "requestSent": "Friend request sent",
+        "requestFailed": "The request could not be sent. Try again."
     },
     "addPeople": {
         "addPeople": "Add people",

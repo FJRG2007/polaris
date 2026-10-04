@@ -56,6 +56,20 @@ vi.mock("@polaris/db", () => ({
     prisma: {
         // Nobody has blocked anybody here; blocking has its own test.
         userBlock: { findMany: async () => [] },
+        // Everybody is friends with everybody here; who may be added to a group
+        // has its own test (`group-friends.test.ts`).
+        friendship: {
+            findMany: async ({
+                where
+            }: {
+                where: { OR: [{ requesterId: string; addresseeId: { in: string[] } }] };
+            }) =>
+                where.OR[0].addresseeId.in.map((addresseeId) => ({
+                    requesterId: where.OR[0].requesterId,
+                    addresseeId,
+                    status: "accepted"
+                }))
+        },
         chatChannel: {
             findUnique: async () => ({
                 id: "channel-1",

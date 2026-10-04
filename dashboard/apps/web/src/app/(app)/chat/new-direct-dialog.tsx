@@ -25,9 +25,10 @@ import { runAction } from "@/lib/run-action";
 import { chatAvatarUrl } from "@/lib/avatar-url";
 import { useEffect, useRef, useState } from "react";
 import { MAX_CHAT_CHANNEL_NAME } from "@polaris/core";
-import { openDirectAction, searchPeopleAction } from "./actions";
+import { openDirectAction } from "./actions";
+import { ChatPeoplePicker } from "./chat-people-picker";
 import { ImagePlus, Loader2, MessageSquare, Users } from "lucide-react";
-import { PeoplePicker, type PickedPerson } from "@/components/people-picker";
+import type { PickedPerson } from "@/components/people-picker";
 import { CROP_ACCEPTED, FACE_CROP, ImageCropDialog } from "@/components/image-cropper";
 import {
     Button,
@@ -158,8 +159,8 @@ export function NewDirectDialog({
                     </div>
                 )}
 
-                <PeoplePicker
-                    search={searchPeopleAction}
+                <ChatPeoplePicker
+                    forGroup={kind === "group"}
                     picked={kind === "group" ? picked : []}
                     onChange={(next) => {
                         if (kind === "group") {

@@ -20,6 +20,7 @@ import { discardChannelFiles } from "./attachments";
 import { discardAvatars } from "@/lib/avatar-service";
 import { readsOrgWhere } from "@/lib/orgs/org-service";
 import { postNotice, postSpaceNotice } from "./notices";
+import { refuseGroupStrangers } from "./group-reach";
 import { blockedBetween, blockedBy } from "@/lib/blocks";
 import { currentChatOrgId, orgChatPeople, readableChatScopes } from "./isolation";
 import {
@@ -1349,6 +1350,7 @@ export async function addChannelMembers(
     if (!access.mayAdminister && !group) {
         throw new ChatAccessError({ key: "errors.channelAddNotAllowed" });
     }
+    let groupOrgId: string | null = null;
     if (group) {
         // Asked of the row, not of the screen: a button hidden from somebody is
         // not a rule, and the call's "add people" reaches here as well.
@@ -1359,12 +1361,14 @@ export async function addChannelMembers(
                 spaceId: true,
                 ownerId: true,
                 createdById: true,
-                membersMayInvite: true
+                membersMayInvite: true,
+                orgId: true
             }
         });
         if (!room || !invitesAllowed({ ...room, mayAdminister: access.mayAdminister }, actor.id)) {
             throw new ChatAccessError({ key: "errors.groupAddOwnerOnly" });
         }
+        groupOrgId = room.orgId ?? null;
     }
 
     const wanted = [...new Set(userIds)];
@@ -1408,6 +1412,22 @@ export async function addChannelMembers(
             })
         ).map((row) => row.userId)
     );
+
+    if (group) {
+        const newcomers = wanted.filter((userId) => !already.has(userId));
+        // A group filed under an organization holds its people and nobody
+        // else, which `openDirect` already insists on when the group is made.
+        // Adding somebody afterwards is the same question asked later.
+        if (groupOrgId && newcomers.length > 0) {
+            const roster = await orgChatPeople(groupOrgId);
+            if (newcomers.some((userId) => !roster.has(userId)))
+                throw new ChatAccessError({ key: "errors.notInOrganization" });
+        }
+        // Only the actor's friends and colleagues - see `group-reach.ts`. Only
+        // the newcomers: whoever is already in the group stays, whatever their
+        // standing with the person adding the next one.
+        await refuseGroupStrangers(actor, newcomers);
+    }
 
     await prisma.chatChannelMember.createMany({
         data: wanted.map((userId) => ({ channelId, userId })),
@@ -1645,7 +1665,8 @@ export async function directCounterpart(
  */
 async function directAllowed(
     actor: ChatActor,
-    userIds: readonly string[]
+    userIds: readonly string[],
+    kept: readonly string[] = []
 ): Promise<{ others: string[]; orgId: string | null }> {
     const others = [...new Set(userIds)].filter((id) => id !== actor.id);
     if (others.length === 0) throw new ChatAccessError({ key: "errors.pickSomebodyToMessage" });
@@ -1675,6 +1696,19 @@ async function directAllowed(
     // rule with two implementations is a rule with one hole in it.
     if (others.length > 1 && !(await can(actor.id, "chat.groups"))) {
         throw new ChatAccessError({ key: "errors.groupStartNotAllowed" });
+    }
+
+    // A group holds the actor's friends and colleagues and nobody else (see
+    // `group-reach.ts`). A one-to-one conversation does not ask: writing to one
+    // person is open to anybody with the chat, and the block above is the
+    // answer to an unwanted one. `kept` is whoever the group grows out of - the
+    // person a one-to-one call was already with - who is not being added.
+    if (others.length > 1) {
+        const keep = new Set(kept);
+        await refuseGroupStrangers(
+            actor,
+            others.filter((id) => !keep.has(id))
+        );
     }
 
     // The chat this is being started in, which is also what it is filed under.
@@ -1726,9 +1760,13 @@ export async function openDirect(
     userIds: readonly string[],
     /** What to call it, for a group whose starter typed something. A one-to-one
      *  conversation ignores it: it is named after the person in it. */
-    name = ""
+    name = "",
+    /** People already in the conversation this group grows out of, who are not
+     *  being added by anybody - see `directAllowed`. Server-side callers only:
+     *  no action passes anything a browser sent here. */
+    kept: readonly string[] = []
 ): Promise<string> {
-    const { others, orgId } = await directAllowed(actor, userIds);
+    const { others, orgId } = await directAllowed(actor, userIds, kept);
 
     const everyone = [actor.id, ...others];
     if (others.length === 1) {

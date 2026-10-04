@@ -25,13 +25,25 @@
 import { cn } from "@polaris/ui";
 import { Avatar } from "@/components/avatar";
 import { Loader2, Search, X } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
 import { useTranslations } from "@/components/i18n/i18n-provider";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { PersonName, PersonRow, PlainNames } from "@/components/person-name";
 
 export interface PickedPerson {
     readonly id: string;
     readonly name: string;
+}
+
+/**
+ * Somebody a search found.
+ *
+ * `unavailable` is why they cannot be picked HERE, in words, when the search
+ * decided they cannot. They are still shown - the person typing their name knows
+ * they exist, and an empty list reads as a broken search - but greyed out with
+ * the reason, so nobody is offered and then refused.
+ */
+export interface FoundPerson extends PickedPerson {
+    readonly unavailable?: string;
 }
 
 /** How long the field sits still before it asks. Long enough that typing a name
@@ -42,13 +54,14 @@ const SEARCH_AFTER = 220;
  *  here too so the request is never made. */
 const SHORTEST = 2;
 
-export function PeoplePicker({
+export function PeoplePicker<P extends FoundPerson = FoundPerson>({
     picked,
     onChange,
     exclude = [],
     max,
     label,
-    search
+    search,
+    unavailableAction
 }: {
     picked: readonly PickedPerson[];
     onChange: (picked: readonly PickedPerson[]) => void;
@@ -60,13 +73,14 @@ export function PeoplePicker({
     /** Who may be offered. Chat passes its own, which leaves out anybody whose
      *  chat is switched off - they have no screen a message could arrive on -
      *  and says how many it left out, so the list can explain itself. */
-    search: (
-        query: string
-    ) => Promise<{ results?: { id: string; name: string }[]; withheld?: number }>;
+    search: (query: string) => Promise<{ results?: P[]; withheld?: number }>;
+    /** What to offer beside somebody who cannot be picked - the way to change
+     *  that, when there is one. */
+    unavailableAction?: (person: P) => ReactNode;
 }) {
     const t = useTranslations("components");
     const [query, setQuery] = useState("");
-    const [results, setResults] = useState<readonly PickedPerson[]>([]);
+    const [results, setResults] = useState<readonly P[]>([]);
     const [withheld, setWithheld] = useState(0);
     const [searching, setSearching] = useState(false);
     // Answers can come back out of order; only the newest one may win.
@@ -173,34 +187,61 @@ export function PeoplePicker({
                                   : t("picker.nobody")}
                         </li>
                     ) : (
-                        offered.map((person) => (
-                            <li key={person.id}>
-                                <PersonRow
-                                    as="button"
-                                    personId={person.id}
-                                    type="button"
-                                    disabled={full}
-                                    onClick={() => {
-                                        // The box empties with the press: the name
-                                        // is now a chip above it, and leaving the
-                                        // text behind means the next person is
-                                        // searched for by typing over somebody
-                                        // else's name.
-                                        setQuery("");
-                                        setResults([]);
-                                        onChange([...picked, person]);
-                                    }}
-                                    className={cn(
-                                        "flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm transition-colors hover:bg-muted disabled:opacity-60"
-                                    )}
+                        offered.map((person) =>
+                            person.unavailable ? (
+                                <li
+                                    key={person.id}
+                                    aria-disabled="true"
+                                    className="flex items-center gap-2 px-2 py-1.5 text-sm"
                                 >
-                                    <Avatar person={person} size={20} />
-                                    <span className="truncate" title={person.name}>
-                                        <PersonName id={person.id} name={person.name} />
+                                    <span className="flex min-w-0 flex-1 items-center gap-2 opacity-60">
+                                        <Avatar person={person} size={20} />
+                                        <span className="flex min-w-0 flex-col">
+                                            <span className="truncate" title={person.name}>
+                                                <PersonName id={person.id} name={person.name} />
+                                            </span>
+                                            <span
+                                                className="truncate text-xs text-muted-foreground"
+                                                title={person.unavailable}
+                                            >
+                                                {person.unavailable}
+                                            </span>
+                                        </span>
                                     </span>
-                                </PersonRow>
-                            </li>
-                        ))
+                                    {unavailableAction?.(person)}
+                                </li>
+                            ) : (
+                                <li key={person.id}>
+                                    <PersonRow
+                                        as="button"
+                                        personId={person.id}
+                                        type="button"
+                                        disabled={full}
+                                        onClick={() => {
+                                            // The box empties with the press: the
+                                            // name is now a chip above it, and
+                                            // leaving the text behind means the
+                                            // next person is searched for by
+                                            // typing over somebody else's name.
+                                            setQuery("");
+                                            setResults([]);
+                                            onChange([
+                                                ...picked,
+                                                { id: person.id, name: person.name }
+                                            ]);
+                                        }}
+                                        className={cn(
+                                            "flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm transition-colors hover:bg-muted disabled:opacity-60"
+                                        )}
+                                    >
+                                        <Avatar person={person} size={20} />
+                                        <span className="truncate" title={person.name}>
+                                            <PersonName id={person.id} name={person.name} />
+                                        </span>
+                                    </PersonRow>
+                                </li>
+                            )
+                        )
                     )}
                 </ul>
             </div>
