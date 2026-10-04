@@ -772,7 +772,12 @@
         "favorites": {
             "title": "Favoritos",
             "description": "Archivos y carpetas que has marcado, en todas las conexiones.",
-            "empty": "Aún no hay favoritos. Haz clic derecho en un archivo o una carpeta y elige \"Añadir a favoritos\"."
+            "empty": "Aún no hay favoritos. Haz clic derecho en un archivo o una carpeta y elige \"Añadir a favoritos\".",
+            "remove": "Quitar {name} de favoritos",
+            "removed": "{name} ya no está en favoritos",
+            "removeFailed": "No se pudo cambiar la estrella de {name}. Inténtalo de nuevo.",
+            "undo": "Recuperar",
+            "showInFolder": "Mostrar {name} en su carpeta"
         },
         "insights": {
             "title": "Dónde fue el espacio",

@@ -1,28 +1,20 @@
-import Link from "next/link";
+import { PageHeader } from "@polaris/ui";
+import { FavoritesView } from "./favorites-view";
 import { getTranslations } from "@/lib/i18n/request";
-import { Folder, Star } from "lucide-react";
-import { Card, CardBody, PageHeader } from "@polaris/ui";
-import { requirePermission } from "@/lib/session";
 import { listFavorites } from "@/lib/drive-meta-service";
+import { requirePermission, sessionCan } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
-
-/** The last path segment (an item's display name). */
-function baseName(path: string): string {
-    const slash = path.lastIndexOf("/");
-    return slash >= 0 ? path.slice(slash + 1) : path;
-}
-
-/** Parent folder of a path, for a link that reveals the item in its folder. */
-function parentOf(path: string): string {
-    const slash = path.lastIndexOf("/");
-    return slash >= 0 ? path.slice(0, slash) : "";
-}
 
 export default async function FavoritesPage() {
     const t = await getTranslations("drive");
     const user = await requirePermission("drive.read");
-    const favorites = await listFavorites(user.id);
+    const [favorites, canEdit] = await Promise.all([
+        listFavorites(user.id),
+        // The same permission the star action checks, so the star is offered
+        // only to somebody it will answer.
+        sessionCan(user, "drive.write")
+    ]);
 
     return (
         <>
@@ -30,40 +22,7 @@ export default async function FavoritesPage() {
                 title={t("pages.favorites.title")}
                 description={t("pages.favorites.description")}
             />
-            {favorites.length === 0 ? (
-                <Card>
-                    <CardBody className="p-8 text-center text-sm text-muted-foreground">
-                        {t("pages.favorites.empty")}
-                    </CardBody>
-                </Card>
-            ) : (
-                <div className="flex flex-col gap-2">
-                    {favorites.map((item) => {
-                        const parent = parentOf(item.path);
-                        const query = new URLSearchParams({ c: item.connectionId });
-                        if (parent) query.set("p", parent);
-                        return (
-                            <Card key={`${item.connectionId}:${item.path}`}>
-                                <Link href={`/drive?${query.toString()}`}>
-                                    <CardBody className="flex items-center gap-3">
-                                        <Star className="size-4 shrink-0 fill-amber-400 text-amber-400" />
-                                        <div className="min-w-0">
-                                            <p className="truncate text-sm font-medium">
-                                                {baseName(item.path)}
-                                            </p>
-                                            <p className="flex items-center gap-1 truncate text-xs text-muted-foreground">
-                                                <Folder className="size-3 shrink-0" />
-                                                {item.connectionName}
-                                                {parent ? ` / ${parent}` : ""}
-                                            </p>
-                                        </div>
-                                    </CardBody>
-                                </Link>
-                            </Card>
-                        );
-                    })}
-                </div>
-            )}
+            <FavoritesView favorites={favorites} canEdit={canEdit} />
         </>
     );
 }

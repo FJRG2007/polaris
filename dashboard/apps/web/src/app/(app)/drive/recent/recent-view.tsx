@@ -2,9 +2,10 @@
 
 /**
  * Recent-files view. Pick a connection and one of three lenses - recently
- * modified, created, or opened - and see the matching files, newest first. Each
- * row links to the file's folder in Drive. The lookup runs client-side against
- * /api/drive/recent so switching lens or connection never blocks a navigation.
+ * modified, created, or opened - and see the matching files, newest first. The
+ * name opens the file; the folder button shows it in its folder in Drive. The
+ * lookup runs client-side against /api/drive/recent so switching lens or
+ * connection never blocks a navigation.
  */
 
 import Link from "next/link";
@@ -149,29 +150,37 @@ export function RecentView({ connections }: { connections: { id: string; name: s
                             {entries.map((entry) => (
                                 <li
                                     key={entry.path}
-                                    className="border-t border-border first:border-t-0"
+                                    className="flex items-center gap-3 border-t border-border px-4 py-2.5 transition-colors first:border-t-0 hover:bg-card-hover"
                                 >
+                                    <FileIcon className="size-4 shrink-0 text-muted-foreground" />
+                                    <div className="min-w-0 flex-1">
+                                        {/* The file itself, in its viewer - the row
+                                            used to lead only to the folder. */}
+                                        <Link
+                                            href={`/drive/open?c=${encodeURIComponent(connectionId)}&p=${encodeURIComponent(entry.path)}`}
+                                            className="block truncate text-sm font-medium hover:underline"
+                                            title={entry.name}
+                                        >
+                                            {entry.name}
+                                        </Link>
+                                        <p className="truncate text-xs text-muted-foreground">
+                                            /{parentOf(entry.path) || ""}
+                                        </p>
+                                    </div>
+                                    <span className="hidden shrink-0 text-xs text-muted-foreground sm:block">
+                                        {formatBytes(BigInt(entry.size))}
+                                    </span>
+                                    <span className="flex shrink-0 items-center gap-1 text-xs text-muted-foreground">
+                                        <Clock className="size-3" />
+                                        <RelativeTime iso={whenOf(entry)} />
+                                    </span>
                                     <Link
-                                        href={`/drive?c=${connectionId}&p=${encodeURIComponent(parentOf(entry.path))}`}
-                                        className="group flex items-center gap-3 px-4 py-2.5 transition-colors hover:bg-card-hover"
+                                        href={`/drive?c=${encodeURIComponent(connectionId)}&p=${encodeURIComponent(parentOf(entry.path))}`}
+                                        aria-label={t("pages.favorites.showInFolder", { name: entry.name })}
+                                        title={t("pages.favorites.showInFolder", { name: entry.name })}
+                                        className="shrink-0 rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                                     >
-                                        <FileIcon className="size-4 shrink-0 text-muted-foreground" />
-                                        <div className="min-w-0 flex-1">
-                                            <p className="truncate text-sm font-medium">
-                                                {entry.name}
-                                            </p>
-                                            <p className="truncate text-xs text-muted-foreground">
-                                                /{parentOf(entry.path) || ""}
-                                            </p>
-                                        </div>
-                                        <span className="hidden shrink-0 text-xs text-muted-foreground sm:block">
-                                            {formatBytes(BigInt(entry.size))}
-                                        </span>
-                                        <span className="flex shrink-0 items-center gap-1 text-xs text-muted-foreground">
-                                            <Clock className="size-3" />
-                                            <RelativeTime iso={whenOf(entry)} />
-                                        </span>
-                                        <FolderOpen className="size-4 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
+                                        <FolderOpen className="size-4" />
                                     </Link>
                                 </li>
                             ))}

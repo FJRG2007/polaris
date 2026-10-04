@@ -772,7 +772,12 @@
         "favorites": {
             "title": "Favorites",
             "description": "Files and folders you have starred, across every connection.",
-            "empty": "No favorites yet. Right-click any file or folder and choose \"Add to favorites\"."
+            "empty": "No favorites yet. Right-click any file or folder and choose \"Add to favorites\".",
+            "remove": "Remove {name} from favorites",
+            "removed": "{name} removed from favorites",
+            "removeFailed": "Could not change the star on {name}. Try again.",
+            "undo": "Put it back",
+            "showInFolder": "Show {name} in its folder"
         },
         "insights": {
             "title": "Where the room went",
