@@ -62,6 +62,9 @@ export interface ApiKeyView {
      *  carries its owner's permissions like any other key. */
     projectId: string | null;
     projectName: string | null;
+    /** What issued it: "cli" for the credential `plr login` was handed, "key"
+     *  for everything else. See `ApiKeyKind`. */
+    kind: ApiKeyKind;
     /** Calls answered today, and over the window the counter keeps. Two numbers
      *  because one of them answers "is this still in use" and the other answers
      *  "was it ever" - a key used once in April and one answering a call a
@@ -69,6 +72,13 @@ export interface ApiKeyView {
     usedToday: number;
     usedRecently: number;
 }
+
+/**
+ * What issued a key. Every key is the same kind of bearer - scoped, listed,
+ * revocable and narrowed to its owner the same way; the kind only says where it
+ * came from, so the list can label it and the CLI can end its own sign-in.
+ */
+export type ApiKeyKind = "key" | "cli";
 
 /** A verified key: who it acts as, what it may do, and where it may be used from. */
 export interface VerifiedApiKey {
@@ -83,6 +93,25 @@ export interface VerifiedApiKey {
     /** The Deploy project the key was minted from, or null for an account key.
      *  Surfaces that reach projects narrow such a key to this one. */
     projectId: string | null;
+    kind: ApiKeyKind;
+    /** Where it was last presented from, for the address lock a CLI sign-in
+     *  answers to like a session does. */
+    lastUsedIp: string | null;
+    /** A CLI sign-in's own answer to that lock; null follows the account's rule. */
+    pinToAddress: boolean | null;
+    /** The system a CLI sign-in reported, which the account's rule reads
+     *  ("computers only"). Null on every other key. */
+    clientOs: string | null;
+}
+
+/** What a CLI sign-in says about the computer it runs on. Labels, never
+ *  decisions: the CLI wrote them. */
+export interface ApiKeyClient {
+    readonly name: string;
+    readonly os: string;
+    readonly version: string | null;
+    /** The address the sign-in was approved from, read off that request. */
+    readonly ip: string | null;
 }
 
 /** The public half of a key: "plk_" plus 8 URL-safe characters. */
@@ -111,6 +140,12 @@ function dayKey(at: Date): string {
  *  the caller's to choose. */
 const MAX_USER_AGENT = 512;
 
+/** How often the "last used" stamp is written for a key in steady use. A key
+ *  answering a call a second does not need a write a second to say it is in
+ *  use; an address change is written at once, since that is what the address
+ *  lock and the sessions screen read. The day's counter still counts every call. */
+export const LAST_USED_EVERY_MS = 60_000;
+
 /** When a key stops working: a hand-picked date if there is one, otherwise the
  *  chosen span, and null for a key that never expires. */
 function expiryFor(input: CreateApiKeyInput): Date | null {
@@ -127,7 +162,8 @@ function expiryFor(input: CreateApiKeyInput): Date | null {
  */
 export async function createApiKey(
     userId: string,
-    input: CreateApiKeyInput
+    input: CreateApiKeyInput,
+    options: { readonly kind?: ApiKeyKind; readonly client?: ApiKeyClient } = {}
 ): Promise<{ id: string; prefix: string; secret: string }> {
     const prefix = generatePrefix();
     const secret = `${prefix}.${generateToken()}`;
@@ -151,6 +187,11 @@ export async function createApiKey(
             allowedUserAgents: stringifyList(input.allowedUserAgents),
             deniedUserAgents: stringifyList(input.deniedUserAgents),
             expiresAt: expiryFor(input),
+            kind: options.kind ?? "key",
+            clientName: options.client?.name ?? null,
+            clientOs: options.client?.os ?? null,
+            clientVersion: options.client?.version ?? null,
+            signedInIp: options.client?.ip ?? null,
             groups: { createMany: { data: owned.map((group) => ({ groupId: group.id })) } }
         },
         select: { id: true }
@@ -200,6 +241,7 @@ export async function listApiKeys(userId: string): Promise<ApiKeyView[]> {
         createdAt: row.createdAt.toISOString(),
         projectId: row.projectId,
         projectName: row.project?.name ?? null,
+        kind: row.kind === "cli" ? "cli" : "key",
         usedToday: row.usage.find((day) => day.day === today)?.calls ?? 0,
         usedRecently: row.usage.reduce((total, day) => total + day.calls, 0)
     }));
@@ -269,7 +311,10 @@ function newExpiry(input: UpdateApiKeyInput): Date | null | undefined {
 
 /** Revoke a key the caller owns. The row is kept so the audit trail survives. */
 export async function revokeApiKey(userId: string, id: string): Promise<void> {
-    await prisma.apiKey.updateMany({ where: { id, userId, revokedAt: null }, data: { revokedAt: new Date() } });
+    await prisma.apiKey.updateMany({
+        where: { id, userId, revokedAt: null },
+        data: { revokedAt: new Date() }
+    });
 }
 
 /** Delete a key the caller owns, once they no longer want it listed. */
@@ -292,7 +337,13 @@ export async function verifyApiKey(presented: string): Promise<VerifiedApiKey | 
         include: {
             groups: {
                 select: {
-                    group: { select: { allowedCidrs: true, allowedCountries: true, allowedContinents: true } }
+                    group: {
+                        select: {
+                            allowedCidrs: true,
+                            allowedCountries: true,
+                            allowedContinents: true
+                        }
+                    }
                 }
             },
             user: { select: { bannedAt: true, isAdmin: true } }
@@ -320,7 +371,11 @@ export async function verifyApiKey(presented: string): Promise<VerifiedApiKey | 
             allowedUserAgents: parseStringList(row.allowedUserAgents),
             deniedUserAgents: parseStringList(row.deniedUserAgents)
         },
-        projectId: row.projectId
+        projectId: row.projectId,
+        kind: row.kind === "cli" ? "cli" : "key",
+        lastUsedIp: row.lastUsedIp,
+        pinToAddress: row.pinToAddress,
+        clientOs: row.clientOs
     };
 }
 
@@ -356,8 +411,17 @@ export async function touchApiKey(
     const now = new Date();
     const day = dayKey(now);
     try {
-        await prisma.apiKey.update({
-            where: { id },
+        // Written only when it is stale or the address moved - one conditional
+        // update, so two calls racing cannot both decide to write.
+        await prisma.apiKey.updateMany({
+            where: {
+                id,
+                OR: [
+                    { lastUsedAt: null },
+                    { lastUsedAt: { lt: new Date(now.getTime() - LAST_USED_EVERY_MS) } },
+                    ...(ip ? [{ lastUsedIp: null }, { lastUsedIp: { not: ip } }] : [])
+                ]
+            },
             data: {
                 lastUsedAt: now,
                 lastUsedIp: ip ?? null,
@@ -377,7 +441,9 @@ export async function touchApiKey(
         // The first call of a day is where the window is trimmed. Doing it on
         // every call would be a delete per request for nothing to delete.
         if (counted.calls === 1) {
-            const oldest = dayKey(new Date(now.getTime() - USAGE_WINDOW_DAYS * 24 * 60 * 60 * 1000));
+            const oldest = dayKey(
+                new Date(now.getTime() - USAGE_WINDOW_DAYS * 24 * 60 * 60 * 1000)
+            );
             await prisma.apiKeyUsage.deleteMany({ where: { apiKeyId: id, day: { lt: oldest } } });
         }
     } catch {

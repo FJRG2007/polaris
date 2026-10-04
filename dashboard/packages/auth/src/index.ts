@@ -166,6 +166,9 @@ export {
     verifyApiKey,
     touchApiKey,
     scopesAvailableTo,
+    LAST_USED_EVERY_MS,
+    type ApiKeyClient,
+    type ApiKeyKind,
     type ApiKeyView,
     type VerifiedApiKey
 } from "./api-keys.js";

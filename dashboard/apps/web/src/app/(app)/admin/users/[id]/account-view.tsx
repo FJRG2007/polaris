@@ -22,6 +22,7 @@ import { useRouter } from "next/navigation";
 import type { RoleOption } from "@/lib/role-service";
 import { banLengthOptions } from "../ban-lengths";
 import { useConfirm } from "@/components/confirm-dialog";
+import type { CliSessionView } from "@/lib/cli/sessions";
 import type { SessionView } from "@/lib/session-directory";
 import { SessionsTable } from "@/components/sessions-table";
 import type { DirectoryUser } from "@/lib/user-admin-service";
@@ -41,6 +42,7 @@ import {
 import {
     banUserAction,
     deleteUserAction,
+    revokeUserCliSessionAction,
     revokeUserSessionAction,
     revokeUserSessionsAction,
     setAdminAccessAction,
@@ -87,11 +89,13 @@ export function AccountView({
     // Null until the list arrives, so the section holds its shape rather than the
     // page waiting on a query nothing above it needs.
     const [sessions, setSessions] = useState<SessionView[] | null>(null);
+    const [cliSessions, setCliSessions] = useState<CliSessionView[]>([]);
 
     /** The open sessions, re-read whenever an action may have ended one. */
     const loadSessions = useCallback(async () => {
         const result = await userSessionsAction(user.id);
         setSessions(result.sessions ?? []);
+        setCliSessions(result.cliSessions ?? []);
     }, [user.id]);
 
     useEffect(() => {
@@ -139,16 +143,24 @@ export function AccountView({
             <Card>
                 <CardBody className="flex flex-col gap-5">
                     <dl className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-                        <Fact label={t("usersDetail.account.facts.username")}>{user.username ?? "-"}</Fact>
-                        <Fact label={t("usersDetail.account.facts.company")}>{user.company ?? "-"}</Fact>
-                        <Fact label={t("usersDetail.account.facts.joined")}>{format.date(user.createdAt)}</Fact>
+                        <Fact label={t("usersDetail.account.facts.username")}>
+                            {user.username ?? "-"}
+                        </Fact>
+                        <Fact label={t("usersDetail.account.facts.company")}>
+                            {user.company ?? "-"}
+                        </Fact>
+                        <Fact label={t("usersDetail.account.facts.joined")}>
+                            {format.date(user.createdAt)}
+                        </Fact>
                         <Fact label={t("usersDetail.account.facts.email")}>
                             {user.emailVerified
                                 ? t("usersDetail.account.facts.verified")
                                 : t("usersDetail.account.facts.unverified")}
                         </Fact>
                         <Fact label={t("usersDetail.account.facts.twoFactor")}>
-                            {user.twoFactorEnabled ? t("usersDetail.account.facts.on") : t("usersDetail.account.facts.off")}
+                            {user.twoFactorEnabled
+                                ? t("usersDetail.account.facts.on")
+                                : t("usersDetail.account.facts.off")}
                         </Fact>
                         <Fact label={t("usersDetail.account.facts.groups")}>
                             {user.groups.length > 0 ? user.groups.join(", ") : "-"}
@@ -156,7 +168,9 @@ export function AccountView({
                     </dl>
 
                     <section className="flex flex-col gap-3 border-t border-border pt-4">
-                        <h2 className="text-sm font-medium">{t("usersDetail.account.access.title")}</h2>
+                        <h2 className="text-sm font-medium">
+                            {t("usersDetail.account.access.title")}
+                        </h2>
                         <div className="flex items-center justify-between gap-3">
                             <div className="min-w-0">
                                 <p className="text-sm">{t("usersDetail.account.access.role")}</p>
@@ -166,12 +180,19 @@ export function AccountView({
                             </div>
                             <Select
                                 className="w-40"
-                                aria-label={t("usersDetail.account.access.roleLabel", { name: user.name })}
+                                aria-label={t("usersDetail.account.access.roleLabel", {
+                                    name: user.name
+                                })}
                                 value={role}
                                 placeholder={t("usersDetail.account.access.noRole")}
                                 disabled={busy}
-                                onValueChange={(next) => void run(() => setUserRoleAction(user.id, next))}
-                                options={roles.map((option) => ({ value: option.name, label: option.name }))}
+                                onValueChange={(next) =>
+                                    void run(() => setUserRoleAction(user.id, next))
+                                }
+                                options={roles.map((option) => ({
+                                    value: option.name,
+                                    label: option.name
+                                }))}
                             />
                         </div>
                         <div className="flex items-center justify-between gap-3">
@@ -184,7 +205,12 @@ export function AccountView({
                                     {t("usersDetail.account.access.openHint", { name: user.name })}
                                 </p>
                             </div>
-                            <Button size="sm" variant="ghost" disabled={busy || isSelf} onClick={() => void onViewAs()}>
+                            <Button
+                                size="sm"
+                                variant="ghost"
+                                disabled={busy || isSelf}
+                                onClick={() => void onViewAs()}
+                            >
                                 <Eye className="size-4" />
                                 {t("usersDetail.account.access.open")}
                             </Button>
@@ -202,16 +228,24 @@ export function AccountView({
                             <Switch
                                 checked={user.isAdmin}
                                 disabled={busy || isSelf}
-                                aria-label={t("usersDetail.account.access.adminLabel", { name: user.name })}
-                                onChange={(checked) => void run(() => setAdminAccessAction(user.id, checked))}
+                                aria-label={t("usersDetail.account.access.adminLabel", {
+                                    name: user.name
+                                })}
+                                onChange={(checked) =>
+                                    void run(() => setAdminAccessAction(user.id, checked))
+                                }
                             />
                         </div>
                     </section>
 
                     <section className="flex flex-col gap-3 border-t border-border pt-4">
                         <div>
-                            <h2 className="text-sm font-medium">{t("usersDetail.account.limits.title")}</h2>
-                            <p className="text-xs text-muted-foreground">{t("usersDetail.account.limits.hint")}</p>
+                            <h2 className="text-sm font-medium">
+                                {t("usersDetail.account.limits.title")}
+                            </h2>
+                            <p className="text-xs text-muted-foreground">
+                                {t("usersDetail.account.limits.hint")}
+                            </p>
                         </div>
                         <AccessRulesEditor value={limits} groups={groups} onChange={setLimits} />
                         <div className="flex items-center justify-between gap-2">
@@ -233,7 +267,9 @@ export function AccountView({
                     <section className="flex flex-col gap-3 border-t border-border pt-4">
                         <div className="flex items-center justify-between gap-3">
                             <div className="min-w-0">
-                                <h2 className="text-sm font-medium">{t("usersDetail.account.sessions.title")}</h2>
+                                <h2 className="text-sm font-medium">
+                                    {t("usersDetail.account.sessions.title")}
+                                </h2>
                                 <p className="text-xs text-muted-foreground">
                                     {t("usersDetail.account.sessions.hint", { name: user.name })}
                                 </p>
@@ -241,7 +277,9 @@ export function AccountView({
                             <Button
                                 size="sm"
                                 variant="ghost"
-                                disabled={busy || sessions?.length === 0}
+                                disabled={
+                                    busy || (sessions?.length === 0 && cliSessions.length === 0)
+                                }
                                 onClick={() => void run(() => revokeUserSessionsAction(user.id))}
                             >
                                 <LogOut className="size-4" />
@@ -254,7 +292,13 @@ export function AccountView({
                                 sessions={sessions}
                                 busyId={busy ? "all" : null}
                                 emptyLabel={t("usersDetail.account.sessions.empty")}
-                                onRevoke={(session) => void run(() => revokeUserSessionAction(user.id, session.id))}
+                                onRevoke={(session) =>
+                                    void run(() => revokeUserSessionAction(user.id, session.id))
+                                }
+                                cliSessions={cliSessions}
+                                onSignOutCli={(session) =>
+                                    void run(() => revokeUserCliSessionAction(user.id, session.id))
+                                }
                             />
                         ) : (
                             <Skeleton className="h-24 w-full rounded-lg" />
@@ -277,7 +321,9 @@ export function AccountView({
 
             <Card>
                 <CardBody className="flex flex-col gap-3">
-                    <h2 className="text-sm font-medium text-danger">{t("usersDetail.account.danger.title")}</h2>
+                    <h2 className="text-sm font-medium text-danger">
+                        {t("usersDetail.account.danger.title")}
+                    </h2>
                     {user.banned ? (
                         <div className="flex items-center justify-between gap-3">
                             <p className="text-xs text-muted-foreground">
@@ -288,7 +334,9 @@ export function AccountView({
                                 {t("usersDetail.account.danger.status", {
                                     kind: user.bannedUntil ? "suspended" : "banned",
                                     at: user.bannedAt ? format.dateTime(user.bannedAt) : "",
-                                    until: user.bannedUntil ? format.dateTime(user.bannedUntil) : "",
+                                    until: user.bannedUntil
+                                        ? format.dateTime(user.bannedUntil)
+                                        : "",
                                     hasReason: user.banReason ? "yes" : "no",
                                     reason: user.banReason ?? ""
                                 })}
@@ -337,7 +385,9 @@ export function AccountView({
                                     }
                                 >
                                     <Ban className="size-4" />
-                                    {Number(banFor) > 0 ? t("users.ban.suspend") : t("users.ban.ban")}
+                                    {Number(banFor) > 0
+                                        ? t("users.ban.suspend")
+                                        : t("users.ban.ban")}
                                 </Button>
                             </div>
                             <p className="text-xs text-muted-foreground">
@@ -349,7 +399,12 @@ export function AccountView({
                         <p className="text-xs text-muted-foreground">
                             {t("usersDetail.account.danger.deleteHint")}
                         </p>
-                        <Button size="sm" variant="danger" disabled={busy || isSelf} onClick={() => void onDelete()}>
+                        <Button
+                            size="sm"
+                            variant="danger"
+                            disabled={busy || isSelf}
+                            onClick={() => void onDelete()}
+                        >
                             <Trash2 className="size-4" />
                             {t("usersDetail.account.danger.delete")}
                         </Button>

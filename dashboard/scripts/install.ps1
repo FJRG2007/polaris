@@ -306,6 +306,27 @@ function Invoke-PolarisInstall {
         if (($env:Path -split ";") -notcontains $binDir) { $env:Path = "$env:Path;$binDir" }
     }
 
+    # The developer CLI (`plr`, served by a Polaris at /cli) and a server do not
+    # share a machine: both are `polaris` and `plr`, and one would silently
+    # shadow the other. Found by the marker its installer writes into its
+    # launchers, never by name. A fresh install stops here and says how to
+    # remove it; an existing deployment is still updated, with a warning,
+    # because refusing would strand a running server.
+    $cliDir = Join-Path $env:LOCALAPPDATA "Programs\polaris-cli"
+    $cliLauncher = Join-Path $cliDir "plr.cmd"
+    if ((Test-Path $cliLauncher) -and (Select-String -Path $cliLauncher -SimpleMatch "polaris-developer-cli" -Quiet)) {
+        $existing = (Get-RunningDeploymentDir) -or (Test-Path (Join-Path $installDir ".git"))
+        Write-Warning "polaris: the Polaris developer CLI is installed on this machine ($cliDir)."
+        if ($existing) {
+            Write-Warning "polaris: its 'polaris' and 'plr' commands collide with this server's; remove it with 'plr uninstall --yes'."
+        }
+        else {
+            Write-Warning "polaris: a server installs its own 'polaris' and 'plr' commands, and the two would collide."
+            Write-Warning "polaris: remove the CLI first with 'plr uninstall --yes', then run this again. Nothing was changed."
+            return
+        }
+    }
+
     # Locate the compose directory: run in place inside a checkout, otherwise
     # clone (or fast-forward) one into the install dir.
     if ((Test-Path "docker/docker-compose.yml") -and (Test-Path "docker/.env.example")) {

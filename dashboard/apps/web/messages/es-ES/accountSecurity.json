@@ -96,7 +96,8 @@
         "sessionGone": "Esa sesión ya no está iniciada.",
         "deviceForgotten": "Ese dispositivo ya no se recuerda.",
         "unknownConnection": "Conexión desconocida.",
-        "connectionEnded": "Esa conexión ya ha terminado."
+        "connectionEnded": "Esa conexión ya ha terminado.",
+        "cliEnded": "Esa sesión de terminal ya ha terminado."
     },
     "phone": {
         "confirmationMessage": "{code} es tu código de confirmación de Polaris. Caduca en {minutes} minutos."
@@ -189,6 +190,11 @@
             "forgetButton": "Pedir otra vez un código aquí",
             "stopNamed": "Dejar de recordar {device}",
             "stopThis": "Dejar de recordar este dispositivo"
+        },
+        "cli": {
+            "title": "¿Cerrar la sesión de esta terminal?",
+            "description": "plr en {name} deja de funcionar en su próximo comando y pide volver a iniciar sesión con plr login.",
+            "confirm": "Cerrar"
         }
     },
     "stepUp": {

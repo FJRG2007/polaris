@@ -20,10 +20,12 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { Badge, Button, cn } from "@polaris/ui";
+import type { CliSessionView } from "@/lib/cli/sessions";
 import { RelativeTime } from "@/components/relative-time";
 import type { VaultClientRow } from "@/lib/vault/devices";
 import type { SessionView } from "@/lib/session-directory";
 import { readClientDevice } from "@/lib/vault/client-device";
+import { CliSessionRows } from "@/components/cli-session-rows";
 import { clientKindText, signInText } from "@/lib/sign-in-words";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { isOnline, OnlineDot, useNow } from "@/components/presence";
@@ -192,7 +194,10 @@ export function SessionsTable({
     onPinExtension,
     onPin,
     emptyLabel,
-    compact = false
+    compact = false,
+    cliSessions = [],
+    onSignOutCli,
+    onPinCli
 }: {
     sessions: SessionView[];
     /**
@@ -243,6 +248,11 @@ export function SessionsTable({
      *  about. The columns fold into the device cell rather than being decided by
      *  a breakpoint that would put the table on a scrollbar at every size. */
     compact?: boolean;
+    /** The command-line sign-ins (`plr login`), rows of their own kind - see
+     *  `cli-session-rows`. */
+    cliSessions?: readonly CliSessionView[];
+    onSignOutCli?: (session: CliSessionView) => void;
+    onPinCli?: (session: CliSessionView, pinned: boolean | null) => void;
 }) {
     const t = useTranslations("components");
     // A clock that ticks, so a row stops reading "Active now" once it is not
@@ -292,7 +302,10 @@ export function SessionsTable({
                     </tr>
                 </thead>
                 <tbody>
-                    {sessions.length === 0 && extensions.length === 0 && clients.length === 0 ? (
+                    {sessions.length === 0 &&
+                    extensions.length === 0 &&
+                    clients.length === 0 &&
+                    cliSessions.length === 0 ? (
                         <tr>
                             <td
                                 colSpan={compact ? 2 : 7}
@@ -566,6 +579,13 @@ export function SessionsTable({
                             </td>
                         </tr>
                     ))}
+                    <CliSessionRows
+                        sessions={cliSessions}
+                        busyId={busyId}
+                        compact={compact}
+                        onSignOut={onSignOutCli}
+                        onPin={onPinCli}
+                    />
                     {/* The apps, under the browsers and in the same columns. What
                         a client reports is a name and a type, so the device column
                         is read back out of that name - which is how a row says
@@ -697,7 +717,7 @@ export function SessionsTable({
  * row. So the button cycles, and its title always says what the current answer
  * actually is and what pressing will do.
  */
-function PinButton({
+export function PinButton({
     label,
     pinToAddress,
     pinnedByRule,

@@ -10,7 +10,8 @@
  * it exists are all the caller's problem, not information to hand out.
  */
 
-import { touchApiKey, verifyApiKey } from "@polaris/auth";
+import { touchApiKey, verifyApiKey, type ApiKeyKind } from "@polaris/auth";
+import { cliAddressAllows } from "@/lib/cli/sessions";
 import { evaluateAccountAccess } from "@/lib/network-rules";
 import { userAgentAllowed, type Permission } from "@polaris/core";
 import { clientIp, clientUserAgent } from "@/lib/request-context";
@@ -23,6 +24,8 @@ export interface ApiKeyPrincipal {
     /** Set on a token minted from a Deploy project's settings. The Deploy API and
      *  its MCP tools confine such a key to that project. */
     projectId: string | null;
+    /** What issued it; "cli" for the credential `plr login` holds. */
+    kind: ApiKeyKind;
 }
 
 /** Extract the presented key, or null when the header is absent or malformed. */
@@ -57,12 +60,18 @@ export async function authenticateApiKey(request: Request): Promise<ApiKeyPrinci
     // credential that has already been proven; it never stands in for proving one.
     if (!userAgentAllowed(verified.clients, userAgent)) return null;
 
+    // A CLI sign-in is also a session, and answers to the address lock like
+    // one: used from somewhere other than where it was last seen while locked,
+    // it is signed out rather than let through.
+    if (verified.kind === "cli" && !(await cliAddressAllows(verified, ip))) return null;
+
     await touchApiKey(verified.id, ip, userAgent);
     return {
         keyId: verified.id,
         userId: verified.userId,
         scopes: verified.scopes,
-        projectId: verified.projectId
+        projectId: verified.projectId,
+        kind: verified.kind
     };
 }
 
@@ -76,9 +85,16 @@ export async function requireApiKey(
     required?: Permission
 ): Promise<ApiKeyPrincipal | Response> {
     const principal = await authenticateApiKey(request);
-    if (!principal) return Response.json({ error: (await readerWords("api"))("errors.unauthorized") }, { status: 401 });
+    if (!principal)
+        return Response.json(
+            { error: (await readerWords("api"))("errors.unauthorized") },
+            { status: 401 }
+        );
     if (required && !principal.scopes.includes(required)) {
-        return Response.json({ error: (await readerWords("api"))("errors.forbidden"), requiredScope: required }, { status: 403 });
+        return Response.json(
+            { error: (await readerWords("api"))("errors.forbidden"), requiredScope: required },
+            { status: 403 }
+        );
     }
     return principal;
 }

@@ -14,6 +14,7 @@ import { requireUser } from "@/lib/session";
 import { getTranslations } from "@/lib/i18n/request";
 import { SessionsView } from "./sessions-view";
 import { listVaultClients } from "@/lib/vault/devices";
+import { listCliSessions } from "@/lib/cli/sessions";
 import { listExtensionSessions } from "@/lib/extension/sessions";
 import { listTrustedDeviceRows, listUserSessions } from "@/lib/session-directory";
 
@@ -25,13 +26,15 @@ export default async function SessionsPage() {
     // The apps as well as the browsers. A client is a different credential from a
     // session and was listed only under the vault, so somebody who connected the
     // extension and came here to check found no trace of it.
-    const [sessions, trusted, extensions, clients] = await Promise.all([
+    const [sessions, trusted, extensions, clients, terminals] = await Promise.all([
         listUserSessions(user.id, user.sessionId),
         listTrustedDeviceRows(user.id),
         // The browser extensions, which are connections rather than vault
         // clients: they are listed and ended here like any other device.
         listExtensionSessions(user.id),
-        listVaultClients(user.id).catch(() => [])
+        listVaultClients(user.id).catch(() => []),
+        // The command-line sign-ins, each an API key listed here as a session.
+        listCliSessions(user.id)
     ]);
 
     // One browser, one row. A vault client let in under a connection is that
@@ -46,7 +49,9 @@ export default async function SessionsPage() {
     return (
         <div className="mx-auto flex w-full max-w-7xl flex-col gap-4">
             <div>
-                <h1 className="text-[1.0625rem] font-semibold tracking-tight">{t("sessions.page.title")}</h1>
+                <h1 className="text-[1.0625rem] font-semibold tracking-tight">
+                    {t("sessions.page.title")}
+                </h1>
                 <p className="text-sm text-muted-foreground">{t("sessions.page.intro")}</p>
             </div>
             <SessionsView
@@ -54,6 +59,7 @@ export default async function SessionsPage() {
                 trusted={trusted}
                 extensions={extensions}
                 clients={apps}
+                cliSessions={terminals}
             />
         </div>
     );

@@ -93,6 +93,9 @@ secrets.*
 # way: the file builds locally, is never committed, and the build dies wherever
 # it is checked out fresh.
 !**/secrets.ts
+# And so is its test, named after it. One was silently left out of a commit.
+!**/secrets.test.ts
+!**/secrets.tsx
 *.pem
 *.key
 

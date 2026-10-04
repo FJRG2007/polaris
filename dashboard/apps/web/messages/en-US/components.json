@@ -705,6 +705,15 @@
             "follow": "follow your account setting",
             "title": "{says}. Press to {then}.",
             "label": "Address lock for {label}: {says}"
+        },
+        "cli": {
+            "badge": "Command line",
+            "lockedHint": "This sign-in only works from the address it was last used at",
+            "signedIn": "Signed in <time></time>",
+            "signedInFrom": "Signed in <time></time> from {ip}",
+            "notUsedYet": "Not used yet",
+            "named": "{name} command line",
+            "signOutNamed": "Sign {name} out of the command line"
         }
     },
     "modelKeys": {

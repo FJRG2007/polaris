@@ -28,11 +28,13 @@ import {
     USERNAME_COOLDOWN_MAX_DAYS
 } from "@polaris/core";
 import { decideRecoveryRequest } from "@/lib/account-recovery-service";
+import { listCliSessions, type CliSessionView } from "@/lib/cli/sessions";
 import { listUserSessions, type SessionView } from "@/lib/session-directory";
 import { createInvite, revokeInvite, type CreatedInvite } from "@/lib/invite-service";
 import {
     banUser,
     deleteUser,
+    revokeCliSessionForUser,
     revokeSessionForUser,
     revokeUserSessions,
     setAdminAccess,
@@ -205,12 +207,18 @@ export async function revokeUserSessionsAction(userId: string): Promise<{ error?
  */
 export async function userSessionsAction(
     userId: unknown
-): Promise<{ sessions?: SessionView[]; error?: string }> {
+): Promise<{ sessions?: SessionView[]; cliSessions?: CliSessionView[]; error?: string }> {
     const admin = await requireAdmin();
     const parsed = idSchema.safeParse(userId);
     if (!parsed.success)
         return { error: (await getTranslations("admin"))("users.errors.unknownAccount") };
-    return { sessions: await listUserSessions(parsed.data, admin.sessionId) };
+    // The command-line sign-ins as well: each is this account signed in from a
+    // terminal, and ending one is the same safety valve as ending a session.
+    const [sessions, cliSessions] = await Promise.all([
+        listUserSessions(parsed.data, admin.sessionId),
+        listCliSessions(parsed.data)
+    ]);
+    return { sessions, cliSessions };
 }
 
 /** End one session of somebody else's without ending the rest. */
@@ -225,6 +233,22 @@ export async function revokeUserSessionAction(
         return { error: (await getTranslations("admin"))("users.errors.unknownSession") };
     }
     const result = await revokeSessionForUser(admin.id, target.data, session.data);
+    revalidatePath("/admin/users");
+    return result;
+}
+
+/** End one of somebody's command-line sign-ins without ending the rest. */
+export async function revokeUserCliSessionAction(
+    userId: unknown,
+    keyId: unknown
+): Promise<{ error?: string }> {
+    const admin = await requireAdmin();
+    const target = idSchema.safeParse(userId);
+    const key = idSchema.safeParse(keyId);
+    if (!target.success || !key.success) {
+        return { error: (await getTranslations("admin"))("users.errors.unknownSession") };
+    }
+    const result = await revokeCliSessionForUser(admin.id, target.data, key.data);
     revalidatePath("/admin/users");
     return result;
 }

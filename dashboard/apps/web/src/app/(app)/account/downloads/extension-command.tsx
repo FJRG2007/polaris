@@ -14,38 +14,35 @@
  * the one they are reading on.
  */
 
-import { Select } from "@polaris/ui";
 import { useEffect, useState } from "react";
+import { installCommand } from "@/lib/install-command";
 import { CopyButton } from "@/components/copy-button";
+import { PlatformSelect } from "@/components/platform-select";
 import { useTranslations } from "@/components/i18n/i18n-provider";
-import { INSTALL_OSES, detectOs, installCommand, type InstallOs } from "@/lib/install-command";
+import { detectPlatform, platformShell, type InstallPlatform } from "@/lib/install-platform";
 
 export function ExtensionCommand({ repo }: { repo: string }) {
     // Detected in an effect rather than during render: this is rendered on the
     // server too, where there is no navigator, and seeding from one would have
     // the browser hydrate something the HTML does not contain.
     const t = useTranslations("account");
-    const [os, setOs] = useState<InstallOs>("unix");
+    const [platform, setPlatform] = useState<InstallPlatform>("linux");
 
     useEffect(() => {
-        setOs(detectOs(navigator.userAgent));
+        setPlatform(detectPlatform(navigator.userAgent));
     }, []);
 
-    const chosen = installCommand(os, repo);
+    const chosen = installCommand(platformShell(platform), repo);
 
     return (
         <div className="flex flex-col gap-2 rounded-md border border-border bg-muted/30 p-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
                 <p className="font-medium">{t("downloads.command.title")}</p>
-                <Select
+                <PlatformSelect
                     className="w-44"
-                    value={os}
-                    aria-label={t("downloads.command.system")}
-                    onValueChange={(value) => setOs(value as InstallOs)}
-                    options={INSTALL_OSES.map((entry) => ({
-                        value: entry,
-                        label: entry === "unix" ? t("downloads.command.unix") : installCommand(entry, repo).label
-                    }))}
+                    value={platform}
+                    label={t("downloads.command.system")}
+                    onChange={setPlatform}
                 />
             </div>
 

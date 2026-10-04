@@ -15,6 +15,7 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@polaris/db";
 import { cookies } from "next/headers";
 import { recordAudit } from "@/lib/audit-service";
+import { revokeCliSessions } from "@/lib/cli/sessions";
 import { revokeExtensionSessions } from "@/lib/extension/sessions";
 import { networkPublicIp } from "@/lib/network-service";
 import { sessionClient, sessionDevice } from "@/lib/session-device";
@@ -515,7 +516,9 @@ export async function revokeOtherSessions(
     });
     // The extensions as well: each is this account signed in somewhere, and one
     // left behind would be the device the press was meant to reach.
-    const count = result.count + (await revokeExtensionSessions(userId));
+    // And every CLI sign-in, which is this account signed in from a terminal.
+    const count =
+        result.count + (await revokeExtensionSessions(userId)) + (await revokeCliSessions(userId));
     if (count > 0) {
         await recordAudit({
             actorId: userId,

@@ -18,6 +18,7 @@
 import { Select } from "@polaris/ui";
 import { useEffect, useRef, useState } from "react";
 import { CopyButton } from "@/components/copy-button";
+import { BrowserMark } from "@/components/client-marks";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import {
     BROWSER_GUIDES,
@@ -97,7 +98,10 @@ export function ExtensionSteps() {
                         }}
                         options={BROWSER_GUIDES.map((entry) => ({
                             value: entry.id,
-                            label: entry.label
+                            label: entry.label,
+                            // Each browser's own mark, which is what somebody
+                            // scanning the list looks for before its name.
+                            icon: <BrowserMark browser={entry.label} />
                         }))}
                     />
                 </label>
@@ -118,10 +122,15 @@ export function ExtensionSteps() {
                 reader has to find their place in twice. */}
             <ol className="ml-5 flex list-decimal flex-col gap-5 text-sm leading-relaxed marker:text-muted-foreground">
                 <li>
-                    {t.rich(guide.unpack ? "downloads.steps.downloadUnpack" : "downloads.steps.downloadZipped", {
-                        press: (chunks) => <Press key="press" text={chunks.join("")} />,
-                        file: guide.file
-                    })}
+                    {t.rich(
+                        guide.unpack
+                            ? "downloads.steps.downloadUnpack"
+                            : "downloads.steps.downloadZipped",
+                        {
+                            press: (chunks) => <Press key="press" text={chunks.join("")} />,
+                            file: guide.file
+                        }
+                    )}
                 </li>
                 <li>
                     {t("downloads.steps.openPage", { browser: guide.label })}
@@ -142,18 +151,23 @@ export function ExtensionSteps() {
                     </li>
                 )}
                 <li>
-                    {t.rich(guide.unpack ? "downloads.steps.pressFolder" : "downloads.steps.pressFile", {
-                        press: (chunks) => <Press key="press" text={chunks.join("")} />,
-                        action: guide.action
-                    })}
+                    {t.rich(
+                        guide.unpack ? "downloads.steps.pressFolder" : "downloads.steps.pressFile",
+                        {
+                            press: (chunks) => <Press key="press" text={chunks.join("")} />,
+                            action: guide.action
+                        }
+                    )}
                 </li>
-                <li>
-                    {t("downloads.steps.pointIt")}
-                </li>
+                <li>{t("downloads.steps.pointIt")}</li>
             </ol>
 
             <p className="text-xs text-muted-foreground">
-                {t(guide.id === "firefox" ? "downloads.steps.caveatFirefox" : "downloads.steps.caveatChromium")}
+                {t(
+                    guide.id === "firefox"
+                        ? "downloads.steps.caveatFirefox"
+                        : "downloads.steps.caveatChromium"
+                )}
             </p>
         </div>
     );

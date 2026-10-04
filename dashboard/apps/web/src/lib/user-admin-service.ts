@@ -20,6 +20,7 @@ import { discardPersonalDrive } from "@/lib/personal-drive";
 import { revokeSessionsRefusedByRules } from "@/lib/session-guard";
 import { parseStringList, type AccessRulesInput } from "@polaris/core";
 import { notifySessionsClosed } from "@/lib/notifications/session-events";
+import { revokeCliSession, revokeCliSessions } from "@/lib/cli/sessions";
 import { revokeExtensionSessions } from "@/lib/extension/sessions";
 import { markPrincipalsMoved, updateEnforcedRules, type AccessGroupView } from "@polaris/auth";
 import { readerWords } from "@/lib/i18n/reader-words";
@@ -184,8 +185,9 @@ async function wouldStrandInstance(userId: string): Promise<boolean> {
 async function dropSessions(userId: string): Promise<number> {
     const { count } = await prisma.session.deleteMany({ where: { userId } });
     const extensions = await revokeExtensionSessions(userId);
+    const terminals = await revokeCliSessions(userId);
     await markPrincipalsMoved([userId]);
-    return count + extensions;
+    return count + extensions + terminals;
 }
 
 /** The longest a suspension can run before it is simply a ban. A year, so a
@@ -211,10 +213,12 @@ export async function banUser(
     if (userId === actorId) return { error: (await readerWords("api"))("refusals.users.banSelf") };
     const target = await prisma.user.findUnique({ where: { id: userId }, select: { id: true } });
     if (!target) return { error: (await readerWords("drive"))("errors.userNotFound") };
-    if (await wouldStrandInstance(userId)) return { error: (await readerWords("api"))("refusals.users.lastAdmin") };
+    if (await wouldStrandInstance(userId))
+        return { error: (await readerWords("api"))("refusals.users.lastAdmin") };
 
     const length = Math.trunc(minutes ?? 0);
-    if (length < 0 || length > MAX_SUSPENSION_MINUTES) return { error: (await readerWords("api"))("refusals.users.notALength") };
+    if (length < 0 || length > MAX_SUSPENSION_MINUTES)
+        return { error: (await readerWords("api"))("refusals.users.notALength") };
     // Both from one instant: taken separately, a suspension's length is off by
     // however long the two calls were apart, which is the sort of thing that is
     // fine until somebody is comparing the two columns.
@@ -286,8 +290,10 @@ export async function setAdminAccess(
     isAdmin: boolean
 ): Promise<{ error?: string }> {
     if (!isAdmin) {
-        if (userId === actorId) return { error: (await readerWords("api"))("refusals.users.ownAdmin") };
-        if (await wouldStrandInstance(userId)) return { error: (await readerWords("api"))("refusals.users.lastAdmin") };
+        if (userId === actorId)
+            return { error: (await readerWords("api"))("refusals.users.ownAdmin") };
+        if (await wouldStrandInstance(userId))
+            return { error: (await readerWords("api"))("refusals.users.lastAdmin") };
     }
     await prisma.user.update({ where: { id: userId }, data: { isAdmin } });
     await recordAudit({
@@ -452,7 +458,8 @@ export async function revokeSessionForUser(
     sessionId: string
 ): Promise<{ error?: string }> {
     const result = await prisma.session.deleteMany({ where: { id: sessionId, userId } });
-    if (result.count === 0) return { error: (await readerWords("api"))("refusals.users.sessionEnded") };
+    if (result.count === 0)
+        return { error: (await readerWords("api"))("refusals.users.sessionEnded") };
     await recordAudit({
         actorId,
         action: "user.session.revoke",
@@ -468,6 +475,31 @@ export async function revokeSessionForUser(
     return {};
 }
 
+/** End one of somebody's command-line sign-ins - the same safety valve as
+ *  ending one of their sessions, and told to them the same way. */
+export async function revokeCliSessionForUser(
+    actorId: string,
+    userId: string,
+    keyId: string
+): Promise<{ error?: string }> {
+    if (!(await revokeCliSession(userId, keyId))) {
+        return { error: (await readerWords("api"))("refusals.users.sessionEnded") };
+    }
+    await recordAudit({
+        actorId,
+        action: "user.cli.revoke",
+        targetType: "apiKey",
+        targetId: keyId,
+        metadata: { userId }
+    });
+    await notifySessionsClosed({
+        userId,
+        count: 1,
+        reason: "An administrator signed out one of your command-line sign-ins."
+    });
+    return {};
+}
+
 /**
  * Delete an account and everything that hangs off it. Irreversible, and it takes
  * the user's connections, deployments and shares with it, so the caller confirms
@@ -475,10 +507,12 @@ export async function revokeSessionForUser(
  * out of - your own account, and the last administrator.
  */
 export async function deleteUser(actorId: string, userId: string): Promise<{ error?: string }> {
-    if (userId === actorId) return { error: (await readerWords("api"))("refusals.users.deleteSelf") };
+    if (userId === actorId)
+        return { error: (await readerWords("api"))("refusals.users.deleteSelf") };
     const target = await prisma.user.findUnique({ where: { id: userId }, select: { email: true } });
     if (!target) return { error: (await readerWords("drive"))("errors.userNotFound") };
-    if (await wouldStrandInstance(userId)) return { error: (await readerWords("api"))("refusals.users.lastAdmin") };
+    if (await wouldStrandInstance(userId))
+        return { error: (await readerWords("api"))("refusals.users.lastAdmin") };
 
     // Their face and their banner, before the rows that say where those are
     // cascade away with the account. A cascade takes rows, not bytes, so without

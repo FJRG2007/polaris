@@ -45,11 +45,7 @@ import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { ApiKeyView } from "@polaris/auth";
 import { deleteApiKeyAction, revokeApiKeyAction } from "./actions";
 import { Ban, MoreHorizontal, Pencil, Plus, Trash2 } from "lucide-react";
-import {
-    API_KEY_ENVIRONMENTS,
-    describeDevice,
-    type ApiKeyEnvironment
-} from "@polaris/core";
+import { API_KEY_ENVIRONMENTS, describeDevice, type ApiKeyEnvironment } from "@polaris/core";
 import * as list from "./api-keys-filter";
 import {
     Badge,
@@ -159,7 +155,9 @@ export function ApiKeysView({ keys }: { keys: ApiKeyView[] }) {
             <div className="flex flex-wrap items-end justify-between gap-2">
                 <div className="flex min-w-0 flex-1 flex-wrap items-end gap-2">
                     <label className="flex min-w-[10rem] flex-1 flex-col gap-1">
-                        <span className="text-xs text-muted-foreground">{t("apiKeys.list.search")}</span>
+                        <span className="text-xs text-muted-foreground">
+                            {t("apiKeys.list.search")}
+                        </span>
                         <Input
                             value={filters.search}
                             placeholder={t("apiKeys.list.searchPlaceholder")}
@@ -168,7 +166,9 @@ export function ApiKeysView({ keys }: { keys: ApiKeyView[] }) {
                         />
                     </label>
                     <label className="flex flex-col gap-1">
-                        <span className="text-xs text-muted-foreground">{t("apiKeys.list.environment")}</span>
+                        <span className="text-xs text-muted-foreground">
+                            {t("apiKeys.list.environment")}
+                        </span>
                         <Select
                             value={filters.environment}
                             onValueChange={(value) => change("environment", value)}
@@ -187,7 +187,9 @@ export function ApiKeysView({ keys }: { keys: ApiKeyView[] }) {
                         not need a picker whose every option is "all". */}
                     {apps.length > 0 && (
                         <label className="flex flex-col gap-1">
-                            <span className="text-xs text-muted-foreground">{t("apiKeys.list.app")}</span>
+                            <span className="text-xs text-muted-foreground">
+                                {t("apiKeys.list.app")}
+                            </span>
                             <Select
                                 value={filters.app}
                                 onValueChange={(value) => change("app", value)}
@@ -204,7 +206,9 @@ export function ApiKeysView({ keys }: { keys: ApiKeyView[] }) {
                         </label>
                     )}
                     <label className="flex flex-col gap-1">
-                        <span className="text-xs text-muted-foreground">{t("apiKeys.list.expiryLabel")}</span>
+                        <span className="text-xs text-muted-foreground">
+                            {t("apiKeys.list.expiryLabel")}
+                        </span>
                         <Select
                             value={filters.expiry}
                             onValueChange={(value) => change("expiry", value as list.ExpiryFilter)}
@@ -216,7 +220,9 @@ export function ApiKeysView({ keys }: { keys: ApiKeyView[] }) {
                         />
                     </label>
                     <label className="flex flex-col gap-1">
-                        <span className="text-xs text-muted-foreground">{t("apiKeys.list.sortBy")}</span>
+                        <span className="text-xs text-muted-foreground">
+                            {t("apiKeys.list.sortBy")}
+                        </span>
                         <Select
                             value={filters.sort}
                             onValueChange={(value) => change("sort", value as list.KeySort)}
@@ -282,7 +288,9 @@ export function ApiKeysView({ keys }: { keys: ApiKeyView[] }) {
                                     {t("apiKeys.list.columns.compromised")}
                                 </th>
                                 <th scope="col" className="px-3 py-2">
-                                    <span className="sr-only">{t("apiKeys.list.columns.actions")}</span>
+                                    <span className="sr-only">
+                                        {t("apiKeys.list.columns.actions")}
+                                    </span>
                                 </th>
                             </tr>
                         </thead>
@@ -353,6 +361,19 @@ function KeyRow({
                     >
                         {entry.name}
                     </Link>
+                    {/* Which keys a terminal is holding, so somebody cleaning up
+                        the list can tell a laptop's sign-in from a pipeline's key. */}
+                    {/* The key is the sign-in; Sessions lists the same row as a
+                        session, so the badge leads there. */}
+                    {entry.kind === "cli" ? (
+                        <Link
+                            href="/account/sessions"
+                            className="shrink-0 no-underline"
+                            title={t("apiKeys.list.cli.title")}
+                        >
+                            <Badge variant="neutral">{t("apiKeys.list.cli.badge")}</Badge>
+                        </Link>
+                    ) : null}
                     {/* Only when it is not what a key normally is. A row that
                         says "Active" on every line says nothing on any of
                         them. */}
@@ -421,7 +442,11 @@ function KeyRow({
                 {date(entry.createdAt)}
             </td>
             <td className="whitespace-nowrap px-3 py-2 align-top text-muted-foreground">
-                {entry.lastUsedAt ? <RelativeTime iso={entry.lastUsedAt} /> : t("apiKeys.list.never")}
+                {entry.lastUsedAt ? (
+                    <RelativeTime iso={entry.lastUsedAt} />
+                ) : (
+                    t("apiKeys.list.never")
+                )}
             </td>
             <td
                 className="whitespace-nowrap px-3 py-2 text-right align-top tabular-nums"

@@ -40,6 +40,7 @@ COPY packages/app-host/package.json ./packages/app-host/
 COPY packages/ai-provider/package.json ./packages/ai-provider/
 COPY packages/ai-search/package.json ./packages/ai-search/
 COPY packages/auth/package.json ./packages/auth/
+COPY packages/cli/package.json ./packages/cli/
 COPY packages/config/package.json ./packages/config/
 COPY packages/core/package.json ./packages/core/
 COPY packages/db/package.json ./packages/db/

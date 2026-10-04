@@ -1407,6 +1407,22 @@ model ApiKey {
     // what the key can reach - that is still its scopes and its owner's
     // permissions. Null is an ordinary account key.
     projectId         String?   @db.Uuid
+    // What issued it: "key" for one made on the API keys screen or a project's
+    // settings, "cli" for the credential `plr login` was handed. The same kind of
+    // bearer either way - listed, scoped, revocable and narrowed to its owner the
+    // same way; this only lets the CLI end its own sign-in and the list say which
+    // one a row is.
+    kind              String    @default("key")
+    // A CLI sign-in is also listed as a session, so it carries what a session
+    // row shows: the computer's name and system and the CLI's version as the CLI
+    // reported them (labels, never decisions), the address it was approved
+    // from, and its own answer to the address lock (null: the account's rule).
+    // Null on every other key.
+    clientName        String?
+    clientOs          String?
+    clientVersion     String?
+    signedInIp        String?
+    pinToAddress      Boolean?
     createdAt         DateTime  @default(now())
 
     user    User                @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -1415,6 +1431,7 @@ model ApiKey {
     usage   ApiKeyUsage[]
 
     @@index([userId])
+    @@index([userId, kind])
     @@index([projectId])
 }
 
@@ -3304,6 +3321,35 @@ model ExtensionAuthorization {
     userId String? @db.Uuid
     // The session that answered, carried to the connection it creates.
     approvedBySessionId String? @db.Uuid
+    expiresAt DateTime
+    createdAt DateTime @default(now())
+
+    @@index([expiresAt])
+}
+
+// A command-line client (`plr login`) asking to be signed in to an account: the
+// device-authorization shape the extension's connection uses (RFC 8628). The CLI
+// polls with a secret only the hash of which is kept; somebody signed in approves
+// the short code on /account/cli, and the first poll after that collects an API
+// key of kind "cli" and spends the row.
+model CliAuthorization {
+    id       String @id @default(uuid(7)) @db.Uuid
+    codeHash String @unique
+    userCode String @unique
+    // What the CLI called itself (its machine's name), for the screen that decides.
+    deviceName    String
+    // The CLI's own version, as it reported it. A label, never a decision.
+    clientVersion String?
+    // JSON array of the permissions it asked for. Narrowed again at claim time to
+    // what the approving account holds.
+    scopes        String  @default("[]")
+    // What the request looked like, read off the request rather than its body.
+    requestIp        String?
+    requestUserAgent String?
+    requestHost      String?
+    // pending | approved | denied
+    status    String
+    userId    String?  @db.Uuid
     expiresAt DateTime
     createdAt DateTime @default(now())
 

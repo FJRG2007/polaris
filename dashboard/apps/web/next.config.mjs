@@ -70,7 +70,11 @@ const nextConfig = {
     // missing bundle is a route that 404s and every dispatched run failing to
     // start, which is why it is named explicitly.
     outputFileTracingIncludes: {
-        "/api/agents/runtime/bundle/**": ["../../packages/agent-runtime/dist/**"]
+        "/api/agents/runtime/bundle/**": ["../../packages/agent-runtime/dist/**"],
+        // The command-line client and its install scripts, served by
+        // `/cli/[file]` and imported by nothing - so named, or the image ships
+        // without them and the install line downloads a 503.
+        "/cli/**": ["../../packages/cli/dist/**", "../../packages/cli/scripts/**"]
     },
     // Pages that moved; the old paths keep working for anything already linking to
     // them. Two rules, and the second is why the first exists:

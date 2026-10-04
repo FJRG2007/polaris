@@ -149,6 +149,35 @@ need() {
     fi
 }
 
+# Where the Polaris developer CLI (`plr`, served by a Polaris at /cli) is
+# installed on this machine, or nothing. It answers to the same two commands
+# this installer puts in /usr/local/bin, so the two are not installed side by
+# side. Found by the marker its installer writes into every file, never by name:
+# this script's own `polaris` must not be mistaken for it. Looked for in the
+# account running this and, under sudo, in the account that ran sudo.
+developer_cli() {
+    for name in polaris plr; do
+        found=$(command -v "$name" 2>/dev/null || true)
+        if [ -n "$found" ] && [ -f "$found" ] && grep -q "polaris-developer-cli" "$found" 2>/dev/null; then
+            printf '%s' "$found"
+            return 0
+        fi
+    done
+    homes="$HOME"
+    if [ -n "${SUDO_USER:-}" ] && command -v getent >/dev/null 2>&1; then
+        homes="$homes $(getent passwd "$SUDO_USER" | cut -d: -f6)"
+    fi
+    for home in $homes; do
+        for marker in "$home/.local/share/polaris-cli/polaris-cli.json" "$home/.local/bin/plr"; do
+            if [ -f "$marker" ] && grep -q "polaris-developer-cli" "$marker" 2>/dev/null; then
+                printf '%s' "$marker"
+                return 0
+            fi
+        done
+    done
+    return 1
+}
+
 # Resolve the docker compose invocation (v2 plugin only; the legacy v1 binary
 # is unsupported). Echoes the base command for the caller to extend.
 compose_cmd() {
@@ -585,6 +614,22 @@ main() {
     need docker "install Docker Engine: https://docs.docker.com/engine/install/"
     need openssl "install openssl (used to generate deployment secrets)"
     compose="$(compose_cmd)"
+
+    # The developer CLI and a server do not share a machine: both are `polaris`
+    # and `plr`, and one would silently shadow the other. A fresh install stops
+    # here and says how to remove the CLI; an existing deployment is still
+    # updated - refusing that would strand a running server - with a warning.
+    if cli_found=$(developer_cli); then
+        if [ -n "$(existing_deployment_dir)" ] || [ -d "$INSTALL_DIR/.git" ]; then
+            err "the Polaris developer CLI is installed on this machine ($cli_found)."
+            err "its 'polaris' and 'plr' commands collide with this server's; remove it with 'plr uninstall --yes'."
+        else
+            err "the Polaris developer CLI is installed on this machine ($cli_found)."
+            err "a server installs its own 'polaris' and 'plr' commands, and the two would collide."
+            err "remove the CLI first with 'plr uninstall --yes', then run this again. Nothing was changed."
+            exit 1
+        fi
+    fi
 
     # Locate the compose directory: run in place if we are already inside a
     # checkout, otherwise clone (or update) one into the install dir.

@@ -30,6 +30,7 @@ import { openLockdownCase } from "@/lib/safety-queue";
 import { notify } from "@/lib/notifications/dispatch";
 import { wordsFor } from "@/lib/notifications/notice-words";
 import { revokeStepUpGrants } from "@/lib/step-up-grant";
+import { revokeCliSessions } from "@/lib/cli/sessions";
 import { revokeExtensionSessions } from "@/lib/extension/sessions";
 
 /** Where the account itself reads about any of this. */
@@ -140,10 +141,7 @@ export async function liftLockdown(userId: string): Promise<void> {
  * asking goes with the rest - the browser is about to be signed out anyway, and
  * leaving one behind would be leaving the one that could undo it.
  */
-export async function closeAccount(
-    userId: string,
-    closure: core.AccountClosure
-): Promise<void> {
+export async function closeAccount(userId: string, closure: core.AccountClosure): Promise<void> {
     const now = new Date();
     await prisma.user.update({
         where: { id: userId },
@@ -154,6 +152,7 @@ export async function closeAccount(
     });
     await prisma.session.deleteMany({ where: { userId } });
     await revokeExtensionSessions(userId);
+    await revokeCliSessions(userId);
     await revokeStepUpGrants(userId);
     await recordAudit({
         actorId: userId,
