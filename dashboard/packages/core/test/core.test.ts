@@ -1,6 +1,14 @@
 import { describe, expect, it } from "vitest";
 import { ipAllowed, ipInCidr } from "../src/cidr.js";
-import { normalizeRelPath, UnsafePathError, extName, joinUnderRoot } from "../src/paths.js";
+import {
+    driveNameKey,
+    extName,
+    joinUnderRoot,
+    normalizeRelPath,
+    numberedName,
+    UnsafePathError,
+    withCopyNumber
+} from "../src/paths.js";
 import { generateToken, hashToken, tokenMatchesHash } from "../src/tokens.js";
 import {
     expandPermissions,
@@ -243,5 +251,24 @@ describe("random drop-point name", () => {
     it("builds a readable capitalized name with a two-digit suffix", () => {
         expect(randomDropPointName(() => 0)).toBe("Swift Harbor 10");
         expect(randomDropPointName(() => 0.999999)).toMatch(/^[A-Z][a-z]+ [A-Z][a-z]+ 99$/);
+    });
+});
+
+describe("names for a file that arrives where its name is taken", () => {
+    it("numbers a kept copy before the extension, from one", () => {
+        expect(withCopyNumber("report.pdf", 1)).toBe("report (1).pdf");
+        expect(withCopyNumber("backup.tar.gz", 2)).toBe("backup.tar (2).gz");
+        expect(withCopyNumber(".gitignore", 1)).toBe(".gitignore (1)");
+        expect(withCopyNumber("album", 3)).toBe("album (3)");
+    });
+
+    it("leaves the visitors' numbering as it was", () => {
+        expect(numberedName("contract.pdf", 1)).toBe("contract.pdf");
+        expect(numberedName("contract.pdf", 2)).toBe("contract (2).pdf");
+    });
+
+    it("compares names ignoring case and Unicode form", () => {
+        expect(driveNameKey("Report.PDF")).toBe(driveNameKey("report.pdf"));
+        expect(driveNameKey("Café.txt")).toBe(driveNameKey("café.txt"));
     });
 });
