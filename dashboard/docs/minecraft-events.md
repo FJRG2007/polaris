@@ -101,6 +101,7 @@ Rare catch, Bingo rush, Boss fishing) leave the world alone.
 | -------------------------------------------------------------- | ----- | ------- |
 | Build battle, Spleef, Parkour, King of the ring, Team duel     | day   | clear   |
 | Capture the flag                                               | day   | clear   |
+| Hot potato                                                     | day   | clear   |
 | Treasure hunt, Supply drop, Explorer, Gathering                | day   | clear   |
 | Horde defense, Villager defense, Mob hunt, Meteor shower       | night | clear   |
 | Blood moon                                                     | night | rain    |
@@ -306,6 +307,24 @@ left out.
   leaves them right. `captures` captures end it; otherwise the team with
   more when time is up. The podium is each player's captures, a tie broken by
   eliminations.
+- **Hot potato** is a striped platform walled in glass three high (11 by 11
+  up to six players, 13 by 13 past), with a gallery behind its north wall a
+  step up, roofed, that whoever is out watches from. Nobody is hurt:
+  Resistance IV, Regeneration and Saturation on everybody, every tick. Each
+  round's holder is drawn from the run's id and the round among who is left
+  (`hot-potato.holderFor`) and wears a marked TNT on their head (only onto an
+  empty one), glowing. Everybody else is under Weakness 101, so they cannot
+  strike: a hit anybody took since the last tick (`damage_taken`) is the
+  holder's, when the holder's `damage_dealt` rose too, and the potato goes to
+  the nearest of those hit. Whoever was just handed it stays weak until the
+  next tick, so it cannot bounce straight back. A hit is seen on the next
+  tick, up to two seconds after it lands. When the fuse runs out the holder is
+  out - particles and a sound where they stand, never a block or an entity -
+  and goes to the gallery; three seconds later the next round starts. Somebody
+  off the server two ticks running is out too. The round, the holder and the
+  fuse's end are clock times in the run, so a restart picks the fuse up where
+  it was. The last one left wins; everybody else is ranked by when they went
+  out, the same moment the same place.
 
 ## Building a map
 
@@ -373,6 +392,7 @@ Everything below is part of the arena's own boxes: built into air with
 | King of the ring | polished stone edge, sea lanterns at the corners, the circle drawn in yellow                                              |
 | Build battle     | a stone curb between plots and glowstone where the lines meet, at floor level                                             |
 | Team duel        | a stone rim round the floor and a post of light at each corner                                                            |
+| Hot potato       | a floor in orange and white stripes, glass walls on a stone rim, sea lanterns up the corners, a spruce gallery            |
 | Capture the flag | the duel's rim and posts, bases in red and blue, banners on sea lanterns, cover of stone brick, spruce and chiseled stone |
 | Boss sky arena   | glass, with a pillar of sea lantern at each corner                                                                        |
 

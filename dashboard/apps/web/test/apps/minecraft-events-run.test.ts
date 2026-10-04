@@ -197,6 +197,8 @@ interface World {
     bossBoxed: boolean;
     /** What the kinds played through the events service keep (`freshKinds`). */
     kinds: WorldKinds;
+    /** Any other count, by objective and player: what an arena kind reads of its own. */
+    board: Record<string, Record<string, number>>;
 }
 
 const world: World = {
@@ -300,7 +302,8 @@ const world: World = {
     lift: [],
     fighterGap: 2,
     bossBoxed: false,
-    kinds: freshKinds()
+    kinds: freshKinds(),
+    board: {}
 };
 let config: Record<string, unknown> = {};
 /** The kept-bag copies written to the database, by id. */
@@ -1498,6 +1501,26 @@ function answer(sent: string): string {
     // Any other block test: whatever the protected-area switch says.
     if (line.startsWith("execute in minecraft:overworld if block "))
         return world.refuseBlocks ? "Test failed" : "Test passed";
+    // Any other count the board keeps, for whoever is on.
+    const board = /^execute as @a run scoreboard players get @s (pe_\w+)$/.exec(line);
+    if (board && world.board[board[1]!]) {
+        const table = world.board[board[1]!]!;
+        return world.online
+            .filter((name) => table[name] !== undefined)
+            .map((name) => `${name} has ${table[name]} [${board[1]}]`)
+            .join("\n");
+    }
+    // Who carries a tag, where they are.
+    const carrying = /^execute as @a\[tag=(pe_\w+)\] run data get entity @s Pos$/.exec(line);
+    if (carrying) {
+        return world.online
+            .filter((name) => tagged(carrying[1]!).has(name))
+            .map((name) => {
+                const [x, y, z] = world.at[name] ?? [0, 64, 0];
+                return `${name} has the following entity data: [${x}d, ${y}d, ${z}d]`;
+            })
+            .join("\n");
+    }
     return "";
 }
 
@@ -1925,6 +1948,7 @@ beforeEach(() => {
     world.fighterGap = 2;
     world.bossBoxed = false;
     world.kinds = freshKinds();
+    world.board = {};
     speechService.forget(SERVER);
     world.stormTicks = 0;
     events.forgetPlayers();
@@ -9185,6 +9209,175 @@ describe("capture the flag", () => {
         chat(["Ana", "join"]);
         await play(40_000);
         expect(state().run).toBeNull();
+        expect(state().history[0]).toMatchObject({
+            outcome: "cancelled",
+            note: "Only 1 joined; it needs 2"
+        });
+        expect(fills()).toEqual([]);
+    });
+});
+
+describe("hot potato", () => {
+    const potatoOf = (fuseSeconds = 10, minutes = 5) => {
+        const preset = newPreset("hot-potato", "potato");
+        return { ...preset, minutes, options: { ...preset.options, fuseSeconds } };
+    };
+    const kind = () =>
+        import("@polaris-app/game-servers/src/lib/minecraft/events/kinds/hot-potato");
+    const holderNow = async () => (await kind()).stateOf(state().run!.game)?.holder ?? null;
+
+    it("passes the potato with a hit, puts its holder out when the fuse runs down, and ends on the last one", async () => {
+        const potato = await kind();
+        world.online = ["Ana", "Ben", "Cy"];
+        world.board = { pe_hpd: { Ana: 0, Ben: 0, Cy: 0 }, pe_hpt: { Ana: 0, Ben: 0, Cy: 0 } };
+        setUp([potatoOf(40)]);
+        await joinAndStart("potato", ["Ana", "Ben", "Cy"]);
+        const run = state().run!;
+        // Half a minute in at the most: the first fuse is still burning.
+        expect(Date.now() - run.readyAt!).toBeLessThan(30_000);
+        expect(run.readyAt).not.toBeNull();
+        expect(world.sent).toContain(
+            "scoreboard objectives add pe_hpd minecraft.custom:minecraft.damage_dealt"
+        );
+        // Built only into air; nobody hurt, and nobody but the holder can hurt.
+        expect(fills().every((line) => line.endsWith(" keep"))).toBe(true);
+        await play(2_100);
+        const first = await holderNow();
+        expect(first).toBe(
+            potato.holderFor(
+                run.id,
+                1,
+                run.entrants.map((one) => one.name)
+            )
+        );
+        expect(world.sent).toContain(
+            `execute unless data entity ${first} Inventory[{Slot:103b}] run item replace entity ${first} armor.head with minecraft:tnt[minecraft:custom_data={polaris_event:1b}] 1`
+        );
+        const others = ["Ana", "Ben", "Cy"].filter((name) => name !== first);
+        expect(world.sent).toContain(`effect give ${others[0]} minecraft:weakness 3 100 true`);
+
+        // The holder strikes; the nearest of those hurt has it now.
+        const [near, far] = others as [string, string];
+        world.at[near] = [world.at[first!]![0] + 1, world.at[first!]![1], world.at[first!]![2]];
+        world.board.pe_hpd![first!] = 2;
+        world.board.pe_hpt![near] = 2;
+        world.board.pe_hpt![far] = 2;
+        await play(2_100);
+        expect(await holderNow()).toBe(near);
+        expect(world.sent).toContain(
+            `clear ${first} minecraft:tnt[minecraft:custom_data={polaris_event:1b}]`
+        );
+        expect(saidToAll(`${first} passed the potato to ${near}`)).toBe(true);
+        // Not straight back: whoever was just handed it stays too weak to
+        // strike until the next tick.
+        const handed =
+            world.sent.length -
+            1 -
+            [...world.sent].reverse().findIndex((line) => line.includes(`${near} armor.head`));
+        const after = world.sent.slice(handed);
+        expect(after).toContain(`effect give ${near} minecraft:weakness 3 100 true`);
+        expect(after).not.toContain(`effect clear ${near} minecraft:weakness`);
+        await play(2_100);
+        expect(world.sent.slice(handed)).toContain(`effect clear ${near} minecraft:weakness`);
+
+        // The fuse: the holder is out, with a bang, to the gallery.
+        await play(potato.stateOf(state().run!.game)!.fuseEndsAt! - Date.now() + 2_100);
+        const out = potato.stateOf(state().run?.game);
+        expect(out?.out.map((one) => one.name)).toEqual([near]);
+        expect(
+            world.sent.some(
+                (line) =>
+                    line.includes("particle minecraft:explosion_emitter") &&
+                    !line.includes("summon")
+            )
+        ).toBe(true);
+        expect(saidToAll(`Bang! ${near} is out`)).toBe(true);
+        const gallery = potato.galleryOf(run.arena!.box);
+        expect(world.at[near]![1]).toBe(gallery.y1 + 1);
+
+        // The next round, after a breath, and its fuse: one left, who wins.
+        await play(potato.ROUND_PAUSE_MS + 2_100);
+        expect(potato.stateOf(state().run!.game)!.round).toBe(2);
+        await play(42_000);
+        const done = state();
+        expect(done.run).toBeNull();
+        expect(done.history[0]).toMatchObject({
+            outcome: "finished",
+            note: "Only one player was left"
+        });
+        const podium = done.history[0]!.podium;
+        expect(podium.map((one) => one.score)).toEqual([3, 2, 1]);
+        expect(podium[2]!.name).toBe(near);
+        // Nothing of the potato left on anybody, the platform down.
+        for (const name of ["Ana", "Ben", "Cy"])
+            expect(world.sent).toContain(
+                `clear ${name} minecraft:tnt[minecraft:custom_data={polaris_event:1b}]`
+            );
+        expect(world.sent).toContain("scoreboard objectives remove pe_hpt");
+        expect(done.arenaLeftovers).toEqual([]);
+        onlyOurBlocks();
+    });
+
+    it("picked up after a restart, keeps the round, its holder and its fuse", async () => {
+        const potato = await kind();
+        world.online = ["Ana", "Ben", "Cy"];
+        setUp([potatoOf(20)]);
+        await joinAndStart("potato", ["Ana", "Ben", "Cy"]);
+        await play(2_100);
+        const saved = state().run!;
+        const before = potato.stateOf(saved.game)!;
+        const at = { ...world.at };
+        await restartedWith(saved, tagsNow());
+        world.at = at;
+        await play(2_100);
+        const after = potato.stateOf(state().run!.game)!;
+        expect(after.holder).toBe(before.holder);
+        expect(after.round).toBe(1);
+        expect(after.fuseEndsAt).toBe(before.fuseEndsAt);
+        // The fuse goes off when it was going to, not a fresh one later.
+        await play(before.fuseEndsAt! - Date.now() + 2_100);
+        expect(potato.stateOf(state().run!.game)!.out.map((one) => one.name)).toEqual([
+            before.holder
+        ]);
+    });
+
+    it("puts out somebody who left the server, rather than wait for them", async () => {
+        const potato = await kind();
+        world.online = ["Ana", "Ben", "Cy"];
+        setUp([potatoOf(30)]);
+        await joinAndStart("potato", ["Ana", "Ben", "Cy"]);
+        await play(2_100);
+        const holder = (await holderNow())!;
+        const gone = ["Ana", "Ben", "Cy"].find((name) => name !== holder)!;
+        world.online = world.online.filter((name) => name !== gone);
+        await play(4_100);
+        expect(potato.stateOf(state().run!.game)!.out.map((one) => one.name)).toEqual([gone]);
+        expect(await holderNow()).toBe(holder);
+    });
+
+    it("called off mid-round, takes the potato off its holder and the platform down", async () => {
+        world.online = ["Ana", "Ben"];
+        setUp([potatoOf(30)]);
+        await joinAndStart("potato");
+        await play(2_100);
+        const holder = (await holderNow())!;
+        await events.cancelEvent("owner", SERVER);
+        await play(2_100);
+        expect(state().run).toBeNull();
+        expect(state().history[0]).toMatchObject({ outcome: "cancelled", podium: [] });
+        expect(world.sent).toContain(
+            `clear ${holder} minecraft:tnt[minecraft:custom_data={polaris_event:1b}]`
+        );
+        expect(state().arenaLeftovers).toEqual([]);
+        onlyOurBlocks();
+    });
+
+    it("is called off with nothing built when only one joins", async () => {
+        setUp([potatoOf()]);
+        await startArena("potato");
+        await play(2_100);
+        chat(["Ana", "join"]);
+        await play(40_000);
         expect(state().history[0]).toMatchObject({
             outcome: "cancelled",
             note: "Only 1 joined; it needs 2"
