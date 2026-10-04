@@ -877,7 +877,32 @@ export type RandomEvents = z.infer<typeof randomSchema>;
  * value an operator chooses later, even one that happens to be an old default,
  * is theirs.
  */
-export const DEFAULTS_VERSION = 2;
+export const DEFAULTS_VERSION = 3;
+
+/** Events saved before this were brought up to their kind's defaults once
+ *  (`toKindDefaults`). */
+const KIND_DEFAULTS_SINCE = 2;
+
+/**
+ * The defaults version each kind joined the catalog at. A server whose events
+ * were saved before a kind existed is given one of it, once, the way a server
+ * that never saved its events is given one of every kind - otherwise a kind
+ * added in an update is offered only to servers set up after it, and every
+ * server already running never hears of it. One the operator deletes after
+ * that stays deleted: the save writes the new version down.
+ */
+const KIND_SINCE: Partial<Readonly<Record<EventKind, number>>> = {
+    "tnt-run": 3,
+    "boat-race": 3,
+    dropper: 3,
+    "capture-the-flag": 3,
+    "hide-and-seek": 3,
+    "hot-potato": 3,
+    "sky-wars": 3,
+    "village-defense": 3,
+    bingo: 3,
+    "boss-fishing": 3
+};
 
 export const settingsSchema = z.object({
     defaults: z.number().int().min(1).max(1000).default(DEFAULTS_VERSION),
@@ -1417,6 +1442,16 @@ export function toKindDefaults(preset: EventPreset): EventPreset {
     return next;
 }
 
+/** The value that comes up most often, the first of a tie; null for none. */
+function mostCommon(values: readonly number[]): number | null {
+    const counts = new Map<number, number>();
+    for (const value of values) counts.set(value, (counts.get(value) ?? 0) + 1);
+    let best: number | null = null;
+    for (const [value, count] of counts)
+        if (best === null || count > counts.get(best)!) best = value;
+    return best;
+}
+
 /** Every kind once, which is what a server that never opened this screen has. */
 export function defaultEventsConfig(language: Language = "en"): EventsConfig {
     return {
@@ -1462,23 +1497,42 @@ export function readEventsConfig(
         return { ...fresh, settings: { ...fresh.settings, timezone } };
     }
     const value = raw as Record<string, unknown>;
-    const saved = (value.settings as { defaults?: unknown } | undefined)?.defaults;
-    const old = typeof saved !== "number" || saved < DEFAULTS_VERSION;
+    const stamp = (value.settings as { defaults?: unknown } | undefined)?.defaults;
+    const saved = typeof stamp === "number" ? stamp : 1;
+    const settings = settingsSchema.safeParse(value.settings);
+    const read = settings.success ? settings.data : settingsSchema.parse({ timezone });
     // A king of the hill's own length first (`migratePreset`), then every
     // kind's defaults, which leave a king of the hill's length to it.
     // One that no longer reads whole keeps every part that does, the rest
     // back to its kind's defaults (`repairPreset`), rather than vanishing
     // from the list and the draw with nothing to say so.
-    const presets = readPresets(value.presets).map(({ preset }) =>
-        old ? toKindDefaults(preset) : preset
+    const kept = readPresets(value.presets).map(({ preset }) =>
+        saved < KIND_DEFAULTS_SINCE ? toKindDefaults(preset) : preset
     );
+    // Every kind this server's events were saved before, once, named in the
+    // language its players read.
+    const had = new Set(kept.map((preset) => preset.kind));
+    const taken = new Set(kept.map((preset) => preset.id));
+    const added = EVENT_KINDS.filter(
+        (kind) => (KIND_SINCE[kind] ?? 1) > saved && !had.has(kind)
+    ).map((kind) => {
+        let id = `default-${kind}`;
+        while (taken.has(id)) id = `${id}-2`;
+        taken.add(id);
+        return newPreset(kind, id, KIND_NAMES[kind][read.language]);
+    });
+    const presets = [...kept, ...added];
     const ids = new Set(presets.map((preset) => preset.id));
     const schedules = (Array.isArray(value.schedules) ? value.schedules : []).flatMap((entry) => {
         const parsed = scheduleEntrySchema.safeParse(entry);
         return parsed.success && ids.has(parsed.data.presetId) ? [parsed.data] : [];
     });
-    const settings = settingsSchema.safeParse(value.settings);
-    const read = settings.success ? settings.data : settingsSchema.parse({ timezone });
+    const pool = read.random.pool.filter((entry) => ids.has(entry.presetId));
+    // Drawn from every event the server had: the new ones join the draw too,
+    // as often as most of the others come up. Drawn from a choice: left to it.
+    const everything =
+        kept.length > 0 && kept.every((one) => pool.some((entry) => entry.presetId === one.id));
+    const weight = mostCommon(pool.map((entry) => entry.weight)) ?? 1;
     return {
         settings: {
             ...read,
@@ -1486,7 +1540,9 @@ export function readEventsConfig(
             defaults: DEFAULTS_VERSION,
             random: {
                 ...read.random,
-                pool: read.random.pool.filter((entry) => ids.has(entry.presetId))
+                pool: everything
+                    ? [...pool, ...added.map((preset) => ({ presetId: preset.id, weight }))]
+                    : pool
             }
         },
         presets,

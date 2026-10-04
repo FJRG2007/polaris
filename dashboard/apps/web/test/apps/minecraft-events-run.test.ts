@@ -7646,7 +7646,11 @@ describe("a king of the hill", () => {
                 schedules: []
             }
         });
-        expect(read.presets.map((one) => [one.id, one.minutes])).toEqual([
+        expect(
+            read.presets
+                .filter((one) => !one.id.startsWith("default-"))
+                .map((one) => [one.id, one.minutes])
+        ).toEqual([
             ["hill-10", 3],
             ["hill-4", 3],
             ["hill-15", 15],
@@ -7679,7 +7683,11 @@ describe("a king of the hill", () => {
             }
         });
         // A name the operator typed, or another kind's, is left as it is.
-        expect(read.presets.map((one) => [one.id, one.name])).toEqual([
+        expect(
+            read.presets
+                .filter((one) => !one.id.startsWith("default-"))
+                .map((one) => [one.id, one.name])
+        ).toEqual([
             ["en", "King of the ring"],
             ["es", "Rey del ring"],
             ["own", "Friday hill"],
