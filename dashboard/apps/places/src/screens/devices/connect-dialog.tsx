@@ -644,7 +644,12 @@ export function ConnectDialog({
     const localConnection = connection
         ? (registry
               .connectionsOfBrand(connection.brand)
-              .find((entry) => entry.discovery === true && entry.id !== connection.id) ?? null)
+              .find(
+                  (entry) =>
+                      entry.discovery === true &&
+                      entry.id !== connection.id &&
+                      entry.kinds.some((kind) => connection.kinds.includes(kind))
+              ) ?? null)
         : null;
 
     /** Leave the file step for the local connection, with the unit picked
