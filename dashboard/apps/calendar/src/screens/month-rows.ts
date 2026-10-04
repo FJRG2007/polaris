@@ -61,11 +61,13 @@ export function measureMonth(root: ParentNode): MonthRoom | null {
     if (line <= 0) return { fit: null, tallest };
     const share = scroller.clientHeight / weeks;
     // FullCalendar's limit counts events, and draws "+N more" under them: as
-    // many events as leave room for that link (as tall as an event until one
-    // has been drawn), and a little air.
+    // many events as leave room for that link, and a little air. The link is
+    // given at least an event's height whether or not one is drawn, so the
+    // answer never grows once a link appears and the limit settles instead of
+    // flipping between showing the link and not.
     let more = 0;
     for (const link of body.querySelectorAll<HTMLElement>(".fc-daygrid-more-link"))
         more = Math.max(more, Math.ceil(link.getBoundingClientRect().height) + 2);
-    const events = Math.floor((share - eventsTop - (more || line) - 4) / line);
+    const events = Math.floor((share - eventsTop - Math.max(more, line) - 4) / line);
     return { fit: Math.max(1, events), tallest };
 }

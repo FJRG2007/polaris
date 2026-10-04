@@ -331,6 +331,11 @@ async function recordTasksApi(provider: sync.CalendarProvider, now: Date): Promi
     if (!gap) return googleApi.recordGoogleTasksApi(null, now);
     if (gap.cause instanceof sync.SyncSetupError)
         return googleApi.recordGoogleTasksApi(gap.cause.setup, now);
+    if (gap.cause instanceof sync.SyncConsentError) return;
+    console.error(
+        "polaris: a Google account's tasks were not listed:",
+        gap.cause instanceof Error ? gap.cause.message : gap.cause
+    );
 }
 
 /** Pull one calendar's changes and store them. */
