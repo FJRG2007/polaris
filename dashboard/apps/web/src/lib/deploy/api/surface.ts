@@ -313,15 +313,21 @@ export async function listProjects(caller: DeployCaller): Promise<ProjectLine[]>
             }
         }
     });
-    const statuses = await deployService.getApplicationDeployStatuses(
-        projects.flatMap((project) =>
-            project.environments.flatMap((environment) => environment.applications)
-        )
-    );
-
+    // Every project's access at once, beside the statuses, rather than one
+    // project after another: each access is a few reads of its own, and a list
+    // of eight projects was eight of those waits in a row before the answer.
+    // Bounded by MAX_PROJECTS above.
+    const [statuses, accesses] = await Promise.all([
+        deployService.getApplicationDeployStatuses(
+            projects.flatMap((project) =>
+                project.environments.flatMap((environment) => environment.applications)
+            )
+        ),
+        Promise.all(projects.map((project) => projectAccess(project.id, caller.userId)))
+    ]);
     const lines: ProjectLine[] = [];
-    for (const project of projects) {
-        const access = await projectAccess(project.id, caller.userId);
+    for (const [index, project] of projects.entries()) {
+        const access = accesses[index];
         if (!access) continue;
         lines.push({
             id: project.id,

@@ -12,6 +12,8 @@ import type { z } from "zod";
 import { CliError } from "./errors.js";
 import { userAgent } from "./version.js";
 import { refusalSchema } from "./schemas.js";
+import { performance } from "node:perf_hooks";
+import { mark, timing } from "./timing.js";
 import { PROTOCOL_HEADER, compatibilityProblem } from "./compat.js";
 
 export interface Connection {
@@ -123,8 +125,11 @@ export async function send(
     options: CallOptions = {}
 ): Promise<Response> {
     const doFetch = options.fetch ?? fetch;
+    const startedAt = timing() ? performance.now() : 0;
+    // Named without its query, which can carry a service's name.
+    const label = `${method} ${path.split("?")[0]}`;
     try {
-        return await doFetch(`${connection.url}${path}`, {
+        const response = await doFetch(`${connection.url}${path}`, {
             method,
             headers: headers(connection, options.body !== undefined),
             body: options.body === undefined ? undefined : JSON.stringify(options.body),
@@ -133,7 +138,10 @@ export async function send(
             redirect: "manual",
             signal: AbortSignal.timeout(options.timeoutMs ?? 30_000)
         });
+        mark(`${label} ${response.status}`, startedAt);
+        return response;
     } catch (caught) {
+        mark(`${label} failed`, startedAt);
         throw new CliError(`Could not reach ${connection.url}: ${unreachableReason(caught)}.`);
     }
 }
