@@ -86,6 +86,15 @@ export function readEventItem(
     return item;
 }
 
+/** The task in an object's text; a task list refuses an event. */
+export function readTodo(ics: string): types.CalendarTodo {
+    const item = engine.parseCalendarText(ics).items[0];
+    if (!item) throw new SyncRefusedError("The object has no task in it", null);
+    if (item.component !== "VTODO")
+        throw new SyncRefusedError("A task list only holds tasks", null);
+    return item.todo;
+}
+
 /** Unfolds iCalendar text into content lines. */
 function contentLines(text: string): string[] {
     return text

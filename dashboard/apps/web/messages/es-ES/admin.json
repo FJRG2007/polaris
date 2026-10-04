@@ -1352,13 +1352,15 @@
             },
             "usedFor": {
                 "calendar": "Calendarios",
-                "drive": "Copias en Drive"
+                "drive": "Copias en Drive",
+                "tasks": "Tareas en el calendario"
             },
             "disabledIn": "Desactivada en el proyecto {project}. Actívala y vuelve a comprobar.",
             "disabledHint": "Desactivada en el proyecto de este cliente. Actívala y vuelve a comprobar.",
             "unknownHint": {
                 "calendar": "Se comprueba cuando alguien vincula Google para calendarios.",
-                "drive": "Se comprueba cuando alguien vincula Google Drive para copias."
+                "drive": "Se comprueba cuando alguien vincula Google Drive para copias.",
+                "tasks": "Se comprueba cuando alguien vincula Google para calendarios con sus tareas."
             }
         },
         "proven": {
@@ -1679,10 +1681,14 @@
                         "help": "En el mismo proyecto. Sin ella, el cliente autoriza bien y todos los calendarios vuelven vacíos."
                     },
                     "5": {
+                        "label": "Activa la API de Tasks",
+                        "help": "En el mismo proyecto. Pone las tareas de Google de cada persona en su calendario; sin ella los calendarios se sincronizan igual, sin tareas."
+                    },
+                    "6": {
                         "label": "Publicar la app",
                         "help": "Un cliente nuevo está en Testing, donde solo pueden autorizar las cuentas de la lista de usuarios de prueba y el resto recibe access_denied. Publicarla lo quita. Hasta que estés listo, añade a cada persona como usuario de prueba."
                     },
-                    "6": {
+                    "7": {
                         "label": "Enviarla a verificación",
                         "help": "El último paso, y el único que quita el aviso 'Google no ha verificado esta app'. Leer un calendario es un ámbito sensible, así que Google pide las páginas de arriba, el dominio demostrado, un motivo para el ámbito y un vídeo de alguien conectando una cuenta. Publicada pero sin verificar funciona: solo que todos tienen que pasar antes por el aviso."
                     }

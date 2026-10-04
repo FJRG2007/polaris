@@ -132,6 +132,12 @@
             "title": "Sugeridos"
         },
         "syncNow": "Sincronizar {name} ahora",
+        "tasks": {
+            "apiAdmin": "La API de Google Tasks está desactivada en el proyecto de Google Cloud con el que Polaris inicia sesión, así que las tareas no se muestran. Actívala y sincroniza.",
+            "apiMember": "Las tareas de Google no se mostrarán hasta que tu administrador las active.",
+            "grant": "Tus tareas de Google aún no se muestran: esta cuenta se enlazó antes de que Polaris las pidiera.",
+            "grantButton": "Ver mis tareas"
+        },
         "title": "Calendarios externos",
         "useForCalendars": "Usar en calendarios"
     },

@@ -53,8 +53,21 @@ export interface WriteTarget {
     remoteId: string;
 }
 
+/**
+ * Calendars the last `listCalendars` could not reach, while the rest of the
+ * account listed fine - Google's tasks, when the account has not granted them
+ * or the API is off. Calendars under `prefix` are kept as they are and not
+ * pulled this time, and `cause` (a `SyncError`) says why.
+ */
+export interface ListingGap {
+    readonly prefix: string;
+    readonly cause: unknown;
+}
+
 export interface CalendarProvider {
     listCalendars(): Promise<RemoteCalendar[]>;
+    /** What the last `listCalendars` left out, when anything; see `ListingGap`. */
+    listingGaps?(): readonly ListingGap[];
     pull(state: PullState): Promise<ChangeSet>;
     /** Creates (`href` null) or replaces an object; a stale `etag` is a `SyncConflictError`. */
     put(

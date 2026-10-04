@@ -132,6 +132,12 @@
             "title": "Suggested"
         },
         "syncNow": "Sync {name} now",
+        "tasks": {
+            "apiAdmin": "Google Tasks API is turned off in the Google Cloud project Polaris signs in with, so tasks aren't shown. Turn it on, then sync.",
+            "apiMember": "Google tasks can't be shown until your administrator turns them on.",
+            "grant": "Your Google tasks aren't shown yet: this account was linked before Polaris asked for them.",
+            "grantButton": "Show my tasks"
+        },
         "title": "Linked calendars",
         "useForCalendars": "Use for calendars"
     },

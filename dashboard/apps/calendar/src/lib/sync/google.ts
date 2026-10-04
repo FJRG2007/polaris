@@ -16,10 +16,20 @@ import { z } from "zod";
 import * as bridge from "./bridge";
 import type * as types from "../../engine/types";
 import { GOOGLE_APIS, readGoogleApiError } from "@polaris/core";
+import * as tasks from "./google-tasks";
 import { errorForProblem, readJson, send, type Fetcher } from "./http";
-import type { CalendarProvider, ChangeSet, RemoteCalendar, RemoteObject } from "./provider";
+import type {
+    CalendarProvider,
+    ChangeSet,
+    ListingGap,
+    PullState,
+    RemoteCalendar,
+    RemoteObject,
+    WriteTarget
+} from "./provider";
 import {
     SyncAuthError,
+    SyncConsentError,
     SyncError,
     SyncRefusedError,
     SyncSetupError,
@@ -461,9 +471,15 @@ export function createGoogleProvider(input: {
     const call = async (
         method: string,
         path: string,
-        options: { query?: Record<string, string>; body?: unknown; ifMatch?: string } = {}
+        options: {
+            query?: Record<string, string>;
+            body?: unknown;
+            ifMatch?: string;
+            /** The API the path is under: the Calendar API unless said. */
+            base?: string;
+        } = {}
     ): Promise<Response> => {
-        const url = new URL(`${GOOGLE_API}${path}`);
+        const url = new URL(`${options.base ?? GOOGLE_API}${path}`);
         for (const [key, value] of Object.entries(options.query ?? {}))
             url.searchParams.set(key, value);
         const headers: Record<string, string> = {
@@ -569,205 +585,101 @@ export function createGoogleProvider(input: {
         }
     };
 
+    // --- Google Tasks: each list one more calendar of the account ----------
+
+    let gaps: ListingGap[] = [];
+
+    const taskCall = (
+        method: string,
+        path: string,
+        options: { query?: Record<string, string>; body?: unknown } = {}
+    ) => call(method, path, { ...options, base: tasks.GOOGLE_TASKS_API });
+
+    const listTaskLists = async (): Promise<RemoteCalendar[]> => {
+        const lists: RemoteCalendar[] = [];
+        let pageToken = "";
+        for (let page = 0; page < 20; page++) {
+            const response = await taskCall("GET", "/users/@me/lists", {
+                query: { maxResults: "1000", ...(pageToken ? { pageToken } : {}) }
+            });
+            const data = await json(response, tasks.TaskListsPage);
+            lists.push(...(data.items ?? []).map(tasks.taskListCalendar));
+            if (!data.nextPageToken) return lists;
+            pageToken = data.nextPageToken;
+        }
+        throw new SyncUnreachableError("Google kept paging without an end", null);
+    };
+
+    /** Every page of one list's tasks; Google's own ceiling is 20,000 a list. */
+    const listTasks = async (
+        listId: string,
+        query: Record<string, string>
+    ): Promise<tasks.GoogleTaskJson[]> => {
+        const found: tasks.GoogleTaskJson[] = [];
+        let pageToken = "";
+        for (let page = 0; page < 300; page++) {
+            const response = await taskCall("GET", `/lists/${encodeURIComponent(listId)}/tasks`, {
+                query: { ...query, maxResults: "100", ...(pageToken ? { pageToken } : {}) }
+            });
+            const data = await json(response, tasks.TasksPage);
+            found.push(...(data.items ?? []));
+            if (!data.nextPageToken) return found;
+            pageToken = data.nextPageToken;
+        }
+        throw new SyncUnreachableError("Google kept paging without an end", null);
+    };
+
+    const taskPath = (listId: string, taskId: string) =>
+        `/lists/${encodeURIComponent(listId)}/tasks/${encodeURIComponent(taskId)}`;
+
     return {
+        listingGaps: () => gaps,
+
         async listCalendars() {
-            const calendars: RemoteCalendar[] = [];
-            let pageToken = "";
-            for (let page = 0; page < 100; page++) {
-                const response = await call("GET", "/users/me/calendarList", {
-                    query: { maxResults: "250", ...(pageToken ? { pageToken } : {}) }
-                });
-                const data = await json(response, CalendarListPage);
-                for (const entry of data.items ?? []) {
-                    if (entry.deleted) continue;
-                    calendars.push({
-                        remoteId: entry.id,
-                        name: entry.summaryOverride ?? entry.summary ?? entry.id,
-                        color: entry.backgroundColor?.toLowerCase() ?? null,
-                        description: entry.description ?? "",
-                        timezone: entry.timeZone ?? null,
-                        readOnly:
-                            entry.accessRole === "reader" || entry.accessRole === "freeBusyReader",
-                        components: ["VEVENT"]
-                    });
-                }
-                if (!data.nextPageToken) return calendars;
-                pageToken = data.nextPageToken;
+            const calendars = await listEventCalendars();
+            // The tasks are an addition to the account, never a reason its
+            // calendars stop syncing: an account linked before tasks were asked
+            // for, or a project with the Tasks API off, lists its calendars and
+            // says what kept the tasks out.
+            try {
+                const lists = await listTaskLists();
+                gaps = [];
+                return [...calendars, ...lists];
+            } catch (caught) {
+                if (caught instanceof SyncAuthError && !(caught instanceof SyncConsentError))
+                    throw caught;
+                gaps = [{ prefix: tasks.TASKS_PREFIX, cause: caught }];
+                return calendars;
             }
-            throw new SyncUnreachableError("Google kept paging without an end", null);
         },
 
         async pull(state): Promise<ChangeSet> {
-            const colors = await loadPalette();
-            const listing = await listEvents(
-                state.remoteId,
-                state.syncToken ? { syncToken: state.syncToken } : {}
-            );
-            const changed: RemoteObject[] = [];
-            const removed: string[] = [];
-
-            if (!state.syncToken) {
-                for (const items of byUid(listing.items).values()) {
-                    const object = groupToObject(items, colors);
-                    if (object && "ics" in object) changed.push(object);
-                }
-                return { changed, removed, syncToken: listing.nextSyncToken, ctag: "", full: true };
-            }
-
-            // Incremental: a change to any part of a series means the whole
-            // series is re-read, since the object is stored whole.
-            const uids = new Map<string, string>();
-            for (const item of listing.items) {
-                const inSeries = Boolean(item.recurringEventId || item.recurrence?.length);
-                if (item.status === "cancelled" && !item.recurringEventId) {
-                    removed.push(item.id);
-                    continue;
-                }
-                if (!inSeries) {
-                    const object = groupToObject([item], colors);
-                    if (object && "ics" in object) changed.push(object);
-                    else if (object) removed.push(object.removed);
-                    continue;
-                }
-                const seriesHref = item.recurringEventId ?? item.id;
-                if (item.iCalUID) uids.set(item.iCalUID, seriesHref);
-                else if (item.recurringEventId) {
-                    // A deleted occurrence can arrive with no UID: its master has it.
-                    const master = await getEvent(state.remoteId, item.recurringEventId);
-                    if (master?.iCalUID) uids.set(master.iCalUID, seriesHref);
-                    else removed.push(seriesHref);
-                }
-            }
-            for (const [uid, seriesHref] of uids) {
-                const members = await group(state.remoteId, uid);
-                const object =
-                    members.length > 0 ? groupToObject(members, colors) : { removed: seriesHref };
-                if (object && "ics" in object) changed.push(object);
-                else if (object) removed.push(object.removed);
-            }
-            const fresh = changed.filter((object) => state.known.get(object.href) !== object.etag);
-            return {
-                changed: fresh,
-                removed: [...new Set(removed)],
-                syncToken: listing.nextSyncToken || state.syncToken,
-                ctag: "",
-                full: false
-            };
+            const listId = tasks.taskListOf(state.remoteId);
+            if (listId !== null)
+                return tasks.pullTaskList(state, (query) => listTasks(listId, query));
+            return pullEvents(state);
         },
 
         async put(target, object) {
-            const colors = await loadPalette();
-            const item = bridge.readEventItem(object.ics, object.uid);
-            const master = item.master;
-            const everyone = [master, ...item.overrides].filter((e): e is types.CalendarEvent =>
-                Boolean(e)
-            );
-            const sendUpdates = everyone.some((e) => e.attendees.length > 0) ? "all" : "none";
-            const query = { sendUpdates, supportsAttachments: "true" };
-            const masterEtag = object.etag?.split(",")[0] || undefined;
-            let href = object.href;
-            let firstEtag = "";
-
-            if (master) {
-                let response = href
-                    ? await call(
-                          "PATCH",
-                          `${calendarPath(target.remoteId)}/${encodeURIComponent(href)}`,
-                          {
-                              query,
-                              body: eventToGoogle(master, colors, {
-                                  instance: false,
-                                  insert: false
-                              }),
-                              ifMatch: masterEtag
-                          }
+            const listId = tasks.taskListOf(target.remoteId);
+            if (listId === null) return putEvent(target, object);
+            const body = tasks.todoToGoogleTask(bridge.readTodo(object.ics));
+            // A null clears a field on a patch; a new task simply has none.
+            const response = object.href
+                ? await taskCall("PATCH", taskPath(listId, object.href), { body })
+                : await taskCall("POST", `/lists/${encodeURIComponent(listId)}/tasks`, {
+                      body: Object.fromEntries(
+                          Object.entries(body).filter(([, value]) => value !== null)
                       )
-                    : await call("POST", calendarPath(target.remoteId), {
-                          query,
-                          body: eventToGoogle(master, colors, { instance: false, insert: true })
-                      });
-                if (!href && response.status === 409) {
-                    const existing = (await group(target.remoteId, object.uid)).find(
-                        (e) => !e.recurringEventId && e.status !== "cancelled"
-                    );
-                    if (existing) {
-                        await response.body?.cancel().catch(() => undefined);
-                        response = await call(
-                            "PATCH",
-                            `${calendarPath(target.remoteId)}/${encodeURIComponent(existing.id)}`,
-                            {
-                                query,
-                                body: eventToGoogle(master, colors, {
-                                    instance: false,
-                                    insert: false
-                                })
-                            }
-                        );
-                    }
-                }
-                const saved = await json(response, GoogleEvent);
-                href = saved.id;
-                firstEtag = saved.etag ?? "";
-            } else if (href) {
-                // An exception whose master is not here: it is written as itself.
-                const only = item.overrides[0];
-                if (only) {
-                    const response = await call(
-                        "PATCH",
-                        `${calendarPath(target.remoteId)}/${encodeURIComponent(href)}`,
-                        {
-                            query,
-                            body: eventToGoogle(only, colors, { instance: true, insert: false }),
-                            ifMatch: masterEtag
-                        }
-                    );
-                    firstEtag = (await json(response, GoogleEvent)).etag ?? "";
-                }
-                return { href, etag: await writeEtag(target.remoteId, object.uid, firstEtag) };
-            } else {
-                throw new SyncRefusedError(
-                    "An occurrence cannot be created without its series",
-                    null
-                );
-            }
-
-            const floating =
-                master && !bridge.isDate(master.start) && master.start.tzid
-                    ? master.start.tzid
-                    : "UTC";
-            const etags = [firstEtag];
-            for (const override of item.overrides) {
-                if (!override.recurrenceId) continue;
-                const instanceId = `${href}_${bridge.compactUtc(override.recurrenceId, bridge.zoneOrUtc(floating))}`;
-                const response = await call(
-                    "PATCH",
-                    `${calendarPath(target.remoteId)}/${encodeURIComponent(instanceId)}`,
-                    {
-                        query,
-                        body: eventToGoogle(override, colors, { instance: true, insert: false })
-                    }
-                );
-                if (response.status === 404) {
-                    await response.body?.cancel().catch(() => undefined);
-                    throw new SyncRefusedError(
-                        "A changed occurrence is not part of the series on Google",
-                        404
-                    );
-                }
-                etags.push((await json(response, GoogleEvent)).etag ?? "");
-            }
-            return { href, etag: await writeEtag(target.remoteId, object.uid, etags.join(",")) };
+                  });
+            const saved = await json(response, tasks.GoogleTask);
+            return { href: saved.id, etag: saved.etag ?? saved.updated ?? "" };
         },
 
         async remove(target, object) {
-            const response = await call(
-                "DELETE",
-                `${calendarPath(target.remoteId)}/${encodeURIComponent(object.href)}`,
-                {
-                    query: { sendUpdates: "all" },
-                    ifMatch: object.etag?.split(",")[0] || undefined
-                }
-            );
+            const listId = tasks.taskListOf(target.remoteId);
+            if (listId === null) return removeEvent(target, object);
+            const response = await taskCall("DELETE", taskPath(listId, object.href));
             if (response.ok || response.status === 404 || response.status === 410) {
                 await response.body?.cancel().catch(() => undefined);
                 return;
@@ -775,4 +687,210 @@ export function createGoogleProvider(input: {
             throw await googleError(response);
         }
     };
+
+    async function listEventCalendars(): Promise<RemoteCalendar[]> {
+        const calendars: RemoteCalendar[] = [];
+        let pageToken = "";
+        for (let page = 0; page < 100; page++) {
+            const response = await call("GET", "/users/me/calendarList", {
+                query: { maxResults: "250", ...(pageToken ? { pageToken } : {}) }
+            });
+            const data = await json(response, CalendarListPage);
+            for (const entry of data.items ?? []) {
+                if (entry.deleted) continue;
+                calendars.push({
+                    remoteId: entry.id,
+                    name: entry.summaryOverride ?? entry.summary ?? entry.id,
+                    color: entry.backgroundColor?.toLowerCase() ?? null,
+                    description: entry.description ?? "",
+                    timezone: entry.timeZone ?? null,
+                    readOnly:
+                        entry.accessRole === "reader" || entry.accessRole === "freeBusyReader",
+                    components: ["VEVENT"]
+                });
+            }
+            if (!data.nextPageToken) return calendars;
+            pageToken = data.nextPageToken;
+        }
+        throw new SyncUnreachableError("Google kept paging without an end", null);
+    }
+
+    async function pullEvents(state: PullState): Promise<ChangeSet> {
+        const colors = await loadPalette();
+        const listing = await listEvents(
+            state.remoteId,
+            state.syncToken ? { syncToken: state.syncToken } : {}
+        );
+        const changed: RemoteObject[] = [];
+        const removed: string[] = [];
+
+        if (!state.syncToken) {
+            for (const items of byUid(listing.items).values()) {
+                const object = groupToObject(items, colors);
+                if (object && "ics" in object) changed.push(object);
+            }
+            return { changed, removed, syncToken: listing.nextSyncToken, ctag: "", full: true };
+        }
+
+        // Incremental: a change to any part of a series means the whole
+        // series is re-read, since the object is stored whole.
+        const uids = new Map<string, string>();
+        for (const item of listing.items) {
+            const inSeries = Boolean(item.recurringEventId || item.recurrence?.length);
+            if (item.status === "cancelled" && !item.recurringEventId) {
+                removed.push(item.id);
+                continue;
+            }
+            if (!inSeries) {
+                const object = groupToObject([item], colors);
+                if (object && "ics" in object) changed.push(object);
+                else if (object) removed.push(object.removed);
+                continue;
+            }
+            const seriesHref = item.recurringEventId ?? item.id;
+            if (item.iCalUID) uids.set(item.iCalUID, seriesHref);
+            else if (item.recurringEventId) {
+                // A deleted occurrence can arrive with no UID: its master has it.
+                const master = await getEvent(state.remoteId, item.recurringEventId);
+                if (master?.iCalUID) uids.set(master.iCalUID, seriesHref);
+                else removed.push(seriesHref);
+            }
+        }
+        for (const [uid, seriesHref] of uids) {
+            const members = await group(state.remoteId, uid);
+            const object =
+                members.length > 0 ? groupToObject(members, colors) : { removed: seriesHref };
+            if (object && "ics" in object) changed.push(object);
+            else if (object) removed.push(object.removed);
+        }
+        const fresh = changed.filter((object) => state.known.get(object.href) !== object.etag);
+        return {
+            changed: fresh,
+            removed: [...new Set(removed)],
+            syncToken: listing.nextSyncToken || state.syncToken,
+            ctag: "",
+            full: false
+        };
+    }
+
+    async function putEvent(
+        target: WriteTarget,
+        object: { href: string | null; etag: string | null; ics: string; uid: string }
+    ): Promise<{ href: string; etag: string }> {
+        const colors = await loadPalette();
+        const item = bridge.readEventItem(object.ics, object.uid);
+        const master = item.master;
+        const everyone = [master, ...item.overrides].filter((e): e is types.CalendarEvent =>
+            Boolean(e)
+        );
+        const sendUpdates = everyone.some((e) => e.attendees.length > 0) ? "all" : "none";
+        const query = { sendUpdates, supportsAttachments: "true" };
+        const masterEtag = object.etag?.split(",")[0] || undefined;
+        let href = object.href;
+        let firstEtag = "";
+
+        if (master) {
+            let response = href
+                ? await call(
+                      "PATCH",
+                      `${calendarPath(target.remoteId)}/${encodeURIComponent(href)}`,
+                      {
+                          query,
+                          body: eventToGoogle(master, colors, {
+                              instance: false,
+                              insert: false
+                          }),
+                          ifMatch: masterEtag
+                      }
+                  )
+                : await call("POST", calendarPath(target.remoteId), {
+                      query,
+                      body: eventToGoogle(master, colors, { instance: false, insert: true })
+                  });
+            if (!href && response.status === 409) {
+                const existing = (await group(target.remoteId, object.uid)).find(
+                    (e) => !e.recurringEventId && e.status !== "cancelled"
+                );
+                if (existing) {
+                    await response.body?.cancel().catch(() => undefined);
+                    response = await call(
+                        "PATCH",
+                        `${calendarPath(target.remoteId)}/${encodeURIComponent(existing.id)}`,
+                        {
+                            query,
+                            body: eventToGoogle(master, colors, {
+                                instance: false,
+                                insert: false
+                            })
+                        }
+                    );
+                }
+            }
+            const saved = await json(response, GoogleEvent);
+            href = saved.id;
+            firstEtag = saved.etag ?? "";
+        } else if (href) {
+            // An exception whose master is not here: it is written as itself.
+            const only = item.overrides[0];
+            if (only) {
+                const response = await call(
+                    "PATCH",
+                    `${calendarPath(target.remoteId)}/${encodeURIComponent(href)}`,
+                    {
+                        query,
+                        body: eventToGoogle(only, colors, { instance: true, insert: false }),
+                        ifMatch: masterEtag
+                    }
+                );
+                firstEtag = (await json(response, GoogleEvent)).etag ?? "";
+            }
+            return { href, etag: await writeEtag(target.remoteId, object.uid, firstEtag) };
+        } else {
+            throw new SyncRefusedError("An occurrence cannot be created without its series", null);
+        }
+
+        const floating =
+            master && !bridge.isDate(master.start) && master.start.tzid ? master.start.tzid : "UTC";
+        const etags = [firstEtag];
+        for (const override of item.overrides) {
+            if (!override.recurrenceId) continue;
+            const instanceId = `${href}_${bridge.compactUtc(override.recurrenceId, bridge.zoneOrUtc(floating))}`;
+            const response = await call(
+                "PATCH",
+                `${calendarPath(target.remoteId)}/${encodeURIComponent(instanceId)}`,
+                {
+                    query,
+                    body: eventToGoogle(override, colors, { instance: true, insert: false })
+                }
+            );
+            if (response.status === 404) {
+                await response.body?.cancel().catch(() => undefined);
+                throw new SyncRefusedError(
+                    "A changed occurrence is not part of the series on Google",
+                    404
+                );
+            }
+            etags.push((await json(response, GoogleEvent)).etag ?? "");
+        }
+        return { href, etag: await writeEtag(target.remoteId, object.uid, etags.join(",")) };
+    }
+
+    async function removeEvent(
+        target: WriteTarget,
+        object: { href: string; etag: string | null }
+    ): Promise<void> {
+        const response = await call(
+            "DELETE",
+            `${calendarPath(target.remoteId)}/${encodeURIComponent(object.href)}`,
+            {
+                query: { sendUpdates: "all" },
+                ifMatch: object.etag?.split(",")[0] || undefined
+            }
+        );
+        if (response.ok || response.status === 404 || response.status === 410) {
+            await response.body?.cancel().catch(() => undefined);
+            return;
+        }
+        throw await googleError(response);
+    }
 }

@@ -17,7 +17,8 @@ import { prisma, VISIBLE_USER } from "@polaris/db";
 import { CredentialDecryptError, decryptSecret, encryptSecret } from "@polaris/storage";
 import { getConnection, listConnections, readCredential } from "@/lib/connections/store";
 import {
-    GOOGLE_CALENDAR_SCOPES,
+    GOOGLE_CALENDAR_SCOPE,
+    GOOGLE_TASKS_SCOPE,
     GoogleAuthExpiredError,
     getGoogleOAuthClient,
     googleAccessToken
@@ -50,20 +51,33 @@ export interface CalendarLink {
      *  something else (a backup, mail) reaches everything but the calendars and
      *  has to be authorized again for them. */
     readonly grantsCalendar: boolean;
+    /** Whether its tasks can be shown beside the calendars. A Google account
+     *  linked before tasks were asked for has to grant them; Microsoft has no
+     *  tasks here, so it never lacks them. */
+    readonly grantsTasks: boolean;
 }
 
 /** The scope that decides whether a link reaches calendars, by provider. */
 const CALENDAR_SCOPE: Record<CalendarLinkProvider, string> = {
-    google: GOOGLE_CALENDAR_SCOPES[GOOGLE_CALENDAR_SCOPES.length - 1]!,
+    google: GOOGLE_CALENDAR_SCOPE,
     microsoft: "Calendars.ReadWrite"
 };
 
-/** Whether a granted scope string carries calendar read and write access. */
-export function grantsCalendar(provider: CalendarLinkProvider, scope: string): boolean {
-    const wanted = CALENDAR_SCOPE[provider];
+/** Whether a granted scope string holds this scope. */
+function holds(scope: string, wanted: string): boolean {
     return scope
         .split(/\s+/)
         .some((granted) => granted === wanted || granted.endsWith(`/${wanted}`));
+}
+
+/** Whether a granted scope string carries calendar read and write access. */
+export function grantsCalendar(provider: CalendarLinkProvider, scope: string): boolean {
+    return holds(scope, CALENDAR_SCOPE[provider]);
+}
+
+/** Whether a granted scope string carries the account's tasks. */
+export function grantsTasks(provider: CalendarLinkProvider, scope: string): boolean {
+    return provider !== "google" || holds(scope, GOOGLE_TASKS_SCOPE);
 }
 
 /** Every Google and Microsoft account this person linked. */
@@ -76,7 +90,8 @@ export async function listCalendarLinks(userId: string): Promise<CalendarLink[]>
                     id: link.id,
                     provider,
                     label: link.label,
-                    grantsCalendar: grantsCalendar(provider, link.scope)
+                    grantsCalendar: grantsCalendar(provider, link.scope),
+                    grantsTasks: grantsTasks(provider, link.scope)
                 }))
         )
     );

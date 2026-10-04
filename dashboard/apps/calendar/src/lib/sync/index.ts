@@ -10,6 +10,7 @@ export * from "./provider";
 export { type Fetcher } from "./http";
 export { discoverCalDav, createCalDavProvider, normalizeServerUrl } from "./caldav";
 export { createGoogleProvider } from "./google";
+export { TASKS_PREFIX } from "./google-tasks";
 export { createGraphProvider, patternToRrule, ruleToPattern } from "./graph";
 export {
     fetchIcsFeed,

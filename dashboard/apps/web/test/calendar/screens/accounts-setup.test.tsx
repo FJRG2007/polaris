@@ -76,6 +76,7 @@ function view(patch: Partial<AccountsView> = {}): AccountsView {
         linkAvailable: { google: true, microsoft: true },
         canManage: false,
         googleSetup: null,
+        tasksApiOff: null,
         presets: [],
         holidays: [],
         ...patch
@@ -158,6 +159,7 @@ describe("connecting again for calendars", () => {
                     provider: "google",
                     label: "backup@gmail.example",
                     grantsCalendar: false,
+                    grantsTasks: false,
                     used: false
                 }
             ]
@@ -169,5 +171,75 @@ describe("connecting again for calendars", () => {
         expect(
             screen.getByRole("link", { name: "Connect again for calendars" }).getAttribute("href")
         ).toBe("/api/connections/google/link?scope=calendar");
+    });
+});
+
+/** The account the source reads through, with or without its tasks granted. */
+function link(grantsTasks: boolean) {
+    return {
+        id: "22222222-2222-4222-8222-222222222222",
+        provider: "google" as const,
+        label: "me@gmail.example",
+        grantsCalendar: true,
+        grantsTasks,
+        used: true
+    };
+}
+
+describe("a Google account's tasks", () => {
+    it("asks an account linked before tasks to grant them, through the consent screen", async () => {
+        accounts = view({ sources: [source({ status: "ok" })], links: [link(false)] });
+        await show();
+        expect(screen.getByText(/Your Google tasks aren't shown yet/)).toBeTruthy();
+        expect(screen.getByRole("link", { name: "Show my tasks" }).getAttribute("href")).toBe(
+            "/api/connections/google/link?scope=calendar"
+        );
+    });
+
+    it("says nothing once the account holds them", async () => {
+        accounts = view({ sources: [source({ status: "ok" })], links: [link(true)] });
+        await show();
+        expect(screen.queryByText(/Google tasks/)).toBeNull();
+        expect(screen.queryByRole("link", { name: "Show my tasks" })).toBeNull();
+    });
+
+    it("gives an administrator the switch when the Tasks API is off", async () => {
+        const enable =
+            "https://console.cloud.google.com/apis/library/tasks.googleapis.com?project=100000000001";
+        accounts = view({
+            canManage: true,
+            sources: [source({ status: "ok" })],
+            links: [link(true)],
+            tasksApiOff: { enableUrl: enable, project: "100000000001" }
+        });
+        await show();
+        expect(screen.getByText(/Google Tasks API is turned off/)).toBeTruthy();
+        expect(
+            screen.getByRole("link", { name: /Turn on in Google Cloud/ }).getAttribute("href")
+        ).toBe(enable);
+    });
+
+    it("tells anybody else the administrator has to turn them on", async () => {
+        accounts = view({
+            sources: [source({ status: "ok" })],
+            links: [link(true)],
+            tasksApiOff: { enableUrl: null, project: null }
+        });
+        await show();
+        expect(
+            screen.getByText("Google tasks can't be shown until your administrator turns them on.")
+        ).toBeTruthy();
+        expect(screen.queryByRole("link", { name: /Google Cloud/ })).toBeNull();
+    });
+
+    it("reads the linked accounts again on the way back from granting more", async () => {
+        accounts = view({ sources: [source({ status: "ok" })], links: [link(true)] });
+        refreshSource.mockResolvedValue({ ok: true, source: source({ status: "ok" }) });
+        render(<Screen linked="linked" />, { wrapper: MessagesWrapper });
+        await act(async () => {
+            for (let turn = 0; turn < 8; turn += 1) await Promise.resolve();
+        });
+        expect(refreshSource).toHaveBeenCalledTimes(1);
+        expect(refreshSource).toHaveBeenCalledWith("11111111-1111-4111-8111-111111111111");
     });
 });
