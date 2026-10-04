@@ -51,14 +51,18 @@ export function useBrowserExporter(): BrowserExporter | null {
  * re-register on every keystroke.
  */
 export function useRegisterExporter(exporter: BrowserExporter): void {
-    const slot = useContext(ExportSlot);
+    const register = useContext(ExportSlot)?.register;
     const held = useRef(exporter);
     held.current = exporter;
 
+    // Keyed on `register` alone, which is stable, and never on the slot itself.
+    // The slot is rebuilt every time an exporter is stored, so an effect that
+    // depended on it stored one, was re-run by that, stored null on the way out
+    // and a fresh function on the way back in - every diagram opened into
+    // React's "Maximum update depth exceeded".
     useEffect(() => {
-        if (!slot) return;
-        slot.register((format) => held.current(format));
-        return () => slot.register(null);
-        // Only the slot: the exporter itself is read through the ref.
-    }, [slot]);
+        if (!register) return;
+        register((format) => held.current(format));
+        return () => register(null);
+    }, [register]);
 }
