@@ -32,7 +32,10 @@ the same change.
    it, because no compiler error tells you: `needsOverworld`,
    `needsHostileMobs`, `summonsMobs`, `needsPvp`, `afkCounts`, `takesJoiners`,
    `playsOnStage`, `playsInArena`, `keepsDay`, `defaultMinPlayers`,
-   `joinersNeeded`, `awardsPrizes`.
+   `joinersNeeded`, `awardsPrizes`. A kind that is neither `playsOnStage` nor
+   `playsInArena` and is held at a place on the ground also needs its own case
+   in `heldWhere`'s switch (see "Where an event is held"), or the Events
+   screen groups it as `anywhere` by default.
 2. **Options**: every field has a `.default()`, so an event saved before the
    field existed still parses. Renaming or reshaping a field needs a
    `z.preprocess` that reads the old shape (`legacyWorldBoss`,
@@ -54,9 +57,15 @@ the same change.
    in `messages/{en-US,es-ES}/minecraft.json` under `events.kinds.<kind>`
    (`label`, `summary`, `unit`) and `editor.*`. Every line has to fit
    `COMMAND_BYTES_MAX` (1014 bytes) in both languages.
-5. **Editor**: put the kind's fields in `event-editor.tsx`, or in an
-   `event-options-<kind>.tsx` of its own once they grow. Add a screen test that
-   saves the defaults and one changed value.
+5. **Editor**: put the kind's fields in `event-editor.tsx`, or group them with
+   kinds held the same way: `event-options-sky.tsx` for one played on a stage
+   or an arena, `event-options-anywhere.tsx` for one played on the ground or
+   wherever players are, `event-options-arena.tsx` for the older team duel and
+   build battle - each reusing `event-editor.tsx`'s shared `Field`,
+   `PlaceField`, `options`, `numberOf` and `problemAt`. A kind large enough on
+   its own still gets an `event-options-<kind>.tsx` of its own (`gathering`,
+   `rare-catch`, `treasure-hunt`, `world-boss`, `xp-boost`). Add a screen test
+   that saves the defaults and one changed value.
 6. **Docs**: add the kind to the world-requirements table and a note under
    "Kind notes" whenever it does something a reader would not guess.
 
@@ -78,6 +87,16 @@ lesson is a bug that reached a player.
   End is never the anchor, and is brought in like anybody when they join).
   After a few tries it comes in closer. With nobody in the Overworld it fails
   saying so; with nowhere free it says what stopped each try.
+- **The Events screen groups every kind by where it is played**
+  (`catalog.heldWhere`, `HELD_WHERE`: `sky`, `world`, `anywhere`), both the new
+  event's kind picker and the saved list: `sky` for anything `playsOnStage` or
+  `playsInArena`, and a world boss with its own sky arena switched on; `world`
+  for a kind held at a place found on the ground - supply drop, king of the
+  ring played on the ground, treasure hunt, horde defense, meteor shower,
+  villager defense, and an explorer set to race; `anywhere` - the default for
+  everything else - for a kind that moves nobody and builds nothing: mining
+  rush, mob hunt, blood moon, fishing, trivia, happy hour, gathering, rare
+  catch, XP boost, bingo rush, boss fishing, and an explorer not racing.
 
 ## World requirements
 
@@ -745,6 +764,13 @@ A new kind follows all of them. A change to an old kind must not undo one.
   the run's id (`trivia-bank.seeded`), never `Math.random()`, and a change to
   what can be drawn keeps the draw of a run saved before it
   (`spleef.variantFor`).
+- **A late joiner's spot is a function of how many are already in, not of one
+  alone.** The ice boat race's grid spot is worked out from the run's id and
+  an index; admitting one late racer at a time asked for a one-racer grid
+  every time, which is always its first spot - every late racer landed on the
+  same one. Admission now asks for a grid sized to everybody already in plus
+  whoever is joining, and gives the new ones the spots after the ones already
+  taken (`stage-service.admit`) (`9010c3bf8`, `655ea112c`).
 
 ### Caches and clocks
 
