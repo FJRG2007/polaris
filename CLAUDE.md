@@ -131,6 +131,17 @@ change:
   a game - is translated in that person's language (`getUserLocale`), not the
   sender's.
 
+## Minecraft events
+
+Before adding or changing a Game servers event
+(`apps/game-servers/src/lib/minecraft/events/`), read
+`dashboard/docs/minecraft-events.md`. The `minecraft-events` skill
+(`.claude/skills/minecraft-events/`) is the procedure. Its "Lessons from real
+servers" section lists the bugs that already reached players: RCON reads
+cutting each other, version gates, both gamerule names, the stash order,
+fall deaths at an arena's end, restarts in the middle of a run. A new kind
+that skips them brings those bugs back.
+
 ## This machine
 
 Docker is not available on the development machine and must never be started
