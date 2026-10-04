@@ -14,7 +14,7 @@
  */
 
 import { storage } from "#imports";
-import { withServer, type SavedServer } from "@/lib/servers";
+import { readServers, settleServers, withServer, type SavedServer } from "@/lib/servers";
 
 /** Where the vault answers, as an origin with no trailing slash. */
 const ORIGIN = storage.defineItem<string | null>("local:server.origin", {
@@ -28,9 +28,20 @@ const ORIGIN = storage.defineItem<string | null>("local:server.origin", {
  */
 const SERVERS = storage.defineItem<SavedServer[]>("local:servers.list", { fallback: [] });
 
-/** The servers as stored. */
+/** The servers as stored, with anything malformed left out. */
 export async function savedServers(): Promise<SavedServer[]> {
-    return SERVERS.getValue();
+    return readServers(await SERVERS.getValue());
+}
+
+/**
+ * Bring the stored list up to date with what this browser already holds - see
+ * `settleServers`. Written only when that changes something, so a worker that
+ * starts a hundred times a day writes nothing after the first.
+ */
+export async function settleSavedServers(): Promise<void> {
+    const [raw, active] = await Promise.all([SERVERS.getValue(), ORIGIN.getValue()]);
+    const settled = settleServers(raw, active);
+    if (JSON.stringify(settled) !== JSON.stringify(raw)) await SERVERS.setValue(settled);
 }
 
 /** Replace the stored list. */
@@ -76,7 +87,7 @@ export async function holdsOrigin(origin: string): Promise<boolean> {
 export async function rememberOrigin(origin: string): Promise<void> {
     await Promise.all([
         ORIGIN.setValue(origin),
-        SERVERS.setValue(withServer(await SERVERS.getValue(), origin))
+        SERVERS.setValue(withServer(await savedServers(), origin))
     ]);
 }
 

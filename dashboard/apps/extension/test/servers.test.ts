@@ -14,8 +14,10 @@ import {
     describeServer,
     listServers,
     normalizeServerName,
+    readServers,
     renameServer,
     serverNameProblem,
+    settleServers,
     withServer,
     withoutServer
 } from "../src/lib/servers";
@@ -111,5 +113,69 @@ describe("a server name", () => {
             serverNameProblem(normalizeServerName(` ${"x".repeat(SERVER_NAME_MAX)} `))
         ).toBeNull();
         expect(serverNameProblem(null)).toBeNull();
+    });
+});
+
+describe("the stored list, read back", () => {
+    it("keeps well-formed rows as they are", () => {
+        const saved = [
+            { origin: HOME, name: "Home" },
+            { origin: WORK, name: null }
+        ];
+        expect(readServers(saved)).toEqual(saved);
+    });
+
+    it("is empty for anything that is not a list", () => {
+        for (const raw of [undefined, null, "x", 3, { origin: HOME }]) {
+            expect(readServers(raw)).toEqual([]);
+        }
+    });
+
+    it("drops rows with no usable address, and a second row for one address", () => {
+        expect(
+            readServers([
+                null,
+                "https://home.example.com",
+                { origin: "ftp://files.example.com", name: "Files" },
+                { origin: "https://home.example.com/path", name: "Path" },
+                { origin: HOME, name: "Home" },
+                { origin: HOME, name: "Again" }
+            ])
+        ).toEqual([{ origin: HOME, name: "Home" }]);
+    });
+
+    it("gives a row its host back when its name would not pass, rather than dropping it", () => {
+        expect(
+            readServers([
+                { origin: HOME, name: "x".repeat(SERVER_NAME_MAX + 1) },
+                { origin: WORK, name: 42 }
+            ])
+        ).toEqual([
+            { origin: HOME, name: null },
+            { origin: WORK, name: null }
+        ]);
+        expect(readServers([{ origin: HOME, name: "  Home   lab " }])).toEqual([
+            { origin: HOME, name: "Home lab" }
+        ]);
+    });
+});
+
+describe("bringing an install up to date", () => {
+    it("adds the address in front to an install that never had a list", () => {
+        expect(settleServers(undefined, HOME)).toEqual([{ origin: HOME, name: null }]);
+    });
+
+    it("keeps names and order, and adds nothing already there", () => {
+        const saved = [
+            { origin: WORK, name: "Office" },
+            { origin: HOME, name: "Home" }
+        ];
+        expect(settleServers(saved, HOME)).toEqual(saved);
+        expect(settleServers(settleServers(saved, HOME), HOME)).toEqual(saved);
+    });
+
+    it("leaves the list alone with no address in front, or one that will not parse", () => {
+        expect(settleServers([], null)).toEqual([]);
+        expect(settleServers([], "not an address")).toEqual([]);
     });
 });

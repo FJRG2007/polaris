@@ -49,6 +49,7 @@ import {
     rememberOrigin,
     saveServers,
     savedServers,
+    settleSavedServers,
     vaultBase
 } from "@/lib/server";
 
@@ -1897,7 +1898,7 @@ async function status(): Promise<messages.VaultStatus> {
     };
 }
 
-/** Whether an origin is one the Servers screen lists, read without the network. */
+/** Whether an origin is one the hosts screen lists, read without the network. */
 async function listedServer(origin: string): Promise<boolean> {
     const [saved, parked, active] = await Promise.all([
         savedServers(),
@@ -3749,6 +3750,11 @@ async function syncAutofill(): Promise<void> {
 }
 
 export default defineBackground(() => {
+    // The hosts list brought up to date with what this browser already holds -
+    // the address in front written onto it for an install from before the list.
+    // In a turn, so it cannot interleave with a switch the popup asks for.
+    void inTurn(() => settleSavedServers());
+
     // The sites this may run inside, kept current. Once at startup because a
     // grant made while the worker was recycled is one nothing else would notice,
     // and on every change because the browser's own extension settings page can
