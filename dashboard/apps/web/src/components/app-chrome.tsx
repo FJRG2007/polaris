@@ -18,7 +18,8 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { AppNav } from "@/components/app-nav";
 import { FavoriteAppsProvider } from "@/components/favorite-apps";
-import { getFavoriteApps } from "@/lib/app-launcher-service";
+import { NO_LAUNCHER_PREFS } from "@/lib/app-launcher";
+import { getLauncherPrefs } from "@/lib/app-launcher-service";
 import { appBaseUrl } from "@/lib/domain-service";
 import { getCapabilities } from "@polaris/config";
 import { heldSectionPermissions, installedSectionApps, reachableAppNav } from "@/lib/app-access";
@@ -138,7 +139,7 @@ export async function AppChrome({ user, children }: { user: SessionUser; childre
         presence,
         status,
         soundVolume,
-        favoriteApps,
+        launcherPrefs,
         chatUnread,
         mailUnread,
         adminWaiting
@@ -160,8 +161,8 @@ export async function AppChrome({ user, children }: { user: SessionUser; childre
         ownStatus(user.id),
         // A sound at the wrong volume is not worth failing the page over.
         getSoundVolume(user.id).catch(() => DEFAULT_SOUND_VOLUME),
-        // The apps pinned to the top of the switcher. Never worth a failed page.
-        getFavoriteApps(user.id).catch(() => []),
+        // The favorites and the order of the app menu. Never worth a failed page.
+        getLauncherPrefs(user.id).catch(() => NO_LAUNCHER_PREFS),
         chatWaiting,
         mailWaiting,
         adminCount
@@ -205,7 +206,10 @@ export async function AppChrome({ user, children }: { user: SessionUser; childre
                                     and the Overview's rail so a star in one moves
                                     the other. Inside the toasts, which is how a
                                     refused save says so. */}
-                                                <FavoriteAppsProvider initial={favoriteApps}>
+                                                <FavoriteAppsProvider
+                                                    initial={launcherPrefs.favorites}
+                                                    initialOrder={launcherPrefs.order}
+                                                >
                                                     {/* Where everybody on screen is, asked once for
                                     the page rather than once per face. Above
                                     everything, because faces are drawn on every

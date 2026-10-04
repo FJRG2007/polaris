@@ -105,9 +105,9 @@ import {
 import { GAME_SERVERS_APP_ID } from "@/lib/apps/games-catalog";
 
 /**
- * The shelves the app menu sorts apps onto once there are too many to scan as
- * one grid - the way an app store, Launchpad's folders or Slack's directory
- * group theirs. Declared once, in the order they are drawn, and named in
+ * What each app is for. The app menu draws one grid with no headings, so these
+ * are never drawn there; the menu's search finds an app by its category, in
+ * English and in the reader's language ("games" finds Game servers). Named in
  * English like every other label here (`nav.labels` translates them).
  */
 export const APP_CATEGORIES = [
@@ -127,8 +127,8 @@ export interface AppEntry {
     description: string;
     icon: LucideIcon;
     href: string;
-    /** The shelf the app menu files this under. Required, so an app added
-     *  without one fails to compile rather than landing on no shelf at all. */
+    /** What the app is for, which the app menu's search finds it by. Required,
+     *  so an app added without one fails to compile. */
     category: AppCategory;
     locked?: boolean;
     /** The capability that opens this app. An account that does not hold it does

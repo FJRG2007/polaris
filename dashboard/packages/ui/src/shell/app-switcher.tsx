@@ -2,25 +2,26 @@
 
 /**
  * Top-left application switcher. Polaris is a platform of apps, and this is how
- * you move between them - drawn the way Google's launcher is: a grid of icons
- * with the name under each, and no description. A description under every app
- * made the list a page to read; an icon and a name is a thing to recognise.
+ * you move between them - drawn the way Google's launcher is: one grid of icons
+ * with the name under each, no headings and no description. A description under
+ * every app made the list a page to read; an icon and a name is a thing to
+ * recognise, and one grid is one place to look.
  *
  * It has to stay that with thirty apps as much as with three, so it borrows what
  * the launchers built for many apps do:
  *
+ * - The first screenful, then a More button that opens the rest in the same
+ *   grid, as Google's does.
  * - A field at the top, as in Microsoft 365's launcher and Spotlight: typing
- *   narrows every app to the ones that match, ranked, and enter opens the first.
- * - Sections the caller decides - favorites, recent, then a shelf per category
- *   (Launchpad's folders, an app store's categories) - so a long list reads as
- *   several short ones.
- * - Favorites arranged by dragging, as in Google's launcher, or from the
- *   keyboard with Alt and an arrow.
+ *   narrows every app - shown or behind More - to the ones that match, ranked,
+ *   and enter opens the first.
+ * - The grid arranged by dragging, as in Google's launcher, or from the keyboard
+ *   with Alt and an arrow.
  * - The arrow keys walk the grid as a grid: left and right along it, up and down
- *   a row, across the headings; tab reaches the star beside each app.
+ *   a row; tab reaches the star beside each app.
  *
- * Which apps go where is the caller's decision (it knows what was pinned and
- * where the reader has been); this only draws it.
+ * Which order the apps come in is the caller's decision (it knows what was
+ * pinned, arranged and used); this only draws it.
  *
  * Locked apps stay visible but badged so the platform's scope is legible even in
  * the limited edition; clicking one routes to its unlock explainer.
@@ -46,7 +47,6 @@ import {
     DropdownMenu,
     DropdownMenuContent,
     DropdownMenuItem,
-    DropdownMenuLabel,
     DropdownMenuTrigger
 } from "../components/dropdown-menu";
 
@@ -67,15 +67,6 @@ export interface PolarisApp {
     readonly keywords?: readonly string[];
 }
 
-/** One block of the grid, drawn under its heading when there is more than one. */
-export interface AppSwitcherSection {
-    readonly key: string;
-    readonly label: string;
-    readonly ids: readonly string[];
-    /** Whether its apps can be dragged into a new order - the favorites. */
-    readonly arrangeable?: boolean;
-}
-
 /** The switcher's own words. Everything else it draws is the caller's data. */
 export interface AppSwitcherStrings {
     /** The search field's placeholder and name. */
@@ -85,8 +76,10 @@ export interface AppSwitcherStrings {
     /** The star's name for an app not yet pinned, and for one that is. */
     readonly pin: (appLabel: string) => string;
     readonly unpin: (appLabel: string) => string;
-    /** Said to a screen reader after a favorite is moved with the keyboard. */
+    /** Said to a screen reader after an app is moved with the keyboard. */
     readonly moved: (appLabel: string, position: number, total: number) => string;
+    /** The button under the first screenful that opens the rest. */
+    readonly more: string;
 }
 
 const ENGLISH: AppSwitcherStrings = {
@@ -94,11 +87,16 @@ const ENGLISH: AppSwitcherStrings = {
     noMatch: (query) => `No app matches ${query}`,
     pin: (appLabel) => `Add ${appLabel} to favorites`,
     unpin: (appLabel) => `Remove ${appLabel} from favorites`,
-    moved: (appLabel, position, total) => `${appLabel} moved to position ${position} of ${total}`
+    moved: (appLabel, position, total) => `${appLabel} moved to position ${position} of ${total}`,
+    more: "More"
 };
 
 /** Tiles per row. The arrow keys move by it, so it is the grid's one number. */
 const COLUMNS = 3;
+
+/** How many apps are drawn before More: four rows, about what the menu shows on
+ *  a laptop without scrolling. */
+const FIRST_SCREEN = COLUMNS * 4;
 
 /** What a search reads of an app: the name first, then the words the caller
  *  added, then the description - which only ever ranks, never fuzzes. */
@@ -115,6 +113,7 @@ function quoted(value: string): string {
 
 const TILE = "data-launcher-tile";
 const STAR = "data-launcher-star";
+const MORE = "data-launcher-more";
 
 export function AppSwitcher({
     apps,
@@ -122,10 +121,11 @@ export function AppSwitcher({
     currentApp,
     linkAs: Anchor = "a",
     alert = false,
-    sections,
+    order,
     pinned = [],
     onTogglePin,
     onArrange,
+    firstScreen = FIRST_SCREEN,
     open,
     onOpenChange,
     footer,
@@ -157,16 +157,18 @@ export function AppSwitcher({
      * is the state this was added to fix.
      */
     alert?: boolean;
-    /** The blocks of the grid, in order. Absent, every app is drawn in one grid
-     *  in the order given. An app no section names is not drawn until searched. */
-    sections?: readonly AppSwitcherSection[];
+    /** The ids of the grid, in order. Absent, every app is drawn in the order
+     *  given. An app the order does not name is not drawn until searched. */
+    order?: readonly string[];
     /** The ids pinned to the favorites, which is what the star says. */
     pinned?: readonly string[];
     /** Pin or unpin one app. Absent, no star is drawn. */
     onTogglePin?: (appId: string) => void;
-    /** The new order of an arrangeable section, after a drag or a keyboard move.
-     *  Only called when the order actually changed. */
+    /** The grid's whole new order, after a drag or a keyboard move. Only called
+     *  when the order actually changed. Absent, the grid cannot be arranged. */
     onArrange?: (ids: string[]) => void;
+    /** How many apps are drawn before More. */
+    firstScreen?: number;
     /** Open state, for a caller that opens the menu from somewhere else. */
     open?: boolean;
     onOpenChange?: (open: boolean) => void;
@@ -177,7 +179,8 @@ export function AppSwitcher({
 }) {
     const [query, setQuery] = useState("");
     const [ownOpen, setOwnOpen] = useState(false);
-    const [dragOrder, setDragOrder] = useState<{ key: string; ids: string[] } | null>(null);
+    const [expanded, setExpanded] = useState(false);
+    const [dragOrder, setDragOrder] = useState<string[] | null>(null);
     const [said, setSaid] = useState("");
     const dragging = useRef<string | null>(null);
     const dropped = useRef(false);
@@ -185,8 +188,9 @@ export function AppSwitcher({
     const surface = useRef<HTMLDivElement>(null);
     const isOpen = open ?? ownOpen;
 
-    // A favorite moved from the keyboard is a node React moved, and moving a
-    // node drops its focus; put it back on the same app.
+    // An app moved from the keyboard is a node React moved, and moving a node
+    // drops its focus; put it back on the same app. The first app More reveals
+    // takes the focus the same way.
     useLayoutEffect(() => {
         const id = refocus.current;
         if (!id) return;
@@ -221,6 +225,7 @@ export function AppSwitcher({
         if (!next) {
             setQuery("");
             setDragOrder(null);
+            setExpanded(false);
             setSaid("");
         }
         setOwnOpen(next);
@@ -230,82 +235,72 @@ export function AppSwitcher({
     const pinnedIds = new Set(pinned);
     const byId = new Map(apps.map((app) => [app.id, app]));
     const searching = query.trim().length > 0;
-    const drawn: { key: string; label: string; apps: PolarisApp[]; arrangeable: boolean }[] =
-        searching
-            ? [
-                  {
-                      key: "results",
-                      label: "",
-                      apps: searchItems(apps, query, SEARCH_FIELDS),
-                      arrangeable: false
-                  }
-              ]
-            : (sections ?? [{ key: "all", label: "", ids: apps.map((app) => app.id) }])
-                  .map((section) => {
-                      const ids =
-                          dragOrder && dragOrder.key === section.key ? dragOrder.ids : section.ids;
-                      return {
-                          key: section.key,
-                          label: section.label,
-                          apps: ids.flatMap((id) => byId.get(id) ?? []),
-                          arrangeable: Boolean(section.arrangeable && onArrange)
-                      };
-                  })
-                  .filter((section) => section.apps.length > 0);
+    const arrangeable = Boolean(onArrange) && !searching;
+    // Only ids that name an app: an order kept from before an app went away
+    // must not count towards the screenful or the positions said aloud.
+    const ordered = (order ?? apps.map((app) => app.id)).filter((id) => byId.has(id));
+    const full = dragOrder ?? ordered;
+    const hidden = !searching && !expanded && full.length > firstScreen;
+    const drawn: PolarisApp[] = searching
+        ? searchItems(apps, query, SEARCH_FIELDS)
+        : (hidden ? full.slice(0, firstScreen) : full).flatMap((id) => byId.get(id) ?? []);
 
-    function arrange(key: string, ids: string[]) {
-        const section = sections?.find((candidate) => candidate.key === key);
-        if (!section || !onArrange) return;
-        if (ids.length === section.ids.length && ids.every((id, at) => id === section.ids[at]))
-            return;
+    function arrange(ids: string[]) {
+        if (!onArrange) return;
+        if (ids.length === ordered.length && ids.every((id, at) => id === ordered[at])) return;
         onArrange(ids);
     }
 
-    /** Move a favorite with the keyboard, keep it focused, and say where it went. */
-    function nudge(key: string, id: string, by: number) {
-        const section = drawn.find((candidate) => candidate.key === key);
-        if (!section) return;
-        const ids = section.apps.map((app) => app.id);
+    /** Move an app with the keyboard, keep it focused, and say where it went. */
+    function nudge(id: string, by: number) {
+        const ids = [...ordered];
         const from = ids.indexOf(id);
         const to = Math.max(0, Math.min(ids.length - 1, from + by));
         if (from < 0 || to === from) return;
         ids.splice(from, 1);
         ids.splice(to, 0, id);
+        // Moved past the first screenful: open the rest so it stays in sight.
+        if (to >= firstScreen) setExpanded(true);
         refocus.current = id;
         setSaid(strings.moved(byId.get(id)?.label ?? id, to + 1, ids.length));
-        arrange(key, ids);
+        arrange(ids);
     }
 
-    function onDragStart(event: DragEvent<HTMLElement>, key: string, id: string) {
+    function showMore() {
+        const first = full[firstScreen];
+        setExpanded(true);
+        if (first) refocus.current = first;
+    }
+
+    function onDragStart(event: DragEvent<HTMLElement>, id: string) {
         dragging.current = id;
         dropped.current = false;
         event.dataTransfer.effectAllowed = "move";
         event.dataTransfer.setData("application/x-polaris-app", id);
-        const section = drawn.find((candidate) => candidate.key === key);
-        setDragOrder({ key, ids: section ? section.apps.map((app) => app.id) : [] });
+        setDragOrder([...ordered]);
     }
 
     // The grid makes room as the tile passes over the others, the way Google's
     // does, so where it will land is what is on screen rather than a guess.
-    function onDragOver(event: DragEvent<HTMLElement>, key: string, overId: string) {
+    function onDragOver(event: DragEvent<HTMLElement>, overId: string) {
         const id = dragging.current;
-        if (!id || !dragOrder || dragOrder.key !== key) return;
+        if (!id || !dragOrder) return;
         event.preventDefault();
         event.dataTransfer.dropEffect = "move";
         if (id === overId) return;
-        const ids = dragOrder.ids.filter((other) => other !== id);
-        ids.splice(dragOrder.ids.indexOf(overId), 0, id);
-        setDragOrder({ key, ids });
+        const ids = dragOrder.filter((other) => other !== id);
+        ids.splice(dragOrder.indexOf(overId), 0, id);
+        setDragOrder(ids);
     }
 
-    function onDrop(event: DragEvent<HTMLElement>, key: string) {
-        if (!dragging.current || !dragOrder || dragOrder.key !== key) return;
+    function onDrop(event: DragEvent<HTMLElement>) {
+        if (!dragging.current || !dragOrder) return;
         event.preventDefault();
         dropped.current = true;
-        arrange(key, dragOrder.ids);
+        arrange(dragOrder);
     }
 
-    // Escape, or a release outside the favorites, puts everything back.
+    // Escape, or a release outside the grid, puts everything back.
     function onDragEnd() {
         dragging.current = null;
         if (!dropped.current) setDragOrder(null);
@@ -317,6 +312,22 @@ export function AppSwitcher({
         const root = event.currentTarget;
         const isTile = target.hasAttribute(TILE);
         const isStar = target.hasAttribute(STAR);
+
+        // More sits between the grid and the options under it: up goes back to
+        // the last row, down on to the options.
+        if (target.hasAttribute(MORE)) {
+            const next =
+                event.key === "ArrowUp"
+                    ? gridStep(root, drawn, drawn[drawn.length - 1]?.id ?? "", "End")
+                    : event.key === "ArrowDown"
+                      ? firstFooterItem(root)
+                      : undefined;
+            if (next === undefined) return;
+            event.preventDefault();
+            event.stopPropagation();
+            if (next instanceof HTMLElement) next.focus();
+            return;
+        }
         if (!isTile && !isStar) return;
 
         // Tab walks every tile and every star in reading order, which is the one
@@ -331,17 +342,13 @@ export function AppSwitcher({
             event.stopPropagation();
             if (next) next.focus();
             else if (event.shiftKey) root.querySelector<HTMLElement>("input")?.focus();
-            else firstFooterItem(root)?.focus();
+            else belowGrid(root)?.focus();
             return;
         }
         if (!isTile) return;
 
         const id = target.getAttribute(TILE) ?? "";
-        const key = target.getAttribute("data-launcher-section") ?? "";
-        const section = drawn.find((candidate) => candidate.key === key);
-        if (!section) return;
-
-        if (event.altKey && section.arrangeable) {
+        if (event.altKey && arrangeable) {
             const by =
                 event.key === "ArrowLeft"
                     ? -1
@@ -355,16 +362,16 @@ export function AppSwitcher({
             if (by === 0) return;
             event.preventDefault();
             event.stopPropagation();
-            nudge(key, id, by);
+            nudge(id, by);
             return;
         }
 
-        const next = gridStep(root, drawn, key, id, event.key);
+        const next = gridStep(root, drawn, id, event.key);
         if (next === undefined) return;
         event.preventDefault();
         event.stopPropagation();
         if (next === "search") root.querySelector<HTMLElement>("input")?.focus();
-        else if (next === "footer") firstFooterItem(root)?.focus();
+        else if (next === "below") belowGrid(root)?.focus();
         else next?.focus();
     }
 
@@ -404,54 +411,48 @@ export function AppSwitcher({
                         className="px-1"
                     />
                 </div>
-                {searching && drawn[0]?.apps.length === 0 ? (
+                {searching && drawn.length === 0 ? (
                     <p className="px-2 py-6 text-center text-xs text-muted-foreground [overflow-wrap:anywhere]">
                         {strings.noMatch(query.trim())}
                     </p>
                 ) : null}
-                {drawn.map((section, index) => (
-                    <div
-                        key={section.key}
-                        role="group"
-                        aria-label={section.label || undefined}
-                        className={cn(index > 0 && "mt-2 border-t border-border pt-2")}
+                <div data-launcher-grid="" className="grid grid-cols-3 gap-1">
+                    {drawn.map((app) => (
+                        <AppTile
+                            key={app.id}
+                            app={app}
+                            active={app.id === currentAppId}
+                            pinned={pinnedIds.has(app.id)}
+                            onTogglePin={onTogglePin}
+                            Anchor={Anchor}
+                            strings={strings}
+                            drag={
+                                arrangeable
+                                    ? {
+                                          start: (event) => onDragStart(event, app.id),
+                                          over: (event) => onDragOver(event, app.id),
+                                          drop: onDrop,
+                                          end: onDragEnd,
+                                          lifted: dragOrder !== null && dragging.current === app.id
+                                      }
+                                    : undefined
+                            }
+                        />
+                    ))}
+                </div>
+                {hidden ? (
+                    <DropdownMenuItem
+                        {...{ [MORE]: "" }}
+                        onSelect={(event) => {
+                            event.preventDefault();
+                            showMore();
+                        }}
+                        className="mt-1 justify-center gap-1 text-xs font-medium text-muted-foreground"
                     >
-                        {drawn.length > 1 && section.label ? (
-                            <DropdownMenuLabel className="px-1 pb-1 pt-0.5 text-[0.6875rem] font-medium uppercase tracking-wider text-foreground-subtle">
-                                {section.label}
-                            </DropdownMenuLabel>
-                        ) : null}
-                        <div className="grid grid-cols-3 gap-1">
-                            {section.apps.map((app) => (
-                                <AppTile
-                                    key={app.id}
-                                    app={app}
-                                    section={section.key}
-                                    active={app.id === currentAppId}
-                                    pinned={pinnedIds.has(app.id)}
-                                    onTogglePin={onTogglePin}
-                                    Anchor={Anchor}
-                                    strings={strings}
-                                    drag={
-                                        section.arrangeable
-                                            ? {
-                                                  start: (event) =>
-                                                      onDragStart(event, section.key, app.id),
-                                                  over: (event) =>
-                                                      onDragOver(event, section.key, app.id),
-                                                  drop: (event) => onDrop(event, section.key),
-                                                  end: onDragEnd,
-                                                  lifted:
-                                                      dragOrder !== null &&
-                                                      dragging.current === app.id
-                                              }
-                                            : undefined
-                                    }
-                                />
-                            ))}
-                        </div>
-                    </div>
-                ))}
+                        {strings.more}
+                        <ChevronDown className="!size-3.5" aria-hidden="true" />
+                    </DropdownMenuItem>
+                ) : null}
                 {footer ? (
                     <div
                         data-launcher-footer=""
@@ -475,37 +476,33 @@ function firstFooterItem(root: HTMLElement) {
     );
 }
 
+/** What comes after the last row: More while there is more, else the options. */
+function belowGrid(root: HTMLElement) {
+    return root.querySelector<HTMLElement>(`[${MORE}]`) ?? firstFooterItem(root);
+}
+
 /**
- * Where an arrow key goes from one tile: along the grid for left and right,
- * a row for up and down - into the section above or below at the same column
- * when the row runs out - and to the ends for Home and End. Up from the top row
- * is the search field, and down from the last row is the footer. `null` is
- * "nowhere further"; `undefined` is "not a key this answers".
+ * Where an arrow key goes from one tile: along the grid for left and right, a
+ * row for up and down, and to the ends for Home and End. Up from the top row
+ * is the search field, and down from the last row is what is under the grid.
+ * `null` is "nowhere further"; `undefined` is "not a key this answers".
  */
 function gridStep(
     root: HTMLElement,
-    drawn: readonly { key: string; apps: readonly PolarisApp[] }[],
-    key: string,
+    drawn: readonly PolarisApp[],
     id: string,
     pressed: string
-): HTMLElement | "search" | "footer" | null | undefined {
-    const find = (sectionKey: string, appId: string) =>
-        root.querySelector<HTMLElement>(
-            `[${TILE}="${quoted(appId)}"][data-launcher-section="${quoted(sectionKey)}"]`
-        );
-    const flat = drawn.flatMap((section) =>
-        section.apps.map((app) => ({ section: section.key, id: app.id }))
-    );
-    const reachable = (entry: { section: string; id: string } | undefined) => {
-        const node = entry ? find(entry.section, entry.id) : null;
+): HTMLElement | "search" | "below" | null | undefined {
+    const reachable = (app: PolarisApp | undefined) => {
+        const node = app ? root.querySelector<HTMLElement>(`[${TILE}="${quoted(app.id)}"]`) : null;
         return node && !node.hasAttribute("data-disabled") ? node : null;
     };
-    const at = flat.findIndex((entry) => entry.section === key && entry.id === id);
+    const at = drawn.findIndex((app) => app.id === id);
     if (at < 0) return undefined;
 
     const walk = (from: number, by: number): HTMLElement | null => {
-        for (let index = from + by; index >= 0 && index < flat.length; index += by) {
-            const node = reachable(flat[index]);
+        for (let index = from + by; index >= 0 && index < drawn.length; index += by) {
+            const node = reachable(drawn[index]);
             if (node) return node;
         }
         return null;
@@ -513,29 +510,19 @@ function gridStep(
     if (pressed === "ArrowLeft") return walk(at, -1);
     if (pressed === "ArrowRight") return walk(at, 1);
     if (pressed === "Home") return walk(-1, 1);
-    if (pressed === "End") return walk(flat.length, -1);
+    if (pressed === "End") return walk(drawn.length, -1);
     if (pressed !== "ArrowUp" && pressed !== "ArrowDown") return undefined;
 
-    const sectionAt = drawn.findIndex((section) => section.key === key);
-    const section = drawn[sectionAt]!;
-    const index = section.apps.findIndex((app) => app.id === id);
-    const column = index % COLUMNS;
-    const row = Math.floor(index / COLUMNS);
-    const rows = Math.ceil(section.apps.length / COLUMNS);
-    const pick = (target: (typeof drawn)[number], targetRow: number) => {
+    const column = at % COLUMNS;
+    const row = Math.floor(at / COLUMNS);
+    const rows = Math.ceil(drawn.length / COLUMNS);
+    const pick = (targetRow: number) => {
         const start = targetRow * COLUMNS;
-        const end = Math.min(start + COLUMNS, target.apps.length) - 1;
-        const app = target.apps[Math.min(start + column, end)];
-        return app ? reachable({ section: target.key, id: app.id }) : null;
+        const end = Math.min(start + COLUMNS, drawn.length) - 1;
+        return reachable(drawn[Math.min(start + column, end)]);
     };
-    if (pressed === "ArrowDown") {
-        if (row + 1 < rows) return pick(section, row + 1);
-        const below = drawn[sectionAt + 1];
-        return below ? pick(below, 0) : "footer";
-    }
-    if (row > 0) return pick(section, row - 1);
-    const above = drawn[sectionAt - 1];
-    return above ? pick(above, Math.ceil(above.apps.length / COLUMNS) - 1) : "search";
+    if (pressed === "ArrowDown") return row + 1 < rows ? pick(row + 1) : "below";
+    return row > 0 ? pick(row - 1) : "search";
 }
 
 /**
@@ -546,12 +533,11 @@ function gridStep(
  * right after its app, and choosing it keeps the menu open. Shown on hover or
  * focus, and always on an app that is pinned, so what is pinned is never a
  * secret. Not drawn for a finger, which has no hover to reveal it with and
- * would only pin things by accident: favorites are arranged from the menu's own
- * option on a phone.
+ * would only pin things by accident: apps are pinned and arranged from the
+ * menu's own option on a phone.
  */
 function AppTile({
     app,
-    section,
     active,
     pinned,
     onTogglePin,
@@ -560,7 +546,6 @@ function AppTile({
     drag
 }: {
     app: PolarisApp;
-    section: string;
     active: boolean;
     pinned: boolean;
     onTogglePin?: (appId: string) => void;
@@ -578,7 +563,7 @@ function AppTile({
     const pinLabel = pinned ? strings.unpin(app.label) : strings.pin(app.label);
     return (
         <div
-            className={cn("group/tile relative", drag?.lifted && "opacity-40")}
+            className={cn("group/tile relative min-w-0", drag?.lifted && "opacity-40")}
             onDragStart={drag?.start}
             onDragOver={drag?.over}
             onDrop={drag?.drop}
@@ -589,14 +574,14 @@ function AppTile({
                 <Anchor
                     href={app.href}
                     draggable={drag ? true : false}
-                    {...{ [TILE]: app.id, "data-launcher-section": section }}
+                    {...{ [TILE]: app.id }}
                     aria-current={active ? "page" : undefined}
                     aria-keyshortcuts={
                         drag ? "Alt+ArrowLeft Alt+ArrowRight Alt+ArrowUp Alt+ArrowDown" : undefined
                     }
                     title={app.description ? `${app.label} - ${app.description}` : app.label}
                     className={cn(
-                        "flex w-full flex-col items-center gap-1.5 rounded-lg px-1 pb-1.5 pt-2.5 text-center",
+                        "flex w-full min-w-0 flex-col items-center gap-1.5 rounded-lg px-1 pb-1.5 pt-2.5 text-center",
                         active && "bg-primary/10 focus:bg-primary/15",
                         app.locked && "opacity-60",
                         drag && "cursor-grab active:cursor-grabbing"
