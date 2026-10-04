@@ -331,6 +331,27 @@
                 "deleteRow": "Delete row",
                 "deleteColumn": "Delete column",
                 "deleteTable": "Delete table"
+            },
+            "colors": {
+                "black": "Black",
+                "darkGray": "Dark gray",
+                "gray": "Gray",
+                "red": "Red",
+                "orange": "Orange",
+                "mustard": "Mustard",
+                "green": "Green",
+                "cyan": "Cyan",
+                "blue": "Blue",
+                "violet": "Violet",
+                "pink": "Pink",
+                "yellow": "Yellow",
+                "lightGreen": "Light green",
+                "lightCyan": "Light cyan",
+                "lightBlue": "Light blue",
+                "lavender": "Lavender",
+                "lightPink": "Light pink",
+                "lightOrange": "Light orange",
+                "lightGray": "Light gray"
             }
         }
     },

@@ -23,6 +23,7 @@ import type { Editor } from "@tiptap/react";
 import { useEditorState } from "@tiptap/react";
 import { useState, type ReactNode } from "react";
 import { MAX_INDENT, indentLevel } from "./document-schema";
+import type { NamespaceKey } from "@/lib/i18n/types";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import {
     AlignCenter,
@@ -84,33 +85,39 @@ export const FONT_FAMILIES = [
 /** Sizes in points, the unit every word processor counts in. */
 export const FONT_SIZES = [8, 9, 10, 11, 12, 14, 16, 18, 20, 24, 28, 32, 36, 48, 72] as const;
 
+/** A colour on offer, and the name it is read out under. */
+interface ColorChoice {
+    value: string;
+    label: NamespaceKey<"components">;
+}
+
 /** Text colours: a dark and a strong of each family, enough for emphasis and a
  *  colour key without a picker. */
-export const TEXT_COLORS = [
-    "#000000",
-    "#4d5561",
-    "#9ca3af",
-    "#dc2626",
-    "#ea580c",
-    "#ca8a04",
-    "#16a34a",
-    "#0891b2",
-    "#2563eb",
-    "#7c3aed",
-    "#db2777"
-] as const;
+export const TEXT_COLORS: readonly ColorChoice[] = [
+    { value: "#000000", label: "editor.toolbar.colors.black" },
+    { value: "#4d5561", label: "editor.toolbar.colors.darkGray" },
+    { value: "#9ca3af", label: "editor.toolbar.colors.gray" },
+    { value: "#dc2626", label: "editor.toolbar.colors.red" },
+    { value: "#ea580c", label: "editor.toolbar.colors.orange" },
+    { value: "#ca8a04", label: "editor.toolbar.colors.mustard" },
+    { value: "#16a34a", label: "editor.toolbar.colors.green" },
+    { value: "#0891b2", label: "editor.toolbar.colors.cyan" },
+    { value: "#2563eb", label: "editor.toolbar.colors.blue" },
+    { value: "#7c3aed", label: "editor.toolbar.colors.violet" },
+    { value: "#db2777", label: "editor.toolbar.colors.pink" }
+];
 
 /** Highlights: light enough that black text on them still reads. */
-export const HIGHLIGHT_COLORS = [
-    "#fef08a",
-    "#bbf7d0",
-    "#a5f3fc",
-    "#bfdbfe",
-    "#ddd6fe",
-    "#fbcfe8",
-    "#fed7aa",
-    "#e5e7eb"
-] as const;
+export const HIGHLIGHT_COLORS: readonly ColorChoice[] = [
+    { value: "#fef08a", label: "editor.toolbar.colors.yellow" },
+    { value: "#bbf7d0", label: "editor.toolbar.colors.lightGreen" },
+    { value: "#a5f3fc", label: "editor.toolbar.colors.lightCyan" },
+    { value: "#bfdbfe", label: "editor.toolbar.colors.lightBlue" },
+    { value: "#ddd6fe", label: "editor.toolbar.colors.lavender" },
+    { value: "#fbcfe8", label: "editor.toolbar.colors.lightPink" },
+    { value: "#fed7aa", label: "editor.toolbar.colors.lightOrange" },
+    { value: "#e5e7eb", label: "editor.toolbar.colors.lightGray" }
+];
 
 /** What the paragraph-style picker calls each kind of block. */
 type BlockStyle = "paragraph" | "h1" | "h2" | "h3";
@@ -489,12 +496,12 @@ export function FormattingToolbar({
                                 </Picked>
                                 {TEXT_COLORS.map((one) => (
                                     <Picked
-                                        key={one}
-                                        chosen={state.color === one}
-                                        onSelect={() => setColor(one)}
+                                        key={one.value}
+                                        chosen={state.color === one.value}
+                                        onSelect={() => setColor(one.value)}
                                     >
-                                        <Swatch color={one} />
-                                        {one}
+                                        <Swatch color={one.value} />
+                                        {t(one.label)}
                                     </Picked>
                                 ))}
                             </DropdownMenuSubContent>
@@ -512,12 +519,12 @@ export function FormattingToolbar({
                                 </Picked>
                                 {HIGHLIGHT_COLORS.map((one) => (
                                     <Picked
-                                        key={one}
-                                        chosen={state.highlight === one}
-                                        onSelect={() => setHighlight(one)}
+                                        key={one.value}
+                                        chosen={state.highlight === one.value}
+                                        onSelect={() => setHighlight(one.value)}
                                     >
-                                        <Swatch color={one} />
-                                        {one}
+                                        <Swatch color={one.value} />
+                                        {t(one.label)}
                                     </Picked>
                                 ))}
                             </DropdownMenuSubContent>
@@ -573,14 +580,26 @@ export function FormattingToolbar({
                             <ImagePlus className="size-4" />
                             {t("editor.toolbar.image")}
                         </DropdownMenuItem>
-                        <DropdownMenuItem
-                            onSelect={() =>
-                                chain().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run()
-                            }
-                        >
-                            <Table2 className="size-4" />
-                            {t("editor.toolbar.insertTable")}
-                        </DropdownMenuItem>
+                        {state.inTable ? (
+                            <DropdownMenuSub>
+                                <DropdownMenuSubTrigger>
+                                    <Table2 className="size-4" />
+                                    {t("editor.toolbar.table")}
+                                </DropdownMenuSubTrigger>
+                                <DropdownMenuSubContent>
+                                    <TableActionItems editor={editor} />
+                                </DropdownMenuSubContent>
+                            </DropdownMenuSub>
+                        ) : (
+                            <DropdownMenuItem
+                                onSelect={() =>
+                                    chain().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run()
+                                }
+                            >
+                                <Table2 className="size-4" />
+                                {t("editor.toolbar.insertTable")}
+                            </DropdownMenuItem>
+                        )}
                         <DropdownMenuItem onSelect={clear}>
                             <RemoveFormatting className="size-4" />
                             {t("editor.toolbar.clear")}
@@ -655,11 +674,12 @@ function SwatchMenu({
     label: string;
     noneLabel: string;
     icon: ReactNode;
-    swatches: readonly string[];
+    swatches: readonly ColorChoice[];
     current: string;
     disabled: boolean;
     onPick: (color: string | null) => void;
 }) {
+    const t = useTranslations("components");
     return (
         <DropdownMenu>
             <DropdownMenuTrigger asChild disabled={disabled}>
@@ -681,15 +701,15 @@ function SwatchMenu({
                 <div className="grid grid-cols-6 gap-1.5">
                     {swatches.map((one) => (
                         <DropdownMenuItem
-                            key={one}
-                            aria-label={one}
-                            title={one}
-                            onSelect={() => onPick(one)}
+                            key={one.value}
+                            aria-label={t(one.label)}
+                            title={t(one.label)}
+                            onSelect={() => onPick(one.value)}
                             className={cn(
                                 "size-6 justify-center rounded p-0",
-                                current === one && "ring-2 ring-primary"
+                                current === one.value && "ring-2 ring-primary"
                             )}
-                            style={{ backgroundColor: one }}
+                            style={{ backgroundColor: one.value }}
                         />
                     ))}
                 </div>
@@ -697,6 +717,35 @@ function SwatchMenu({
                 <DropdownMenuItem onSelect={() => onPick(null)}>{noneLabel}</DropdownMenuItem>
             </DropdownMenuContent>
         </DropdownMenu>
+    );
+}
+
+/** What can be done to a table the caret is in, as menu rows: the ones that
+ *  add or switch, then the ones that remove. */
+function TableActionItems({ editor }: { editor: Editor }) {
+    const t = useTranslations("components");
+    const chain = () => editor.chain().focus();
+    const actions = [
+        { key: "rowAbove", run: () => chain().addRowBefore().run() },
+        { key: "rowBelow", run: () => chain().addRowAfter().run() },
+        { key: "columnLeft", run: () => chain().addColumnBefore().run() },
+        { key: "columnRight", run: () => chain().addColumnAfter().run() },
+        { key: "headerRow", run: () => chain().toggleHeaderRow().run() },
+        { key: "deleteRow", run: () => chain().deleteRow().run() },
+        { key: "deleteColumn", run: () => chain().deleteColumn().run() },
+        { key: "deleteTable", run: () => chain().deleteTable().run() }
+    ] as const;
+    return (
+        <>
+            {actions.map((one, index) => (
+                <div key={one.key}>
+                    {index === 5 ? <DropdownMenuSeparator /> : null}
+                    <DropdownMenuItem onSelect={one.run}>
+                        {t(`editor.toolbar.tableActions.${one.key}`)}
+                    </DropdownMenuItem>
+                </div>
+            ))}
+        </>
     );
 }
 
@@ -723,16 +772,6 @@ function TableMenu({
             </ToolbarButton>
         );
     }
-    const actions = [
-        { key: "rowAbove", run: () => chain().addRowBefore().run() },
-        { key: "rowBelow", run: () => chain().addRowAfter().run() },
-        { key: "columnLeft", run: () => chain().addColumnBefore().run() },
-        { key: "columnRight", run: () => chain().addColumnAfter().run() },
-        { key: "headerRow", run: () => chain().toggleHeaderRow().run() },
-        { key: "deleteRow", run: () => chain().deleteRow().run() },
-        { key: "deleteColumn", run: () => chain().deleteColumn().run() },
-        { key: "deleteTable", run: () => chain().deleteTable().run() }
-    ] as const;
     return (
         <DropdownMenu>
             <DropdownMenuTrigger asChild disabled={disabled}>
@@ -746,14 +785,7 @@ function TableMenu({
                 </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start">
-                {actions.map((one, index) => (
-                    <div key={one.key}>
-                        {index === 5 ? <DropdownMenuSeparator /> : null}
-                        <DropdownMenuItem onSelect={one.run}>
-                            {t(`editor.toolbar.tableActions.${one.key}`)}
-                        </DropdownMenuItem>
-                    </div>
-                ))}
+                <TableActionItems editor={editor} />
             </DropdownMenuContent>
         </DropdownMenu>
     );

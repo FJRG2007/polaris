@@ -118,6 +118,7 @@ describe("exporting a formatted document to Word", () => {
         const { body } = await wordParts();
         expect(body).toContain("<w:tbl>");
         for (const cell of ["Name", "Role", "Ada", "Engineer"]) expect(body).toContain(`>${cell}<`);
+        expect(body).toContain('w:fill="F2F2F2"');
     });
 
     it("writes each checklist item as its own list item", async () => {
@@ -145,6 +146,46 @@ describe("exporting a formatted document to a page and to Markdown", () => {
         const md = new TextDecoder().decode(out?.bytes);
         expect(md).toContain("| Name | Role |");
         expect(md).toContain("| Ada | Engineer |");
+    });
+
+    it("leaves the first row of a table with no header row as ordinary cells", async () => {
+        const plain = stored([
+            {
+                type: "table",
+                content: [
+                    {
+                        type: "tableRow",
+                        content: [
+                            { type: "tableCell", content: [{ type: "paragraph", content: [text("Ada")] }] },
+                            { type: "tableCell", content: [{ type: "paragraph", content: [text("Engineer")] }] }
+                        ]
+                    }
+                ]
+            }
+        ]);
+        const html = new TextDecoder().decode((await exportDocument("doc", "T", plain, "html"))?.bytes);
+        expect(html).not.toContain("<th>");
+        expect(html).toContain("<td>Ada</td>");
+        const md = new TextDecoder().decode((await exportDocument("doc", "T", plain, "md"))?.bytes);
+        expect(md).toContain("|  |  |\n| --- | --- |\n| Ada | Engineer |");
+        const docx = await exportDocument("doc", "T", plain, "docx");
+        const zip = await JSZip.loadAsync(docx?.bytes ?? new Uint8Array());
+        const body = (await zip.file("word/document.xml")?.async("string")) ?? "";
+        expect(body).toContain(">Ada<");
+        expect(body).not.toContain('w:fill="F2F2F2"');
+    });
+
+    it("writes a picture as a link to it rather than dropping it", async () => {
+        const pictured = stored([
+            { type: "image", attrs: { src: "https://example.com/chart.png", alt: "Sales chart" } }
+        ]);
+        const html = new TextDecoder().decode((await exportDocument("doc", "T", pictured, "html"))?.bytes);
+        expect(html).toContain('<a href="https://example.com/chart.png">Sales chart</a>');
+        const docx = await exportDocument("doc", "T", pictured, "docx");
+        const zip = await JSZip.loadAsync(docx?.bytes ?? new Uint8Array());
+        expect(await zip.file("word/_rels/document.xml.rels")?.async("string")).toContain(
+            'Target="https://example.com/chart.png"'
+        );
     });
 
     it("never writes a stored value that is not a colour or a safe link", async () => {

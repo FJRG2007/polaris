@@ -134,6 +134,22 @@ describe("the document formatting bar", () => {
         expect(screen.getByRole("button", { name: "More formatting" })).toBeTruthy();
     });
 
+    it("offers the table's own actions in the More menu when the caret is in one", async () => {
+        editor.commands.insertTable({ rows: 2, cols: 2, withHeaderRow: true });
+        bar();
+        fireEvent.pointerDown(screen.getByRole("button", { name: "More formatting" }), {
+            button: 0,
+            ctrlKey: false,
+            pointerType: "mouse"
+        });
+        const table = await screen.findByRole("menuitem", { name: "Table" });
+        expect(screen.queryByRole("menuitem", { name: "Insert table" })).toBeNull();
+        act(() => fireEvent.click(table));
+        const rowBelow = await screen.findByRole("menuitem", { name: "Insert row below" });
+        act(() => fireEvent.click(rowBelow));
+        expect(editor.getHTML().match(/<tr>/g)).toHaveLength(3);
+    });
+
     it("draws nothing pressable for a reader", () => {
         editor.setEditable(false);
         bar();

@@ -32,8 +32,10 @@ export interface DocBlock {
     /** Steps in from the margin, 0 to 8. */
     readonly indent?: number;
     /** A table's cells, by row, for the block whose kind is "table". The first
-     *  row is the header. */
+     *  row is the header unless `headerRow` is false. */
     readonly rows?: readonly (readonly string[])[];
+    /** False for a table whose first row is ordinary cells. Absent is a header. */
+    readonly headerRow?: boolean;
 }
 
 /** A stretch of a block's text that is all formatted one way. */
@@ -143,7 +145,7 @@ export function toMarkdown(title: string, blocks: readonly DocBlock[]): string {
     for (const block of blocks) {
         if (block.kind === "table" && block.rows && block.rows.length > 0) {
             counted = 0;
-            lines.push(tableToMarkdown(block.rows), "");
+            lines.push(tableToMarkdown(block.rows, block.headerRow !== false), "");
             continue;
         }
         const text = block.text.trim();
@@ -173,8 +175,9 @@ export function toMarkdown(title: string, blocks: readonly DocBlock[]): string {
 
 /** A table, as Markdown. The separator row is what makes it a table rather than
  *  three lines of pipes, and a cell holding a pipe would end the column - so it
- *  is escaped. */
-export function tableToMarkdown(rows: readonly (readonly string[])[]): string {
+ *  is escaped. Markdown has no table without a header, so one with none gets an
+ *  empty one rather than its first row promoted. */
+export function tableToMarkdown(rows: readonly (readonly string[])[], headerRow = true): string {
     if (rows.length === 0) return "";
     const cell = (value: string): string => value.replace(/\|/g, "\\|").replace(/\n+/g, " ");
     const width = Math.max(...rows.map((row) => row.length));
@@ -182,7 +185,7 @@ export function tableToMarkdown(rows: readonly (readonly string[])[]): string {
         ...row.map(cell),
         ...Array.from({ length: width - row.length }, () => "")
     ];
-    const [head, ...body] = rows;
+    const [head, ...body] = headerRow ? rows : [[], ...rows];
     return [
         `| ${pad(head!).join(" | ")} |`,
         `| ${Array.from({ length: width }, () => "---").join(" | ")} |`,
@@ -267,12 +270,12 @@ export function toHtml(title: string, blocks: readonly DocBlock[]): string {
     for (const block of blocks) {
         if (block.kind === "table" && block.rows && block.rows.length > 0) {
             closeList();
-            const [head, ...rest] = block.rows;
             const row = (cells: readonly string[], tag: "th" | "td"): string =>
                 `<tr>${cells.map((cell) => `<${tag}>${escapeHtml(cell)}</${tag}>`).join("")}</tr>`;
+            const [head, ...rest] = block.headerRow === false ? [null, ...block.rows] : block.rows;
             body.push(
-                `<table><thead>${row(head ?? [], "th")}</thead>` +
-                    `<tbody>${rest.map((cells) => row(cells, "td")).join("")}</tbody></table>`
+                `<table>${head ? `<thead>${row(head, "th")}</thead>` : ""}` +
+                    `<tbody>${rest.map((cells) => row(cells ?? [], "td")).join("")}</tbody></table>`
             );
             continue;
         }

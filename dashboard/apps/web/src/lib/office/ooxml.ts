@@ -116,9 +116,9 @@ export async function writeDocx(
 
     /** A table: the engine's own grid, with the header row it shades, and each
      *  cell's text put into it. */
-    const asTable = (rows: readonly (readonly string[])[]): string => {
+    const asTable = (rows: readonly (readonly string[])[], headerRow: boolean): string => {
         const width = Math.max(1, ...rows.map((row) => row.length));
-        const grid = generateTableXml(rows.length, width, { headerRow: true });
+        const grid = generateTableXml(rows.length, width, { headerRow });
         return patchTableCellTexts(
             grid,
             rows.map((row) =>
@@ -131,7 +131,7 @@ export async function writeDocx(
         generateParagraphXml(asBlock("h1", title) as never, context as never),
         ...blocks.map((block) =>
             block.kind === "table" && block.rows && block.rows.length > 0
-                ? asTable(block.rows)
+                ? asTable(block.rows, block.headerRow !== false)
                 : generateParagraphXml(
                       asBlock(block.kind, block.text, block) as never,
                       context as never

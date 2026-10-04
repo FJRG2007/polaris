@@ -91,8 +91,23 @@ function docBlocks(doc: Y.Doc): core.DocBlock[] {
         if (name === "table") {
             const rows = tableRows(node);
             if (rows.length > 0) {
-                blocks.push({ kind: "table", text: rows.map((row) => row.join("\t")).join("\n"), rows });
+                blocks.push({
+                    kind: "table",
+                    text: rows.map((row) => row.join("\t")).join("\n"),
+                    rows,
+                    ...(hasHeaderRow(node) ? {} : { headerRow: false })
+                });
             }
+            return;
+        }
+        // A picture is not carried into the file itself; it leaves as a link to
+        // where it lives, under its description when it has one.
+        if (name === "image") {
+            const href = core.cleanHref(node.getAttribute("src"));
+            if (!href) return;
+            const alt = String(node.getAttribute("alt") ?? "").trim();
+            const label = alt || href;
+            blocks.push({ kind: inherited || "p", text: label, runs: [{ text: label, href }] });
             return;
         }
         const kind =
@@ -180,6 +195,14 @@ function inlineRuns(node: Y.XmlElement): core.DocRun[] {
         }
     }
     return runs;
+}
+
+/** Whether a table's first row is made of header cells, as the editor's
+ *  "Header row" toggle leaves it. */
+function hasHeaderRow(table: Y.XmlElement): boolean {
+    const first = table.toArray().find((row): row is Y.XmlElement => row instanceof Y.XmlElement);
+    const cells = first?.toArray().filter((cell): cell is Y.XmlElement => cell instanceof Y.XmlElement) ?? [];
+    return cells.length > 0 && cells.every((cell) => cell.nodeName === "tableHeader");
 }
 
 /** A table's cells as text, row by row. */

@@ -331,6 +331,27 @@
                 "deleteRow": "Eliminar fila",
                 "deleteColumn": "Eliminar columna",
                 "deleteTable": "Eliminar tabla"
+            },
+            "colors": {
+                "black": "Negro",
+                "darkGray": "Gris oscuro",
+                "gray": "Gris",
+                "red": "Rojo",
+                "orange": "Naranja",
+                "mustard": "Mostaza",
+                "green": "Verde",
+                "cyan": "Cian",
+                "blue": "Azul",
+                "violet": "Violeta",
+                "pink": "Rosa",
+                "yellow": "Amarillo",
+                "lightGreen": "Verde claro",
+                "lightCyan": "Cian claro",
+                "lightBlue": "Azul claro",
+                "lavender": "Lavanda",
+                "lightPink": "Rosa claro",
+                "lightOrange": "Naranja claro",
+                "lightGray": "Gris claro"
             }
         }
     },
