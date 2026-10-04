@@ -1812,6 +1812,86 @@ export function stashesFirst(preset: EventPreset): boolean {
     return preset.kind === "sky-wars";
 }
 
+/** Whether a version is at least another. A snapshot is taken as recent; one
+ *  that cannot be read at all as unknown, which is not at least anything. */
+export function versionAtLeast(version: string | null, wanted: readonly number[]): boolean {
+    if (version === null) return false;
+    const match = /^(\d+)\.(\d+)(?:\.(\d+))?/.exec(version);
+    if (!match) return true;
+    const have = [Number(match[1]), Number(match[2]), Number(match[3] ?? 0)];
+    for (let index = 0; index < wanted.length; index += 1) {
+        const left = have[index] ?? 0;
+        const right = wanted[index] ?? 0;
+        if (left !== right) return left > right;
+    }
+    return true;
+}
+
+/** Why an event cannot be played on a server, in the screen's words
+ *  (`events.incompatible.<why>`): what it needs, and from which version. */
+export interface Incompatibility {
+    readonly why: "arena" | "items" | "loot" | "ores" | "material";
+    /** The version it needs, as players write it. */
+    readonly needs: string;
+}
+
+/** What an option of an event names that only exists from a version on. */
+const LOOT_SINCE: Partial<Record<(typeof LOOT_TABLES)[number], readonly number[]>> = {
+    bastion: [1, 16],
+    "ancient-city": [1, 19]
+};
+const ORES_SINCE: Partial<Record<(typeof METEOR_ORES)[number], readonly number[]>> = {
+    debris: [1, 16]
+};
+const MATERIAL_SINCE: Partial<Record<GatherMaterial, readonly number[]>> = {
+    bamboo: [1, 14]
+};
+
+const written = (version: readonly number[]): string => version.join(".");
+
+/**
+ * Whether this event, as set up, cannot be played on a server running
+ * `version`, and why - or null when it can. A version that could not be read is
+ * never a reason: the screen says nothing it does not know, and the start
+ * itself still refuses what the game turns out not to have.
+ *
+ * The rules are the start's own (`events-service` `startEvent`): an arena reads
+ * its kit and what players dropped the way 1.16 writes them, SkyWars needs what
+ * players carry put away first (1.17), and a loot table, an ore or a material
+ * the game does not have yet would leave a chest empty or a round unwinnable.
+ */
+export function incompatibility(
+    preset: EventPreset,
+    version: string | null
+): Incompatibility | null {
+    if (version === null) return null;
+    const lacks = (since: readonly number[] | undefined) =>
+        since !== undefined && !versionAtLeast(version, since);
+    if (stashesFirst(preset) && lacks([1, 17])) return { why: "items", needs: "1.17" };
+    if (playsInArena(preset) && lacks([1, 16])) return { why: "arena", needs: "1.16" };
+    const options = preset.options as {
+        loot?: (typeof LOOT_TABLES)[number];
+        ores?: (typeof METEOR_ORES)[number];
+        material?: GatherMaterial | "random";
+    };
+    if (
+        (preset.kind === "supply-drop" || preset.kind === "treasure-hunt") &&
+        options.loot &&
+        lacks(LOOT_SINCE[options.loot])
+    )
+        return { why: "loot", needs: written(LOOT_SINCE[options.loot]!) };
+    if (preset.kind === "meteor-shower" && options.ores && lacks(ORES_SINCE[options.ores]))
+        return { why: "ores", needs: written(ORES_SINCE[options.ores]!) };
+    if (
+        preset.kind === "gathering" &&
+        options.material &&
+        options.material !== "random" &&
+        lacks(MATERIAL_SINCE[options.material])
+    )
+        return { why: "material", needs: written(MATERIAL_SINCE[options.material]!) };
+    return null;
+}
+
 /** Played in an arena until one player is left: ranked by the order they went
  *  out in, so anybody who took part at all is ranked. */
 export function lastStanding(preset: EventPreset): boolean {

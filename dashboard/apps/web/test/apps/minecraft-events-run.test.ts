@@ -8405,6 +8405,25 @@ describe("a server whose version is not in today's log", () => {
         );
         expect(refused).toMatch(/needs Minecraft 1.16/);
     });
+
+    it("is read for the Events screen once a minute, even when no log says it", async () => {
+        vi.setSystemTime(Date.parse("2026-12-01T00:00:00Z"));
+        world.versionIn = "none";
+        setUp([duel()]);
+        const run = vi.spyOn(server, "run");
+        const reads = () =>
+            run.mock.calls.filter(([argv]) => argv.join(" ").includes("Starting minecraft")).length;
+        expect((await events.eventsView(SERVER)).version).toBeNull();
+        const first = reads();
+        expect(first).toBeGreaterThan(0);
+        expect((await events.eventsView(SERVER)).version).toBeNull();
+        expect(reads()).toBe(first);
+        world.version = "1.21.4";
+        world.versionIn = "latest";
+        vi.setSystemTime(Date.parse("2026-12-01T00:01:01Z"));
+        expect((await events.eventsView(SERVER)).version).toBe("1.21.4");
+        run.mockRestore();
+    });
 });
 
 describe("a server with EssentialsX on it", () => {

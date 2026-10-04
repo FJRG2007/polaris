@@ -24,3 +24,18 @@ export function kindUnit(t: GameText<"minecraft">, kind: Kind): string {
         ? t(`events.kinds.${kind}.unit` as GameKey<"minecraft">)
         : "";
 }
+
+/** Why this server cannot play an event, in the reader's words; null when it can
+ *  or its version is not known - a version is never mentioned otherwise. */
+export function incompatibleText(
+    t: GameText<"minecraft">,
+    preset: catalog.EventPreset,
+    version: string | null
+): string | null {
+    const found = catalog.incompatibility(preset, version);
+    if (!found || version === null) return null;
+    return t(`events.incompatible.${found.why}` as GameKey<"minecraft">, {
+        needs: found.needs,
+        version
+    });
+}

@@ -1801,7 +1801,7 @@
             "xpBoost": "Everybody on gets {extra} until it ends. Nothing is ever taken away; an ore block placed during it is not paid for again.",
             "waves": "{waves} waves, {minutes} minutes at most. A wave ends when all of it is killed, or after two minutes.",
             "wavesPoint": "The point is on open, flat ground the world made, at least 96 blocks from any online player's bed. Only monsters that cannot break blocks come - no creepers, endermen or ravagers - and every one of them is removed when it ends.",
-            "keepInventory": "Keep inventory is on while it runs, so dying costs nothing; the server's own setting comes back afterward. Java 1.17 or later.",
+            "keepInventory": "Keep inventory is on while it runs, so dying costs nothing; the server's own setting comes back afterward.",
             "meteors": "{meteors} meteors of {size} ore blocks each, one every {seconds} seconds from the start. Each block mined near a meteor scores 1; ore placed near one is taken off.",
             "meteorsLand": "Meteors land on open, flat ground the world made, away from every online player's bed - on an island, on the island itself - and ore is only ever put where there was air. What nobody mined is taken away at the end - only blocks still exactly the meteor's ore - and nothing else is touched.",
             "pickaxes": "Diamond and emerald ore need an iron pickaxe, ancient debris a diamond one.",
@@ -1809,23 +1809,23 @@
             "spleef": "A {size} by {size} snow floor about {height} blocks up. Falling through it is being out; the last one on it wins.",
             "joinCountdown": "Only players who type join (or unirse) in the chat during the countdown - at least {seconds} seconds - take part. They are taken there and brought back to exactly where they were when it ends, even after a restart.",
             "stageBuilt": "It is built only in empty air, over open ground away from everybody's bed, and taken down block by block afterward - only what it placed. Inside, nobody can take damage and everybody is in adventure mode; their game mode is given back after.",
-            "spleefShovel": "Players get a marked shovel that only breaks the snow; it is cleared at the end, and nothing else of theirs is touched. Needs Java 1.14.4 or newer; before 1.20.5 the snow drops snowballs when dug.",
-            "parkourItems": "Nobody's items are touched. Needs Java 1.14.4 or newer.",
+            "spleefShovel": "Players get a marked shovel that only breaks the snow; it is cleared at the end, and nothing else of theirs is touched.",
+            "parkourItems": "Nobody's items are touched.",
             "tntRun": "{layers} floors of TNT, {size} by {size}, stacked about {height} blocks up. Every block a player stands on goes a moment later; falling through a floor lands on the next, and through the last is being out. The last one standing wins.",
-            "tntRunSafe": "Nothing explodes: the blocks are only ever taken away, and any TNT lit near the arena is put out at once. Played by a small data pack Polaris adds to the world. Needs Java 1.14.4 or newer.",
+            "tntRunSafe": "Nothing explodes: the blocks are only ever taken away, and any TNT lit near the arena is put out at once. Played by a small data pack Polaris adds to the world.",
             "boatRace": "{laps} {laps, plural, one {lap} other {laps}} of an ice track about {height} blocks up: a new loop every time, walled on both sides, with gates to pass in order. Fall off, cut a corner or leave your boat and you go back to your last gate in a new one.",
-            "boatRaceBoats": "From Java 1.19.4 every racer is put in a boat at the start; before it, each is handed a marked boat to put down, taken back at the end. The gates are counted by a small data pack Polaris adds to the world. Needs Java 1.14.4 or newer.",
+            "boatRaceBoats": "Every racer starts with a boat, taken back at the end. The gates are counted by a small data pack Polaris adds to the world.",
             "dropper": "A shaft of {levels} floors, {difficulty}, each with one hole that never lines up with the one above it, and a pool at the bottom. A new shaft every time, and every hole reachable from the one above while falling.",
-            "dropperSafe": "Played under Slow Falling, so there is time to steer and no fall hurts. Landing on a floor is caught the moment it happens by a small data pack Polaris adds to the world. Needs Java 1.14.4 or newer.",
+            "dropperSafe": "Played under Slow Falling, so there is time to steer and no fall hurts. Landing on a floor is caught the moment it happens by a small data pack Polaris adds to the world.",
             "duelJoin": "Only players who type join (or unirse) in the chat during the countdown take part. They are split into two teams and taken to an arena built 30 blocks up, over open ground away from anybody's bed.",
             "duelKit": "Everybody gets the same {kit} sword and a shield. A player down to {hearts} {hearts, plural, one {heart} other {hearts}} is out: the other team scores, the rival who brought them down gets the elimination, and they are sent back to their side, healed. The team with more wins; the podium goes by eliminations.",
             "duelKeepInventory": "Keep inventory is on while it lasts and put back after, so even a death in the arena keeps everything.",
-            "duelNeeds": "Needs Player versus player allowed in Settings, and Minecraft 1.16 or later. Up to 16 players.",
+            "duelNeeds": "Needs Player versus player allowed in Settings. Up to 16 players.",
             "buildJoin": "Only players who type join (or unirse) in the chat during the countdown take part. Each gets a plot on a platform built 30 blocks up, over open ground away from anybody's bed.",
             "buildPlanMine": "A theme from your list, a {size} by {size} plot, 16 kinds of glass and a brush; {minutes} minutes to build, then {seconds} seconds touring the plots and voting in the chat - one vote each, not for your own plot. Most votes wins.",
             "buildPlanBuiltIn": "A built-in theme, a {size} by {size} plot, 16 kinds of glass and a brush; {minutes} minutes to build, then {seconds} seconds touring the plots and voting in the chat - one vote each, not for your own plot. Most votes wins.",
             "buildGlass": "Only the kit's glass can be placed: builders play in adventure mode, where their own blocks cannot be put down at all, so nothing of theirs is used or left on a plot. Glass broken by hand drops nothing, so no kit leaves a plot either.",
-            "buildNeeds": "Needs Minecraft 1.16 or later. Up to 12 builders.",
+            "buildNeeds": "Up to 12 builders.",
             "arena": "Nothing of anybody's is touched. The arena goes only where the air was empty, and comes down block kind by block kind; only the event's own marked kit is taken back; each player is sent back to exactly where they stood, in their own game mode, with whatever they dropped. Somebody offline at the end finds it still standing when they log in, and is sent back then.",
             "overworld": "Happens in the Overworld; only players there take part.",
             "rankedFrom": "Ranked from {score} {unit}; below that, no podium and no prize.",
@@ -1923,7 +1923,7 @@
             "iron_ingot": "Iron ingots (smelted)",
             "coal": "Coal",
             "kelp": "Kelp",
-            "bamboo": "Bamboo (1.14+)",
+            "bamboo": "Bamboo",
             "sugar_cane": "Sugar cane",
             "potato": "Potatoes",
             "carrot": "Carrots",
@@ -2033,6 +2033,14 @@
                 "label": "Wherever players are",
                 "hint": "Nothing is built and nobody is moved: each player plays where they are."
             }
+        },
+        "incompatible": {
+            "badge": "Incompatible",
+            "arena": "Needs Minecraft {needs} or later; this server runs {version}.",
+            "items": "Needs Minecraft {needs} or later; this server runs {version}.",
+            "loot": "The chosen loot only exists from Minecraft {needs}; this server runs {version}.",
+            "ores": "The chosen ore only exists from Minecraft {needs}; this server runs {version}.",
+            "material": "The chosen material only exists from Minecraft {needs}; this server runs {version}."
         }
     },
     "editor": {
@@ -2144,9 +2152,9 @@
             "loot": {
                 "treasure": "Buried treasure",
                 "dungeon": "Dungeon",
-                "bastion": "Bastion treasure (1.16+)",
+                "bastion": "Bastion treasure",
                 "end-city": "End city",
-                "ancient-city": "Ancient city (1.19+)"
+                "ancient-city": "Ancient city"
             },
             "boss": {
                 "wither-skeleton": "The Warlord (wither skeleton)",
@@ -2174,10 +2182,10 @@
                 "mixed": "Everything above, and pillagers"
             },
             "meteorOre": {
-                "common": "Common: coal, iron, copper (1.17+), gold, redstone, lapis",
+                "common": "Common: coal, iron, copper, gold, redstone, lapis",
                 "precious": "Precious: gold, lapis, diamond, emerald",
                 "diamond": "Diamond ore only",
-                "debris": "Ancient debris only (1.16+)"
+                "debris": "Ancient debris only"
             },
             "trivia": {
                 "questions": "Questions",

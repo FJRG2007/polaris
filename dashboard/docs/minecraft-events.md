@@ -798,6 +798,13 @@ A new kind follows all of them. A change to an old kind must not undo one.
 
 ### The Events screen
 
+- **A version is only said where it stops this server.** The screen marks an
+  event "Incompatible", with why, only when the server's version is known and
+  too old for it or for an option chosen in it (`catalog.incompatibility`), and
+  the Run button is disabled for the same reason. Nowhere else does an event's
+  text name a version: an operator on a server that plays it has no use for
+  "needs 1.16". A version-dependent detail is worded so it is true on every
+  version, and the start still refuses whatever the game turns out not to have.
 - **A line about what was just done goes away after a few seconds.** A failed
   read is tried again on the next beat. Live reads have a time limit
   (`f7b2a8a6b`).
