@@ -291,7 +291,7 @@ async function raise(ctx: KindContext): Promise<void> {
     // What a kind puts in its chests is marked the way the kit is, so it is
     // read before anything is built - and kept for the kit.
     const marker = game?.decorate ? (run.marker ?? (await kitMarker(ctx))) : run.marker;
-    ctx.run = { ...ctx.run, arena: built, marker };
+    ctx.run = { ...ctx.run, arena: built, marker, game: game?.built?.(run) ?? ctx.run.game };
     await ctx.persist();
     await ctx.server.sayAll([
         ...fills.flatMap((one) =>

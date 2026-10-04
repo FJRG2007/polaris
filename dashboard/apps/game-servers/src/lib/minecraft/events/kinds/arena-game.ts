@@ -103,6 +103,9 @@ export interface ArenaGame {
     /** Every block kind that can be in its box while it stands - what it built
      *  and what players can place - as bare ids, for taking it down. */
     blocks(run: stored.EventRun, box: stored.Box): string[];
+    /** The kind's own state as it is built, written with the arena: the
+     *  version of its layout, so a run built before an update keeps it. */
+    built?(run: stored.EventRun): Record<string, unknown>;
     /** Lines run once the fills are in: what a chest holds, say. */
     decorate?(run: stored.EventRun, box: stored.Box, syntax: ItemSyntax): string[];
     /** Every item it hands out, marked, for taking back. */

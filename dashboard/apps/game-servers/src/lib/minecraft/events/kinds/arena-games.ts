@@ -6,8 +6,11 @@
 
 import type { EventKind } from "../catalog";
 import type { ArenaGame } from "./arena-game";
+import { captureTheFlag } from "./capture-the-flag-service";
 
-const GAMES: Partial<Record<EventKind, ArenaGame>> = {};
+const GAMES: Partial<Record<EventKind, ArenaGame>> = {
+    "capture-the-flag": captureTheFlag
+};
 
 /** The kind's own game, or null for one `arena-service` plays itself. */
 export function gameOf(kind: EventKind): ArenaGame | null {

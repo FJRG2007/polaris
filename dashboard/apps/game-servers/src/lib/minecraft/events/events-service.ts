@@ -1514,7 +1514,7 @@ async function begin(
         }
         // No healing on a full belly in a duel: what the rule was written down
         // with keepInventory, and put back with it.
-        if (preset.kind === "team-duel") {
+        if (preset.kind === "team-duel" || preset.kind === "capture-the-flag") {
             for (const rule of duel.NATURAL_REGENERATION) {
                 const value =
                     loop.run.gamerules[rule] ??

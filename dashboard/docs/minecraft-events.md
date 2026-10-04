@@ -100,6 +100,7 @@ Rare catch, Bingo rush, Boss fishing) leave the world alone.
 | Kind                                                           | Time  | Weather |
 | -------------------------------------------------------------- | ----- | ------- |
 | Build battle, Spleef, Parkour, King of the ring, Team duel     | day   | clear   |
+| Capture the flag                                               | day   | clear   |
 | Treasure hunt, Supply drop, Explorer, Gathering                | day   | clear   |
 | Horde defense, Villager defense, Mob hunt, Meteor shower       | night | clear   |
 | Blood moon                                                     | night | rain    |
@@ -284,6 +285,27 @@ left out.
   with - no climb, moving platform or checkpoint light appears on a course
   that was placed without them, so a race running across the update is never
   changed under the players mid-run.
+- **Arena kinds played through `ArenaGame`** (`kinds/arena-game.ts`): each
+  kind's own part of the arena's steps - its box, fills, kit, start spots,
+  "Go!", tick, quick lines and results - lives in `kinds/<kind>.ts` (pure)
+  and `kinds/<kind>-service.ts`, looked up in `kinds/arena-games.ts`. The
+  team duel, build battle and king of the ring keep their older branches in
+  `arena-service.ts`.
+- **Capture the flag** is two teams set up exactly as a duel's (kit,
+  `downHearts` send-back and shield, kill credit, natural regeneration off),
+  in an arena 21 by 47 with a base at each end: the floor in the team's
+  color, the banner on a sea lantern. A player touching the other team's
+  banner while it stands at home takes it - the quick look marks a touch in
+  passing (`touchLines`), so running past it counts - and wears it on their
+  head (marked as the kit, only onto an empty head, `item replace` from
+  1.17 and `replaceitem` before), glowing and slowed. Carried into their own
+  base while their own flag stands there it is a capture: a point for the
+  carrier and one for the team. Brought low, sent back or gone, the carrier
+  drops it and it is back on its stand. Where each flag is lives in the run
+  (`game.flags`), and every tick puts the stands as that says, so a restart
+  leaves them right. `captures` captures end it; otherwise the team with
+  more when time is up. The podium is each player's captures, a tie broken by
+  eliminations.
 
 ## Building a map
 
@@ -329,21 +351,30 @@ new map:
   (an ender pearl, a push) is sent back to their own with "No shortcuts".
 - **A layout change bumps `parkour.DESIGN`**, written onto the stage when it
   is built, so a course standing across an update keeps the layout it was
-  built with.
+  built with. An arena kind writes its own (`ArenaGame.built`) into the run
+  with the arena.
+- **A field fought over is the same from both sides**: capture the flag's
+  cover is drawn on one half and turned half a circle onto the other
+  (`capture-the-flag.coverFor`), and `layoutProblems` proves it - every piece
+  has its twin, no two pieces touch, nothing stands within a block of a side
+  wall or on a base, and every floor block can be walked to from both bases
+  (a flood fill: no sealed corner). Over 3,000 seeds: no rule broken, 10 to
+  16 pieces a field.
 
 ## How the floating maps look
 
 Everything below is part of the arena's own boxes: built into air with
 `keep`, and taken out with the rest.
 
-| Arena            | Look                                                                          |
-| ---------------- | ----------------------------------------------------------------------------- |
-| Spleef           | each floor walled in its own color, a sea lantern on every corner post        |
-| Parkour          | the course's theme, a light under every checkpoint                            |
-| King of the ring | polished stone edge, sea lanterns at the corners, the circle drawn in yellow  |
-| Build battle     | a stone curb between plots and glowstone where the lines meet, at floor level |
-| Team duel        | a stone rim round the floor and a post of light at each corner                |
-| Boss sky arena   | glass, with a pillar of sea lantern at each corner                            |
+| Arena            | Look                                                                                                                      |
+| ---------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| Spleef           | each floor walled in its own color, a sea lantern on every corner post                                                    |
+| Parkour          | the course's theme, a light under every checkpoint                                                                        |
+| King of the ring | polished stone edge, sea lanterns at the corners, the circle drawn in yellow                                              |
+| Build battle     | a stone curb between plots and glowstone where the lines meet, at floor level                                             |
+| Team duel        | a stone rim round the floor and a post of light at each corner                                                            |
+| Capture the flag | the duel's rim and posts, bases in red and blue, banners on sea lanterns, cover of stone brick, spruce and chiseled stone |
+| Boss sky arena   | glass, with a pillar of sea lantern at each corner                                                                        |
 
 ## Lessons from real servers
 

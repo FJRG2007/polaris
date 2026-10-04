@@ -8975,3 +8975,220 @@ describe("a boss fishing", () => {
         expect(state().run).toBeNull();
     });
 });
+
+// ------------------------------------------------------------------ arena kinds through ArenaGame
+
+/** A stored run put back as a restarted Polaris finds it, the loop gone and
+ *  the world as it stood: what the next sweep picks up. */
+async function restartedWith(run: unknown, tags: World["tags"]): Promise<void> {
+    await events.cancelEvent("owner", SERVER);
+    await play(2_100);
+    world.tags = tags;
+    world.sent = [];
+    config[catalog.EVENT_STATE_KEY] = {
+        ...(config[catalog.EVENT_STATE_KEY] as object),
+        run,
+        arenaLeftovers: []
+    };
+    await events.sweepEvents();
+    expect(events.runningEvents()).toContain(SERVER);
+}
+
+/** A copy of who carries which tag, to put back after a restart. */
+function tagsNow(): World["tags"] {
+    return Object.fromEntries(
+        Object.entries(world.tags).map(([tag, names]) => [tag, new Set(names)])
+    );
+}
+
+/** Whether a line said to everybody reads `text` once its JSON is put together. */
+function saidToAll(text: string): boolean {
+    return world.sent.some((line) => line.startsWith("tellraw @a") && visible(line).includes(text));
+}
+
+describe("capture the flag", () => {
+    const ctfOf = (captures = 1, minutes = 5) => {
+        const preset = newPreset("capture-the-flag", "ctf");
+        return { ...preset, minutes, options: { ...preset.options, captures } };
+    };
+    const ctf = () =>
+        import("@polaris-app/game-servers/src/lib/minecraft/events/kinds/capture-the-flag");
+
+    it("splits who joined into teams, takes the other team's flag home and ends on the captures set", async () => {
+        const flag = await ctf();
+        setUp([ctfOf(1)]);
+        await joinAndStart("ctf");
+        const run = state().run!;
+        expect(run.readyAt).not.toBeNull();
+        expect(run.entrants.map((one) => [one.name, one.side])).toEqual([
+            ["Ana", 0],
+            ["Ben", 1]
+        ]);
+        const box = run.arena!.box;
+        // Built only into air, its banners on their stands, the teams set up as a duel's.
+        expect(fills().every((line) => line.endsWith(" keep"))).toBe(true);
+        expect(fills().some((line) => line.includes("minecraft:red_banner[rotation=0] keep"))).toBe(
+            true
+        );
+        expect(world.sent).toContain("team modify pe_blue friendlyFire false");
+        expect(world.sent).toContain("tag Ana add pe_ctf_s0");
+        expect(world.sent).toContain("tag Ben add pe_ctf_s1");
+        expect(world.sent).toContain("gamerule naturalRegeneration false");
+        expect(world.sent).toContain("gamerule keepInventory true");
+        expect(world.sent).toContain(
+            "give Ana minecraft:stone_sword[minecraft:custom_data={polaris_event:1b}] 1"
+        );
+        // The quick look marks touches between ticks.
+        await play(500);
+        expect(world.sent.some((line) => line.includes("add pe_ctf_t1"))).toBe(true);
+
+        // Ana at the blue flag: she has it on her head, and its stand is empty.
+        const blue = flag.standAt(box, 1);
+        const red = flag.standAt(box, 0);
+        world.at = {
+            Ana: [blue.x + 0.5, blue.y, blue.z + 0.5],
+            Ben: [red.x + 4.5, red.y, red.z + 3.5]
+        };
+        await play(2_100);
+        expect(flag.stateOf(state().run!.game).flags[1].carrier).toBe("Ana");
+        expect(world.sent).toContain(
+            "execute unless data entity Ana Inventory[{Slot:103b}] run item replace entity Ana armor.head with minecraft:blue_banner[minecraft:custom_data={polaris_event:1b}] 1"
+        );
+        expect(world.sent).toContain(
+            `execute in minecraft:overworld if block ${blue.x} ${blue.y} ${blue.z} minecraft:blue_banner run setblock ${blue.x} ${blue.y} ${blue.z} minecraft:air`
+        );
+        expect(world.sent).toContain("effect give Ana minecraft:glowing 3 0 true");
+        // Ben standing by his own takes nothing.
+        expect(flag.stateOf(state().run!.game).flags[0].carrier).toBeNull();
+
+        // Home with it, her own flag there: a capture, and the one set wins it.
+        world.at.Ana = [red.x + 1.5, red.y, red.z + 1.5];
+        await play(2_100);
+        const after = state();
+        expect(after.run).toBeNull();
+        expect(after.history[0]).toMatchObject({
+            outcome: "finished",
+            note: "The Red team reached its captures",
+            podium: [{ place: 1, name: "Ana", score: 1 }]
+        });
+        expect(world.sent).toContain(
+            "clear Ana minecraft:blue_banner[minecraft:custom_data={polaris_event:1b}]"
+        );
+        expect(world.sent).toContain(
+            `execute in minecraft:overworld run setblock ${blue.x} ${blue.y} ${blue.z} minecraft:blue_banner[rotation=8] keep`
+        );
+        expect(saidToAll("captured the Blue flag")).toBe(true);
+        // Everything down again, the teams and tags gone, everybody home.
+        for (const block of run.arena!.blocks)
+            expect(world.sent).toContain(
+                `execute in minecraft:overworld run fill ${box.x1} ${box.y1} ${box.z1} ${box.x2} ${box.y2} ${box.z2} minecraft:air replace ${block}`
+            );
+        expect(run.arena!.blocks).toContain("minecraft:blue_banner");
+        expect(world.sent).toContain("team remove pe_red");
+        expect(world.sent).toContain("tag @a remove pe_ctf_s0");
+        expect(world.sent).toContain("gamerule naturalRegeneration true");
+        expect(after.arenaLeftovers).toEqual([]);
+        onlyOurBlocks();
+    });
+
+    it("drops the flag when its carrier is brought low, back on its stand, the elimination credited", async () => {
+        const flag = await ctf();
+        setUp([ctfOf(3)]);
+        await joinAndStart("ctf");
+        const box = state().run!.arena!.box;
+        const blue = flag.standAt(box, 1);
+        world.dealt = { Ben: 10 };
+        world.at = {
+            Ana: [blue.x + 0.5, blue.y, blue.z + 0.5],
+            Ben: [blue.x + 2.5, blue.y, blue.z]
+        };
+        await play(2_100);
+        expect(flag.stateOf(state().run!.game).flags[1].carrier).toBe("Ana");
+        world.dealt = { Ben: 40 };
+        world.hp = { Ana: 4 };
+        await play(2_100);
+        world.hp = {};
+        const game = flag.stateOf(state().run!.game);
+        expect(game.flags[1].carrier).toBeNull();
+        expect(game.kills).toEqual({ Ben: 1 });
+        expect(state().run!.points).toEqual({});
+        expect(world.sent).toContain(
+            "clear Ana minecraft:blue_banner[minecraft:custom_data={polaris_event:1b}]"
+        );
+        expect(
+            world.sent.some((line) => line.startsWith("effect give Ana minecraft:resistance 5 4"))
+        ).toBe(true);
+        expect(saidToAll("dropped the Blue flag")).toBe(true);
+    });
+
+    it("picked up after a restart, keeps who carries which flag and still captures", async () => {
+        const flag = await ctf();
+        setUp([ctfOf(1)]);
+        await joinAndStart("ctf");
+        const box = state().run!.arena!.box;
+        const blue = flag.standAt(box, 1);
+        const red = flag.standAt(box, 0);
+        world.at = {
+            Ana: [blue.x + 0.5, blue.y, blue.z + 0.5],
+            Ben: [red.x + 4.5, red.y, red.z + 3.5]
+        };
+        await play(2_100);
+        const saved = state().run!;
+        expect(flag.stateOf(saved.game).flags[1].carrier).toBe("Ana");
+        const at = { ...world.at };
+        await restartedWith(saved, tagsNow());
+        world.at = { ...at, Ana: [blue.x + 0.5, blue.y, blue.z - 6.5] };
+        await play(2_100);
+        // Still Ana's: the stand kept empty, nobody else handed it.
+        expect(flag.stateOf(state().run!.game).flags[1].carrier).toBe("Ana");
+        expect(world.sent).toContain(
+            `execute in minecraft:overworld if block ${blue.x} ${blue.y} ${blue.z} minecraft:blue_banner run setblock ${blue.x} ${blue.y} ${blue.z} minecraft:air`
+        );
+        world.at.Ana = [red.x + 1.5, red.y, red.z + 1.5];
+        await play(2_100);
+        expect(state().history[0]).toMatchObject({ id: saved.id, outcome: "finished" });
+        expect(state().history[0]?.podium).toEqual([{ place: 1, name: "Ana", score: 1 }]);
+        expect(state().arenaLeftovers).toEqual([]);
+        onlyOurBlocks();
+    });
+
+    it("called off mid-game, takes back the flag a carrier wears with the rest of the kit", async () => {
+        const flag = await ctf();
+        setUp([ctfOf(3, 10)]);
+        await joinAndStart("ctf");
+        const run = state().run!;
+        const blue = flag.standAt(run.arena!.box, 1);
+        world.at = {
+            Ana: [blue.x + 0.5, blue.y, blue.z + 0.5],
+            Ben: [blue.x + 6.5, blue.y, blue.z]
+        };
+        await play(2_100);
+        await events.cancelEvent("owner", SERVER);
+        await play(2_100);
+        expect(state().run).toBeNull();
+        expect(state().history[0]).toMatchObject({ outcome: "cancelled", podium: [] });
+        expect(world.sent).toContain(
+            "clear Ana minecraft:blue_banner[minecraft:custom_data={polaris_event:1b}]"
+        );
+        expect(world.sent).toContain(
+            "clear Ben minecraft:shield[minecraft:custom_data={polaris_event:1b}]"
+        );
+        expect(world.sent).toContain("team remove pe_blue");
+        expect(state().arenaLeftovers).toEqual([]);
+        onlyOurBlocks();
+    });
+
+    it("is called off with nothing built when only one joins", async () => {
+        setUp([ctfOf()]);
+        await startArena("ctf");
+        await play(2_100);
+        chat(["Ana", "join"]);
+        await play(40_000);
+        expect(state().run).toBeNull();
+        expect(state().history[0]).toMatchObject({
+            outcome: "cancelled",
+            note: "Only 1 joined; it needs 2"
+        });
+        expect(fills()).toEqual([]);
+    });
+});
