@@ -76,7 +76,9 @@ export function ExportMenu({
             return;
         }
         const link = answer.link;
-        setGoogle((held) => (held ? { ...held, copyLink: link, savedAt: new Date().toISOString() } : held));
+        setGoogle((held) =>
+            held ? { ...held, copyLink: link, savedAt: new Date().toISOString() } : held
+        );
         toast.show({
             title: t("google.saved"),
             body: t("google.openCopy"),

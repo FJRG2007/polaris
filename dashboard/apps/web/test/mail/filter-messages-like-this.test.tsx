@@ -49,7 +49,9 @@ function screenFor(params: URLSearchParams) {
     render(
         <MessagesWrapper>
             <RulesView
-                accounts={[{ ...ACCOUNT, id: "acc-1", address: "other@example.com" }, ACCOUNT] as never}
+                accounts={
+                    [{ ...ACCOUNT, id: "acc-1", address: "other@example.com" }, ACCOUNT] as never
+                }
                 folders={[]}
                 labels={[]}
                 rules={{ "acc-1": [], "acc-2": [] }}
@@ -75,16 +77,30 @@ describe("filter messages like this", () => {
 
     it("opens the form on that mailbox, written from the message, and shows the shape", () => {
         screenFor(
-            new URLSearchParams({ account: "acc-2", from: "notifications@github.example", similar: SUBJECT })
+            new URLSearchParams({
+                account: "acc-2",
+                from: "notifications@github.example",
+                similar: SUBJECT
+            })
         );
         expect(screen.getByText("Filters on me@example.com")).toBeTruthy();
-        const values = screen.getAllByRole("textbox", { name: "What to look for" }) as HTMLInputElement[];
+        const values = screen.getAllByRole("textbox", {
+            name: "What to look for"
+        }) as HTMLInputElement[];
         expect(values.map((one) => one.value)).toEqual(["notifications@github.example", SUBJECT]);
-        expect(screen.getByText(/Matches subjects shaped like: \[\*\] run failed: ci - main \(\*\)/)).toBeTruthy();
+        expect(
+            screen.getByText(/Matches subjects shaped like: \[\*\] run failed: ci - main \(\*\)/)
+        ).toBeTruthy();
     });
 
     it("saves both conditions, all of which have to hold", async () => {
-        screenFor(new URLSearchParams({ account: "acc-2", from: "notifications@github.example", similar: SUBJECT }));
+        screenFor(
+            new URLSearchParams({
+                account: "acc-2",
+                from: "notifications@github.example",
+                similar: SUBJECT
+            })
+        );
         await act(async () => {
             fireEvent.click(screen.getByRole("button", { name: "Save the filter" }));
         });
@@ -105,7 +121,9 @@ describe("filter messages like this", () => {
     it("will not save a similar-subject condition that would match nothing, and says why", () => {
         screenFor(new URLSearchParams({ account: "acc-2", similar: "#42" }));
         expect(screen.getByText(/would match nothing/)).toBeTruthy();
-        expect((screen.getByRole("button", { name: "Save the filter" }) as HTMLButtonElement).disabled).toBe(true);
+        expect(
+            (screen.getByRole("button", { name: "Save the filter" }) as HTMLButtonElement).disabled
+        ).toBe(true);
     });
 
     it("opens on a plain screen when nothing asked for a filter", () => {

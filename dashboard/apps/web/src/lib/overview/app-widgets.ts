@@ -51,7 +51,10 @@ export async function availableAppWidgetKinds(): Promise<AppWidgetKind[]> {
                     defaultSize: definition.defaultSize
                 };
             } catch (caught) {
-                console.error(`polaris: ${app} could not describe its ${definition.kind} card:`, caught);
+                console.error(
+                    `polaris: ${app} could not describe its ${definition.kind} card:`,
+                    caught
+                );
                 return null;
             }
         })
@@ -92,7 +95,10 @@ export async function readAppWidgets(
             try {
                 return [card.id, { ok: true, view: await definition.read(card.targets) }];
             } catch (caught) {
-                console.error(`polaris: the ${card.app} ${card.kind} card could not be read:`, caught);
+                console.error(
+                    `polaris: the ${card.app} ${card.kind} card could not be read:`,
+                    caught
+                );
                 return [card.id, { ok: false, reason: "failed" }];
             }
         })

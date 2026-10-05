@@ -138,12 +138,16 @@ export function RecentView({ connections }: { connections: { id: string; name: s
             <Card>
                 <CardBody className="p-0">
                     {loading ? (
-                        <p className="p-8 text-center text-sm text-muted-foreground">{t("recent.loading")}</p>
+                        <p className="p-8 text-center text-sm text-muted-foreground">
+                            {t("recent.loading")}
+                        </p>
                     ) : error ? (
                         <p className="p-8 text-center text-sm text-danger">{error}</p>
                     ) : entries.length === 0 ? (
                         <p className="p-8 text-center text-sm text-muted-foreground">
-                            {lens === "opened" ? t("recent.noFilesOpenedHereYet") : t("recent.nothingHereYet")}
+                            {lens === "opened"
+                                ? t("recent.noFilesOpenedHereYet")
+                                : t("recent.nothingHereYet")}
                         </p>
                     ) : (
                         <ul>
@@ -176,8 +180,12 @@ export function RecentView({ connections }: { connections: { id: string; name: s
                                     </span>
                                     <Link
                                         href={`/drive?c=${encodeURIComponent(connectionId)}&p=${encodeURIComponent(parentOf(entry.path))}`}
-                                        aria-label={t("pages.favorites.showInFolder", { name: entry.name })}
-                                        title={t("pages.favorites.showInFolder", { name: entry.name })}
+                                        aria-label={t("pages.favorites.showInFolder", {
+                                            name: entry.name
+                                        })}
+                                        title={t("pages.favorites.showInFolder", {
+                                            name: entry.name
+                                        })}
                                         className="shrink-0 rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                                     >
                                         <FolderOpen className="size-4" />

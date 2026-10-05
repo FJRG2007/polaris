@@ -20,7 +20,16 @@ import { sizeLabel, widgetDescription, widgetLabel } from "./widget-names";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { ArrowDown, ArrowUp, GripVertical, RotateCcw } from "lucide-react";
 import type { OverviewWidgetId, OverviewWidgetPreference, OverviewWidgetSize } from "@polaris/core";
-import { Button, Dialog, DialogContent, DialogHeader, DialogTitle, Select, Switch, cn } from "@polaris/ui";
+import {
+    Button,
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+    Select,
+    Switch,
+    cn
+} from "@polaris/ui";
 
 export function CustomizeDialog({
     open,
@@ -74,7 +83,9 @@ export function CustomizeDialog({
                                     "flex items-center gap-3 border-b border-border/60 py-3 last:border-b-0",
                                     widget.hidden && "opacity-60",
                                     dragged === widget.id && "opacity-40",
-                                    over === widget.id && dragged !== widget.id && "rounded-md ring-2 ring-primary"
+                                    over === widget.id &&
+                                        dragged !== widget.id &&
+                                        "rounded-md ring-2 ring-primary"
                                 )}
                                 onDragOver={(event) => {
                                     if (!dragged) return;
@@ -82,7 +93,9 @@ export function CustomizeDialog({
                                     event.dataTransfer.dropEffect = "move";
                                     setOver(widget.id);
                                 }}
-                                onDragLeave={() => setOver((held) => (held === widget.id ? null : held))}
+                                onDragLeave={() =>
+                                    setOver((held) => (held === widget.id ? null : held))
+                                }
                                 onDrop={(event) => {
                                     event.preventDefault();
                                     if (dragged) onMoveOnto(dragged, widget.id);
@@ -107,19 +120,34 @@ export function CustomizeDialog({
                                 >
                                     <GripVertical className="size-4" aria-hidden="true" />
                                 </span>
-                                <Icon className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+                                <Icon
+                                    className="size-4 shrink-0 text-muted-foreground"
+                                    aria-hidden="true"
+                                />
                                 <div className="flex min-w-0 flex-1 flex-col">
-                                    <span className="truncate text-sm font-medium" title={label}>{label}</span>
-                                    <span className="truncate text-xs text-muted-foreground" title={description}>{description}</span>
+                                    <span className="truncate text-sm font-medium" title={label}>
+                                        {label}
+                                    </span>
+                                    <span
+                                        className="truncate text-xs text-muted-foreground"
+                                        title={description}
+                                    >
+                                        {description}
+                                    </span>
                                 </div>
 
                                 {entry.sizes.length > 1 && !widget.hidden ? (
                                     <Select
                                         value={widget.size}
-                                        onValueChange={(value) => onResize(widget.id, value as OverviewWidgetSize)}
+                                        onValueChange={(value) =>
+                                            onResize(widget.id, value as OverviewWidgetSize)
+                                        }
                                         aria-label={t("customize.width", { name: label })}
                                         className="h-8 w-28 shrink-0"
-                                        options={entry.sizes.map((size) => ({ value: size, label: sizeLabel(t, size) }))}
+                                        options={entry.sizes.map((size) => ({
+                                            value: size,
+                                            label: sizeLabel(t, size)
+                                        }))}
                                     />
                                 ) : null}
 
@@ -160,7 +188,11 @@ export function CustomizeDialog({
 
                 <div className="flex items-center justify-between gap-3 border-t border-border pt-3">
                     <label className="flex items-center gap-2 text-sm">
-                        <Switch checked={greeting} onChange={onGreetingChange} aria-label={t("customize.greet")} />
+                        <Switch
+                            checked={greeting}
+                            onChange={onGreetingChange}
+                            aria-label={t("customize.greet")}
+                        />
                         {t("customize.greet")}
                     </label>
                     <Button variant="ghost" size="sm" onClick={onReset}>

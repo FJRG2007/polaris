@@ -90,7 +90,10 @@ describe("reading the cards on one Overview", () => {
         const spy = vi.spyOn(console, "error").mockImplementation(() => undefined);
         read.mockRejectedValue(new Error("down"));
         expect(
-            await widgets.readAppWidgets([card(["t1"]), { ...card(["t1"], "retired"), id: "card0002" }])
+            await widgets.readAppWidgets([
+                card(["t1"]),
+                { ...card(["t1"], "retired"), id: "card0002" }
+            ])
         ).toEqual({
             card0001: { ok: false, reason: "failed" },
             card0002: { ok: false, reason: "gone" }
@@ -108,7 +111,11 @@ describe("a press", () => {
 
     it("is refused before the app is asked when it names something the card does not watch", async () => {
         expect(
-            await widgets.actOnAppWidget(card(["t1"]), { item: "t9", control: "power", value: true })
+            await widgets.actOnAppWidget(card(["t1"]), {
+                item: "t9",
+                control: "power",
+                value: true
+            })
         ).toEqual({ error: "unknown" });
         expect(act).not.toHaveBeenCalled();
     });
@@ -116,16 +123,22 @@ describe("a press", () => {
     it("carries the app's own refusal back", async () => {
         act.mockResolvedValueOnce({ error: "You cannot operate that from here" } as never);
         expect(
-            await widgets.actOnAppWidget(card(["t1"]), { item: "t1", control: "power", value: true })
+            await widgets.actOnAppWidget(card(["t1"]), {
+                item: "t1",
+                control: "power",
+                value: true
+            })
         ).toEqual({ error: "You cannot operate that from here" });
     });
 
     it("is validated in shape before anything", () => {
-        expect(widgets.appWidgetInputSchema.safeParse({ item: "t1", control: "x", value: "on" }).success).toBe(
-            false
-        );
         expect(
-            widgets.appWidgetInputSchema.safeParse({ item: "t1", control: "x", value: Number.NaN }).success
+            widgets.appWidgetInputSchema.safeParse({ item: "t1", control: "x", value: "on" })
+                .success
+        ).toBe(false);
+        expect(
+            widgets.appWidgetInputSchema.safeParse({ item: "t1", control: "x", value: Number.NaN })
+                .success
         ).toBe(false);
     });
 });

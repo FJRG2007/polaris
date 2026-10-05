@@ -38,21 +38,21 @@ export default async function OverviewPage() {
 
     return (
         <Messages namespaces={["home"]}>
-        <OverviewGrid
-            name={user.name}
-            isAdmin={user.isAdmin}
-            preferences={preferences}
-            available={available}
-            layout={resolveOverviewLayout(preferences, available)}
-            apps={apps.map((app) => ({
-                id: app.id,
-                label: app.label,
-                description: app.description,
-                href: app.href
-            }))}
-            gate={{ held, installed }}
-            appKinds={appKinds}
-        />
+            <OverviewGrid
+                name={user.name}
+                isAdmin={user.isAdmin}
+                preferences={preferences}
+                available={available}
+                layout={resolveOverviewLayout(preferences, available)}
+                apps={apps.map((app) => ({
+                    id: app.id,
+                    label: app.label,
+                    description: app.description,
+                    href: app.href
+                }))}
+                gate={{ held, installed }}
+                appKinds={appKinds}
+            />
         </Messages>
     );
 }

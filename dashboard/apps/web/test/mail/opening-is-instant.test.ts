@@ -112,7 +112,9 @@ describe("marking it read", () => {
         expect(body).toContain("after(pushThenRelease)");
         // And held until that push has finished, so a sync in between keeps the
         // flag rather than the server's old one (see `sync-keeps-held-flags`).
-        expect(body.indexOf("holdFlag(")).toBeLessThan(body.indexOf("prisma.mailMessage.updateMany"));
+        expect(body.indexOf("holdFlag(")).toBeLessThan(
+            body.indexOf("prisma.mailMessage.updateMany")
+        );
     });
 
     it("leaves a move alone, which must not be believed before the server agrees", async () => {

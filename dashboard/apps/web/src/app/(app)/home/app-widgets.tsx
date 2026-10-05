@@ -173,7 +173,8 @@ export function AppWidgetGridItems({
     async function act(cardId: string, input: AppWidgetInput): Promise<void> {
         const key = `${input.item}:${input.control}`;
         const before = readouts[cardId];
-        if (before) setReadouts((current) => ({ ...current, [cardId]: withPressed(before, input) }));
+        if (before)
+            setReadouts((current) => ({ ...current, [cardId]: withPressed(before, input) }));
         setBusy((current) => new Set(current).add(key));
         let error: string | undefined;
         try {
@@ -201,7 +202,11 @@ export function AppWidgetGridItems({
             {shown.map((card, index) => {
                 const kind = kinds.find((one) => one.app === card.app && one.kind === card.kind)!;
                 return (
-                    <div key={card.id} data-app-widget={card.id} className={cn("min-w-0", SPAN[card.size])}>
+                    <div
+                        key={card.id}
+                        data-app-widget={card.id}
+                        className={cn("min-w-0", SPAN[card.size])}
+                    >
                         <WidgetCard
                             title={kind.label}
                             icon={Blocks}
@@ -341,19 +346,29 @@ export function AppWidgetCatalog({
             <ul className="flex flex-col">
                 {kinds.map((kind) => (
                     <li key={`${kind.app}:${kind.kind}`} className="flex items-center gap-3 py-2">
-                        <Blocks className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+                        <Blocks
+                            className="size-4 shrink-0 text-muted-foreground"
+                            aria-hidden="true"
+                        />
                         <div className="flex min-w-0 flex-1 flex-col">
                             <span className="truncate text-sm font-medium" title={kind.label}>
                                 {kind.label}
                             </span>
-                            <span className="truncate text-xs text-muted-foreground" title={kind.hint}>
+                            <span
+                                className="truncate text-xs text-muted-foreground"
+                                title={kind.hint}
+                            >
                                 {kind.hint}
                             </span>
                         </div>
                         <button
                             type="button"
                             disabled={state.full}
-                            title={state.full ? t("appCards.full", { count: MAX_APP_WIDGETS }) : undefined}
+                            title={
+                                state.full
+                                    ? t("appCards.full", { count: MAX_APP_WIDGETS })
+                                    : undefined
+                            }
                             onClick={() => setAdding(kind)}
                             className="shrink-0 rounded-md border border-border px-2.5 py-1 text-xs font-medium transition-colors hover:bg-muted disabled:pointer-events-none disabled:opacity-40"
                         >

@@ -193,37 +193,37 @@ export function ProjectsGrid({
                     />
                 </div>
                 <div className="flex shrink-0 items-center gap-3">
-                {/* Only when there is something it would hide. */}
-                {managedCount > 0 && (
-                    <label className="flex cursor-pointer items-center gap-2 text-xs text-muted-foreground">
-                        <Switch
-                            checked={showManaged}
-                            onChange={setShowManaged}
-                            aria-label={t("projects.showManaged")}
-                        />
-                        <span className="hidden sm:inline">
-                            {t("projects.showManagedCount", { count: managedCount })}
-                        </span>
-                    </label>
-                )}
-                <div className="flex items-center gap-1 rounded-md border border-border p-0.5">
-                    <button
-                        type="button"
-                        onClick={() => setLayout("grid")}
-                        aria-label={t("projects.gridView")}
-                        className={`rounded p-1.5 transition-colors ${layout === "grid" ? "bg-muted text-foreground" : "text-muted-foreground hover:text-foreground"}`}
-                    >
-                        <LayoutGrid className="size-4" />
-                    </button>
-                    <button
-                        type="button"
-                        onClick={() => setLayout("list")}
-                        aria-label={t("projects.listView")}
-                        className={`rounded p-1.5 transition-colors ${layout === "list" ? "bg-muted text-foreground" : "text-muted-foreground hover:text-foreground"}`}
-                    >
-                        <List className="size-4" />
-                    </button>
-                </div>
+                    {/* Only when there is something it would hide. */}
+                    {managedCount > 0 && (
+                        <label className="flex cursor-pointer items-center gap-2 text-xs text-muted-foreground">
+                            <Switch
+                                checked={showManaged}
+                                onChange={setShowManaged}
+                                aria-label={t("projects.showManaged")}
+                            />
+                            <span className="hidden sm:inline">
+                                {t("projects.showManagedCount", { count: managedCount })}
+                            </span>
+                        </label>
+                    )}
+                    <div className="flex items-center gap-1 rounded-md border border-border p-0.5">
+                        <button
+                            type="button"
+                            onClick={() => setLayout("grid")}
+                            aria-label={t("projects.gridView")}
+                            className={`rounded p-1.5 transition-colors ${layout === "grid" ? "bg-muted text-foreground" : "text-muted-foreground hover:text-foreground"}`}
+                        >
+                            <LayoutGrid className="size-4" />
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setLayout("list")}
+                            aria-label={t("projects.listView")}
+                            className={`rounded p-1.5 transition-colors ${layout === "list" ? "bg-muted text-foreground" : "text-muted-foreground hover:text-foreground"}`}
+                        >
+                            <List className="size-4" />
+                        </button>
+                    </div>
                 </div>
             </div>
 

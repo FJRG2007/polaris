@@ -141,17 +141,26 @@ export interface DisconnectReason {
 const REASON_WORDS: readonly [DisconnectReasonKind, RegExp][] = [
     ["whitelist", /white-?listed|not on the whitelist/i],
     ["banned", /\bbanned\b/i],
-    ["outdated", /outdated (client|server)|incompatible client|multiplayer\.disconnect\.(outdated|incompatible)/i],
+    [
+        "outdated",
+        /outdated (client|server)|incompatible client|multiplayer\.disconnect\.(outdated|incompatible)/i
+    ],
     ["full", /server is full|multiplayer\.disconnect\.server_full/i],
     ["duplicate", /logged in from another location|duplicate_login|duplicate login/i],
     ["idle", /idle for too long|multiplayer\.disconnect\.idling/i],
-    ["auth", /failed to verify username|invalid session|unverified_username|failed to log in|authentication/i],
+    [
+        "auth",
+        /failed to verify username|invalid session|unverified_username|failed to log in|authentication/i
+    ],
     ["flying", /flying is not enabled|multiplayer\.disconnect\.flying/i],
     ["kicked", /kicked by an operator|you have been kicked|multiplayer\.disconnect\.kicked/i],
     ["shutdown", /server closed|server shutting down|multiplayer\.disconnect\.server_shutdown/i],
     ["timeout", /timed out|readtimeoutexception|took too long to log in|disconnect\.timeout/i],
     ["quit", /^\s*disconnected\s*$|disconnect\.quitting|^\s*quitting\s*$/i],
-    ["network", /internal exception|connection reset|end of stream|disconnect\.genericreason|broken pipe/i]
+    [
+        "network",
+        /internal exception|connection reset|end of stream|disconnect\.genericreason|broken pipe/i
+    ]
 ];
 
 /**
@@ -161,7 +170,10 @@ const REASON_WORDS: readonly [DisconnectReasonKind, RegExp][] = [
  * "lost connection" carries the message the operator typed, which is free text
  * and could be anything, so the kick line is what says it was a kick.
  */
-export function classifyDisconnect(raw: string, kickedWith: string | null = null): DisconnectReason {
+export function classifyDisconnect(
+    raw: string,
+    kickedWith: string | null = null
+): DisconnectReason {
     const text = stripCodes(raw).trim();
     if (kickedWith !== null) return { kind: "kicked", raw: text || stripCodes(kickedWith).trim() };
     for (const [kind, words] of REASON_WORDS) {
@@ -263,7 +275,11 @@ export function parsePlayerSessions(log: string): PlayerSessionEvent[] {
             if (entry.kind === "refused" || (entry.kind === "lost" && !inGame.has(key))) {
                 // The second line about one departure - the stop already ended
                 // it, or "left the game" came first - is its reason.
-                if (held && sameMoment(held.at, at) && (held.kind === "leave" || held.kind === "refused")) {
+                if (
+                    held &&
+                    sameMoment(held.at, at) &&
+                    (held.kind === "leave" || held.kind === "refused")
+                ) {
                     if (!held.reason && said) events[previous!.index] = { ...held, reason: why() };
                     break;
                 }

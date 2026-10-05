@@ -152,7 +152,10 @@ export function FavoritesView({
                                     href={folderHref(row)}
                                     aria-label={t("pages.favorites.showInFolder", { name })}
                                     title={t("pages.favorites.showInFolder", { name })}
-                                    className={cn(buttonVariants({ variant: "ghost", size: "icon" }), "shrink-0")}
+                                    className={cn(
+                                        buttonVariants({ variant: "ghost", size: "icon" }),
+                                        "shrink-0"
+                                    )}
                                 >
                                     <FolderOpen className="size-4" />
                                 </Link>

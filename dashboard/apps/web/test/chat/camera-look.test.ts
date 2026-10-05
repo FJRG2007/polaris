@@ -140,7 +140,10 @@ describe("what a browser remembers about the look", () => {
     });
 
     it("believes nothing it did not write, field by field", () => {
-        store.set("polaris.call.camera-look", JSON.stringify({ light: "laser", style: "mono", frame: 7 }));
+        store.set(
+            "polaris.call.camera-look",
+            JSON.stringify({ light: "laser", style: "mono", frame: 7 })
+        );
         expect(look.cameraLook()).toEqual({ light: "off", style: "mono", frame: "off" });
         store.set("polaris.call.camera-look", "{not json");
         expect(look.cameraLook()).toEqual(look.LOOK_DEFAULT);
@@ -179,7 +182,11 @@ describe("auto light", () => {
 
 describe("auto framing", () => {
     /** A mask of `width` x `height` with a person filling the given cells. */
-    function mask(width: number, height: number, fill: (x: number, y: number) => boolean): Uint8ClampedArray {
+    function mask(
+        width: number,
+        height: number,
+        fill: (x: number, y: number) => boolean
+    ): Uint8ClampedArray {
         const pixels = new Uint8ClampedArray(width * height * 4);
         for (let y = 0; y < height; y += 1) {
             for (let x = 0; x < width; x += 1) {
@@ -190,12 +197,22 @@ describe("auto framing", () => {
     }
 
     it("finds the person in a mask's alpha", () => {
-        const box = look.personBox(mask(10, 10, (x, y) => x >= 6 && y >= 3), 10, 10);
+        const box = look.personBox(
+            mask(10, 10, (x, y) => x >= 6 && y >= 3),
+            10,
+            10
+        );
         expect(box).toEqual({ x: 0.6, y: 0.3, w: 0.4, h: 0.7 });
     });
 
     it("finds nobody in an empty room", () => {
-        expect(look.personBox(mask(10, 10, () => false), 10, 10)).toBeNull();
+        expect(
+            look.personBox(
+                mask(10, 10, () => false),
+                10,
+                10
+            )
+        ).toBeNull();
         expect(look.frameFor(null)).toEqual(look.WHOLE_FRAME);
     });
 
@@ -239,14 +256,20 @@ describe("the camera pipeline", () => {
         workers[0]?.onmessage?.();
         await vi.waitFor(() => expect(contexts[0]?.draws.length).toBeGreaterThan(0));
         const sent = contexts[0];
-        expect(sent?.filters[0]).toBe(look.lookFilter({ light: "bright", style: "warm", frame: "off" }));
+        expect(sent?.filters[0]).toBe(
+            look.lookFilter({ light: "bright", style: "warm", frame: "off" })
+        );
         // The whole frame, drawn at the canvas's size.
         expect(sent?.draws[0]?.slice(1)).toEqual([0, 0, 640, 360, 0, 0, 640, 360]);
         await built?.stop();
     });
 
     it("lifts a dark picture under auto light", async () => {
-        const built = await maskCamera(cameraTrack(), "off", null, { light: "auto", style: "none", frame: "off" });
+        const built = await maskCamera(cameraTrack(), "off", null, {
+            light: "auto",
+            style: "none",
+            frame: "off"
+        });
         workers[0]?.onmessage?.();
         await vi.waitFor(() => expect(contexts[0]?.draws.length).toBeGreaterThan(0));
         expect(contexts[0]?.filters[0]).toMatch(/^brightness\(1\.\d+\)/);
@@ -254,7 +277,11 @@ describe("the camera pipeline", () => {
     });
 
     it("needs the model for framing, and says so when it is missing", async () => {
-        const built = await maskCamera(cameraTrack(), "off", null, { light: "off", style: "none", frame: "auto" });
+        const built = await maskCamera(cameraTrack(), "off", null, {
+            light: "off",
+            style: "none",
+            frame: "auto"
+        });
         expect(appended).toHaveLength(1);
         expect(built?.track).toBeNull();
         expect(built?.problem).toMatch(/background model is not on this server/);

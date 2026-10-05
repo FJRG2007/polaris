@@ -89,11 +89,16 @@ export function TextDropPointsView({ requests }: { requests: TextDropPointRow[] 
             selection.forget(result.deleted);
             if (result.error || result.failed.length > 0) {
                 await confirm({
-                    title: t("list.someNotDeleted", { count: result.failed.length || chosen.length }),
+                    title: t("list.someNotDeleted", {
+                        count: result.failed.length || chosen.length
+                    }),
                     description:
                         result.error ??
                         result.failed
-                            .map((one) => `${chosen.find((row) => row.id === one.id)?.title ?? ""}: ${one.error}`)
+                            .map(
+                                (one) =>
+                                    `${chosen.find((row) => row.id === one.id)?.title ?? ""}: ${one.error}`
+                            )
                             .join("\n"),
                     alert: true
                 });
@@ -254,7 +259,11 @@ export function TextDropPointsView({ requests }: { requests: TextDropPointRow[] 
                                         <Link
                                             href={`/drive/drop-points/text/${row.id}`}
                                             onClick={(event) => {
-                                                if (event.shiftKey || event.ctrlKey || event.metaKey) {
+                                                if (
+                                                    event.shiftKey ||
+                                                    event.ctrlKey ||
+                                                    event.metaKey
+                                                ) {
                                                     event.preventDefault();
                                                 }
                                             }}
@@ -283,7 +292,9 @@ export function TextDropPointsView({ requests }: { requests: TextDropPointRow[] 
                                         {scheduled && row.startsAt
                                             ? t("list.opensOn", { date: format.date(row.startsAt) })
                                             : row.expiresAt
-                                              ? t("list.untilOn", { date: format.date(row.expiresAt) })
+                                              ? t("list.untilOn", {
+                                                    date: format.date(row.expiresAt)
+                                                })
                                               : "-"}
                                     </td>
                                     <td className="px-3 py-2">
@@ -293,7 +304,9 @@ export function TextDropPointsView({ requests }: { requests: TextDropPointRow[] 
                                                     size="icon-sm"
                                                     variant="ghost"
                                                     title={t("textList.copyTheLink")}
-                                                    aria-label={t("list.copyLinkTo", { name: row.title })}
+                                                    aria-label={t("list.copyLinkTo", {
+                                                        name: row.title
+                                                    })}
                                                     onClick={() => onCopyLink(row)}
                                                     disabled={busy === row.id}
                                                 >
@@ -309,7 +322,9 @@ export function TextDropPointsView({ requests }: { requests: TextDropPointRow[] 
                                                     size="icon-sm"
                                                     variant="ghost"
                                                     title={t("textList.reopen")}
-                                                    aria-label={t("list.reopenNamed", { name: row.title })}
+                                                    aria-label={t("list.reopenNamed", {
+                                                        name: row.title
+                                                    })}
                                                     onClick={() => onReopen(row)}
                                                     disabled={rowBusy}
                                                 >
@@ -320,7 +335,9 @@ export function TextDropPointsView({ requests }: { requests: TextDropPointRow[] 
                                                     size="icon-sm"
                                                     variant="ghost"
                                                     title={t("textList.close")}
-                                                    aria-label={t("list.closeNamed", { name: row.title })}
+                                                    aria-label={t("list.closeNamed", {
+                                                        name: row.title
+                                                    })}
                                                     onClick={() => onClose(row)}
                                                     disabled={rowBusy}
                                                 >
@@ -331,7 +348,9 @@ export function TextDropPointsView({ requests }: { requests: TextDropPointRow[] 
                                                 size="icon-sm"
                                                 variant="ghost"
                                                 title={t("textList.delete")}
-                                                aria-label={t("list.deleteNamed", { name: row.title })}
+                                                aria-label={t("list.deleteNamed", {
+                                                    name: row.title
+                                                })}
                                                 onClick={() => onDelete(row)}
                                                 disabled={rowBusy}
                                             >

@@ -44,7 +44,12 @@ function mount() {
 }
 
 beforeEach(() => {
-    for (const mock of [push, officeGoogleStateAction, listGoogleFilesAction, importGoogleFileAction]) {
+    for (const mock of [
+        push,
+        officeGoogleStateAction,
+        listGoogleFilesAction,
+        importGoogleFileAction
+    ]) {
         mock.mockReset();
     }
 });
@@ -54,7 +59,9 @@ describe("opening from Google Drive", () => {
     it("says who can add Google when this Polaris has none", async () => {
         officeGoogleStateAction.mockResolvedValue({ available: false, accounts: [] });
         mount();
-        expect(await screen.findByText(/An administrator can add it under Integrations/)).toBeTruthy();
+        expect(
+            await screen.findByText(/An administrator can add it under Integrations/)
+        ).toBeTruthy();
         expect(listGoogleFilesAction).not.toHaveBeenCalled();
     });
 
@@ -97,10 +104,18 @@ describe("opening from Google Drive", () => {
 
         const deck = (await screen.findByText("Launch deck")).closest("button");
         expect(deck?.disabled).toBe(true);
-        expect(listGoogleFilesAction).toHaveBeenCalledWith({ connectionId: "a1", search: "", pageToken: null });
+        expect(listGoogleFilesAction).toHaveBeenCalledWith({
+            connectionId: "a1",
+            search: "",
+            pageToken: null
+        });
 
         await userEvent.click(screen.getByText("Quarterly plan"));
-        expect(importGoogleFileAction).toHaveBeenCalledWith({ connectionId: "a1", fileId: "d1", orgId: null });
+        expect(importGoogleFileAction).toHaveBeenCalledWith({
+            connectionId: "a1",
+            fileId: "d1",
+            orgId: null
+        });
         expect(onClose).toHaveBeenCalled();
         expect(push).toHaveBeenCalledWith(expect.stringContaining("doc1"));
     });

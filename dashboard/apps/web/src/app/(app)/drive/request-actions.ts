@@ -100,7 +100,12 @@ export async function createFileRequestAction(
 ): Promise<{ url?: string; error?: string }> {
     const user = await requirePermission("requests.create");
     const parsed = createFileRequestSchema.safeParse(input);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? (await getTranslations("drive"))("errors.invalidRequest") };
+    if (!parsed.success)
+        return {
+            error:
+                parsed.error.issues[0]?.message ??
+                (await getTranslations("drive"))("errors.invalidRequest")
+        };
 
     // A blank title gets a generated name; resolve it once so the drop point's
     // folder and its stored title match.
@@ -119,12 +124,15 @@ export async function createFileRequestAction(
     } catch (caught) {
         if (caught instanceof DriveAccessError)
             return { error: (await getTranslations("drive"))("errors.collectDenied") };
-        if (caught instanceof DriveLockedError) return { error: (await getTranslations("drive"))("errors.folderLocked") };
+        if (caught instanceof DriveLockedError)
+            return { error: (await getTranslations("drive"))("errors.folderLocked") };
         if (caught instanceof SmbShareRequiredError)
             return { error: (await getTranslations("drive"))("errors.shareFirst") };
         return {
             error:
-                caught instanceof Error ? caught.message : (await getTranslations("drive"))("errors.prepareFailed")
+                caught instanceof Error
+                    ? caught.message
+                    : (await getTranslations("drive"))("errors.prepareFailed")
         };
     }
 
@@ -330,7 +338,12 @@ export async function deleteFileRequestAction(
     deleteFolder: boolean
 ): Promise<{ error?: string }> {
     const user = await requirePermission("requests.create");
-    const result = await removeFileRequest(user.id, String(requestId), Boolean(deleteFolder), false);
+    const result = await removeFileRequest(
+        user.id,
+        String(requestId),
+        Boolean(deleteFolder),
+        false
+    );
     if (!result.error) revalidatePath("/drive/drop-points");
     return result;
 }
@@ -361,7 +374,11 @@ export async function deleteFileRequestsAction(
     const user = await requirePermission("requests.create");
     const parsed = bulkDeleteSchema.safeParse({ requestIds, deleteFolders });
     if (!parsed.success) {
-        return { deleted: [], failed: [], error: (await getTranslations("drive"))("errors.dropPointGone") };
+        return {
+            deleted: [],
+            failed: [],
+            error: (await getTranslations("drive"))("errors.dropPointGone")
+        };
     }
     const deleted: string[] = [];
     const failed: { id: string; error: string }[] = [];
@@ -420,12 +437,15 @@ async function removeFileRequest(
         } catch (caught) {
             if (caught instanceof DriveAccessError)
                 return { error: (await getTranslations("drive"))("errors.folderDeleteDenied") };
-            if (caught instanceof DriveLockedError) return { error: (await getTranslations("drive"))("errors.folderLocked") };
+            if (caught instanceof DriveLockedError)
+                return { error: (await getTranslations("drive"))("errors.folderLocked") };
             if (!isMissingError(caught)) {
                 return {
                     error:
                         caught instanceof Error
-                            ? (await getTranslations("drive"))("errors.folderDeleteReason", { reason: caught.message })
+                            ? (await getTranslations("drive"))("errors.folderDeleteReason", {
+                                  reason: caught.message
+                              })
                             : (await getTranslations("drive"))("errors.folderDeleteFailed")
                 };
             }
@@ -514,7 +534,8 @@ export async function saveDropPointTemplateAction(
     const trimmed = name.trim();
     if (!trimmed) return { error: (await getTranslations("drive"))("errors.templateName") };
     const parsed = templateConfigSchema.safeParse(config);
-    if (!parsed.success) return { error: (await getTranslations("drive"))("errors.templateInvalid") };
+    if (!parsed.success)
+        return { error: (await getTranslations("drive"))("errors.templateInvalid") };
     const { id } = await dropPoints.createTemplate(
         user.id,
         trimmed.slice(0, 120),

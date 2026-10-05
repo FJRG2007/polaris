@@ -2841,7 +2841,8 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
      * the call lasted, downloading the model each time.
      */
     useEffect(() => {
-        if (maskApplied.current === null || maskApplied.current === effectsKey(background, look)) return;
+        if (maskApplied.current === null || maskApplied.current === effectsKey(background, look))
+            return;
         void swapBackground();
     }, [background, look, swapBackground]);
 

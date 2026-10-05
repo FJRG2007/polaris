@@ -257,7 +257,9 @@ export function OfficeView({
                         error?: string;
                     } | null;
                     if (!answer.ok || !body?.id || !body.kind) {
-                        toast.show({ title: body?.error ?? t("view.openFailed", { name: file.name }) });
+                        toast.show({
+                            title: body?.error ?? t("view.openFailed", { name: file.name })
+                        });
                         continue;
                     }
                     opened.push({ id: body.id, kind: body.kind });
@@ -562,7 +564,9 @@ function Row({
                     {row.editedBy ? (
                         <>
                             <span aria-hidden>-</span>
-                            <span className="truncate">{t("view.editedBy", { name: row.editedBy })}</span>
+                            <span className="truncate">
+                                {t("view.editedBy", { name: row.editedBy })}
+                            </span>
                         </>
                     ) : null}
                 </p>

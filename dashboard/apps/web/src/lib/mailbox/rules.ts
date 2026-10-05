@@ -390,14 +390,20 @@ export interface MailRuleView {
 export async function listRulesFor(
     accountIds: readonly string[]
 ): Promise<Record<string, MailRuleView[]>> {
-    const out: Record<string, MailRuleView[]> = Object.fromEntries(accountIds.map((id) => [id, []]));
+    const out: Record<string, MailRuleView[]> = Object.fromEntries(
+        accountIds.map((id) => [id, []])
+    );
     if (accountIds.length === 0) return out;
     const rows = await prisma.mailRule.findMany({
         where: { accountId: { in: [...accountIds] } },
         orderBy: [{ accountId: "asc" }, { position: "asc" }]
     });
     for (const row of rows) {
-        out[row.accountId]?.push({ ...toRule(row), position: row.position, matchCount: row.matchCount });
+        out[row.accountId]?.push({
+            ...toRule(row),
+            position: row.position,
+            matchCount: row.matchCount
+        });
     }
     return out;
 }
@@ -507,7 +513,10 @@ export async function applyRuleToInbox(
     const rule = toRule(row);
     // The inbox by id, so the pages below walk the folder's own sent-date index.
     const inbox = (
-        await prisma.mailFolder.findMany({ where: { accountId, role: "inbox" }, select: { id: true } })
+        await prisma.mailFolder.findMany({
+            where: { accountId, role: "inbox" },
+            select: { id: true }
+        })
     ).map((folder) => folder.id);
     if (inbox.length === 0) return 0;
     let matched = 0;

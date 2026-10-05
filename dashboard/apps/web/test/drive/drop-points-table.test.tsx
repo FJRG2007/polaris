@@ -43,7 +43,12 @@ const row = (id: string, title: string, destinationPath = `Drop Points/${title}`
     createdAt: "2026-01-01T00:00:00.000Z"
 });
 
-const requests = [row("a", "Photos"), row("b", "Invoices"), row("c", "Scans"), row("d", "Root", "")];
+const requests = [
+    row("a", "Photos"),
+    row("b", "Invoices"),
+    row("c", "Scans"),
+    row("d", "Root", "")
+];
 
 function view() {
     render(
@@ -53,7 +58,8 @@ function view() {
     );
 }
 
-const box = (name: string) => screen.getByRole("checkbox", { name: `Select ${name}` }) as HTMLInputElement;
+const box = (name: string) =>
+    screen.getByRole("checkbox", { name: `Select ${name}` }) as HTMLInputElement;
 const chosen = () =>
     screen
         .getAllByRole("row")
@@ -137,7 +143,9 @@ describe("the drop point table", () => {
         fireEvent.click(box("Invoices"));
         fireEvent.click(screen.getByRole("button", { name: "Delete 2" }));
         await act(async () => {
-            fireEvent.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Delete" }));
+            fireEvent.click(
+                within(await screen.findByRole("dialog")).getByRole("button", { name: "Delete" })
+            );
         });
         expect(await screen.findByText("1 was not deleted")).toBeTruthy();
         expect(screen.getByText(/Invoices: The share is offline\./)).toBeTruthy();

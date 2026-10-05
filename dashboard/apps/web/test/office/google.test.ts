@@ -43,7 +43,13 @@ vi.mock("@/lib/google-calendar/service", () => ({
     googleAccessToken
 }));
 vi.mock("@/lib/office/import", () => ({ importFile, OfficeImportError }));
-vi.mock("@/lib/office/documents", () => ({ applyUpdate, createDocument, deleteDocument, documentAccess, readDocument }));
+vi.mock("@/lib/office/documents", () => ({
+    applyUpdate,
+    createDocument,
+    deleteDocument,
+    documentAccess,
+    readDocument
+}));
 vi.mock("@/lib/office/export", () => ({ exportDocument }));
 
 const google = await import("../../src/lib/office/google");
@@ -53,13 +59,23 @@ const DOC_MIME = "application/vnd.google-apps.document";
 const SLIDES_MIME = "application/vnd.google-apps.presentation";
 
 function link(scope: string, userId = "u1") {
-    return { id: CONNECTION, provider: "google", method: "oauth", scope, label: "ana@example.test", userId };
+    return {
+        id: CONNECTION,
+        provider: "google",
+        method: "oauth",
+        scope,
+        label: "ana@example.test",
+        userId
+    };
 }
 
 const fetchMock = vi.fn();
 
 function json(body: unknown, status = 200): Response {
-    return new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
+    return new Response(JSON.stringify(body), {
+        status,
+        headers: { "content-type": "application/json" }
+    });
 }
 
 beforeEach(() => {
@@ -128,7 +144,12 @@ describe("listing", () => {
         fetchMock.mockResolvedValueOnce(
             json({
                 files: [
-                    { id: "d1", name: "Plan", mimeType: DOC_MIME, modifiedTime: "2026-10-01T00:00:00Z" },
+                    {
+                        id: "d1",
+                        name: "Plan",
+                        mimeType: DOC_MIME,
+                        modifiedTime: "2026-10-01T00:00:00Z"
+                    },
                     { id: "p1", name: "Deck", mimeType: SLIDES_MIME },
                     { id: "x1", name: "Photo", mimeType: "image/png" }
                 ],
@@ -149,7 +170,9 @@ describe("listing", () => {
 
     it("refuses an account that is not the caller's", async () => {
         getConnection.mockResolvedValue(null);
-        await expect(google.listGoogleOfficeFiles("u2", CONNECTION, "", null)).rejects.toMatchObject({
+        await expect(
+            google.listGoogleOfficeFiles("u2", CONNECTION, "", null)
+        ).rejects.toMatchObject({
             reason: "no-account"
         });
         expect(fetchMock).not.toHaveBeenCalled();
@@ -157,14 +180,18 @@ describe("listing", () => {
 
     it("asks for the account again when it was linked without Drive", async () => {
         getConnection.mockResolvedValue(link("openid email"));
-        await expect(google.listGoogleOfficeFiles("u1", CONNECTION, "", null)).rejects.toMatchObject({
+        await expect(
+            google.listGoogleOfficeFiles("u1", CONNECTION, "", null)
+        ).rejects.toMatchObject({
             reason: "relink"
         });
     });
 
     it("turns Google's 401 into a relink rather than a failure", async () => {
         fetchMock.mockResolvedValueOnce(json({ error: "invalid" }, 401));
-        await expect(google.listGoogleOfficeFiles("u1", CONNECTION, "", null)).rejects.toMatchObject({
+        await expect(
+            google.listGoogleOfficeFiles("u1", CONNECTION, "", null)
+        ).rejects.toMatchObject({
             reason: "relink"
         });
     });
@@ -177,15 +204,23 @@ describe("what Google's refusals mean", () => {
                 {
                     error: {
                         code: 403,
-                        message: "Google Drive API has not been used in project 123 before or it is disabled.",
+                        message:
+                            "Google Drive API has not been used in project 123 before or it is disabled.",
                         errors: [{ reason: "accessNotConfigured" }],
-                        details: [{ reason: "SERVICE_DISABLED", metadata: { service: "drive.googleapis.com" } }]
+                        details: [
+                            {
+                                reason: "SERVICE_DISABLED",
+                                metadata: { service: "drive.googleapis.com" }
+                            }
+                        ]
                     }
                 },
                 403
             )
         );
-        await expect(google.listGoogleOfficeFiles("u1", CONNECTION, "", null)).rejects.toMatchObject({
+        await expect(
+            google.listGoogleOfficeFiles("u1", CONNECTION, "", null)
+        ).rejects.toMatchObject({
             reason: "api-off"
         });
     });
@@ -194,14 +229,20 @@ describe("what Google's refusals mean", () => {
         fetchMock.mockResolvedValueOnce(
             json({ error: { code: 403, errors: [{ reason: "insufficientPermissions" }] } }, 403)
         );
-        await expect(google.listGoogleOfficeFiles("u1", CONNECTION, "", null)).rejects.toMatchObject({
+        await expect(
+            google.listGoogleOfficeFiles("u1", CONNECTION, "", null)
+        ).rejects.toMatchObject({
             reason: "relink"
         });
     });
 
     it("says a plain 403 is a refusal of the file", async () => {
-        fetchMock.mockResolvedValueOnce(json({ error: { code: 403, errors: [{ reason: "forbidden" }] } }, 403));
-        await expect(google.listGoogleOfficeFiles("u1", CONNECTION, "", null)).rejects.toMatchObject({
+        fetchMock.mockResolvedValueOnce(
+            json({ error: { code: 403, errors: [{ reason: "forbidden" }] } }, 403)
+        );
+        await expect(
+            google.listGoogleOfficeFiles("u1", CONNECTION, "", null)
+        ).rejects.toMatchObject({
             reason: "denied"
         });
     });
@@ -212,7 +253,11 @@ describe("importing", () => {
         fetchMock
             .mockResolvedValueOnce(json({ id: "d1", name: "Q3 / plan", mimeType: DOC_MIME }))
             .mockResolvedValueOnce(new Response(new Uint8Array([1, 2, 3])));
-        importFile.mockResolvedValue({ kind: "doc", title: "Q3 - plan", update: new Uint8Array([9]) });
+        importFile.mockResolvedValue({
+            kind: "doc",
+            title: "Q3 - plan",
+            update: new Uint8Array([9])
+        });
         createDocument.mockResolvedValue("doc1");
 
         const made = await google.importGoogleFile({ id: "u1" }, CONNECTION, "d1", null);
@@ -243,13 +288,17 @@ describe("importing", () => {
         deleteDocument.mockResolvedValue(undefined);
         officeGoogleFile.create.mockRejectedValue(new Error("db down"));
 
-        await expect(google.importGoogleFile({ id: "u1" }, CONNECTION, "d1", null)).rejects.toThrow("db down");
+        await expect(google.importGoogleFile({ id: "u1" }, CONNECTION, "d1", null)).rejects.toThrow(
+            "db down"
+        );
         expect(deleteDocument).toHaveBeenCalledWith({ id: "u1" }, "doc1");
     });
 
     it("refuses Slides by Google's word, before exporting anything", async () => {
         fetchMock.mockResolvedValueOnce(json({ id: "p1", name: "Deck", mimeType: SLIDES_MIME }));
-        await expect(google.importGoogleFile({ id: "u1" }, CONNECTION, "p1", null)).rejects.toMatchObject({
+        await expect(
+            google.importGoogleFile({ id: "u1" }, CONNECTION, "p1", null)
+        ).rejects.toMatchObject({
             reason: "not-supported"
         });
         expect(fetchMock).toHaveBeenCalledTimes(1);
@@ -267,7 +316,9 @@ describe("importing", () => {
         fetchMock
             .mockResolvedValueOnce(json({ id: "d1", name: "Big", mimeType: DOC_MIME }))
             .mockResolvedValueOnce(new Response(endless));
-        await expect(google.importGoogleFile({ id: "u1" }, CONNECTION, "d1", null)).rejects.toMatchObject({
+        await expect(
+            google.importGoogleFile({ id: "u1" }, CONNECTION, "d1", null)
+        ).rejects.toMatchObject({
             reason: "too-large"
         });
         expect(pulled).toBeLessThan(15);
@@ -285,7 +336,10 @@ describe("saving back", () => {
     };
 
     beforeEach(() => {
-        readDocument.mockResolvedValue({ view: { kind: "doc", title: "Plan" }, content: new Uint8Array([7]) });
+        readDocument.mockResolvedValue({
+            view: { kind: "doc", title: "Plan" },
+            content: new Uint8Array([7])
+        });
         exportDocument.mockResolvedValue({ bytes: new Uint8Array([4, 5]) });
     });
 
@@ -333,20 +387,29 @@ describe("saving back", () => {
     it("refuses a reader the account does not belong to", async () => {
         officeGoogleFile.findUnique.mockResolvedValue({ ...row });
         getConnection.mockResolvedValue(null);
-        await expect(google.saveToGoogle({ id: "u2" }, "doc1")).rejects.toMatchObject({ reason: "no-account" });
+        await expect(google.saveToGoogle({ id: "u2" }, "doc1")).rejects.toMatchObject({
+            reason: "no-account"
+        });
         expect(fetchMock).not.toHaveBeenCalled();
     });
 
     it("refuses somebody who cannot read the document", async () => {
         officeGoogleFile.findUnique.mockResolvedValue({ ...row });
         readDocument.mockResolvedValue(null);
-        await expect(google.saveToGoogle({ id: "u1" }, "doc1")).rejects.toMatchObject({ reason: "not-found" });
+        await expect(google.saveToGoogle({ id: "u1" }, "doc1")).rejects.toMatchObject({
+            reason: "not-found"
+        });
     });
 });
 
 describe("the multipart body", () => {
     it("carries the metadata, then the bytes, between the boundaries", () => {
-        const body = google.multipartBody({ name: "A" }, "text/plain", new TextEncoder().encode("hi"), "b0");
+        const body = google.multipartBody(
+            { name: "A" },
+            "text/plain",
+            new TextEncoder().encode("hi"),
+            "b0"
+        );
         expect(new TextDecoder().decode(body)).toBe(
             '--b0\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n{"name":"A"}\r\n--b0\r\nContent-Type: text/plain\r\n\r\nhi\r\n--b0--'
         );

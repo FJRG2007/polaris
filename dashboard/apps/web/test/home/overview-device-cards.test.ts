@@ -158,13 +158,19 @@ describe("who sees and operates what", () => {
     it("offers for quick controls only devices with something to change", async () => {
         const offered = await cards.deviceTargets("controls");
         expect(offered.map((target) => target.id)).toEqual(["ac", "plug"]);
-        expect(offered[0]).toEqual({ id: "ac", label: "Living room AC", detail: expect.stringContaining("Living room") });
+        expect(offered[0]).toEqual({
+            id: "ac",
+            label: "Living room AC",
+            detail: expect.stringContaining("Living room")
+        });
     });
 });
 
 describe("a press", () => {
     it("is the devices screen's own action, with the setting it means", async () => {
-        expect(await cards.operate(["ac"], { item: "ac", control: "target", value: 21.5 })).toEqual({});
+        expect(await cards.operate(["ac"], { item: "ac", control: "target", value: 21.5 })).toEqual(
+            {}
+        );
         expect(operateDeviceAction).toHaveBeenCalledWith("ac", "set-temperature", {
             action: "set-temperature",
             target: 21.5
@@ -181,9 +187,15 @@ describe("a press", () => {
     });
 
     it("is refused for a device or a control the card does not have", async () => {
-        expect((await cards.operate(["ac"], { item: "plug", control: "power", value: true })).error).toBeTruthy();
-        expect((await cards.operate(["ac"], { item: "ac", control: "unlock", value: true })).error).toBeTruthy();
-        expect((await cards.operate(["ac"], { item: "ac", control: "power", value: 3 })).error).toBeTruthy();
+        expect(
+            (await cards.operate(["ac"], { item: "plug", control: "power", value: true })).error
+        ).toBeTruthy();
+        expect(
+            (await cards.operate(["ac"], { item: "ac", control: "unlock", value: true })).error
+        ).toBeTruthy();
+        expect(
+            (await cards.operate(["ac"], { item: "ac", control: "power", value: 3 })).error
+        ).toBeTruthy();
         expect(operateDeviceAction).not.toHaveBeenCalled();
     });
 });

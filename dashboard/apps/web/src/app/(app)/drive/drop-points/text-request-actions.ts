@@ -51,7 +51,12 @@ export async function createTextRequestAction(
 ): Promise<{ id?: string; url?: string; error?: string }> {
     const user = await requirePermission("requests.create");
     const parsed = createTextRequestSchema.safeParse(input);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? (await getTranslations("drive"))("errors.invalidDropPoint") };
+    if (!parsed.success)
+        return {
+            error:
+                parsed.error.issues[0]?.message ??
+                (await getTranslations("drive"))("errors.invalidDropPoint")
+        };
 
     const { id, token } = await textRequests.createTextRequest(user.id, parsed.data);
     await recordAudit({
@@ -78,7 +83,12 @@ export async function updateTextRequestAction(
 ): Promise<{ error?: string }> {
     const user = await requirePermission("requests.create");
     const parsed = updateTextRequestSchema.safeParse(input);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? (await getTranslations("drive"))("errors.invalidDropPoint") };
+    if (!parsed.success)
+        return {
+            error:
+                parsed.error.issues[0]?.message ??
+                (await getTranslations("drive"))("errors.invalidDropPoint")
+        };
     await textRequests.updateTextRequest(user.id, requestId, parsed.data);
     await recordAudit({
         actorId: user.id,
@@ -253,7 +263,8 @@ export async function submitTextAction(
 
     const session = await getSession();
     const userId = session?.user?.id ?? null;
-    if (request.requireLogin && !userId) return { error: (await getTranslations("drive"))("errors.signInToSend") };
+    if (request.requireLogin && !userId)
+        return { error: (await getTranslations("drive"))("errors.signInToSend") };
     if (!(await textRequests.textRequestUserAllowed(request.allowedUsers, userId))) {
         return { error: (await getTranslations("drive"))("errors.accountDenied") };
     }
@@ -281,7 +292,12 @@ export async function submitTextAction(
     }
 
     const parsed = submitTextSchema.safeParse(input);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? (await getTranslations("drive"))("errors.invalidSubmission") };
+    if (!parsed.success)
+        return {
+            error:
+                parsed.error.issues[0]?.message ??
+                (await getTranslations("drive"))("errors.invalidSubmission")
+        };
 
     const result = await textRequests.submitText(request, parsed.data, {
         userId,
@@ -291,7 +307,9 @@ export async function submitTextAction(
         return {
             error:
                 result.reason === "too_long"
-                    ? (await getTranslations("drive"))("errors.textTooLong", { max: request.maxLength })
+                    ? (await getTranslations("drive"))("errors.textTooLong", {
+                          max: request.maxLength
+                      })
                     : result.reason === "full"
                       ? (await getTranslations("drive"))("errors.full")
                       : (await getTranslations("drive"))("errors.noSealed")

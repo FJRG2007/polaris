@@ -112,7 +112,10 @@ export function deviceItem(
         const target = degrees(climate.target, climate.unit);
         if (target) readings.push({ label: t("overview.target"), value: target });
         if (climate.mode) {
-            readings.push({ label: t("overview.mode"), value: t(`devices.climate.modes.${climate.mode}`) });
+            readings.push({
+                label: t("overview.mode"),
+                value: t(`devices.climate.modes.${climate.mode}`)
+            });
         }
     }
     const air = device.air ?? null;
@@ -122,7 +125,12 @@ export function deviceItem(
             readings.push({
                 label: t("overview.air"),
                 value: airQualityText(quality.level, t),
-                tone: quality.level === "good" || quality.level === "fair" ? "ok" : quality.level === "moderate" ? "warn" : "bad"
+                tone:
+                    quality.level === "good" || quality.level === "fair"
+                        ? "ok"
+                        : quality.level === "moderate"
+                          ? "warn"
+                          : "bad"
             });
         }
         if (air.readings.pm25 !== undefined) {
@@ -204,7 +212,10 @@ export function deviceItem(
 
 /** What a card shows for the devices picked, in the order they were picked.
  *  A device this reader no longer reaches - or that is gone - is left out. */
-export async function readDevices(targets: readonly string[], mode: DeviceCardMode): Promise<AppWidgetView> {
+export async function readDevices(
+    targets: readonly string[],
+    mode: DeviceCardMode
+): Promise<AppWidgetView> {
     const found = await reachable();
     if (!found) return { items: [] };
     const t = await placesT();
@@ -212,7 +223,8 @@ export async function readDevices(targets: readonly string[], mode: DeviceCardMo
     // Whether the house's own people may operate things; a visitor's right is
     // per device, and is the lent grant's.
     const user = await host.session.requireUser();
-    const resident = found.reach.everything && (await host.session.sessionCanAny(user, "home.control"));
+    const resident =
+        found.reach.everything && (await host.session.sessionCanAny(user, "home.control"));
     return {
         items: targets.flatMap((id) => {
             const device = byId.get(id);

@@ -281,7 +281,9 @@ export function DropPointsView({ requests }: { requests: DropPointRow[] }) {
                                     >
                                         <td className="px-3 py-2">
                                             <Checkbox
-                                                aria-label={t("list.selectNamed", { name: request.title })}
+                                                aria-label={t("list.selectNamed", {
+                                                    name: request.title
+                                                })}
                                                 checked={chosen}
                                                 onClick={(event) => {
                                                     event.stopPropagation();
@@ -296,7 +298,11 @@ export function DropPointsView({ requests }: { requests: DropPointRow[] }) {
                                                 onClick={(event) => {
                                                     // Shift or Ctrl chooses the row
                                                     // instead of opening it.
-                                                    if (event.shiftKey || event.ctrlKey || event.metaKey) {
+                                                    if (
+                                                        event.shiftKey ||
+                                                        event.ctrlKey ||
+                                                        event.metaKey
+                                                    ) {
                                                         event.preventDefault();
                                                     }
                                                 }}
@@ -337,9 +343,13 @@ export function DropPointsView({ requests }: { requests: DropPointRow[] }) {
                                         </td>
                                         <td className="hidden whitespace-nowrap px-3 py-2 text-xs text-muted-foreground md:table-cell">
                                             {scheduled && request.startsAt
-                                                ? t("list.opensOn", { date: format.date(request.startsAt) })
+                                                ? t("list.opensOn", {
+                                                      date: format.date(request.startsAt)
+                                                  })
                                                 : request.expiresAt
-                                                  ? t("list.untilOn", { date: format.date(request.expiresAt) })
+                                                  ? t("list.untilOn", {
+                                                        date: format.date(request.expiresAt)
+                                                    })
                                                   : "-"}
                                         </td>
                                         <td className="px-3 py-2">
@@ -348,7 +358,9 @@ export function DropPointsView({ requests }: { requests: DropPointRow[] }) {
                                                     <Button
                                                         size="icon-sm"
                                                         variant="ghost"
-                                                        aria-label={t("list.reopenNamed", { name: request.title })}
+                                                        aria-label={t("list.reopenNamed", {
+                                                            name: request.title
+                                                        })}
                                                         title={t("list.reopen")}
                                                         onClick={() => onReopen(request.id)}
                                                         disabled={rowBusy}
@@ -359,7 +371,9 @@ export function DropPointsView({ requests }: { requests: DropPointRow[] }) {
                                                     <Button
                                                         size="icon-sm"
                                                         variant="ghost"
-                                                        aria-label={t("list.closeNamed", { name: request.title })}
+                                                        aria-label={t("list.closeNamed", {
+                                                            name: request.title
+                                                        })}
                                                         title={t("list.close")}
                                                         onClick={() => void onRevoke(request.id)}
                                                         disabled={rowBusy}
@@ -370,7 +384,9 @@ export function DropPointsView({ requests }: { requests: DropPointRow[] }) {
                                                 <Button
                                                     size="icon-sm"
                                                     variant="ghost"
-                                                    aria-label={t("list.deleteNamed", { name: request.title })}
+                                                    aria-label={t("list.deleteNamed", {
+                                                        name: request.title
+                                                    })}
                                                     title={t("list.delete")}
                                                     onClick={() => setDeleting(targetOf(request))}
                                                     disabled={rowBusy}
@@ -388,7 +404,12 @@ export function DropPointsView({ requests }: { requests: DropPointRow[] }) {
             )}
             <DeleteDropPointDialog
                 target={deleting}
-                busy={pending && (busy === "bulk" || (!Array.isArray(deleting) && busy === (deleting as DropPointTarget | null)?.id))}
+                busy={
+                    pending &&
+                    (busy === "bulk" ||
+                        (!Array.isArray(deleting) &&
+                            busy === (deleting as DropPointTarget | null)?.id))
+                }
                 onCancel={() => setDeleting(null)}
                 onConfirm={onDelete}
             />

@@ -1021,7 +1021,7 @@ export function mailSubjectShape(subject: string): string {
     while (prefix.test(text)) text = text.replace(prefix, "");
     const masked = text
         .replace(/\[[^\]]*\]/g, " [*] ")
-        .replace(/"[^"]*"|“[^”]*”|‘[^’]*’|`[^`]*`/g, " \"*\" ")
+        .replace(/"[^"]*"|“[^”]*”|‘[^’]*’|`[^`]*`/g, ' "*" ')
         .replace(/\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/gi, " * ")
         .replace(/[^\s@]+@[^\s@]+\.[a-z]{2,}\b/gi, " * ")
         .replace(/\bhttps?:\/\/\S+/gi, " * ")

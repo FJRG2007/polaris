@@ -36,7 +36,13 @@ import { prisma } from "@polaris/db";
 import * as core from "@polaris/core";
 import { exportDocument } from "./export";
 import { importFile, OfficeImportError } from "./import";
-import { applyUpdate, createDocument, deleteDocument, documentAccess, readDocument } from "./documents";
+import {
+    applyUpdate,
+    createDocument,
+    deleteDocument,
+    documentAccess,
+    readDocument
+} from "./documents";
 import { getConnection, listConnections, readCredential } from "@/lib/connections/store";
 import {
     GOOGLE_DRIVE_FILE_SCOPE,
@@ -132,7 +138,9 @@ export async function officeGoogleState(userId: string): Promise<{
 }> {
     const client = await getGoogleOAuthClient();
     if (!client) return { available: false, accounts: [] };
-    const links = (await listConnections(userId, "google")).filter((link) => link.method === "oauth");
+    const links = (await listConnections(userId, "google")).filter(
+        (link) => link.method === "oauth"
+    );
     return {
         available: true,
         accounts: links.map((link) => ({
@@ -181,7 +189,8 @@ async function driveFetch(token: string, url: string, init: RequestInit = {}): P
         await response.json().catch(() => undefined)
     );
     if (problem.kind === "setup") throw new OfficeGoogleError("api-off");
-    if (problem.kind === "auth" || problem.kind === "consent") throw new OfficeGoogleError("relink");
+    if (problem.kind === "auth" || problem.kind === "consent")
+        throw new OfficeGoogleError("relink");
     if (problem.kind === "rate") throw new OfficeGoogleError("busy");
     if (response.status === 403) throw new OfficeGoogleError("denied");
     throw new OfficeGoogleError("failed");
@@ -221,7 +230,9 @@ export function driveOfficeQuery(search: string): string {
     const types = Object.keys(GOOGLE_OFFICE_TYPES)
         .map((mime) => `mimeType = ${driveQueryLiteral(mime)}`)
         .join(" or ");
-    const named = search.trim() ? ` and name contains ${driveQueryLiteral(search.trim().slice(0, 100))}` : "";
+    const named = search.trim()
+        ? ` and name contains ${driveQueryLiteral(search.trim().slice(0, 100))}`
+        : "";
     return `(${types}) and trashed = false${named}`;
 }
 
@@ -237,7 +248,10 @@ export async function listGoogleOfficeFiles(
     url.searchParams.set("q", driveOfficeQuery(search));
     url.searchParams.set("orderBy", "modifiedTime desc");
     url.searchParams.set("pageSize", "50");
-    url.searchParams.set("fields", "nextPageToken, files(id, name, mimeType, modifiedTime, webViewLink)");
+    url.searchParams.set(
+        "fields",
+        "nextPageToken, files(id, name, mimeType, modifiedTime, webViewLink)"
+    );
     url.searchParams.set("supportsAllDrives", "true");
     url.searchParams.set("includeItemsFromAllDrives", "true");
     if (pageToken) url.searchParams.set("pageToken", pageToken);
@@ -313,7 +327,10 @@ export async function importGoogleFile(
 
     const exportUrl = new URL(`${DRIVE_API}/files/${encodeURIComponent(meta.data.id)}/export`);
     exportUrl.searchParams.set("mimeType", target.mime);
-    const bytes = await readCapped(await driveFetch(token, exportUrl.toString()), MAX_GOOGLE_EXPORT_BYTES);
+    const bytes = await readCapped(
+        await driveFetch(token, exportUrl.toString()),
+        MAX_GOOGLE_EXPORT_BYTES
+    );
 
     const name = (meta.data.name.trim() || "Untitled").replace(/[\\/]/g, "-");
     let imported;
@@ -323,7 +340,11 @@ export async function importGoogleFile(
         if (caught instanceof OfficeImportError) throw caught;
         throw new OfficeGoogleError("failed");
     }
-    const documentId = await createDocument(user, { kind: imported.kind, title: imported.title, orgId });
+    const documentId = await createDocument(user, {
+        kind: imported.kind,
+        title: imported.title,
+        orgId
+    });
     try {
         await applyUpdate(user, documentId, imported.update);
         await prisma.officeGoogleFile.create({
@@ -351,11 +372,20 @@ export interface OfficeGoogleLink {
     readonly copyLink: string | null;
 }
 
-export async function googleLinkOf(userId: string, documentId: string): Promise<OfficeGoogleLink | null> {
+export async function googleLinkOf(
+    userId: string,
+    documentId: string
+): Promise<OfficeGoogleLink | null> {
     if (!(await documentAccess({ id: userId }, documentId))) return null;
     const row = await prisma.officeGoogleFile.findUnique({
         where: { documentId },
-        select: { connectionId: true, sourceName: true, savedAt: true, copyFileId: true, sourceMime: true }
+        select: {
+            connectionId: true,
+            sourceName: true,
+            savedAt: true,
+            copyFileId: true,
+            sourceMime: true
+        }
     });
     if (!row) return null;
     const link = await getConnection(userId, row.connectionId);
@@ -370,8 +400,10 @@ export async function googleLinkOf(userId: string, documentId: string): Promise<
 /** Where a Google file opens for editing. */
 export function editLinkFor(mime: string, fileId: string): string {
     const id = encodeURIComponent(fileId);
-    if (mime === "application/vnd.google-apps.spreadsheet") return `https://docs.google.com/spreadsheets/d/${id}/edit`;
-    if (mime === "application/vnd.google-apps.presentation") return `https://docs.google.com/presentation/d/${id}/edit`;
+    if (mime === "application/vnd.google-apps.spreadsheet")
+        return `https://docs.google.com/spreadsheets/d/${id}/edit`;
+    if (mime === "application/vnd.google-apps.presentation")
+        return `https://docs.google.com/presentation/d/${id}/edit`;
     return `https://docs.google.com/document/d/${id}/edit`;
 }
 
@@ -404,7 +436,10 @@ const createdSchema = z.object({ id: z.string().min(1).max(200) });
  * read it here. The first save creates a Google copy; every later one updates
  * that copy. Answers with where it can be opened.
  */
-export async function saveToGoogle(user: { id: string }, documentId: string): Promise<{ link: string }> {
+export async function saveToGoogle(
+    user: { id: string },
+    documentId: string
+): Promise<{ link: string }> {
     const row = await prisma.officeGoogleFile.findUnique({ where: { documentId } });
     if (!row) throw new OfficeGoogleError("not-found");
     const found = await readDocument(user, documentId);
@@ -414,7 +449,12 @@ export async function saveToGoogle(user: { id: string }, documentId: string): Pr
     const format = GOOGLE_OFFICE_TYPES[googleMime];
 
     const token = await tokenFor(user.id, row.connectionId, GOOGLE_DRIVE_FILE_SCOPE);
-    const file = await exportDocument(found.view.kind, found.view.title, found.content, format.extension);
+    const file = await exportDocument(
+        found.view.kind,
+        found.view.title,
+        found.content,
+        format.extension
+    );
     if (!file) throw new OfficeGoogleError("not-supported");
 
     let copyId = row.copyFileId;
@@ -431,7 +471,8 @@ export async function saveToGoogle(user: { id: string }, documentId: string): Pr
             });
         } catch (caught) {
             // Deleted on the Google side since: make a new copy rather than fail.
-            if (!(caught instanceof OfficeGoogleError && caught.reason === "not-found")) throw caught;
+            if (!(caught instanceof OfficeGoogleError && caught.reason === "not-found"))
+                throw caught;
             copyId = null;
         }
     }

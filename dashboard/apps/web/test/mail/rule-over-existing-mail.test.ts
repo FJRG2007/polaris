@@ -69,11 +69,16 @@ describe("running one filter over the inbox", () => {
         expect(await applyRuleToInbox("acc-1", "r1")).toBe(2);
         expect(actOnMessages.mock.calls.map((call) => call[1])).toEqual([["m1"], ["m3"]]);
         // Only the columns a filter reads, from the inbox's own folders.
-        const asked = messageFind.mock.calls[0]![0] as { where: unknown; select: Record<string, boolean> };
+        const asked = messageFind.mock.calls[0]![0] as {
+            where: unknown;
+            select: Record<string, boolean>;
+        };
         expect(asked.where).toEqual({ folderId: { in: ["inbox-1"] } });
         expect(asked.select.bodyText).toBe(true);
         expect(ruleUpdate).toHaveBeenCalledWith(
-            expect.objectContaining({ data: expect.objectContaining({ matchCount: { increment: 2 } }) })
+            expect.objectContaining({
+                data: expect.objectContaining({ matchCount: { increment: 2 } })
+            })
         );
     });
 
@@ -95,8 +100,30 @@ describe("running one filter over the inbox", () => {
 describe("listing the filters of every mailbox", () => {
     it("reads them in one query and hands each mailbox its own, in order", async () => {
         mailRuleFindMany.mockResolvedValue([
-            { id: "a", accountId: "acc-1", name: "A", enabled: true, match: "all", conditions: [], actions: [], stop: false, position: 0, matchCount: 0 },
-            { id: "b", accountId: "acc-2", name: "B", enabled: true, match: "all", conditions: [], actions: [], stop: false, position: 0, matchCount: 3 }
+            {
+                id: "a",
+                accountId: "acc-1",
+                name: "A",
+                enabled: true,
+                match: "all",
+                conditions: [],
+                actions: [],
+                stop: false,
+                position: 0,
+                matchCount: 0
+            },
+            {
+                id: "b",
+                accountId: "acc-2",
+                name: "B",
+                enabled: true,
+                match: "all",
+                conditions: [],
+                actions: [],
+                stop: false,
+                position: 0,
+                matchCount: 3
+            }
         ]);
         const byAccount = await listRulesFor(["acc-1", "acc-2", "acc-3"]);
         expect(mailRuleFindMany).toHaveBeenCalledTimes(1);

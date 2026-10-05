@@ -69,7 +69,12 @@ describe("the players table", () => {
                 status={STATUS}
                 roster={{ ops: [], whitelist: ["Alice"], bans: [], whitelistEnforced: true }}
                 rosterAsOf={null}
-                access={{ rules: [], bindAddresses: true, addressesAvailable: true, edition: "java" }}
+                access={{
+                    rules: [],
+                    bindAddresses: true,
+                    addressesAvailable: true,
+                    edition: "java"
+                }}
                 sessions={SESSIONS}
                 seen={{}}
                 now={Date.parse("2026-08-08T11:00:00.000Z")}

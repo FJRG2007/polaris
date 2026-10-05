@@ -31,7 +31,7 @@ import { decodePart, unflow } from "./decode";
 import { folderForRole } from "./folder-roles";
 import { recordSubscription } from "./subscriptions";
 import { catchUpFolder, refreshThreads } from "./sync";
-import { forgetTrashOrigins, rememberTrashOrigins, restoreFromTrash } from "./trash"
+import { forgetTrashOrigins, rememberTrashOrigins, restoreFromTrash } from "./trash";
 import { withImap, type MailConnectionSource } from "./imap";
 import { addDelta, nudgeFolderUnread, unseenByFolder } from "./folder-counts";
 import {

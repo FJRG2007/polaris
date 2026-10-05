@@ -132,13 +132,21 @@ export function DraftsView({ drafts }: { drafts: MailDraftView[] }) {
                                             <span className="flex items-center gap-1.5">
                                                 <Send className="size-3 shrink-0" aria-hidden />
                                                 {draft.sendAt
-                                                    ? t("drafts.waitingAt", { time: format.dateTime(new Date(draft.sendAt)) })
+                                                    ? t("drafts.waitingAt", {
+                                                          time: format.dateTime(
+                                                              new Date(draft.sendAt)
+                                                          )
+                                                      })
                                                     : t("drafts.waiting")}
                                             </span>
                                         ) : (
                                             <span className="block truncate">
                                                 {draft.to.length > 0
-                                                    ? t("drafts.to", { names: draft.to.map((one) => one.address).join(", ") })
+                                                    ? t("drafts.to", {
+                                                          names: draft.to
+                                                              .map((one) => one.address)
+                                                              .join(", ")
+                                                      })
                                                     : t("drafts.toNobody")}
                                             </span>
                                         )}

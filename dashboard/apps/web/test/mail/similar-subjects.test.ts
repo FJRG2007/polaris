@@ -15,20 +15,37 @@ import { describe, expect, it } from "vitest";
 const same = (left: string, right: string) =>
     expect(core.mailSubjectShape(left), `${left} / ${right}`).toBe(core.mailSubjectShape(right));
 const different = (left: string, right: string) =>
-    expect(core.mailSubjectShape(left), `${left} / ${right}`).not.toBe(core.mailSubjectShape(right));
+    expect(core.mailSubjectShape(left), `${left} / ${right}`).not.toBe(
+        core.mailSubjectShape(right)
+    );
 
 describe("the shape of a subject", () => {
     it("is the same for two runs of one template, whatever changed in them", () => {
-        same("[acme/api] Run failed: CI - main (3f2a9c1)", "[acme/web] Run failed: CI - main (9b1e0d4)");
-        same("Successfully published @acme/widgets@2.4.0", "Successfully published left-pad@1.3.0-beta.2");
-        same("Re: [acme/api] Fix the login race (PR #412)", "[other/repo] Fix the login race (PR #7)");
+        same(
+            "[acme/api] Run failed: CI - main (3f2a9c1)",
+            "[acme/web] Run failed: CI - main (9b1e0d4)"
+        );
+        same(
+            "Successfully published @acme/widgets@2.4.0",
+            "Successfully published left-pad@1.3.0-beta.2"
+        );
+        same(
+            "Re: [acme/api] Fix the login race (PR #412)",
+            "[other/repo] Fix the login race (PR #7)"
+        );
         same("Your invoice 2026-0042 is ready", "Your invoice 2026-0107 is ready");
         same('Build "nightly" finished in 4m 12s', 'Build "release" finished in 13m 2s');
-        same("Ticket 8c6f1d2e-0b7a-4e3b-9a51-2f3c4d5e6f70 was updated", "Ticket 11111111-2222-4333-8444-555555555555 was updated");
+        same(
+            "Ticket 8c6f1d2e-0b7a-4e3b-9a51-2f3c4d5e6f70 was updated",
+            "Ticket 11111111-2222-4333-8444-555555555555 was updated"
+        );
     });
 
     it("keeps the fixed words, so different templates stay different", () => {
-        different("[acme/api] Run failed: CI - main (3f2a9c1)", "[acme/api] Run succeeded: CI - main (3f2a9c1)");
+        different(
+            "[acme/api] Run failed: CI - main (3f2a9c1)",
+            "[acme/api] Run succeeded: CI - main (3f2a9c1)"
+        );
         different("Successfully published left-pad@1.3.0", "Package left-pad@1.3.0 was deprecated");
     });
 
@@ -62,10 +79,15 @@ describe("a similar-subject condition", () => {
             value: "[acme/api] Run failed: CI - main (3f2a9c1)"
         });
         // Stored as the shape, so the rule says what it matches on.
-        expect(condition.value).toBe(core.mailSubjectShape("[acme/api] Run failed: CI - main (3f2a9c1)"));
+        expect(condition.value).toBe(
+            core.mailSubjectShape("[acme/api] Run failed: CI - main (3f2a9c1)")
+        );
         expect(core.mailConditionHolds(condition, MESSAGE)).toBe(true);
         expect(
-            core.mailConditionHolds(condition, { ...MESSAGE, subject: "[acme/web] Run succeeded: CI - main (1)" })
+            core.mailConditionHolds(condition, {
+                ...MESSAGE,
+                subject: "[acme/web] Run succeeded: CI - main (1)"
+            })
         ).toBe(false);
     });
 
@@ -88,16 +110,27 @@ describe("a similar-subject condition", () => {
         };
         expect(core.mailActionsFor([rule], MESSAGE)).toEqual([{ kind: "archive" }]);
         expect(
-            core.mailActionsFor([rule], { ...MESSAGE, from: [{ name: "", address: "someone@else.example" }] })
+            core.mailActionsFor([rule], {
+                ...MESSAGE,
+                from: [{ name: "", address: "someone@else.example" }]
+            })
         ).toEqual([]);
     });
 
     it("is refused on anything but a subject, and for a subject with no fixed words", () => {
         expect(
-            core.mailRuleConditionSchema.safeParse({ field: "from", operator: "similar", value: "x 1" }).success
+            core.mailRuleConditionSchema.safeParse({
+                field: "from",
+                operator: "similar",
+                value: "x 1"
+            }).success
         ).toBe(false);
         expect(
-            core.mailRuleConditionSchema.safeParse({ field: "subject", operator: "similar", value: "#42" }).success
+            core.mailRuleConditionSchema.safeParse({
+                field: "subject",
+                operator: "similar",
+                value: "#42"
+            }).success
         ).toBe(false);
     });
 });

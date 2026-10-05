@@ -20,14 +20,20 @@ export async function saveOverviewPreferencesAction(input: unknown): Promise<{ e
     const user = await requireUser();
     const parsed = overviewPreferencesSchema.safeParse(input);
     if (!parsed.success) {
-        return { error: parsed.error.issues[0]?.message ?? (await getTranslations("home"))("errors.layoutNotSaved") };
+        return {
+            error:
+                parsed.error.issues[0]?.message ??
+                (await getTranslations("home"))("errors.layoutNotSaved")
+        };
     }
     // The apps' cards are saved on their own (`saveAppWidgetsAction`). A save
     // from a screen that does not send them - which is every save of the grid,
     // and every tab opened before apps could add cards - keeps the stored ones
     // rather than writing them away.
     const sent = typeof input === "object" && input !== null && "appWidgets" in input;
-    const appWidgets = sent ? parsed.data.appWidgets : (await getOverviewPreferences(user.id)).appWidgets;
+    const appWidgets = sent
+        ? parsed.data.appWidgets
+        : (await getOverviewPreferences(user.id)).appWidgets;
     await saveOverviewPreferences(user.id, { ...parsed.data, appWidgets });
     return {};
 }

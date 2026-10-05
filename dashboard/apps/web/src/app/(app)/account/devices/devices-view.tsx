@@ -1007,7 +1007,10 @@ function LookSelect<T extends string>({
                     if (picked) onPick(picked.value);
                 }}
                 aria-label={label}
-                options={choices.map((choice) => ({ value: choice.value, label: tChat(choice.label) }))}
+                options={choices.map((choice) => ({
+                    value: choice.value,
+                    label: tChat(choice.label)
+                }))}
             />
         </label>
     );

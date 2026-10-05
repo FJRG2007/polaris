@@ -21,12 +21,7 @@ import {
     DropdownMenuSubTrigger,
     cn
 } from "@polaris/ui";
-import {
-    FRAME_CHOICES,
-    LIGHT_CHOICES,
-    STYLE_CHOICES,
-    type CameraLook
-} from "./camera-look";
+import { FRAME_CHOICES, LIGHT_CHOICES, STYLE_CHOICES, type CameraLook } from "./camera-look";
 
 export function CameraLookMenu({
     look,
@@ -79,7 +74,9 @@ function LookSub<T extends string>({
         <DropdownMenuSub>
             <DropdownMenuSubTrigger>
                 <span className="flex min-w-0 flex-1 items-center justify-between gap-3">
-                    <span className="truncate" title={label}>{label}</span>
+                    <span className="truncate" title={label}>
+                        {label}
+                    </span>
                     <span className="truncate text-xs text-muted-foreground">
                         {current ? t(current.label) : null}
                     </span>

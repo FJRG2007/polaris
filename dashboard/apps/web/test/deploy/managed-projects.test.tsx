@@ -16,12 +16,16 @@ import { isManagedProject, MARKETPLACE_PROJECT_SLUG } from "@/lib/deploy/managed
 
 vi.mock("@/lib/session", () => ({}));
 vi.mock("@/lib/auth", () => ({}));
-vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: () => undefined, push: () => undefined }) }));
+vi.mock("next/navigation", () => ({
+    useRouter: () => ({ refresh: () => undefined, push: () => undefined })
+}));
 vi.mock("@/app/(app)/apps/deploy/actions", () => ({
     createProjectAction: async () => ({}),
     deleteProjectAction: async () => ({})
 }));
-vi.mock("@/app/(app)/apps/deploy/registry-credentials", () => ({ RegistryCredentialsButton: () => null }));
+vi.mock("@/app/(app)/apps/deploy/registry-credentials", () => ({
+    RegistryCredentialsButton: () => null
+}));
 
 const { ProjectsGrid } = await import("@/app/(app)/apps/deploy/projects-grid");
 
@@ -39,7 +43,10 @@ describe("which projects are Polaris's own", () => {
 
     it("counts a project holding only services Polaris installed", () => {
         expect(
-            isManagedProject({ slug: "mail-mx", applicationIds: ["mail-app"], databaseCount: 0 }, managed)
+            isManagedProject(
+                { slug: "mail-mx", applicationIds: ["mail-app"], databaseCount: 0 },
+                managed
+            )
         ).toBe(true);
     });
 
@@ -51,14 +58,20 @@ describe("which projects are Polaris's own", () => {
             )
         ).toBe(false);
         expect(
-            isManagedProject({ slug: "mail-mx", applicationIds: ["mail-app"], databaseCount: 1 }, managed)
+            isManagedProject(
+                { slug: "mail-mx", applicationIds: ["mail-app"], databaseCount: 1 },
+                managed
+            )
         ).toBe(false);
-        expect(isManagedProject({ slug: "empty", applicationIds: [], databaseCount: 0 }, managed)).toBe(
-            false
-        );
+        expect(
+            isManagedProject({ slug: "empty", applicationIds: [], databaseCount: 0 }, managed)
+        ).toBe(false);
         // A name is not evidence: only what backs the services is.
         expect(
-            isManagedProject({ slug: "polaris", applicationIds: ["mine"], databaseCount: 0 }, managed)
+            isManagedProject(
+                { slug: "polaris", applicationIds: ["mine"], databaseCount: 0 },
+                managed
+            )
         ).toBe(false);
     });
 });
@@ -74,7 +87,11 @@ const card = (id: string, name: string, managed: boolean) => ({
     total: 0
 });
 
-const projects = [card("p1", "Website", false), card("p2", "Marketplace", true), card("p3", "Mail mx", true)];
+const projects = [
+    card("p1", "Website", false),
+    card("p2", "Marketplace", true),
+    card("p3", "Mail mx", true)
+];
 
 function grid(hideManagedByDefault: boolean, viewerId = "ada") {
     return render(
@@ -113,13 +130,19 @@ describe("the Deploy list", () => {
         expect(screen.queryByText("Mail mx")).toBeNull();
         expect(screen.getByText("Show 2 apps Polaris runs")).toBeTruthy();
         expect(
-            screen.getByRole("switch", { name: "Show apps Polaris runs for itself" }).getAttribute("aria-checked")
+            screen
+                .getByRole("switch", { name: "Show apps Polaris runs for itself" })
+                .getAttribute("aria-checked")
         ).toBe("false");
     });
 
     it("shows them on the switch, and remembers that for the same person", () => {
         grid(true);
-        act(() => fireEvent.click(screen.getByRole("switch", { name: "Show apps Polaris runs for itself" })));
+        act(() =>
+            fireEvent.click(
+                screen.getByRole("switch", { name: "Show apps Polaris runs for itself" })
+            )
+        );
         expect(screen.getByText("Marketplace")).toBeTruthy();
         cleanup();
 

@@ -26,7 +26,11 @@ const join = (minute: number, name: string) => [
 describe("a departure's reason", () => {
     it("reads a timeout off the network line and keeps one event for the two lines", () => {
         const events = parsePlayerSessions(
-            [...join(1, "Alice"), at(9, "Alice lost connection: Timed out"), at(9, "Alice left the game")].join("\n")
+            [
+                ...join(1, "Alice"),
+                at(9, "Alice lost connection: Timed out"),
+                at(9, "Alice left the game")
+            ].join("\n")
         );
         expect(events.filter((event) => event.kind === "leave")).toEqual([
             {
@@ -62,23 +66,27 @@ describe("a departure's reason", () => {
                 at(6, "Cy lost connection: You logged in from another location")
             ].join("\n")
         );
-        expect(events.filter((event) => event.kind === "leave").map((event) => event.reason?.kind)).toEqual([
-            "quit",
-            "banned",
-            "duplicate"
-        ]);
+        expect(
+            events.filter((event) => event.kind === "leave").map((event) => event.reason?.kind)
+        ).toEqual(["quit", "banned", "duplicate"]);
     });
 
     it("gives the server stopping as the reason for everybody still on", () => {
         const events = parsePlayerSessions(
-            [...join(1, "Dee"), at(7, "Stopping server"), at(7, "Dee lost connection: Server closed")].join("\n")
+            [
+                ...join(1, "Dee"),
+                at(7, "Stopping server"),
+                at(7, "Dee lost connection: Server closed")
+            ].join("\n")
         );
         expect(events.at(-1)).toMatchObject({ kind: "leave", reason: { kind: "shutdown" } });
         expect(events.filter((event) => event.kind === "refused")).toEqual([]);
     });
 
     it("leaves a departure with no reason as it always was", () => {
-        const events = parsePlayerSessions([...join(1, "Eve"), at(2, "Eve left the game")].join("\n"));
+        const events = parsePlayerSessions(
+            [...join(1, "Eve"), at(2, "Eve left the game")].join("\n")
+        );
         expect(events.at(-1)).toEqual({
             name: "Eve",
             kind: "leave",
@@ -91,7 +99,10 @@ describe("a departure's reason", () => {
 describe("an attempt the server turned away", () => {
     it("records the whitelist refusal of a newer server, by name", () => {
         const events = parsePlayerSessions(
-            at(3, "Mallory (/198.51.100.4:41221) lost connection: You are not white-listed on this server!")
+            at(
+                3,
+                "Mallory (/198.51.100.4:41221) lost connection: You are not white-listed on this server!"
+            )
         );
         expect(events).toEqual([
             {
@@ -112,7 +123,11 @@ describe("an attempt the server turned away", () => {
             )
         );
         expect(events).toMatchObject([
-            { name: "Oscar", kind: "refused", reason: { kind: "outdated", raw: "Outdated client! Please use 1.21.4" } }
+            {
+                name: "Oscar",
+                kind: "refused",
+                reason: { kind: "outdated", raw: "Outdated client! Please use 1.21.4" }
+            }
         ]);
     });
 
@@ -128,12 +143,17 @@ describe("an attempt the server turned away", () => {
     });
 
     it("ignores a dropped connection that never had a name", () => {
-        expect(parsePlayerSessions(at(3, "/203.0.113.9:5555 lost connection: Disconnected"))).toEqual([]);
+        expect(
+            parsePlayerSessions(at(3, "/203.0.113.9:5555 lost connection: Disconnected"))
+        ).toEqual([]);
     });
 
     it("is never a visit: somebody only ever refused has not played", () => {
         const events = parsePlayerSessions(
-            at(3, "Mallory (/198.51.100.4:41221) lost connection: You are not white-listed on this server!")
+            at(
+                3,
+                "Mallory (/198.51.100.4:41221) lost connection: You are not white-listed on this server!"
+            )
         );
         expect(playerActivity(events, false, Date.parse("2026-08-08T11:00:00Z"))).toEqual({
             presence: "never",

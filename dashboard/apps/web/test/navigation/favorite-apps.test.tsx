@@ -207,7 +207,11 @@ describe("the Overview rail", () => {
     it("follows the menu's first apps once it is arranged, on the same frame", () => {
         save.mockReturnValue(new Promise(() => undefined));
         const store = mount(["mail"], <AppSidebar appIds={appIds} />);
-        act(() => store.get().arrangeApps(["notes", "mail", "drive", "vault", "apps", "tasks", "chat", "office"]));
+        act(() =>
+            store
+                .get()
+                .arrangeApps(["notes", "mail", "drive", "vault", "apps", "tasks", "chat", "office"])
+        );
         const links = [...document.querySelectorAll("nav a")].map((link) =>
             link.getAttribute("href")
         );

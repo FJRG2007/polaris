@@ -343,7 +343,9 @@ export async function maskCamera(
         if (look.light === "auto" && sampling && frames % MEASURE_EVERY === 1) {
             sampling.globalCompositeOperation = "copy";
             sampling.drawImage(source, 0, 0, SAMPLE_WIDTH, SAMPLE_HEIGHT);
-            const wanted = autoGain(meanLuma(sampling.getImageData(0, 0, SAMPLE_WIDTH, SAMPLE_HEIGHT).data));
+            const wanted = autoGain(
+                meanLuma(sampling.getImageData(0, 0, SAMPLE_WIDTH, SAMPLE_HEIGHT).data)
+            );
             gain += (wanted - gain) * 0.3;
         }
         crop = look.frame === "auto" ? followFrame(crop, aim) : WHOLE_FRAME;

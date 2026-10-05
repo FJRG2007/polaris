@@ -96,7 +96,10 @@ export function beginChange(threadIds: readonly string[], change: ThreadPatch): 
     const held = ledger();
     const id = held.next++;
     if (threadIds.length > 0) {
-        held.changes = [...held.changes, { id, threadIds: [...threadIds], change, settledAt: null }];
+        held.changes = [
+            ...held.changes,
+            { id, threadIds: [...threadIds], change, settledAt: null }
+        ];
         changed();
     }
     // Answered once: a second answer - a settle after a settle, a refusal after

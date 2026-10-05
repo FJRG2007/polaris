@@ -166,7 +166,10 @@ export function meanLuma(pixels: ArrayLike<number>): number {
     let total = 0;
     let count = 0;
     for (let at = 0; at + 3 < pixels.length; at += 4) {
-        total += 0.2126 * (pixels[at] ?? 0) + 0.7152 * (pixels[at + 1] ?? 0) + 0.0722 * (pixels[at + 2] ?? 0);
+        total +=
+            0.2126 * (pixels[at] ?? 0) +
+            0.7152 * (pixels[at + 1] ?? 0) +
+            0.0722 * (pixels[at + 2] ?? 0);
         count += 1;
     }
     return count > 0 ? total / count / 255 : 0;
@@ -199,7 +202,11 @@ const MIN_PERSON = 0.02;
  * for aiming a crop, and a box accurate to a pixel of a 1280-wide frame is
  * precision nobody can see. Null when there is nobody there.
  */
-export function personBox(pixels: ArrayLike<number>, width: number, height: number): FrameBox | null {
+export function personBox(
+    pixels: ArrayLike<number>,
+    width: number,
+    height: number
+): FrameBox | null {
     let left = width;
     let right = -1;
     let top = height;
@@ -240,7 +247,10 @@ const HEADROOM = 0.08;
  */
 export function frameFor(person: FrameBox | null): FrameBox {
     if (!person) return WHOLE_FRAME;
-    const size = Math.min(1, Math.max(1 / MAX_ZOOM, person.h / PERSON_SHARE, person.w / PERSON_SHARE));
+    const size = Math.min(
+        1,
+        Math.max(1 / MAX_ZOOM, person.h / PERSON_SHARE, person.w / PERSON_SHARE)
+    );
     const centerX = person.x + person.w / 2;
     const top = person.y - size * HEADROOM;
     return {

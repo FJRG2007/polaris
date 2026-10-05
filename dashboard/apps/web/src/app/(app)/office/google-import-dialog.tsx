@@ -14,7 +14,15 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { RelativeTime } from "@/components/relative-time";
 import { useTranslations } from "@/components/i18n/i18n-provider";
-import { ExternalLink, FileText, Loader2, Presentation, RefreshCw, Search, Table2 } from "lucide-react";
+import {
+    ExternalLink,
+    FileText,
+    Loader2,
+    Presentation,
+    RefreshCw,
+    Search,
+    Table2
+} from "lucide-react";
 import {
     Button,
     Dialog,
@@ -92,7 +100,11 @@ export function GoogleImportDialog({
     const load = useCallback(
         async (page: string | null) => {
             if (!accountId) return;
-            const answer = await listGoogleFilesAction({ connectionId: accountId, search, pageToken: page });
+            const answer = await listGoogleFilesAction({
+                connectionId: accountId,
+                search,
+                pageToken: page
+            });
             if (answer.error) {
                 setFailure({ error: answer.error, relink: Boolean(answer.relink) });
                 if (!page) setFiles([]);
@@ -116,7 +128,11 @@ export function GoogleImportDialog({
     async function open(file: GoogleOfficeFile): Promise<void> {
         if (!accountId || opening) return;
         setOpening(file.id);
-        const answer = await importGoogleFileAction({ connectionId: accountId, fileId: file.id, orgId });
+        const answer = await importGoogleFileAction({
+            connectionId: accountId,
+            fileId: file.id,
+            orgId
+        });
         setOpening(null);
         if (answer.error || !answer.id || !answer.kind) {
             toast.show({ title: answer.error ?? t("google.errors.failed") });
@@ -141,7 +157,9 @@ export function GoogleImportDialog({
                 ) : usable.length === 0 ? (
                     <div className="space-y-3">
                         <p className="text-sm text-foreground-muted">
-                            {state.accounts.length > 0 ? t("google.reauthorize") : t("google.connectFirst")}
+                            {state.accounts.length > 0
+                                ? t("google.reauthorize")
+                                : t("google.connectFirst")}
                         </p>
                         <Button asChild size="sm">
                             <a href={OFFICE_GOOGLE_LINK}>
@@ -165,7 +183,10 @@ export function GoogleImportDialog({
                                     }))}
                                 />
                             ) : (
-                                <p className="min-w-0 truncate text-sm text-foreground-muted" title={usable[0]?.label}>
+                                <p
+                                    className="min-w-0 truncate text-sm text-foreground-muted"
+                                    title={usable[0]?.label}
+                                >
                                     {usable[0]?.label}
                                 </p>
                             )}
@@ -192,7 +213,11 @@ export function GoogleImportDialog({
                                         <a href={OFFICE_GOOGLE_LINK}>{t("google.connect")}</a>
                                     </Button>
                                 ) : (
-                                    <Button size="sm" variant="secondary" onClick={() => void load(null)}>
+                                    <Button
+                                        size="sm"
+                                        variant="secondary"
+                                        onClick={() => void load(null)}
+                                    >
                                         <RefreshCw className="size-4 shrink-0" aria-hidden />
                                         {t("google.retry")}
                                     </Button>
@@ -224,16 +249,31 @@ export function GoogleImportDialog({
                                                 type="button"
                                                 className="flex w-full min-w-0 items-center gap-3 rounded-md px-2 py-2 text-left hover:bg-option-hover disabled:cursor-not-allowed disabled:opacity-60"
                                                 disabled={!file.importable || opening !== null}
-                                                title={file.importable ? file.name : t("google.slidesLater")}
+                                                title={
+                                                    file.importable
+                                                        ? file.name
+                                                        : t("google.slidesLater")
+                                                }
                                                 onClick={() => void open(file)}
                                             >
                                                 {opening === file.id ? (
-                                                    <Loader2 className="size-4 shrink-0 animate-spin" aria-hidden />
+                                                    <Loader2
+                                                        className="size-4 shrink-0 animate-spin"
+                                                        aria-hidden
+                                                    />
                                                 ) : (
-                                                    <Icon className="size-4 shrink-0 text-foreground-muted" aria-hidden />
+                                                    <Icon
+                                                        className="size-4 shrink-0 text-foreground-muted"
+                                                        aria-hidden
+                                                    />
                                                 )}
                                                 <span className="min-w-0 flex-1">
-                                                    <span className="block truncate text-sm" title={file.name}>{file.name}</span>
+                                                    <span
+                                                        className="block truncate text-sm"
+                                                        title={file.name}
+                                                    >
+                                                        {file.name}
+                                                    </span>
                                                     {file.importable ? null : (
                                                         <span className="block truncate text-xs text-foreground-subtle">
                                                             {t("google.slidesLater")}
@@ -262,7 +302,9 @@ export function GoogleImportDialog({
                                     void load(next).finally(() => setMore(false));
                                 }}
                             >
-                                {more ? <Loader2 className="size-4 shrink-0 animate-spin" aria-hidden /> : null}
+                                {more ? (
+                                    <Loader2 className="size-4 shrink-0 animate-spin" aria-hidden />
+                                ) : null}
                                 {t("google.more")}
                             </Button>
                         ) : null}

@@ -57,7 +57,10 @@ const OPERATORS = {
 } as const;
 
 function fieldOptions(t: NamespaceTranslator<"mailSettings">) {
-    return Object.entries(FIELDS).map(([value, key]) => ({ value, label: t(`rules.fields.${key}`) }));
+    return Object.entries(FIELDS).map(([value, key]) => ({
+        value,
+        label: t(`rules.fields.${key}`)
+    }));
 }
 
 /** The comparisons that make sense for a field. "Similar" is about a subject's
@@ -117,9 +120,7 @@ export function RulesView({
     // Opened from "Filter messages like this": the form starts open on that
     // mailbox, filled in from the message.
     const params = useSearchParams();
-    const [seed] = useState(() =>
-        seedFrom(params ? new URLSearchParams(params.toString()) : null)
-    );
+    const [seed] = useState(() => seedFrom(params ? new URLSearchParams(params.toString()) : null));
     const [accountId, setAccountId] = useState(
         seed?.accountId && accounts.some((one) => one.id === seed.accountId)
             ? seed.accountId
@@ -135,7 +136,9 @@ export function RulesView({
 
             <div className="mb-3 flex items-center justify-between">
                 <div>
-                    <h2 className="text-[13px] font-medium">{t("rules.title", { address: account.address })}</h2>
+                    <h2 className="text-[13px] font-medium">
+                        {t("rules.title", { address: account.address })}
+                    </h2>
                     <p className="text-[12px] text-muted-foreground">{t("rules.hint")}</p>
                 </div>
                 <Button variant="secondary" onClick={() => setAdding(true)}>
@@ -167,7 +170,9 @@ export function RulesView({
                                 <p className="text-[11px] text-foreground-subtle">
                                     {rule.enabled ? t("rules.on") : t("rules.off")}
                                     {rule.stop ? t("rules.stops") : ""}
-                                    {rule.matchCount > 0 ? t("rules.matched", { count: rule.matchCount }) : ""}
+                                    {rule.matchCount > 0
+                                        ? t("rules.matched", { count: rule.matchCount })
+                                        : ""}
                                 </p>
                             </div>
                             <Button
@@ -236,11 +241,15 @@ function describe(
             switch (action.kind) {
                 case "move": {
                     const folder = folders.find((one) => one.id === action.folder)?.name;
-                    return folder ? t("rules.said.move", { folder }) : t("rules.said.moveSomewhere");
+                    return folder
+                        ? t("rules.said.move", { folder })
+                        : t("rules.said.moveSomewhere");
                 }
                 case "label": {
                     const label = labels.find((one) => one.id === action.label)?.name;
-                    return label ? t("rules.said.label", { label }) : t("rules.said.labelSomething");
+                    return label
+                        ? t("rules.said.label", { label })
+                        : t("rules.said.labelSomething");
                 }
                 case "star":
                     return t("rules.actions.star");
@@ -367,7 +376,9 @@ function RuleForm({
 
             {conditions.length > 1 ? (
                 <div className="flex flex-wrap items-center gap-2">
-                    <span className="text-[13px] text-muted-foreground">{t("rules.matchLabel")}</span>
+                    <span className="text-[13px] text-muted-foreground">
+                        {t("rules.matchLabel")}
+                    </span>
                     <Select
                         value={match}
                         onValueChange={(next) => setMatch(next === "any" ? "any" : "all")}
@@ -385,13 +396,19 @@ function RuleForm({
                 {conditions.map((one, index) => {
                     const answer = checked[index];
                     const problemHere =
-                        answer && !answer.success && one.value.trim() ? answer.error.issues[0]?.message : "";
+                        answer && !answer.success && one.value.trim()
+                            ? answer.error.issues[0]?.message
+                            : "";
                     const shape =
                         one.operator === "similar" ? core.mailSubjectShape(one.value) : "";
                     return (
                         <li key={one.key} className="flex flex-wrap items-end gap-2">
                             <span className="w-8 pb-2 text-[13px] text-muted-foreground">
-                                {index === 0 ? t("rules.if") : match === "all" ? t("rules.andShort") : t("rules.orShort")}
+                                {index === 0
+                                    ? t("rules.if")
+                                    : match === "all"
+                                      ? t("rules.andShort")
+                                      : t("rules.orShort")}
                             </span>
                             <Select
                                 value={one.field}
@@ -410,11 +427,15 @@ function RuleForm({
                             <div className="w-52 min-w-0">
                                 <Input
                                     value={one.value}
-                                    onChange={(event) => update(one.key, { value: event.target.value })}
+                                    onChange={(event) =>
+                                        update(one.key, { value: event.target.value })
+                                    }
                                     aria-label={t("rules.valueLabel")}
                                     aria-invalid={problemHere ? true : undefined}
                                     placeholder={
-                                        one.operator === "similar" ? t("rules.similarPlaceholder") : undefined
+                                        one.operator === "similar"
+                                            ? t("rules.similarPlaceholder")
+                                            : undefined
                                     }
                                 />
                             </div>
@@ -454,7 +475,9 @@ function RuleForm({
                 <Button
                     variant="ghost"
                     size="sm"
-                    onClick={() => setConditions((current) => [...current, draft("subject", "contains", "")])}
+                    onClick={() =>
+                        setConditions((current) => [...current, draft("subject", "contains", "")])
+                    }
                 >
                     <Plus className="size-4 shrink-0" aria-hidden />
                     {t("rules.addCondition")}
@@ -514,17 +537,11 @@ function RuleForm({
             </div>
 
             {actionKind === "forward" ? (
-                <p className="text-[12px] text-foreground-subtle">
-                    {t("rules.forwardHint")}
-                </p>
+                <p className="text-[12px] text-foreground-subtle">{t("rules.forwardHint")}</p>
             ) : null}
 
             <label className="flex items-center gap-2 text-[13px]">
-                <Switch
-                    checked={stop}
-                    onChange={setStop}
-                    aria-label={t("rules.stopLabel")}
-                />
+                <Switch checked={stop} onChange={setStop} aria-label={t("rules.stopLabel")} />
                 {t("rules.stop")}
             </label>
             <label className="flex items-center gap-2 text-[13px]">

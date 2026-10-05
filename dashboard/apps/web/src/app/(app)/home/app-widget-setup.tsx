@@ -86,7 +86,9 @@ export function AppWidgetSetup({
         <Dialog open={subject !== null} onOpenChange={(open) => !open && onCancel()}>
             <DialogContent className="max-w-md">
                 <DialogHeader>
-                    <DialogTitle>{t("appCards.setupTitle", { name: subject?.label ?? "" })}</DialogTitle>
+                    <DialogTitle>
+                        {t("appCards.setupTitle", { name: subject?.label ?? "" })}
+                    </DialogTitle>
                     <DialogDescription>
                         {t("appCards.setupHint", { count: MAX_APP_WIDGET_TARGETS })}
                     </DialogDescription>

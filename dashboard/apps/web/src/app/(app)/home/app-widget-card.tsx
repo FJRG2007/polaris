@@ -18,7 +18,10 @@ import type { AppWidgetReadout } from "@/lib/overview/app-widgets";
 import { WidgetEmpty, WidgetRowsSkeleton, WidgetUnavailable } from "./widget-card";
 import type { AppWidgetControl, AppWidgetInput, AppWidgetItem } from "@/lib/app-extensions/types";
 
-const TONE: Record<NonNullable<AppWidgetItem["tone"]>, "success" | "warning" | "danger" | "neutral"> = {
+const TONE: Record<
+    NonNullable<AppWidgetItem["tone"]>,
+    "success" | "warning" | "danger" | "neutral"
+> = {
     ok: "success",
     warn: "warning",
     bad: "danger",
@@ -193,7 +196,10 @@ function Control({
             >
                 <Minus className="size-3.5" aria-hidden="true" />
             </button>
-            <span className="min-w-12 text-center text-sm font-medium tabular-nums" aria-live="polite">
+            <span
+                className="min-w-12 text-center text-sm font-medium tabular-nums"
+                aria-live="polite"
+            >
                 {value === null ? "-" : `${value}${control.unit}`}
             </span>
             <button

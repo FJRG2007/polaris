@@ -327,11 +327,7 @@ describe("the switcher", () => {
 
     it("draws the trigger for the app somebody is in", () => {
         const html = renderToStaticMarkup(
-            <AppSwitcher
-                apps={apps}
-                currentAppId="games"
-                order={["games"]}
-            />
+            <AppSwitcher apps={apps} currentAppId="games" order={["games"]} />
         );
         expect(html).toContain("Game servers");
         expect(html).not.toContain("Files across every NAS");

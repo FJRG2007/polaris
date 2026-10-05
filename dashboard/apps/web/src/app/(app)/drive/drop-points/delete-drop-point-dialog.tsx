@@ -115,7 +115,9 @@ export function DeleteDropPointDialog({
                                     {single ? (
                                         <>
                                             {single.connectionName} / {single.destinationPath}
-                                            {t("deleteDialog.files", { count: single.submissionCount })}
+                                            {t("deleteDialog.files", {
+                                                count: single.submissionCount
+                                            })}
                                         </>
                                     ) : (
                                         t("deleteDialog.foldersSummary", {

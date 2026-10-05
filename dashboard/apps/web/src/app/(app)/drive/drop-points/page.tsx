@@ -56,7 +56,9 @@ export default async function DropPointsPage() {
         <div className="mx-auto flex max-w-5xl flex-col gap-6">
             <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
-                    <h1 className="text-[1.0625rem] font-semibold tracking-tight">{t("pages.dropPoints.title")}</h1>
+                    <h1 className="text-[1.0625rem] font-semibold tracking-tight">
+                        {t("pages.dropPoints.title")}
+                    </h1>
                     <p className="text-sm text-muted-foreground">
                         {t("pages.dropPoints.description")}
                     </p>
@@ -70,12 +72,16 @@ export default async function DropPointsPage() {
             </div>
 
             <section className="flex flex-col gap-3">
-                <h2 className="text-sm font-medium text-muted-foreground">{t("pages.dropPoints.files")}</h2>
+                <h2 className="text-sm font-medium text-muted-foreground">
+                    {t("pages.dropPoints.files")}
+                </h2>
                 <DropPointsView requests={rows} />
             </section>
 
             <section className="flex flex-col gap-3">
-                <h2 className="text-sm font-medium text-muted-foreground">{t("pages.dropPoints.text")}</h2>
+                <h2 className="text-sm font-medium text-muted-foreground">
+                    {t("pages.dropPoints.text")}
+                </h2>
                 <TextDropPointsView requests={textRows} />
             </section>
         </div>

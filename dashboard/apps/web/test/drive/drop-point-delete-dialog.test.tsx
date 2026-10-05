@@ -12,7 +12,10 @@
 import { MessagesWrapper } from "../setup/i18n";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { DeleteDropPointDialog, type DropPointTarget } from "@/app/(app)/drive/drop-points/delete-drop-point-dialog";
+import {
+    DeleteDropPointDialog,
+    type DropPointTarget
+} from "@/app/(app)/drive/drop-points/delete-drop-point-dialog";
 
 afterEach(cleanup);
 
@@ -27,7 +30,11 @@ const photos = (): DropPointTarget => ({
 function dialog(target: DropPointTarget | null, onConfirm = vi.fn()) {
     return (
         <MessagesWrapper>
-            <DeleteDropPointDialog target={target} onCancel={() => undefined} onConfirm={onConfirm} />
+            <DeleteDropPointDialog
+                target={target}
+                onCancel={() => undefined}
+                onConfirm={onConfirm}
+            />
         </MessagesWrapper>
     );
 }
@@ -48,7 +55,9 @@ describe("deleting a drop point", () => {
         act(() => fireEvent.click(screen.getByRole("switch", { name: "Delete the folder too" })));
         rerender(dialog(photos(), onConfirm));
         expect(
-            screen.getByRole("switch", { name: "Delete the folder too" }).getAttribute("aria-checked")
+            screen
+                .getByRole("switch", { name: "Delete the folder too" })
+                .getAttribute("aria-checked")
         ).toBe("false");
         fireEvent.click(screen.getByRole("button", { name: "Delete" }));
         expect(onConfirm).toHaveBeenCalledWith(false);
@@ -60,7 +69,9 @@ describe("deleting a drop point", () => {
         rerender(dialog(null));
         rerender(dialog({ ...photos(), id: "dp2", title: "Invoices" }));
         expect(
-            screen.getByRole("switch", { name: "Delete the folder too" }).getAttribute("aria-checked")
+            screen
+                .getByRole("switch", { name: "Delete the folder too" })
+                .getAttribute("aria-checked")
         ).toBe("true");
     });
 });

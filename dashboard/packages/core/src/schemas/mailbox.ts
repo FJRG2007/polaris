@@ -565,7 +565,11 @@ export const mailRuleConditionSchema = z
     .superRefine((condition, context) => {
         if (condition.operator !== "similar") return;
         if (condition.field !== "subject") {
-            context.addIssue({ code: "custom", path: ["field"], message: "Only a subject can be similar" });
+            context.addIssue({
+                code: "custom",
+                path: ["field"],
+                message: "Only a subject can be similar"
+            });
         } else if (!condition.value) {
             context.addIssue({
                 code: "custom",

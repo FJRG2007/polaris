@@ -37,7 +37,12 @@ const listSchema = z.object({
 
 const importSchema = z.object({
     connectionId: z.string().uuid(),
-    fileId: z.string().trim().min(1).max(200).regex(/^[\w-]+$/),
+    fileId: z
+        .string()
+        .trim()
+        .min(1)
+        .max(200)
+        .regex(/^[\w-]+$/),
     orgId: core.officeCreateSchema.shape.orgId
 });
 

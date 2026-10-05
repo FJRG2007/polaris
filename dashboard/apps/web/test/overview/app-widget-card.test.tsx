@@ -47,7 +47,9 @@ const READOUT: AppWidgetReadout = {
                 id: "lamp",
                 title: "Desk lamp",
                 readings: [],
-                controls: [{ kind: "toggle", id: "power", label: "Power", on: false, disabled: "Offline" }]
+                controls: [
+                    { kind: "toggle", id: "power", label: "Power", on: false, disabled: "Offline" }
+                ]
             }
         ]
     }

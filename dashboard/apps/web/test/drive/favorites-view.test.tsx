@@ -57,7 +57,9 @@ describe("the favorites list", () => {
     it("takes the star off on the spot and offers Undo", async () => {
         view();
         await act(async () => {
-            fireEvent.click(screen.getByRole("button", { name: "Remove report.pdf from favorites" }));
+            fireEvent.click(
+                screen.getByRole("button", { name: "Remove report.pdf from favorites" })
+            );
         });
         expect(setItemFavoriteAction).toHaveBeenCalledWith("c1", "Work/Q3/report.pdf", false);
         expect(screen.queryByRole("link", { name: "report.pdf" })).toBeNull();
@@ -73,7 +75,9 @@ describe("the favorites list", () => {
         setItemFavoriteAction.mockRejectedValue(new Error("no"));
         view();
         await act(async () => {
-            fireEvent.click(screen.getByRole("button", { name: "Remove report.pdf from favorites" }));
+            fireEvent.click(
+                screen.getByRole("button", { name: "Remove report.pdf from favorites" })
+            );
         });
         expect(screen.getByRole("link", { name: "report.pdf" })).toBeTruthy();
     });

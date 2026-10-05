@@ -61,8 +61,19 @@ describe("the stored layout", () => {
     it("refuses a card that is not in the stored shape, and two with one id", async () => {
         for (const bad of [
             [{ ...CARD, app: "../etc" }],
-            [{ ...CARD, targets: Array.from({ length: core.MAX_APP_WIDGET_TARGETS + 1 }, (_, at) => `d${at}`) }],
-            Array.from({ length: core.MAX_APP_WIDGETS + 1 }, (_, at) => ({ ...CARD, id: `card${String(at).padStart(8, "0")}` })),
+            [
+                {
+                    ...CARD,
+                    targets: Array.from(
+                        { length: core.MAX_APP_WIDGET_TARGETS + 1 },
+                        (_, at) => `d${at}`
+                    )
+                }
+            ],
+            Array.from({ length: core.MAX_APP_WIDGETS + 1 }, (_, at) => ({
+                ...CARD,
+                id: `card${String(at).padStart(8, "0")}`
+            })),
             [CARD, CARD]
         ]) {
             expect((await saveAppWidgetsAction(bad)).error).toBeTruthy();
