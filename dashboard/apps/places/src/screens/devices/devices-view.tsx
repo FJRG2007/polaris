@@ -115,10 +115,10 @@ export function DevicesView({
     const [error, setError] = useState("");
     const groups = useMemo(() => groupDevices(devices ?? [], t), [devices, t]);
 
-    /** A full list from the server, moving only the devices that differ. */
     /** When each device was last pushed, so a full read that began before a
      *  push cannot put the older state back. */
     const pushedAt = useRef(new Map<string, number>());
+    /** A full list from the server, moving only the devices that differ. */
     const take = useCallback(
         (
             result: { devices?: DeviceView[]; accounts?: DeviceAccountView[] },

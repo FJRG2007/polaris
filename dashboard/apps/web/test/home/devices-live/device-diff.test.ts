@@ -87,6 +87,14 @@ describe("merging a full list into the one on screen", () => {
         expect(merged[0]).toBe(lampOn);
     });
 
+    it("keeps a device pushed as new that the read began too early to see", () => {
+        const lamp = device();
+        const fan = device({ id: "device-2", name: "Fan" });
+        const merged = mergeDevices([lamp, fan], [lamp], (id) => id === "device-2");
+        expect(merged).toEqual([lamp, fan]);
+        expect(merged[1]).toBe(fan);
+    });
+
     it("takes the list whole when there was none", () => {
         expect(mergeDevices(null, [device()])).toEqual([device()]);
     });

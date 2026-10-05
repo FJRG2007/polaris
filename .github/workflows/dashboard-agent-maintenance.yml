@@ -81,10 +81,13 @@ jobs:
           full="$RUNNER_TEMP/report-full.md"
           cp "$report" "$full"
           if [ "$(wc -c < "$full")" -gt 60000 ]; then
+            cut="$RUNNER_TEMP/report-cut.md"
+            head -c 60000 "$full" | sed '$d' > "$cut"
             {
-              head -c 60000 "$full"
-              echo
-              echo '```'
+              cat "$cut"
+              if [ $(( $(grep -c '^```' "$cut" || true) % 2 )) -eq 1 ]; then
+                echo '```'
+              fi
               echo
               echo "_Report cut at 60,000 characters. The full report is the \`maintenance-report\` artifact of [this run]($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID)._"
             } > "$report"

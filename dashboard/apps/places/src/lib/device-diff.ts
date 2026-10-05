@@ -82,6 +82,10 @@ export function mergeDevices(
         if (pushedSince(device.id)) return before ? [before] : [];
         return [before && sameDevice(before, device) ? before : device];
     });
+    const read = new Set(next.map((device) => device.id));
+    for (const device of current) {
+        if (!read.has(device.id) && pushedSince(device.id)) merged.push(device);
+    }
     const changed =
         merged.length !== current.length ||
         merged.some((device, index) => device !== current[index]);
