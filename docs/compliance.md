@@ -41,9 +41,10 @@ where copies of keys are kept outside the instance, and the organization's own p
 - **Connected AI assistants**: a third-party MCP client (Claude, ChatGPT, Cursor, VS
   Code and others) reaches a person's own account over OAuth 2.1, scoped to the
   permissions they tick on Polaris's own consent screen and cut down live if they
-  reconnect with fewer. Connecting one, and a connection Polaris ends itself because a
-  token was presented twice, both raise the same security alert a new API key does
-  (Account > API keys).
+  reconnect with fewer, or if the permissions are changed afterward from the
+  assistant's own page. Connecting one, changing what it may do, and a connection
+  Polaris ends itself because a token was presented twice all raise the same
+  security alert a new API key does (Account > AI assistants).
 - **Firewall** rules sit in front of every service and in front of Polaris itself:
   managed rule packs, custom rules, address allow and deny lists, a required Polaris
   sign-in, SQL injection and cross-site scripting checks, and bans (Firewall).

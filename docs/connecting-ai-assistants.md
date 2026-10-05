@@ -67,7 +67,7 @@ reachable from the internet.
 
 ### Cursor
 
-Use **Add to Cursor** on the Downloads page, or add this to `~/.cursor/mcp.json`:
+Use **Add to Cursor** on the AI assistants page, or add this to `~/.cursor/mcp.json`:
 
 ```json
 {
@@ -81,7 +81,7 @@ Cursor asks you to sign in the first time it uses Polaris.
 
 ### Visual Studio Code
 
-Use **Add to VS Code** on the Downloads page, run
+Use **Add to VS Code** on the AI assistants page, run
 `code --add-mcp '{"name":"polaris","type":"http","url":"https://<your-polaris-address>/api/mcp"}'`,
 or add this to `.vscode/mcp.json`:
 
@@ -243,6 +243,6 @@ OAuth 2.1 with Polaris as its own authorization server.
   registered. Start the connection again from the app.
 - **A tool says the connection needs a scope.** Connect the app again and tick
   that permission, or ask an administrator for it if it is not offered.
-- **It stopped working.** Check Connected assistants: if it is not listed, it
-  was disconnected (by you, or because one of its tokens was used twice).
-  Connect it again from the app.
+- **It stopped working.** Check **Account > AI assistants**: if it is not
+  listed, it was disconnected (by you, or because one of its tokens was used
+  twice). Connect it again from the app.
