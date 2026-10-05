@@ -20,14 +20,19 @@ import { BubbleMenu } from "@tiptap/react/menus";
 import { useEffect, useRef, useState } from "react";
 import { Bold, Code, Italic, Link2, Link2Off, Strikethrough } from "lucide-react";
 
-function Control({
+/** One icon button on a formatting bar. Shared by the bar over a selection and
+ *  the one along the top of a document, so a pressed Bold looks the same in
+ *  both. */
+export function ToolbarButton({
     label,
     active,
+    disabled,
     onClick,
     children
 }: {
     label: string;
     active?: boolean;
+    disabled?: boolean;
     onClick: () => void;
     children: React.ReactNode;
 }) {
@@ -37,12 +42,13 @@ function Control({
             aria-label={label}
             title={label}
             aria-pressed={active}
+            disabled={disabled}
             // The selection is lost the moment the editor blurs, so the press
             // must never move the focus out of it.
             onMouseDown={(event) => event.preventDefault()}
             onClick={onClick}
             className={cn(
-                "rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground",
+                "shrink-0 rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:pointer-events-none disabled:opacity-40",
                 active && "bg-muted text-foreground"
             )}
         >
@@ -100,52 +106,52 @@ export function SelectionToolbar({ editor }: { editor: Editor }) {
                         }}
                         className="h-7 w-56 rounded border border-border bg-field px-2 text-xs hover:border-border-strong focus:border-border-strong"
                     />
-                    <Control label={t("editor.applyLink")} onClick={commit}>
+                    <ToolbarButton label={t("editor.applyLink")} onClick={commit}>
                         <Link2 className="size-4" />
-                    </Control>
+                    </ToolbarButton>
                 </form>
             ) : (
                 <>
-                    <Control
+                    <ToolbarButton
                         label={t("editor.bold")}
                         active={editor.isActive("bold")}
                         onClick={() => editor.chain().focus().toggleBold().run()}
                     >
                         <Bold className="size-4" />
-                    </Control>
-                    <Control
+                    </ToolbarButton>
+                    <ToolbarButton
                         label={t("editor.italic")}
                         active={editor.isActive("italic")}
                         onClick={() => editor.chain().focus().toggleItalic().run()}
                     >
                         <Italic className="size-4" />
-                    </Control>
-                    <Control
+                    </ToolbarButton>
+                    <ToolbarButton
                         label={t("editor.strike")}
                         active={editor.isActive("strike")}
                         onClick={() => editor.chain().focus().toggleStrike().run()}
                     >
                         <Strikethrough className="size-4" />
-                    </Control>
-                    <Control
+                    </ToolbarButton>
+                    <ToolbarButton
                         label={t("editor.blocks.code")}
                         active={editor.isActive("code")}
                         onClick={() => editor.chain().focus().toggleCode().run()}
                     >
                         <Code className="size-4" />
-                    </Control>
+                    </ToolbarButton>
                     <span className="mx-0.5 h-5 w-px bg-border" />
                     {editor.isActive("link") ? (
-                        <Control
+                        <ToolbarButton
                             label={t("editor.removeLink")}
                             onClick={() =>
                                 editor.chain().focus().extendMarkRange("link").unsetLink().run()
                             }
                         >
                             <Link2Off className="size-4" />
-                        </Control>
+                        </ToolbarButton>
                     ) : (
-                        <Control
+                        <ToolbarButton
                             label={t("editor.addLink")}
                             onClick={() => {
                                 setHref(editor.getAttributes("link").href ?? "");
@@ -153,7 +159,7 @@ export function SelectionToolbar({ editor }: { editor: Editor }) {
                             }}
                         >
                             <Link2 className="size-4" />
-                        </Control>
+                        </ToolbarButton>
                     )}
                 </>
             )}

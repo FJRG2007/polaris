@@ -32,7 +32,8 @@ import { OFFICE_FIELD } from "@/lib/office/content";
 import { useOfficeDocument, type OfficeSaving } from "@/app/(app)/office/use-office-document";
 import { EditorContent, useEditor } from "@tiptap/react";
 import { useMemo } from "react";
-import { baseExtensions } from "@/components/rich-text/schema";
+import { documentExtensions } from "@/components/rich-text/document-schema";
+import { FormattingToolbar } from "@/components/rich-text/formatting-toolbar";
 import { redo, undo, ySyncPlugin, yUndoPlugin } from "y-prosemirror";
 
 export function DocEditor({
@@ -47,6 +48,7 @@ export function DocEditor({
     editable: boolean;
 }) {
     const t = useTranslations("office");
+    const tc = useTranslations("components");
     // The document and the wire under it. Shared with every other editor here:
     // none of that is about documents - see `use-office-document`.
     const { doc, saving } = useOfficeDocument({ documentId, content, editable });
@@ -78,7 +80,10 @@ export function DocEditor({
             // Next renders this on the server too, and a CRDT bound to a DOM
             // that does not exist is an error nobody can read.
             immediatelyRender: false,
-            extensions: [...baseExtensions(editable ? "Write something" : ""), collaboration],
+            extensions: [
+                ...documentExtensions(editable ? tc("editor.placeholder") : ""),
+                collaboration
+            ],
             editorProps: {
                 attributes: {
                     class: cn(
@@ -93,7 +98,15 @@ export function DocEditor({
                         "[&_a]:text-primary [&_a]:underline",
                         "[&_ul]:list-disc [&_ul]:pl-6 [&_ol]:list-decimal [&_ol]:pl-6 [&_li]:my-1",
                         "[&_blockquote]:border-l-2 [&_blockquote]:border-border [&_blockquote]:pl-4 [&_blockquote]:text-muted-foreground",
-                        "[&_pre]:overflow-x-auto [&_pre]:rounded-md [&_pre]:bg-muted [&_pre]:p-3 [&_pre]:text-[13px]"
+                        "[&_pre]:overflow-x-auto [&_pre]:rounded-md [&_pre]:bg-muted [&_pre]:p-3 [&_pre]:text-[13px]",
+                        "[&_u]:underline [&_s]:line-through [&_mark]:rounded-sm [&_mark]:px-0.5 [&_mark]:text-[#111]",
+                        "[&_img]:max-w-full [&_img]:rounded-md",
+                        // Tables: ruled cells, a shaded header, and a row that
+                        // scrolls sideways on a phone rather than squeezing.
+                        "[&_.tableWrapper]:overflow-x-auto [&_table]:w-full [&_table]:border-collapse [&_table]:text-[14px]",
+                        "[&_td]:border [&_td]:border-border [&_td]:px-2 [&_td]:py-1 [&_td]:align-top",
+                        "[&_th]:border [&_th]:border-border [&_th]:bg-muted [&_th]:px-2 [&_th]:py-1 [&_th]:text-left [&_th]:font-semibold",
+                        "[&_td>p]:m-0 [&_th>p]:m-0 [&_.selectedCell]:bg-primary/10"
                     )
                 }
             }
@@ -103,6 +116,21 @@ export function DocEditor({
 
     return (
         <div className="flex min-h-0 flex-1 flex-col">
+            {/* Only for somebody who can change it: a reader has nothing to
+                format, and a row of disabled controls is noise. */}
+            {editor && editable ? (
+                <FormattingToolbar
+                    editor={editor}
+                    onUndo={() => {
+                        undo(editor.state);
+                        editor.commands.focus();
+                    }}
+                    onRedo={() => {
+                        redo(editor.state);
+                        editor.commands.focus();
+                    }}
+                />
+            ) : null}
             <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
                 {/* The page. A measure rather than the full width of the window:
                     a line of eighty characters is what anybody can read, and a
@@ -138,9 +166,7 @@ function SavingNote({ state }: { state: OfficeSaving }) {
                 state === "failed" ? "text-danger" : "text-muted-foreground"
             )}
         >
-            {state === "saving"
-                ? t("docEditor.saving")
-                : t("docEditor.thatDidNotSaveYour")}
+            {state === "saving" ? t("docEditor.saving") : t("docEditor.thatDidNotSaveYour")}
         </p>
     );
 }

@@ -24,6 +24,66 @@ export interface DocBlock {
      *  arrive as bullets stops saying that they are in an order. */
     readonly kind: string;
     readonly text: string;
+    /** The same text, split where its formatting changes. Absent for a block
+     *  with none, and a writer that has no word for formatting reads `text`. */
+    readonly runs?: readonly DocRun[];
+    /** How the paragraph is set across the page. Absent is the default, left. */
+    readonly align?: "left" | "center" | "right" | "justify";
+    /** Steps in from the margin, 0 to 8. */
+    readonly indent?: number;
+    /** A table's cells, by row, for the block whose kind is "table". The first
+     *  row is the header unless `headerRow` is false. */
+    readonly rows?: readonly (readonly string[])[];
+    /** False for a table whose first row is ordinary cells. Absent is a header. */
+    readonly headerRow?: boolean;
+}
+
+/** A stretch of a block's text that is all formatted one way. */
+export interface DocRun {
+    readonly text: string;
+    readonly bold?: boolean;
+    readonly italic?: boolean;
+    readonly underline?: boolean;
+    readonly strike?: boolean;
+    readonly code?: boolean;
+    /** Six hex digits with a hash. */
+    readonly color?: string;
+    /** Six hex digits with a hash. */
+    readonly highlight?: string;
+    /** One font family name. */
+    readonly font?: string;
+    /** Points. */
+    readonly sizePt?: number;
+    /** An http, https or mailto address. */
+    readonly href?: string;
+}
+
+/** A colour as `#rrggbb`, or null for anything else - a value that came out of
+ *  a shared document and is about to be written into somebody's file. */
+export function cleanHexColor(value: unknown): string | null {
+    const text = String(value ?? "").trim();
+    const short = /^#([0-9a-f])([0-9a-f])([0-9a-f])$/i.exec(text);
+    if (short) {
+        return `#${short[1]}${short[1]}${short[2]}${short[2]}${short[3]}${short[3]}`.toLowerCase();
+    }
+    return /^#[0-9a-f]{6}$/i.test(text) ? text.toLowerCase() : null;
+}
+
+/** A font family as one plain name - the first of a CSS list, unquoted - or
+ *  null when it is not a name a word processor would recognise as one. */
+export function cleanFontName(value: unknown): string | null {
+    const first = (String(value ?? "").split(",")[0] ?? "").trim().replace(/^["']|["']$/g, "");
+    return /^[A-Za-z0-9][A-Za-z0-9 -]{0,63}$/.test(first) ? first : null;
+}
+
+/** A link address a stranger's program may open: http, https or mailto. */
+export function cleanHref(value: unknown): string | null {
+    try {
+        const parsed = new URL(String(value ?? "").trim());
+        return ["http:", "https:", "mailto:"].includes(parsed.protocol) ? parsed.toString() : null;
+    } catch {
+        return null;
+    }
 }
 
 /* -------------------------------------------------------------------------- */
@@ -83,6 +143,11 @@ export function toMarkdown(title: string, blocks: readonly DocBlock[]): string {
     // procedures and the second one starts at 1.
     let counted = 0;
     for (const block of blocks) {
+        if (block.kind === "table" && block.rows && block.rows.length > 0) {
+            counted = 0;
+            lines.push(tableToMarkdown(block.rows, block.headerRow !== false), "");
+            continue;
+        }
         const text = block.text.trim();
         if (!text) {
             continue;
@@ -110,8 +175,9 @@ export function toMarkdown(title: string, blocks: readonly DocBlock[]): string {
 
 /** A table, as Markdown. The separator row is what makes it a table rather than
  *  three lines of pipes, and a cell holding a pipe would end the column - so it
- *  is escaped. */
-export function tableToMarkdown(rows: readonly (readonly string[])[]): string {
+ *  is escaped. Markdown has no table without a header, so one with none gets an
+ *  empty one rather than its first row promoted. */
+export function tableToMarkdown(rows: readonly (readonly string[])[], headerRow = true): string {
     if (rows.length === 0) return "";
     const cell = (value: string): string => value.replace(/\|/g, "\\|").replace(/\n+/g, " ");
     const width = Math.max(...rows.map((row) => row.length));
@@ -119,7 +185,7 @@ export function tableToMarkdown(rows: readonly (readonly string[])[]): string {
         ...row.map(cell),
         ...Array.from({ length: width - row.length }, () => "")
     ];
-    const [head, ...body] = rows;
+    const [head, ...body] = headerRow ? rows : [[], ...rows];
     return [
         `| ${pad(head!).join(" | ")} |`,
         `| ${Array.from({ length: width }, () => "---").join(" | ")} |`,
@@ -143,6 +209,47 @@ export function escapeHtml(text: string): string {
         .replace(/'/g, "&#39;");
 }
 
+/** A paragraph's alignment and indent as a `style` attribute, or nothing. */
+function paragraphStyle(block: DocBlock): string {
+    const rules: string[] = [];
+    if (block.align === "center" || block.align === "right" || block.align === "justify") {
+        rules.push(`text-align:${block.align}`);
+    }
+    const indent = Math.min(8, Math.max(0, Math.trunc(Number(block.indent ?? 0)) || 0));
+    if (indent > 0) rules.push(`margin-left:${indent * 2}rem`);
+    return rules.length > 0 ? ` style="${rules.join(";")}"` : "";
+}
+
+/** A block's runs as markup, every value checked before it is written, or null
+ *  when the block has none. */
+function runsToHtml(block: DocBlock): string | null {
+    if (!block.runs || block.runs.length === 0) return null;
+    return block.runs
+        .map((run) => {
+            let html = escapeHtml(run.text);
+            if (!html) return "";
+            const rules: string[] = [];
+            const color = cleanHexColor(run.color);
+            if (color) rules.push(`color:${color}`);
+            const highlight = cleanHexColor(run.highlight);
+            if (highlight) rules.push(`background-color:${highlight}`);
+            const font = cleanFontName(run.font);
+            if (font) rules.push(`font-family:'${font}'`);
+            const size = Number(run.sizePt);
+            if (Number.isFinite(size) && size > 0 && size <= 400) rules.push(`font-size:${size}pt`);
+            if (run.code) html = `<code>${html}</code>`;
+            if (run.bold) html = `<strong>${html}</strong>`;
+            if (run.italic) html = `<em>${html}</em>`;
+            if (run.underline) html = `<u>${html}</u>`;
+            if (run.strike) html = `<s>${html}</s>`;
+            if (rules.length > 0) html = `<span style="${rules.join(";")}">${html}</span>`;
+            const href = cleanHref(run.href);
+            if (href) html = `<a href="${escapeHtml(href)}">${html}</a>`;
+            return html;
+        })
+        .join("");
+}
+
 /**
  * A document, as a page.
  *
@@ -161,8 +268,21 @@ export function toHtml(title: string, blocks: readonly DocBlock[]): string {
     };
 
     for (const block of blocks) {
+        if (block.kind === "table" && block.rows && block.rows.length > 0) {
+            closeList();
+            const row = (cells: readonly string[], tag: "th" | "td"): string =>
+                `<tr>${cells.map((cell) => `<${tag}>${escapeHtml(cell)}</${tag}>`).join("")}</tr>`;
+            const [head, ...rest] = block.headerRow === false ? [null, ...block.rows] : block.rows;
+            body.push(
+                `<table>${head ? `<thead>${row(head, "th")}</thead>` : ""}` +
+                    `<tbody>${rest.map((cells) => row(cells ?? [], "td")).join("")}</tbody></table>`
+            );
+            continue;
+        }
         const text = block.text.trim();
         if (!text) continue;
+        const inner = runsToHtml(block) ?? escapeHtml(text);
+        const style = paragraphStyle(block);
         if (block.kind === "li" || block.kind === "oli") {
             const tag = block.kind === "li" ? "ul" : "ol";
             // A bulleted list running into a numbered one is two lists, and
@@ -171,18 +291,18 @@ export function toHtml(title: string, blocks: readonly DocBlock[]): string {
             if (listTag !== tag) closeList();
             listTag = tag;
             list = list ?? [];
-            list.push(`<li>${escapeHtml(text)}</li>`);
+            list.push(`<li>${inner}</li>`);
             continue;
         }
         closeList();
         if (/^h[1-6]$/.test(block.kind)) {
-            body.push(`<${block.kind}>${escapeHtml(text)}</${block.kind}>`);
+            body.push(`<${block.kind}${style}>${inner}</${block.kind}>`);
         } else if (block.kind === "quote") {
-            body.push(`<blockquote>${escapeHtml(text)}</blockquote>`);
+            body.push(`<blockquote${style}>${inner}</blockquote>`);
         } else if (block.kind === "code") {
             body.push(`<pre><code>${escapeHtml(text)}</code></pre>`);
         } else {
-            body.push(`<p>${escapeHtml(text)}</p>`);
+            body.push(`<p${style}>${inner}</p>`);
         }
     }
     closeList();

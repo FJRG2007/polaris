@@ -74,16 +74,40 @@ function docBlocks(doc: Y.Doc): core.DocBlock[] {
         // an item that reaches a writer as "li" is written with a bullet, and a
         // procedure whose steps arrive as bullets stops saying they are in an
         // order.
-        if (name === "bulletList" || name === "orderedList") {
-            for (const child of node.toArray()) walk(child, name === "bulletList" ? "li" : "oli");
+        // A checklist is a bulleted list as far as any of these formats can say:
+        // none of them has a word for a box with a tick in it.
+        if (name === "bulletList" || name === "orderedList" || name === "taskList") {
+            for (const child of node.toArray()) walk(child, name === "orderedList" ? "oli" : "li");
             return;
         }
-        if (name === "listItem") {
+        if (name === "listItem" || name === "taskItem") {
             for (const child of node.toArray()) walk(child, inherited || "li");
             return;
         }
         if (name === "blockquote") {
             for (const child of node.toArray()) walk(child, "quote");
+            return;
+        }
+        if (name === "table") {
+            const rows = tableRows(node);
+            if (rows.length > 0) {
+                blocks.push({
+                    kind: "table",
+                    text: rows.map((row) => row.join("\t")).join("\n"),
+                    rows,
+                    ...(hasHeaderRow(node) ? {} : { headerRow: false })
+                });
+            }
+            return;
+        }
+        // A picture is not carried into the file itself; it leaves as a link to
+        // where it lives, under its description when it has one.
+        if (name === "image") {
+            const href = core.cleanHref(node.getAttribute("src"));
+            if (!href) return;
+            const alt = String(node.getAttribute("alt") ?? "").trim();
+            const label = alt || href;
+            blocks.push({ kind: inherited || "p", text: label, runs: [{ text: label, href }] });
             return;
         }
         const kind =
@@ -95,11 +119,116 @@ function docBlocks(doc: Y.Doc): core.DocBlock[] {
                     ? inherited || "p"
                     : inherited || "p";
         const text = node.toString().replace(/<[^>]*>/g, "");
-        if (text.trim()) blocks.push({ kind, text });
+        if (!text.trim()) return;
+        const runs = name === "codeBlock" ? [] : inlineRuns(node);
+        const align = alignOf(node.getAttribute("textAlign"));
+        const indent = Number(node.getAttribute("indent") ?? 0);
+        blocks.push({
+            kind,
+            text,
+            ...(runs.some(isFormatted) ? { runs } : {}),
+            ...(align ? { align } : {}),
+            ...(Number.isFinite(indent) && indent > 0
+                ? { indent: Math.min(8, Math.trunc(indent)) }
+                : {})
+        });
     };
 
     for (const node of fragment.toArray()) walk(node, "");
     return blocks;
+}
+
+/** An alignment a writer understands, or nothing for the default. */
+function alignOf(value: unknown): core.DocBlock["align"] | undefined {
+    return value === "center" || value === "right" || value === "justify" ? value : undefined;
+}
+
+/** Whether a run carries anything beyond its text. */
+function isFormatted(run: core.DocRun): boolean {
+    return Object.keys(run).some((key) => key !== "text");
+}
+
+/** What a mark stored by the editor holds: Yjs keeps each mark under its name,
+ *  with the mark's own attributes as the value. */
+type MarkAttributes = Record<string, Record<string, unknown> | undefined>;
+
+/** One stretch of text and the marks on it, as a run. Every value is checked:
+ *  it came out of a shared document and is about to go into somebody's file. */
+function runOf(text: string, marks: MarkAttributes | undefined): core.DocRun {
+    const style = marks?.textStyle ?? {};
+    const size = /^(\d+(?:\.\d+)?)pt$/.exec(String(style.fontSize ?? ""));
+    const color = core.cleanHexColor(style.color);
+    const highlight = marks?.highlight ? core.cleanHexColor(marks.highlight.color) : null;
+    const font = core.cleanFontName(style.fontFamily);
+    const href = marks?.link ? core.cleanHref(marks.link.href) : null;
+    return {
+        text,
+        ...(marks?.bold ? { bold: true } : {}),
+        ...(marks?.italic ? { italic: true } : {}),
+        ...(marks?.underline ? { underline: true } : {}),
+        ...(marks?.strike ? { strike: true } : {}),
+        ...(marks?.code ? { code: true } : {}),
+        ...(color ? { color } : {}),
+        // A highlight with no colour of its own is the editor's default yellow.
+        ...(marks?.highlight ? { highlight: highlight ?? "#fef08a" } : {}),
+        ...(font ? { font } : {}),
+        ...(size ? { sizePt: Number(size[1]) } : {}),
+        ...(href ? { href } : {})
+    };
+}
+
+/** A paragraph's inline content as runs, in order. A line break is a newline in
+ *  the run it falls in, and a mention or a chip is its label. */
+function inlineRuns(node: Y.XmlElement): core.DocRun[] {
+    const runs: core.DocRun[] = [];
+    for (const child of node.toArray()) {
+        if (child instanceof Y.XmlText) {
+            for (const piece of child.toDelta() as {
+                insert?: unknown;
+                attributes?: MarkAttributes;
+            }[]) {
+                if (typeof piece.insert === "string" && piece.insert) {
+                    runs.push(runOf(piece.insert, piece.attributes));
+                }
+            }
+        } else if (child instanceof Y.XmlElement) {
+            if (child.nodeName === "hardBreak") runs.push({ text: "\n" });
+            else if (child.nodeName === "reference") {
+                const label = String(child.getAttribute("label") ?? "");
+                if (label) runs.push({ text: label });
+            }
+        }
+    }
+    return runs;
+}
+
+/** Whether a table's first row is made of header cells, as the editor's
+ *  "Header row" toggle leaves it. */
+function hasHeaderRow(table: Y.XmlElement): boolean {
+    const first = table.toArray().find((row): row is Y.XmlElement => row instanceof Y.XmlElement);
+    const cells =
+        first?.toArray().filter((cell): cell is Y.XmlElement => cell instanceof Y.XmlElement) ?? [];
+    return cells.length > 0 && cells.every((cell) => cell.nodeName === "tableHeader");
+}
+
+/** A table's cells as text, row by row. */
+function tableRows(table: Y.XmlElement): string[][] {
+    const rows: string[][] = [];
+    for (const row of table.toArray()) {
+        if (!(row instanceof Y.XmlElement) || row.nodeName !== "tableRow") continue;
+        rows.push(
+            row
+                .toArray()
+                .filter((cell): cell is Y.XmlElement => cell instanceof Y.XmlElement)
+                .map((cell) =>
+                    cell
+                        .toArray()
+                        .map((paragraph) => paragraph.toString().replace(/<[^>]*>/g, ""))
+                        .join("\n")
+                )
+        );
+    }
+    return rows;
 }
 
 /** A workbook, as a grid per sheet. The cells are stored sparse and keyed
