@@ -17,6 +17,5 @@
         "typecheck": "tsc --noEmit",
         "test": "vitest run --passWithNoTests"
     },
-    "dependencies": {
-    }
+    "dependencies": {}
 }
