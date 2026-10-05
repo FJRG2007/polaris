@@ -2,11 +2,10 @@
  * Keep the build machine's paths out of the browser bundle.
  *
  * Webpack compiles a bare `import.meta.url` to the absolute `file://` URL of the
- * module on the machine that ran the build. pdf.js (its Node-only canvas factory)
- * and Excalidraw (its font-subsetting worker) both read it, so every client that
- * loaded them was sent the builder's disk layout - the account name included.
- * Neither use runs in a browser with that value: the canvas factory is Node-only,
- * and a worker cannot start from a `file://` URL either way.
+ * module on the machine that ran the build. pdf.js reads it in its Node-only
+ * canvas factory, so every client that loaded a PDF was sent the builder's disk
+ * layout - the account name included - for a branch that never runs in a
+ * browser. Any other dependency that reads it would do the same.
  *
  * In the client compilation this answers `import.meta.url` with the module's path
  * relative to the workspace root instead, still a `file:` URL so code that parses

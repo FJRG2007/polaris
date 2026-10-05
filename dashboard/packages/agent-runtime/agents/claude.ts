@@ -86,6 +86,10 @@ async function installClaudeCli(): Promise<string> {
  *   - `Monitor` runs a shell command/script (the `command` field)
  *   - `REPL` runs arbitrary JavaScript (can `require("node:child_process")`)
  *   - `Workflow` orchestrates subagents/pipelines that can reach the above
+ *   - `PowerShell` (registered by the binary by 2.1.289) runs a PowerShell
+ *     command wherever `pwsh` is on the PATH
+ * REVALIDATE ON EVERY claude-code BUMP: grep the platform binary for
+ * `name:"<Tool>"` and add any new tool that runs a command or code.
  * Each is denied at top level and inside `Agent(...)` (Task subagents), mirroring
  * the existing `Bash` / `Agent(Bash)` pair. Denying a tool that isn't registered
  * in a given run is a harmless no-op, so this list is also forward-safe.
@@ -97,8 +101,8 @@ async function installClaudeCli(): Promise<string> {
  * `--dangerously-skip-permissions` the native Bash tool ran despite
  * `--disallowedTools Bash`, leaking a per-run secret marker.
  */
-const CLAUDE_EXEC_TOOLS = ["Bash", "Monitor", "REPL", "Workflow"] as const;
-const CLAUDE_EXEC_TOOL_DENY_RULES = [
+const CLAUDE_EXEC_TOOLS = ["Bash", "PowerShell", "Monitor", "REPL", "Workflow"] as const;
+export const CLAUDE_EXEC_TOOL_DENY_RULES = [
   ...CLAUDE_EXEC_TOOLS,
   ...CLAUDE_EXEC_TOOLS.map((t) => `Agent(${t})`),
 ];
@@ -198,7 +202,7 @@ const CLAUDE_EFFORT_ENV = "CLAUDE_CODE_EFFORT_LEVEL";
 
 /**
  * levels the pinned binary's `--effort` will accept, verbatim from
- * `claude --help` on 2.1.150 and confirmed by probing each one. anything else is
+ * `claude --help` on 2.1.150 (unchanged on 2.1.289) and confirmed by probing each one. anything else is
  * an arg-parse failure - exit 1, before any API call - so this is the last gate
  * before a rung reaches the CLI. rungs come from models.dev, a different source
  * from this enum, so the two are free to drift.

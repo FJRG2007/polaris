@@ -41,10 +41,9 @@ Accepted today (until 2027-01-05):
 | GHSA-86w9-cpqp-85rv | node-forge | No fixed release. acme-client uses forge for keys, CSRs and PEM, never RSA signature verification. | node-forge ships a fix, or acme-client drops forge. |
 | GHSA-c475-qrg2-pj4r | basic-ftp | No fixed release. Only on Puppeteer's browser download, which the bridge image skips. | whatsapp-web.js moves to a Puppeteer without proxy-agent's FTP path. |
 | GHSA-jmr9-qjv8-65gv, GHSA-7pqw-9j4j-h8q3 | extract-zip | No fixed release. Only unpacks Puppeteer's browser download, which the bridge image skips. | Same as above. |
-| GHSA-vfj7-8cjw-p6xm | braces | No fixed release. Expands globs written in this repository (Tailwind 3 content paths, patch-package). | Tailwind 4 migration; patch-package replaced. |
+| GHSA-vfj7-8cjw-p6xm | braces | No fixed release. Expands globs written in this repository (Tailwind 3 content paths, patch-package, sass's unused watch mode). | Tailwind 4 migration; patch-package replaced. |
 | GHSA-6g55-p6wh-862q, GHSA-r28c-9q8g-f849 | postcss | Next 15 and dymo-api's tw-to-css pin 8.4.31; see Overrides. Build-time CSS and an SDK path Polaris does not call. | Next 16; dymo-api replaced by direct calls. |
-| GHSA-28wg-ghj8-5hjv, GHSA-2v37-7h3g-55p8, GHSA-xwg4-73v4-xw9w | nanoid | Exact pins in Excalidraw and Univer 0.25, all called with fixed positive sizes. | Excalidraw replaced by the in-house diagram editor; Univer 1.x. |
-| GHSA-r5fr-rjxr-66jc | lodash-es | chevrotain (via Excalidraw's Mermaid import) pins 4.17.21 and never calls `_.template`. | Excalidraw replaced. |
+| GHSA-28wg-ghj8-5hjv | nanoid | @univerjs/core 0.25 pins 5.1.11; every call passes a fixed positive size. | Univer 1.x, which drops nanoid. |
 
 ## Overrides
 
@@ -58,7 +57,7 @@ one is a decision somebody has to undo later, so each is listed here.
 | `react`, `react-dom: 19.0.0` | One React in the whole tree: two copies break hooks at runtime. | Never, while this is a monorepo with one app. |
 
 npm does not apply these to every node. The ones it skips today are Next's own
-`postcss@8.4.31` and the exact pins inside Excalidraw and Univer, which is why
+`postcss@8.4.31`, dymo-api's tw-to-css and Univer's exact nanoid pin, which is why
 those advisories are accepted above rather than overridden. Check with
 `npm ls <package>` after changing an override: a node it reached shows
 `overridden`.

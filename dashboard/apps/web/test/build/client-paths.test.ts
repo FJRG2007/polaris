@@ -2,7 +2,7 @@
  * The browser bundle never carries a path from the machine that built it.
  *
  * Webpack compiles a bare `import.meta.url` to the module's absolute `file://`
- * URL, and pdf.js and Excalidraw both read one, which published the builder's
+ * URL, and pdf.js reads one, which published the builder's
  * account name and disk layout to every visitor. The plugin swaps it for a
  * workspace-relative URL in the client build, and the postbuild check fails the
  * build if a path gets through anyway; these pin both halves.

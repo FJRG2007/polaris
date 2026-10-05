@@ -28,7 +28,7 @@
         {
             "id": "GHSA-vfj7-8cjw-p6xm",
             "package": "braces",
-            "reason": "No fixed release. Build- and install-time only: tailwindcss 3 and patch-package expand glob patterns written in this repository (content paths, patch file names), never a pattern from a request. The copy under dymo-api's tw-to-css sits on the SDK's sendEmail path, which Polaris never calls.",
+            "reason": "No fixed release. Build- and install-time only: tailwindcss 3, patch-package and the diagram package's sass (watch mode, never used) expand glob patterns written in this repository, never a pattern from a request. The copy under dymo-api's tw-to-css sits on the SDK's sendEmail path, which Polaris never calls.",
             "expires": "2027-01-05"
         },
         {
@@ -46,25 +46,7 @@
         {
             "id": "GHSA-28wg-ghj8-5hjv",
             "package": "nanoid",
-            "reason": "Exact pins in @excalidraw/excalidraw (3.3.3), @excalidraw/mermaid-to-excalidraw (4.0.2) and @univerjs/core 0.25 (5.1.11). Each calls nanoid() with a fixed positive size, never a negative one. Excalidraw is being replaced by the in-house diagram editor; Univer 1.x drops nanoid.",
-            "expires": "2027-01-05"
-        },
-        {
-            "id": "GHSA-2v37-7h3g-55p8",
-            "package": "nanoid",
-            "reason": "Exact pins in @excalidraw/excalidraw (3.3.3), @excalidraw/mermaid-to-excalidraw (4.0.2) and @univerjs/core 0.25 (5.1.11). None calls a custom generator with size 0. Excalidraw is being replaced by the in-house diagram editor; Univer 1.x drops nanoid.",
-            "expires": "2027-01-05"
-        },
-        {
-            "id": "GHSA-xwg4-73v4-xw9w",
-            "package": "nanoid",
-            "reason": "Exact pins in @excalidraw/excalidraw (3.3.3), @excalidraw/mermaid-to-excalidraw (4.0.2) and @univerjs/core 0.25 (5.1.11). Sizes are small constants, nowhere near the integer overflow. Excalidraw is being replaced by the in-house diagram editor; Univer 1.x drops nanoid.",
-            "expires": "2027-01-05"
-        },
-        {
-            "id": "GHSA-r5fr-rjxr-66jc",
-            "package": "lodash-es",
-            "reason": "chevrotain 11 pins lodash-es 4.17.21 (via mermaid, only through @excalidraw/mermaid-to-excalidraw). The flaw is in _.template with attacker-chosen import keys; chevrotain never calls _.template. Goes away with Excalidraw.",
+            "reason": "@univerjs/core 0.25 pins nanoid 5.1.11 exactly, and npm does not apply an override to it. Univer calls generateRandomId with fixed positive sizes (4 to 21), never a negative one. Univer 1.x drops nanoid.",
             "expires": "2027-01-05"
         }
     ]

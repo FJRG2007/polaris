@@ -23,7 +23,7 @@
         "@polaris/genoffice-ui": "*",
         "@polaris/pdf2docx": "*",
         "@polaris/project-store": "*",
-        "pdfjs-dist": "6.1.200",
+        "pdfjs-dist": "6.4.299",
         "react": "19.0.0",
         "react-dom": "19.0.0"
     },
