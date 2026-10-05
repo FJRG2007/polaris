@@ -152,6 +152,18 @@ updates:
     commit-message:
       prefix: "👷 ci"
     labels: [dependencies]
+    # Workflows pin an action's major (`@v4`), so an update here is a major: each
+    # one comes alone, to be proven by dispatching the workflows that use it.
     groups:
       actions:
+        update-types: [minor, patch]
         patterns: ["*"]
+    # Used by the release jobs, which only a real tag runs: their next major is
+    # taken together with a release where it can be watched, not on its own.
+    ignore:
+      - dependency-name: "actions/upload-artifact"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "actions/download-artifact"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "softprops/action-gh-release"
+        update-types: ["version-update:semver-major"]
