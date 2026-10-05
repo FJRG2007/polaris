@@ -35,11 +35,11 @@
         "@polaris/pptx": "*",
         "@polaris/pptx-render": "*",
         "@polaris/project-store": "*",
-        "acorn": "8.14.0",
+        "acorn": "8.18.0",
         "konva": "9.3.16",
-        "react": "19.0.0",
-        "react-dom": "19.0.0",
-        "react-konva": "19.0.3"
+        "react": "19.3.0",
+        "react-dom": "19.3.0",
+        "react-konva": "19.3.0"
     },
     "main": "./dist/App.js",
     "types": "./dist/App.d.ts"

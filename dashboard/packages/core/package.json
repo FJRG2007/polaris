@@ -55,7 +55,7 @@
     },
     "dependencies": {
         "intl-messageformat": "12.1.2",
-        "ipaddr.js": "2.2.0",
+        "ipaddr.js": "2.5.0",
         "zod": "3.24.1"
     }
 }

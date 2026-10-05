@@ -24,8 +24,8 @@
         "@polaris/pdf2docx": "*",
         "@polaris/project-store": "*",
         "pdfjs-dist": "6.4.299",
-        "react": "19.0.0",
-        "react-dom": "19.0.0"
+        "react": "19.3.0",
+        "react-dom": "19.3.0"
     },
     "main": "./dist/App.js",
     "types": "./dist/App.d.ts"
