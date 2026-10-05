@@ -56,10 +56,12 @@ updates:
           - "mysql2"
           - "mongodb"
           - "ioredis"
-      # The framework and the React it renders with move together, at any level:
-      # the root's react override follows the root's own react version.
+      # The framework and the React it renders with move together: the root's
+      # react override follows the root's own react version. A major of any of
+      # them comes alone.
       framework:
         applies-to: version-updates
+        update-types: [minor, patch]
         patterns:
           - "next"
           - "react"

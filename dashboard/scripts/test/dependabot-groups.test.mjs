@@ -90,4 +90,16 @@ test("the routine group excludes every name the special groups hold", () => {
 
 test("no group bundles majors: each one arrives alone", () => {
     assert.doesNotMatch(config, /update-types: \[[^\]]*major/);
+    const npm = config.slice(0, config.indexOf("package-ecosystem: github-actions"));
+    const groups = npm.split(/^ {6}(?=[a-z0-9.-]+:\s*$)/m).slice(1);
+    const unbounded = groups
+        .filter((body) => /^\s*applies-to: version-updates\s*$/m.test(body))
+        .filter((body) => !/^\s*update-types: \[/m.test(body))
+        .map((body) => body.slice(0, body.indexOf(":")));
+    assert.ok(groups.length > 0);
+    assert.deepEqual(
+        unbounded,
+        [],
+        `give these groups update-types without major: ${unbounded.join(", ")}`
+    );
 });
