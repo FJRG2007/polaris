@@ -7,7 +7,8 @@
  * through the consent screen to be connected again. Changing its permissions
  * takes effect on its next call, and can only reach what the app asked for,
  * what Polaris offers over MCP and what this person holds right now - the
- * boxes the screen drew are not what is trusted.
+ * boxes the screen drew are not what is trusted. Setting where it may call
+ * from applies on its next call and next token refresh.
  */
 
 import { z } from "zod";
@@ -20,7 +21,13 @@ import { getTranslations } from "@/lib/i18n/request";
 import { newDeviceRefusal } from "@/lib/device-grace";
 import { PERMISSIONS, expandPermissions } from "@polaris/core";
 import { localized } from "@/app/(app)/account/security/action-messages";
-import { changeGrantScopes, findConnectedApp, revokeConnectedApp } from "@/lib/mcp/oauth/grants";
+import { ipPolicySchema, type IpPolicy } from "@/lib/mcp/oauth/ip-policy";
+import {
+    changeGrantScopes,
+    findConnectedApp,
+    revokeConnectedApp,
+    setGrantIpPolicy
+} from "@/lib/mcp/oauth/grants";
 
 const PAGE = "/account/assistants";
 
@@ -95,4 +102,43 @@ export async function changeAppScopesAction(
     });
     revalidatePath(PAGE);
     return { scopes };
+}
+
+const ipRuleSchema = z.object({ id: z.string().uuid(), policy: ipPolicySchema });
+
+/** Set where a connected app may call from. Answers with the rule now held. */
+export async function setAppIpPolicyAction(
+    input: unknown
+): Promise<{ policy?: IpPolicy; error?: string }> {
+    const user = await requireUser();
+    const t = await getTranslations("mcp");
+    const parsed = ipRuleSchema.safeParse(input);
+    if (!parsed.success || user.viewingAs) return { error: t("connectedApps.ip.failed") };
+
+    const app = await findConnectedApp(user.id, parsed.data.id);
+    if (!app) return { error: t("connectedApps.ip.failed") };
+    const { policy } = parsed.data;
+    const stored: IpPolicy =
+        policy.mode === "list" ? policy : { mode: policy.mode, allow: [], deny: [] };
+    if (stored.mode === "origin" && !app.approvedIp) return { error: t("connectedApps.ip.noOrigin") };
+
+    // Narrowing where an app may call from is always allowed; anything that
+    // could widen it is a change to a credential and waits out a new device.
+    if (stored.mode === "none" || stored.mode === "list") {
+        const blocked = await newDeviceRefusal(user);
+        if (blocked) return localized({ error: blocked });
+    }
+
+    if (!(await setGrantIpPolicy(user.id, app.id, stored))) {
+        return { error: t("connectedApps.ip.failed") };
+    }
+    await recordAudit({
+        actorId: user.id,
+        action: "account.oauth.ip-rule-changed",
+        targetType: "oauthGrant",
+        targetId: app.id,
+        metadata: { app: app.name, before: app.ipPolicy, after: stored }
+    });
+    revalidatePath(PAGE);
+    return { policy: stored };
 }

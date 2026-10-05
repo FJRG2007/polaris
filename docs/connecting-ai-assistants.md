@@ -298,6 +298,14 @@ may do, and when and from where it was last used.
   when it connected, and never more than your own account holds. An assistant
   connected before this was recorded can be narrowed, but to widen it, connect
   it again.
+- **Where it may connect from** sets an address rule for that one connection,
+  on top of your account's access rules: anywhere (the default), only the
+  address you approved it from, an allow and deny list of IP addresses and
+  ranges (IPv4 and IPv6; a deny entry wins), or only from where you are signed
+  in to Polaris right now (an IPv6 address counts for its whole /64). It is
+  checked on every call and every token refresh. A refused call gets a 403
+  saying the address is not allowed, and the refusal shows on the connection
+  and in your activity.
 - **Disconnect** stops it at once: every token it holds is ended, and it has to
   be connected again through the consent screen.
 

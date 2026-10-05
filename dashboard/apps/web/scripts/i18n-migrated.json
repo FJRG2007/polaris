@@ -263,6 +263,7 @@
         "web/src/app/(app)/account/assistants/connect-guides.tsx",
         "web/src/app/(app)/account/assistants/connected-app-actions.ts",
         "web/src/app/(app)/account/assistants/connected-apps.tsx",
+        "web/src/app/(app)/account/assistants/ip-rule-dialog.tsx",
         "web/src/app/(app)/account/assistants/mcp-assistants.tsx",
         "web/src/app/(app)/account/assistants/page.tsx",
         "web/src/app/(app)/account/avatar-card.tsx",

@@ -28,6 +28,7 @@ const state = vi.hoisted(() => ({
         viewingAs?: unknown;
     },
     rateLimited: false,
+    ip: "203.0.113.5" as string | undefined,
     buckets: [] as string[],
     audit: [] as { action: string; actorId: string | null }[],
     db: null as unknown as ReturnType<typeof import("./fake-db").createFakeDb>
@@ -62,7 +63,7 @@ vi.mock("@/lib/deploy/api/http", () => ({
     throttleDeployKey: async () => null,
     tooManyCalls: (seconds: number) => `Too many calls. Try again in ${seconds}s.`
 }));
-vi.mock("@/lib/request-context", () => ({ clientIp: async () => "203.0.113.5" }));
+vi.mock("@/lib/request-context", () => ({ clientIp: async () => state.ip }));
 vi.mock("@/lib/rate-limit-service", () => ({
     rateLimit: async (bucket: string) => {
         state.buckets.push(bucket);
@@ -121,7 +122,7 @@ const serverMetadata = await import(
 );
 const { answerAuthorizationAction } = await import("@/app/oauth/authorize/actions");
 const { listConnectedApps, revokeConnectedApp } = await import("@/lib/mcp/oauth/grants");
-const { changeAppScopesAction } = await import(
+const { changeAppScopesAction, setAppIpPolicyAction } = await import(
     "@/app/(app)/account/assistants/connected-app-actions"
 );
 
@@ -224,6 +225,7 @@ beforeEach(() => {
     state.permissions = new Set(["tasks.read", "tasks.manage", "deploy.read"]);
     state.user = { id: ADA.id, name: "Ada", email: ADA.email, isAdmin: false, sessionId: "s1" };
     state.rateLimited = false;
+    state.ip = "203.0.113.5";
     state.audit = [];
     ADA.bannedAt = null;
 });
@@ -832,5 +834,165 @@ describe("changing what a connected app may do", () => {
         });
         expect(result.scopes).toEqual(["tasks.read"]);
         expect(await whoami(String(tokens.body.access_token))).toEqual(["tasks.read"]);
+    });
+});
+
+describe("where a connected app may call from", () => {
+    const whoami = { method: "tools/call", params: { name: "polaris_whoami", arguments: {} } };
+
+    async function connected() {
+        const result = await connect();
+        const [app] = await listConnectedApps(ADA.id);
+        return { ...result, app: app!, access: String(result.tokens.body.access_token) };
+    }
+
+    function refresh(clientId: string, refreshToken: string) {
+        return tokenCall({
+            grant_type: "refresh_token",
+            refresh_token: refreshToken,
+            client_id: clientId
+        });
+    }
+
+    it("lets everything through by default, as before", async () => {
+        const { app, access } = await connected();
+        expect(app.ipPolicy.mode).toBe("none");
+        expect(app.approvedIp).toBe("203.0.113.5");
+        state.ip = "198.51.100.20";
+        expect((await mcpCall(access, whoami)).status).toBe(200);
+    });
+
+    it("locks to the address it was approved from, on calls and on refresh", async () => {
+        const { app, access, client, tokens } = await connected();
+        expect(
+            await setAppIpPolicyAction({ id: app.id, policy: { mode: "origin" } })
+        ).toMatchObject({ policy: { mode: "origin" } });
+        expect((await mcpCall(access, whoami)).status).toBe(200);
+
+        state.ip = "198.51.100.20";
+        const refused = await mcpCall(access, whoami);
+        expect(refused.status).toBe(403);
+        expect(refused.body?.error_description).toContain("not allowed from this IP address");
+        const renewed = await refresh(client.client_id!, String(tokens.body.refresh_token));
+        expect(renewed.body.error).toBe("invalid_grant");
+        expect(String(renewed.body.error_description)).toContain("IP address");
+
+        // The refusal is on the connection and in the activity, once.
+        const [after] = await listConnectedApps(ADA.id);
+        expect(after!.lastRefusedIp).toBe("198.51.100.20");
+        expect(
+            state.audit.filter((entry) => entry.action === "account.oauth.ip-refused")
+        ).toHaveLength(1);
+
+        // The refresh token was not spent by the refusal.
+        state.ip = "203.0.113.5";
+        const back = await refresh(client.client_id!, String(tokens.body.refresh_token));
+        expect(back.status).toBe(200);
+    });
+
+    it("applies an allow list and a deny list, IPv4 and IPv6", async () => {
+        const { app, access } = await connected();
+        await setAppIpPolicyAction({
+            id: app.id,
+            policy: {
+                mode: "list",
+                allow: ["198.51.100.0/24", "2001:db8::/32"],
+                deny: ["198.51.100.66"]
+            }
+        });
+        for (const [ip, status] of [
+            ["198.51.100.20", 200],
+            ["198.51.100.66", 403],
+            ["2001:db8:1::5", 200],
+            ["2001:db9::5", 403],
+            ["203.0.113.5", 403],
+            [undefined, 403]
+        ] as const) {
+            state.ip = ip;
+            expect((await mcpCall(access, whoami)).status, String(ip)).toBe(status);
+        }
+    });
+
+    it("follows the person's live sessions", async () => {
+        const { app, access } = await connected();
+        await setAppIpPolicyAction({ id: app.id, policy: { mode: "sessions" } });
+        const later = new Date(Date.now() + 60_000);
+        const sessions = state.db.tables.session!;
+
+        state.ip = "198.51.100.20";
+        expect((await mcpCall(access, whoami)).status).toBe(403);
+
+        sessions.push({ userId: ADA.id, expiresAt: later, ipAddress: "198.51.100.20", state: null });
+        expect((await mcpCall(access, whoami)).status).toBe(200);
+
+        // Another person's session, an expired one, or one awaiting approval
+        // does not count.
+        state.ip = "192.0.2.9";
+        sessions.push({ userId: BOB.id, expiresAt: later, ipAddress: "192.0.2.9", state: null });
+        sessions.push({
+            userId: ADA.id,
+            expiresAt: new Date(Date.now() - 60_000),
+            ipAddress: "192.0.2.9",
+            state: null
+        });
+        sessions.push({
+            userId: ADA.id,
+            expiresAt: later,
+            ipAddress: null,
+            state: { ip: "192.0.2.9", approval: "pending" }
+        });
+        expect((await mcpCall(access, whoami)).status).toBe(403);
+
+        // A session that moved counts at its new address; IPv6 by its /64.
+        sessions.push({
+            userId: ADA.id,
+            expiresAt: later,
+            ipAddress: "198.51.100.30",
+            state: { ip: "2001:db8:aa:bb::1", approval: "approved" }
+        });
+        state.ip = "2001:db8:aa:bb:ffff::2";
+        expect((await mcpCall(access, whoami)).status).toBe(200);
+        state.ip = "2001:db8:aa:bc::1";
+        expect((await mcpCall(access, whoami)).status).toBe(403);
+
+        // Signing out everywhere stops it.
+        sessions.length = 0;
+        state.ip = "198.51.100.20";
+        expect((await mcpCall(access, whoami)).status).toBe(403);
+    });
+
+    it("validates the rule, and only the owner may set it", async () => {
+        const { app, access } = await connected();
+        expect(
+            (await setAppIpPolicyAction({ id: app.id, policy: { mode: "list", allow: ["nope"] } }))
+                .error
+        ).toBe("connectedApps.ip.failed");
+        expect(
+            (await setAppIpPolicyAction({ id: app.id, policy: { mode: "list" } })).error
+        ).toBe("connectedApps.ip.failed");
+        state.user = { ...state.user, id: BOB.id };
+        expect(
+            (await setAppIpPolicyAction({ id: app.id, policy: { mode: "sessions" } })).error
+        ).toBe("connectedApps.ip.failed");
+        state.user = { ...state.user, id: ADA.id };
+        state.ip = "198.51.100.20";
+        expect((await mcpCall(access, whoami)).status).toBe(200);
+
+        // Back to anywhere.
+        await setAppIpPolicyAction({ id: app.id, policy: { mode: "origin" } });
+        expect((await mcpCall(access, whoami)).status).toBe(403);
+        await setAppIpPolicyAction({ id: app.id, policy: { mode: "none" } });
+        expect((await mcpCall(access, whoami)).status).toBe(200);
+        expect(state.audit.map((entry) => entry.action)).toContain(
+            "account.oauth.ip-rule-changed"
+        );
+    });
+
+    it("cannot lock to an origin a connection never recorded", async () => {
+        const { app } = await connected();
+        state.db.tables.oAuthGrant![0]!.approvedIp = null;
+        expect(
+            (await setAppIpPolicyAction({ id: app.id, policy: { mode: "origin" } })).error
+        ).toBe("connectedApps.ip.noOrigin");
     });
 });

@@ -25,6 +25,8 @@ import { sameResource } from "./urls";
 import { scopeString } from "./scopes";
 import { verifierMatches } from "./pkce";
 import { clientBrand, type ClientBrand } from "./client-brand";
+import { IP_REFUSED_DESCRIPTION, grantAllowsIp } from "./ip-guard";
+import { readIpPolicy, type IpPolicy } from "./ip-policy";
 import { getUserPermissions } from "@polaris/auth";
 import type { OAuthClientRecord } from "./clients";
 import { generateToken, hashToken } from "@polaris/core/tokens";
@@ -116,6 +118,8 @@ export async function approve(input: {
     resource: string;
     scopes: readonly Permission[];
     requested: readonly Permission[];
+    /** Where the person approved it from, for the "only from there" rule. */
+    approvedIp?: string | null;
 }): Promise<{ code: string; grantId: string }> {
     const scopes = stringifyList([...input.scopes]);
     const requestedScopes = stringifyList([...input.requested]);
@@ -126,9 +130,18 @@ export async function approve(input: {
             clientId: input.client.id,
             scopes,
             requestedScopes,
+            approvedIp: input.approvedIp ?? null,
             resource: input.resource
         },
-        update: { scopes, requestedScopes, resource: input.resource, revokedAt: null },
+        // The address rule the person set is kept across a reconnection; the
+        // address it was approved from is the new one.
+        update: {
+            scopes,
+            requestedScopes,
+            approvedIp: input.approvedIp ?? null,
+            resource: input.resource,
+            revokedAt: null
+        },
         select: { id: true }
     });
     const code = `${CODE_PREFIX}${generateToken()}`;
@@ -221,6 +234,8 @@ export async function exchangeCode(input: {
     redirectUri: string | null;
     verifier: string | null;
     resource: string | null;
+    /** The caller's address, as `clientIp()` resolved it. */
+    ip?: string;
 }): Promise<TokenOutcome> {
     if (!input.code || !input.verifier || !input.redirectUri) {
         return refused("invalid_request", "code, code_verifier and redirect_uri are required");
@@ -234,8 +249,11 @@ export async function exchangeCode(input: {
             grant: {
                 select: {
                     id: true,
+                    userId: true,
                     clientId: true,
                     revokedAt: true,
+                    ipPolicy: true,
+                    approvedIp: true,
                     user: { select: { bannedAt: true } }
                 }
             }
@@ -261,6 +279,9 @@ export async function exchangeCode(input: {
         return refused("invalid_target", "resource does not match the one that was authorized");
     }
     if (!(await grantStands(row.grant))) return invalid;
+    if (!(await grantAllowsIp(row.grant, input.ip))) {
+        return refused("invalid_grant", IP_REFUSED_DESCRIPTION);
+    }
 
     // Spent before anything is issued, and only by the one request that finds it
     // unspent: two exchanges racing each other get one pair between them.
@@ -281,6 +302,8 @@ export async function refresh(input: {
     refreshToken: string | null;
     scope: string | null;
     resource: string | null;
+    /** The caller's address, as `clientIp()` resolved it. */
+    ip?: string;
 }): Promise<TokenOutcome> {
     if (!input.refreshToken) return refused("invalid_request", "refresh_token is required");
     const invalid = refused("invalid_grant", "The refresh token is not valid or has expired");
@@ -293,9 +316,12 @@ export async function refresh(input: {
             grant: {
                 select: {
                     id: true,
+                    userId: true,
                     clientId: true,
                     revokedAt: true,
                     scopes: true,
+                    ipPolicy: true,
+                    approvedIp: true,
                     user: { select: { bannedAt: true } }
                 }
             }
@@ -311,6 +337,11 @@ export async function refresh(input: {
     if (!(await grantStands(row.grant))) return invalid;
     if (input.resource !== null && !sameResource(input.resource, row.resource)) {
         return refused("invalid_target", "resource does not match the one that was authorized");
+    }
+    // Refused before the token is spent, so the app can retry from an address
+    // the rule allows with the same refresh token.
+    if (!(await grantAllowsIp(row.grant, input.ip))) {
+        return refused("invalid_grant", IP_REFUSED_DESCRIPTION);
     }
 
     // A refresh may ask for less than the grant, never for more - and never for
@@ -362,6 +393,9 @@ export interface VerifiedAccess {
     readonly userId: string;
     readonly isAdmin: boolean;
     readonly scopes: Permission[];
+    /** What the connection's address rule reads, for the caller to apply. */
+    readonly ipPolicy: string | null;
+    readonly approvedIp: string | null;
 }
 
 /**
@@ -389,6 +423,8 @@ export async function verifyAccessToken(
                     userId: true,
                     revokedAt: true,
                     scopes: true,
+                    ipPolicy: true,
+                    approvedIp: true,
                     lastUsedAt: true,
                     user: { select: { bannedAt: true, isAdmin: true } }
                 }
@@ -415,7 +451,9 @@ export async function verifyAccessToken(
         grantId: row.grant.id,
         userId: row.grant.userId,
         isAdmin: row.grant.user.isAdmin,
-        scopes
+        scopes,
+        ipPolicy: row.grant.ipPolicy,
+        approvedIp: row.grant.approvedIp
     };
 }
 
@@ -453,6 +491,12 @@ export interface ConnectedAppView {
     readonly createdAt: string;
     readonly lastUsedAt: string | null;
     readonly lastUsedIp: string | null;
+    /** Where it may call from. */
+    readonly ipPolicy: IpPolicy;
+    readonly approvedIp: string | null;
+    /** The last call that rule refused. */
+    readonly lastRefusedAt: string | null;
+    readonly lastRefusedIp: string | null;
 }
 
 /** What the account screen reads of a grant and its app. */
@@ -463,6 +507,10 @@ const APP_SELECT = {
     createdAt: true,
     lastUsedAt: true,
     lastUsedIp: true,
+    ipPolicy: true,
+    approvedIp: true,
+    lastRefusedAt: true,
+    lastRefusedIp: true,
     client: { select: { name: true, clientUri: true, clientId: true, redirectUris: true } }
 } as const;
 
@@ -473,6 +521,10 @@ function appView(row: {
     createdAt: Date;
     lastUsedAt: Date | null;
     lastUsedIp: string | null;
+    ipPolicy: string | null;
+    approvedIp: string | null;
+    lastRefusedAt: Date | null;
+    lastRefusedIp: string | null;
     client: { name: string; clientUri: string | null; redirectUris: string };
 }): ConnectedAppView {
     const redirects = parseStringList(row.client.redirectUris);
@@ -493,7 +545,11 @@ function appView(row: {
         requestable: parseStringList(row.requestedScopes ?? row.scopes),
         createdAt: row.createdAt.toISOString(),
         lastUsedAt: row.lastUsedAt?.toISOString() ?? null,
-        lastUsedIp: row.lastUsedIp
+        lastUsedIp: row.lastUsedIp,
+        ipPolicy: readIpPolicy(row.ipPolicy),
+        approvedIp: row.approvedIp,
+        lastRefusedAt: row.lastRefusedAt?.toISOString() ?? null,
+        lastRefusedIp: row.lastRefusedIp
     };
 }
 
@@ -560,4 +616,21 @@ export async function changeGrantScopes(
         prisma.oAuthToken.updateMany({ where: { grantId: grant.id }, data: { scopes: stored } })
     ]);
     return { before: parseStringList(grant.scopes) };
+}
+
+/**
+ * Set where a connected app may call from. Applies to its very next call: the
+ * MCP endpoint and the token endpoint read the rule from the grant every time.
+ * False when the grant is not this person's or was disconnected.
+ */
+export async function setGrantIpPolicy(
+    userId: string,
+    grantId: string,
+    policy: IpPolicy
+): Promise<boolean> {
+    const changed = await prisma.oAuthGrant.updateMany({
+        where: { id: grantId, userId, revokedAt: null },
+        data: { ipPolicy: policy.mode === "none" ? null : JSON.stringify(policy) }
+    });
+    return changed.count === 1;
 }

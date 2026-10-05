@@ -1510,6 +1510,15 @@ model OAuthGrant {
     updatedAt       DateTime  @updatedAt
     lastUsedAt      DateTime?
     lastUsedIp      String?
+    // Where the person was when they approved it, for the "only from there"
+    // rule. Null on grants made before it was kept.
+    approvedIp      String?
+    // JSON: the address rule the person set on this connection (see
+    // lib/mcp/oauth/ip-policy.ts). Null reads as "from anywhere".
+    ipPolicy        String?
+    // The last call that rule refused, shown on the connection.
+    lastRefusedAt   DateTime?
+    lastRefusedIp   String?
     revokedAt       DateTime?
 
     user   User         @relation(fields: [userId], references: [id], onDelete: Cascade)

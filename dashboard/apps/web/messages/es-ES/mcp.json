@@ -102,6 +102,48 @@
         "save": "Guardar",
         "pickOne": "Elige al menos un permiso, o desconéctala.",
         "changeFailed": "No se han podido cambiar los permisos. Recarga e inténtalo de nuevo.",
-        "loading": "Cargando asistentes conectados"
+        "loading": "Cargando asistentes conectados",
+        "ip": {
+            "edit": "Desde dónde puede conectarse",
+            "editNamed": "Desde dónde puede conectarse {app}",
+            "title": "Desde dónde puede conectarse {app}",
+            "hint": "Se comprueba en cada llamada y en cada renovación del token, además de las reglas de acceso de tu cuenta.",
+            "legend": "Direcciones permitidas",
+            "modes": {
+                "none": {
+                    "label": "Desde cualquier IP",
+                    "hint": "Sin regla de direcciones propia."
+                },
+                "origin": {
+                    "label": "Solo desde la dirección en la que se aprobó",
+                    "hint": "{ip}"
+                },
+                "list": {
+                    "label": "Direcciones que elija",
+                    "hint": "Una lista de permitidas y otra de bloqueadas, con IP o rangos."
+                },
+                "sessions": {
+                    "label": "Solo donde tengo sesión iniciada",
+                    "hint": "Las direcciones de tus sesiones activas de Polaris. Deja de funcionar si cierras sesión en todas partes."
+                }
+            },
+            "noOrigin": "No se guardó para esta conexión. Vuelve a conectarla para usar esta opción.",
+            "allow": "Permitidas",
+            "allowHint": "Déjala vacía para permitir todo lo que no esté bloqueado.",
+            "deny": "Bloqueadas",
+            "denyHint": "Las direcciones bloqueadas se rechazan aunque estén permitidas.",
+            "placeholder": "203.0.113.7 o 2001:db8::/48",
+            "invalid": "Introduce una dirección IP o un rango CIDR.",
+            "listEmpty": "Añade al menos una dirección.",
+            "summary": {
+                "none": "Desde cualquier IP",
+                "origin": "Solo desde {ip}",
+                "sessions": "Solo desde donde tienes la sesión iniciada",
+                "list": "{allow, plural, =0 {Cualquier dirección} one {# dirección permitida} other {# direcciones permitidas}}, {deny, plural, =0 {ninguna bloqueada} one {# bloqueada} other {# bloqueadas}}"
+            },
+            "refused": "Rechazada {time} desde {ip}",
+            "unknownIp": "una IP desconocida",
+            "failed": "No se ha podido guardar la regla de direcciones. Recarga e inténtalo de nuevo."
+        }
     }
 }

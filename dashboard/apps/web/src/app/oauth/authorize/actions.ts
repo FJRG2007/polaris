@@ -13,6 +13,7 @@
 
 import { z } from "zod";
 import { requireUser } from "@/lib/session";
+import { clientIp } from "@/lib/request-context";
 import { approve } from "@/lib/mcp/oauth/grants";
 import { scopesAvailableTo } from "@polaris/auth";
 import { recordAudit } from "@/lib/audit-service";
@@ -81,7 +82,8 @@ export async function answerAuthorizationAction(
         codeChallenge: request.codeChallenge,
         resource: request.resource,
         scopes,
-        requested: request.scopes
+        requested: request.scopes,
+        approvedIp: (await clientIp()) ?? null
     });
     await recordAudit({
         actorId: user.id,

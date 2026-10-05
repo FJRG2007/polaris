@@ -28,7 +28,8 @@ const BODY_MAX = 16 * 1024;
 const PER_ADDRESS_PER_MINUTE = 60;
 
 export async function POST(request: Request): Promise<Response> {
-    const ip = (await clientIp()) ?? "unknown";
+    const address = await clientIp();
+    const ip = address ?? "unknown";
     const throttle = await rateLimit(`oauth-token:${ip}`, PER_ADDRESS_PER_MINUTE, 60_000);
     if (!throttle.ok) return slowDown(throttle.retryAfterMs);
 
@@ -58,7 +59,8 @@ export async function POST(request: Request): Promise<Response> {
             code: params.get("code") ?? null,
             redirectUri: params.get("redirect_uri") ?? null,
             verifier: params.get("code_verifier") ?? null,
-            resource
+            resource,
+            ip: address
         });
         return outcome.ok
             ? oauthJson(outcome.body)
@@ -69,7 +71,8 @@ export async function POST(request: Request): Promise<Response> {
             client,
             refreshToken: params.get("refresh_token") ?? null,
             scope: params.get("scope") ?? null,
-            resource
+            resource,
+            ip: address
         });
         return outcome.ok
             ? oauthJson(outcome.body)

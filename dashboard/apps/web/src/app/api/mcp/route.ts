@@ -41,6 +41,7 @@ import { originOf } from "@/lib/mcp/oauth/origin";
 import { evaluateAccountAccess } from "@/lib/network-rules";
 import { mcpResource, wwwAuthenticate } from "@/lib/mcp/oauth/urls";
 import { ACCESS_TOKEN_PREFIX, touchGrant, verifyAccessToken } from "@/lib/mcp/oauth/grants";
+import { IP_REFUSED_DESCRIPTION, grantAllowsIp } from "@/lib/mcp/oauth/ip-guard";
 import {
     MCP_PROTOCOL_VERSION,
     RPC_INVALID_REQUEST,
@@ -133,7 +134,10 @@ const NO_RULES_OF_ITS_OWN = { allowedCidrs: [], allowedCountries: [], allowedCon
  * configuration before it ran - so "connect your agent to Polaris" is not a setup
  * step anybody has to know about, and nothing has to be minted for it.
  */
-async function callerFor(request: Request): Promise<McpCaller | null> {
+/** A connected app whose own address rule refused this call. */
+const IP_REFUSED = Symbol("ip-refused");
+
+async function callerFor(request: Request): Promise<McpCaller | typeof IP_REFUSED | null> {
     const header = request.headers.get("authorization") ?? "";
     const [scheme, ...rest] = header.trim().split(/\s+/);
     if (scheme?.toLowerCase() !== "bearer") return null;
@@ -148,6 +152,15 @@ async function callerFor(request: Request): Promise<McpCaller | null> {
         const ip = await clientIp();
         const decision = await evaluateAccountAccess(access.userId, ip, NO_RULES_OF_ITS_OWN);
         if (!decision.allowed) return null;
+        // The rule the person set on this one connection, read on every call
+        // so a change applies at once.
+        const guarded = {
+            id: access.grantId,
+            userId: access.userId,
+            ipPolicy: access.ipPolicy,
+            approvedIp: access.approvedIp
+        };
+        if (!(await grantAllowsIp(guarded, ip))) return IP_REFUSED;
         await touchGrant(access.grantId, ip);
         return {
             userId: access.userId,
@@ -295,6 +308,13 @@ function unauthorized(request: Request, hadToken: boolean): Response {
 
 export async function POST(request: Request): Promise<Response> {
     const caller = await callerFor(request);
+    // A 403 rather than a 401: the credential is good, and a client told to
+    // sign in again would only loop. The description says where to change it.
+    if (caller === IP_REFUSED)
+        return Response.json(
+            { error: "access_denied", error_description: IP_REFUSED_DESCRIPTION },
+            { status: 403 }
+        );
     // A 401 here rather than a JSON-RPC error: the call never reached the
     // protocol, and an MCP client that sees a 401 knows to fix its credential
     // rather than reporting a tool failure to the model.

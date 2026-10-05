@@ -102,6 +102,48 @@
         "save": "Save",
         "pickOne": "Choose at least one permission, or disconnect it.",
         "changeFailed": "The permissions could not be changed. Reload and try again.",
-        "loading": "Loading connected assistants"
+        "loading": "Loading connected assistants",
+        "ip": {
+            "edit": "Where it may connect from",
+            "editNamed": "Where {app} may connect from",
+            "title": "Where {app} may connect from",
+            "hint": "Checked on every call and every token refresh, on top of your account access rules.",
+            "legend": "Allowed addresses",
+            "modes": {
+                "none": {
+                    "label": "From any address",
+                    "hint": "No address rule of its own."
+                },
+                "origin": {
+                    "label": "Only the address it was approved from",
+                    "hint": "{ip}"
+                },
+                "list": {
+                    "label": "Addresses I choose",
+                    "hint": "An allow list and a deny list of IP addresses or ranges."
+                },
+                "sessions": {
+                    "label": "Only where I am signed in",
+                    "hint": "Addresses of your active Polaris sessions. It stops working when you sign out everywhere."
+                }
+            },
+            "noOrigin": "Not recorded for this connection. Connect it again to use this.",
+            "allow": "Allowed",
+            "allowHint": "Leave empty to allow everything that is not denied.",
+            "deny": "Blocked",
+            "denyHint": "Blocked addresses are refused even if they are allowed.",
+            "placeholder": "203.0.113.7 or 2001:db8::/48",
+            "invalid": "Enter an IP address or a CIDR range.",
+            "listEmpty": "Add at least one address.",
+            "summary": {
+                "none": "From any address",
+                "origin": "Only from {ip}",
+                "sessions": "Only from where you are signed in",
+                "list": "{allow, plural, =0 {Any address} one {# allowed address} other {# allowed addresses}}, {deny, plural, =0 {none denied} one {# denied} other {# denied}}"
+            },
+            "refused": "Refused {time} from {ip}",
+            "unknownIp": "an unknown address",
+            "failed": "The address rule could not be saved. Reload and try again."
+        }
     }
 }

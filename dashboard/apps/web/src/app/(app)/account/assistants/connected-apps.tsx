@@ -26,8 +26,14 @@ import { groupScopes, scopeGroupKey } from "@/lib/api-key-scopes";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { expandPermissions, type Permission } from "@polaris/core";
 import { McpScopeChecklist } from "@/components/mcp-scope-checklist";
-import { Bot, ChevronRight, Pencil, Search, Unplug } from "lucide-react";
-import { changeAppScopesAction, disconnectAppAction } from "./connected-app-actions";
+import { IpRuleDialog } from "./ip-rule-dialog";
+import type { IpPolicy } from "@/lib/mcp/oauth/ip-policy";
+import { Bot, ChevronRight, Network, Pencil, Search, ShieldAlert, Unplug } from "lucide-react";
+import {
+    changeAppScopesAction,
+    disconnectAppAction,
+    setAppIpPolicyAction
+} from "./connected-app-actions";
 import {
     Badge,
     Button,
@@ -66,6 +72,7 @@ export function ConnectedApps({ apps: initial }: { apps: ConnectedAppRow[] }) {
     const [error, setError] = useState<string | null>(null);
     const [query, setQuery] = useState("");
     const [editing, setEditing] = useState<ConnectedAppRow | null>(null);
+    const [network, setNetwork] = useState<ConnectedAppRow | null>(null);
 
     const needle = query.trim().toLowerCase();
     const shown = useMemo(
@@ -127,6 +134,25 @@ export function ConnectedApps({ apps: initial }: { apps: ConnectedAppRow[] }) {
         router.refresh();
     }
 
+    async function saveNetwork(app: ConnectedAppRow, policy: IpPolicy) {
+        setNetwork(null);
+        setError(null);
+        const before = apps;
+        setApps((current) =>
+            current.map((entry) => (entry.id === app.id ? { ...entry, ipPolicy: policy } : entry))
+        );
+        const result = await setAppIpPolicyAction({ id: app.id, policy }).catch(() => ({
+            error: t("connectedApps.ip.failed"),
+            policy: undefined
+        }));
+        if (result.error || !result.policy) {
+            setApps(before);
+            setError(result.error ?? t("connectedApps.ip.failed"));
+            return;
+        }
+        router.refresh();
+    }
+
     return (
         <Card>
             <CardHeader>
@@ -177,6 +203,7 @@ export function ConnectedApps({ apps: initial }: { apps: ConnectedAppRow[] }) {
                                 key={app.id}
                                 app={app}
                                 onEdit={() => setEditing(app)}
+                                onNetwork={() => setNetwork(app)}
                                 onDisconnect={() => void disconnect(app)}
                             />
                         ))}
@@ -190,18 +217,43 @@ export function ConnectedApps({ apps: initial }: { apps: ConnectedAppRow[] }) {
                     onSave={(scopes) => void save(editing, scopes)}
                 />
             ) : null}
+            {network ? (
+                <IpRuleDialog
+                    name={network.name || t("consent.unnamed")}
+                    current={network.ipPolicy}
+                    approvedIp={network.approvedIp}
+                    onCancel={() => setNetwork(null)}
+                    onSave={(policy) => void saveNetwork(network, policy)}
+                />
+            ) : null}
             {confirmElement}
         </Card>
     );
 }
 
+/** The connection's address rule in a few words. */
+function ruleSummary(t: ReturnType<typeof useTranslations<"mcp">>, app: ConnectedAppRow): string {
+    const policy = app.ipPolicy;
+    if (policy.mode === "origin")
+        return t("connectedApps.ip.summary.origin", { ip: app.approvedIp ?? "" });
+    if (policy.mode === "sessions") return t("connectedApps.ip.summary.sessions");
+    if (policy.mode === "list")
+        return t("connectedApps.ip.summary.list", {
+            allow: policy.allow.length,
+            deny: policy.deny.length
+        });
+    return t("connectedApps.ip.summary.none");
+}
+
 function AppRow({
     app,
     onEdit,
+    onNetwork,
     onDisconnect
 }: {
     app: ConnectedAppRow;
     onEdit: () => void;
+    onNetwork: () => void;
     onDisconnect: () => void;
 }) {
     const t = useTranslations("mcp");
@@ -253,6 +305,25 @@ function AppRow({
                         time: <RelativeTime key="time" iso={app.createdAt} />
                     })}
                 </p>
+                {app.ipPolicy.mode !== "none" ? (
+                    <p className="flex min-w-0 items-start gap-1.5 text-xs text-muted-foreground">
+                        <Network className="mt-0.5 size-3 shrink-0" aria-hidden />
+                        <span className="min-w-0 [overflow-wrap:anywhere]">
+                            {ruleSummary(t, app)}
+                        </span>
+                    </p>
+                ) : null}
+                {app.lastRefusedAt ? (
+                    <p className="flex min-w-0 items-start gap-1.5 text-xs text-warning-ink">
+                        <ShieldAlert className="mt-0.5 size-3 shrink-0" aria-hidden />
+                        <span className="min-w-0 [overflow-wrap:anywhere]">
+                            {t.rich("connectedApps.ip.refused", {
+                                time: <RelativeTime key="time" iso={app.lastRefusedAt} />,
+                                ip: app.lastRefusedIp ?? t("connectedApps.ip.unknownIp")
+                            })}
+                        </span>
+                    </p>
+                ) : null}
                 <button
                     type="button"
                     className="mt-1 inline-flex w-fit items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
@@ -278,6 +349,15 @@ function AppRow({
                     onClick={onEdit}
                 >
                     <Pencil className="size-3.5" aria-hidden />
+                </Button>
+                <Button
+                    variant="ghost"
+                    size="icon-sm"
+                    aria-label={t("connectedApps.ip.editNamed", { app: name })}
+                    title={t("connectedApps.ip.edit")}
+                    onClick={onNetwork}
+                >
+                    <Network className="size-3.5" aria-hidden />
                 </Button>
                 <Button
                     variant="ghost"

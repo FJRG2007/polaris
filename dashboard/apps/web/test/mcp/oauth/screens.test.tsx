@@ -101,7 +101,11 @@ describe("the connected-assistants list", () => {
         offered: ["tasks.read", "tasks.manage", "notes.use"] as never,
         createdAt: new Date().toISOString(),
         lastUsedAt: null,
-        lastUsedIp: null
+        lastUsedIp: null,
+        ipPolicy: { mode: "none" as const, allow: [], deny: [] },
+        approvedIp: "203.0.113.5",
+        lastRefusedAt: null,
+        lastRefusedIp: null
     };
 
     it("lists each app with its mark, return address, a permission count and its actions", () => {
@@ -134,6 +138,26 @@ describe("the connected-assistants list", () => {
         expect(html).toContain("Used in the last 7 days");
         expect(html).toContain("203.0.113.9");
         expect(html).toContain('type="search"');
+    });
+
+    it("says where an app may connect from, and when its rule refused it", () => {
+        const html = renderToStaticMarkup(
+            withMessages(
+                <ConnectedApps
+                    apps={[
+                        {
+                            ...app,
+                            ipPolicy: { mode: "origin", allow: [], deny: [] },
+                            lastRefusedAt: new Date().toISOString(),
+                            lastRefusedIp: "198.51.100.20"
+                        }
+                    ]}
+                />
+            )
+        );
+        expect(html).toContain("Only from 203.0.113.5");
+        expect(html).toContain("198.51.100.20");
+        expect(html).toContain('aria-label="Where Visual Studio Code may connect from"');
     });
 
     it("says how to connect one when there are none", () => {
