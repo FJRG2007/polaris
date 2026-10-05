@@ -71,7 +71,8 @@ permissions:
 # removes; the next successful run measures its changes from the last one that
 # succeeded, so nothing the cancelled run carried is skipped.
 concurrency:
-  group: dashboard-publish
+  # A dry run has a queue of its own: it must never cancel a real publish.
+  group: dashboard-publish${{ inputs.dry_run && '-dry-run' || '' }}
   cancel-in-progress: true
 
 # 'false' only for a manual run asked to be dry: everything builds exactly as it
