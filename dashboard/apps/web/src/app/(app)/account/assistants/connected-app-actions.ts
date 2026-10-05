@@ -120,7 +120,8 @@ export async function setAppIpPolicyAction(
     const { policy } = parsed.data;
     const stored: IpPolicy =
         policy.mode === "list" ? policy : { mode: policy.mode, allow: [], deny: [] };
-    if (stored.mode === "origin" && !app.approvedIp) return { error: t("connectedApps.ip.noOrigin") };
+    if (stored.mode === "origin" && !app.approvedIp)
+        return { error: t("connectedApps.ip.noOrigin") };
 
     // Narrowing where an app may call from is always allowed; anything that
     // could widen it is a change to a credential and waits out a new device.

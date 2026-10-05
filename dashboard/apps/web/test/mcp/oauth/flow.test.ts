@@ -922,7 +922,12 @@ describe("where a connected app may call from", () => {
         state.ip = "198.51.100.20";
         expect((await mcpCall(access, whoami)).status).toBe(403);
 
-        sessions.push({ userId: ADA.id, expiresAt: later, ipAddress: "198.51.100.20", state: null });
+        sessions.push({
+            userId: ADA.id,
+            expiresAt: later,
+            ipAddress: "198.51.100.20",
+            state: null
+        });
         expect((await mcpCall(access, whoami)).status).toBe(200);
 
         // Another person's session, an expired one, or one awaiting approval
@@ -967,9 +972,9 @@ describe("where a connected app may call from", () => {
             (await setAppIpPolicyAction({ id: app.id, policy: { mode: "list", allow: ["nope"] } }))
                 .error
         ).toBe("connectedApps.ip.failed");
-        expect(
-            (await setAppIpPolicyAction({ id: app.id, policy: { mode: "list" } })).error
-        ).toBe("connectedApps.ip.failed");
+        expect((await setAppIpPolicyAction({ id: app.id, policy: { mode: "list" } })).error).toBe(
+            "connectedApps.ip.failed"
+        );
         state.user = { ...state.user, id: BOB.id };
         expect(
             (await setAppIpPolicyAction({ id: app.id, policy: { mode: "sessions" } })).error
@@ -983,16 +988,14 @@ describe("where a connected app may call from", () => {
         expect((await mcpCall(access, whoami)).status).toBe(403);
         await setAppIpPolicyAction({ id: app.id, policy: { mode: "none" } });
         expect((await mcpCall(access, whoami)).status).toBe(200);
-        expect(state.audit.map((entry) => entry.action)).toContain(
-            "account.oauth.ip-rule-changed"
-        );
+        expect(state.audit.map((entry) => entry.action)).toContain("account.oauth.ip-rule-changed");
     });
 
     it("cannot lock to an origin a connection never recorded", async () => {
         const { app } = await connected();
         state.db.tables.oAuthGrant![0]!.approvedIp = null;
-        expect(
-            (await setAppIpPolicyAction({ id: app.id, policy: { mode: "origin" } })).error
-        ).toBe("connectedApps.ip.noOrigin");
+        expect((await setAppIpPolicyAction({ id: app.id, policy: { mode: "origin" } })).error).toBe(
+            "connectedApps.ip.noOrigin"
+        );
     });
 });
