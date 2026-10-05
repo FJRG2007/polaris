@@ -33,15 +33,18 @@ export const MAIL_REFUSALS: Readonly<Record<string, MailKey>> = {
     "That authorized account is not linked here any more.": "refusals.authorizerUnlinked",
     "That account is linked, but it has not been given access to its mail. Authorize it again from here.":
         "refusals.authorizerNoMailAccess",
-    "Polaris could not reach the incoming server. Check the name and the port.": "refusals.incomingUnreachable",
-    "Polaris could not reach the outgoing server. Check the name and the port.": "refusals.outgoingUnreachable",
+    "Polaris could not reach the incoming server. Check the name and the port.":
+        "refusals.incomingUnreachable",
+    "Polaris could not reach the outgoing server. Check the name and the port.":
+        "refusals.outgoingUnreachable",
     "Enter the password for this mailbox.": "refusals.enterPassword",
     "The servers or login changed, so enter the password again.": "refusals.passwordAgain",
     "That message has no files to save.": "refusals.noFilesToSave",
     "That draft is not yours.": "refusals.draftNotYours",
     "This mailbox needs its password again.": "refusals.needsPassword",
     "The account that authorized this mailbox is no longer linked.": "refusals.authorizerGone",
-    "The account that authorized this mailbox needs authorizing again.": "refusals.authorizerExpired",
+    "The account that authorized this mailbox needs authorizing again.":
+        "refusals.authorizerExpired",
     "Google is not connected on this Polaris any more.": "refusals.googleGone",
     "Microsoft is not connected on this Polaris any more.": "refusals.microsoftGone",
     "This mailbox needs authorizing again.": "refusals.needsAuthorizing",
@@ -62,7 +65,8 @@ export const MAIL_REFUSALS: Readonly<Record<string, MailKey>> = {
     "This sender no longer publishes a way to unsubscribe.": "refusals.noUnsubscribe",
     "That template is not yours.": "refusals.templateNotYours",
     "Not sent. The outgoing server refused this message.": "refusals.sendRefused",
-    "Not sent yet. Polaris could not reach the outgoing server, and will try again.": "refusals.sendRetrying",
+    "Not sent yet. Polaris could not reach the outgoing server, and will try again.":
+        "refusals.sendRetrying",
     "Not sent yet. Polaris could not reach the outgoing server.": "refusals.sendUnreached",
     "It did not reach the address it was sent to.": "refusals.bounced",
     // What the browser's own mail calls say when the answer never came back
@@ -121,27 +125,67 @@ export const MAIL_REFUSALS: Readonly<Record<string, MailKey>> = {
 
 /** Sentences that carry values, by the shape of their English. Each group of
  *  the pattern fills the parameter named at the same place. */
-const PATTERNS: readonly { readonly pattern: RegExp; readonly key: MailKey; readonly params: readonly string[] }[] = [
-    { pattern: /^This mailbox has no (.+) folder\.$/, key: "refusals.noRoleFolder", params: ["role"] },
-    { pattern: /^A folder name cannot contain "(.+)"\.$/, key: "refusals.folderNameCharacter", params: ["character"] },
-    { pattern: /^You already have a label called (.+)\.$/, key: "refusals.labelTaken", params: ["name"] },
-    { pattern: /^You already have a template called (.+)\.$/, key: "refusals.templateTaken", params: ["name"] },
-    { pattern: /^Not sent\. The outgoing server refused it: (.+)$/s, key: "refusals.sendRefusedBecause", params: ["reason"] },
+const PATTERNS: readonly {
+    readonly pattern: RegExp;
+    readonly key: MailKey;
+    readonly params: readonly string[];
+}[] = [
+    {
+        pattern: /^This mailbox has no (.+) folder\.$/,
+        key: "refusals.noRoleFolder",
+        params: ["role"]
+    },
+    {
+        pattern: /^A folder name cannot contain "(.+)"\.$/,
+        key: "refusals.folderNameCharacter",
+        params: ["character"]
+    },
+    {
+        pattern: /^You already have a label called (.+)\.$/,
+        key: "refusals.labelTaken",
+        params: ["name"]
+    },
+    {
+        pattern: /^You already have a template called (.+)\.$/,
+        key: "refusals.templateTaken",
+        params: ["name"]
+    },
+    {
+        pattern: /^Not sent\. The outgoing server refused it: (.+)$/s,
+        key: "refusals.sendRefusedBecause",
+        params: ["reason"]
+    },
     {
         pattern: /^Not sent yet\. The outgoing server said: (.+) Polaris will try again\.$/s,
         key: "refusals.sendRetryingBecause",
         params: ["reason"]
     },
-    { pattern: /^Not sent yet\. The outgoing server said: (.+)$/s, key: "refusals.sendSaid", params: ["reason"] },
+    {
+        pattern: /^Not sent yet\. The outgoing server said: (.+)$/s,
+        key: "refusals.sendSaid",
+        params: ["reason"]
+    },
     {
         pattern: /^The outgoing server would not send it to (.+) and (\d+) more\.$/s,
         key: "refusals.partialMore",
         params: ["names", "rest"]
     },
-    { pattern: /^The outgoing server would not send it to (.+)\.$/s, key: "refusals.partial", params: ["names"] },
-    { pattern: /^It did not reach to (.+?): (.+)$/s, key: "refusals.bouncedToBecause", params: ["recipient", "reason"] },
+    {
+        pattern: /^The outgoing server would not send it to (.+)\.$/s,
+        key: "refusals.partial",
+        params: ["names"]
+    },
+    {
+        pattern: /^It did not reach to (.+?): (.+)$/s,
+        key: "refusals.bouncedToBecause",
+        params: ["recipient", "reason"]
+    },
     { pattern: /^It did not reach to (.+)\.$/s, key: "refusals.bouncedTo", params: ["recipient"] },
-    { pattern: /^It did not reach the address it was sent to: (.+)$/s, key: "refusals.bouncedBecause", params: ["reason"] },
+    {
+        pattern: /^It did not reach the address it was sent to: (.+)$/s,
+        key: "refusals.bouncedBecause",
+        params: ["reason"]
+    },
     {
         pattern: /^Not delivered to (.+?) yet, and the server is still trying: (.+)$/s,
         key: "refusals.delayedToBecause",
@@ -173,7 +217,10 @@ export function mailRefusalText(t: NamespaceTranslator<"mail">, message: string)
     for (const { pattern, key: shaped, params } of PATTERNS) {
         const found = pattern.exec(message);
         if (!found) continue;
-        return t(shaped, Object.fromEntries(params.map((name, index) => [name, found[index + 1] ?? ""])));
+        return t(
+            shaped,
+            Object.fromEntries(params.map((name, index) => [name, found[index + 1] ?? ""]))
+        );
     }
     return message;
 }

@@ -136,7 +136,9 @@ describe("a message that arrives after the filter was saved", () => {
         });
         expect(actOnMessages.mock.calls.map((call) => call[2])).toEqual(["trash", "star"]);
         // Said where an operator can find it, without anything the message says.
-        expect(String(quiet.mock.calls[0]?.[0])).toContain(`could not trash a message in mailbox ${MAILBOX}`);
+        expect(String(quiet.mock.calls[0]?.[0])).toContain(
+            `could not trash a message in mailbox ${MAILBOX}`
+        );
         quiet.mockRestore();
     });
 

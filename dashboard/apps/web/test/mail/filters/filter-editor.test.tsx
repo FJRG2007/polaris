@@ -272,7 +272,9 @@ describe("a filter that forwards", () => {
     it("warns in the list when its address is not a verified one, with a way to fix it", () => {
         draw([FORWARDER], []);
         expect(
-            screen.getByText("Not forwarding: team@example.com is not a verified address on your account.")
+            screen.getByText(
+                "Not forwarding: team@example.com is not a verified address on your account."
+            )
         ).toBeTruthy();
         expect(screen.getByRole("link", { name: "Manage your addresses" })).toBeTruthy();
     });

@@ -62,7 +62,10 @@ export function blockedBy(rule: MailRuleView): BlockedSender | null {
 }
 
 /** Everybody this mailbox is refusing. */
-export async function listBlockedSenders(userId: string, accountId: string): Promise<BlockedSender[]> {
+export async function listBlockedSenders(
+    userId: string,
+    accountId: string
+): Promise<BlockedSender[]> {
     const rules = await listRules(userId, accountId);
     return rules.map(blockedBy).filter((one): one is BlockedSender => one !== null);
 }
@@ -105,6 +108,10 @@ export async function blockSender(
 
 /** Take the block off. What was already thrown away stays thrown away - it is in
  *  the trash, where it can be fetched back by hand. */
-export async function unblockSender(userId: string, accountId: string, ruleId: string): Promise<void> {
+export async function unblockSender(
+    userId: string,
+    accountId: string,
+    ruleId: string
+): Promise<void> {
     await deleteRule(userId, accountId, ruleId);
 }
