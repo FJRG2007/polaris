@@ -49,6 +49,19 @@ describe("check-client-paths", () => {
         expect(findLeaks(bundle, spellings(root))).toEqual([]);
     });
 
+    it("does not take a workspace at a top-level directory for every URL that names it", () => {
+        const needles = [...spellings(resolve("/build")), ...spellings(resolve("/root"))];
+        const bundle = 'createRequire("file:///node_modules/pdfjs-dist/build/pdf.mjs");fetch("/build/prune?all=true");n.push("/root")';
+        expect(findLeaks(bundle, needles)).toEqual([]);
+        expect(findLeaks(`new URL("${pathToFileURL(resolve("/build", "x.js")).href}")`, needles).length).toBeGreaterThan(0);
+    });
+
+    it("matches only a whole path, not a longer one that starts with it", () => {
+        const needles = spellings(root);
+        expect(findLeaks(`"${root.replaceAll("\\", "/")}-old/x.js"`, needles)).toEqual([]);
+        expect(findLeaks(`"/mirror${root.replaceAll("\\", "/")}/x.js"`, needles)).toEqual([]);
+    });
+
     it("ignores paths too short to mean anything", () => {
         expect(spellings("/")).toEqual([]);
     });

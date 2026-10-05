@@ -112,7 +112,13 @@ jobs:
           fi
           npm audit --omit=dev --json > "$RUNNER_TEMP/audit.json" || true
           node scripts/audit-gate.mjs "$RUNNER_TEMP/audit.json" $mode --title "Production dependencies" | tee -a "$GITHUB_STEP_SUMMARY"
-          exit "${PIPESTATUS[0]}"
+          status="${PIPESTATUS[0]}"
+          if [ -n "$mode" ] && [ "$status" = 2 ]; then
+            echo "::warning title=npm audit::The audit could not run (npm or its report failed); not gating this change on it."
+            echo "Audit could not run: npm or its report failed." >> "$GITHUB_STEP_SUMMARY"
+            status=0
+          fi
+          exit "$status"
 
       - run: npm run db:generate
       # The packages only. They publish the declarations everything below reads;

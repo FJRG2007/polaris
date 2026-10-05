@@ -16,13 +16,21 @@ import { dirname, join, relative, resolve } from "node:path";
 import { readdirSync, readFileSync, statSync } from "node:fs";
 
 const TEXT = /\.(?:m?js|css|json|map|html|txt|svg)$/i;
+const PATH_CHAR = /[\w.~\\/-]/;
 
-/** Every way `path` can appear inside a built file. Paths too short to be specific are skipped. */
+/**
+ * Every way `path` can appear inside a built file. Paths too short to be specific are skipped,
+ * and a single top-level directory (`/build`, `/root`) is only looked for as a `file://` URL,
+ * since its bare spelling is also an ordinary URL path.
+ */
 export function spellings(path) {
     const native = resolve(path);
     if (native.replace(/[\\/]+$/, "").length < 4) return [];
+    const segments = native.split(/[\\/]+/).filter((segment) => segment && !/^[A-Za-z]:$/.test(segment));
+    if (!segments.length) return [];
+    const href = pathToFileURL(native).href;
     const forward = native.replaceAll("\\", "/");
-    const forms = new Set([native, forward, JSON.stringify(native).slice(1, -1), pathToFileURL(native).href]);
+    const forms = new Set(segments.length < 2 ? [href] : [native, forward, JSON.stringify(native).slice(1, -1), href]);
     // A drive letter is written in either case, depending on who formatted it.
     for (const form of [...forms]) {
         const drive = /^([A-Za-z]):/.exec(form) ?? /^file:\/\/\/([A-Za-z]):/.exec(form);
@@ -34,6 +42,13 @@ export function spellings(path) {
     return [...forms];
 }
 
+/** Whether `needle` at `at` is a whole path, not part of a longer name or path. */
+function standsAlone(text, at, needle) {
+    const before = text[at - 1];
+    const after = text[at + needle.length];
+    return !(before && PATH_CHAR.test(before)) && !(after && after !== "/" && after !== "\\" && PATH_CHAR.test(after));
+}
+
 /** The lines of `text` that contain any of `needles`, trimmed to a readable excerpt. */
 export function findLeaks(text, needles) {
     const hits = [];
@@ -41,7 +56,7 @@ export function findLeaks(text, needles) {
         if (hits.length) break;
         let at = text.indexOf(needle);
         while (at !== -1 && hits.length < 5) {
-            hits.push(text.slice(Math.max(0, at - 40), at + needle.length + 40).replace(/\s+/g, " "));
+            if (standsAlone(text, at, needle)) hits.push(text.slice(Math.max(0, at - 40), at + needle.length + 40).replace(/\s+/g, " "));
             at = text.indexOf(needle, at + needle.length);
         }
     }
