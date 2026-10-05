@@ -39,7 +39,13 @@ import { dropAutomationsCache } from "../automations/cache";
 import { Badge, Button, Card, Skeleton, cn } from "@polaris/ui";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { DeviceControls, DeviceIcon, DevicePanel, stateClass, toneClass } from "../devices/device-panel";
+import {
+    DeviceControls,
+    DeviceIcon,
+    DevicePanel,
+    stateClass,
+    toneClass
+} from "../devices/device-panel";
 import {
     AlertTriangle,
     ArrowRight,
@@ -153,7 +159,9 @@ export function OverviewView({
     }, [load]);
 
     const update = useCallback((change: (entry: DeviceView) => DeviceView) => {
-        setData((current) => (current ? { ...current, devices: current.devices.map(change) } : current));
+        setData((current) =>
+            current ? { ...current, devices: current.devices.map(change) } : current
+        );
         setOpened((current) => (current ? change(current) : current));
     }, []);
     const { busy, act } = useDeviceAct({ update, setError, resync: () => void load(true) });
@@ -166,27 +174,40 @@ export function OverviewView({
     // A place that could not be read is not drawn as one with nothing in it.
     const unread = data === null && error !== "";
 
-    const onAct = (device: DeviceView) => (action: kinds.DeviceAction, command?: kinds.DeviceCommand) => {
-        // Thrown by `act` so the panel can show it; here the line above has it.
-        void act(device, action, command).catch(() => undefined);
-    };
+    const onAct =
+        (device: DeviceView) => (action: kinds.DeviceAction, command?: kinds.DeviceCommand) => {
+            // Thrown by `act` so the panel can show it; here the line above has it.
+            void act(device, action, command).catch(() => undefined);
+        };
 
     return (
         <div className="flex flex-col gap-6">
             {error ? (
-                <p role="alert" className="rounded-md bg-danger-soft px-3 py-2 text-sm text-danger-ink">
+                <p
+                    role="alert"
+                    className="rounded-md bg-danger-soft px-3 py-2 text-sm text-danger-ink"
+                >
                     {error}
                 </p>
             ) : null}
 
-            {unread ? null : <SummaryTiles summary={summary} cameras={data?.cameras.length ?? null} />}
+            {unread ? null : (
+                <SummaryTiles summary={summary} cameras={data?.cameras.length ?? null} />
+            )}
 
             {summary && summary.attention.length > 0 ? (
                 <AttentionCard items={summary.attention} onOpen={setOpened} />
             ) : null}
 
-            <div className={unread ? "hidden" : "flex flex-col gap-6 lg:grid lg:grid-cols-3 lg:items-start"}>
-                <section aria-label={t("placeOverview.rooms.title")} className="order-2 flex min-w-0 flex-col gap-3 lg:order-none lg:col-span-2">
+            <div
+                className={
+                    unread ? "hidden" : "flex flex-col gap-6 lg:grid lg:grid-cols-3 lg:items-start"
+                }
+            >
+                <section
+                    aria-label={t("placeOverview.rooms.title")}
+                    className="order-2 flex min-w-0 flex-col gap-3 lg:order-none lg:col-span-2"
+                >
                     <h2 className="text-[0.6875rem] font-semibold uppercase tracking-wide text-foreground-subtle">
                         {t("placeOverview.rooms.title")}
                     </h2>
@@ -198,13 +219,19 @@ export function OverviewView({
                     ) : rooms.length === 0 ? (
                         <Card className="flex flex-col items-center gap-2 px-4 py-8 text-center">
                             <Plug className="size-5 text-muted-foreground" aria-hidden="true" />
-                            <p className="text-sm font-medium">{t("placeOverview.rooms.emptyTitle")}</p>
+                            <p className="text-sm font-medium">
+                                {t("placeOverview.rooms.emptyTitle")}
+                            </p>
                             <p className="max-w-sm text-xs text-muted-foreground">
-                                {canManage ? t("placeOverview.rooms.emptyManage") : t("placeOverview.rooms.emptyView")}
+                                {canManage
+                                    ? t("placeOverview.rooms.emptyManage")
+                                    : t("placeOverview.rooms.emptyView")}
                             </p>
                             {canManage ? (
                                 <Button asChild size="sm" className="mt-1">
-                                    <Link href="/places/devices">{t("placeOverview.rooms.connect")}</Link>
+                                    <Link href="/places/devices">
+                                        {t("placeOverview.rooms.connect")}
+                                    </Link>
                                 </Button>
                             ) : null}
                         </Card>
@@ -247,7 +274,11 @@ export function OverviewView({
                                                   ...current,
                                                   automations: current.automations.map((entry) =>
                                                       entry.id === id
-                                                          ? { ...entry, lastStatus: status, lastRunAt: new Date().toISOString() }
+                                                          ? {
+                                                                ...entry,
+                                                                lastStatus: status,
+                                                                lastRunAt: new Date().toISOString()
+                                                            }
                                                           : entry
                                                   )
                                               }
@@ -286,7 +317,11 @@ export function OverviewView({
                 }}
             />
             {watching ? (
-                <CameraViewer camera={watching} canControl={canControl} onClose={() => setWatching(null)} />
+                <CameraViewer
+                    camera={watching}
+                    canControl={canControl}
+                    onClose={() => setWatching(null)}
+                />
             ) : null}
         </div>
     );
@@ -312,7 +347,10 @@ function OverviewCard({
         <Card className="flex min-w-0 flex-col">
             <div className="flex items-center gap-2 border-b border-border px-4 py-3">
                 <Icon className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
-                <h2 className="min-w-0 flex-1 truncate text-sm font-semibold tracking-tight" title={title}>
+                <h2
+                    className="min-w-0 flex-1 truncate text-sm font-semibold tracking-tight"
+                    title={title}
+                >
                     {title}
                 </h2>
                 {hint}
@@ -364,7 +402,10 @@ function SummaryTiles({
         return (
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6" aria-busy="true">
                 {[0, 1, 2, 3].map((index) => (
-                    <div key={index} className="flex flex-col gap-2 rounded-lg border border-border bg-card px-3 py-3">
+                    <div
+                        key={index}
+                        className="flex flex-col gap-2 rounded-lg border border-border bg-card px-3 py-3"
+                    >
                         <Skeleton className="h-3 w-16" />
                         <Skeleton className="h-4 w-24" />
                     </div>
@@ -375,7 +416,10 @@ function SummaryTiles({
     const tiles = summaryTiles(summary, cameras, t);
     if (tiles.length === 0) return null;
     return (
-        <section aria-label={t("placeOverview.summary.label")} className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+        <section
+            aria-label={t("placeOverview.summary.label")}
+            className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6"
+        >
             {tiles.map((tile) => (
                 <Link
                     key={tile.key}
@@ -383,14 +427,22 @@ function SummaryTiles({
                     className="flex min-w-0 flex-col gap-1 rounded-lg border border-border bg-card px-3 py-2.5 transition-colors hover:bg-muted"
                 >
                     <span className="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
-                        <tile.icon className={cn("size-3.5 shrink-0", TILE_TONES[tile.tone])} aria-hidden="true" />
-                        <span className="truncate" title={tile.label}>{tile.label}</span>
+                        <tile.icon
+                            className={cn("size-3.5 shrink-0", TILE_TONES[tile.tone])}
+                            aria-hidden="true"
+                        />
+                        <span className="truncate" title={tile.label}>
+                            {tile.label}
+                        </span>
                     </span>
                     <span className="truncate text-sm font-semibold" title={tile.value}>
                         {tile.value}
                     </span>
                     {tile.detail ? (
-                        <span className="truncate text-[0.6875rem] text-foreground-subtle" title={tile.detail}>
+                        <span
+                            className="truncate text-[0.6875rem] text-foreground-subtle"
+                            title={tile.detail}
+                        >
                             {tile.detail}
                         </span>
                     ) : null}
@@ -412,7 +464,10 @@ export function summaryTiles(
         tiles.push({
             key: "devices",
             label: t("placeOverview.summary.devices"),
-            value: t("placeOverview.summary.online", { online: summary.online, total: summary.total }),
+            value: t("placeOverview.summary.online", {
+                online: summary.online,
+                total: summary.total
+            }),
             detail:
                 summary.offline > 0
                     ? t("placeOverview.summary.offline", { count: summary.offline })
@@ -470,7 +525,10 @@ export function summaryTiles(
                 summary.unlocked > 0
                     ? t("placeOverview.summary.unlocked", { count: summary.unlocked })
                     : t("placeOverview.summary.allLocked"),
-            detail: summary.doorsOpen > 0 ? t("placeOverview.summary.doorsOpen", { count: summary.doorsOpen }) : undefined,
+            detail:
+                summary.doorsOpen > 0
+                    ? t("placeOverview.summary.doorsOpen", { count: summary.doorsOpen })
+                    : undefined,
             icon: summary.unlocked > 0 || summary.doorsOpen > 0 ? DoorOpen : Lock,
             tone: summary.unlocked > 0 || summary.doorsOpen > 0 ? "warn" : "ok",
             href: "/places/devices"
@@ -491,7 +549,10 @@ export function summaryTiles(
         tiles.push({
             key: "attention",
             label: t("placeOverview.summary.attention"),
-            value: count > 0 ? t("placeOverview.summary.needYou", { count }) : t("placeOverview.summary.allGood"),
+            value:
+                count > 0
+                    ? t("placeOverview.summary.needYou", { count })
+                    : t("placeOverview.summary.allGood"),
             icon: count > 0 ? AlertTriangle : CheckCircle2,
             tone: count > 0 ? "warn" : "ok",
             href: "/places/devices"
@@ -517,7 +578,11 @@ function AttentionCard({
 }) {
     const t = usePlacesT();
     return (
-        <OverviewCard title={t("placeOverview.attention.title")} icon={AlertTriangle} href="/places/devices">
+        <OverviewCard
+            title={t("placeOverview.attention.title")}
+            icon={AlertTriangle}
+            href="/places/devices"
+        >
             <ul className="flex flex-col divide-y divide-border">
                 {items.map(({ device, reason }) => (
                     <li key={device.id}>
@@ -527,16 +592,24 @@ function AttentionCard({
                             className="flex w-full min-w-0 items-center gap-2.5 px-4 py-2.5 text-left transition-colors hover:bg-muted"
                         >
                             {reason === "battery" ? (
-                                <BatteryLow className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+                                <BatteryLow
+                                    className="size-4 shrink-0 text-muted-foreground"
+                                    aria-hidden="true"
+                                />
                             ) : (
-                                <DeviceIcon kind={device.kind} className="size-4 shrink-0 text-muted-foreground" />
+                                <DeviceIcon
+                                    kind={device.kind}
+                                    className="size-4 shrink-0 text-muted-foreground"
+                                />
                             )}
                             <span className="flex min-w-0 flex-1 flex-col">
                                 <span className="truncate text-sm" title={device.name}>
                                     {device.name}
                                 </span>
                                 {device.zone ? (
-                                    <span className="truncate text-[0.6875rem] text-foreground-subtle">{device.zone}</span>
+                                    <span className="truncate text-[0.6875rem] text-foreground-subtle">
+                                        {device.zone}
+                                    </span>
                                 ) : null}
                             </span>
                             <Badge className={cn("shrink-0", toneClass(ATTENTION_TONES[reason]))}>
@@ -562,7 +635,9 @@ function RoomCard({
     canControl: boolean;
     busy: { id: string; action: kinds.DeviceAction } | null;
     onOpen: (device: DeviceView) => void;
-    onAct: (device: DeviceView) => (action: kinds.DeviceAction, command?: kinds.DeviceCommand) => void;
+    onAct: (
+        device: DeviceView
+    ) => (action: kinds.DeviceAction, command?: kinds.DeviceCommand) => void;
 }) {
     const t = usePlacesT();
     const title = room.name || t("placeOverview.rooms.unplaced");
@@ -580,15 +655,24 @@ function RoomCard({
         >
             <ul className="flex flex-col divide-y divide-border">
                 {room.devices.map((device) => (
-                    <li key={device.id} className="flex flex-wrap items-center gap-x-3 gap-y-2 px-4 py-2.5">
+                    <li
+                        key={device.id}
+                        className="flex flex-wrap items-center gap-x-3 gap-y-2 px-4 py-2.5"
+                    >
                         <button
                             type="button"
                             onClick={() => onOpen(device)}
                             className="flex min-w-[8rem] flex-1 items-center gap-2.5 text-left"
                         >
-                            <DeviceIcon kind={device.kind} className="size-4 shrink-0 text-muted-foreground" />
+                            <DeviceIcon
+                                kind={device.kind}
+                                className="size-4 shrink-0 text-muted-foreground"
+                            />
                             <span className="flex min-w-0 flex-col items-start gap-0.5">
-                                <span className="max-w-full truncate text-sm font-medium" title={device.name}>
+                                <span
+                                    className="max-w-full truncate text-sm font-medium"
+                                    title={device.name}
+                                >
                                     {device.name}
                                 </span>
                                 <Badge className={cn("max-w-full truncate", stateClass(device))}>
@@ -658,7 +742,9 @@ function CamerasCard({
                 </div>
             ) : cameras.length === 0 ? (
                 <div className="flex flex-col items-center gap-2 px-4 py-6 text-center">
-                    <p className="text-xs text-muted-foreground">{t("placeOverview.cameras.empty")}</p>
+                    <p className="text-xs text-muted-foreground">
+                        {t("placeOverview.cameras.empty")}
+                    </p>
                     {canManage ? (
                         <Button asChild size="sm" variant="outline">
                             <Link href="/places/cameras">{t("placeOverview.cameras.add")}</Link>
@@ -669,11 +755,19 @@ function CamerasCard({
                 <div className="flex flex-col gap-2 p-3">
                     <div className="grid grid-cols-2 gap-2">
                         {shown.map((camera) => (
-                            <CameraThumb key={camera.id} camera={camera} tick={tick} onWatch={onWatch} />
+                            <CameraThumb
+                                key={camera.id}
+                                camera={camera}
+                                tick={tick}
+                                onWatch={onWatch}
+                            />
                         ))}
                     </div>
                     {more > 0 ? (
-                        <Link href="/places/live" className="self-start text-xs text-muted-foreground hover:text-foreground">
+                        <Link
+                            href="/places/live"
+                            className="self-start text-xs text-muted-foreground hover:text-foreground"
+                        >
                             {t("placeOverview.cameras.more", { count: more })}
                         </Link>
                     ) : null}
@@ -722,7 +816,9 @@ function CameraThumb({
                 />
             ) : (
                 <span className="flex size-full items-center justify-center px-2 text-center text-[0.6875rem] text-muted-foreground">
-                    {battery ? t("camera.batteryOpenToWatch") : t("placeOverview.cameras.noPicture")}
+                    {battery
+                        ? t("camera.batteryOpenToWatch")
+                        : t("placeOverview.cameras.noPicture")}
                 </span>
             )}
             <span className="absolute inset-x-0 bottom-0 truncate bg-black/55 px-2 py-1 text-[0.6875rem] font-medium text-white">
@@ -764,7 +860,10 @@ function RoutinesCard({
         setError("");
         setRan(null);
         setRunning(automation.id);
-        const result = await runAction(() => automationActions.runAutomationAction(automation.id), setError);
+        const result = await runAction(
+            () => automationActions.runAutomationAction(automation.id),
+            setError
+        );
         setRunning(null);
         if (!result) return;
         if (result.error) {
@@ -777,7 +876,11 @@ function RoutinesCard({
     };
 
     return (
-        <OverviewCard title={t("placeOverview.routines.title")} icon={Workflow} href="/places/devices/automations">
+        <OverviewCard
+            title={t("placeOverview.routines.title")}
+            icon={Workflow}
+            href="/places/devices/automations"
+        >
             {automations === null ? (
                 <div className="flex flex-col gap-3 p-4" aria-busy="true">
                     <Skeleton className="h-4 w-3/5" />
@@ -785,36 +888,51 @@ function RoutinesCard({
                 </div>
             ) : shown.length === 0 ? (
                 <div className="flex flex-col items-center gap-2 px-4 py-6 text-center">
-                    <p className="text-xs text-muted-foreground">{t("placeOverview.routines.empty")}</p>
+                    <p className="text-xs text-muted-foreground">
+                        {t("placeOverview.routines.empty")}
+                    </p>
                     {canManage ? (
                         <Button asChild size="sm" variant="outline">
-                            <Link href="/places/devices/automations/new">{t("placeOverview.routines.create")}</Link>
+                            <Link href="/places/devices/automations/new">
+                                {t("placeOverview.routines.create")}
+                            </Link>
                         </Button>
                     ) : null}
                 </div>
             ) : (
                 <>
                     {error ? (
-                        <p role="alert" className="mx-4 mt-3 rounded-md bg-danger-soft px-3 py-2 text-xs text-danger-ink">
+                        <p
+                            role="alert"
+                            className="mx-4 mt-3 rounded-md bg-danger-soft px-3 py-2 text-xs text-danger-ink"
+                        >
                             {error}
                         </p>
                     ) : null}
                     <ul className="flex flex-col divide-y divide-border">
                         {shown.map((automation) => (
-                            <li key={automation.id} className="flex min-w-0 items-center gap-2 px-4 py-2">
+                            <li
+                                key={automation.id}
+                                className="flex min-w-0 items-center gap-2 px-4 py-2"
+                            >
                                 <Link
                                     href={`/places/devices/automations/${automation.id}`}
                                     className="flex min-w-0 flex-1 flex-col"
                                 >
                                     <span
-                                        className={cn("truncate text-sm", !automation.enabled && "text-muted-foreground")}
+                                        className={cn(
+                                            "truncate text-sm",
+                                            !automation.enabled && "text-muted-foreground"
+                                        )}
                                         title={automation.name}
                                     >
                                         {automation.name}
                                     </span>
                                     <span className="truncate text-[0.6875rem] text-foreground-subtle">
                                         {ran === automation.id ? (
-                                            <span role="status">{t("placeOverview.routines.started")}</span>
+                                            <span role="status">
+                                                {t("placeOverview.routines.started")}
+                                            </span>
                                         ) : !automation.enabled ? (
                                             t("placeOverview.routines.off")
                                         ) : automation.lastStatus && automation.lastRunAt ? (
@@ -843,8 +961,14 @@ function RoutinesCard({
                                         variant="ghost"
                                         className="size-8 shrink-0 p-0"
                                         disabled={running === automation.id || !automation.enabled}
-                                        aria-label={t("automations.list.runName", { name: automation.name })}
-                                        title={automation.enabled ? t("automations.list.run") : t("automations.list.runOff")}
+                                        aria-label={t("automations.list.runName", {
+                                            name: automation.name
+                                        })}
+                                        title={
+                                            automation.enabled
+                                                ? t("automations.list.run")
+                                                : t("automations.list.runOff")
+                                        }
                                         onClick={() => void run(automation)}
                                     >
                                         {running === automation.id ? (
@@ -875,7 +999,9 @@ function EventsCard({ events }: { events: readonly actions.OverviewEvent[] | nul
                     <Skeleton className="h-4 w-1/2" />
                 </div>
             ) : events.length === 0 ? (
-                <p className="px-4 py-6 text-center text-xs text-muted-foreground">{t("placeOverview.events.empty")}</p>
+                <p className="px-4 py-6 text-center text-xs text-muted-foreground">
+                    {t("placeOverview.events.empty")}
+                </p>
             ) : (
                 <ul className="flex flex-col">
                     {events.map((event) => {
@@ -891,8 +1017,12 @@ function EventsCard({ events }: { events: readonly actions.OverviewEvent[] | nul
                                             "size-2 shrink-0 rounded-full",
                                             event.acked ? "bg-transparent" : "bg-accent"
                                         )}
-                                        title={event.acked ? undefined : t("placeOverview.events.new")}
-                                        aria-label={event.acked ? undefined : t("placeOverview.events.new")}
+                                        title={
+                                            event.acked ? undefined : t("placeOverview.events.new")
+                                        }
+                                        aria-label={
+                                            event.acked ? undefined : t("placeOverview.events.new")
+                                        }
                                     />
                                     <span className="flex min-w-0 flex-1 flex-col">
                                         <span className="truncate text-sm" title={what}>

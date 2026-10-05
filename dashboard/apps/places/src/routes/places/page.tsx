@@ -26,8 +26,15 @@ export default async function PlacePage() {
     return (
         <div className="mx-auto flex w-full max-w-6xl flex-col gap-6">
             <div className="flex flex-wrap items-start justify-between gap-2">
-                <PageHeader title={place.current.name} description={t("pages.overview.description")} />
-                <PlaceSwitcher places={place.places} current={place.current} canManage={canManage} />
+                <PageHeader
+                    title={place.current.name}
+                    description={t("pages.overview.description")}
+                />
+                <PlaceSwitcher
+                    places={place.places}
+                    current={place.current}
+                    canManage={canManage}
+                />
             </div>
             <OverviewView
                 placeId={place.current.id}

@@ -175,7 +175,9 @@ describe("the Overview", () => {
             fireEvent.click(toggle);
         });
         expect(pressed).toEqual([["lamp", "turn-on"]]);
-        await waitFor(() => expect(screen.getByRole("alert").textContent).toContain("The light did not answer."));
+        await waitFor(() =>
+            expect(screen.getByRole("alert").textContent).toContain("The light did not answer.")
+        );
         expect(toggle.getAttribute("aria-checked")).toBe("false");
     });
 
@@ -198,7 +200,9 @@ describe("the Overview", () => {
         hold = true;
         draw();
         const toggle = screen.getByRole("switch", { name: "Turn Reading lamp on or off" });
-        expect(toggle.hasAttribute("disabled") || toggle.getAttribute("aria-disabled") === "true").toBe(true);
+        expect(
+            toggle.hasAttribute("disabled") || toggle.getAttribute("aria-disabled") === "true"
+        ).toBe(true);
         await act(async () => reply({ overview: HOUSE }));
         await waitFor(() => {
             const fresh = screen.getByRole("switch", { name: "Turn Reading lamp on or off" });
@@ -228,27 +232,43 @@ describe("the Overview", () => {
         expect(refreshed).toHaveBeenCalled();
         expect(screen.queryByText("Garage light")).toBeNull();
         const toggle = screen.getByRole("switch", { name: "Turn Reading lamp on or off" });
-        expect(toggle.hasAttribute("disabled") || toggle.getAttribute("aria-disabled") === "true").toBe(true);
+        expect(
+            toggle.hasAttribute("disabled") || toggle.getAttribute("aria-disabled") === "true"
+        ).toBe(true);
     });
 
     it("rounds both ends of a temperature range", async () => {
         served = {
             ...HOUSE,
             devices: [
-                device({ id: "a", kind: "sensor", name: "Hall sensor", reading: { value: "21.37", unit: "°C" } }),
-                device({ id: "b", kind: "sensor", name: "Attic sensor", reading: { value: "23", unit: "°C" } })
+                device({
+                    id: "a",
+                    kind: "sensor",
+                    name: "Hall sensor",
+                    reading: { value: "21.37", unit: "°C" }
+                }),
+                device({
+                    id: "b",
+                    kind: "sensor",
+                    name: "Attic sensor",
+                    reading: { value: "23", unit: "°C" }
+                })
             ]
         };
         draw();
         await screen.findByText("Hall sensor");
-        expect(screen.getByRole("region", { name: "At a glance" }).textContent).toContain("21.4 to 23°C");
+        expect(screen.getByRole("region", { name: "At a glance" }).textContent).toContain(
+            "21.4 to 23°C"
+        );
     });
 
     it("speaks Spanish", async () => {
         draw({ locale: "es-ES" });
         await screen.findByText("Reading lamp");
         expect(screen.getByText("Salas")).toBeTruthy();
-        expect(screen.getByRole("region", { name: "De un vistazo" }).textContent).toContain("2 de 3 en línea");
+        expect(screen.getByRole("region", { name: "De un vistazo" }).textContent).toContain(
+            "2 de 3 en línea"
+        );
         expect(screen.getByText("Sin sala")).toBeTruthy();
     });
 });

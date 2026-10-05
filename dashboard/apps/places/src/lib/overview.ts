@@ -177,8 +177,7 @@ export function groupByRoom(devices: readonly DeviceView[]): Room[] {
         room.devices.push(device);
         rooms.set(key, room);
     }
-    const order = (device: DeviceView) =>
-        kinds.DEVICE_KINDS.indexOf(kinds.deviceKind(device.kind));
+    const order = (device: DeviceView) => kinds.DEVICE_KINDS.indexOf(kinds.deviceKind(device.kind));
     return [...rooms.values()]
         .sort((left, right) =>
             left.name === "" ? 1 : right.name === "" ? -1 : left.name.localeCompare(right.name)
