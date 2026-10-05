@@ -33,7 +33,7 @@ import type { DeviceAccountView } from "../../lib/device-accounts";
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import * as registry from "../../lib/device-connections";
 import { BatteryLow, Plus, RefreshCw, Unplug } from "lucide-react";
-import type { DeviceView } from "../../lib/device-kinds";
+import type { DeviceAction, DeviceCommand, DeviceView } from "../../lib/device-kinds";
 import { useDeviceAct } from "./use-device-act";
 import { DeviceControls, DeviceIcon, DevicePanel, stateClass } from "./device-panel";
 import { FilterChip } from "./air-controls";
@@ -212,6 +212,17 @@ export function DevicesView({
         [take]
     );
 
+    /** Put a change into both lists a device can be in, so the row and the open
+     *  panel never disagree about what a door is doing. */
+    const update = useCallback((change: (entry: DeviceView) => DeviceView) => {
+        setDevices((current) => (current ?? []).map(change));
+        setOpened((current) => (current ? change(current) : current));
+    }, []);
+    const settle = (device: DeviceView) =>
+        update((entry) => (entry.id === device.id ? device : entry));
+
+    const { busy, act } = useDeviceAct({ update, setError, resync: () => void sync(true) });
+
     const connected = accounts.length > 0;
 
     /**
@@ -266,17 +277,6 @@ export function DevicesView({
         onChange: receive,
         onReady: () => void reread()
     });
-
-    /** Put a change into both lists a device can be in, so the row and the open
-     *  panel never disagree about what a door is doing. */
-    const update = useCallback((change: (entry: DeviceView) => DeviceView) => {
-        setDevices((current) => (current ?? []).map(change));
-        setOpened((current) => (current ? change(current) : current));
-    }, []);
-    const settle = (device: DeviceView) =>
-        update((entry) => (entry.id === device.id ? device : entry));
-
-    const { busy, act } = useDeviceAct({ update, setError, resync: () => void sync(true) });
 
     // Stable across renders, so a row whose device did not change is not
     // redrawn because the screen around it was.
