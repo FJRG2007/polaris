@@ -41,7 +41,7 @@ vi.mock("@/lib/safe-fetch", () => ({
     readCapped: async (response: Response) => new Uint8Array(await response.arrayBuffer())
 }));
 
-const { resolveClient } = await import("@/lib/mcp/oauth/clients");
+const { lookupClient, resolveClient } = await import("@/lib/mcp/oauth/clients");
 
 const ADDRESS = "https://claude.ai/oauth/claude-code-client-metadata";
 
@@ -75,6 +75,15 @@ describe("a metadata-document client", () => {
     it("is refused when the address does not answer 200 (a redirect included)", async () => {
         state.status = 302;
         expect(await resolveClient(ADDRESS)).toBeNull();
+    });
+
+    it("tells a document that could not be read from one that was read and refused", async () => {
+        state.status = 503;
+        expect(await lookupClient(ADDRESS)).toEqual({ client: null, failure: "unreachable" });
+        state.status = 200;
+        state.document = { ...(state.document as object), client_id: "https://evil.example/meta" };
+        expect(await lookupClient(ADDRESS)).toEqual({ client: null, failure: "rejected" });
+        expect(await lookupClient("pmc_unknown")).toEqual({ client: null });
     });
 
     it("is never fetched for an address that is not https with a path", async () => {

@@ -43,7 +43,15 @@ const client = {
     source: "registered" as const
 };
 
-const resolve = async (id: string) => (id === client.clientId ? client : null);
+const UNREACHABLE = "https://app.example/oauth/client.json";
+const REFUSED = "https://app.example/oauth/refused.json";
+
+const resolve = async (id: string) => {
+    if (id === client.clientId) return { client };
+    if (id === UNREACHABLE) return { client: null, failure: "unreachable" as const };
+    if (id === REFUSED) return { client: null, failure: "rejected" as const };
+    return { client: null };
+};
 
 function params(overrides: Record<string, string | undefined> = {}) {
     return {
@@ -79,11 +87,15 @@ describe("an authorization request", () => {
             reason: "client"
         });
         expect(await check({ client_id: undefined })).toEqual({ kind: "unsafe", reason: "client" });
-        // An app named by a metadata address whose document could not be had is
-        // told apart, and still never redirected.
-        expect(await check({ client_id: "https://app.example/oauth/client.json" })).toEqual({
+        // An app named by a metadata address whose document could not be read,
+        // or was read and refused, is told apart, and still never redirected.
+        expect(await check({ client_id: UNREACHABLE })).toEqual({
             kind: "unsafe",
             reason: "clientDetails"
+        });
+        expect(await check({ client_id: REFUSED })).toEqual({
+            kind: "unsafe",
+            reason: "clientRefused"
         });
         for (const redirect of [
             "https://attacker.example/cb",

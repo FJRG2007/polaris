@@ -405,19 +405,29 @@ export async function storedClient(clientId: string): Promise<OAuthClientRecord 
     return row ? record(row) : null;
 }
 
+/** Why a metadata-document client could not be had: its document could not be
+ *  read this time (`unreachable`), or it was read and is not one this server
+ *  accepts (`rejected`), which no retry changes. */
+export type ClientFailure = "unreachable" | "rejected";
+
+/** A client looked up for an authorization request, or why there is none. */
+export type ClientLookup =
+    | { readonly client: OAuthClientRecord; readonly failure?: undefined }
+    | { readonly client: null; readonly failure?: ClientFailure };
+
 /**
  * The client an authorization request names. A metadata document is read when
  * it has not been, or not for a day; a copy that cannot be refreshed is kept
  * rather than locking its app out because its host was briefly down.
  */
-export async function resolveClient(clientId: string): Promise<OAuthClientRecord | null> {
-    if (!clientId || clientId.length > MAX_URI_LENGTH) return null;
+export async function lookupClient(clientId: string): Promise<ClientLookup> {
+    if (!clientId || clientId.length > MAX_URI_LENGTH) return { client: null };
     const row = await prisma.oAuthClient.findUnique({ where: { clientId }, select: SELECT });
     const address = metadataDocumentUrl(clientId);
-    if (!address) return row && row.source === "registered" ? record(row) : null;
+    if (!address) return { client: row && row.source === "registered" ? record(row) : null };
 
     const fresh = row?.fetchedAt && Date.now() - row.fetchedAt.getTime() < METADATA_TTL_MS;
-    if (row && fresh) return record(row);
+    if (row && fresh) return { client: record(row) };
 
     const fetched = await fetchMetadataDocument(address);
     const document = fetched.ok
@@ -429,7 +439,8 @@ export async function resolveClient(clientId: string): Promise<OAuthClientRecord
             reason: document.reason,
             kept: row ? "the copy read earlier" : undefined
         });
-        return row ? record(row) : null;
+        if (row) return { client: record(row) };
+        return { client: null, failure: fetched.ok ? "rejected" : "unreachable" };
     }
     const saved = await prisma.oAuthClient.upsert({
         where: { clientId },
@@ -450,7 +461,12 @@ export async function resolveClient(clientId: string): Promise<OAuthClientRecord
         },
         select: SELECT
     });
-    return record(saved);
+    return { client: record(saved) };
+}
+
+/** The client an authorization request names, or null. */
+export async function resolveClient(clientId: string): Promise<OAuthClientRecord | null> {
+    return (await lookupClient(clientId)).client;
 }
 
 /**
