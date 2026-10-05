@@ -337,7 +337,7 @@ function _op(fn: AnyAsyncFn, options: OpOptions): OpFunction<AnyAsyncFn> {
 
           const isLastAttempt = attempt >= retries.length;
           // do NOT log `input` - it can carry secrets (`token`, `apiKey`, …)
-          // through generic op wrappers into log drains. `key` is the SHA-1
+          // through generic op wrappers into log drains. `key` is the SHA-256
           // hash of input (sufficient for retry correlation) and `error`
           // already carries request URL / status. see polaris/app#742.
           if (isLastAttempt) {

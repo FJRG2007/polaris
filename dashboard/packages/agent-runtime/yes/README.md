@@ -67,7 +67,7 @@ getRepo.invalidate((key) => key.org === "acme"); // => number removed
 
 ### Cache keys
 
-The first argument is used as the cache key. Strings pass through directly; objects are hashed with [`object-hash`](https://github.com/puleos/object-hash) (order-independent):
+The first argument is used as the cache key. Strings pass through directly; objects are hashed with a SHA-256 of their canonical form (order-independent - key order in an object, item order in an array/Set):
 
 ```ts
 await getRepo({ org: "acme", repo: "app" });
