@@ -25,7 +25,9 @@ vi.mock("@/lib/mcp/oauth/scopes", () => ({ mcpScopes: async () => [] }));
 // exercises, but imported unconditionally - and it drags in audit-service.ts,
 // which needs a configured database and secrets this test has none of.
 vi.mock("@/app/oauth/authorize/actions", () => ({ answerAuthorizationAction: vi.fn() }));
-const reason = vi.hoisted(() => ({ current: "clientDetails" as "clientDetails" | "clientRefused" }));
+const reason = vi.hoisted(() => ({
+    current: "clientDetails" as "clientDetails" | "clientRefused"
+}));
 vi.mock("@/lib/mcp/oauth/authorize", async (importOriginal) => ({
     ...(await importOriginal<typeof import("@/lib/mcp/oauth/authorize")>()),
     checkAuthorizationRequest: async () => ({ kind: "unsafe", reason: reason.current })
