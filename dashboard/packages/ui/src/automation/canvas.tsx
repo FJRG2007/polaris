@@ -34,8 +34,7 @@ import {
     type Edge,
     type Node,
     type NodeChange,
-    type NodeProps,
-    type OnSelectionChangeFunc
+    type NodeProps
 } from "@xyflow/react";
 import { AlertCircle, Filter, Maximize, Play, Plus, X, Zap, ZoomIn, ZoomOut } from "lucide-react";
 import { cn } from "../lib/cn";
@@ -201,6 +200,28 @@ function targetGroup(
     if (selection?.role !== "group") return null;
     const group = definition.conditions.groups[selection.index];
     return group && group.items.length < perGroup ? group : null;
+}
+
+/** The node a batch of React Flow's changes selects: its id, null when it only
+ *  lets go of the one selected, undefined when it says nothing about that.
+ *
+ *  Selection is read from these changes - which React Flow makes only for what
+ *  the reader did - and never from its `onSelectionChange`, which also reports
+ *  the diagram's own state: empty for a moment each time the diagram is drawn
+ *  afresh (back from the narrow list), and a render behind the nodes handed to
+ *  it. Read as the reader's choice, that dropped the selection, and its answer
+ *  and the nodes then chased each other until React gave up ("Maximum update
+ *  depth exceeded"). */
+function selectedBy(
+    changes: readonly NodeChange[],
+    current: string | null
+): string | null | undefined {
+    const picked = changes.find((change) => change.type === "select" && change.selected);
+    if (picked?.type === "select") return picked.id;
+    const dropped = changes.some(
+        (change) => change.type === "select" && !change.selected && change.id === current
+    );
+    return dropped ? null : undefined;
 }
 
 function orderOf(definition: graphs.FlowDefinition): string {
@@ -757,6 +778,10 @@ function CanvasBody<D extends graphs.FlowDefinition>({
 
     const onNodesChange = useCallback(
         (changes: NodeChange<ViewNode>[]) => {
+            setSelectedId((current) => {
+                const next = selectedBy(changes, current);
+                return next === undefined ? current : next;
+            });
             if (readOnly) {
                 setNodes((current) =>
                     applyNodeChanges(
@@ -783,7 +808,7 @@ function CanvasBody<D extends graphs.FlowDefinition>({
                 return;
             }
             // Removal is the definition's to do (`onNodesDelete`); selection is
-            // `selectedId`'s.
+            // `selectedId`'s, read above.
             setNodes((current) =>
                 applyNodeChanges(
                     changes.filter(
@@ -794,14 +819,6 @@ function CanvasBody<D extends graphs.FlowDefinition>({
             );
         },
         [readOnly, nodes, laidOut, onChange]
-    );
-
-    const onSelectionChange = useCallback<OnSelectionChangeFunc<ViewNode>>(
-        ({ nodes: selected }) => {
-            const id = selected[0]?.id ?? null;
-            setSelectedId((current) => (current === id ? current : id));
-        },
-        []
     );
 
     const add = (adding: Adding) => {
@@ -966,7 +983,6 @@ function CanvasBody<D extends graphs.FlowDefinition>({
                         edges={edges}
                         nodeTypes={NODE_TYPES}
                         onNodesChange={onNodesChange}
-                        onSelectionChange={onSelectionChange}
                         onNodeDragStart={() => {
                             dragging.current = true;
                         }}
