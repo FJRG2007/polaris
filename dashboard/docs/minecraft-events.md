@@ -203,7 +203,8 @@ left out.
   put over the middle, the lid goes, and they fall. The events data pack
   catches a landing the tick it happens - anybody racing who is on the ground
   anywhere over the floors, the rim of a hole included, goes back to the top,
-  once (`dropper.SENT_TAG`, see "Players" under the lessons) - and notes the lowest each racer has been and the tick they reach the water.
+  once (`dropper.SENT_TAG`, see "Players" under the lessons) - and notes the
+  lowest each racer has been and the tick they reach the water.
   Ranked by finish time, then by the deepest floor. It is played under Slow
   Falling: in a free fall a player is past three blocks a tick within seven
   seconds and can steer a tenth of a block between two floors, so holes that do
@@ -838,6 +839,18 @@ A new kind follows all of them. A change to an old kind must not undo one.
   slime pads only where the bounce lands. Its version (`parkour.DESIGN`) is
   kept on the run, so a course built before an update stays as it was
   (`c19b87280`, `9615bcd75`).
+- **A version kept on the run only helps if the old shape can still be
+  redrawn from it.** Hide and seek never stored which way its hall was
+  mirrored - only `layoutFor(run.id)` said, recomputed each time a spot was
+  asked for. That held while the draw never changed; the day the hall became
+  a house the same id drew a different layout under the new code, so a hall
+  built by the old design sent hiders and seekers into the wrong corner of an
+  arena nobody had rebuilt. Its design (`hide-and-seek.DESIGN`) is kept the
+  same way, but for a hall that old the mirror it was actually built with can
+  no longer be redrawn - so it is read back from the world instead: the
+  barrier over the old cage's middle sits under exactly one of the four
+  mirrors, and a test command says which (`hide-and-seek.mirrorTests`,
+  `73e33a69f`).
 - **A choice drawn per run stays the same after a restart**: it is seeded by
   the run's id (`trivia-bank.seeded`), never `Math.random()`, and a change to
   what can be drawn keeps the draw of a run saved before it
