@@ -109,7 +109,8 @@ describe("the R shortcut", () => {
                 onForward={() => undefined}
                 onEdit={() => undefined}
                 onDelete={() => undefined}
-            />, { wrapper: MessagesWrapper }
+            />,
+            { wrapper: MessagesWrapper }
         );
 
         // The star button is always drawn, so it is a reliable way to land focus
@@ -135,7 +136,8 @@ describe("the R shortcut", () => {
                 onForward={() => undefined}
                 onEdit={() => undefined}
                 onDelete={() => undefined}
-            />, { wrapper: MessagesWrapper }
+            />,
+            { wrapper: MessagesWrapper }
         );
 
         await user.tab();
@@ -161,7 +163,8 @@ describe("the R shortcut", () => {
                     onEdit={() => undefined}
                     onDelete={() => undefined}
                 />
-            </>, { wrapper: MessagesWrapper }
+            </>,
+            { wrapper: MessagesWrapper }
         );
 
         const field = screen.getByLabelText("Somewhere else entirely");

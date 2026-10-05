@@ -104,7 +104,8 @@ function list() {
             onReact={() => undefined}
             onStar={() => undefined}
             onDelete={() => undefined}
-        />, { wrapper: MessagesWrapper }
+        />,
+        { wrapper: MessagesWrapper }
     );
 }
 
@@ -139,7 +140,10 @@ describe("right-clicking somebody's name", () => {
         // its menu altogether, which is the way this actually breaks.
         const user = userEvent.setup();
         list();
-        await user.pointer({ target: screen.getByRole("button", { name: "grace" }), keys: "[MouseRight]" });
+        await user.pointer({
+            target: screen.getByRole("button", { name: "grace" }),
+            keys: "[MouseRight]"
+        });
 
         expect(screen.queryByText("Report this account")).not.toBeNull();
         // And the message menu is not the one that opened: the two menus name

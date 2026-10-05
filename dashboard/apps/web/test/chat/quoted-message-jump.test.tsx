@@ -128,7 +128,8 @@ function list(
             onReact={() => undefined}
             onStar={() => undefined}
             onDelete={() => undefined}
-        />, { wrapper: MessagesWrapper }
+        />,
+        { wrapper: MessagesWrapper }
     );
 }
 

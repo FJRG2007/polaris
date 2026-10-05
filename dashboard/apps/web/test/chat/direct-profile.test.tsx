@@ -101,7 +101,8 @@ function panel() {
             open
             onOpenChange={() => undefined}
             onMention={() => undefined}
-        />, { wrapper: MessagesWrapper }
+        />,
+        { wrapper: MessagesWrapper }
     );
 }
 

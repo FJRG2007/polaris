@@ -437,7 +437,9 @@ export function MemberMenu({
                             ) : (
                                 <VolumeX className="size-3.5" />
                             )}
-                            {silenced ? t("memberMenu.letThemThrough") : t("memberMenu.silenceThemForYou")}
+                            {silenced
+                                ? t("memberMenu.letThemThrough")
+                                : t("memberMenu.silenceThemForYou")}
                         </menu.Item>
 
                         {/* Shown even when it can do nothing, and that is
@@ -620,7 +622,9 @@ export function MemberMenu({
                             }
                         >
                             <UserMinus className="size-3.5" />
-                            {space ? t("memberMenu.removeFromTheServer") : t("memberMenu.removeFromTheGroup")}
+                            {space
+                                ? t("memberMenu.removeFromTheServer")
+                                : t("memberMenu.removeFromTheGroup")}
                         </menu.Item>
 
                         {/* Only a space. See `memberActions`. */}
