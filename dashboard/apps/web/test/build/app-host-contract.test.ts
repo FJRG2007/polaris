@@ -100,7 +100,13 @@ const EAGER = [
     "backupsSourcesTypes.shellQuote",
     "backupsSourcesTypes.stageDir",
     "backupsSourcesTypes.stagedFrom",
-    "hostAddress.getHostLanIp"
+    "hostAddress.getHostLanIp",
+    // What an app's MCP tools are written with: the refusal a model is shown,
+    // a class like the one above, and the identity function that types a tool
+    // against its own schema. Both are reached for once a tool module loads,
+    // which is after the dashboard has provided them.
+    "mcp.McpRefusal",
+    "mcp.defineTool"
 ];
 
 const CLIENT = readFileSync(join(SRC, "components/app-host/client.tsx"), "utf8");

@@ -32,7 +32,7 @@ export async function GET(
         // i18n-ignore read by a machine, not shown to a person
         return Response.json({ error: "No protected resource here" }, { status: 404 });
     }
-    return metadataJson(protectedResourceMetadata(originOf(request), mcpScopes()));
+    return metadataJson(protectedResourceMetadata(originOf(request), await mcpScopes()));
 }
 
 export function OPTIONS(): Response {

@@ -2,9 +2,10 @@
 
 Polaris is an MCP server. Claude, ChatGPT, Cursor, VS Code and any other client
 that speaks remote MCP (Streamable HTTP or SSE, or stdio through mcp-remote) can
-connect to it, sign in as you, and work with
-your tasks, deployments, notes, chat, Drive and calendar. Each assistant can do
-only what you approve when it connects, and never more than your own account.
+connect to it, sign in as you, and work with your tasks, deployments, notes, chat,
+Drive and mail - and, when they are installed, your calendar, your places'
+devices and your game servers. Each assistant can do only what you approve when
+it connects, and never more than your own account.
 
 The quickest way in is **Account > AI assistants**, which shows your server URL
 and the setup for each client with copy buttons and install links. This page is
@@ -81,9 +82,9 @@ Use **Add to Cursor** on the AI assistants page (Cursor's documented
 
 ```json
 {
-    "mcpServers": {
-        "polaris": { "url": "https://<your-polaris-address>/api/mcp" }
-    }
+  "mcpServers": {
+    "polaris": { "url": "https://<your-polaris-address>/api/mcp" }
+  }
 }
 ```
 
@@ -98,9 +99,12 @@ or run **MCP: Open User Configuration** and add:
 
 ```json
 {
-    "servers": {
-        "polaris": { "type": "http", "url": "https://<your-polaris-address>/api/mcp" }
+  "servers": {
+    "polaris": {
+      "type": "http",
+      "url": "https://<your-polaris-address>/api/mcp"
     }
+  }
 }
 ```
 
@@ -187,13 +191,13 @@ Add this to `opencode.json`:
 
 ```json
 {
-    "mcp": {
-        "polaris": {
-            "type": "remote",
-            "url": "https://<your-polaris-address>/api/mcp",
-            "enabled": true
-        }
+  "mcp": {
+    "polaris": {
+      "type": "remote",
+      "url": "https://<your-polaris-address>/api/mcp",
+      "enabled": true
     }
+  }
 }
 ```
 
@@ -219,16 +223,23 @@ kimi mcp auth polaris
 Streamable HTTP, for clients that support remote servers (recommended):
 
 ```json
-{ "mcpServers": { "polaris": { "url": "https://<your-polaris-address>/api/mcp" } } }
+{
+  "mcpServers": {
+    "polaris": { "url": "https://<your-polaris-address>/api/mcp" }
+  }
+}
 ```
 
 SSE, for clients that support remote servers but not Streamable HTTP:
 
 ```json
 {
-    "mcpServers": {
-        "polaris": { "type": "sse", "url": "https://<your-polaris-address>/api/mcp/sse" }
+  "mcpServers": {
+    "polaris": {
+      "type": "sse",
+      "url": "https://<your-polaris-address>/api/mcp/sse"
     }
+  }
 }
 ```
 
@@ -238,12 +249,12 @@ opens the sign-in in your browser:
 
 ```json
 {
-    "mcpServers": {
-        "polaris": {
-            "command": "npx",
-            "args": ["-y", "mcp-remote", "https://<your-polaris-address>/api/mcp"]
-        }
+  "mcpServers": {
+    "polaris": {
+      "command": "npx",
+      "args": ["-y", "mcp-remote", "https://<your-polaris-address>/api/mcp"]
     }
+  }
 }
 ```
 
@@ -258,7 +269,9 @@ claude mcp add --transport http polaris https://<your-polaris-address>/api/mcp \
     --header "Authorization: Bearer plk_..."
 ```
 
-The key's scopes work exactly like an assistant's.
+The key's scopes work exactly like an assistant's. A key holds permissions
+only, so the finer scopes below (mail, calendar, Places, game servers) are for
+assistants that sign in.
 
 ## What you approve
 
@@ -269,23 +282,47 @@ to `localhost` or `127.0.0.1` runs on your own computer: only continue if you
 started the connection yourself.
 
 Untick anything it should not do. Ticking a permission that needs another (for
-example, changing tasks needs reading them) ticks that one too.
+example, changing tasks needs reading them) ticks that one too. What reaches
+outside Polaris or into your home - sending mail, changing your calendar,
+operating a device, running a routine, starting or stopping a game server -
+starts unticked: tick it only if you mean the assistant to do it.
 
-| Permission       | What the assistant can do                                        |
-| ---------------- | ---------------------------------------------------------------- |
-| `tasks.read`     | Read spaces, lists and tasks                                     |
-| `tasks.manage`   | Create tasks, change them, and comment                           |
-| `agents.read`    | See agent sessions                                               |
-| `agents.manage`  | Start agent sessions and send them prompts                       |
-| `deploy.read`    | See apps, deployments, logs, variable names (never values) and domains |
-| `deploy.manage`  | Deploy, restart, roll back, set variables and add domains        |
-| `notes.use`      | List, read, write and change your notes                          |
-| `chat.use`       | List your conversations, read them and send messages             |
-| `drive.read`     | List your storages and folders, and see a file's details         |
-| `shares.create`  | Create a public share link to a file you can download            |
-| `calendar.use`   | See what is coming up on your calendars                          |
+| Permission      | What the assistant can do                                              |
+| --------------- | ---------------------------------------------------------------------- |
+| `tasks.read`    | Read spaces, lists and tasks                                           |
+| `tasks.manage`  | Create tasks, change them, and comment                                 |
+| `agents.read`   | See agent sessions                                                     |
+| `agents.manage` | Start agent sessions and send them prompts                             |
+| `deploy.read`   | See apps, deployments, logs, variable names (never values) and domains |
+| `deploy.manage` | Deploy, restart, roll back, set variables and add domains              |
+| `notes.use`     | List, read, write and change your notes                                |
+| `chat.use`      | List your conversations, read them and send messages                   |
+| `drive.read`    | List your storages and folders, and see a file's details               |
+| `shares.create` | Create a public share link to a file you can download                  |
+| `mail.read`     | List, search and read the mail in mailboxes you linked                 |
+| `mail.send`     | Send mail from your mailboxes, in your name                            |
 
-Only the permissions your account holds are offered.
+With the Calendar, Places or Game servers app installed:
+
+| Permission           | What the assistant can do                                     |
+| -------------------- | ------------------------------------------------------------- |
+| `calendar.read`      | See your calendars and their events                           |
+| `calendar.manage`    | Create, change and delete events (includes `calendar.read`)   |
+| `places.read`        | See the devices in your places and their state                |
+| `places.control`     | Lock, unlock, switch and set devices (includes `places.read`) |
+| `places.routines`    | See and run your places' routines                             |
+| `gameservers.read`   | See your game servers and who is playing                      |
+| `gameservers.manage` | Start, stop and restart them, and use their consoles          |
+
+Each of these stands on a permission of your account - mail on using Mail,
+calendar on using the Calendar, devices on seeing or controlling places,
+routines on managing them, game servers on seeing or managing them - and does
+nothing once you no longer hold it. Only the permissions your account holds,
+and of the apps installed here, are offered.
+
+An assistant connected before reading and changing the calendar were split may
+hold `calendar.use`: it keeps reading your upcoming events, and can be given
+`calendar.read` or `calendar.manage` from **Change permissions**.
 
 ## Managing connected assistants
 
@@ -294,10 +331,19 @@ may do, and when and from where it was last used.
 
 - **Change permissions** opens the same boxes as the consent screen. A
   permission you take away is refused on the assistant's next call; one you add
-  works on its next call too. You can only add what the assistant asked for
-  when it connected, and never more than your own account holds. An assistant
-  connected before this was recorded can be narrowed, but to widen it, connect
-  it again.
+  works on its next call too. Anything Polaris offers can be added - a
+  permission the assistant did not ask for when it connected, or one added to
+  Polaris since, is marked as such and stays off until you tick it - but never
+  more than your own account holds. A permission of an app that is no longer
+  installed is not shown and is kept as it was.
+- **Where it may connect from** sets an address rule for that one connection,
+  on top of your account's access rules: anywhere (the default), only the
+  address you approved it from, an allow and deny list of IP addresses and
+  ranges (IPv4 and IPv6; a deny entry wins), or only from where you are signed
+  in to Polaris right now (an IPv6 address counts for its whole /64). It is
+  checked on every call and every token refresh. A refused call gets a 403
+  saying the address is not allowed, and the refusal shows on the connection
+  and in your activity.
 - **Disconnect** stops it at once: every token it holds is ended, and it has to
   be connected again through the consent screen.
 
@@ -319,27 +365,50 @@ their next call.
 Read tools first, then the ones that change something. Clients use the
 annotations to ask you before a change; tools marked "changes" ask by default.
 
-| Tool                   | Permission      | Kind                         |
-| ---------------------- | --------------- | ---------------------------- |
-| `polaris_whoami`       | none            | read                         |
-| `tasks_list`, `tasks_get`, `tasks_spaces` | `tasks.read` | read        |
-| `tasks_create`, `tasks_comment` | `tasks.manage` | adds                  |
-| `tasks_update`         | `tasks.manage`  | changes                      |
-| `agent_sessions_list`, `agent_session_get` | `agents.read` | read      |
-| `agent_session_start`, `agent_session_prompt` | `agents.manage` | adds |
-| `deploy_projects`, `deploy_service`, `deploy_deployments`, `deploy_deployment`, `deploy_logs`, `deploy_variables`, `env_list`, `deploy_domains` | `deploy.read` | read |
-| `deploy_add_domain`    | `deploy.manage` | adds                         |
-| `deploy_start`, `deploy_set_variable`, `env_set`, `env_delete`, `deploy_restart`, `deploy_rollback` | `deploy.manage` | changes |
-| `notes_list`, `notes_get` | `notes.use`  | read                         |
-| `notes_create`         | `notes.use`     | adds                         |
-| `notes_update`         | `notes.use`     | changes                      |
-| `chat_conversations`, `chat_messages` | `chat.use` | read              |
-| `chat_send`            | `chat.use`      | adds                         |
-| `drive_sources`, `drive_list`, `drive_stat` | `drive.read` | read      |
-| `drive_share_create`   | `shares.create` | changes (publishes a file)   |
-| `calendar_upcoming`    | `calendar.use`  | read                         |
+| Tool                                                                                                                                            | Permission                 | Kind                         |
+| ----------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------- | ---------------------------- |
+| `polaris_whoami`                                                                                                                                | none                       | read                         |
+| `tasks_list`, `tasks_get`, `tasks_spaces`                                                                                                       | `tasks.read`               | read                         |
+| `tasks_create`, `tasks_comment`                                                                                                                 | `tasks.manage`             | adds                         |
+| `tasks_update`                                                                                                                                  | `tasks.manage`             | changes                      |
+| `agent_sessions_list`, `agent_session_get`                                                                                                      | `agents.read`              | read                         |
+| `agent_session_start`, `agent_session_prompt`                                                                                                   | `agents.manage`            | adds                         |
+| `deploy_projects`, `deploy_service`, `deploy_deployments`, `deploy_deployment`, `deploy_logs`, `deploy_variables`, `env_list`, `deploy_domains` | `deploy.read`              | read                         |
+| `deploy_add_domain`                                                                                                                             | `deploy.manage`            | adds                         |
+| `deploy_start`, `deploy_set_variable`, `env_set`, `env_delete`, `deploy_restart`, `deploy_rollback`                                             | `deploy.manage`            | changes                      |
+| `notes_list`, `notes_get`                                                                                                                       | `notes.use`                | read                         |
+| `notes_create`                                                                                                                                  | `notes.use`                | adds                         |
+| `notes_update`                                                                                                                                  | `notes.use`                | changes                      |
+| `chat_conversations`, `chat_messages`                                                                                                           | `chat.use`                 | read                         |
+| `chat_send`                                                                                                                                     | `chat.use`                 | adds                         |
+| `drive_sources`, `drive_list`, `drive_stat`                                                                                                     | `drive.read`               | read                         |
+| `drive_share_create`                                                                                                                            | `shares.create`            | changes (publishes a file)   |
+| `mail_mailboxes`                                                                                                                                | `mail.read` or `mail.send` | read                         |
+| `mail_list`, `mail_read`                                                                                                                        | `mail.read`                | read                         |
+| `mail_send`                                                                                                                                     | `mail.send`                | adds (after your undo delay) |
 
-Not offered on purpose: variable values, file contents, vault items and mail.
+Offered only while their app is installed:
+
+| Tool                                    | Permission                        | Kind                   |
+| --------------------------------------- | --------------------------------- | ---------------------- |
+| `calendar_upcoming`                     | `calendar.read` or `calendar.use` | read                   |
+| `calendar_calendars`, `calendar_events` | `calendar.read`                   | read                   |
+| `calendar_create`                       | `calendar.manage`                 | adds                   |
+| `calendar_update`                       | `calendar.manage`                 | changes                |
+| `calendar_delete`                       | `calendar.manage`                 | changes (to the trash) |
+| `places_devices`                        | `places.read`                     | read                   |
+| `places_device_control`                 | `places.control`                  | changes                |
+| `places_routines`                       | `places.routines`                 | read                   |
+| `places_routine_run`                    | `places.routines`                 | adds (a run)           |
+| `games_servers`, `games_server_status`  | `gameservers.read`                | read                   |
+| `games_server_power`, `games_console`   | `gameservers.manage`              | changes                |
+
+Each tool applies the same rules as the app's own screens: a calendar shared
+with you read-only stays read-only, a device somebody lent you is the only one
+you can open, the console needs the console grant on that server.
+
+Not offered on purpose: variable values, file contents, vault items, mail
+attachments, cameras and footage.
 A value set with `env_set` is stored and never returned.
 Every change made through a tool is written to your activity log with the
 assistant that made it. Each connection may make 120 tool calls a minute, 30 of
@@ -351,16 +420,16 @@ Polaris follows the MCP authorization spec
 ([modelcontextprotocol.io](https://modelcontextprotocol.io/specification/2025-11-25/basic/authorization)):
 OAuth 2.1 with Polaris as its own authorization server.
 
-| Endpoint                                             | What it is                                      |
-| ---------------------------------------------------- | ----------------------------------------------- |
-| `POST /api/mcp`                                      | The MCP server (Streamable HTTP, JSON answers)  |
-| `GET`/`POST /api/mcp/sse`                            | The same server over the legacy HTTP+SSE transport |
-| `GET /.well-known/oauth-protected-resource[/api/mcp]` | Protected Resource Metadata (RFC 9728)         |
-| `GET /.well-known/oauth-authorization-server`        | Authorization Server Metadata (RFC 8414)        |
-| `POST /api/oauth/register`                           | Dynamic Client Registration (RFC 7591)          |
-| `GET /oauth/authorize`                               | The consent screen                              |
-| `POST /api/oauth/token`                              | Token endpoint: authorization code and refresh  |
-| `POST /api/oauth/revoke`                             | Token revocation (RFC 7009)                     |
+| Endpoint                                              | What it is                                         |
+| ----------------------------------------------------- | -------------------------------------------------- |
+| `POST /api/mcp`                                       | The MCP server (Streamable HTTP, JSON answers)     |
+| `GET`/`POST /api/mcp/sse`                             | The same server over the legacy HTTP+SSE transport |
+| `GET /.well-known/oauth-protected-resource[/api/mcp]` | Protected Resource Metadata (RFC 9728)             |
+| `GET /.well-known/oauth-authorization-server`         | Authorization Server Metadata (RFC 8414)           |
+| `POST /api/oauth/register`                            | Dynamic Client Registration (RFC 7591)             |
+| `GET /oauth/authorize`                                | The consent screen                                 |
+| `POST /api/oauth/token`                               | Token endpoint: authorization code and refresh     |
+| `POST /api/oauth/revoke`                              | Token revocation (RFC 7009)                        |
 
 - A call with no credential is answered `401` with a `WWW-Authenticate`
   challenge pointing at the resource metadata, which is how a client finds the

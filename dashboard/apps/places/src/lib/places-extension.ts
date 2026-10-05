@@ -111,5 +111,10 @@ export const placesExtension: AppExtension = {
     // Places is the one app a single item of can be lent to somebody who holds
     // none of its permissions - one door, one camera - and somebody holding a key
     // to a door has an app to open.
-    reaches: async (userId) => (await import("./sharing")).reachesPlaces(userId)
+    reaches: async (userId) => (await import("./sharing")).reachesPlaces(userId),
+
+    // What a connected assistant may do in the house: see the devices, and -
+    // on the scopes that say so - operate them and run its routines, by the
+    // same rules as the screens.
+    mcpTools: async () => (await import("./mcp-tools")).placesMcpTools()
 };

@@ -22,6 +22,8 @@
 import { z } from "zod";
 import * as surface from "@/lib/deploy/api/surface";
 import { publicFailure } from "@/lib/deploy/api/refusal";
+import { isMcpOnlyScope } from "../scope-table";
+import type { Permission } from "@polaris/core";
 import { McpRefusal, type McpCaller, type McpTool } from "../protocol";
 import {
     addDomainSchema,
@@ -35,7 +37,8 @@ import {
 function deployCaller(caller: McpCaller): surface.DeployCaller {
     return {
         userId: caller.userId,
-        scopes: caller.scopes,
+        // The Deploy API reads permissions; a finer MCP scope is none of its.
+        scopes: caller.scopes.filter((scope): scope is Permission => !isMcpOnlyScope(scope)),
         keyId: caller.keyId ?? null,
         projectId: caller.projectId ?? null,
         via: "mcp"

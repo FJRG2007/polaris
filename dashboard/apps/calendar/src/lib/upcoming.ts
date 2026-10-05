@@ -24,16 +24,19 @@ export interface Upcoming {
     readonly href: string;
 }
 
-export async function upcomingEvents(
-    userId: string,
-    limit: number,
-    now = new Date()
-): Promise<Upcoming[]> {
+/**
+ * What one person's calendar view is drawn from: the zone they read it in, the
+ * calendars they reach and have not hidden, with their colours, and their
+ * Calendar preferences. Shared by the Overview card and the assistant tools,
+ * so both read the same calendar the person sees. Null for an account that is
+ * not there.
+ */
+export async function readerView(userId: string) {
     const person = await prisma.user.findUnique({
         where: { id: userId },
         select: { id: true, email: true, name: true, isAdmin: true }
     });
-    if (!person) return [];
+    if (!person) return null;
     const user: SessionUser = { ...person, sessionId: "" };
     const preferences = await loadPreferences(userId);
     const zone = displayZone(
@@ -58,6 +61,17 @@ export async function upcomingEvents(
     ]);
     const hide = new Set(hidden.map((row) => row.calendarId));
     const shown = calendars.filter((calendar) => !hide.has(calendar.id));
+    return { user, preferences, zone, shown };
+}
+
+export async function upcomingEvents(
+    userId: string,
+    limit: number,
+    now = new Date()
+): Promise<Upcoming[]> {
+    const reader = await readerView(userId);
+    if (!reader) return [];
+    const { user, preferences, zone, shown } = reader;
     const colors = new Map(shown.map((calendar) => [calendar.id, calendar.color]));
     const view = await occurrencesIn(
         user,

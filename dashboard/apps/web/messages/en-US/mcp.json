@@ -42,8 +42,12 @@
         "notes_use": "Read and write your notes",
         "office_use": "Read and write documents",
         "mail_use": "Read and send mail",
+        "mail_read": "Read and search your mail",
+        "mail_send": "Send mail as you",
         "mailserver_manage": "Run mail servers",
-        "calendar_use": "Read and change your calendars",
+        "calendar_use": "See upcoming calendar events",
+        "calendar_read": "See your calendars and events",
+        "calendar_manage": "Create, change and delete events",
         "chat_use": "Read and post in your conversations",
         "chat_spaces": "Create chat servers",
         "chat_groups": "Start group conversations",
@@ -56,11 +60,16 @@
         "games_moderate": "Moderate players",
         "games_console": "Use game server consoles",
         "games_manage": "Manage game servers",
+        "gameservers_read": "See game servers and who is playing",
+        "gameservers_manage": "Start, stop and restart game servers, and use their consoles",
         "agents_read": "See agent sessions",
         "agents_manage": "Start and steer agent sessions",
         "home_read": "See places and cameras",
         "home_control": "Control places and cameras",
         "home_manage": "Manage cameras",
+        "places_read": "See the devices in your places",
+        "places_control": "Operate devices: switch, lock, set",
+        "places_routines": "See and run routines",
         "tools_use": "Use the tools",
         "tools_manage": "Manage short links",
         "tasks_read": "Read spaces, lists and tasks",
@@ -98,10 +107,53 @@
         "editNamed": "Change permissions for {app}",
         "disconnectNamed": "Disconnect {app}",
         "editTitle": "What {app} may do",
-        "editHint": "Changes apply on its next call. Only what it asked for when it connected is listed.",
+        "editHint": "Changes apply on its next call. Anything it did not ask for is marked, and stays off until you tick it.",
+        "notRequested": "Not asked for by this app",
         "save": "Save",
         "pickOne": "Choose at least one permission, or disconnect it.",
         "changeFailed": "The permissions could not be changed. Reload and try again.",
-        "loading": "Loading connected assistants"
+        "loading": "Loading connected assistants",
+        "ip": {
+            "edit": "Where it may connect from",
+            "editNamed": "Where {app} may connect from",
+            "title": "Where {app} may connect from",
+            "hint": "Checked on every call and every token refresh, on top of your account access rules.",
+            "legend": "Allowed addresses",
+            "modes": {
+                "none": {
+                    "label": "From any address",
+                    "hint": "No address rule of its own."
+                },
+                "origin": {
+                    "label": "Only the address it was approved from",
+                    "hint": "{ip}. For assistants on your own device or network."
+                },
+                "list": {
+                    "label": "Addresses I choose",
+                    "hint": "An allow list and a deny list of IP addresses or ranges."
+                },
+                "sessions": {
+                    "label": "Only where I am signed in",
+                    "hint": "Addresses of your active Polaris sessions, for assistants on your own devices. It stops working when you sign out everywhere."
+                }
+            },
+            "noOrigin": "Not recorded for this connection. Connect it again to use this.",
+            "allow": "Allowed",
+            "allowHint": "Leave empty to allow everything that is not denied.",
+            "deny": "Blocked",
+            "denyHint": "Blocked addresses are refused even if they are allowed.",
+            "placeholder": "203.0.113.7 or 2001:db8::/48",
+            "invalid": "Enter an IP address or a CIDR range.",
+            "listEmpty": "Add at least one address.",
+            "summary": {
+                "none": "From any address",
+                "origin": "Only from {ip}",
+                "sessions": "Only from where you are signed in",
+                "list": "{allow, plural, =0 {Any address} one {# allowed address} other {# allowed addresses}}, {deny, plural, =0 {none denied} one {# denied} other {# denied}}"
+            },
+            "refused": "Refused {time} from {ip}",
+            "unknownIp": "an unknown address",
+            "failed": "The address rule could not be saved. Reload and try again."
+        }
     }
 }

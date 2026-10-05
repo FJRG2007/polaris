@@ -635,9 +635,18 @@ Telemetry (what breaks):
   authorization server (Dynamic Client Registration, PKCE, resource
   indicators, token rotation and replay detection) - see
   [`docs/connecting-ai-assistants.md`](../docs/connecting-ai-assistants.md).
-  Tools beyond Tasks and sessions: Deploy, Notes, Chat, Drive and Calendar,
-  each gated by its own scope and offered only when the account holds the
-  underlying permission.
+  Tools beyond Tasks and sessions: Deploy, Notes, Chat, Drive and Mail, each
+  gated by its own scope and offered only when the account holds the
+  underlying permission. Calendar, Places and Game servers add theirs the same
+  way but only while their app is installed, through the same `mcpTools` hook
+  core asks of every app extension - see
+  [`docs/installable-apps-plan.md`](../docs/installable-apps-plan.md). A
+  finer cut of some permissions exists only for these credentials - reading a
+  calendar apart from changing it, seeing a device apart from controlling it,
+  running a routine - each still standing on the one permission the account
+  holds, never a role of its own. A connection can also be pinned to the
+  address it was approved from, a chosen allow/deny list, or only while the
+  person is signed in to Polaris, checked on every call and token refresh.
 - Account > AI assistants has a guide for each client whose own docs say how
   to add a custom remote server, with the server URL filled in, the value to
   copy at each step, the documented one-click install where there is one

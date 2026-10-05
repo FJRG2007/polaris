@@ -188,5 +188,10 @@ export const gameServersExtension: AppExtension = {
         const { gameContextFor } = await import("../screens/installed/game-context");
         const context = await gameContextFor(install).catch(() => null);
         return { app: GAME_SERVERS_APP_ID, kind: GAME_SLOTS.server, props: { context } };
-    }
+    },
+
+    // What a connected assistant may do with the servers: see them and who is
+    // on them, and - on the scope that says so - start, stop, restart and use
+    // the console, by the same standing the server pages read.
+    mcpTools: async () => (await import("./mcp-tools")).gameMcpTools()
 };

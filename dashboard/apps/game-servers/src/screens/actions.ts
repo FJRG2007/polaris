@@ -14,7 +14,7 @@ import { revalidatePath } from "next/cache";
 import { clearResourceGrants } from "@polaris/auth";
 import { findMap } from "../lib/minecraft/maps";
 import { flushGameWorld } from "../lib/games-flush";
-import { clearCrashLoop } from "../lib/games-health";
+import { setServerRunning } from "../lib/games-operations";
 import { gameDomainSuffix } from "../lib/minecraft/address";
 import { clearQueue } from "../lib/minecraft/queue-service";
 import { clearSnapshots } from "../lib/minecraft/inventory-service";
@@ -41,7 +41,7 @@ const { clientIp } = host.requestContext;
 const { requirePermission } = host.session;
 const { recordAudit } = host.auditService;
 const { uninstallApp } = host.appsInstallService;
-const { deployApplication, setApplicationRunning } = host.deployService;
+const { deployApplication } = host.deployService;
 const { installRef, requireGameServer, requireGameServerOwner } = host.appsInstallAccess;
 
 export interface GameSetup {
@@ -348,22 +348,7 @@ export async function setGameServerRunningAction(
 ): Promise<{ error?: string }> {
     try {
         const { user, access } = await requireGameServer("games.manage", installedAppId);
-        if (!access.install.applicationId)
-            throw new Error((await gameWords("games"))("errors.thisServerHasNotBeen"));
-        // Written out before it goes down. A stop that does not finish gracefully
-        // is killed, and what a kill costs is the last few minutes everyone played.
-        if (!running) await flushGameWorld(access.ownerId, installedAppId);
-        // Somebody starting it again is somebody saying the last crash is dealt
-        // with, or at least worth another try. If it was not, the health sweep
-        // writes the loop back within the minute.
-        if (running) await clearCrashLoop(installedAppId);
-        await setApplicationRunning(access.install.applicationId, access.ownerId, running, user.id);
-        await recordAudit({
-            actorId: user.id,
-            action: running ? "games.start" : "games.stop",
-            targetType: "installedApp",
-            targetId: installedAppId
-        });
+        await setServerRunning(user, access, running);
         revalidatePath("/apps/games");
         return {};
     } catch (caught) {

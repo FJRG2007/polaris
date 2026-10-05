@@ -13,6 +13,7 @@
 
 import { z } from "zod";
 import { requireUser } from "@/lib/session";
+import { clientIp } from "@/lib/request-context";
 import { approve } from "@/lib/mcp/oauth/grants";
 import { scopesAvailableTo } from "@polaris/auth";
 import { recordAudit } from "@/lib/audit-service";
@@ -20,14 +21,14 @@ import { mcpScopes } from "@/lib/mcp/oauth/scopes";
 import { getTranslations } from "@/lib/i18n/request";
 import { newDeviceRefusal } from "@/lib/device-grace";
 import { currentOrigin } from "@/lib/mcp/oauth/origin";
-import { PERMISSIONS, expandPermissions } from "@polaris/core";
+import { MCP_SCOPES, expandScopes, scopeRequires, type McpScope } from "@/lib/mcp/scope-table";
 import { localized } from "@/app/(app)/account/security/action-messages";
 import { answerUrl, checkAuthorizationRequest, readParams } from "@/lib/mcp/oauth/authorize";
 
 const answerSchema = z.object({
     query: z.string().max(16 * 1024),
     allow: z.boolean(),
-    scopes: z.array(z.enum(PERMISSIONS)).max(PERMISSIONS.length)
+    scopes: z.array(z.enum(MCP_SCOPES as [McpScope, ...McpScope[]])).max(MCP_SCOPES.length)
 });
 
 export async function answerAuthorizationAction(
@@ -40,7 +41,7 @@ export async function answerAuthorizationAction(
     if (user.viewingAs) return { error: t("consent.errors.viewingAs") };
 
     const origin = await currentOrigin();
-    const supported = mcpScopes();
+    const supported = await mcpScopes();
     const check = await checkAuthorizationRequest(
         readParams(new URLSearchParams(parsed.data.query)),
         origin,
@@ -68,9 +69,10 @@ export async function answerAuthorizationAction(
     const asked = new Set(request.scopes);
     // What a ticked scope implies comes with it (managing tasks without reading
     // them is not a grant anybody means), and then everything is cut to what is
-    // offered and held.
-    const scopes = expandPermissions(parsed.data.scopes.filter((scope) => asked.has(scope))).filter(
-        (scope) => offered.has(scope) && held.has(scope)
+    // offered and to what the person holds - for a finer scope, the permission
+    // it stands on.
+    const scopes = expandScopes(parsed.data.scopes.filter((scope) => asked.has(scope))).filter(
+        (scope) => offered.has(scope) && held.has(scopeRequires(scope))
     );
     if (scopes.length === 0) return { error: t("consent.pickOne") };
 
@@ -81,7 +83,8 @@ export async function answerAuthorizationAction(
         codeChallenge: request.codeChallenge,
         resource: request.resource,
         scopes,
-        requested: request.scopes
+        requested: request.scopes,
+        approvedIp: (await clientIp()) ?? null
     });
     await recordAudit({
         actorId: user.id,

@@ -17,6 +17,7 @@ import type { GamePortRow, GamePortsReading } from "@/lib/apps/port-advice";
 import type {
     AppExtension,
     AppJob,
+    AppMcpTool,
     AppSlot,
     AppWidgetDefinition,
     ChatCommandSpec,
@@ -33,6 +34,7 @@ import type {
 export type {
     AppExtension,
     AppJob,
+    AppMcpTool,
     AppSlot,
     ChatCommandSpec,
     ChatGameLink,
@@ -315,6 +317,29 @@ async function installedWith(hook: keyof AppExtension): Promise<AppExtension[]> 
     const offering = extensions().filter((extension) => extension[hook]);
     const installed = await Promise.all(offering.map((extension) => isAppInstalled(extension.id)));
     return offering.filter((_, index) => installed[index]);
+}
+
+/**
+ * The MCP tools the installed apps offer, each with the app it came from.
+ *
+ * Asked on every call rather than kept: an app uninstalled a moment ago must
+ * stop answering at once, and what is installed is already cached for a few
+ * seconds by `isAppInstalled`. One app failing to say leaves its tools out and
+ * never anybody else's.
+ */
+export async function appMcpTools(): Promise<{ app: string; tool: AppMcpTool }[]> {
+    const lists = await Promise.all(
+        (await installedWith("mcpTools")).map(async (extension) => {
+            try {
+                const tools = (await extension.mcpTools?.()) ?? [];
+                return tools.map((tool) => ({ app: extension.id, tool }));
+            } catch (caught) {
+                console.error(`polaris: ${extension.id} could not list its MCP tools:`, caught);
+                return [];
+            }
+        })
+    );
+    return lists.flat();
 }
 
 /** What the installed apps have linked to these Chat conversations. One app

@@ -32,6 +32,7 @@ vi.mock("@/lib/i18n/request", async () => {
 
 const { ConsentView } = await import("@/app/oauth/authorize/consent-view");
 const { ConnectedApps } = await import("@/app/(app)/account/assistants/connected-apps");
+const { McpScopeChecklist } = await import("@/components/mcp-scope-checklist");
 
 describe("the consent card", () => {
     const props = {
@@ -58,6 +59,24 @@ describe("the consent card", () => {
         expect((html.match(/type="checkbox"/g) ?? []).length).toBe(2);
         expect(html).toContain("your account cannot: Manage users");
         expect(html).not.toContain("runs on this computer");
+    });
+
+    it("leaves what reaches outside Polaris unticked until the person ticks it", () => {
+        const html = renderToStaticMarkup(
+            withMessages(
+                <ConsentView
+                    {...props}
+                    offered={["mail.read", "mail.send", "places.control"] as never}
+                    withheld={[]}
+                />
+            )
+        );
+        expect(html).toContain("Read and search your mail");
+        expect(html).toContain("Send mail as you");
+        expect(html).toContain("Operate devices: switch, lock, set");
+        // One box of three is ticked: reading.
+        expect((html.match(/type="checkbox"/g) ?? []).length).toBe(3);
+        expect((html.match(/checked=""/g) ?? []).length).toBe(1);
     });
 
     it("warns about an app on this computer, and falls back for an unnamed one", () => {
@@ -99,9 +118,14 @@ describe("the connected-assistants list", () => {
         scopes: ["tasks.read", "tasks.manage", "notes.use"],
         requestable: ["tasks.read", "tasks.manage", "notes.use"],
         offered: ["tasks.read", "tasks.manage", "notes.use"] as never,
+        unrequested: [] as never,
         createdAt: new Date().toISOString(),
         lastUsedAt: null,
-        lastUsedIp: null
+        lastUsedIp: null,
+        ipPolicy: { mode: "none" as const, allow: [], deny: [] },
+        approvedIp: "203.0.113.5",
+        lastRefusedAt: null,
+        lastRefusedIp: null
     };
 
     it("lists each app with its mark, return address, a permission count and its actions", () => {
@@ -136,6 +160,26 @@ describe("the connected-assistants list", () => {
         expect(html).toContain('type="search"');
     });
 
+    it("says where an app may connect from, and when its rule refused it", () => {
+        const html = renderToStaticMarkup(
+            withMessages(
+                <ConnectedApps
+                    apps={[
+                        {
+                            ...app,
+                            ipPolicy: { mode: "origin", allow: [], deny: [] },
+                            lastRefusedAt: new Date().toISOString(),
+                            lastRefusedIp: "198.51.100.20"
+                        }
+                    ]}
+                />
+            )
+        );
+        expect(html).toContain("Only from 203.0.113.5");
+        expect(html).toContain("198.51.100.20");
+        expect(html).toContain('aria-label="Where Visual Studio Code may connect from"');
+    });
+
     it("says how to connect one when there are none", () => {
         const html = renderToStaticMarkup(withMessages(<ConnectedApps apps={[]} />));
         expect(html).toContain("No assistants connected yet");
@@ -146,5 +190,45 @@ describe("the connected-assistants list", () => {
         const html = renderToStaticMarkup(withMessages(<ConnectedApps apps={[app]} />, "es-ES"));
         expect(html).toContain("Asistentes conectados");
         expect(html).toContain("3 permisos");
+    });
+});
+
+describe("the boxes an app's permissions are changed with", () => {
+    it("marks what the app never asked for, and ticks none of it", () => {
+        const toggle = vi.fn();
+        const html = renderToStaticMarkup(
+            withMessages(
+                <McpScopeChecklist
+                    offered={["tasks.read", "mail.read", "calendar.manage"]}
+                    selected={["tasks.read"]}
+                    effective={new Set(["tasks.read"])}
+                    unrequested={new Set(["mail.read", "calendar.manage"])}
+                    onToggle={toggle}
+                />
+            )
+        );
+        expect((html.match(/Not asked for by this app/g) ?? []).length).toBe(2);
+        expect((html.match(/checked=""/g) ?? []).length).toBe(1);
+        expect(html).toContain("Create, change and delete events");
+        // Drawing the boxes changes nothing: only a click does.
+        expect(toggle).not.toHaveBeenCalled();
+    });
+
+    it("says that a reading scope comes with the managing one", () => {
+        const toggle = vi.fn();
+        const html = renderToStaticMarkup(
+            withMessages(
+                <McpScopeChecklist
+                    offered={["calendar.read", "calendar.manage"]}
+                    selected={["calendar.manage"]}
+                    effective={new Set(["calendar.read", "calendar.manage"])}
+                    onToggle={toggle}
+                />,
+                "es-ES"
+            )
+        );
+        expect(html).toContain("Crear, cambiar y eliminar eventos");
+        expect(html).toContain("Incluido con Crear, cambiar y eliminar eventos");
+        expect(toggle).not.toHaveBeenCalled();
     });
 });

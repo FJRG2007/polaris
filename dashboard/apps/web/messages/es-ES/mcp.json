@@ -42,8 +42,12 @@
         "notes_use": "Leer y escribir tus notas",
         "office_use": "Leer y escribir documentos",
         "mail_use": "Leer y enviar correo",
+        "mail_read": "Leer y buscar en tu correo",
+        "mail_send": "Enviar correo por ti",
         "mailserver_manage": "Gestionar correo",
-        "calendar_use": "Ver y cambiar tus calendarios",
+        "calendar_use": "Ver los próximos eventos",
+        "calendar_read": "Ver tus calendarios y eventos",
+        "calendar_manage": "Crear, cambiar y eliminar eventos",
         "chat_use": "Leer y escribir en tus conversaciones",
         "chat_spaces": "Crear servidores de chat",
         "chat_groups": "Abrir conversaciones de grupo",
@@ -56,11 +60,16 @@
         "games_moderate": "Moderar jugadores",
         "games_console": "Usar consolas de juego",
         "games_manage": "Gestionar servidores",
+        "gameservers_read": "Ver servidores de juegos y quién juega",
+        "gameservers_manage": "Iniciar, detener y reiniciar servidores de juegos, y usar su consola",
         "agents_read": "Ver sesiones de agentes",
         "agents_manage": "Iniciar y dirigir sesiones de agentes",
         "home_read": "Ver lugares y cámaras",
         "home_control": "Controlar lugares y cámaras",
         "home_manage": "Gestionar cámaras",
+        "places_read": "Ver los dispositivos de tus lugares",
+        "places_control": "Manejar dispositivos: encender, cerrar, ajustar",
+        "places_routines": "Ver y ejecutar rutinas",
         "tools_use": "Usar herramientas",
         "tools_manage": "Crear enlaces cortos",
         "tasks_read": "Leer espacios, listas y tareas",
@@ -98,10 +107,53 @@
         "editNamed": "Cambiar los permisos de {app}",
         "disconnectNamed": "Desconectar {app}",
         "editTitle": "Qué puede hacer {app}",
-        "editHint": "Los cambios se aplican en su siguiente llamada. Solo aparece lo que pidió al conectarse.",
+        "editHint": "Los cambios se aplican en su siguiente llamada. Lo que no pidió aparece indicado y no se activa hasta que lo marques.",
+        "notRequested": "Esta app no lo pidió",
         "save": "Guardar",
         "pickOne": "Elige al menos un permiso, o desconéctala.",
         "changeFailed": "No se han podido cambiar los permisos. Recarga e inténtalo de nuevo.",
-        "loading": "Cargando asistentes conectados"
+        "loading": "Cargando asistentes conectados",
+        "ip": {
+            "edit": "Desde dónde puede conectarse",
+            "editNamed": "Desde dónde puede conectarse {app}",
+            "title": "Desde dónde puede conectarse {app}",
+            "hint": "Se comprueba en cada llamada y en cada renovación del token, además de las reglas de acceso de tu cuenta.",
+            "legend": "Direcciones permitidas",
+            "modes": {
+                "none": {
+                    "label": "Desde cualquier IP",
+                    "hint": "Sin regla de direcciones propia."
+                },
+                "origin": {
+                    "label": "Solo desde la dirección en la que se aprobó",
+                    "hint": "{ip}. Para asistentes en tu propio equipo o red."
+                },
+                "list": {
+                    "label": "Direcciones que elija",
+                    "hint": "Una lista de permitidas y otra de bloqueadas, con IP o rangos."
+                },
+                "sessions": {
+                    "label": "Solo donde tengo sesión iniciada",
+                    "hint": "Las direcciones de tus sesiones activas de Polaris, para asistentes en tus propios equipos. Deja de funcionar si cierras sesión en todas partes."
+                }
+            },
+            "noOrigin": "No se guardó para esta conexión. Vuelve a conectarla para usar esta opción.",
+            "allow": "Permitidas",
+            "allowHint": "Déjala vacía para permitir todo lo que no esté bloqueado.",
+            "deny": "Bloqueadas",
+            "denyHint": "Las direcciones bloqueadas se rechazan aunque estén permitidas.",
+            "placeholder": "203.0.113.7 o 2001:db8::/48",
+            "invalid": "Introduce una dirección IP o un rango CIDR.",
+            "listEmpty": "Añade al menos una dirección.",
+            "summary": {
+                "none": "Desde cualquier IP",
+                "origin": "Solo desde {ip}",
+                "sessions": "Solo desde donde tienes la sesión iniciada",
+                "list": "{allow, plural, =0 {Cualquier dirección} one {# dirección permitida} other {# direcciones permitidas}}, {deny, plural, =0 {ninguna bloqueada} one {# bloqueada} other {# bloqueadas}}"
+            },
+            "refused": "Rechazada {time} desde {ip}",
+            "unknownIp": "una IP desconocida",
+            "failed": "No se ha podido guardar la regla de direcciones. Recarga e inténtalo de nuevo."
+        }
     }
 }

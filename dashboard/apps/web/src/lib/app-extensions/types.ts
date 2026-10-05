@@ -11,6 +11,7 @@
  * about. Everything here is a type, so this module is shared by core and apps.
  */
 
+import type { McpTool } from "@/lib/mcp/protocol";
 import type { PendingAppLink } from "@polaris/core";
 import type { BackupSource } from "@/lib/backups/sources/types";
 import type { GamePortRow, GamePortsReading } from "@/lib/apps/port-advice";
@@ -122,6 +123,15 @@ export interface AppExtension {
     /** Its servers, for the overview card. */
     readonly gameServerSummaries?: (userId: string) => Promise<readonly GameServerSummary[]>;
 
+    /**
+     * The tools it offers connected assistants over MCP. Listed, callable and
+     * offered as scopes only while the app is installed; each tool names a
+     * scope from core's table (`lib/mcp/scope-table.ts`) and enforces access
+     * with the app's own rules. Loaded when asked, so the tools' modules are
+     * not imported with the registry. See docs/installable-apps-plan.md.
+     */
+    readonly mcpTools?: () => Promise<readonly AppMcpTool[]>;
+
     /** The ports the router has to forward for it. */
     readonly forwardedPorts?: () => Promise<readonly GamePortRow[]>;
 
@@ -217,6 +227,10 @@ export interface AppExtension {
      */
     readonly gameSanctions?: (userId: string) => Promise<readonly GameSanction[]>;
 }
+
+/** A tool an app offers over MCP, its input type already erased by
+ *  `defineTool` (`host.mcp.defineTool`). */
+export type AppMcpTool = McpTool<never>;
 
 /** A sanction a game server put on a player linked to an account. */
 export interface GameSanction {

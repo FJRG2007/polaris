@@ -23,7 +23,7 @@ export async function GET(
         // i18n-ignore read by a machine, not shown to a person
         return Response.json({ error: "No authorization server here" }, { status: 404 });
     }
-    return metadataJson(authorizationServerMetadata(originOf(request), mcpScopes()));
+    return metadataJson(authorizationServerMetadata(originOf(request), await mcpScopes()));
 }
 
 export function OPTIONS(): Response {

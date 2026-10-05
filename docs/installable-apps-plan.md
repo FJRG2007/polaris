@@ -74,18 +74,18 @@ game-servers-<build>.tgz
 
 What core asks an app today, grouped by the core screen that asks:
 
-| Core area                                            | What it needs from Game servers                                            |
-| ---------------------------------------------------- | -------------------------------------------------------------------------- |
-| Deploy (`deploy-service`)                            | which image a Minecraft server's release runs                              |
-| Marketplace / install (`install-service`, `catalog`) | port allocation for game ports, loader and software defaults, ARK map list |
-| Access (`install-access`, `container-files`)         | per-server permissions, container file access                              |
-| Admin > Domains                                      | game ports to forward, their live reachability, the port policy            |
-| Firewall                                             | the per-server player access panel                                         |
-| Backups                                              | the Minecraft world backup source                                          |
-| Overview and home widgets                            | counts and state of game servers                                           |
-| Router guide                                         | which ports the router has to forward                                      |
-| Cron                                                 | the game-\* jobs                                                           |
-| Presence activity (`presence-activity`)              | which server a player is on, to show "Playing Minecraft on \<server\>"     |
+| Core area                                            | What it needs from Game servers                                                                                                                      |
+| ---------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Deploy (`deploy-service`)                            | which image a Minecraft server's release runs                                                                                                        |
+| Marketplace / install (`install-service`, `catalog`) | port allocation for game ports, loader and software defaults, ARK map list                                                                           |
+| Access (`install-access`, `container-files`)         | per-server permissions, container file access                                                                                                        |
+| Admin > Domains                                      | game ports to forward, their live reachability, the port policy                                                                                      |
+| Firewall                                             | the per-server player access panel                                                                                                                   |
+| Backups                                              | the Minecraft world backup source                                                                                                                    |
+| Overview and home widgets                            | counts and state of game servers                                                                                                                     |
+| Router guide                                         | which ports the router has to forward                                                                                                                |
+| Cron                                                 | the game-\* jobs                                                                                                                                     |
+| Presence activity (`presence-activity`)              | which server a player is on, to show "Playing Minecraft on \<server\>"                                                                               |
 | Chat                                                 | which conversations a server is linked to (badge, `/online`/`/status`), and which messages cross between a game and a linked or relayed conversation |
 
 The registry is a typed interface in core with one implementation per installed
@@ -97,6 +97,89 @@ anything, not only by the app it belongs to, so it imports nothing heavy at the
 top: each hook loads the services it needs when it runs. Without that, an app
 extension that reached the database, the session or a container runtime would
 load those into a core path that never uses them.
+
+## MCP tools
+
+An app can offer tools to connected AI assistants (see
+[connecting-ai-assistants.md](connecting-ai-assistants.md)) through the
+`mcpTools` hook:
+
+```ts
+// src/lib/my-extension.ts
+mcpTools: async () => (await import("./mcp-tools")).myMcpTools();
+
+// src/lib/mcp-tools.ts
+import { z } from "zod";
+import { host } from "@polaris/app-host";
+import type { AppHostTypes } from "@polaris/app-host";
+
+// Built when asked for, never at module load: a module of the app can be
+// loaded before the dashboard has provided `host`.
+const listTool = () =>
+  host.mcp.defineTool({
+    name: "garden_beds",
+    title: "List beds",
+    description: "The garden's beds and what is planted in each. Read-only.",
+    input: z.object({ limit: z.number().int().min(1).max(50).default(20) }),
+    scope: "places.read",
+    readOnly: true,
+    async run(input, caller) {
+      const user = await host.mcp.actingUser(caller.userId);
+      if (!user)
+        throw new host.mcp.McpRefusal("This account cannot use the garden.");
+      // ...the same service and access check the app's own action uses
+      return { text: "...", structured: { beds: [] } };
+    },
+  });
+
+export function myMcpTools(): readonly AppHostTypes["McpTool"][] {
+  return [listTool()];
+}
+```
+
+- **Installed only.** Core asks the hook on every MCP request, only of installed
+  apps (`isAppInstalled`). An app that is not installed has no tools on the
+  list, a call to one is "no such tool", and its scopes are not offered on the
+  consent screen, in the metadata or in the `WWW-Authenticate` challenge. Load
+  the tools module inside the hook, never at the extension's top level, and
+  call `host` only inside functions: a module may be evaluated before the
+  dashboard provides it.
+- **Scopes come from core's table** (`apps/web/src/lib/mcp/scope-table.ts`).
+  `scope` is one scope, or a list of which any one is enough; `McpScope` makes
+  an unknown one a compile error, and core leaves out (and logs) a tool with no
+  scope, an unknown scope, a name that is not `^[a-z][a-z0-9_]{1,63}$`, or a
+  name another tool has. A new scope is a row in that table - `<area>.<verb>`,
+  the permission it `requires`, what it `implies`, `sensitive` if it acts
+  outside Polaris - plus its label under `scopes` in
+  `apps/web/messages/en-US/mcp.json` and `es-ES/mcp.json`. Never add a role
+  permission for it: a scope stands on an existing permission and is good on a
+  call only while the person holds that permission.
+- **Enforce access with the app's own rules.** A call has no session cookie.
+  `host.mcp.actingUser(caller.userId)` builds the person as a session user (no
+  view-as; null for a banned or disabled account), and the tool passes it to
+  the same access check and service the app's screen uses - for example
+  `host.appsInstallAccess.gameServerAccess`, `placesReach`,
+  `requireWritableCalendar`. Do not write a second, weaker check; if an action
+  does its work inline, move that work into a lib function both call (as
+  `operateDevice` and `games-operations.ts` do).
+- **Refusals.** Throw `new host.mcp.McpRefusal(sentence)` for anything the model
+  can act on; turn the app's own refusal class into one. Anything else thrown
+  is logged and the model gets a generic sentence, so internals never leak.
+  Reach for `host.mcp.McpRefusal` only inside `run`: it is a class the host
+  provides, not a stand-in.
+- **Annotations.** `readOnly: true` for reads. For a change, `destructive:
+false` only when it only adds (creating, sending, starting a run);
+  `idempotent: true` when repeating it changes nothing more. Give every input a
+  zod schema with bounds and a `.describe()` per field, and a `title`.
+- **Audit and budgets** are core's: every successful changing call is written
+  to the person's activity with the connection that made it, and calls are
+  rate-limited per credential. Write the app's own audit line where its screen
+  does.
+- **Testing.** Under `apps/web/test/mcp/`, call the tools through
+  `handleMcpMessage` with the hook's list and a caller's scopes, mocking the
+  services they reach (see `app-tools-calendar.test.ts`), and add the app's
+  hook to `scope-table.test.ts`, which fails on a scope that is not in the
+  table, has no label, or a tool whose schema a client cannot read.
 
 ## Phases
 
@@ -243,4 +326,5 @@ load those into a core path that never uses them.
    An app's jobs are read on every scheduler tick (`scheduledJobs()`), since
    they arrive with its code. `npm run dev:up` builds the bundles into
    `dashboard/.app-bundles` for a local dashboard.
+
 5. **Places** went through the same phases with Game servers.

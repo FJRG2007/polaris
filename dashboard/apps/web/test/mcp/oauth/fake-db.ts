@@ -54,6 +54,12 @@ function matches(row: Row, where: Row | undefined, relations: (row: Row) => Row)
                         !(value.getTime() < (operand as Date).getTime())
                     )
                         return false;
+                } else if (op === "gt") {
+                    if (
+                        !(value instanceof Date) ||
+                        !(value.getTime() > (operand as Date).getTime())
+                    )
+                        return false;
                 } else if (op === "in") {
                     if (!(operand as unknown[]).includes(value)) return false;
                 } else {
@@ -76,7 +82,8 @@ export function createFakeDb(users: FakeUser[]) {
         oAuthClient: [],
         oAuthGrant: [],
         oAuthCode: [],
-        oAuthToken: []
+        oAuthToken: [],
+        session: []
     };
 
     function relationsOf(model: string, row: Row): Row {
@@ -199,6 +206,7 @@ export function createFakeDb(users: FakeUser[]) {
         oAuthGrant: delegate("oAuthGrant"),
         oAuthCode: delegate("oAuthCode"),
         oAuthToken: delegate("oAuthToken"),
+        session: delegate("session"),
         user: {
             async findUnique({ where }: { where: { id: string } }) {
                 return users.find((user) => user.id === where.id) ?? null;

@@ -11,7 +11,9 @@
  * spec asks for that to be said.
  *
  * The boxes are `McpScopeChecklist`, the same list an app's permissions are
- * changed with afterwards.
+ * changed with afterwards. Everything asked for starts ticked except what
+ * reaches outside Polaris or into the house - sending mail, switching a
+ * device - which waits for the person to tick it.
  */
 
 import { useMemo, useState } from "react";
@@ -19,7 +21,7 @@ import { answerAuthorizationAction } from "./actions";
 import { scopeLabelKey } from "@/lib/mcp/oauth/scope-labels";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { AlertTriangle, Blocks, Globe, Info, Undo2 } from "lucide-react";
-import { expandPermissions, type Permission } from "@polaris/core";
+import { expandScopes, isSensitiveScope, type McpScope } from "@/lib/mcp/scope-table";
 import { ConsentCard, ConsentFacts } from "@/components/consent-card";
 import { ClientMark } from "@/components/client-logo";
 import type { ClientBrand } from "@/lib/mcp/oauth/client-brand";
@@ -44,21 +46,23 @@ export function ConsentView({
     query: string;
     app: AppSummary;
     person: string;
-    offered: Permission[];
-    withheld: Permission[];
+    offered: McpScope[];
+    withheld: McpScope[];
 }) {
     const t = useTranslations("mcp");
-    const [selected, setSelected] = useState<Permission[]>(offered);
+    const [selected, setSelected] = useState<McpScope[]>(() =>
+        offered.filter((scope) => !isSensitiveScope(scope))
+    );
     const [pending, setPending] = useState<"allow" | "deny" | null>(null);
     const [error, setError] = useState<string | null>(null);
 
     const effective = useMemo(
-        () => new Set(expandPermissions(selected).filter((scope) => offered.includes(scope))),
+        () => new Set(expandScopes(selected).filter((scope) => offered.includes(scope))),
         [selected, offered]
     );
     const name = app.name || t("consent.unnamed");
 
-    function toggle(scope: Permission, checked: boolean) {
+    function toggle(scope: McpScope, checked: boolean) {
         setError(null);
         setSelected((current) =>
             checked ? [...current, scope] : current.filter((entry) => entry !== scope)

@@ -6,29 +6,34 @@
  *
  * Ticking a broad permission ticks what it cannot work without, locked, the
  * way the API key picker does; the server expands the same way whatever is
- * posted. Pure display: the caller holds what was ticked.
+ * posted. A scope the app never asked for - one Polaris added since it
+ * connected, say - is offered on the edit dialog with a line that says so,
+ * and is never ticked for the person. Pure display: the caller holds what was
+ * ticked.
  */
 
 import { Checkbox } from "@polaris/ui";
-import { impliedBy } from "@polaris/core";
-import type { Permission } from "@polaris/core";
 import { scopeLabelKey } from "@/lib/mcp/oauth/scope-labels";
 import { useTranslations } from "@/components/i18n/i18n-provider";
+import { scopeImplies, type McpScope } from "@/lib/mcp/scope-table";
 
 export function McpScopeChecklist({
     offered,
     selected,
     effective,
+    unrequested,
     disabled,
     onToggle
 }: {
-    offered: readonly Permission[];
+    offered: readonly McpScope[];
     /** What was ticked by hand. */
-    selected: readonly Permission[];
+    selected: readonly McpScope[];
     /** What the app would hold: the ticked ones and what they imply. */
-    effective: ReadonlySet<Permission>;
+    effective: ReadonlySet<McpScope>;
+    /** The ones the app did not ask for, marked as such. */
+    unrequested?: ReadonlySet<McpScope>;
     disabled?: boolean;
-    onToggle: (scope: Permission, checked: boolean) => void;
+    onToggle: (scope: McpScope, checked: boolean) => void;
 }) {
     const t = useTranslations("mcp");
     return (
@@ -36,7 +41,7 @@ export function McpScopeChecklist({
             {offered.map((scope) => {
                 const implied = effective.has(scope) && !selected.includes(scope);
                 const source = implied
-                    ? selected.find((entry) => impliedBy(entry).includes(scope))
+                    ? selected.find((entry) => scopeImplies(entry).includes(scope))
                     : undefined;
                 return (
                     <li key={scope}>
@@ -56,6 +61,11 @@ export function McpScopeChecklist({
                                           })
                                         : scope}
                                 </span>
+                                {unrequested?.has(scope) ? (
+                                    <span className="text-xs text-muted-foreground">
+                                        {t("connectedApps.notRequested")}
+                                    </span>
+                                ) : null}
                             </span>
                         </label>
                     </li>

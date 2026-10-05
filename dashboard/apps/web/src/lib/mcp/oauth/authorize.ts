@@ -15,7 +15,7 @@
 
 import { validChallenge } from "./pkce";
 import { requestedScopes } from "./scopes";
-import type { Permission } from "@polaris/core";
+import type { McpScope } from "@/lib/mcp/scope-table";
 import { resolveClient, type OAuthClientRecord } from "./clients";
 import {
     MAX_URI_LENGTH,
@@ -36,7 +36,7 @@ export interface AuthorizationRequest {
     readonly state: string | undefined;
     readonly codeChallenge: string;
     readonly resource: string;
-    readonly scopes: Permission[];
+    readonly scopes: McpScope[];
 }
 
 /** Why the screen cannot even send the app an error: there is no address that
@@ -68,7 +68,7 @@ export function answerUrl(
 export async function checkAuthorizationRequest(
     params: AuthorizationParams,
     origin: string,
-    supportedScopes: readonly Permission[],
+    supportedScopes: readonly McpScope[],
     resolve: (clientId: string) => Promise<OAuthClientRecord | null> = resolveClient
 ): Promise<AuthorizationCheck> {
     const clientId = params.client_id ?? "";

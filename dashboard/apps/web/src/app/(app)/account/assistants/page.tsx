@@ -10,11 +10,10 @@
 
 import { Suspense } from "react";
 import { requireUser } from "@/lib/session";
-import type { Permission } from "@polaris/core";
 import { McpAssistants } from "./mcp-assistants";
 import { ConnectedApps } from "./connected-apps";
 import { scopesAvailableTo } from "@polaris/auth";
-import { mcpScopes } from "@/lib/mcp/oauth/scopes";
+import { editableScopes, mcpScopes } from "@/lib/mcp/oauth/scopes";
 import { getTranslations } from "@/lib/i18n/request";
 import { Messages } from "@/components/i18n/messages";
 import { listConnectedApps } from "@/lib/mcp/oauth/grants";
@@ -24,20 +23,19 @@ export const dynamic = "force-dynamic";
 
 /** The list, once the grants and what this person holds are read. */
 async function ConnectedAppsSection({ userId, isAdmin }: { userId: string; isAdmin: boolean }) {
-    const [apps, available] = await Promise.all([
+    const [apps, available, supported] = await Promise.all([
         listConnectedApps(userId),
-        scopesAvailableTo(userId, isAdmin)
+        scopesAvailableTo(userId, isAdmin),
+        mcpScopes()
     ]);
-    const held = new Set<string>(available);
-    // What each app could be given: what it asked for, cut to what MCP offers
-    // and what this person holds. The action cuts it the same way again.
-    const supported = mcpScopes();
+    // What each app could be given: what MCP offers now and the old scopes it
+    // still holds, cut to what this person holds. The ones it did not ask for
+    // are marked. The action cuts it the same way again.
     const rows = apps.map((app) => {
         const requestable = new Set(app.requestable);
-        const offered: Permission[] = supported.filter(
-            (scope) => requestable.has(scope) && held.has(scope)
-        );
-        return { ...app, offered };
+        const offered = editableScopes(app.scopes, supported, available);
+        const unrequested = offered.filter((scope) => !requestable.has(scope));
+        return { ...app, offered, unrequested };
     });
     return <ConnectedApps apps={rows} />;
 }

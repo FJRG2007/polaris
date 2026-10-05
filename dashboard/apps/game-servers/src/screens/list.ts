@@ -17,7 +17,6 @@ import { type GameId } from "@polaris/core";
 import type { GameKey } from "../../messages";
 import type { GameServerFacts, GameServerLive } from "../lib/games-service";
 
-
 /** What the page knows about one server before anything is polled. */
 export interface GameServerSeed {
     id: string;
@@ -57,7 +56,10 @@ export type SortDir = "asc" | "desc";
 /** Which way a column sorts on the first click, chosen per column because the
  *  interesting end differs: the servers with something wrong, and the servers with
  *  people on them. */
-export const FIRST_CLICK: Record<Exclude<SortKey, null>, SortDir> = { status: "asc", players: "desc" };
+export const FIRST_CLICK: Record<Exclude<SortKey, null>, SortDir> = {
+    status: "asc",
+    players: "desc"
+};
 
 /** The states a row can report, worst first. Sorting by status ascending puts
  *  everything that needs somebody at the top, which is the only reason to sort a
@@ -98,7 +100,7 @@ export const STATUS_FILTERS: Record<string, readonly StatusKind[]> = {
  * saying it is online before it has said so would be reporting the container, which
  * is the thing an operator opens this page to distrust.
  */
-export function statusOf(server: ServerView): StatusKind {
+export function statusOf(server: Pick<ServerView, "status" | "facts" | "live">): StatusKind {
     const { facts, live } = server;
     if (server.status === "failed" && !facts?.running) return "failed";
     if (facts === null) return "unknown";
@@ -150,12 +152,17 @@ export function filterServers(
  * done what they asked. Below them, the chosen column, and the name to break every
  * tie - without it a table of stopped servers reshuffles itself on every poll.
  */
-export function sortServers(servers: readonly ServerView[], key: SortKey, dir: SortDir): ServerView[] {
+export function sortServers(
+    servers: readonly ServerView[],
+    key: SortKey,
+    dir: SortDir
+): ServerView[] {
     const direction = dir === "asc" ? 1 : -1;
     return [...servers].sort((left, right) => {
         if (left.favorite !== right.favorite) return left.favorite ? -1 : 1;
         if (key === "status") {
-            const gap = STATUS_ORDER.indexOf(statusOf(left)) - STATUS_ORDER.indexOf(statusOf(right));
+            const gap =
+                STATUS_ORDER.indexOf(statusOf(left)) - STATUS_ORDER.indexOf(statusOf(right));
             if (gap !== 0) return gap * direction;
         }
         if (key === "players") {
@@ -179,7 +186,8 @@ export function sortServers(servers: readonly ServerView[], key: SortKey, dir: S
 export function uptimeLine(server: ServerView): { prefix: GameKey<"games">; at: string } | null {
     const { facts, live } = server;
     if (!facts) return null;
-    if (live?.answering === true) return facts.onlineSince ? { prefix: "status.upSince", at: facts.onlineSince } : null;
+    if (live?.answering === true)
+        return facts.onlineSince ? { prefix: "status.upSince", at: facts.onlineSince } : null;
     return facts.lastOnlineAt ? { prefix: "status.lastUp", at: facts.lastOnlineAt } : null;
 }
 
@@ -219,6 +227,7 @@ export function nextSort(
     clicked: Exclude<SortKey, null>
 ): { key: SortKey; dir: SortDir } {
     if (current.key !== clicked) return { key: clicked, dir: FIRST_CLICK[clicked] };
-    if (current.dir === FIRST_CLICK[clicked]) return { key: clicked, dir: current.dir === "asc" ? "desc" : "asc" };
+    if (current.dir === FIRST_CLICK[clicked])
+        return { key: clicked, dir: current.dir === "asc" ? "desc" : "asc" };
     return { key: null, dir: FIRST_CLICK[clicked] };
 }

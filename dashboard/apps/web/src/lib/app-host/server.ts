@@ -18,6 +18,7 @@
  */
 
 import * as mime from "@/lib/mime";
+import { McpRefusal, defineMcpTool } from "@/lib/mcp/protocol";
 import { portKey } from "@/lib/apps/port-key";
 import * as appsCatalog from "@/lib/apps/catalog";
 import * as hostAddress from "@/lib/host-address";
@@ -42,6 +43,8 @@ import type {
     RelayedChannelMessage
 } from "@/lib/app-extensions/types";
 import type { InstallConfig } from "@/lib/apps/install-config";
+import type { McpScope } from "@/lib/mcp/scope-table";
+import type { McpCaller, McpTool, McpToolResult } from "@/lib/mcp/protocol";
 import type { LinkableConversations } from "@/lib/chat/game-links";
 import type { InstallSeed, InstalledAppSetting } from "@/lib/apps/install-service";
 import type { InstallAccessEntry, InstallAccessView } from "@/lib/apps/install-sharing";
@@ -121,6 +124,7 @@ const load = {
     neighbours: once(() => import("@/lib/storage-whereabouts/neighbours")),
     i18nLocaleService: once(() => import("@/lib/i18n/locale-service")),
     i18nRequest: once(() => import("@/lib/i18n/request")),
+    mcpActingUser: once(() => import("@/lib/mcp/acting-user")),
     integrationService: once(() => import("@/lib/integration-service")),
     minecraftRouter: once(() => import("@/lib/minecraft-router")),
     integrationsCloudflareAccountService: once(
@@ -176,6 +180,9 @@ export const serverHost = {
         tunableEnvVars: appsCatalog.tunableEnvVars
     },
     appsInstallAccess: {
+        // The same standing `requireGameServer` reads, for a caller with no
+        // session - an MCP tool, acting for the user `mcp.actingUser` built.
+        gameServerAccess: later(load.appsInstallAccess, "gameServerAccess"),
         gamePermissionsFor: later(load.appsInstallAccess, "gamePermissionsFor"),
         installRef: later(load.appsInstallAccess, "installRef"),
         reachableInstallIds: later(load.appsInstallAccess, "reachableInstallIds"),
@@ -364,6 +371,15 @@ export const serverHost = {
         resolveZoneForHostname: later(load.integrationsCloudflareApi, "resolveZoneForHostname"),
         upsertSrvRecord: later(load.integrationsCloudflareApi, "upsertSrvRecord")
     },
+    // What an app needs to offer tools over MCP (the `mcpTools` hook): a
+    // tool typed against its own schema, the refusal a model is shown as
+    // written, and the person a call acts for, shaped like a session so the
+    // app's own access rules decide. See docs/installable-apps-plan.md.
+    mcp: {
+        McpRefusal,
+        actingUser: later(load.mcpActingUser, "actingUser"),
+        defineTool: defineMcpTool
+    },
     metricsShared: {
         resolveRange: metricsShared.resolveRange
     },
@@ -459,6 +475,10 @@ declare module "@polaris/app-host" {
         InstalledSlotHost: InstalledSlotHost;
         LinkableConversations: LinkableConversations;
         LiveGrant: LiveGrant;
+        McpCaller: McpCaller;
+        McpScope: McpScope;
+        McpTool: McpTool<never>;
+        McpToolResult: McpToolResult;
         RelayedChannelMessage: RelayedChannelMessage;
         SealedSecret: SealedSecret;
         SessionUser: SessionUser;
