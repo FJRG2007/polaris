@@ -16,6 +16,7 @@
  */
 
 import { Prisma, prisma } from "@polaris/db";
+import * as live from "./device-live";
 import * as kinds from "./device-kinds";
 import { HomeError } from "./home-error";
 import * as accounts from "./device-accounts";
@@ -29,6 +30,9 @@ const { dropGrantsFor } = host.accessGrants;
  *  over its radio, say - that a background read must never spend. */
 export interface SyncOptions {
     readonly probe?: boolean;
+    /** Only these accounts, where a caller is pacing them one by one. Every
+     *  connected account when absent. */
+    readonly only?: readonly string[];
 }
 
 /** Which of the actions count as somebody using the thing, for the chart. A door
@@ -228,7 +232,11 @@ export async function updateDevice(
         },
         select: DEVICE_FIELDS
     });
-    return toView(row);
+    const view = toView(row);
+    // Renamed or moved to another place: every open screen hears it, and the
+    // ones looking at the place it left take it off.
+    live.announceDevices(installedAppId, [view]);
+    return view;
 }
 
 /**
@@ -354,7 +362,9 @@ export async function actOnDevice(
     // A socket told to go on is on now, and whatever is watching it hears so
     // now rather than at the next sync.
     await tellAutomations(installedAppId, [row]);
-    return toView(row);
+    const acted = toView(row);
+    live.announceDevices(installedAppId, [acted]);
+    return acted;
 }
 
 /**
@@ -375,30 +385,44 @@ async function tellAutomations(installedAppId: string, rows: readonly DeviceRow[
 }
 
 /**
- * Go and ask every connected account what it has.
+ * Go and ask every connected account what it has, or only `options.only` of
+ * them - how `device-watch` reads one account at its own pace without the
+ * rest waiting on it.
  *
  * One after the other, and one of them failing does not stop the rest: an account
  * that is refusing its token must not leave a second make's devices unread. What
  * went wrong is remembered on the account it went wrong on, so a screen can say
- * which of them is the problem rather than putting one line above everything.
+ * which of them is the problem rather than putting one line above everything;
+ * `failed` names those accounts for a caller pacing them, such as the backoff
+ * in `device-watch`.
  */
 export async function syncDevices(
     installedAppId: string,
     options: SyncOptions = {}
-): Promise<{ devices: number; error: string | null }> {
+): Promise<{ devices: number; error: string | null; failed: string[] }> {
     const connected = await accounts.listAccounts(installedAppId);
     let devices = 0;
     let error: string | null = null;
+    const failed: string[] = [];
+    let read = false;
     for (const account of connected) {
         if (!accounts.isConnectable(account.connection)) continue;
+        if (options.only && !options.only.includes(account.id)) continue;
+        read = true;
         try {
             devices += await syncAccount(installedAppId, account.id, options);
         } catch (caught) {
+            failed.push(account.id);
             error =
                 caught instanceof Error ? caught.message : `${account.label} could not be reached`;
         }
     }
-    return { devices, error };
+    // When each account was last read is what an open screen shows beside it,
+    // and whether it is refusing is the line above the list.
+    if (read && live.hasListeners()) {
+        live.announceAccounts(installedAppId, await accounts.listAccounts(installedAppId));
+    }
+    return { devices, error, failed };
 }
 
 /** One account: what it holds now, and what has happened on it. */
@@ -479,6 +503,11 @@ async function syncAccount(
         await prisma.placeDevice.deleteMany({
             where: { id: { in: gone.map((device) => device.id) } }
         });
+        live.announceDevices(
+            installedAppId,
+            read.map(toView),
+            gone.map((device) => device.id)
+        );
 
         if (driver.history)
             await ingestHistory(accountId, await driver.history(credentials, HISTORY_PAGE));

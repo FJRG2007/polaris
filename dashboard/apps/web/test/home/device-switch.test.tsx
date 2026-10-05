@@ -75,6 +75,8 @@ vi.mock("@polaris-app/places/src/screens/actions", () => ({
 
 const { DevicesView } = await import("@polaris-app/places/src/screens/devices/devices-view");
 
+let renders = 0;
+
 afterEach(() => {
     cleanup();
     pressed.length = 0;
@@ -83,7 +85,18 @@ afterEach(() => {
 async function drawn(devices: DeviceView[], canControl = true, locale?: "es-ES") {
     listed = devices;
     render(
-        withMessages(<DevicesView places={[]} canControl={canControl} canManage={false} />, locale)
+        withMessages(
+            <DevicesView
+                places={[]}
+                placeId="place-1"
+                // Its own per render: what one test drew must not be the cached
+                // screen the next one opens on.
+                cacheKey={`test-${(renders += 1)}`}
+                canControl={canControl}
+                canManage={false}
+            />,
+            locale
+        )
     );
     await screen.findByText(devices[0]!.name);
 }

@@ -15,12 +15,13 @@
  * "the locks are out" are different sentences and a screen that merged them would
  * tell somebody neither.
  *
- * The list refreshes itself while somebody is looking at it, because a device's
- * state is the one thing on this screen that changes without them: a door opened
- * by a keypad downstairs has to appear here. It refreshes on the half minute,
- * only while the tab is in front, and again the moment it comes back to the
- * front - every refresh is a call to somebody else's account, and a screen nobody
- * is watching does not need one.
+ * The list is live, the way Home Assistant's is: a device's state is the one
+ * thing on this screen that changes without the reader, so the server reads the
+ * accounts while somebody is looking and pushes each device the moment it is
+ * found changed (`use-device-stream`). The screen opens on what this browser
+ * last saw (`device-cache`) and the reads that follow move only the devices that
+ * differ - so a screen nothing happened to does not visibly change. "Check
+ * again" stays, for the read that wakes the devices themselves.
  */
 
 import * as actions from "../actions";
@@ -29,7 +30,7 @@ import { ConnectDialog, type Connected } from "./connect-dialog";
 import * as kinds from "../../lib/device-kinds";
 import type { PlaceView } from "../../lib/place-kinds";
 import type { DeviceAccountView } from "../../lib/device-accounts";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import * as registry from "../../lib/device-connections";
 import { BatteryLow, Plus, RefreshCw, Unplug } from "lucide-react";
 import type { DeviceAction, DeviceCommand, DeviceView } from "../../lib/device-kinds";
@@ -40,16 +41,24 @@ import { hostUi } from "@polaris/app-host/client";
 import { usePlacesT } from "../use-places-t";
 import type { PlacesTranslator } from "../../lib/i18n";
 import { placesRefusalText } from "../../lib/refusal-text";
+import { readCachedDevices, writeCachedDevices } from "./device-cache";
+import {
+    applyDeviceChange,
+    mergeDevices,
+    sameAccounts,
+    type DeviceChange
+} from "../../lib/device-diff";
+import { markSeen, useDeviceStream, useSeenAt } from "./use-device-stream";
 
 const { runAction } = hostUi.runAction;
 const { useDisplayFormat } = hostUi.displayFormat;
 const { IntegrationLogo } = hostUi.logos;
+const { RelativeTime } = hostUi.relativeTime;
 
-/** How often the list goes and asks again, while the tab is in front. Short
- *  enough that a door somebody else just used is right by the time the reader
- *  looks up; nothing is woken to answer it, so the cost is one call to the
- *  account and no battery. */
-const REFRESH_MS = 30_000;
+/** Record when each device in a full list was read. */
+function markRead(devices: readonly DeviceView[]): void {
+    markSeen(devices.map((device) => [device.id, device.stateAt] as const));
+}
 
 /**
  * The devices of one sort, together.
@@ -77,10 +86,16 @@ function groupDevices(
 
 export function DevicesView({
     places,
+    placeId,
+    cacheKey,
     canControl,
     canManage
 }: {
     places: readonly PlaceView[];
+    /** The place being looked at. */
+    placeId: string;
+    /** Whose screen of which place this is, for what this browser keeps of it. */
+    cacheKey: string;
     canControl: boolean;
     canManage: boolean;
 }) {
@@ -100,64 +115,141 @@ export function DevicesView({
     const [error, setError] = useState("");
     const groups = useMemo(() => groupDevices(devices ?? [], t), [devices, t]);
 
+    /** A full list from the server, moving only the devices that differ. */
+    const take = useCallback(
+        (result: { devices?: DeviceView[]; accounts?: DeviceAccountView[] }) => {
+            if (result.devices) {
+                const next = result.devices;
+                markRead(next);
+                setDevices((current) => mergeDevices(current, next));
+                setOpened((current) =>
+                    current ? (next.find((entry) => entry.id === current.id) ?? current) : current
+                );
+            }
+            if (result.accounts) {
+                const next = result.accounts;
+                setAccounts((current) => (sameAccounts(current, next) ? current : next));
+            }
+        },
+        []
+    );
+
+    /** The stored list, read again: no account is called. */
+    const reread = useCallback(async () => {
+        take(await actions.listDevicesAction());
+    }, [take]);
+
+    /** Which screen the list on display belongs to, so another place's doors
+     *  are never kept under this one's name while a switch is being read. */
+    const listedFor = useRef<string | null>(null);
+
+    // What this browser last saw, drawn before the first paint so a cached
+    // screen never shows a skeleton; then the stored list, which moves only
+    // what differs from it. Another place with nothing kept waits for its
+    // read rather than showing this one's doors.
+    useLayoutEffect(() => {
+        const cached = readCachedDevices(cacheKey);
+        listedFor.current = cached ? cacheKey : null;
+        if (cached) markRead(cached.devices);
+        setDevices(cached ? cached.devices : null);
+        if (cached) setAccounts(cached.accounts);
+    }, [cacheKey]);
+
     useEffect(() => {
         let cancelled = false;
         void (async () => {
             const result = await actions.listDevicesAction();
             if (cancelled) return;
             if (result.error) setError(result.error);
-            setDevices(result.devices ?? []);
-            setAccounts(result.accounts ?? []);
+            listedFor.current = cacheKey;
+            take({ devices: result.devices ?? [], accounts: result.accounts ?? [] });
         })();
         return () => {
             cancelled = true;
         };
-    }, []);
+    }, [cacheKey, take]);
+
+    useEffect(() => {
+        if (devices && listedFor.current === cacheKey) {
+            writeCachedDevices(cacheKey, { devices, accounts });
+        }
+    }, [cacheKey, devices, accounts]);
 
     /**
      * Ask the account what it has now.
      *
-     * `quiet` is the timer's version, which must not put a spinner on a screen
-     * nobody asked to wait - and which reads what the account already knows
-     * rather than making the devices themselves speak up. The loud version is
-     * somebody pressing the button, and that one is allowed to wake them: it is
-     * the difference between "as far as we know" and "as of now", and it is only
-     * ever spent when a person asked for it.
+     * `quiet` is spent without a spinner on a screen nobody asked to wait for -
+     * the one-shot read fired a few seconds after a press, to catch a lock as
+     * it settles, rather than making the devices themselves speak up. The loud
+     * version is somebody pressing "Check again", and that one is allowed to
+     * wake them: it is the difference between "as far as we know" and "as of
+     * now", and it is only ever spent when a person asked for it.
      *
-     * When it was last checked comes back with the devices. Without it the line
-     * at the top kept the time of the first read for as long as the tab was open,
-     * which is a screen refreshing itself every half a minute while saying it
-     * has not looked since you arrived.
+     * When it was last checked comes back with the devices, which is what moves
+     * each row's "Updated" line (`markRead` through `take`).
      */
-    const sync = useCallback(async (quiet = false) => {
-        if (!quiet) setRefreshing(true);
-        const result = await actions.syncDevicesAction({ probe: !quiet });
-        if (!quiet) setRefreshing(false);
-        if (result.devices) setDevices(result.devices);
-        if (result.accounts) setAccounts(result.accounts);
-        if (!quiet) setError(result.error ?? "");
-    }, []);
+    const sync = useCallback(
+        async (quiet = false) => {
+            if (!quiet) setRefreshing(true);
+            const result = await actions.syncDevicesAction({ probe: !quiet });
+            if (!quiet) setRefreshing(false);
+            take(result);
+            if (!quiet) setError(result.error ?? "");
+        },
+        [take]
+    );
 
     const connected = accounts.length > 0;
 
-    useEffect(() => {
-        if (!connected) return;
-        const timer = setInterval(() => {
-            if (document.visibilityState === "visible") void sync(true);
-        }, REFRESH_MS);
-        // A tab that has been in the background is a tab whose every state is as
-        // old as the moment it was left. Coming back to it is exactly when
-        // somebody is about to read a door and believe it, so it is read again
-        // then rather than up to half a minute later.
-        const wake = () => {
-            if (document.visibilityState === "visible") void sync(true);
-        };
-        document.addEventListener("visibilitychange", wake);
-        return () => {
-            clearInterval(timer);
-            document.removeEventListener("visibilitychange", wake);
-        };
-    }, [connected, sync]);
+    /**
+     * A pushed change. Only the devices it names move; the "updated" line moves
+     * for every device it confirms. An account connected or removed somewhere
+     * else changes which devices are here at all, so that is read again whole.
+     */
+    const heldAccounts = useRef(accounts);
+    heldAccounts.current = accounts;
+    // A device being pressed is left alone until its answer: a read that
+    // started before the press would otherwise flip the switch back under the
+    // finger. Its answer, and the push that follows it, settle it.
+    const pressing = useRef<string | null>(null);
+    pressing.current = busy?.id ?? null;
+    const receive = useCallback(
+        (pushed: DeviceChange) => {
+            const seen = pushed.seen;
+            if (seen) markSeen(seen.ids.map((id) => [id, seen.at] as const));
+            const change = {
+                ...pushed,
+                devices: pushed.devices.filter((entry) => entry.id !== pressing.current)
+            };
+            if (change.devices.length || change.removed.length) {
+                setDevices((current) => applyDeviceChange(current, change));
+                const gone = new Set(change.removed);
+                setOpened((current) => {
+                    if (!current) return current;
+                    if (gone.has(current.id)) return null;
+                    return change.devices.find((entry) => entry.id === current.id) ?? current;
+                });
+            }
+            const next = change.accounts;
+            if (next) {
+                const before = heldAccounts.current.map((account) => account.id).sort();
+                const after = next.map((account) => account.id).sort();
+                setAccounts((current) => (sameAccounts(current, next) ? current : [...next]));
+                if (before.join() !== after.join()) void reread();
+            }
+        },
+        [reread]
+    );
+
+    // Every open - the first, a tab brought back, a dropped connection -
+    // catches up on what it was not told: a change that landed between the
+    // read above and the stream subscribing is never pushed afterwards.
+    useDeviceStream({
+        enabled: devices !== null,
+        placeId,
+        onChange: receive,
+        onReady: () => void reread()
+    });
 
     /** Put a device back into both lists it can be in, so the row and the open
      *  panel never disagree about what a door is doing. */
@@ -234,6 +326,20 @@ export function DevicesView({
         setTimeout(() => void sync(true), 4000);
     };
 
+    // Stable across renders, so a row whose device did not change is not
+    // redrawn because the screen around it was.
+    const latestAct = useRef(act);
+    latestAct.current = act;
+    const actOnRow = useCallback(
+        (device: DeviceView, action: DeviceAction, command?: DeviceCommand) => {
+            // Thrown by `act` so the panel can show it; on the row the line above
+            // the list already has.
+            void latestAct.current(device, action, command).catch(() => undefined);
+        },
+        []
+    );
+    const openDevice = useCallback((device: DeviceView) => setOpened(device), []);
+
     const disconnect = async () => {
         if (!disconnecting) return;
         const result = await runAction(
@@ -245,15 +351,13 @@ export function DevicesView({
             if (result?.error) setError(result.error);
             return;
         }
-        setAccounts(result.accounts ?? []);
-        setDevices(result.devices ?? []);
+        take({ devices: result.devices ?? [], accounts: result.accounts ?? [] });
     };
 
     /** One dialog, two jobs, and the difference is which account it was opened
      *  on. Closing it has to forget that either way. */
     const settleConnection = (result: Connected) => {
-        setDevices(result.devices);
-        setAccounts(result.accounts);
+        take(result);
         setConnecting(false);
         setReconnecting(null);
     };
@@ -433,74 +537,14 @@ export function DevicesView({
                             )}
                             <ul className="flex flex-col gap-2">
                                 {group.devices.map((device) => (
-                                    <li
+                                    <DeviceRow
                                         key={device.id}
-                                        className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-lg border border-border bg-card px-4 py-3"
-                                    >
-                                        <button
-                                            type="button"
-                                            onClick={() => setOpened(device)}
-                                            className="flex min-w-[10rem] flex-1 flex-col items-start gap-0.5 text-left"
-                                        >
-                                            <span className="flex min-w-0 max-w-full items-center gap-2">
-                                                <DeviceIcon
-                                                    kind={device.kind}
-                                                    className="size-4 shrink-0 text-muted-foreground"
-                                                />
-                                                <span
-                                                    className="truncate text-sm font-medium"
-                                                    title={device.name}
-                                                >
-                                                    {device.name}
-                                                </span>
-                                                <Badge
-                                                    className={cn("shrink-0", stateClass(device))}
-                                                >
-                                                    {kinds.badgeText(device, t)}
-                                                </Badge>
-                                                <FilterChip air={device.air} />
-                                                {device.batteryCritical && (
-                                                    <Badge className="shrink-0 gap-1 border-danger-edge bg-danger-soft text-danger-ink">
-                                                        <BatteryLow className="size-3 shrink-0" />
-                                                        {t("power.labels.battery")}
-                                                    </Badge>
-                                                )}
-                                                {device.placeId === null && (
-                                                    <Badge className="shrink-0 border-border bg-muted text-muted-foreground">
-                                                        {t("devicesView.notPlaced")}
-                                                    </Badge>
-                                                )}
-                                            </span>
-                                            <span className="max-w-full truncate text-[0.6875rem] text-foreground-subtle">
-                                                {[
-                                                    device.zone,
-                                                    device.model,
-                                                    device.doorState === "none"
-                                                        ? null
-                                                        : kinds.doorText(device.doorState, t),
-                                                    device.batteryPercent === null
-                                                        ? null
-                                                        : t("devicesView.batteryPercent", {
-                                                              percent: device.batteryPercent
-                                                          })
-                                                ]
-                                                    .filter(Boolean)
-                                                    .join(" - ")}
-                                            </span>
-                                        </button>
-                                        <DeviceControls
-                                            device={device}
-                                            canControl={canControl}
-                                            busy={busy?.id === device.id ? busy.action : null}
-                                            onAct={(action, command) => {
-                                                // Thrown by `act` so the panel can show it; on
-                                                // the row the line above the list already has.
-                                                void act(device, action, command).catch(
-                                                    () => undefined
-                                                );
-                                            }}
-                                        />
-                                    </li>
+                                        device={device}
+                                        canControl={canControl}
+                                        busy={busy?.id === device.id ? busy.action : null}
+                                        onOpen={openDevice}
+                                        onAct={actOnRow}
+                                    />
                                 ))}
                             </ul>
                         </section>
@@ -553,5 +597,114 @@ export function DevicesView({
             {view}
             {connectDialog}
         </>
+    );
+}
+
+/**
+ * One device on the list.
+ *
+ * Memoized, and handed the very object the list held unless that device
+ * changed: a push about one door redraws that door's row and no other. When it
+ * was last read is not part of what it is handed, for the same reason - see
+ * `DeviceFreshness`.
+ */
+const DeviceRow = memo(function DeviceRow({
+    device,
+    canControl,
+    busy,
+    onOpen,
+    onAct
+}: {
+    device: DeviceView;
+    canControl: boolean;
+    busy: DeviceAction | null;
+    onOpen: (device: DeviceView) => void;
+    onAct: (device: DeviceView, action: DeviceAction, command?: DeviceCommand) => void;
+}) {
+    const t = usePlacesT();
+    const details = [
+        device.zone,
+        device.model,
+        device.doorState === "none" ? null : kinds.doorText(device.doorState, t),
+        device.batteryPercent === null
+            ? null
+            : t("devicesView.batteryPercent", { percent: device.batteryPercent })
+    ]
+        .filter(Boolean)
+        .join(" - ");
+    return (
+        <li className="flex flex-wrap items-center gap-x-4 gap-y-2 rounded-lg border border-border bg-card px-4 py-3">
+            <button
+                type="button"
+                onClick={() => onOpen(device)}
+                className="flex min-w-[10rem] flex-1 flex-col items-start gap-0.5 text-left"
+            >
+                <span className="flex min-w-0 max-w-full items-center gap-2">
+                    <DeviceIcon
+                        kind={device.kind}
+                        className="size-4 shrink-0 text-muted-foreground"
+                    />
+                    <span className="truncate text-sm font-medium" title={device.name}>
+                        {device.name}
+                    </span>
+                    <Badge className={cn("shrink-0", stateClass(device))}>
+                        {kinds.badgeText(device, t)}
+                    </Badge>
+                    <FilterChip air={device.air} />
+                    {device.batteryCritical && (
+                        <Badge className="shrink-0 gap-1 border-danger-edge bg-danger-soft text-danger-ink">
+                            <BatteryLow className="size-3 shrink-0" />
+                            {t("power.labels.battery")}
+                        </Badge>
+                    )}
+                    {device.placeId === null && (
+                        <Badge className="shrink-0 border-border bg-muted text-muted-foreground">
+                            {t("devicesView.notPlaced")}
+                        </Badge>
+                    )}
+                </span>
+                <span className="max-w-full truncate text-[0.6875rem] text-foreground-subtle">
+                    {details}
+                    <DeviceFreshness
+                        id={device.id}
+                        online={device.online}
+                        separated={details.length > 0}
+                    />
+                </span>
+            </button>
+            <DeviceControls
+                device={device}
+                canControl={canControl}
+                busy={busy}
+                onAct={(action, command) => onAct(device, action, command)}
+            />
+        </li>
+    );
+});
+
+/**
+ * When a device's state was last confirmed, beside it. A device that is not
+ * answering says so in its badge, so this says nothing for it rather than the
+ * same thing twice. Subscribed on its own, so the reads that confirm every
+ * device move this line and leave the rest of the row alone.
+ */
+function DeviceFreshness({
+    id,
+    online,
+    separated
+}: {
+    id: string;
+    online: boolean;
+    /** Whether something is printed before it on the line. */
+    separated: boolean;
+}) {
+    const t = usePlacesT();
+    const at = useSeenAt(id);
+    if (!online || !at) return null;
+    return (
+        <span>
+            {separated ? " - " : ""}
+            {t("devicesView.updated")} <RelativeTime iso={at} formatStyle="narrow" />
+        </span>
     );
 }

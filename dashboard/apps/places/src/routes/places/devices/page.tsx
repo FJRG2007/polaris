@@ -19,7 +19,7 @@ export const dynamic = "force-dynamic";
 export default async function DevicesPage() {
     const t = await placesT();
     // Somebody lent one door reaches this screen, and sees that door.
-    const { install, canControl, canManage } = await requireHomeReach();
+    const { user, install, canControl, canManage } = await requireHomeReach();
     const place = await currentPlace(install.id);
 
     return (
@@ -35,7 +35,13 @@ export default async function DevicesPage() {
                     canManage={canManage}
                 />
             </div>
-            <DevicesView places={place.places} canControl={canControl} canManage={canManage} />
+            <DevicesView
+                places={place.places}
+                placeId={place.current.id}
+                cacheKey={`${user.id}:${place.current.id}`}
+                canControl={canControl}
+                canManage={canManage}
+            />
         </div>
     );
 }

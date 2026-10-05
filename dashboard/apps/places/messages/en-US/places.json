@@ -1523,6 +1523,7 @@
         "notChecked": "not checked yet",
         "refusing": "refusing what it was given",
         "notAnswering": "not answering",
+        "updated": "Last updated",
         "checkAgain": "Check again",
         "reconnect": "Reconnect",
         "nothingTitle": "The account answered with nothing.",
