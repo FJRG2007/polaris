@@ -20,6 +20,10 @@ vi.mock("@/app/(app)/office/actions", () => ({
     renameDocumentAction: vi.fn(async () => ({})),
     starDocumentAction: vi.fn(async () => ({}))
 }));
+vi.mock("@/app/(app)/office/google-actions", () => ({
+    officeGoogleLinkAction: vi.fn(async () => ({ link: null })),
+    saveToGoogleAction: vi.fn(async () => ({}))
+}));
 vi.mock("@/app/(app)/office/link-panel", () => ({ OfficeLinkPanel: () => null }));
 vi.mock("@/components/access/share-dialog", () => ({ ShareDialog: () => null }));
 vi.mock("next/navigation", () => ({
