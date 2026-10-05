@@ -42,7 +42,7 @@ const StaticCanvas = (props: StaticCanvasProps) => {
       isComponentMounted.current = true;
 
       wrapper.replaceChildren(canvas);
-      canvas.classList.add("diagram__canvas", "static");
+      canvas.classList.add("polaris-diagram__canvas", "static");
     }
 
     const widthString = `${props.appState.width}px`;
@@ -80,7 +80,7 @@ const StaticCanvas = (props: StaticCanvasProps) => {
     );
   });
 
-  return <div className="diagram__canvas-wrapper" ref={wrapperRef} />;
+  return <div className="polaris-diagram__canvas-wrapper" ref={wrapperRef} />;
 };
 
 const getRelevantAppStateProps = (

@@ -669,15 +669,15 @@ body.polaris-diagram-cursor-resize * {
     }
   }
 
-  .diagram__paragraph {
+  .polaris-diagram__paragraph {
     margin: 1rem 0;
   }
 
   .Modal__content {
-    .diagram__paragraph:first-child {
+    .polaris-diagram__paragraph:first-child {
       margin-top: 0;
     }
-    .diagram__paragraph + .diagram__paragraph {
+    .polaris-diagram__paragraph + .polaris-diagram__paragraph {
       margin-top: 0rem;
     }
   }
@@ -736,8 +736,8 @@ body.polaris-diagram-cursor-resize * {
   }
 }
 
-.diagram__embeddable-container {
-  .diagram__embeddable-container__inner {
+.polaris-diagram__embeddable-container {
+  .polaris-diagram__embeddable-container__inner {
     overflow: hidden;
     display: flex;
     align-items: center;
@@ -745,7 +745,7 @@ body.polaris-diagram-cursor-resize * {
     border-radius: var(--embeddable-radius);
   }
 
-  .diagram__embeddable__outer {
+  .polaris-diagram__embeddable__outer {
     width: 100%;
     height: 100%;
     & > * {
@@ -753,7 +753,7 @@ body.polaris-diagram-cursor-resize * {
     }
   }
 
-  .diagram__embeddable-hint {
+  .polaris-diagram__embeddable-hint {
     position: absolute;
     z-index: 1;
     background: rgba(0, 0, 0, 0.5);

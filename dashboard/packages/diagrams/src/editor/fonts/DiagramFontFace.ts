@@ -88,7 +88,7 @@ export class DiagramFontFace {
     );
 
     // in case of issues, at least return the last url as a content
-    // defaults to unpkg for bundled fonts (so that we don't have to host them forever) and http url for others
+    // (the host-served path for bundled faces, the http url for others)
     return this.urls.length ? this.urls[this.urls.length - 1].toString() : "";
   }
 
@@ -152,8 +152,11 @@ export class DiagramFontFace {
     }
 
     // Bundled faces are served by the host, from the path it set with
-    // `setAssetPath` - never from a third-party CDN.
-    const assetUrl: string = uri.replace(/^(\.\/|\/)+/, "");
+    // `setAssetPath` - never from a third-party CDN. The bundler writes each
+    // face's path relative to the chunk that imports it ("../editor/fonts/..."
+    // from a shared chunk), so every leading "./", "../" and "/" goes: the host
+    // stages the same `editor/fonts/...` tree under that one path.
+    const assetUrl: string = uri.replace(/^(\.{1,2}\/|\/)+/, "");
     return [new URL(assetUrl, DiagramFontFace.normalizeBaseUrl(assetPath))];
   }
 

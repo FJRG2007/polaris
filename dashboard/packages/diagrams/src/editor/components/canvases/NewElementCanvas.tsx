@@ -41,7 +41,7 @@ const NewElementCanvas = (props: NewElementCanvasProps) => {
 
   return (
     <canvas
-      className="diagram__canvas"
+      className="polaris-diagram__canvas"
       style={{
         width: props.appState.width,
         height: props.appState.height,

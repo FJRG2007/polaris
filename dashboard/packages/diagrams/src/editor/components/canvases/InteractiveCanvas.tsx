@@ -147,7 +147,7 @@ const InteractiveCanvas = (props: InteractiveCanvasProps) => {
 
   return (
     <canvas
-      className="diagram__canvas interactive"
+      className="polaris-diagram__canvas interactive"
       style={{
         width: props.appState.width,
         height: props.appState.height,

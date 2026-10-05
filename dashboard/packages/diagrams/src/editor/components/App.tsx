@@ -787,7 +787,7 @@ class App extends React.Component<AppProps, AppState> {
         if (data.method === "paused") {
           let source: Window | null = null;
           const iframes = document.body.querySelectorAll(
-            "iframe.diagram__embeddable",
+            "iframe.polaris-diagram__embeddable",
           );
           if (!iframes) {
             break;
@@ -1188,7 +1188,7 @@ class App extends React.Component<AppProps, AppState> {
           return (
             <div
               key={el.id}
-              className={clsx("diagram__embeddable-container", {
+              className={clsx("polaris-diagram__embeddable-container", {
                 "is-hovered": isHovered,
               })}
               style={{
@@ -1230,7 +1230,7 @@ class App extends React.Component<AppProps, AppState> {
                     });
                   }
                 }}*/
-                className="diagram__embeddable-container__inner"
+                className="polaris-diagram__embeddable-container__inner"
                 style={{
                   width: isVisible ? `${el.width}px` : 0,
                   height: isVisible ? `${el.height}px` : 0,
@@ -1241,12 +1241,12 @@ class App extends React.Component<AppProps, AppState> {
                 }}
               >
                 {isHovered && (
-                  <div className="diagram__embeddable-hint">
+                  <div className="polaris-diagram__embeddable-hint">
                     {t("buttons.embeddableInteractionButton")}
                   </div>
                 )}
                 <div
-                  className="diagram__embeddable__outer"
+                  className="polaris-diagram__embeddable__outer"
                   style={{
                     padding: `${el.strokeWidth}px`,
                   }}
@@ -1256,7 +1256,7 @@ class App extends React.Component<AppProps, AppState> {
                     : null) ?? (
                     <iframe
                       ref={(ref) => this.cacheEmbeddableRef(el, ref)}
-                      className="diagram__embeddable"
+                      className="polaris-diagram__embeddable"
                       srcDoc={
                         src?.type === "document"
                           ? src.srcdoc(this.state.theme)

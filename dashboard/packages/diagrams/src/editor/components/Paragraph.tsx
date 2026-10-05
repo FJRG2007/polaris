@@ -3,7 +3,7 @@ export const Paragraph = (props: {
   style?: React.CSSProperties;
 }) => {
   return (
-    <p className="diagram__paragraph" style={props.style}>
+    <p className="polaris-diagram__paragraph" style={props.style}>
       {props.children}
     </p>
   );

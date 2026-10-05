@@ -176,11 +176,16 @@ beforeAll(async () => {
         callback(new Blob([new Uint8Array([137, 80, 78, 71])], { type: type ?? "image/png" }));
     };
     if (!("Path2D" in window)) vi.stubGlobal("Path2D", class {});
-    if (!window.FontFace) {
-        window.FontFace = class {
-            load = async () => this;
-        } as unknown as typeof FontFace;
-    }
+    // Enough of a font face for the exporter to decide which files to read.
+    window.FontFace = class {
+        family: string;
+        unicodeRange: string;
+        constructor(family: string, _source: string, descriptors?: FontFaceDescriptors) {
+            this.family = family;
+            this.unicodeRange = descriptors?.unicodeRange ?? "U+0-10FFFF";
+        }
+        load = async () => this;
+    } as unknown as typeof FontFace;
     if (!document.fonts) {
         Object.defineProperty(document, "fonts", {
             value: {
@@ -229,6 +234,25 @@ describe("the diagram canvas's assets", () => {
             }
         }
         expect([...hosts].filter((host) => !NAMED_NOT_FETCHED.has(host))).toEqual([]);
+    });
+
+    it("style only classes the canvas actually puts on its elements", () => {
+        // The canvas's own class names were renamed on the way in; a selector
+        // renamed one way and the markup another is a canvas whose layers stack
+        // in the wrong order and swallow every press.
+        let code = "";
+        const walk = (dir: string): void => {
+            for (const entry of readdirSync(dir, { withFileTypes: true })) {
+                const path = join(dir, entry.name);
+                if (entry.isDirectory()) walk(path);
+                else if (/\.tsx?$/.test(entry.name)) code += readFileSync(path, "utf8");
+            }
+        };
+        walk(join(packageRoot, "src"));
+        const styled = new Set(
+            [...built(".css").join("\n").matchAll(/\.((?:polaris-)?diagram[\w-]*)/g)].map((m) => m[1]!)
+        );
+        expect([...styled].filter((name) => !code.includes(name))).toEqual([]);
     });
 
     it("say nothing of where the code came from in the stylesheet's class names", () => {
@@ -286,9 +310,16 @@ describe("exporting a diagram", () => {
         expect(Number(svg.getAttribute("width"))).toBeGreaterThan(100);
         expect(svg.querySelectorAll("path, rect, text").length).toBeGreaterThan(0);
         expect(svg.outerHTML).toContain("Hello");
-        // Fonts inlined into the file are read from this origin, never a CDN.
+        // The text's face is inlined into the file, read from this origin under
+        // the staged path - never from a CDN, and never from a path the build
+        // does not stage (a chunk-relative "../editor/..." once escaped it).
+        expect(fetched.length).toBeGreaterThan(0);
         for (const url of fetched) {
-            expect(url.startsWith(`${base}/`) || url.startsWith(`${window.location.origin}${base}/`)).toBe(true);
+            const { origin, pathname } = new URL(url);
+            expect(origin).toBe(window.location.origin);
+            expect(pathname.startsWith(`${base}/editor/fonts/`), pathname).toBe(true);
+            const staged = join(dist, ...pathname.slice(base.length + 1).split("/"));
+            expect(() => readFileSync(staged), staged).not.toThrow();
         }
     });
 
