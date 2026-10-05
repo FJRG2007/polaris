@@ -61,6 +61,31 @@ describe("the newest CLI release", () => {
         ]);
     });
 
+    it("walks on to the next page while a full page has none", async () => {
+        const seen: string[] = [];
+        const full = Array.from({ length: 100 }, (_, index) => release(`dashboard-v0.${index}.0`));
+        const pages: Fetch = async (input) => {
+            seen.push(String(input));
+            return Response.json(
+                String(input).endsWith("&page=2") ? [release("cli-v0.6.0")] : full
+            );
+        };
+        const found = await newestRelease(pages, "example/polaris");
+        expect(found.version).toBe("0.6.0");
+        expect(seen).toEqual([
+            "https://api.github.com/repos/example/polaris/releases?per_page=100",
+            "https://api.github.com/repos/example/polaris/releases?per_page=100&page=2"
+        ]);
+    });
+
+    it("stops at a page that is not full", async () => {
+        const seen: string[] = [];
+        await expect(
+            newestRelease(listing([release("extension-v0.1.0")], seen), "example/polaris")
+        ).rejects.toThrow(/no CLI release yet/);
+        expect(seen).toHaveLength(1);
+    });
+
     it("skips a release with no digest to check the bundle against", async () => {
         const found = await newestRelease(
             listing([release("cli-v0.6.0", {}, null), release("cli-v0.5.0")])

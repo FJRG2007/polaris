@@ -92,11 +92,16 @@ function Install-PolarisCli {
     # prereleases are skipped, and so is a release with no digest to check.
     $asset = $null
     try {
-        $releases = Invoke-RestMethod -UseBasicParsing -Uri "$api/repos/$repo/releases?per_page=100" -Headers @{ "User-Agent" = "polaris-cli-installer"; "Accept" = "application/vnd.github+json" }
-        foreach ($release in @($releases)) {
-            if ($release.draft -or $release.prerelease -or -not ([string]$release.tag_name).StartsWith("cli-v")) { continue }
-            $candidate = @($release.assets) | Where-Object { $_.name -eq "polaris.mjs" -and ([string]$_.digest) -match '^sha256:[0-9a-fA-F]{64}$' } | Select-Object -First 1
-            if ($candidate) { $asset = $candidate; break }
+        # A page at a time, up to ten, while a full page has none.
+        for ($page = 1; $page -le 10 -and -not $asset; $page++) {
+            $listed = Invoke-RestMethod -UseBasicParsing -Uri "$api/repos/$repo/releases?per_page=100&page=$page" -Headers @{ "User-Agent" = "polaris-cli-installer"; "Accept" = "application/vnd.github+json" }
+            $releases = @($listed)
+            foreach ($release in $releases) {
+                if ($release.draft -or $release.prerelease -or -not ([string]$release.tag_name).StartsWith("cli-v")) { continue }
+                $candidate = @($release.assets) | Where-Object { $_.name -eq "polaris.mjs" -and ([string]$_.digest) -match '^sha256:[0-9a-fA-F]{64}$' } | Select-Object -First 1
+                if ($candidate) { $asset = $candidate; break }
+            }
+            if ($releases.Count -lt 100) { break }
         }
     }
     catch { $asset = $null }

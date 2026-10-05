@@ -70,18 +70,33 @@ fetch() { curl -fsSL -H "User-Agent: polaris-cli-installer" -H "Accept: applicat
 # repository releases the dashboard and the extension too, so the tag prefix is
 # what tells them apart; drafts and prereleases are skipped. GitHub prints one
 # field per line, and in an asset the digest comes before the download address.
+# The list is walked a page at a time, up to ten, while a full page has none.
 newest_bundle() {
-    fetch "$API/repos/$REPO/releases?per_page=100" | awk '
-        /"tag_name":/ { tag = $0; sub(/.*"tag_name": *"/, "", tag); sub(/".*/, "", tag); skip = 0 }
+    page=1
+    while [ "$page" -le 10 ]; do
+        answer=$(fetch "$API/repos/$REPO/releases?per_page=100&page=$page" | newest_on_page) || return 0
+        case "$answer" in
+            more) page=$((page + 1)) ;;
+            *) printf '%s' "$answer"; return 0 ;;
+        esac
+    done
+}
+
+# "<url> <digest>" from one page of the release list, "more" when the page was
+# full without one, or nothing.
+newest_on_page() {
+    awk '
+        /"tag_name":/ { tag = $0; sub(/.*"tag_name": *"/, "", tag); sub(/".*/, "", tag); skip = 0; count++ }
         /"draft": *true/ || /"prerelease": *true/ { skip = 1 }
         /"digest":/ { digest = $0; sub(/.*"digest": *"/, "", digest); sub(/".*/, "", digest) }
         /"digest": *null/ { digest = "" }
         /"browser_download_url":/ {
             url = $0; sub(/.*"browser_download_url": *"/, "", url); sub(/".*/, "", url)
             name = url; sub(/.*\//, "", name)
-            if (tag ~ /^cli-v/ && !skip && name == "polaris.mjs" && digest ~ /^sha256:/) { print url " " digest; exit }
+            if (tag ~ /^cli-v/ && !skip && name == "polaris.mjs" && digest ~ /^sha256:/) { print url " " digest; found = 1; exit }
             digest = ""
         }
+        END { if (!found && count >= 100) print "more" }
     '
 }
 

@@ -25,7 +25,7 @@ import Link from "next/link";
 import { Suspense } from "react";
 import { loadEnv } from "@polaris/config";
 import { requireUser } from "@/lib/session";
-import { appBaseUrl } from "@/lib/domain-service";
+import { publicAppUrl } from "@/lib/domain-service";
 import { CliSection } from "./cli-section";
 import { ExtensionSteps } from "./extension-steps";
 import { getTranslations } from "@/lib/i18n/request";
@@ -54,7 +54,7 @@ export default async function DownloadsPage() {
         getTranslations("account"),
         // The address the CLI signs in to. Null falls back to the one this page
         // is open on, which the reader has just proven reaches this Polaris.
-        appBaseUrl().catch(() => null)
+        publicAppUrl().catch(() => null)
     ]);
     const repo = loadEnv().POLARIS_REPO;
 

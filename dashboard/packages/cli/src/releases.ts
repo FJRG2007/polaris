@@ -32,6 +32,11 @@ export function installCommand(platform: NodeJS.Platform, repo: string = DEFAULT
         : `curl -fsSL ${scripts}/install.sh | sh`;
 }
 
+/** Releases per page of GitHub's list, and how many pages are walked before
+ *  giving up: the dashboard and the extension release from here too. */
+const PER_PAGE = 100;
+const MAX_PAGES = 10;
+
 const REPO_SHAPE = /^[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})\/[A-Za-z0-9._-]{1,100}$/;
 
 const releasesSchema = z.array(
@@ -68,9 +73,31 @@ export async function newestRelease(
     api = "https://api.github.com"
 ): Promise<CliRelease> {
     if (!REPO_SHAPE.test(repo)) throw new CliError(`"${repo}" is not a GitHub repository.`);
+    for (let page = 1; page <= MAX_PAGES; page++) {
+        const query = page === 1 ? `per_page=${PER_PAGE}` : `per_page=${PER_PAGE}&page=${page}`;
+        const releases = await releasePage(fetcher, `${api}/repos/${repo}/releases?${query}`);
+        for (const release of releases) {
+            if (release.draft || release.prerelease || !release.tag_name.startsWith(CLI_TAG_PREFIX))
+                continue;
+            const asset = release.assets.find((entry) => entry.name === BUNDLE_ASSET);
+            const digest = /^sha256:([0-9a-f]{64})$/i.exec(asset?.digest ?? "");
+            if (!asset || !digest) continue;
+            return {
+                version: release.tag_name.slice(CLI_TAG_PREFIX.length),
+                url: asset.browser_download_url,
+                sha256: digest[1]!.toLowerCase()
+            };
+        }
+        if (releases.length < PER_PAGE) break;
+    }
+    throw new CliError(`${repo} has no CLI release yet.`);
+}
+
+/** One page of the repository's release list. */
+async function releasePage(fetcher: Fetch, url: string): Promise<z.infer<typeof releasesSchema>> {
     let response: Response;
     try {
-        response = await fetcher(`${api}/repos/${repo}/releases?per_page=100`, {
+        response = await fetcher(url, {
             headers: { accept: "application/vnd.github+json", "user-agent": userAgent() },
             signal: AbortSignal.timeout(20_000)
         });
@@ -87,17 +114,5 @@ export async function newestRelease(
     const parsed = releasesSchema.safeParse(await response.json().catch(() => null));
     if (!parsed.success)
         throw new CliError("GitHub answered in a shape this CLI does not understand.");
-    for (const release of parsed.data) {
-        if (release.draft || release.prerelease || !release.tag_name.startsWith(CLI_TAG_PREFIX))
-            continue;
-        const asset = release.assets.find((entry) => entry.name === BUNDLE_ASSET);
-        const digest = /^sha256:([0-9a-f]{64})$/i.exec(asset?.digest ?? "");
-        if (!asset || !digest) continue;
-        return {
-            version: release.tag_name.slice(CLI_TAG_PREFIX.length),
-            url: asset.browser_download_url,
-            sha256: digest[1]!.toLowerCase()
-        };
-    }
-    throw new CliError(`${repo} has no CLI release yet.`);
+    return parsed.data;
 }

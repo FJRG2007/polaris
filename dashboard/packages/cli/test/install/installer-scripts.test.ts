@@ -26,6 +26,8 @@ const BUNDLE = new TextEncoder().encode("#!/usr/bin/env node\nconsole.log('plr f
 
 /** What the stand-in lists: the newest CLI release behind a dashboard one. */
 let releases: unknown[] = [];
+/** What the stand-in lists from the second page on. */
+let laterReleases: unknown[] = [];
 let server: Server;
 let api = "";
 
@@ -62,7 +64,8 @@ beforeAll(async () => {
         if (request.url?.startsWith("/repos/example/polaris/releases")) {
             // Pretty-printed, one field per line, the way api.github.com answers.
             response.writeHead(200, { "content-type": "application/json" });
-            response.end(JSON.stringify(releases, null, 2));
+            const later = /[?&]page=([2-9]|\d{2,})/.test(request.url);
+            response.end(JSON.stringify(later ? laterReleases : releases, null, 2));
             return;
         }
         if (request.url === "/download/cli-v0.6.0/polaris.mjs") {
@@ -141,6 +144,21 @@ describe.skipIf(!hasSh)("install.sh", { timeout: 180_000 }, () => {
         // With no Polaris named, the next step says to name one.
         expect(result.stdout).toContain("next: plr login --url https://your-polaris");
     });
+
+    it("walks on to the next page of releases while a full page has none", async () => {
+        releases = Array.from({ length: 100 }, dashboardRelease);
+        laterReleases = [cliRelease(sha256(BUNDLE))];
+        try {
+            const { home, env } = await shellHome();
+            const result = await runShell(env);
+            expect(result.code).toBe(0);
+            expect(
+                new Uint8Array(readFileSync(`${home}/.local/share/polaris-cli/polaris.mjs`))
+            ).toEqual(BUNDLE);
+        } finally {
+            laterReleases = [];
+        }
+    }, 300_000);
 
     it("names the Polaris that served it as the one to sign in to", async () => {
         releases = [cliRelease(sha256(BUNDLE))];
@@ -248,6 +266,17 @@ describe.skipIf(process.platform !== "win32")("install.ps1", () => {
         expect(existsSync(join(home, "local", "Programs", "polaris-cli", "polaris.mjs"))).toBe(
             false
         );
+    }, 60_000);
+
+    it("walks on to the next page of releases while a full page has none", async () => {
+        releases = Array.from({ length: 100 }, dashboardRelease);
+        laterReleases = [cliRelease("1".repeat(64))];
+        try {
+            const { stdout } = await runPowerShell({});
+            expect(stdout).toContain("did not match its checksum");
+        } finally {
+            laterReleases = [];
+        }
     }, 60_000);
 
     it("says so when there is no CLI release to install", async () => {
