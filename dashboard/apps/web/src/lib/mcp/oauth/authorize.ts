@@ -15,8 +15,9 @@
 
 import { validChallenge } from "./pkce";
 import { requestedScopes } from "./scopes";
+import { hostOf, logRefusal } from "./log";
 import type { McpScope } from "@/lib/mcp/scope-table";
-import { resolveClient, type OAuthClientRecord } from "./clients";
+import { metadataDocumentUrl, resolveClient, type OAuthClientRecord } from "./clients";
 import {
     MAX_URI_LENGTH,
     canonicalResource,
@@ -40,8 +41,10 @@ export interface AuthorizationRequest {
 }
 
 /** Why the screen cannot even send the app an error: there is no address that
- *  is safe to send it to. */
-export type UnsafeReason = "client" | "redirect";
+ *  is safe to send it to. `clientDetails` is an app named by its metadata
+ *  address whose document could not be read or accepted; `client` is an id
+ *  this instance never registered. */
+export type UnsafeReason = "client" | "clientDetails" | "redirect";
 
 export type AuthorizationCheck =
     | { readonly kind: "ok"; readonly request: AuthorizationRequest }
@@ -73,7 +76,18 @@ export async function checkAuthorizationRequest(
 ): Promise<AuthorizationCheck> {
     const clientId = params.client_id ?? "";
     const client = clientId && clientId.length <= MAX_URI_LENGTH ? await resolve(clientId) : null;
-    if (!client) return { kind: "unsafe", reason: "client" };
+    if (!client) {
+        // An app named by its metadata address whose document could not be read
+        // or accepted is told apart from an id nobody ever registered here: the
+        // first is worth retrying, the second means the registration was lost.
+        const named = clientId ? metadataDocumentUrl(clientId) : null;
+        logRefusal("authorization", {
+            reason: named ? "app details could not be read or accepted" : "unknown client_id",
+            client_id: clientId || null,
+            redirect_host: hostOf(params.redirect_uri)
+        });
+        return { kind: "unsafe", reason: named ? "clientDetails" : "client" };
+    }
 
     // OAuth 2.1 lets an app with exactly one registered address leave it out.
     // Not a loopback one: its port is chosen at run time, so the registered
@@ -84,6 +98,12 @@ export async function checkAuthorizationRequest(
         if (!only.startsWith("http://")) redirectUri = only;
     }
     if (!redirectUri || !redirectMatches(client.redirectUris, redirectUri)) {
+        logRefusal("authorization", {
+            reason: "redirect_uri is not one the app registered",
+            client_id: clientId,
+            redirect_host: hostOf(redirectUri),
+            registered_hosts: client.redirectUris.map(hostOf).join(", ")
+        });
         return { kind: "unsafe", reason: "redirect" };
     }
 

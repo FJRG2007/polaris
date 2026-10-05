@@ -12,7 +12,8 @@
 import { clientIp } from "@/lib/request-context";
 import { readCappedBody } from "@/lib/request-body";
 import { rateLimit } from "@/lib/rate-limit-service";
-import { checkRegistration, registerClient } from "@/lib/mcp/oauth/clients";
+import { hostOf, logRefusal } from "@/lib/mcp/oauth/log";
+import { MAX_REDIRECT_URIS, checkRegistration, registerClient } from "@/lib/mcp/oauth/clients";
 import { oauthError, oauthJson, preflight, slowDown } from "@/lib/mcp/oauth/http";
 
 export const runtime = "nodejs";
@@ -33,24 +34,46 @@ export async function POST(request: Request): Promise<Response> {
         ["oauth-register:all", PER_INSTANCE_PER_HOUR]
     ] as const) {
         const throttle = await rateLimit(key, limit, HOUR);
-        if (!throttle.ok) return slowDown(throttle.retryAfterMs);
+        if (!throttle.ok) {
+            logRefusal("registration", {
+                reason: key.endsWith(":all")
+                    ? "rate limited (whole instance)"
+                    : "rate limited (per address)"
+            });
+            return slowDown(throttle.retryAfterMs);
+        }
     }
 
     const declared = Number(request.headers.get("content-length"));
     if (Number.isFinite(declared) && declared > BODY_MAX) {
+        logRefusal("registration", { reason: "body too large", bytes: declared });
         return oauthError("invalid_client_metadata", "The registration is too large", 413);
     }
     const bytes = await readCappedBody(request, BODY_MAX);
-    if (!bytes) return oauthError("invalid_client_metadata", "The registration is too large", 413);
+    if (!bytes) {
+        logRefusal("registration", { reason: "body too large" });
+        return oauthError("invalid_client_metadata", "The registration is too large", 413);
+    }
     let body: unknown;
     try {
         body = JSON.parse(new TextDecoder().decode(bytes));
     } catch {
+        logRefusal("registration", { reason: "body is not JSON" });
         return oauthError("invalid_client_metadata", "The registration must be a JSON object");
     }
 
     const checked = checkRegistration(body);
-    if (!checked.ok) return oauthError(checked.refusal.error, checked.refusal.description);
+    if (!checked.ok) {
+        const fields = body && typeof body === "object" ? (body as Record<string, unknown>) : {};
+        logRefusal("registration", {
+            reason: `${checked.refusal.error}: ${checked.refusal.description}`,
+            client_name: typeof fields.client_name === "string" ? fields.client_name : undefined,
+            redirect_hosts: Array.isArray(fields.redirect_uris)
+                ? fields.redirect_uris.slice(0, MAX_REDIRECT_URIS).map(hostOf).join(", ")
+                : undefined
+        });
+        return oauthError(checked.refusal.error, checked.refusal.description);
+    }
     return oauthJson(await registerClient(checked), 201);
 }
 

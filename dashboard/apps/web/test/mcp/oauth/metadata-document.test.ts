@@ -83,3 +83,41 @@ describe("a metadata-document client", () => {
         expect(state.fetches).toEqual([]);
     });
 });
+
+/** ChatGPT's document as https://chatgpt.com/oauth/client.json serves it. It
+ *  prefers private_key_jwt but lists none among the methods it supports, and
+ *  the method used is chosen from what both ends support. */
+const CHATGPT = "https://chatgpt.com/oauth/client.json";
+const CHATGPT_DOCUMENT = {
+    client_id: CHATGPT,
+    client_uri: "https://chatgpt.com/",
+    redirect_uris: ["https://chatgpt.com/connector_platform_oauth_redirect"],
+    token_endpoint_auth_method: "private_key_jwt",
+    token_endpoint_auth_methods_supported: ["none", "private_key_jwt"],
+    grant_types: ["authorization_code", "refresh_token"],
+    response_types: ["code"],
+    client_name: "ChatGPT",
+    logo_uri: "https://persistent.oaistatic.com/sonic/misc/openai-logo.png",
+    token_endpoint_auth_signing_alg: "RS256",
+    jwks_uri: "https://chatgpt.com/oauth/jwks.json"
+};
+
+describe("ChatGPT's metadata document", () => {
+    it("is accepted as a public client, since it supports none", async () => {
+        state.document = CHATGPT_DOCUMENT;
+        const client = await resolveClient(CHATGPT);
+        expect(client?.name).toBe("ChatGPT");
+        expect(client?.tokenAuthMethod).toBe("none");
+        expect(client?.redirectUris).toEqual([
+            "https://chatgpt.com/connector_platform_oauth_redirect"
+        ]);
+    });
+
+    it("is refused when it supports only methods this server cannot check", async () => {
+        state.document = {
+            ...CHATGPT_DOCUMENT,
+            token_endpoint_auth_methods_supported: ["private_key_jwt"]
+        };
+        expect(await resolveClient(CHATGPT)).toBeNull();
+    });
+});

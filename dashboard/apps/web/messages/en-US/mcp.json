@@ -19,7 +19,8 @@
         "later": "You can change or disconnect it at any time under Account > AI assistants.",
         "errorTitle": "This connection cannot continue",
         "errors": {
-            "client": "This link does not name an app Polaris can identify. Start the connection again from the app.",
+            "client": "Polaris has no record of the app asking to connect, so its registration never reached Polaris. Try connecting again from the app. If it happens again, remove Polaris from the app and add it back.",
+            "clientDetails": "Polaris could not read the details this app publishes about itself, so it cannot check where to send you back. Try connecting again from the app in a few minutes.",
             "redirect": "This link would send you to an address the app never registered, so it was stopped. Start the connection again from the app.",
             "viewingAs": "You are viewing Polaris as someone else. Stop viewing as them to connect an app to your own account.",
             "tooMany": "Too many connection attempts. Wait a few minutes and start again from the app.",

@@ -31,6 +31,9 @@ const state = vi.hoisted(() => ({
     ip: "203.0.113.5" as string | undefined,
     buckets: [] as string[],
     audit: [] as { action: string; actorId: string | null }[],
+    /** What a metadata-document address serves, by address. */
+    documents: new Map<string, unknown>(),
+    fetches: [] as string[],
     db: null as unknown as ReturnType<typeof import("./fake-db").createFakeDb>
 }));
 
@@ -52,6 +55,23 @@ const BOB: FakeUser = {
 vi.mock("@polaris/db", () => ({
     get prisma() {
         return state.db.prisma;
+    }
+}));
+vi.mock("@/lib/safe-fetch", async (importOriginal) => ({
+    ...(await importOriginal<typeof import("@/lib/safe-fetch")>()),
+    configuredRequest: async (
+        address: string,
+        _init: unknown,
+        options: { allowPrivate: boolean }
+    ) => {
+        expect(options.allowPrivate).toBe(false);
+        state.fetches.push(address);
+        const document = state.documents.get(address);
+        return document === undefined
+            ? new Response("not found", { status: 404 })
+            : new Response(JSON.stringify(document), {
+                  headers: { "content-type": "application/json; charset=utf-8" }
+              });
     }
 }));
 vi.mock("@polaris/auth", () => ({
@@ -227,6 +247,8 @@ beforeEach(() => {
     state.rateLimited = false;
     state.ip = "203.0.113.5";
     state.audit = [];
+    state.documents = new Map();
+    state.fetches = [];
     ADA.bannedAt = null;
 });
 
@@ -265,6 +287,138 @@ describe("discovery", () => {
         expect(body.issuer).toBe(ORIGIN);
         expect(body.token_endpoint).toBe(`${ORIGIN}/api/oauth/token`);
         expect((body.scopes_supported as string[]).length).toBeGreaterThan(0);
+    });
+});
+
+/**
+ * ChatGPT, as OpenAI documents it (developers.openai.com/plugins/build/auth):
+ * it reads the resource metadata, then the authorization server's, and - since
+ * Polaris advertises client_id_metadata_document_supported and RFC 9207's iss -
+ * skips registration and names itself by its stable metadata document, sending
+ * people back to its stable redirect address. The document below is the one
+ * https://chatgpt.com/oauth/client.json serves.
+ */
+describe("ChatGPT", () => {
+    const CHATGPT = "https://chatgpt.com/oauth/client.json";
+    const CHATGPT_REDIRECT = "https://chatgpt.com/connector_platform_oauth_redirect";
+    const document = {
+        client_id: CHATGPT,
+        client_uri: "https://chatgpt.com/",
+        redirect_uris: [CHATGPT_REDIRECT],
+        token_endpoint_auth_method: "private_key_jwt",
+        token_endpoint_auth_methods_supported: ["none", "private_key_jwt"],
+        grant_types: ["authorization_code", "refresh_token"],
+        response_types: ["code"],
+        client_name: "ChatGPT",
+        logo_uri: "https://persistent.oaistatic.com/sonic/misc/openai-logo.png",
+        token_endpoint_auth_signing_alg: "RS256",
+        jwks_uri: "https://chatgpt.com/oauth/jwks.json"
+    };
+
+    it("connects through its metadata document, end to end", async () => {
+        state.documents.set(CHATGPT, document);
+
+        // Discovery, from the 401's challenge.
+        const challenge = await mcpCall(null, { method: "tools/list" });
+        const pointer = /resource_metadata="([^"]+)"/.exec(
+            challenge.headers.get("www-authenticate") ?? ""
+        )![1]!;
+        const resourcePath = new URL(pointer).pathname.split("/").slice(3);
+        const resourceDoc = (await (
+            await resourceMetadata.GET(new Request(pointer), {
+                params: Promise.resolve({ path: resourcePath })
+            })
+        ).json()) as { resource: string; authorization_servers: string[] };
+        const serverDoc = (await (
+            await serverMetadata.GET(
+                new Request(
+                    `${resourceDoc.authorization_servers[0]}/.well-known/oauth-authorization-server`
+                ),
+                { params: Promise.resolve({}) }
+            )
+        ).json()) as Record<string, unknown>;
+        expect(serverDoc.client_id_metadata_document_supported).toBe(true);
+        expect(serverDoc.authorization_response_iss_parameter_supported).toBe(true);
+        expect(serverDoc.code_challenge_methods_supported).toContain("S256");
+        expect(serverDoc.token_endpoint_auth_methods_supported).toContain("none");
+
+        // Authorization, with the resource echoed and PKCE.
+        const { verifier, challenge: codeChallenge } = pkce();
+        const query = new URLSearchParams({
+            response_type: "code",
+            client_id: CHATGPT,
+            redirect_uri: CHATGPT_REDIRECT,
+            code_challenge: codeChallenge,
+            code_challenge_method: "S256",
+            state: "chatgpt-state",
+            resource: resourceDoc.resource,
+            scope: "tasks.read"
+        }).toString();
+        const answer = await answerAuthorizationAction({
+            query,
+            allow: true,
+            scopes: ["tasks.read"]
+        });
+        expect(answer.error).toBeUndefined();
+        const back = new URL(answer.redirectTo!);
+        expect(`${back.origin}${back.pathname}`).toBe(CHATGPT_REDIRECT);
+        expect(back.searchParams.get("iss")).toBe(serverDoc.issuer);
+        expect(back.searchParams.get("state")).toBe("chatgpt-state");
+
+        // The exchange, as a public client: no secret, no assertion.
+        const tokens = await tokenCall({
+            grant_type: "authorization_code",
+            code: back.searchParams.get("code")!,
+            code_verifier: verifier,
+            redirect_uri: CHATGPT_REDIRECT,
+            client_id: CHATGPT,
+            resource: resourceDoc.resource
+        });
+        expect(tokens.status).toBe(200);
+        const call = await mcpCall(String(tokens.body.access_token), {
+            method: "tools/call",
+            params: { name: "polaris_whoami", arguments: {} }
+        });
+        expect(call.status).toBe(200);
+
+        // Known by its document, read once; nothing was registered.
+        expect(state.fetches).toEqual([CHATGPT]);
+        expect(state.db.tables.oAuthClient).toHaveLength(1);
+        expect(state.db.tables.oAuthClient![0]).toMatchObject({
+            clientId: CHATGPT,
+            source: "metadata",
+            tokenAuthMethod: "none"
+        });
+    });
+
+    it("says the app's details could not be read when its document is unreachable, and logs why", async () => {
+        const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+        const { challenge } = pkce();
+        const query = new URLSearchParams({
+            response_type: "code",
+            client_id: CHATGPT,
+            redirect_uri: CHATGPT_REDIRECT,
+            code_challenge: challenge,
+            code_challenge_method: "S256"
+        }).toString();
+        const answer = await answerAuthorizationAction({
+            query,
+            allow: true,
+            scopes: ["tasks.read"]
+        });
+        expect(answer).toEqual({ error: "consent.errors.clientDetails" });
+        const lines = warn.mock.calls.map((call) => String(call[0]));
+        warn.mockRestore();
+        expect(lines).toContain(
+            `polaris: oauth metadata document refused ${JSON.stringify({
+                client_id: CHATGPT,
+                reason: "the address answered 404, not 200"
+            })}`
+        );
+        expect(lines.some((line) => line.startsWith("polaris: oauth authorization refused"))).toBe(
+            true
+        );
+        expect(lines.join("\n")).not.toContain(challenge);
     });
 });
 
