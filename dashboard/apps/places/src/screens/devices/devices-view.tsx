@@ -178,17 +178,15 @@ export function DevicesView({
     /**
      * Ask the account what it has now.
      *
-     * `quiet` is the timer's version, which must not put a spinner on a screen
-     * nobody asked to wait - and which reads what the account already knows
-     * rather than making the devices themselves speak up. The loud version is
-     * somebody pressing the button, and that one is allowed to wake them: it is
-     * the difference between "as far as we know" and "as of now", and it is only
-     * ever spent when a person asked for it.
+     * `quiet` is spent without a spinner on a screen nobody asked to wait for -
+     * the one-shot read fired a few seconds after a press, to catch a lock as
+     * it settles, rather than making the devices themselves speak up. The loud
+     * version is somebody pressing "Check again", and that one is allowed to
+     * wake them: it is the difference between "as far as we know" and "as of
+     * now", and it is only ever spent when a person asked for it.
      *
-     * When it was last checked comes back with the devices. Without it the line
-     * at the top kept the time of the first read for as long as the tab was open,
-     * which is a screen refreshing itself every half a minute while saying it
-     * has not looked since you arrived.
+     * When it was last checked comes back with the devices, which is what moves
+     * each row's "Updated" line (`markRead` through `take`).
      */
     const sync = useCallback(
         async (quiet = false) => {

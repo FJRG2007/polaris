@@ -385,12 +385,16 @@ async function tellAutomations(installedAppId: string, rows: readonly DeviceRow[
 }
 
 /**
- * Go and ask every connected account what it has.
+ * Go and ask every connected account what it has, or only `options.only` of
+ * them - how `device-watch` reads one account at its own pace without the
+ * rest waiting on it.
  *
  * One after the other, and one of them failing does not stop the rest: an account
  * that is refusing its token must not leave a second make's devices unread. What
  * went wrong is remembered on the account it went wrong on, so a screen can say
- * which of them is the problem rather than putting one line above everything.
+ * which of them is the problem rather than putting one line above everything;
+ * `failed` names those accounts for a caller pacing them, such as the backoff
+ * in `device-watch`.
  */
 export async function syncDevices(
     installedAppId: string,

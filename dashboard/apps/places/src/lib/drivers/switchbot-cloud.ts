@@ -7,11 +7,12 @@
  * humidifiers, vacuums, infrared remotes - is left out.
  *
  * The account allows 10,000 calls a day, and a status is one call per device.
- * The screen reads every half a minute while it is open, which would spend that
- * by lunchtime on a house of a dozen devices, so a status is held for a few
- * minutes and the list of devices for longer. Pressing refresh (`probe`) and
- * pressing a button on a device both throw the held answer away, so what somebody
- * asked for is always read fresh.
+ * `device-watch` already paces this account at a minute rather than the
+ * cadence it gives a cloud account, for the same quota - but that is still
+ * too often to spend a call on every device every time, so a status is held
+ * for a few minutes and the list of devices for longer. Pressing refresh
+ * (`probe`) and pressing a button on a device both throw the held answer
+ * away, so what somebody asked for is always read fresh.
  *
  * Server-only.
  */

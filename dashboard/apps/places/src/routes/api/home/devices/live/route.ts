@@ -20,7 +20,7 @@
  * house's accounts.
  *
  * What the reader reaches is resolved again every half minute, so a lent door
- * taken back stops arriving; and the stream ends on its own after a few
+ * taken back stops arriving; and the stream ends on its own after ten
  * minutes, so the browser reconnects through the sign-in check again.
  *
  * Node runtime, never cached.
