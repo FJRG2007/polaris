@@ -12,11 +12,10 @@ import { CliError } from "../errors.js";
 import type { Flags } from "../args.js";
 import { meSchema } from "../schemas.js";
 import { configFile } from "../config.js";
-import { readFile } from "node:fs/promises";
 import { CLI_VERSION } from "../version.js";
 import { line, printJson } from "../output.js";
-import { DEFAULT_REPO, newestRelease } from "../releases.js";
-import { bundlePath, readMarker, sha256 } from "./install.js";
+import { DEFAULT_REPO, isNewerVersion, newestRelease } from "../releases.js";
+import { bundlePath, readMarker } from "./install.js";
 import { requireSession, type Context, type Session } from "../context.js";
 
 interface Report {
@@ -36,7 +35,7 @@ async function updateAvailable(context: Context): Promise<boolean | null> {
     if (!marker) return null;
     try {
         const release = await newestRelease(context.fetch, marker.repo ?? DEFAULT_REPO);
-        return release.sha256 !== sha256(new Uint8Array(await readFile(bundle)));
+        return isNewerVersion(release.version, CLI_VERSION);
     } catch {
         return null;
     }

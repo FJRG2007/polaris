@@ -93,6 +93,26 @@ export async function newestRelease(
     throw new CliError(`${repo} has no CLI release yet.`);
 }
 
+/**
+ * Whether release `candidate` comes after `current`, compared as dotted
+ * numbers; a prerelease of the same numbers comes before the release itself.
+ * False when either is not a version.
+ */
+export function isNewerVersion(candidate: string, current: string): boolean {
+    const parse = (version: string) => {
+        const found = /^v?(\d+(?:\.\d+)*)(?:-([0-9A-Za-z.-]+))?$/.exec(version.trim());
+        return found ? { parts: found[1]!.split(".").map(Number), pre: found[2] ?? null } : null;
+    };
+    const next = parse(candidate);
+    const now = parse(current);
+    if (!next || !now) return false;
+    for (let index = 0; index < Math.max(next.parts.length, now.parts.length); index++) {
+        const difference = (next.parts[index] ?? 0) - (now.parts[index] ?? 0);
+        if (difference !== 0) return difference > 0;
+    }
+    return now.pre !== null && next.pre === null;
+}
+
 /** One page of the repository's release list. */
 async function releasePage(fetcher: Fetch, url: string): Promise<z.infer<typeof releasesSchema>> {
     let response: Response;

@@ -156,8 +156,7 @@ export async function update(context: Context, flags: Flags): Promise<void> {
     await rename(next, bundle);
     await writeFile(
         join(dirname(bundle), INSTALL_MARKER_FILE),
-        `${JSON.stringify({ marker: CLI_MARKER, origin, repo, sha256: digest, installedAt: new Date().toISOString() }, null, 4)}
-`
+        `${JSON.stringify({ marker: CLI_MARKER, origin, repo, sha256: digest, installedAt: new Date().toISOString() }, null, 4)}\n`
     );
     line(context.io, `Updated to ${named}.`);
 }

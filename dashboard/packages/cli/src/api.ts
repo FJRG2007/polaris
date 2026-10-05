@@ -146,6 +146,13 @@ export async function send(
     }
 }
 
+/** Refuse an answer from a Polaris on a different API, in a sentence that
+ *  names the command that brings the two back in step. */
+export function requireCompatible(connection: Connection, response: Response): void {
+    const mismatch = compatibilityProblem(connection.url, response.headers.get(PROTOCOL_HEADER));
+    if (mismatch) throw new CliError(mismatch);
+}
+
 /**
  * One call: send it, refuse anything that is not a 2xx in words, and parse the
  * answer through `schema`.
@@ -160,8 +167,7 @@ export async function call<Schema extends z.ZodTypeAny>(
     const response = await send(connection, method, path, options);
     // First: a server on a different API can answer anything at all, and the
     // only useful thing to say then is how to get the two back in step.
-    const mismatch = compatibilityProblem(connection.url, response.headers.get(PROTOCOL_HEADER));
-    if (mismatch) throw new CliError(mismatch);
+    requireCompatible(connection, response);
     if (response.status >= 300 && response.status < 400)
         throw new CliError(redirectMessage(connection.url, response));
     if (!response.ok)

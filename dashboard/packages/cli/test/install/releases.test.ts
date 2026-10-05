@@ -8,7 +8,12 @@ import { describe, expect, it } from "vitest";
 import type { Fetch } from "../../src/api.js";
 import { testContext } from "../helpers/context.js";
 import { fetchRelease, sha256 } from "../../src/commands/install.js";
-import { installCommand, newestRelease, type CliRelease } from "../../src/releases.js";
+import {
+    installCommand,
+    isNewerVersion,
+    newestRelease,
+    type CliRelease
+} from "../../src/releases.js";
 
 const BUNDLE = new TextEncoder().encode("#!/usr/bin/env node\nconsole.log('plr');\n");
 const DIGEST = sha256(BUNDLE);
@@ -133,5 +138,17 @@ describe("a release's bundle", () => {
         await expect(
             fetchRelease(other.context, { ...wanted, sha256: sha256(page) })
         ).rejects.toThrow(/not a CLI/);
+    });
+});
+
+describe("a release's version", () => {
+    it("counts as newer only when it comes after this CLI's", () => {
+        expect(isNewerVersion("0.7.0", "0.6.0")).toBe(true);
+        expect(isNewerVersion("0.10.0", "0.9.3")).toBe(true);
+        expect(isNewerVersion("0.6.0", "0.6.0-beta.1")).toBe(true);
+        expect(isNewerVersion("0.6.0", "0.6.0")).toBe(false);
+        expect(isNewerVersion("0.6.0", "0.7.0")).toBe(false);
+        expect(isNewerVersion("0.6.0-beta.1", "0.6.0")).toBe(false);
+        expect(isNewerVersion("nightly", "0.6.0")).toBe(false);
     });
 });
