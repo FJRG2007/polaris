@@ -240,7 +240,7 @@ export function MemberMenu({
     // a ref set by the right-click would not draw them again.
     const [anchor, setAnchor] = useState<HTMLElement | null>(null);
     const { spaces, blocked, friends, refresh } = useChat();
-    const [removeFriend, removeFriendDialog] = useRemoveFriend(onError);
+    const [removeFriend, removeFriendDialog, removingFriend] = useRemoveFriend(onError);
     const [busy, setBusy] = useState(false);
     const direct = useOpenDirect(onError);
     // Read once, when the menu is built. A volume is not something that changes
@@ -295,7 +295,7 @@ export function MemberMenu({
         onChanged();
     };
 
-    const working = busy || direct.busy;
+    const working = busy || direct.busy || removingFriend;
 
     return (
         <menu.Root>

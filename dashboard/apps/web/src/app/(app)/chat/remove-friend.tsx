@@ -10,7 +10,7 @@
  * easy. The rail is asked again afterwards so every menu stops offering it.
  */
 
-import { useCallback } from "react";
+import { useCallback, useState } from "react";
 import { useChat } from "./chat-context";
 import { runAction } from "@/lib/run-action";
 import { useConfirm } from "@/components/confirm-dialog";
@@ -29,10 +29,11 @@ export interface FriendToRemove {
  */
 export function useRemoveFriend(
     onError: (message: string) => void
-): [(person: FriendToRemove) => Promise<void>, React.ReactNode] {
+): [(person: FriendToRemove) => Promise<void>, React.ReactNode, boolean] {
     const t = useTranslations("chat");
     const { refresh } = useChat();
     const [confirm, element] = useConfirm();
+    const [busy, setBusy] = useState(false);
 
     const ask = useCallback(
         async (person: FriendToRemove): Promise<void> => {
@@ -43,7 +44,9 @@ export function useRemoveFriend(
                 danger: true
             });
             if (!sure) return;
+            setBusy(true);
             const result = await runAction(() => removeFriendAction(person.id), onError);
+            setBusy(false);
             if (!result) return;
             if (result.error) {
                 onError(result.error);
@@ -54,5 +57,5 @@ export function useRemoveFriend(
         [confirm, onError, refresh, t]
     );
 
-    return [ask, element];
+    return [ask, element, busy];
 }
