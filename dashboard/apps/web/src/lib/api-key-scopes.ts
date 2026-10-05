@@ -156,6 +156,8 @@ export const SCOPE_GROUPS: readonly ScopeGroup[] = [
         scopes: ["games.read", "games.moderate", "games.console", "games.manage"]
     },
     // i18n-ignore said in the reader's words by account/api-keys/scope-picker
+    { title: "Agents", scopes: ["agents.read", "agents.manage"] },
+    // i18n-ignore said in the reader's words by account/api-keys/scope-picker
     { title: "Home", scopes: ["home.read", "home.control", "home.manage"] },
     // i18n-ignore said in the reader's words by account/api-keys/scope-picker
     { title: "Tools", scopes: ["tools.use", "tools.manage"] },
@@ -166,3 +168,28 @@ export const SCOPE_GROUPS: readonly ScopeGroup[] = [
     // i18n-ignore said in the reader's words by account/api-keys/scope-picker
     { title: "Administration", scopes: ["users.manage", "settings.manage", "system.manage"] }
 ];
+
+/** Where an area's name is in the `account` catalog: `SCOPE_GROUPS` names each
+ *  in English, and the catalog holds the same names by that English,
+ *  camel-cased. */
+export function scopeGroupKey(title: string): string {
+    const camel = title
+        .replace(/ (\w)/g, (_, letter: string) => letter.toUpperCase())
+        .replace(/^\w/, (letter) => letter.toLowerCase());
+    return `apiKeys.scopes.groups.${camel}`;
+}
+
+/** Scopes sorted into the areas above, in their order. What no area lists is
+ *  returned as `rest`, for the caller's "Other". */
+export function groupScopes(scopes: readonly string[]): {
+    groups: { title: string; scopes: Permission[] }[];
+    rest: string[];
+} {
+    const held = new Set(scopes);
+    const groups = SCOPE_GROUPS.map((group) => ({
+        title: group.title,
+        scopes: group.scopes.filter((scope) => held.has(scope))
+    })).filter((group) => group.scopes.length > 0);
+    const listed = new Set<string>(groups.flatMap((group) => group.scopes));
+    return { groups, rest: scopes.filter((scope) => !listed.has(scope)) };
+}

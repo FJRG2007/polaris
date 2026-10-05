@@ -27,7 +27,6 @@ import { loadEnv } from "@polaris/config";
 import { requireUser } from "@/lib/session";
 import { CliSection } from "./cli-section";
 import { ExtensionSteps } from "./extension-steps";
-import { McpAssistants } from "./mcp-assistants";
 import { getTranslations } from "@/lib/i18n/request";
 import { ExtensionCommand } from "./extension-command";
 import { InstallAppCard } from "@/components/installed-app";
@@ -123,8 +122,6 @@ export default async function DownloadsPage() {
                     </p>
                 </CardBody>
             </Card>
-
-            <McpAssistants />
 
             <CliSection />
 

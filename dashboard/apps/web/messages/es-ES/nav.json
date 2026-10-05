@@ -132,6 +132,7 @@
         }
     },
     "labels": {
+        "AI assistants": "Asistentes de IA",
         "AI provider keys": "Claves de IA",
         "AI providers": "Proveedores de IA",
         "API keys": "Claves API",

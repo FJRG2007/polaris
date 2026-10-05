@@ -5,9 +5,9 @@ that speaks remote MCP over HTTP can connect to it, sign in as you, and work wit
 your tasks, deployments, notes, chat, Drive and calendar. Each assistant can do
 only what you approve when it connects, and never more than your own account.
 
-The quickest way in is **Account > Downloads > AI assistants (MCP)**, which shows
-your server URL and the setup for each client with copy buttons and install
-links. This page is the same information, plus how it works.
+The quickest way in is **Account > AI assistants**, which shows your server URL
+and the setup for each client with copy buttons and install links. This page is
+the same information, plus how it works.
 
 ## Your server URL
 
@@ -46,19 +46,28 @@ servers, so your Polaris must be reachable from the internet for this one.
 
 ### ChatGPT
 
-Needs a Plus, Pro, Business, Enterprise or Education plan, on the web.
+Needs a Plus, Pro, Business, Enterprise or Education plan, on the web. In a
+Business, Enterprise or Education workspace, an admin may have to allow
+Developer mode first.
 
 1. Open **Settings > Security and login** and turn on **Developer mode**.
-2. In **Plugins**, select **+** and create an app with the server URL. Choose
-   OAuth.
-3. Sign in to Polaris when ChatGPT asks.
+2. Open **Plugins**, select **Add**, then **Create MCP App**.
+3. Name it Polaris. Under **Connection**, keep **Server URL** and paste the
+   server URL.
+4. Set **Authentication** to **OAuth**. No client ID or secret is needed:
+   Polaris registers ChatGPT itself.
+5. Check **I understand and want to continue**, then select **Create**.
+6. Sign in to Polaris when ChatGPT asks.
+
+If **Add** only offers **Create plugin** and **Upload plugin**, Developer mode
+is off. Those two are for packaged plugins and do not take a server URL.
 
 Like Claude on the web, ChatGPT connects from its own servers and needs Polaris
 reachable from the internet.
 
 ### Cursor
 
-Use **Add to Cursor** on the Downloads page, or add this to `~/.cursor/mcp.json`:
+Use **Add to Cursor** on the AI assistants page, or add this to `~/.cursor/mcp.json`:
 
 ```json
 {
@@ -72,7 +81,7 @@ Cursor asks you to sign in the first time it uses Polaris.
 
 ### Visual Studio Code
 
-Use **Add to VS Code** on the Downloads page, run
+Use **Add to VS Code** on the AI assistants page, run
 `code --add-mcp '{"name":"polaris","type":"http","url":"https://<your-polaris-address>/api/mcp"}'`,
 or add this to `.vscode/mcp.json`:
 
@@ -135,15 +144,22 @@ Only the permissions your account holds are offered.
 
 ## Managing connected assistants
 
-**Account > API keys > Connected assistants** lists every assistant you have
-connected, what it may do, and when it was last used. **Disconnect** stops it at
-once: every token it holds is ended, and it has to be connected again through
-the consent screen.
+**Account > AI assistants** lists every assistant you have connected, what it
+may do, and when and from where it was last used.
+
+- **Change permissions** opens the same boxes as the consent screen. A
+  permission you take away is refused on the assistant's next call; one you add
+  works on its next call too. You can only add what the assistant asked for
+  when it connected, and never more than your own account holds. An assistant
+  connected before this was recorded can be narrowed, but to widen it, connect
+  it again.
+- **Disconnect** stops it at once: every token it holds is ended, and it has to
+  be connected again through the consent screen.
 
 Connecting an assistant raises the same security alert as creating an API key,
-and so does a connection Polaris ends on its own because one of its tokens was
-presented twice - which means somebody else held it. Both open **Account > API
-keys**.
+and so do changing what one may do and a connection Polaris ends on its own
+because one of its tokens was presented twice - which means somebody else held
+it. All of them open **Account > AI assistants**.
 
 If you go through the consent screen again for an app you already connected and
 untick a permission, every token it holds - including ones already issued - is
@@ -227,6 +243,6 @@ OAuth 2.1 with Polaris as its own authorization server.
   registered. Start the connection again from the app.
 - **A tool says the connection needs a scope.** Connect the app again and tick
   that permission, or ask an administrator for it if it is not offered.
-- **It stopped working.** Check Connected assistants: if it is not listed, it
-  was disconnected (by you, or because one of its tokens was used twice).
-  Connect it again from the app.
+- **It stopped working.** Check **Account > AI assistants**: if it is not
+  listed, it was disconnected (by you, or because one of its tokens was used
+  twice). Connect it again from the app.

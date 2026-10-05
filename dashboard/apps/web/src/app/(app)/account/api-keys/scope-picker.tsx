@@ -30,7 +30,7 @@ import { ChevronRight, Search, X } from "lucide-react";
 import { Badge, Button, Checkbox, Input, cn } from "@polaris/ui";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { expandPermissions, impliedBy, type Permission } from "@polaris/core";
-import { SCOPE_GROUPS, SCOPE_HINTS, SCOPE_LABELS } from "@/lib/api-key-scopes";
+import { SCOPE_GROUPS, SCOPE_HINTS, SCOPE_LABELS, scopeGroupKey } from "@/lib/api-key-scopes";
 
 /** Which held scope pulled an implied one in, for the "Included with" note. */
 function includedBy(scope: Permission, selected: readonly Permission[]): Permission | null {
@@ -69,7 +69,9 @@ export function ScopePicker({
         })).filter((group) => group.scopes.length > 0);
         const listed = new Set(named.flatMap((group) => group.scopes));
         const rest = available.filter((scope) => !listed.has(scope));
-        return rest.length > 0 ? [...named, { title: t("apiKeys.scopes.other"), scopes: rest }] : named;
+        return rest.length > 0
+            ? [...named, { title: t("apiKeys.scopes.other"), scopes: rest }]
+            : named;
     }, [available, offered, t]);
 
     const needle = search.trim().toLowerCase();
@@ -80,9 +82,7 @@ export function ScopePicker({
     }
 
     if (available.length === 0) {
-        return (
-            <p className="text-sm text-muted-foreground">{t("apiKeys.scopes.noneHeld")}</p>
-        );
+        return <p className="text-sm text-muted-foreground">{t("apiKeys.scopes.noneHeld")}</p>;
     }
 
     return (
@@ -100,7 +100,10 @@ export function ScopePicker({
                     />
                 </span>
                 <span className="text-xs text-muted-foreground">
-                    {t("apiKeys.scopes.selected", { count: effective.size, total: available.length })}
+                    {t("apiKeys.scopes.selected", {
+                        count: effective.size,
+                        total: available.length
+                    })}
                 </span>
             </div>
 
@@ -114,7 +117,13 @@ export function ScopePicker({
                     {[...effective].map((scope) => {
                         const source = includedBy(scope, selected);
                         return source ? (
-                            <Badge key={scope} variant="neutral" title={t("apiKeys.scopes.includedWith", { scope: SCOPE_LABELS[source] })}>
+                            <Badge
+                                key={scope}
+                                variant="neutral"
+                                title={t("apiKeys.scopes.includedWith", {
+                                    scope: SCOPE_LABELS[source]
+                                })}
+                            >
                                 {SCOPE_LABELS[scope]}
                             </Badge>
                         ) : (
@@ -122,7 +131,9 @@ export function ScopePicker({
                                 key={scope}
                                 type="button"
                                 onClick={() => toggle(scope, false)}
-                                aria-label={t("apiKeys.scopes.remove", { scope: SCOPE_LABELS[scope] })}
+                                aria-label={t("apiKeys.scopes.remove", {
+                                    scope: SCOPE_LABELS[scope]
+                                })}
                                 title={t("apiKeys.scopes.remove", { scope: SCOPE_LABELS[scope] })}
                                 className="inline-flex items-center gap-1 rounded border border-transparent bg-primary/15 px-1.5 py-px text-[0.6875rem] font-medium leading-[18px] text-primary transition-colors hover:bg-primary/25"
                             >
@@ -164,7 +175,10 @@ export function ScopePicker({
                                         expanded && "rotate-90"
                                     )}
                                 />
-                                <span className="min-w-0 flex-1 truncate font-medium" title={group.title}>
+                                <span
+                                    className="min-w-0 flex-1 truncate font-medium"
+                                    title={group.title}
+                                >
                                     {group.title}
                                 </span>
                                 <span
@@ -173,7 +187,12 @@ export function ScopePicker({
                                         chosen > 0 ? "text-primary" : "text-muted-foreground"
                                     )}
                                 >
-                                    {chosen > 0 ? t("apiKeys.scopes.ofGroup", { count: chosen, total: group.scopes.length }) : t("apiKeys.scopes.none")}
+                                    {chosen > 0
+                                        ? t("apiKeys.scopes.ofGroup", {
+                                              count: chosen,
+                                              total: group.scopes.length
+                                          })
+                                        : t("apiKeys.scopes.none")}
                                 </span>
                             </button>
 
@@ -205,7 +224,9 @@ export function ScopePicker({
                                                         </code>
                                                         {source ? (
                                                             <span className="text-xs text-muted-foreground">
-                                                                {t("apiKeys.scopes.includedWith", { scope: SCOPE_LABELS[source] })}
+                                                                {t("apiKeys.scopes.includedWith", {
+                                                                    scope: SCOPE_LABELS[source]
+                                                                })}
                                                             </span>
                                                         ) : null}
                                                     </span>
@@ -221,9 +242,13 @@ export function ScopePicker({
                         </div>
                     );
                 })}
-                {groups.every((group) => group.scopes.every((scope) => !matches(scope, needle))) && (
+                {groups.every((group) =>
+                    group.scopes.every((scope) => !matches(scope, needle))
+                ) && (
                     <div className="flex items-center justify-between gap-2 px-3 py-3">
-                        <p className="text-sm text-muted-foreground">{t("apiKeys.scopes.noMatch")}</p>
+                        <p className="text-sm text-muted-foreground">
+                            {t("apiKeys.scopes.noMatch")}
+                        </p>
                         <Button size="sm" variant="ghost" onClick={() => setSearch("")}>
                             {t("apiKeys.scopes.clear")}
                         </Button>
@@ -234,9 +259,8 @@ export function ScopePicker({
     );
 }
 
-/** An area's name in the reader's words: `SCOPE_GROUPS` names each in English,
- *  and the catalog holds the same names by that English, camel-cased. */
+/** An area's name in the reader's words, falling back to its English. */
 function scopeGroupTitle(t: ReturnType<typeof useTranslations<"account">>, title: string): string {
-    const key = `apiKeys.scopes.groups.${title.replace(/ (\w)/g, (_, letter: string) => letter.toUpperCase()).replace(/^\w/, (letter) => letter.toLowerCase())}`;
+    const key = scopeGroupKey(title);
     return t.has(key) ? t(key as NamespaceKey<"account">) : title;
 }

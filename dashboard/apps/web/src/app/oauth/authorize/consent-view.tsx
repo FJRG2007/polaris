@@ -10,8 +10,8 @@
  * address gets its own warning: it means an app on this computer, and the MCP
  * spec asks for that to be said.
  *
- * Ticking a broad permission ticks what it cannot work without, locked, the way
- * the API key picker does; the server expands the same way whatever is posted.
+ * The boxes are `McpScopeChecklist`, the same list an app's permissions are
+ * changed with afterwards.
  */
 
 import { useMemo, useState } from "react";
@@ -19,12 +19,16 @@ import { answerAuthorizationAction } from "./actions";
 import { scopeLabelKey } from "@/lib/mcp/oauth/scope-labels";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { AlertTriangle, Blocks, Globe, Info, Undo2 } from "lucide-react";
-import { expandPermissions, impliedBy, type Permission } from "@polaris/core";
-import { Checkbox } from "@polaris/ui";
+import { expandPermissions, type Permission } from "@polaris/core";
 import { ConsentCard, ConsentFacts } from "@/components/consent-card";
+import { ClientMark } from "@/components/client-logo";
+import type { ClientBrand } from "@/lib/mcp/oauth/client-brand";
+import { McpScopeChecklist } from "@/components/mcp-scope-checklist";
 
 interface AppSummary {
     readonly name: string;
+    /** A known assistant's mark; null draws the generic glyph. */
+    readonly brand: ClientBrand | null;
     readonly website: string | null;
     readonly returnsTo: string;
     readonly loopback: boolean;
@@ -90,7 +94,13 @@ export function ConsentView({
     return (
         <main className="grid min-h-dvh place-items-center p-4">
             <ConsentCard
-                requester={<Blocks className="text-muted-foreground" />}
+                requester={
+                    app.brand ? (
+                        <ClientMark brand={app.brand} name={name} className="size-6" />
+                    ) : (
+                        <Blocks className="text-muted-foreground" />
+                    )
+                }
                 title={t("consent.title", { app: name })}
                 account={t("consent.signedInAs", { name: person })}
                 error={error}
@@ -133,38 +143,13 @@ export function ConsentView({
                     <fieldset className="flex flex-col gap-2">
                         <legend className="mb-1 font-medium">{t("consent.scopesTitle")}</legend>
                         <p className="text-xs text-muted-foreground">{t("consent.scopesHint")}</p>
-                        <ul className="flex flex-col gap-1.5">
-                            {offered.map((scope) => {
-                                const implied = effective.has(scope) && !selected.includes(scope);
-                                const source = implied
-                                    ? selected.find((entry) => impliedBy(entry).includes(scope))
-                                    : undefined;
-                                return (
-                                    <li key={scope}>
-                                        <label className="flex min-w-0 items-start gap-2">
-                                            <Checkbox
-                                                checked={effective.has(scope)}
-                                                disabled={implied || pending !== null}
-                                                onChange={(event) =>
-                                                    toggle(scope, event.target.checked)
-                                                }
-                                                className="mt-0.5"
-                                            />
-                                            <span className="flex min-w-0 flex-col">
-                                                <span>{t(scopeLabelKey(scope))}</span>
-                                                <span className="truncate font-mono text-xs text-muted-foreground">
-                                                    {source
-                                                        ? t("consent.impliedBy", {
-                                                              scope: t(scopeLabelKey(source))
-                                                          })
-                                                        : scope}
-                                                </span>
-                                            </span>
-                                        </label>
-                                    </li>
-                                );
-                            })}
-                        </ul>
+                        <McpScopeChecklist
+                            offered={offered}
+                            selected={selected}
+                            effective={effective}
+                            disabled={pending !== null}
+                            onToggle={toggle}
+                        />
                     </fieldset>
                 ) : (
                     <p className="text-muted-foreground">{t("consent.noneHeld")}</p>

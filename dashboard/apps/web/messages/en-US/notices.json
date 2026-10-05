@@ -70,6 +70,7 @@
         "account_ai_key_added": "An AI provider key was added",
         "account_ai_key_deleted": "An AI provider key was removed",
         "account_oauth_connected": "An AI assistant was connected to your account",
+        "account_oauth_updated": "A connected AI assistant was given different permissions",
         "account_oauth_replay_detected": "A connected assistant was disconnected because its token was used twice",
         "advice": "If this was not you, change your password and sign out every other device."
     },

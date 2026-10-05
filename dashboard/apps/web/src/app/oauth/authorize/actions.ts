@@ -80,7 +80,8 @@ export async function answerAuthorizationAction(
         redirectUri: request.redirectUri,
         codeChallenge: request.codeChallenge,
         resource: request.resource,
-        scopes
+        scopes,
+        requested: request.scopes
     });
     await recordAudit({
         actorId: user.id,

@@ -24,6 +24,7 @@ import { recordAudit } from "@/lib/audit-service";
 import { sameResource } from "./urls";
 import { scopeString } from "./scopes";
 import { verifierMatches } from "./pkce";
+import { clientBrand, type ClientBrand } from "./client-brand";
 import { getUserPermissions } from "@polaris/auth";
 import type { OAuthClientRecord } from "./clients";
 import { generateToken, hashToken } from "@polaris/core/tokens";
@@ -104,7 +105,8 @@ async function endGrant(grantId: string): Promise<void> {
  * Record a person's approval and hand back the code for the app.
  *
  * One grant per person and app: approving the same app again replaces what it
- * may do with what was approved now, and brings a revoked grant back.
+ * may do with what was approved now, and brings a revoked grant back. What the
+ * app asked for is kept beside it, as the ceiling for changing it later.
  */
 export async function approve(input: {
     userId: string;
@@ -113,17 +115,20 @@ export async function approve(input: {
     codeChallenge: string;
     resource: string;
     scopes: readonly Permission[];
+    requested: readonly Permission[];
 }): Promise<{ code: string; grantId: string }> {
     const scopes = stringifyList([...input.scopes]);
+    const requestedScopes = stringifyList([...input.requested]);
     const grant = await prisma.oAuthGrant.upsert({
         where: { userId_clientId: { userId: input.userId, clientId: input.client.id } },
         create: {
             userId: input.userId,
             clientId: input.client.id,
             scopes,
+            requestedScopes,
             resource: input.resource
         },
-        update: { scopes, resource: input.resource, revokedAt: null },
+        update: { scopes, requestedScopes, resource: input.resource, revokedAt: null },
         select: { id: true }
     });
     const code = `${CODE_PREFIX}${generateToken()}`;
@@ -439,10 +444,57 @@ export interface ConnectedAppView {
     readonly clientUri: string | null;
     /** Where it sends people back to, which is what identifies it. */
     readonly redirectHost: string | null;
+    /** The known assistant it is, for its mark; null draws its initial. */
+    readonly brand: ClientBrand | null;
     readonly scopes: string[];
+    /** What the app asked for when it was approved: the most it can be given
+     *  later. A grant from before that was kept can only be narrowed. */
+    readonly requestable: string[];
     readonly createdAt: string;
     readonly lastUsedAt: string | null;
     readonly lastUsedIp: string | null;
+}
+
+/** What the account screen reads of a grant and its app. */
+const APP_SELECT = {
+    id: true,
+    scopes: true,
+    requestedScopes: true,
+    createdAt: true,
+    lastUsedAt: true,
+    lastUsedIp: true,
+    client: { select: { name: true, clientUri: true, clientId: true, redirectUris: true } }
+} as const;
+
+function appView(row: {
+    id: string;
+    scopes: string;
+    requestedScopes: string | null;
+    createdAt: Date;
+    lastUsedAt: Date | null;
+    lastUsedIp: string | null;
+    client: { name: string; clientUri: string | null; redirectUris: string };
+}): ConnectedAppView {
+    const redirects = parseStringList(row.client.redirectUris);
+    const first = redirects[0];
+    let redirectHost: string | null = null;
+    try {
+        redirectHost = first ? new URL(first).hostname : null;
+    } catch {
+        redirectHost = null;
+    }
+    return {
+        id: row.id,
+        name: row.client.name,
+        clientUri: row.client.clientUri,
+        redirectHost,
+        brand: clientBrand(row.client.name, redirects),
+        scopes: parseStringList(row.scopes),
+        requestable: parseStringList(row.requestedScopes ?? row.scopes),
+        createdAt: row.createdAt.toISOString(),
+        lastUsedAt: row.lastUsedAt?.toISOString() ?? null,
+        lastUsedIp: row.lastUsedIp
+    };
 }
 
 /** The apps a person has connected and not disconnected, most recent first. */
@@ -451,34 +503,21 @@ export async function listConnectedApps(userId: string): Promise<ConnectedAppVie
         where: { userId, revokedAt: null },
         orderBy: { updatedAt: "desc" },
         take: 100,
-        select: {
-            id: true,
-            scopes: true,
-            createdAt: true,
-            lastUsedAt: true,
-            lastUsedIp: true,
-            client: { select: { name: true, clientUri: true, clientId: true, redirectUris: true } }
-        }
+        select: APP_SELECT
     });
-    return rows.map((row) => {
-        const first = parseStringList(row.client.redirectUris)[0];
-        let redirectHost: string | null = null;
-        try {
-            redirectHost = first ? new URL(first).hostname : null;
-        } catch {
-            redirectHost = null;
-        }
-        return {
-            id: row.id,
-            name: row.client.name,
-            clientUri: row.client.clientUri,
-            redirectHost,
-            scopes: parseStringList(row.scopes),
-            createdAt: row.createdAt.toISOString(),
-            lastUsedAt: row.lastUsedAt?.toISOString() ?? null,
-            lastUsedIp: row.lastUsedIp
-        };
+    return rows.map(appView);
+}
+
+/** One app this person has connected, or null when it is not theirs. */
+export async function findConnectedApp(
+    userId: string,
+    grantId: string
+): Promise<ConnectedAppView | null> {
+    const row = await prisma.oAuthGrant.findFirst({
+        where: { id: grantId, userId, revokedAt: null },
+        select: APP_SELECT
     });
+    return row ? appView(row) : null;
 }
 
 /** Disconnect an app a person connected. False when it is not theirs. */
@@ -490,4 +529,35 @@ export async function revokeConnectedApp(userId: string, grantId: string): Promi
     if (!grant) return false;
     await endGrant(grant.id);
     return true;
+}
+
+/**
+ * Change what a connected app may do, at once.
+ *
+ * `scopes` is the whole new set, already cut by the caller to what the app
+ * asked for, what MCP offers and what the person holds. The grant and every
+ * live token under it are rewritten together: a scope taken away is refused on
+ * the app's very next call (every call reads the grant), and one added works
+ * on that call too, without waiting for the app to refresh. Codes in flight
+ * are left alone; they carry the grant's own check when exchanged.
+ *
+ * Null when the grant is not this person's or was disconnected; otherwise what
+ * it held before, for the audit.
+ */
+export async function changeGrantScopes(
+    userId: string,
+    grantId: string,
+    scopes: readonly Permission[]
+): Promise<{ before: string[] } | null> {
+    const grant = await prisma.oAuthGrant.findFirst({
+        where: { id: grantId, userId, revokedAt: null },
+        select: { id: true, scopes: true }
+    });
+    if (!grant) return null;
+    const stored = stringifyList([...scopes]);
+    await prisma.$transaction([
+        prisma.oAuthGrant.update({ where: { id: grant.id }, data: { scopes: stored } }),
+        prisma.oAuthToken.updateMany({ where: { grantId: grant.id }, data: { scopes: stored } })
+    ]);
+    return { before: parseStringList(grant.scopes) };
 }
