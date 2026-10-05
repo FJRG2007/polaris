@@ -422,6 +422,84 @@ describe("ChatGPT", () => {
     });
 });
 
+/**
+ * The clients that connected before ChatGPT's fix, end to end, so changing how
+ * a metadata document is read can never lock them out: Claude Code through its
+ * metadata document (as https://claude.ai/oauth/claude-code-client-metadata
+ * serves it, with only the legacy single method), and an app registered through
+ * RFC 7591 dynamic registration.
+ */
+describe("clients that already connect", () => {
+    async function authorizeAndExchange(clientId: string, redirectUri: string) {
+        const { verifier, challenge } = pkce();
+        const query = authorizeQuery(clientId, challenge, { redirect_uri: redirectUri });
+        const answer = await answerAuthorizationAction({
+            query,
+            allow: true,
+            scopes: ["tasks.read"]
+        });
+        expect(answer.error).toBeUndefined();
+        const back = new URL(answer.redirectTo!);
+        expect(back.searchParams.get("iss")).toBe(ORIGIN);
+        const tokens = await tokenCall({
+            grant_type: "authorization_code",
+            code: back.searchParams.get("code")!,
+            code_verifier: verifier,
+            redirect_uri: redirectUri,
+            client_id: clientId,
+            resource: `${ORIGIN}/api/mcp`
+        });
+        expect(tokens.status).toBe(200);
+        const call = await mcpCall(String(tokens.body.access_token), {
+            method: "tools/call",
+            params: { name: "polaris_whoami", arguments: {} }
+        });
+        expect(call.status).toBe(200);
+        return back;
+    }
+
+    it("Claude Code, through its metadata document and a loopback port of its own", async () => {
+        const CLAUDE_CODE = "https://claude.ai/oauth/claude-code-client-metadata";
+        state.documents.set(CLAUDE_CODE, {
+            client_id: CLAUDE_CODE,
+            client_name: "Claude Code",
+            client_uri: "https://claude.ai",
+            redirect_uris: ["http://localhost/callback", "http://127.0.0.1/callback"],
+            grant_types: ["authorization_code", "refresh_token"],
+            response_types: ["code"],
+            token_endpoint_auth_method: "none"
+        });
+        const back = await authorizeAndExchange(CLAUDE_CODE, "http://localhost:51234/callback");
+        expect(back.origin).toBe("http://localhost:51234");
+        expect(state.db.tables.oAuthClient![0]).toMatchObject({
+            clientId: CLAUDE_CODE,
+            source: "metadata",
+            tokenAuthMethod: "none"
+        });
+    });
+
+    it("an app registered through RFC 7591", async () => {
+        const { status, body } = await registerClient();
+        expect(status).toBe(201);
+        const back = await authorizeAndExchange(body.client_id!, "http://127.0.0.1:49200/callback");
+        expect(back.origin).toBe("http://127.0.0.1:49200");
+        expect(state.fetches).toEqual([]);
+    });
+
+    it("still refuses a return address either one never registered", async () => {
+        const { body } = await registerClient();
+        const { challenge } = pkce();
+        const answer = await answerAuthorizationAction({
+            query: authorizeQuery(body.client_id!, challenge, {
+                redirect_uri: "https://attacker.example/cb"
+            }),
+            allow: true,
+            scopes: ["tasks.read"]
+        });
+        expect(answer).toEqual({ error: "consent.errors.redirect" });
+    });
+});
+
 describe("registration", () => {
     it("registers a public client and stores nothing secret", async () => {
         const { status, body } = await registerClient();
