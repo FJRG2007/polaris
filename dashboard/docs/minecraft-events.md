@@ -196,7 +196,11 @@ left out.
   from the ground) is taken out by the pack the tick it appears, and over RCON
   every tick as well. The pack goes on before anything is built; a server
   where it cannot is called off, never left with a floor that does not go.
-  Scored as spleef: by the order players went out.
+  Scored as spleef: by the order players went out - and the pack notes the
+  game tick each racer first goes under the lowest floor, so those out on
+  one look go out in that order (`tnt-run.fallOrder`), and when the last
+  ones standing all fell within one look, the one who fell alone and last
+  is the winner rather than nobody.
 - **Dropper** is a shaft 11 blocks across, walled all round, `levels` floors
   (5-20) each with one hole, a pool at the bottom, laid out from the run's id
   (`dropper.plan`). Everybody waits on a glass lid; at "Go!" all of them are
@@ -204,7 +208,11 @@ left out.
   catches a landing the tick it happens - anybody racing who is on the ground
   anywhere over the floors, the rim of a hole included, goes back to the top,
   once (`dropper.SENT_TAG`, see "Players" under the lessons) - and notes the
-  lowest each racer has been and the tick they reach the water.
+  lowest each racer has been and the tick they reach the water. The spot they
+  are let fall from, a block over where the lid was, is never a landing
+  either: with it inside the landing box a racer put there was sent back to it
+  every tick, held in mid-air until the server kicked them for floating. Two
+  who reach the water in one look are told their places by those ticks.
   Ranked by finish time, then by the deepest floor. It is played under Slow
   Falling: in a free fall a player is past three blocks a tick within seven
   seconds and can steer a tenth of a block between two floors, so holes that do
@@ -225,7 +233,11 @@ left out.
   `ride`) left their boat back to their last gate in a new one, one racer a
   look at a time so two never share a boat, and takes away the boats nobody
   is in. Ranked by finish time, then by gates passed. Its boats - summoned or
-  put down - go with the track.
+  put down - go with the track. A racer who leaves a race already on and
+  joins it again comes back at the last gate they passed, with every pass
+  they made (`boat-race.resumeSpot`, `racerScores`); their clock never
+  stopped. Somebody past the four boats one quick look hands out is seated
+  on the next without being told they left theirs.
 - **King of the ring** (`king-of-the-hill` in code and saved settings; it was
   called King of the hill before it moved into the air) with fists only is a
   platform floating `hill.LIFT` over whatever is under it. Off the ring Poison
@@ -283,8 +295,15 @@ left out.
       everybody is told once under half and once under a quarter.
     - Missing for two looks in a row (`LOST_AFTER`: a restarted server loads
       entities a moment after their chunks), it is dead: the event ends there,
-      with no podium and no prizes, and the results say why. Otherwise the
-      waves play out and the podium goes to the most kills.
+      with no podium and no prizes, and the results say why. A look that
+      cannot read its health shows the health read last, never a healed one.
+      Otherwise the waves play out and the podium goes to the most kills.
+    - Kills - here and in a horde defense - are counted by the events data
+      pack where it goes on (`run.killsByPack`): an advancement on a kill of a
+      monster tagged `pe_wfight`, so only what the event summoned to fight
+      counts - never the night's own, nor a jockey's chicken or horse. The
+      game's `killed` statistics, the fallback, count the night's own zombies
+      killed near the point as well.
     - The end, a call-off or a restart kills exactly what carries the tag, and
       the zombie villager a zombie on Normal or Hard turns a villager into,
       where it stood.
@@ -300,8 +319,11 @@ left out.
     - An item is marked the first time it is seen in a player's inventory
       (`clear <player> <item> 0`, as a gathering reads one) - once the game's
       own statistics say they came by one since the start: picked up (less
-      what they dropped), crafted, smelted or traded for. A stack carried in
-      or taken out of their own chest marks nothing. It is all worked out in
+      what they dropped), crafted, smelted or traded for. Smelted and traded
+      count as the game counts them, as crafted, taken from the furnace's or
+      the villager's result slot by hand: what a hopper pulls out of a
+      furnace has no statistic, and marks nothing. A stack carried in or
+      taken out of their own chest marks nothing. It is all worked out in
       the game, every player in one batch a look, and kept on the scoreboard
       (`pe_bg*`), so a restart finds the marks; a mark is never taken back.
     - The card is shown to everybody at the start, each item named by the
@@ -311,7 +333,9 @@ left out.
       panel shows everybody's count.
     - `goal`: the first full row, column or diagonal (`line`), or the whole
       card (`card`), ends it and wins, whatever the least to be ranked;
-      nobody seen in creative or spectator can. Two in the same look: the
+      nobody seen in creative or spectator can - looked for on every one of
+      the rush's own looks, not only the run's fifteen-second sample, since
+      crafting in creative raises the statistic a card is marked by. Two in the same look: the
       most marked, then the name. With time up, the most marked win (the
       least to be ranked applies), a tie to whoever got there first.
 - **Boss fishing** is a legendary fish on everybody's line, its strength on
@@ -323,6 +347,9 @@ left out.
       game counts only for fish. A treasure takes `TREASURE_WORTH` (3): read
       the way a rare catch reads one (a fishing treasure picked up, less any
       dropped, within a few looks of reeling in), since no statistic has it.
+      The count a catch is measured from is the most a player has had
+      (`rare-catch.catchCommit`), so a treasure dropped and picked up again
+      on a later look is never a new catch.
       Junk counts for nothing. Each player's catches are the side panel.
     - Catches by anybody AFK from the start or seen in creative or spectator
       take nothing off it, and keep them off the podium (`afkCounts`). What a
@@ -385,6 +412,19 @@ left out.
   leaves them right. `captures` captures end it; otherwise the team with
   more when time is up. The podium is each player's captures, a tie broken by
   eliminations.
+    - The quick look's marks (touched a flag, stood at home) are taken in one
+      batch, copied and cleared (`TAKE_MARKS`), and wiped off anybody the
+      tick sends back straight after the move (`unmarkLines`): a mark made
+      where they stood before it is never read with them at home.
+    - Only somebody alive takes or captures a flag: a player dead by it stays
+      marked there while on the death screen.
+    - A player with no `health` score is on and whole: the game makes the
+      score only once that player's health first changes (`duel.healthOf`).
+    - An elimination is the rival the game says last hurt the player brought
+      low (`execute on attacker`, from 1.19.4), nobody when that was no rival;
+      a death, whose player comes back as a new one, by the kill the game
+      counted. Before 1.19.4, the rival who struck last. The team duel
+      credits the same way.
 - **Hot potato** is a striped platform walled in glass three high (11 by 11
   up to six players, 13 by 13 past), with a gallery behind its north wall a
   step up, roofed, that whoever is out watches from. Nobody is hurt:
@@ -392,11 +432,14 @@ left out.
   round's holder is drawn from the run's id and the round among who is left
   (`hot-potato.holderFor`) and wears a marked TNT on their head (only onto an
   empty one), glowing. Everybody else is under Weakness 101, so they cannot
-  strike: a hit anybody took since the last tick (`damage_taken`) is the
-  holder's, when the holder's `damage_dealt` rose too, and the potato goes to
-  the nearest of those hit. Whoever was just handed it stays weak until the
-  next tick, so it cannot bounce straight back. A hit is seen on the next
-  tick, up to two seconds after it lands. When the fuse runs out the holder is
+  strike. A punch - the left button; the right one hurts nobody and passes
+  nothing - is read off the events data pack (see "Hits" below): the holder
+  struck a player and somebody was hurt by one, by the holder where the game
+  says who hurt them (from 1.19.4), and the potato goes to the nearest of
+  them. Where the pack cannot be put on, the hit is read off `damage_dealt`
+  and `damage_taken` as before. Whoever was just handed it stays weak until
+  the next tick, so it cannot bounce straight back. A hit is seen on the
+  next tick, up to two seconds after it lands. When the fuse runs out the holder is
   out - particles and a sound where they stand, never a block or an entity -
   and goes to the gallery; three seconds later the next round starts. Somebody
   off the server two ticks running is out too. The round, the holder and the
@@ -416,9 +459,11 @@ left out.
   restart neither lets them out early nor builds it again. Two teams hide each
   side's names from the other
   (`nametagVisibility hideForOtherTeams`), friendly fire off; hiders are
-  under Weakness 101, so only a seeker can strike, and a hider whose
-  `damage_taken` rose within five blocks of a seeker whose `damage_dealt`
-  rose was found by them. Whoever is found joins the seekers. Nobody is hurt
+  under Weakness 101, so only a seeker can strike. A hider hurt by a player
+  (the events data pack, see "Hits" below) is found by the seeker the game
+  says hurt them, from 1.19.4; before, by the nearest seeker within five
+  blocks who struck. A drop off the gallery, four blocks up, hurts, and is
+  never a find. Whoever is found joins the seekers. Nobody is hurt
   (Resistance IV, Regeneration, Saturation every tick). Scoring: a hider
   scores a point for every second hidden while on the server, from "Go!" to
   being found; a seeker scores 30 a find (`FIND_POINTS`: half a minute of
@@ -444,13 +489,34 @@ left out.
   shield catches them at two hearts (`OUT_HEALTH`), when they die anyway,
   fall under the islands, cross the play area's edge, or are off the server
   two ticks running; their kit is taken and they watch from an invisible
-  gallery over the middle. The quick look takes whoever crosses the play
-  area's edge up to the gallery at once, and kills any arrow stuck in a
-  block before it can be picked up as nobody's. Each hit is credited to
-  whoever struck nearest (within six blocks) or else drew a bow; whoever
-  hit someone in the ten seconds before they went out has the elimination.
-  The last one left wins; everybody else is ranked by when they went out,
-  a tie broken by eliminations.
+  gallery over the middle. The quick look takes whoever crosses the play area's edge
+  up to the gallery at once, and kills any arrow stuck in a block before it
+  can be picked up as nobody's. Each hit is credited to whoever the game says
+  hurt the player (`execute on attacker`, from 1.19.4) - nobody, for a fall
+  or a fire - and before 1.19.4 to whoever struck nearest (within six
+  blocks) or else drew a bow; whoever hit someone in the ten seconds before
+  they went out has the elimination. The last one left
+  wins; everybody else is ranked by when they went out, a tie broken by
+  eliminations.
+- **Hits** (`kinds/hits.ts`, `hits-service.ts`): who hit whom in an arena is
+  read off the game, never guessed from statistics where it can be helped.
+    - The events data pack carries two advancements with no display:
+      `entity_hurt_player` (hurt by a player, not blocked by a shield) and
+      `player_hurt_entity` (hurt a player). Their reward functions tag a
+      player an arena took in (`pe_hit_hurt`, `pe_hit_struck`) and revoke
+      the advancement, so the next hit fires it again. They fire on any
+      damage that gets through, however small after Resistance, and never
+      for a fall. A kind that reads them says so (`ArenaGame.hits`), the
+      pack is put on before its arena is built, and the tags are cleared at
+      "Go!": any arena's fight leaves them.
+    - The tick takes the tags in one batch (`TAKE`: copied, then cleared),
+      so a hit landing while it reads is kept for the next look.
+    - Who hurt a player is asked of the game (`hits.attackerLine`, an
+      `execute on attacker`, from 1.19.4): the last living thing that hurt
+      them in the last five seconds, nothing after a fall. Before 1.19.4,
+      the nearest of those who struck.
+    - Where the pack cannot be put on, the damage statistics are read, a
+      first score counted as a rise from 0 (`hits.rose`).
 
 ## Building a map
 
@@ -676,6 +742,73 @@ A new kind follows all of them. A change to an old kind must not undo one.
   now hands both the one look already running instead of firing a second RCON
   trip for the same server (`af7fbb20d`).
 
+### Reading what happened in the game
+
+- **A statistic's score does not exist until it first moves.** An objective
+  on `damage_dealt`, `damage_taken`, `playerKillCount` or a `used:` count
+  has no score for a player until that player's count changes after it was
+  made, and a tick that compared each count with the last it read dropped
+  every first rise: the first punch of each hot potato holder, the first
+  find, the first hit and kill of every fighter. A count read for the first
+  time of somebody on at the last look rises from 0 (`hits.rose`)
+  (`a5bfc3c12`, `800b43f30`, `50c9aca43`).
+- **Neither does a `health` score until that player's health changes.** A
+  capture the flag player nobody had hurt yet read as not on, and could not
+  take a flag; such a player is whole (`duel.healthOf`) (`800b43f30`).
+- **The damage statistics are not hits.** They count tenths of a heart,
+  rounded, so a quick second punch under Resistance IV counts nothing, and
+  `damage_taken` rises for a fall as much as for a blow: a hider dropping off
+  the gallery beside a seeker who had struck somebody else was "found", and
+  a SkyWars player who jumped off a tree handed the nearest striker an
+  elimination. A hit is the events data pack's advancement (see "Hits" in
+  the kind notes), and who hurt whom is the game's own memory of it,
+  `execute on attacker` (`a5bfc3c12`, `50c9aca43`).
+- **A tag the game sets for anybody is cleared before a game reads it.** The
+  pack tags a hit in any arena, and only hot potato and hide and seek take
+  the tags: one left from an earlier fight was read on their first look as a
+  pass or a find of their own. Both clear them at "Go!" (`9ef1d4813`).
+- **Credit goes to whoever hurt that player, not whoever struck last.** "The
+  rival who struck last" was anybody's strike at anybody: with more than one
+  a side, eliminations went to the wrong rival (`800b43f30`).
+- **A mark the quick look leaves is taken in the same batch it is cleared,
+  and wiped off anybody the tick moves.** Capture the flag read its marks and
+  cleared them in separate trips and sent its lines - the send-back teleport
+  among them - at the end of the tick. A quick look in between marked a
+  player brought low by the other team's flag where they stood before the
+  move, and on the next tick they took that flag from their own base, two
+  blocks from their own, and captured it at once (`800b43f30`).
+- **A dead player is still somewhere.** `@a` selects players on the death
+  screen where they fell, so a player dead by a flag was marked as touching
+  it after their death was counted; only somebody alive takes or captures
+  one (`800b43f30`).
+- **`tp` leaves its target on the ground.** The dropper's landing box
+  reached the spot it sends landed racers back to, so each was sent back
+  every tick - the server ignores a player's moves until it has their answer
+  to a teleport - and held in mid-air until vanilla kicked them for floating
+  too long, on every run on a real server (`fac79a14a`).
+- **What the pack notes to the tick orders what one look sees.** Two
+  racers reaching the dropper's water in one look were told their places by
+  join order, and the last two of a TNT run falling in one look left no
+  winner; both go by the game tick the pack wrote (`fac79a14a`, `5779a007a`).
+- **A rule a winner must keep is checked on the look that crowns them.**
+  Creative was sampled every fifteen seconds and a bingo card every two:
+  crafting in creative in between and switching back won the card
+  (`2bdb2b344`).
+- **A count measured from the last look can be wound back.** A treasure
+  dropped on one look lowered the count a catch is measured from, and picked
+  up again after a cast on a later one it was a new catch, over and over; the
+  measure is now the most a player has had (`72b98f85c`).
+- **A statistic for a kind of mob counts the world's own mobs too.** A horde
+  or villager defense counted every zombie killed near the point at night,
+  summoned or not; the pack counts kills of `pe_wfight` only (`88a8e34ee`,
+  `4a6f9bae5`): not `pe_mob`, which a jockey's mount carries too.
+- **Coming back is not starting over.** A boat racer who left and joined
+  again lost every gate in the game while their clock kept running; they now
+  come back at their last gate with their passes (`d50b36885`).
+- **A look that cannot read a value keeps the last one, never a default.**
+  The villager's health fell back to full on a look it could not be read,
+  showing a dying villager healed (`8b7f0626d`).
+
 ### Versions, loaders and plugins
 
 - **Gate every command on the server version** (`atLeast`), and give an
@@ -690,7 +823,11 @@ A new kind follows all of them. A change to an old kind must not undo one.
       beside what players carry (`13d8449e1`).
     - 1.19.4: the heightmap. Before it, the ground marker lands a block or two
       off, so keep a margin from beds and never leave a marked chunk loaded
-      (`40bcd010c`, `4f5b2ccc3`).
+      (`40bcd010c`, `4f5b2ccc3`). And `execute on attacker`, who hurt a
+      player; before it, the nearest striker is the guess (`a5bfc3c12`,
+      `800b43f30`, `50c9aca43`).
+    - 1.21: the data pack's `advancement` and `function` folders, singular;
+      before, plural. The pack ships both (`a5bfc3c12`).
     - 1.20.5: item components. Before it, NBT `Count` (`b29835d20`).
     - 1.21.5: equipment, `drop_chances`, SNBT text names, and the new
       click-event spelling (`e3143f57b`, `e24b3e480`).

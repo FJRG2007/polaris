@@ -10,9 +10,12 @@
  * Each round one player holds the potato - drawn from the run's id and the
  * round, so a restart draws the same - and wears it: a marked TNT on their head
  * (only onto an empty one), glowing, told so on their screen. Everybody but
- * the holder is weakened past doing any harm, so a hit anybody takes is the
- * holder's (`hitBy`); the one it was is the nearest of those hit, and the
- * potato is theirs - not straight back: whoever was just handed it cannot pass
+ * the holder is weakened past doing any harm, so a hit anybody takes from a
+ * player is the holder's - read off the events data pack (`hits.ts`), which
+ * sees every punch, and checked against who the game says hurt them where it
+ * can (`hurtByHolder`); the one it was is the nearest of those hit
+ * (`hitBy`), and the potato is theirs - not straight back: whoever was just
+ * handed it cannot pass
  * it for `PASS_COOLDOWN_MS`. When the round's fuse runs out its holder is out
  * and goes to the gallery; after a breath the next round starts with a new
  * holder. The last one left wins; everybody else is ranked by when they went
@@ -22,6 +25,7 @@
  */
 
 import { z } from "zod";
+import * as hits from "./hits";
 import type { Box } from "../state";
 import type { Spot } from "./arena";
 import { seeded } from "../trivia-bank";
@@ -53,7 +57,8 @@ export const ROUND_PAUSE_MS = 3_000;
 /** The potato. */
 export const POTATO = "minecraft:tnt";
 
-/** What the game counts a hit by: damage dealt, damage taken. */
+/** What the game counts a hit by where the events data pack is not on: damage
+ *  dealt, damage taken. */
 export const DEALT = "pe_hpd";
 export const TAKEN = "pe_hpt";
 export const READ_DEALT = `execute as @a run scoreboard players get @s ${DEALT}`;
@@ -286,6 +291,14 @@ export function hitBy(
     return best;
 }
 
+/** Whether somebody hurt was hurt by the holder: the game's word where it was
+ *  asked (`hits-service.attackers`, from 1.19.4; null when nothing hurt them),
+ *  anybody hurt where it was not. */
+export function hurtByHolder(attacker: string | null | undefined, holder: string): boolean {
+    if (attacker === undefined) return true;
+    return attacker !== null && attacker.toLowerCase() === holder.toLowerCase();
+}
+
 /** Whether the potato can change hands now: not straight back. */
 export function canPass(state: PotatoState, now: number): boolean {
     return state.holder !== null && now >= state.passedAt + PASS_COOLDOWN_MS;
@@ -313,9 +326,10 @@ export function setupLines(): string[] {
     ]);
 }
 
-export const TEARDOWN = [DEALT, TAKEN].map(
-    (objective) => `scoreboard objectives remove ${objective}`
-);
+export const TEARDOWN = [
+    ...[DEALT, TAKEN].map((objective) => `scoreboard objectives remove ${objective}`),
+    ...hits.TAGS_OFF
+];
 
 /** Nobody hurt, whoever they are: a punch a fifth of one, mended at once. */
 export function unhurtLines(name: string): string[] {

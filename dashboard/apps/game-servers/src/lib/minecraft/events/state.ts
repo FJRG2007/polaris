@@ -279,6 +279,11 @@ export const runSchema = z.object({
     boss: bossStateSchema.nullable().default(null),
     /** A villager defense: its villager, written down before it is summoned. */
     villager: villagerSchema.nullable().default(null),
+    /** A horde or villager defense whose kills the events data pack counts -
+     *  only the monsters it summoned (`waves.wavesSetup`) - rather than the
+     *  game's own statistics, which count the night's own too. Chosen as it
+     *  begins; a run saved before it reads as the statistics. */
+    killsByPack: z.boolean().default(false),
     /** A bingo rush: its card, drawn as it began, and who has marked what. */
     bingo: bingoSchema.nullable().default(null),
     /** A boss fishing: the fish's strength, who it was sized for, and the catches. */

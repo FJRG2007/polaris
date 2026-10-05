@@ -24,6 +24,7 @@
  * Pure: the files and the lines are functions of what they are given.
  */
 
+import * as hits from "./hits";
 import type { Box } from "./stage";
 import * as tntRun from "./tnt-run";
 import * as dropper from "./dropper";
@@ -124,18 +125,26 @@ const FUNCTIONS: Readonly<Record<string, readonly string[]>> = {
  * (`tnt-run.ts`), a dropper's landings (`dropper.ts`) and a boat race's gates
  * (`boat-race.ts`). Each has a `tick`
  * function, which the game runs every tick and which does nothing while that
- * game's own switch is off.
+ * game's own switch is off. And the arenas' hits (`hits.ts`), which have no
+ * tick: their functions are the rewards of the advancements under `hit/`.
  */
 const GAMES: readonly (readonly [string, Readonly<Record<string, readonly string[]>>])[] = [
     ["spleef", FUNCTIONS],
     ["tntrun", tntRun.FUNCTIONS],
     ["dropper", dropper.FUNCTIONS],
-    ["boat", boatRace.FUNCTIONS]
+    ["boat", boatRace.FUNCTIONS],
+    ["hit", hits.FUNCTIONS]
+];
+
+/** The advancements, by their folder under `polaris:`. */
+const ADVANCEMENTS: readonly (readonly [string, Readonly<Record<string, unknown>>])[] = [
+    ["hit", hits.ADVANCEMENTS]
 ];
 
 /** The pack's files, by their path inside its folder. Both spellings of the
- *  function folders, because 1.21 renamed them (`functions` to `function`) and
- *  each release reads only its own; the format range covers 1.13 onwards. */
+ *  function and advancement folders, because 1.21 renamed them (`functions` to
+ *  `function`, `advancements` to `advancement`) and each release reads only
+ *  its own; the format range covers 1.13 onwards. */
 export function packFiles(): ReadonlyMap<string, string> {
     const files = new Map<string, string>();
     files.set(
@@ -150,7 +159,18 @@ export function packFiles(): ReadonlyMap<string, string> {
             }
         })}\n`
     );
-    const tick = `${JSON.stringify({ values: GAMES.map(([game]) => `polaris:${game}/tick`) })}\n`;
+    const tick = `${JSON.stringify({
+        values: GAMES.filter(([, functions]) => functions.tick).map(
+            ([game]) => `polaris:${game}/tick`
+        )
+    })}\n`;
+    for (const folder of ["advancements", "advancement"])
+        for (const [game, advancements] of ADVANCEMENTS)
+            for (const [name, advancement] of Object.entries(advancements))
+                files.set(
+                    `data/polaris/${folder}/${game}/${name}.json`,
+                    `${JSON.stringify(advancement)}\n`
+                );
     for (const folder of ["functions", "function"]) {
         files.set(`data/minecraft/tags/${folder}/tick.json`, tick);
         for (const [game, functions] of GAMES)

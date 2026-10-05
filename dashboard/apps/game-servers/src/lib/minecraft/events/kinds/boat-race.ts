@@ -834,12 +834,16 @@ export const SCORES_ADDED = [...OWN, OBJECTIVE].map(
 );
 export const SCORES_REMOVED = OWN.map((name) => `scoreboard objectives remove ${name}`);
 
-/** A racer coming in: at the start, nothing passed. */
-export function racerScores(name: string): string[] {
+/**
+ * A racer coming in: at the start, nothing passed - or, coming back to a race
+ * they left, the `passed` passes they had made over a track of `gates`, the
+ * last of them their last gate and the one after it their next.
+ */
+export function racerScores(name: string, passed = 0, gates = 1): string[] {
     return [
-        `scoreboard players set ${name} ${PASSED_SCORE} 0`,
-        `scoreboard players set ${name} ${NEXT_SCORE} 0`,
-        `scoreboard players set ${name} ${LAST_SCORE} -1`,
+        `scoreboard players set ${name} ${PASSED_SCORE} ${passed}`,
+        `scoreboard players set ${name} ${NEXT_SCORE} ${passed % gates}`,
+        `scoreboard players set ${name} ${LAST_SCORE} ${passed > 0 ? (passed - 1) % gates : -1}`,
         `scoreboard players set ${name} ${FINISH_SCORE} 0`,
         `scoreboard players set ${name} ${CUT_SCORE} 0`
     ];
@@ -959,6 +963,9 @@ const MOUNT_TAG = "pe_mount";
 /** For one quick look: a race boat somebody sits in, and a racer in no race boat. */
 const HELD_TAG = "pe_held";
 const AFOOT_TAG = "pe_afoot";
+/** Put back on the last look but past the boats it had room for: already
+ *  told why, and in a boat on this one without being told they left theirs. */
+const WAIT_TAG = "pe_bwait";
 /** Racers put in a new boat in one quick look. */
 const MOUNTS_PER_LOOK = 4;
 
@@ -1006,9 +1013,10 @@ export function quickLines(
     );
     if (rides(way))
         lines.push(
-            `execute as @a[${racing},tag=!${RESET_TAG},tag=${AFOOT_TAG}] run tellraw @s ${told.lost}`,
+            `execute as @a[${racing},tag=!${RESET_TAG},tag=!${WAIT_TAG},tag=${AFOOT_TAG}] run tellraw @s ${told.lost}`,
             `tag @a[${racing},tag=${AFOOT_TAG}] add ${RESET_TAG}`,
-            `tag @a remove ${AFOOT_TAG}`
+            `tag @a remove ${AFOOT_TAG}`,
+            `tag @a remove ${WAIT_TAG}`
         );
     const back = [grid(track, 1)[0]!, ...track.respawns];
     back.forEach((spot, index) =>
@@ -1026,12 +1034,20 @@ export function quickLines(
             `tag @a[tag=${MOUNT_TAG}] remove ${RESET_TAG}`,
             `tag @a remove ${MOUNT_TAG}`
         );
+    if (rides(way)) lines.push(`tag @a[tag=${RESET_TAG}] add ${WAIT_TAG}`);
     lines.push(`tag @a remove ${RESET_TAG}`);
     if (!rides(way))
         lines.push(
             `give @a[${racing},nbt=!{RootVehicle:{}},nbt=!{Inventory:[{id:"minecraft:oak_boat"}]}] ${markedBoat(way)} 1`
         );
     return lines;
+}
+
+/** Where a racer who has made `passed` passes goes back in: their last gate,
+ *  as a reset puts them; the grid's first spot before any. */
+export function resumeSpot(track: Track, passed: number): Spot {
+    if (passed <= 0) return grid(track, 1)[0]!;
+    return track.respawns[(passed - 1) % track.gates.length]!;
 }
 
 /** The lap a racer is on and the gates passed on it, from the gates passed. */

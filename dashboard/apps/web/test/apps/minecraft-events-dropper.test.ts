@@ -395,8 +395,19 @@ describe("the dropper's data pack", () => {
             `scoreboard players set #fy1 polaris_drop ${(lowest + 1) * 64 - 16}`
         );
         expect(lines).toContain(
-            `scoreboard players set #fy2 polaris_drop ${(shaft.top + 2) * 64 - 1}`
+            `scoreboard players set #fy2 polaris_drop ${(shaft.top + 1) * 64 - 1}`
         );
+        // Where a racer is let fall from - at "Go!" and each time they are sent
+        // back - is never a landing: `tp` leaves its target on the ground, and
+        // with the spot inside, the pack sent them back to it every tick,
+        // holding them in mid-air until the server kicked them for floating.
+        const fy2 = (shaft.top + 1) * 64 - 1;
+        expect(dropper.spawn(shaft).y * 64).toBeGreaterThan(fy2);
+        expect(
+            Number(/summon minecraft:armor_stand \S+ (\S+) /.exec(lines.join("\n"))![1]) * 64
+        ).toBeGreaterThan(fy2);
+        // The first floor's own landing is still one.
+        expect((shaft.floors[0]! + 1) * 64).toBeLessThanOrEqual(fy2);
         expect(lines).toContain(
             `scoreboard players set #wy polaris_drop ${(shaft.water + 1) * 64}`
         );

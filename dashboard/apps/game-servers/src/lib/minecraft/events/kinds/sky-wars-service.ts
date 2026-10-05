@@ -5,13 +5,15 @@
  * Built, the islands' chests are filled (`decorate`), each item marked as the
  * kit. At "Go!" the cages come down. Each tick reads health, damage dealt and
  * taken, bows drawn, deaths, where everybody is, and whom the quick look found
- * past the play area; it credits each hit to whoever struck nearest, or else
- * whoever drew a bow; then puts out whoever is down to `OUT_HEALTH`, died, fell
+ * past the play area; it credits each hit to whoever the game says hurt them
+ * (from 1.19.4; nobody for a fall), or before that to whoever struck nearest,
+ * or else whoever drew a bow; then puts out whoever is down to `OUT_HEALTH`, died, fell
  * under the islands or left the play area, or has been off the server two
  * looks running - their kit taken, up to the gallery, the last to hit them in
  * the last ten seconds credited. The last one left wins.
  */
 
+import * as hits from "./hits";
 import * as arena from "./arena";
 import * as sw from "./sky-wars";
 import * as duel from "./team-duel";
@@ -21,6 +23,7 @@ import * as written from "../messages";
 import * as commands from "../commands";
 import type * as stored from "../state";
 import * as said from "./sky-wars-messages";
+import * as hitsService from "./hits-service";
 import type { ArenaGame, ItemSyntax, KindContext } from "./arena-game";
 
 const messages = speech.spoken(written);
@@ -57,10 +60,10 @@ function atOf(run: stored.EventRun, place: stored.Point = run.place!): sw.Placed
 
 /** What one run keeps between ticks: nothing that must survive a restart. */
 interface Memory {
-    dealt: Map<string, number>;
-    taken: Map<string, number>;
-    bows: Map<string, number>;
-    kills: Map<string, number>;
+    dealt: hits.Tally;
+    taken: hits.Tally;
+    bows: hits.Tally;
+    kills: hits.Tally;
     /** Who last hit each player, and when. */
     hitBy: Map<string, { by: string; at: number }>;
     missing: Map<string, number>;
@@ -73,10 +76,10 @@ function memoryOf(runId: string): Memory {
     if (!memory) {
         if (memories.size >= 16) memories.delete(memories.keys().next().value!);
         memory = {
-            dealt: new Map(),
-            taken: new Map(),
-            bows: new Map(),
-            kills: new Map(),
+            dealt: hits.tally(),
+            taken: hits.tally(),
+            bows: hits.tally(),
+            kills: hits.tally(),
             hitBy: new Map(),
             missing: new Map()
         };
@@ -132,20 +135,13 @@ async function tick(ctx: KindContext, lines: string[]): Promise<string | null> {
     const gone = new Set(
         commands.readWhere(await say(arena.readTagged(sw.GONE_TAG))).map((one) => lower(one.name))
     );
-    // What rose since the last look; nothing on the first.
-    const since = (scores: Map<string, number>, kept: Map<string, number>) => {
-        const fresh = new Set<string>();
-        for (const [name, value] of scores) {
-            const before = kept.get(name);
-            if (before !== undefined && value > before) fresh.add(lower(name));
-            kept.set(name, value);
-        }
-        return fresh;
-    };
-    const struck = since(dealt, memory.dealt);
-    const hurt = since(taken, memory.taken);
-    const drew = since(bows, memory.bows);
-    const killedSince = since(killed, memory.kills);
+    // What rose since the last look; nothing on the first after a restart,
+    // and a first score counted from 0.
+    const on = new Set(here.keys());
+    const struck = hits.roseFor(memory.dealt, dealt, on);
+    const hurt = hits.roseFor(memory.taken, taken, on);
+    const drew = hits.roseFor(memory.bows, bows, on);
+    const killedSince = hits.roseFor(memory.kills, killed, on);
 
     const before = sw.stateOf(run.game);
     const state: sw.WarState = structuredClone(before);
@@ -153,20 +149,32 @@ async function tick(ctx: KindContext, lines: string[]): Promise<string | null> {
     const alive = () => run.entrants.filter((one) => !isOut(one.name));
     const placed = (name: string) => ({ ...here.get(lower(name))!, name });
 
-    // Each hit credited to whoever struck nearest, or else drew a bow.
-    for (const one of alive()) {
-        const victim = here.get(lower(one.name));
-        if (!victim || !hurt.has(lower(one.name))) continue;
+    // Each hit credited to whoever the game says hurt them (from 1.19.4) -
+    // nobody, for a fall or a fire - or before that to whoever struck nearest,
+    // or else drew a bow.
+    const hurtNow = alive().filter((one) => here.has(lower(one.name)) && hurt.has(lower(one.name)));
+    const attackers = await hitsService.attackers(
+        ctx,
+        hurtNow.map((one) => one.name)
+    );
+    for (const one of hurtNow) {
+        const victim = here.get(lower(one.name))!;
         const others = alive().filter(
             (other) => lower(other.name) !== lower(one.name) && here.has(lower(other.name))
         );
-        const by = sw.hitBy(
-            victim,
-            others
-                .filter((other) => struck.has(lower(other.name)))
-                .map((other) => placed(other.name)),
-            others.filter((other) => drew.has(lower(other.name))).map((other) => placed(other.name))
-        );
+        const named = attackers.get(lower(one.name));
+        const by =
+            named !== undefined
+                ? (others.find((other) => lower(other.name) === lower(named ?? ""))?.name ?? null)
+                : sw.hitBy(
+                      victim,
+                      others
+                          .filter((other) => struck.has(lower(other.name)))
+                          .map((other) => placed(other.name)),
+                      others
+                          .filter((other) => drew.has(lower(other.name)))
+                          .map((other) => placed(other.name))
+                  );
         if (by) memory.hitBy.set(lower(one.name), { by, at: now });
     }
 

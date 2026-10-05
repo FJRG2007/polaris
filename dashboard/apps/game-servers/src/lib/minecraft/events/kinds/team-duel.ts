@@ -35,6 +35,26 @@ export const DIED = "pe_died";
 export const KILLS = "pe_pk";
 
 export const READ_HP = `execute as @a run scoreboard players get @s ${HP}`;
+
+/** A whole player's health: twenty half hearts. */
+export const FULL_HEALTH = 20;
+
+/**
+ * Everybody's health as read, by name, with whoever is on but has no score -
+ * the game sets a `health` score only when that player's health first
+ * changes after the count was made - at full health, which is what an
+ * unchanged health is here: everybody comes in healed. Without it, a player
+ * nobody had hurt yet was taken for one not on.
+ */
+export function healthOf(
+    read: ReadonlyMap<string, number>,
+    on: Iterable<string>
+): Map<string, number> {
+    const health = new Map(read);
+    const known = new Set([...read.keys()].map((name) => name.toLowerCase()));
+    for (const name of on) if (!known.has(name.toLowerCase())) health.set(name, FULL_HEALTH);
+    return health;
+}
 export const READ_DEALT = `execute as @a run scoreboard players get @s ${DEALT}`;
 export const READ_DIED = `execute as @a run scoreboard players get @s ${DIED}`;
 export const READ_KILLS = `execute as @a run scoreboard players get @s ${KILLS}`;
@@ -217,15 +237,21 @@ export function sendBack(name: string, spot: Spot): string[] {
 export const CREDIT_MS = 6_000;
 
 /**
- * Who brought a player down: a rival the game counts a player kill for since
- * the last look, or else the rival who struck last, within a few seconds.
+ * Who brought a player down. Where the game was asked who last hurt them
+ * (`attacker`, from 1.19.4: null when nothing did), that one if a rival, and
+ * nobody else - "struck last" is anybody's strike at anybody. Otherwise a rival
+ * the game counts a player kill for since the last look, or else the rival who
+ * struck last, within a few seconds.
  */
 export function creditFor(
     rivals: readonly string[],
     killsSince: ReadonlyMap<string, number>,
     lastHit: ReadonlyMap<string, number>,
-    now: number
+    now: number,
+    attacker?: string | null
 ): string | null {
+    if (attacker !== undefined)
+        return rivals.find((name) => name.toLowerCase() === (attacker ?? "").toLowerCase()) ?? null;
     const killer = rivals.find((name) => (killsSince.get(name) ?? 0) > 0);
     if (killer) return killer;
     let best: string | null = null;

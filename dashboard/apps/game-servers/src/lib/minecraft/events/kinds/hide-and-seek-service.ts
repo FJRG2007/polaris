@@ -12,6 +12,7 @@
  * seekers out early nor builds the cage again.
  */
 
+import * as hits from "./hits";
 import * as arena from "./arena";
 import * as hs from "./hide-and-seek";
 import * as catalog from "../catalog";
@@ -19,6 +20,7 @@ import * as speech from "../../speech";
 import * as written from "../messages";
 import * as commands from "../commands";
 import type * as stored from "../state";
+import * as hitsService from "./hits-service";
 import * as said from "./hide-and-seek-messages";
 import type { ArenaGame, KindContext } from "./arena-game";
 
@@ -46,8 +48,8 @@ function layoutOf(runId: string): hs.Layout {
 
 /** What one run keeps between ticks: nothing that must survive a restart. */
 interface Memory {
-    dealt: Map<string, number>;
-    taken: Map<string, number>;
+    dealt: hits.Tally;
+    taken: hits.Tally;
 }
 
 const memories = new Map<string, Memory>();
@@ -56,7 +58,7 @@ function memoryOf(runId: string): Memory {
     let memory = memories.get(runId);
     if (!memory) {
         if (memories.size >= 16) memories.delete(memories.keys().next().value!);
-        memory = { dealt: new Map(), taken: new Map() };
+        memory = { dealt: hits.tally(), taken: hits.tally() };
         memories.set(runId, memory);
     }
     return memory;
@@ -119,7 +121,8 @@ async function goLines(ctx: KindContext): Promise<string[]> {
     const seconds = optionsOf(run).hideSeconds;
     const seekers = firstSeekers(run).map(lower);
     const mirror = await mirrorOf(ctx);
-    const out: string[] = [];
+    // No hit from before "Go!" - or from another arena's fight - read as a find.
+    const out: string[] = [...hits.TAGS_OFF];
     for (const one of run.entrants) {
         const seeking = seekers.includes(lower(one.name));
         out.push(
@@ -153,23 +156,19 @@ async function tick(ctx: KindContext, lines: string[]): Promise<string | null> {
     const now = ctx.now;
     const memory = memoryOf(run.id);
     const say = (line: string) => ctx.server.say([line]);
-    const dealt = commands.readScores(await say(hs.READ_DEALT));
-    const taken = commands.readScores(await say(hs.READ_TAKEN));
     const here = new Map(
         commands.readWhere(await say(commands.IN_OVERWORLD)).map((one) => [lower(one.name), one])
     );
-    // Who struck and who was hurt since the last look; nothing on the first.
-    const since = (scores: Map<string, number>, kept: Map<string, number>) => {
-        const fresh = new Set<string>();
-        for (const [name, value] of scores) {
-            const before = kept.get(name);
-            if (before !== undefined && value > before) fresh.add(lower(name));
-            kept.set(name, value);
-        }
-        return fresh;
-    };
-    const struck = since(dealt, memory.dealt);
-    const hurt = since(taken, memory.taken);
+    // Who struck and who was hurt since the last look: the pack's, or else what
+    // the damage counts say - nothing on the first look after a restart.
+    const taken = await hitsService.take(ctx);
+    const on = new Set(here.keys());
+    const struck =
+        taken?.struck ??
+        hits.roseFor(memory.dealt, commands.readScores(await say(hs.READ_DEALT)), on);
+    const hurt =
+        taken?.hurt ??
+        hits.roseFor(memory.taken, commands.readScores(await say(hs.READ_TAKEN)), on);
 
     const before = hs.stateOf(run.game);
     const start = run.readyAt ?? now;
@@ -205,20 +204,29 @@ async function tick(ctx: KindContext, lines: string[]): Promise<string | null> {
         if (!hs.seeks(state, one.name) && here.has(lower(one.name)))
             state.hidden[one.name] = (state.hidden[one.name] ?? 0) + elapsed;
 
-    // Found: a hider hurt beside a seeker who struck.
+    // Found: a hider hurt by a seeker - the one the game says, or else beside
+    // a seeker who struck.
     if (state.released) {
-        const strikers = run.entrants
-            .filter(
-                (one) =>
-                    hs.seeks(state, one.name) &&
-                    struck.has(lower(one.name)) &&
-                    here.has(lower(one.name))
-            )
+        const seeking = run.entrants.filter((one) => hs.seeks(state, one.name));
+        const strikers = seeking
+            .filter((one) => struck.has(lower(one.name)) && here.has(lower(one.name)))
             .map((one) => ({ ...here.get(lower(one.name))!, name: one.name }));
-        for (const one of run.entrants) {
-            const at = here.get(lower(one.name));
-            if (!at || hs.seeks(state, one.name) || !hurt.has(lower(one.name))) continue;
-            const by = hs.foundBy(at, strikers);
+        const hurtHiders = run.entrants.filter(
+            (one) =>
+                here.has(lower(one.name)) && !hs.seeks(state, one.name) && hurt.has(lower(one.name))
+        );
+        const attackers = await hitsService.attackers(
+            ctx,
+            hurtHiders.map((one) => one.name)
+        );
+        for (const one of hurtHiders) {
+            const at = here.get(lower(one.name))!;
+            const by = hs.foundBy(
+                at,
+                strikers,
+                attackers.get(lower(one.name)),
+                seeking.map((each) => each.name)
+            );
             if (!by) continue;
             state.finds.push({ hider: one.name, by, at: now });
             const left = run.entrants.filter((each) => !hs.seeks(state, each.name)).length;
@@ -290,6 +298,7 @@ export const hideAndSeek: ArenaGame = {
     fills: (run, box) => hs.hallFills(box, layoutOf(run.id)),
     blocks: () => [...hs.HALL_BLOCKS],
     kit: () => [],
+    hits: true,
     side: (_run, index) => index,
     spot: (run, entrant) => spotOf(run, entrant),
     beginLines: (_preset, language) => hs.setupLines(said.teamNames(language)),

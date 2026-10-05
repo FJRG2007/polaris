@@ -185,6 +185,50 @@ describe("the TNT run's data pack", () => {
         expect(tntRun.FUSE_TICKS).toBeLessThanOrEqual(10);
     });
 
+    it("notes the game tick each racer first goes under the lowest floor, once", () => {
+        expect(fn("player")).toContain(
+            "execute unless score @s polaris_tntrun matches 1.. if score #py polaris_tntrun < #fy polaris_tntrun store result score @s polaris_tntrun run time query gametime"
+        );
+        const arena = arenaOf(15, 3, { x: 0, z: 0 }, 100);
+        const bottom = arena.floors.at(-1)!;
+        const arm = tntRun.armLines(arena);
+        // Out where `spleef.fell` puts them out: half a block into the lowest floor.
+        expect(arm).toContain(`scoreboard players set #fy polaris_tntrun ${bottom * 64 + 32}`);
+        // Nobody's fall of an earlier run kept, before the switch goes on.
+        expect(arm.indexOf("scoreboard players reset @a polaris_tntrun")).toBeLessThan(
+            arm.indexOf("scoreboard players set #on polaris_tntrun 1")
+        );
+        expect(tntRun.racerLines("Ana")).toEqual(["scoreboard players reset Ana polaris_tntrun"]);
+    });
+
+    it("tells apart who went out on one look by the tick they fell, the last alone still standing", () => {
+        const fell = new Map([
+            ["ana", 100],
+            ["ben", 110],
+            ["cy", 100]
+        ]);
+        // The last two (and Cy) out on one look: Ben fell last, alone - he won.
+        expect(tntRun.fallOrder(["Ana", "Ben", "Cy"], fell, 0)).toEqual({
+            groups: [["Ana", "Cy"]],
+            survivor: "Ben"
+        });
+        // Somebody else still standing: nobody survives, they go out in order.
+        expect(tntRun.fallOrder(["Ben", "Ana"], fell, 1)).toEqual({
+            groups: [["Ana"], ["Ben"]],
+            survivor: null
+        });
+        // Fell on the same tick: the same place, and nobody left standing.
+        expect(tntRun.fallOrder(["Ana", "Cy"], fell, 0)).toEqual({
+            groups: [["Ana", "Cy"]],
+            survivor: null
+        });
+        // Somebody who left (no tick) went first; a faller alone after them wins.
+        expect(tntRun.fallOrder(["Ben", "Dee"], fell, 0)).toEqual({
+            groups: [["Dee"]],
+            survivor: "Ben"
+        });
+    });
+
     it("takes a block only when its fuse runs out, only if it is still TNT, and burns the fuse down first", () => {
         const run = fn("run");
         expect(run[0]).toBe(
