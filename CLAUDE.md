@@ -84,10 +84,9 @@ one outage here Polaris can end without a terminal.
 ## The browser bundle never carries this machine's paths
 
 Webpack compiles a bare `import.meta.url` to the module's absolute `file://`
-path on whichever machine ran the build. pdf.js and Excalidraw both read it
-(a Node-only canvas factory, a font-subset worker), so without the fix below
-every client that touched either one downloaded the builder's disk layout -
-account name included.
+path on whichever machine ran the build. pdf.js reads it (in a Node-only canvas
+factory), so without the fix below every client that loaded it downloaded the
+builder's disk layout - account name included.
 
 - **The client webpack compilation answers `import.meta.url` with a
   workspace-relative path instead**, via a plugin

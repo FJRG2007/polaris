@@ -11,7 +11,7 @@
  */
 
 import { cn } from "@polaris/ui";
-import type { SVGProps } from "react";
+import type { JSX, SVGProps } from "react";
 import { Archive, Database } from "lucide-react";
 import { dbEngineLabel, isStorageEngine, type DbEngine } from "@polaris/core";
 import { MariaDbMark, MongoDbMark, MySqlMark, PostgresMark, RedisMark } from "./brand-icons";

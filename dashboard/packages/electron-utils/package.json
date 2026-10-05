@@ -17,7 +17,5 @@
         "typecheck": "tsc --noEmit",
         "test": "vitest run --passWithNoTests"
     },
-    "dependencies": {
-        "parse5": "7.2.1"
-    }
+    "dependencies": {}
 }

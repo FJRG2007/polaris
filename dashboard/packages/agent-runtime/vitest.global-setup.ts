@@ -1,6 +1,6 @@
 import { resolve } from "node:path";
-import { config } from "dotenv";
+import { loadDotEnv } from "./vitest.env.ts";
 
 export default async function setup() {
-  config({ path: resolve(import.meta.dirname, "../.env") });
+    loadDotEnv(resolve(import.meta.dirname, "../.env"));
 }

@@ -11,9 +11,12 @@ Wrap any async function with `op` to get caching, deduplication, and retries for
 ```ts
 import { op } from "polaris/yes";
 
-const getUser = op(async (id: string) => {
-  return db.users.findUnique({ where: { id } });
-}, { ttl: 60_000 });
+const getUser = op(
+    async (id: string) => {
+        return db.users.findUnique({ where: { id } });
+    },
+    { ttl: 60_000 }
+);
 
 await getUser("abc"); // executes
 await getUser("abc"); // cache hit
@@ -23,7 +26,7 @@ Without `ttl`, there's no LRU cache - but concurrent calls with the same key are
 
 ```ts
 const getUser = op(async (id: string) => {
-  return db.users.findUnique({ where: { id } });
+    return db.users.findUnique({ where: { id } });
 });
 
 // only one DB call is made
@@ -34,17 +37,17 @@ const [a, b] = await Promise.all([getUser("abc"), getUser("abc")]);
 
 ```ts
 op(fn, {
-  name: "getUser",         // label for log output
-  ttl: 60_000,             // LRU cache TTL in ms (no cache without this)
-  maxItems: 1000,          // max LRU entries (default: 1000)
-  retries: [100, 500],     // retry delays in ms
-  retryAfter: true,        // honor a retry-after / x-ratelimit-reset header on retries
-                           // (true = built-in reader, or a (err) => number | undefined)
-  retryAfterCap: 20_000,   // cap (ms) on a honored retry-after hint (default: 20000)
-  bail: (err) => boolean,  // return true to abort retries immediately
-  skipCache: (result) => boolean, // return true to skip caching this result
-  cacheHit: (key) => {},   // called on cache hit (null to silence)
-  cacheMiss: (key) => {},  // called on cache miss (null to silence)
+    name: "getUser", // label for log output
+    ttl: 60_000, // LRU cache TTL in ms (no cache without this)
+    maxItems: 1000, // max LRU entries (default: 1000)
+    retries: [100, 500], // retry delays in ms
+    retryAfter: true, // honor a retry-after / x-ratelimit-reset header on retries
+    // (true = built-in reader, or a (err) => number | undefined)
+    retryAfterCap: 20_000, // cap (ms) on a honored retry-after hint (default: 20000)
+    bail: (err) => boolean, // return true to abort retries immediately
+    skipCache: (result) => boolean, // return true to skip caching this result
+    cacheHit: (key) => {}, // called on cache hit (null to silence)
+    cacheMiss: (key) => {} // called on cache miss (null to silence)
 });
 ```
 
@@ -53,13 +56,16 @@ op(fn, {
 Every `op` function gets `clear`, `has`, and `invalidate` methods:
 
 ```ts
-const getRepo = op(async (input: { org: string; repo: string }) => {
-  return github.repos.get(input);
-}, { ttl: 60_000 });
+const getRepo = op(
+    async (input: { org: string; repo: string }) => {
+        return github.repos.get(input);
+    },
+    { ttl: 60_000 }
+);
 
-getRepo.has({ org: "acme", repo: "app" });    // => boolean
-getRepo.clear({ org: "acme", repo: "app" });  // clear one key
-getRepo.clear();                               // clear all
+getRepo.has({ org: "acme", repo: "app" }); // => boolean
+getRepo.clear({ org: "acme", repo: "app" }); // clear one key
+getRepo.clear(); // clear all
 
 // predicate-based eviction
 getRepo.invalidate((key) => key.org === "acme"); // => number removed
@@ -67,7 +73,7 @@ getRepo.invalidate((key) => key.org === "acme"); // => number removed
 
 ### Cache keys
 
-The first argument is used as the cache key. Strings pass through directly; objects are hashed with [`object-hash`](https://github.com/puleos/object-hash) (order-independent):
+The first argument is used as the cache key. Strings pass through directly; objects are hashed with a SHA-256 of their canonical form (order-independent - key order in an object, item order in an array/Set):
 
 ```ts
 await getRepo({ org: "acme", repo: "app" });
@@ -81,9 +87,12 @@ await getRepo({ repo: "app", org: "acme" }); // cache hit - same hash
 If your function accepts a second argument, it's treated as a **context** parameter - passed through to the function but **not** included in the cache key:
 
 ```ts
-const getRepo = op(async (id: string, ctx: { token: string }) => {
-  return github.repos.get({ id, token: ctx.token });
-}, { ttl: 60_000 });
+const getRepo = op(
+    async (id: string, ctx: { token: string }) => {
+        return github.repos.get({ id, token: ctx.token });
+    },
+    { ttl: 60_000 }
+);
 
 await getRepo("123", { token: "abc" }); // executes
 await getRepo("123", { token: "xyz" }); // cache hit (ctx ignored)
@@ -94,22 +103,28 @@ await getRepo("123", { token: "xyz" }); // cache hit (ctx ignored)
 Pass an array of delay values in ms. The function will retry up to `retries.length` times:
 
 ```ts
-const getUser = op(async (id: string) => {
-  return api.getUser(id);
-}, {
-  retries: [100, 500, 2000],
-});
+const getUser = op(
+    async (id: string) => {
+        return api.getUser(id);
+    },
+    {
+        retries: [100, 500, 2000]
+    }
+);
 ```
 
 Use `bail` to abort retries early on non-transient errors:
 
 ```ts
-const getUser = op(async (id: string) => {
-  return api.getUser(id);
-}, {
-  retries: [100, 500, 2000],
-  bail: (err) => err instanceof NotFoundError,
-});
+const getUser = op(
+    async (id: string) => {
+        return api.getUser(id);
+    },
+    {
+        retries: [100, 500, 2000],
+        bail: (err) => err instanceof NotFoundError
+    }
+);
 ```
 
 ### Object form with Standard Schema validation
@@ -120,13 +135,13 @@ The object form accepts optional `input` and `output` schemas conforming to the 
 import { z } from "zod";
 
 const getUser = op({
-  input: z.string(),
-  output: z.object({ id: z.string(), name: z.string() }),
-  run: async (id) => {
-    return db.users.findUnique({ where: { id } });
-  },
-  ttl: 60_000,
-  retries: [100, 500],
+    input: z.string(),
+    output: z.object({ id: z.string(), name: z.string() }),
+    run: async (id) => {
+        return db.users.findUnique({ where: { id } });
+    },
+    ttl: 60_000,
+    retries: [100, 500]
 });
 ```
 
@@ -136,10 +151,10 @@ The object form also supports a `ctx` parameter on `run`:
 
 ```ts
 const getUser = op({
-  input: z.string(),
-  run: async (id, ctx: { requestId: string }) => {
-    return { id, requestId: ctx.requestId };
-  },
+    input: z.string(),
+    run: async (id, ctx: { requestId: string }) => {
+        return { id, requestId: ctx.requestId };
+    }
 });
 
 await getUser("abc", { requestId: "req-1" });
@@ -167,7 +182,7 @@ Designed to plug directly into `retries`:
 
 ```ts
 const getUser = op(async (id: string) => api.getUser(id), {
-  retries: schedule((i) => 100 * 2 ** i, 4),
+    retries: schedule((i) => 100 * 2 ** i, 4)
 });
 ```
 
@@ -178,7 +193,7 @@ Small array helper with three overloads:
 ```ts
 import { range } from "polaris/yes";
 
-range(5);           // => [0, 1, 2, 3, 4]
-range(1, 5);        // => [1, 2, 3, 4, 5]
+range(5); // => [0, 1, 2, 3, 4]
+range(1, 5); // => [1, 2, 3, 4, 5]
 range(4, (i) => i ** 2); // => [0, 1, 4, 9]
 ```

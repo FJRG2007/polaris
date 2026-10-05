@@ -43,7 +43,7 @@
     "overrides": {
         "esbuild": ">=0.25.0",
         "postcss": "^8.5.29",
-        "react": "19.0.0",
-        "react-dom": "19.0.0"
+        "react": "$react",
+        "react-dom": "$react-dom"
     }
 }
