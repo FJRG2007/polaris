@@ -89,9 +89,7 @@ export const Indent = Extension.create({
                 const inTask = isNodeActive(state, "taskItem");
                 if (inTask || isNodeActive(state, "listItem")) {
                     const item = inTask ? "taskItem" : "listItem";
-                    return by > 0
-                        ? commands.sinkListItem(item)
-                        : commands.liftListItem(item);
+                    return by > 0 ? commands.sinkListItem(item) : commands.liftListItem(item);
                 }
                 const { from, to } = state.selection;
                 let changed = false;

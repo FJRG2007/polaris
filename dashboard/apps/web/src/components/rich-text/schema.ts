@@ -104,7 +104,10 @@ const BoundedLink = Link.extend({ inclusive: () => false });
  * caret is in them, because clicking a link you are editing is how you lose what
  * you were typing.
  */
-export function baseExtensions(placeholder: string, { history = true }: { history?: boolean } = {}) {
+export function baseExtensions(
+    placeholder: string,
+    { history = true }: { history?: boolean } = {}
+) {
     return [
         // Everything visual is left to the shared type styles the surface
         // carries, so a heading is the same size here as it is once saved.

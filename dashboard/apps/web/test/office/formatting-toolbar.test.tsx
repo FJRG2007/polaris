@@ -16,7 +16,11 @@ import { MessagesWrapper } from "../setup/i18n";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { documentExtensions, MAX_INDENT } from "@/components/rich-text/document-schema";
-import { FormattingToolbar, pointsOf, safeAddress } from "@/components/rich-text/formatting-toolbar";
+import {
+    FormattingToolbar,
+    pointsOf,
+    safeAddress
+} from "@/components/rich-text/formatting-toolbar";
 
 if (!document.elementFromPoint) document.elementFromPoint = () => null;
 if (!Range.prototype.getClientRects)
@@ -60,7 +64,9 @@ describe("the document formatting bar", () => {
         expect(bold.getAttribute("aria-pressed")).toBe("false");
         act(() => fireEvent.click(bold));
         expect(editor.getHTML()).toContain("<strong>Hello</strong>");
-        expect(screen.getByRole("button", { name: "Bold" }).getAttribute("aria-pressed")).toBe("true");
+        expect(screen.getByRole("button", { name: "Bold" }).getAttribute("aria-pressed")).toBe(
+            "true"
+        );
     });
 
     it("underlines, and centres the paragraph", () => {
@@ -77,7 +83,9 @@ describe("the document formatting bar", () => {
 
     it("indents a paragraph one step at a time and stops at the limit", () => {
         bar();
-        const outdent = screen.getByRole("button", { name: "Decrease indent" }) as HTMLButtonElement;
+        const outdent = screen.getByRole("button", {
+            name: "Decrease indent"
+        }) as HTMLButtonElement;
         expect(outdent.disabled).toBe(true);
         for (let step = 0; step < MAX_INDENT + 2; step += 1) {
             act(() => {

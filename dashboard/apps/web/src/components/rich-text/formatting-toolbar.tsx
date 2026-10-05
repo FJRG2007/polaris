@@ -166,9 +166,10 @@ function readState(editor: Editor) {
         italic: editor.isActive("italic"),
         underline: editor.isActive("underline"),
         strike: editor.isActive("strike"),
-        align: (["center", "right", "justify"] as const).find((one) =>
-            editor.isActive({ textAlign: one })
-        ) ?? ("left" as const),
+        align:
+            (["center", "right", "justify"] as const).find((one) =>
+                editor.isActive({ textAlign: one })
+            ) ?? ("left" as const),
         bullets: editor.isActive("bulletList"),
         numbered: editor.isActive("orderedList"),
         tasks: editor.isActive("taskList"),
@@ -206,7 +207,10 @@ export function FormattingToolbar({
     ];
     const setBlock = (next: string): void => {
         if (next === "paragraph") chain().setParagraph().run();
-        else chain().setHeading({ level: Number(next.slice(1)) as 1 | 2 | 3 }).run();
+        else
+            chain()
+                .setHeading({ level: Number(next.slice(1)) as 1 | 2 | 3 })
+                .run();
     };
 
     const familyOptions = [
@@ -432,11 +436,7 @@ export function FormattingToolbar({
                     <ImagePlus className="size-4" />
                 </ToolbarButton>
                 <TableMenu editor={editor} inTable={state.inTable} disabled={inert} />
-                <ToolbarButton
-                    label={t("editor.toolbar.clear")}
-                    disabled={inert}
-                    onClick={clear}
-                >
+                <ToolbarButton label={t("editor.toolbar.clear")} disabled={inert} onClick={clear}>
                     <RemoveFormatting className="size-4" />
                 </ToolbarButton>
             </div>
@@ -456,7 +456,9 @@ export function FormattingToolbar({
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end" className="w-60">
                         <DropdownMenuSub>
-                            <DropdownMenuSubTrigger>{t("editor.toolbar.font")}</DropdownMenuSubTrigger>
+                            <DropdownMenuSubTrigger>
+                                {t("editor.toolbar.font")}
+                            </DropdownMenuSubTrigger>
                             <DropdownMenuSubContent>
                                 {familyOptions.map((one) => (
                                     <Picked
@@ -470,14 +472,17 @@ export function FormattingToolbar({
                             </DropdownMenuSubContent>
                         </DropdownMenuSub>
                         <DropdownMenuSub>
-                            <DropdownMenuSubTrigger>{t("editor.toolbar.size")}</DropdownMenuSubTrigger>
+                            <DropdownMenuSubTrigger>
+                                {t("editor.toolbar.size")}
+                            </DropdownMenuSubTrigger>
                             <DropdownMenuSubContent className="max-h-72 overflow-y-auto">
                                 {sizeOptions.map((one) => (
                                     <Picked
                                         key={one.value || "default"}
                                         chosen={
-                                            (state.fontSize === null ? "" : String(state.fontSize)) ===
-                                            one.value
+                                            (state.fontSize === null
+                                                ? ""
+                                                : String(state.fontSize)) === one.value
                                         }
                                         onSelect={() => setSize(one.value)}
                                     >
@@ -593,7 +598,9 @@ export function FormattingToolbar({
                         ) : (
                             <DropdownMenuItem
                                 onSelect={() =>
-                                    chain().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run()
+                                    chain()
+                                        .insertTable({ rows: 3, cols: 3, withHeaderRow: true })
+                                        .run()
                                 }
                             >
                                 <Table2 className="size-4" />
@@ -847,7 +854,11 @@ function AddressDialog({
                 >
                     <Input
                         autoFocus
-                        aria-label={kind === "image" ? t("editor.toolbar.imageAddress") : t("editor.linkAddress")}
+                        aria-label={
+                            kind === "image"
+                                ? t("editor.toolbar.imageAddress")
+                                : t("editor.linkAddress")
+                        }
                         aria-invalid={invalid}
                         placeholder="https://"
                         value={value}

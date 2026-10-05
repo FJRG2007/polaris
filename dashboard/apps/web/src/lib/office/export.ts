@@ -128,7 +128,9 @@ function docBlocks(doc: Y.Doc): core.DocBlock[] {
             text,
             ...(runs.some(isFormatted) ? { runs } : {}),
             ...(align ? { align } : {}),
-            ...(Number.isFinite(indent) && indent > 0 ? { indent: Math.min(8, Math.trunc(indent)) } : {})
+            ...(Number.isFinite(indent) && indent > 0
+                ? { indent: Math.min(8, Math.trunc(indent)) }
+                : {})
         });
     };
 
@@ -181,7 +183,10 @@ function inlineRuns(node: Y.XmlElement): core.DocRun[] {
     const runs: core.DocRun[] = [];
     for (const child of node.toArray()) {
         if (child instanceof Y.XmlText) {
-            for (const piece of child.toDelta() as { insert?: unknown; attributes?: MarkAttributes }[]) {
+            for (const piece of child.toDelta() as {
+                insert?: unknown;
+                attributes?: MarkAttributes;
+            }[]) {
                 if (typeof piece.insert === "string" && piece.insert) {
                     runs.push(runOf(piece.insert, piece.attributes));
                 }
@@ -201,7 +206,8 @@ function inlineRuns(node: Y.XmlElement): core.DocRun[] {
  *  "Header row" toggle leaves it. */
 function hasHeaderRow(table: Y.XmlElement): boolean {
     const first = table.toArray().find((row): row is Y.XmlElement => row instanceof Y.XmlElement);
-    const cells = first?.toArray().filter((cell): cell is Y.XmlElement => cell instanceof Y.XmlElement) ?? [];
+    const cells =
+        first?.toArray().filter((cell): cell is Y.XmlElement => cell instanceof Y.XmlElement) ?? [];
     return cells.length > 0 && cells.every((cell) => cell.nodeName === "tableHeader");
 }
 

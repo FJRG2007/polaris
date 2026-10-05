@@ -206,7 +206,9 @@ export function asRun(run: core.DocRun): Record<string, unknown> {
 const INDENT_TWIPS = 720;
 
 /** A paragraph's alignment and indent, as the engine's paragraph format. */
-export function paragraphFormat(block: core.DocBlock | undefined): Record<string, unknown> | undefined {
+export function paragraphFormat(
+    block: core.DocBlock | undefined
+): Record<string, unknown> | undefined {
     if (!block) return undefined;
     const format: Record<string, unknown> = {};
     if (block.align && block.align !== "left") format.align = block.align;

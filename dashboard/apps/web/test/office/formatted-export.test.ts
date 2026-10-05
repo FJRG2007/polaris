@@ -36,9 +36,15 @@ const formatted = stored([
         content: [
             text("Bold red ", [
                 { type: "bold" },
-                { type: "textStyle", attrs: { color: "#dc2626", fontFamily: "Georgia", fontSize: "18pt" } }
+                {
+                    type: "textStyle",
+                    attrs: { color: "#dc2626", fontFamily: "Georgia", fontSize: "18pt" }
+                }
             ]),
-            text("marked", [{ type: "highlight", attrs: { color: "#fef08a" } }, { type: "underline" }]),
+            text("marked", [
+                { type: "highlight", attrs: { color: "#fef08a" } },
+                { type: "underline" }
+            ]),
             text(" and "),
             text("linked", [{ type: "link", attrs: { href: "https://example.com/a?b=1&c=2" } }])
         ]
@@ -49,15 +55,24 @@ const formatted = stored([
             {
                 type: "tableRow",
                 content: [
-                    { type: "tableHeader", content: [{ type: "paragraph", content: [text("Name")] }] },
-                    { type: "tableHeader", content: [{ type: "paragraph", content: [text("Role")] }] }
+                    {
+                        type: "tableHeader",
+                        content: [{ type: "paragraph", content: [text("Name")] }]
+                    },
+                    {
+                        type: "tableHeader",
+                        content: [{ type: "paragraph", content: [text("Role")] }]
+                    }
                 ]
             },
             {
                 type: "tableRow",
                 content: [
                     { type: "tableCell", content: [{ type: "paragraph", content: [text("Ada")] }] },
-                    { type: "tableCell", content: [{ type: "paragraph", content: [text("Engineer")] }] }
+                    {
+                        type: "tableCell",
+                        content: [{ type: "paragraph", content: [text("Engineer")] }]
+                    }
                 ]
             }
         ]
@@ -156,14 +171,22 @@ describe("exporting a formatted document to a page and to Markdown", () => {
                     {
                         type: "tableRow",
                         content: [
-                            { type: "tableCell", content: [{ type: "paragraph", content: [text("Ada")] }] },
-                            { type: "tableCell", content: [{ type: "paragraph", content: [text("Engineer")] }] }
+                            {
+                                type: "tableCell",
+                                content: [{ type: "paragraph", content: [text("Ada")] }]
+                            },
+                            {
+                                type: "tableCell",
+                                content: [{ type: "paragraph", content: [text("Engineer")] }]
+                            }
                         ]
                     }
                 ]
             }
         ]);
-        const html = new TextDecoder().decode((await exportDocument("doc", "T", plain, "html"))?.bytes);
+        const html = new TextDecoder().decode(
+            (await exportDocument("doc", "T", plain, "html"))?.bytes
+        );
         expect(html).not.toContain("<th>");
         expect(html).toContain("<td>Ada</td>");
         const md = new TextDecoder().decode((await exportDocument("doc", "T", plain, "md"))?.bytes);
@@ -179,7 +202,9 @@ describe("exporting a formatted document to a page and to Markdown", () => {
         const pictured = stored([
             { type: "image", attrs: { src: "https://example.com/chart.png", alt: "Sales chart" } }
         ]);
-        const html = new TextDecoder().decode((await exportDocument("doc", "T", pictured, "html"))?.bytes);
+        const html = new TextDecoder().decode(
+            (await exportDocument("doc", "T", pictured, "html"))?.bytes
+        );
         expect(html).toContain('<a href="https://example.com/chart.png">Sales chart</a>');
         const docx = await exportDocument("doc", "T", pictured, "docx");
         const zip = await JSZip.loadAsync(docx?.bytes ?? new Uint8Array());

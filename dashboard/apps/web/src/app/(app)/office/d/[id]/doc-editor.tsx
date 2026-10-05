@@ -166,9 +166,7 @@ function SavingNote({ state }: { state: OfficeSaving }) {
                 state === "failed" ? "text-danger" : "text-muted-foreground"
             )}
         >
-            {state === "saving"
-                ? t("docEditor.saving")
-                : t("docEditor.thatDidNotSaveYour")}
+            {state === "saving" ? t("docEditor.saving") : t("docEditor.thatDidNotSaveYour")}
         </p>
     );
 }
