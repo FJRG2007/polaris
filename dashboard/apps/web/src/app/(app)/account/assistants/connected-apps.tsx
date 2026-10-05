@@ -15,7 +15,7 @@
  */
 
 import { useMemo, useState } from "react";
-import { ClientLogo } from "./client-logo";
+import { ClientLogo } from "@/components/client-logo";
 import { useRouter } from "next/navigation";
 import type { NamespaceKey } from "@/lib/i18n/types";
 import { useConfirm } from "@/components/confirm-dialog";

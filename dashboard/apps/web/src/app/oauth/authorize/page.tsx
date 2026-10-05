@@ -20,6 +20,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ShieldAlert } from "lucide-react";
 import { ConsentView } from "./consent-view";
+import { clientBrand } from "@/lib/mcp/oauth/client-brand";
 import { scopesAvailableTo } from "@polaris/auth";
 import { isLoopback } from "@/lib/mcp/oauth/urls";
 import { mcpScopes } from "@/lib/mcp/oauth/scopes";
@@ -110,6 +111,7 @@ export default async function AuthorizePage({ searchParams }: { searchParams: Se
                 query={query}
                 app={{
                     name: request.client.name,
+                    brand: clientBrand(request.client.name, request.client.redirectUris),
                     website,
                     returnsTo: redirectUrl.host,
                     loopback: isLoopback(redirectUrl)

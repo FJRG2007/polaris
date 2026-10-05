@@ -21,10 +21,14 @@ import { useTranslations } from "@/components/i18n/i18n-provider";
 import { AlertTriangle, Blocks, Globe, Info, Undo2 } from "lucide-react";
 import { expandPermissions, type Permission } from "@polaris/core";
 import { ConsentCard, ConsentFacts } from "@/components/consent-card";
+import { ClientMark } from "@/components/client-logo";
+import type { ClientBrand } from "@/lib/mcp/oauth/client-brand";
 import { McpScopeChecklist } from "@/components/mcp-scope-checklist";
 
 interface AppSummary {
     readonly name: string;
+    /** A known assistant's mark; null draws the generic glyph. */
+    readonly brand: ClientBrand | null;
     readonly website: string | null;
     readonly returnsTo: string;
     readonly loopback: boolean;
@@ -90,7 +94,13 @@ export function ConsentView({
     return (
         <main className="grid min-h-dvh place-items-center p-4">
             <ConsentCard
-                requester={<Blocks className="text-muted-foreground" />}
+                requester={
+                    app.brand ? (
+                        <ClientMark brand={app.brand} name={name} className="size-6" />
+                    ) : (
+                        <Blocks className="text-muted-foreground" />
+                    )
+                }
                 title={t("consent.title", { app: name })}
                 account={t("consent.signedInAs", { name: person })}
                 error={error}

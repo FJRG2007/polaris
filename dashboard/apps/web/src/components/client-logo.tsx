@@ -11,6 +11,31 @@ import { cn } from "@polaris/ui";
 import type { ClientBrand } from "@/lib/mcp/oauth/client-brand";
 import { ClaudeMark, CursorMark, OpenAiMark } from "@/components/model-marks";
 
+/** The mark alone, for a caller that draws its own frame (the consent card). */
+export function ClientMark({
+    brand,
+    name,
+    className = "size-5"
+}: {
+    brand: ClientBrand | null;
+    name: string;
+    className?: string;
+}) {
+    if (brand === "claude" || brand === "claude-code") return <ClaudeMark className={className} />;
+    if (brand === "chatgpt") return <OpenAiMark className={className} />;
+    if (brand === "cursor") return <CursorMark className={className} />;
+    if (brand === "vscode")
+        // Microsoft's own file, served as it ships: its masks and gradients
+        // carry ids that would collide inline.
+        // eslint-disable-next-line @next/next/no-img-element
+        return <img src="/logos/vscode.svg" alt="" className={className} />;
+    return (
+        <span className="text-sm font-semibold uppercase text-muted-foreground" aria-hidden>
+            {Array.from(name.trim())[0] ?? "?"}
+        </span>
+    );
+}
+
 export function ClientLogo({
     brand,
     name,
@@ -20,22 +45,6 @@ export function ClientLogo({
     name: string;
     className?: string;
 }) {
-    const mark = "size-5";
-    let inner;
-    if (brand === "claude" || brand === "claude-code") inner = <ClaudeMark className={mark} />;
-    else if (brand === "chatgpt") inner = <OpenAiMark className={mark} />;
-    else if (brand === "cursor") inner = <CursorMark className={mark} />;
-    else if (brand === "vscode")
-        // Microsoft's own file, served as it ships: its masks and gradients
-        // carry ids that would collide inline.
-        // eslint-disable-next-line @next/next/no-img-element
-        inner = <img src="/logos/vscode.svg" alt="" className={mark} />;
-    else
-        inner = (
-            <span className="text-sm font-semibold uppercase text-muted-foreground" aria-hidden>
-                {Array.from(name.trim())[0] ?? "?"}
-            </span>
-        );
     return (
         <span
             className={cn(
@@ -44,7 +53,7 @@ export function ClientLogo({
             )}
             aria-hidden
         >
-            {inner}
+            <ClientMark brand={brand} name={name} />
         </span>
     );
 }

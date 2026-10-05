@@ -37,7 +37,13 @@ const { McpAssistants } = await import("@/app/(app)/account/assistants/mcp-assis
 describe("the consent card", () => {
     const props = {
         query: "client_id=x",
-        app: { name: "Claude", website: "claude.ai", returnsTo: "claude.ai", loopback: false },
+        app: {
+            name: "Claude",
+            brand: null,
+            website: "claude.ai",
+            returnsTo: "claude.ai",
+            loopback: false
+        },
         person: "Ada",
         offered: ["tasks.read", "tasks.manage"] as never,
         withheld: ["users.manage"] as never
@@ -66,6 +72,15 @@ describe("the consent card", () => {
         );
         expect(html).toContain("This app runs on this computer");
         expect(html).toContain("Connect An unnamed app to Polaris");
+    });
+
+    it("draws a recognised assistant's own mark instead of the generic glyph", () => {
+        const plain = renderToStaticMarkup(withMessages(<ConsentView {...props} />));
+        const branded = renderToStaticMarkup(
+            withMessages(<ConsentView {...props} app={{ ...props.app, brand: "vscode" }} />)
+        );
+        expect(plain).not.toContain('src="/logos/vscode.svg"');
+        expect(branded).toContain('src="/logos/vscode.svg"');
     });
 
     it("reads in Spanish", () => {
