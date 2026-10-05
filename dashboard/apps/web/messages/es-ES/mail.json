@@ -162,7 +162,11 @@
         "listNotLoaded": "No se pudo cargar esa lista.",
         "notOpened": "No se pudo abrir ese mensaje.",
         "folderNotInMailbox": "Esa carpeta no está en ese buzón.",
-        "ruleNotOnMailbox": "Esa regla no está en este buzón."
+        "ruleNotOnMailbox": "Esa regla no está en este buzón.",
+        "labelNotYours": "Esa etiqueta no es tuya.",
+        "forwardLoop": "Esa dirección es un buzón de aquí. Reenviar a ella crearía un bucle.",
+        "forwardUnverified": "Reenvía solo a una dirección que hayas verificado en tu cuenta.",
+        "filtersFull": "Este buzón ya tiene todos los filtros que puede tener."
     },
     "schema": {
         "matchOn": "Añade algo con lo que coincidir",
@@ -185,7 +189,27 @@
         "timePassed": "Esa hora ya ha pasado",
         "writeWhat": "Escribe lo que debe decir",
         "writeTemplate": "Escribe lo que dice la plantilla",
-        "waitNotOffered": "Esa no es una de las esperas disponibles."
+        "waitNotOffered": "Esa no es una de las esperas disponibles.",
+        "similarSubjectOnly": "Solo un asunto puede ser parecido",
+        "similarNoWords": "Ese asunto no tiene palabras fijas con las que coincidir",
+        "operatorMismatch": "Esa comparación no encaja con lo que mira",
+        "headerName": "Indica la cabecera",
+        "notHeaderName": "Ese no es un nombre de cabecera",
+        "sizeBytes": "Indica un tamaño en bytes, sin decimales",
+        "yesOrNo": "Indica sí o no",
+        "patternInvalid": "Ese patrón no es válido",
+        "patternUnsafe": "Ese patrón podría tardar demasiado en comprobarse. Hazlo más sencillo",
+        "conditionTooLong": "Es más largo de lo que puede ser una condición",
+        "filterDamaged": "Ese filtro está dañado. Vuelve a abrirlo",
+        "groupEmpty": "Un grupo necesita una condición",
+        "groupFull": "Es más de lo que cabe en un grupo",
+        "tooManyGroups": "Son más grupos de los que caben en un filtro",
+        "tooManySteps": "Son más pasos de los que caben en un filtro",
+        "tooManyConditions": "Son más condiciones de las que caben en un filtro",
+        "stopTwice": "Este filtro ya tiene «Parar aquí»",
+        "chooseFolder": "Elige una carpeta",
+        "chooseLabel": "Elige una etiqueta",
+        "chooseForward": "Elige adónde enviarlo"
     },
     "noSubject": "(sin asunto)",
     "notify": {

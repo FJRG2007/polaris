@@ -1,91 +1,51 @@
 "use client";
 
 /**
- * Filters.
+ * Filters, per mailbox.
  *
- * Written as sentences rather than as a grid of dropdowns: "If the sender
- * contains invoices@, move it to Accounts." A filter is something people write
- * once and read back a year later trying to work out why a message vanished, and
- * the reading is the part that has to be easy.
+ * Each filter is an automation - WHEN a message arrives, IF these hold, THEN
+ * these steps - opened in the same editor Places' automations use. The list
+ * reads each one back as a sentence ("If the subject contains 'PR run failed:',
+ * put it in the trash."), because a filter is something people write once and
+ * read back a year later trying to work out why a message vanished.
  *
- * The order matters and the screen says so, because a rule that stops the ones
- * below it is the single most confusing thing about every filter system ever
- * built.
+ * The order matters and the screen says so, because a filter that stops the
+ * ones below it is the single most confusing thing about every filter system
+ * ever built. Every change here - switching one off, moving it, copying it,
+ * deleting it, saving it - shows at once and is put back if the server refuses.
  */
 
 import * as core from "@polaris/core";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Plus, Trash2, X } from "lucide-react";
-import { useState } from "react";
-import { useBusy } from "@/app/(app)/mail/use-busy";
+import { useEffect, useRef, useState } from "react";
+import { ArrowDown, ArrowUp, Copy, MoreHorizontal, Pencil, Play, Plus, Trash2 } from "lucide-react";
+import {
+    Button,
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+    Switch,
+    useToast
+} from "@polaris/ui";
 import { AccountPicker } from "../account-picker";
 import { refusalOf } from "@/app/(app)/mail/refusal";
-import { addressState } from "@/app/(app)/mail/address-state";
+import { useConfirm } from "@/components/confirm-dialog";
 import type { MailRuleView } from "@/lib/mailbox/rules";
 import type { MailLabelView } from "@/lib/mailbox/labels";
 import type { MailFolderView } from "@/lib/mailbox/views";
 import type { MailAccountView } from "@/lib/mailbox/accounts";
-import { Button, Input, Select, Switch, useToast } from "@polaris/ui";
-import { deleteRuleAction, saveRuleAction } from "@/app/(app)/mail/actions";
-import type { NamespaceTranslator } from "@/lib/i18n/types";
 import { useTranslations } from "@/components/i18n/i18n-provider";
-
-/** What a condition can look at, named in `mailSettings.rules.fields.<key>`. */
-const FIELDS = {
-    from: "from",
-    recipient: "recipient",
-    to: "to",
-    subject: "subject",
-    body: "body",
-    list: "list",
-    attachment: "attachment",
-    size: "size"
-} as const;
-
-/** How it compares, named in `mailSettings.rules.operators.<key>`. */
-const OPERATORS = {
-    contains: "contains",
-    "not-contains": "notContains",
-    is: "is",
-    "is-not": "isNot",
-    "starts-with": "startsWith",
-    "ends-with": "endsWith",
-    matches: "matches",
-    similar: "similar",
-    "greater-than": "greaterThan",
-    "less-than": "lessThan"
-} as const;
-
-function fieldOptions(t: NamespaceTranslator<"mailSettings">) {
-    return Object.entries(FIELDS).map(([value, key]) => ({
-        value,
-        label: t(`rules.fields.${key}`)
-    }));
-}
-
-/** The comparisons that make sense for a field. "Similar" is about a subject's
- *  shape, so it is only offered there. */
-function operatorOptions(t: NamespaceTranslator<"mailSettings">, field: string) {
-    return Object.entries(OPERATORS)
-        .filter(([value]) => value !== "similar" || field === "subject")
-        .map(([value, key]) => ({ value, label: t(`rules.operators.${key}`) }));
-}
-
-/** One condition as the form holds it, with a key of its own for the list. */
-interface DraftCondition {
-    readonly key: number;
-    readonly field: string;
-    readonly operator: string;
-    readonly value: string;
-}
-
-let nextKey = 1;
-const draft = (field: string, operator: string, value: string): DraftCondition => ({
-    key: nextKey++,
-    field,
-    operator,
-    value
-});
+import {
+    deleteRuleAction,
+    duplicateRuleAction,
+    reorderRulesAction,
+    runRuleOverInboxAction,
+    saveRuleAction,
+    setRuleEnabledAction
+} from "@/app/(app)/mail/actions";
+import { FilterEditor, Saving, draftOf, type FilterDraft, type FilterIssue } from "./filter-editor";
+import * as words from "./filter-words";
 
 /** What "Filter messages like this" asked for, from the address that opened
  *  this screen - read once, when it opens. */
@@ -103,21 +63,36 @@ export function seedFrom(params: URLSearchParams | null): RuleSeed | null {
     return { accountId: params.get("account"), from, similar };
 }
 
+/** What the editor is open on: a filter by id, or a new one. A refused save
+ *  reopens it on the draft that was refused, with what the server said. */
+type Editing = {
+    readonly id: string | null;
+    readonly draft: FilterDraft;
+    readonly issues: readonly FilterIssue[];
+    readonly error: string;
+};
+
+/** A row on its way to the server. */
+type Pending = MailRuleView & { readonly saving?: boolean };
+
 export function RulesView({
     accounts,
     folders,
     labels,
-    rules
+    rules,
+    forwardTargets
 }: {
     accounts: MailAccountView[];
     folders: MailFolderView[];
     labels: MailLabelView[];
     rules: Record<string, MailRuleView[]>;
+    forwardTargets: string[];
 }) {
     const router = useRouter();
     const toast = useToast();
     const t = useTranslations("mailSettings");
-    // Opened from "Filter messages like this": the form starts open on that
+    const [confirm, confirmDialog] = useConfirm();
+    // Opened from "Filter messages like this": the editor starts open on that
     // mailbox, filled in from the message.
     const params = useSearchParams();
     const [seed] = useState(() => seedFrom(params ? new URLSearchParams(params.toString()) : null));
@@ -127,474 +102,436 @@ export function RulesView({
             : accounts[0]!.id
     );
     const account = accounts.find((one) => one.id === accountId) ?? accounts[0]!;
-    const mine = rules[account.id] ?? [];
-    const [adding, setAdding] = useState(seed !== null);
+
+    // The list as this screen believes it, ahead of the server where a change is
+    // on its way. Replaced by what the server says whenever it says something.
+    const [byAccount, setByAccount] = useState<Record<string, Pending[]>>(rules);
+    useEffect(() => setByAccount(rules), [rules]);
+    const mine = byAccount[account.id] ?? [];
+    const setMine = (change: (current: Pending[]) => Pending[]) =>
+        setByAccount((current) => ({
+            ...current,
+            [account.id]: change(current[account.id] ?? [])
+        }));
+    /** Put a mailbox's list back the way it was, after a refusal. */
+    const restore = (accountKey: string, before: Pending[]) =>
+        setByAccount((current) => ({ ...current, [accountKey]: before }));
+
+    const [editing, setEditing] = useState<Editing | null>(() =>
+        seed
+            ? {
+                  id: null,
+                  draft: {
+                      name: seed.similar
+                          ? t("rules.likeName", { subject: seed.similar }).slice(0, 80)
+                          : "",
+                      enabled: true,
+                      definition: words.blankDefinition(seed),
+                      applyToExisting: false
+                  },
+                  issues: [],
+                  error: ""
+              }
+            : null
+    );
+    const busy = useRef(new Set<string>());
+
+    const myFolders = folders.filter((folder) => folder.accountId === account.id);
+    const lookup: words.FilterLookup = {
+        folderName: (id) => myFolders.find((folder) => folder.id === id)?.name,
+        labelName: (id) => labels.find((label) => label.id === id)?.name
+    };
+
+    /** A row the server has taken: its own id from now on, and no spinner. The
+     *  refresh that follows brings the server's copy, but the row must not wait
+     *  on it to stop saying it is saving. */
+    const landed = (accountKey: string, shownAs: string, answer: unknown) => {
+        const held =
+            typeof answer === "object" && answer !== null && "id" in answer ? answer.id : undefined;
+        const id = typeof held === "string" ? held : shownAs;
+        setByAccount((current) => ({
+            ...current,
+            [accountKey]: (current[accountKey] ?? []).map((row) =>
+                row.id === shownAs ? { ...row, id, saving: false } : row
+            )
+        }));
+    };
+
+    /** Say a refusal, put the list back, and ask the server for the truth. */
+    const refused = (said: string, accountKey: string, before: Pending[]) => {
+        restore(accountKey, before);
+        toast.show({ title: said });
+        router.refresh();
+    };
+
+    const save = (id: string | null, draft: FilterDraft) => {
+        const accountKey = account.id;
+        const before = mine;
+        const definition = draft.definition;
+        // Shown at once - in place, or at the bottom for a new one - and put back
+        // if the server refuses it, with the editor reopened on what was refused.
+        const temporary = id ?? `new-${core.automationNodeId()}`;
+        setMine((current) =>
+            id
+                ? current.map((row) =>
+                      row.id === id
+                          ? {
+                                ...row,
+                                name: draft.name,
+                                enabled: draft.enabled,
+                                definition,
+                                saving: true
+                            }
+                          : row
+                  )
+                : [
+                      ...current,
+                      {
+                          id: temporary,
+                          name: draft.name,
+                          enabled: draft.enabled,
+                          definition,
+                          position: current.length,
+                          matchCount: 0,
+                          lastRunAt: null,
+                          saving: true
+                      }
+                  ]
+        );
+        setEditing(null);
+        void (async () => {
+            const answer = await saveRuleAction(accountKey, id, draft).catch(() => ({
+                error: t("rules.list.unreachable")
+            }));
+            const said = refusalOf(answer);
+            if (said) {
+                restore(accountKey, before);
+                const issues =
+                    "issues" in answer && Array.isArray(answer.issues)
+                        ? (answer.issues as FilterIssue[])
+                        : [];
+                setEditing({ id, draft, issues, error: said });
+                return;
+            }
+            landed(accountKey, temporary, answer);
+            toast.show({
+                title: draft.applyToExisting ? t("rules.list.savedRunning") : t("rules.saved")
+            });
+            router.refresh();
+        })();
+    };
+
+    /** One change to a row, shown at once and undone if refused. */
+    const change = (
+        key: string,
+        optimistic: (current: Pending[]) => Pending[],
+        call: () => Promise<unknown>,
+        done?: string,
+        /** The row shown ahead of the server, when the change adds one. */
+        shownAs?: string
+    ) => {
+        if (busy.current.has(key)) return;
+        busy.current.add(key);
+        const accountKey = account.id;
+        const before = mine;
+        setMine(optimistic);
+        void (async () => {
+            const answer = await call().catch(() => ({ error: t("rules.list.unreachable") }));
+            busy.current.delete(key);
+            const said = refusalOf(answer);
+            if (said) {
+                refused(said, accountKey, before);
+                return;
+            }
+            if (shownAs) landed(accountKey, shownAs, answer);
+            if (done) toast.show({ title: done });
+            router.refresh();
+        })();
+    };
+
+    const toggle = (rule: Pending, enabled: boolean) =>
+        change(
+            `toggle-${rule.id}`,
+            (current) => current.map((row) => (row.id === rule.id ? { ...row, enabled } : row)),
+            () => setRuleEnabledAction(account.id, rule.id, enabled)
+        );
+
+    const move = (index: number, by: -1 | 1) => {
+        const target = index + by;
+        if (target < 0 || target >= mine.length) return;
+        const next = [...mine];
+        [next[index], next[target]] = [next[target]!, next[index]!];
+        change(
+            "order",
+            () => next,
+            () =>
+                reorderRulesAction(
+                    account.id,
+                    next.map((row) => row.id)
+                )
+        );
+    };
+
+    const duplicate = (rule: Pending, index: number) => {
+        const name = t("rules.list.copyName", { name: rule.name }).slice(0, 80);
+        change(
+            `copy-${rule.id}`,
+            (current) => [
+                ...current.slice(0, index + 1),
+                {
+                    ...rule,
+                    id: `copy-${rule.id}`,
+                    name,
+                    enabled: false,
+                    matchCount: 0,
+                    lastRunAt: null,
+                    saving: true
+                },
+                ...current.slice(index + 1)
+            ],
+            () => duplicateRuleAction(account.id, rule.id, name),
+            t("rules.list.copied"),
+            `copy-${rule.id}`
+        );
+    };
+
+    const remove = async (rule: Pending) => {
+        const sure = await confirm({
+            title: t("rules.list.deleteTitle", { name: rule.name }),
+            description: t("rules.list.deleteBody"),
+            confirmLabel: t("rules.list.delete"),
+            danger: true
+        });
+        if (!sure) return;
+        change(
+            `delete-${rule.id}`,
+            (current) => current.filter((row) => row.id !== rule.id),
+            () => deleteRuleAction(account.id, rule.id),
+            t("rules.list.deleted")
+        );
+    };
+
+    const run = (rule: Pending) =>
+        change(
+            `run-${rule.id}`,
+            (current) => current,
+            () => runRuleOverInboxAction(account.id, rule.id),
+            t("rules.list.running", { name: rule.name })
+        );
+
+    if (editing) {
+        const existing = editing.id ? mine.find((row) => row.id === editing.id) : undefined;
+        return (
+            <div className="min-w-0">
+                {confirmDialog}
+                <FilterEditor
+                    key={`${account.id}-${editing.id ?? "new"}-${editing.error}`}
+                    address={account.address}
+                    initial={editing.draft}
+                    isNew={editing.id === null || existing === undefined || editing.error !== ""}
+                    folders={myFolders}
+                    labels={labels}
+                    forwardTargets={forwardTargets}
+                    mailboxAddresses={accounts.map((one) => one.address)}
+                    serverIssues={editing.issues}
+                    serverError={editing.error}
+                    onSave={(draft) => save(editing.id, draft)}
+                    onClose={() => setEditing(null)}
+                />
+            </div>
+        );
+    }
+
+    const open = (rule: Pending) => {
+        if (rule.saving) return;
+        setEditing({ id: rule.id, draft: draftOf(rule), issues: [], error: "" });
+    };
 
     return (
-        <div>
+        <div className="min-w-0">
+            {confirmDialog}
             <AccountPicker accounts={accounts} value={accountId} onChange={setAccountId} />
 
-            <div className="mb-3 flex items-center justify-between">
-                <div>
-                    <h2 className="text-[13px] font-medium">
+            <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
+                <div className="min-w-0 flex-1">
+                    <h2 className="break-words text-[13px] font-medium [overflow-wrap:anywhere]">
                         {t("rules.title", { address: account.address })}
                     </h2>
                     <p className="text-[12px] text-muted-foreground">{t("rules.hint")}</p>
                 </div>
-                <Button variant="secondary" onClick={() => setAdding(true)}>
+                <Button
+                    variant="secondary"
+                    disabled={mine.length >= core.MAIL_FILTER_LIMITS.filters}
+                    title={
+                        mine.length >= core.MAIL_FILTER_LIMITS.filters
+                            ? t("rules.list.full")
+                            : undefined
+                    }
+                    onClick={() =>
+                        setEditing({
+                            id: null,
+                            draft: {
+                                name: "",
+                                enabled: true,
+                                definition: words.blankDefinition(),
+                                applyToExisting: false
+                            },
+                            issues: [],
+                            error: ""
+                        })
+                    }
+                >
                     <Plus className="size-4 shrink-0" aria-hidden />
                     {t("rules.new")}
                 </Button>
             </div>
 
-            {mine.length === 0 && !adding ? (
+            {mine.length === 0 ? (
                 <p className="rounded-md border border-dashed border-border px-4 py-6 text-center text-[13px] text-muted-foreground">
                     {t("rules.empty")}
                 </p>
             ) : null}
 
-            <ul className="space-y-2">
-                {mine.map((rule, index) => (
-                    <li key={rule.id} className="rounded-md border border-border bg-card px-3 py-2">
-                        <div className="flex items-start gap-3">
-                            <span className="mt-0.5 shrink-0 text-[11px] tabular-nums text-foreground-subtle">
-                                {index + 1}
-                            </span>
-                            <div className="min-w-0 flex-1">
-                                <p className="truncate text-[13px] font-medium" title={rule.name}>
-                                    {rule.name}
-                                </p>
-                                <p className="text-[12px] text-muted-foreground">
-                                    {describe(t, rule, folders, labels)}
-                                </p>
-                                <p className="text-[11px] text-foreground-subtle">
-                                    {rule.enabled ? t("rules.on") : t("rules.off")}
-                                    {rule.stop ? t("rules.stops") : ""}
-                                    {rule.matchCount > 0
-                                        ? t("rules.matched", { count: rule.matchCount })
-                                        : ""}
-                                </p>
-                            </div>
-                            <Button
-                                variant="ghost"
-                                size="icon"
-                                aria-label={t("rules.deleteNamed", { name: rule.name })}
-                                title={t("rules.deleteNamed", { name: rule.name })}
-                                onClick={() =>
-                                    void (async () => {
-                                        const answer = await deleteRuleAction(account.id, rule.id);
-                                        const said = refusalOf(answer);
-                                        if (said) {
-                                            toast.show({ title: said });
-                                            return;
-                                        }
-                                        router.refresh();
-                                    })()
-                                }
-                            >
-                                <Trash2 className="size-4 shrink-0" aria-hidden />
-                            </Button>
-                        </div>
-                    </li>
-                ))}
-            </ul>
-
-            {adding ? (
-                <RuleForm
-                    key={account.id}
-                    seed={seed}
-                    accountId={account.id}
-                    folders={folders.filter((folder) => folder.accountId === account.id)}
-                    labels={labels}
-                    onDone={() => {
-                        setAdding(false);
-                        router.refresh();
-                    }}
-                    onCancel={() => setAdding(false)}
-                />
-            ) : null}
-        </div>
-    );
-}
-
-/** A rule as a sentence, which is how it will be read back a year from now. */
-function describe(
-    t: NamespaceTranslator<"mailSettings">,
-    rule: MailRuleView,
-    folders: readonly MailFolderView[],
-    labels: readonly MailLabelView[]
-): string {
-    const joiner = rule.match === "all" ? t("rules.and") : t("rules.or");
-    const conditions = rule.conditions
-        .map((condition) => {
-            const fieldKey = FIELDS[condition.field as keyof typeof FIELDS];
-            const operatorKey = OPERATORS[condition.operator as keyof typeof OPERATORS];
-            return t("rules.condition", {
-                field: fieldKey ? t(`rules.fields.${fieldKey}`) : condition.field,
-                operator: operatorKey ? t(`rules.operators.${operatorKey}`) : condition.operator,
-                value: condition.value
-            });
-        })
-        .join(joiner);
-    const actions = rule.actions
-        .map((action) => {
-            switch (action.kind) {
-                case "move": {
-                    const folder = folders.find((one) => one.id === action.folder)?.name;
-                    return folder
-                        ? t("rules.said.move", { folder })
-                        : t("rules.said.moveSomewhere");
-                }
-                case "label": {
-                    const label = labels.find((one) => one.id === action.label)?.name;
-                    return label
-                        ? t("rules.said.label", { label })
-                        : t("rules.said.labelSomething");
-                }
-                case "star":
-                    return t("rules.actions.star");
-                case "read":
-                    return t("rules.actions.read");
-                case "archive":
-                    return t("rules.actions.archive");
-                case "trash":
-                    return t("rules.actions.trash");
-                case "junk":
-                    return t("rules.actions.junk");
-                case "pin":
-                    return t("rules.actions.pin");
-                case "mute":
-                    return t("rules.actions.mute");
-                case "forward":
-                    return t("rules.said.forward", { to: action.to });
-            }
-        })
-        .join(", ");
-    return t("rules.sentence", { conditions, actions });
-}
-
-function RuleForm({
-    seed = null,
-    accountId,
-    folders,
-    labels,
-    onDone,
-    onCancel
-}: {
-    seed?: RuleSeed | null;
-    accountId: string;
-    folders: MailFolderView[];
-    labels: MailLabelView[];
-    onDone: () => void;
-    onCancel: () => void;
-}) {
-    const toast = useToast();
-    const t = useTranslations("mailSettings");
-    const tm = useTranslations("mail");
-    const tc = useTranslations("common");
-    const [name, setName] = useState(() =>
-        seed?.similar ? t("rules.likeName", { subject: seed.similar }).slice(0, 80) : ""
-    );
-    const [match, setMatch] = useState<"all" | "any">("all");
-    const [conditions, setConditions] = useState<DraftCondition[]>(() => {
-        const seeded = [
-            ...(seed?.from ? [draft("from", "is", seed.from)] : []),
-            ...(seed?.similar ? [draft("subject", "similar", seed.similar)] : [])
-        ];
-        return seeded.length > 0 ? seeded : [draft("from", "contains", "")];
-    });
-    const update = (key: number, change: Partial<DraftCondition>) =>
-        setConditions((current) =>
-            current.map((one) => {
-                if (one.key !== key) return one;
-                const next = { ...one, ...change };
-                // A field that cannot be similar drops the comparison with it.
-                return next.operator === "similar" && next.field !== "subject"
-                    ? { ...next, operator: "contains" }
-                    : next;
-            })
-        );
-    /** Each condition as the server will read it, or why it will not. */
-    const checked = conditions.map((one) =>
-        core.mailRuleConditionSchema.safeParse({
-            field: one.field,
-            operator: one.operator,
-            value: one.value
-        })
-    );
-    const conditionsReady = checked.every((one) => one.success);
-    const [actionKind, setActionKind] = useState("archive");
-    const [folderId, setFolderId] = useState(folders[0]?.id ?? "");
-    const [labelId, setLabelId] = useState(labels[0]?.id ?? "");
-    const [forwardTo, setForwardTo] = useState("");
-    const [stop, setStop] = useState(false);
-    const [applyToExisting, setApplyToExisting] = useState(false);
-    const [problem, setProblem] = useState("");
-    const [saving, startSaving] = useBusy();
-
-    const actionOptions = [
-        { value: "archive", label: t("rules.actions.archive") },
-        ...(folders.length > 0 ? [{ value: "move", label: t("rules.actions.move") }] : []),
-        ...(labels.length > 0 ? [{ value: "label", label: t("rules.actions.label") }] : []),
-        { value: "star", label: t("rules.actions.star") },
-        { value: "read", label: t("rules.actions.read") },
-        { value: "junk", label: t("rules.actions.junk") },
-        { value: "trash", label: t("rules.actions.trash") },
-        { value: "pin", label: t("rules.actions.pin") },
-        { value: "mute", label: t("rules.actions.mute") },
-        { value: "forward", label: t("rules.actions.forward") }
-    ];
-
-    /** The forward address as the form reads it. Answered while it is typed
-     *  against the same schema the action is refused by, because this is the one
-     *  filter that sends mail off the machine and a round trip is a poor way to
-     *  find out an address was mistyped. */
-    const forwardAddress = addressState(forwardTo, []);
-    const forwarding = actionKind === "forward";
-
-    function action(): core.MailRuleAction {
-        if (actionKind === "move") return { kind: "move", folder: folderId };
-        if (actionKind === "label") return { kind: "label", label: labelId };
-        if (actionKind === "forward")
-            return { kind: "forward", to: forwardTo.trim().toLowerCase() };
-        return { kind: actionKind } as core.MailRuleAction;
-    }
-
-    return (
-        <div className="mt-3 space-y-3 rounded-md border border-border p-3">
-            <label className="block">
-                <span className="mb-1 block text-[12px] text-muted-foreground">
-                    {t("rules.name")} <span aria-hidden>*</span>
-                </span>
-                <Input
-                    value={name}
-                    autoFocus
-                    placeholder={t("rules.namePlaceholder")}
-                    onChange={(event) => setName(event.target.value)}
-                />
-            </label>
-
-            {conditions.length > 1 ? (
-                <div className="flex flex-wrap items-center gap-2">
-                    <span className="text-[13px] text-muted-foreground">
-                        {t("rules.matchLabel")}
-                    </span>
-                    <Select
-                        value={match}
-                        onValueChange={(next) => setMatch(next === "any" ? "any" : "all")}
-                        options={[
-                            { value: "all", label: t("rules.matchAll") },
-                            { value: "any", label: t("rules.matchAny") }
-                        ]}
-                        aria-label={t("rules.matchLabel")}
-                        className="w-56"
-                    />
-                </div>
-            ) : null}
-
-            <ul className="space-y-2">
-                {conditions.map((one, index) => {
-                    const answer = checked[index];
-                    const problemHere =
-                        answer && !answer.success && one.value.trim()
-                            ? answer.error.issues[0]?.message
-                            : "";
-                    const shape =
-                        one.operator === "similar" ? core.mailSubjectShape(one.value) : "";
+            <ol className="space-y-2">
+                {mine.map((rule, index) => {
+                    const stops = core.mailFilterStops(rule.definition);
+                    const sentence = words.describeFilter(rule.definition, lookup, t);
                     return (
-                        <li key={one.key} className="flex flex-wrap items-end gap-2">
-                            <span className="w-8 pb-2 text-[13px] text-muted-foreground">
-                                {index === 0
-                                    ? t("rules.if")
-                                    : match === "all"
-                                      ? t("rules.andShort")
-                                      : t("rules.orShort")}
-                            </span>
-                            <Select
-                                value={one.field}
-                                onValueChange={(next) => update(one.key, { field: next })}
-                                options={fieldOptions(t)}
-                                aria-label={t("rules.fieldLabel")}
-                                className="w-44"
-                            />
-                            <Select
-                                value={one.operator}
-                                onValueChange={(next) => update(one.key, { operator: next })}
-                                options={operatorOptions(t, one.field)}
-                                aria-label={t("rules.operatorLabel")}
-                                className="w-44"
-                            />
-                            <div className="w-52 min-w-0">
-                                <Input
-                                    value={one.value}
-                                    onChange={(event) =>
-                                        update(one.key, { value: event.target.value })
-                                    }
-                                    aria-label={t("rules.valueLabel")}
-                                    aria-invalid={problemHere ? true : undefined}
-                                    placeholder={
-                                        one.operator === "similar"
-                                            ? t("rules.similarPlaceholder")
-                                            : undefined
-                                    }
-                                />
+                        <li
+                            key={rule.id}
+                            className="rounded-md border border-border bg-card px-3 py-2"
+                        >
+                            <div className="flex min-w-0 items-start gap-2">
+                                <span className="mt-0.5 w-5 shrink-0 text-right text-[11px] tabular-nums text-foreground-subtle">
+                                    {index + 1}
+                                </span>
+                                <div className="min-w-0 flex-1">
+                                    <button
+                                        type="button"
+                                        className="flex max-w-full items-center gap-1.5 text-left text-[13px] font-medium hover:underline disabled:no-underline"
+                                        disabled={rule.saving}
+                                        title={t("rules.list.editNamed", { name: rule.name })}
+                                        onClick={() => open(rule)}
+                                    >
+                                        <span className="min-w-0 truncate">{rule.name}</span>
+                                        {rule.saving ? <Saving /> : null}
+                                    </button>
+                                    <p className="break-words text-[12px] text-muted-foreground [overflow-wrap:anywhere]">
+                                        {sentence}
+                                    </p>
+                                    <p className="text-[11px] text-foreground-subtle">
+                                        {rule.enabled ? t("rules.on") : t("rules.off")}
+                                        {stops ? t("rules.stops") : ""}
+                                        {rule.matchCount > 0
+                                            ? t("rules.matched", { count: rule.matchCount })
+                                            : ""}
+                                    </p>
+                                </div>
+                                <div className="flex shrink-0 items-center gap-0.5">
+                                    <Switch
+                                        checked={rule.enabled}
+                                        disabled={rule.saving}
+                                        aria-label={t("rules.list.enabledNamed", {
+                                            name: rule.name
+                                        })}
+                                        onChange={(enabled) => toggle(rule, enabled)}
+                                    />
+                                    <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="hidden sm:inline-flex"
+                                        disabled={index === 0 || rule.saving}
+                                        aria-label={t("rules.list.upNamed", { name: rule.name })}
+                                        title={t("rules.list.upNamed", { name: rule.name })}
+                                        onClick={() => move(index, -1)}
+                                    >
+                                        <ArrowUp className="size-4 shrink-0" aria-hidden />
+                                    </Button>
+                                    <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="hidden sm:inline-flex"
+                                        disabled={index === mine.length - 1 || rule.saving}
+                                        aria-label={t("rules.list.downNamed", { name: rule.name })}
+                                        title={t("rules.list.downNamed", { name: rule.name })}
+                                        onClick={() => move(index, 1)}
+                                    >
+                                        <ArrowDown className="size-4 shrink-0" aria-hidden />
+                                    </Button>
+                                    <DropdownMenu>
+                                        <DropdownMenuTrigger asChild>
+                                            <Button
+                                                variant="ghost"
+                                                size="icon"
+                                                disabled={rule.saving}
+                                                aria-label={t("rules.list.moreNamed", {
+                                                    name: rule.name
+                                                })}
+                                                title={t("rules.list.moreNamed", {
+                                                    name: rule.name
+                                                })}
+                                            >
+                                                <MoreHorizontal
+                                                    className="size-4 shrink-0"
+                                                    aria-hidden
+                                                />
+                                            </Button>
+                                        </DropdownMenuTrigger>
+                                        <DropdownMenuContent align="end">
+                                            <DropdownMenuItem onSelect={() => open(rule)}>
+                                                <Pencil className="size-4 shrink-0" aria-hidden />
+                                                {t("rules.list.edit")}
+                                            </DropdownMenuItem>
+                                            {/* On a narrow screen the arrows live here. */}
+                                            {index > 0 ? (
+                                                <DropdownMenuItem
+                                                    className="sm:hidden"
+                                                    onSelect={() => move(index, -1)}
+                                                >
+                                                    <ArrowUp
+                                                        className="size-4 shrink-0"
+                                                        aria-hidden
+                                                    />
+                                                    {t("rules.list.up")}
+                                                </DropdownMenuItem>
+                                            ) : null}
+                                            {index < mine.length - 1 ? (
+                                                <DropdownMenuItem
+                                                    className="sm:hidden"
+                                                    onSelect={() => move(index, 1)}
+                                                >
+                                                    <ArrowDown
+                                                        className="size-4 shrink-0"
+                                                        aria-hidden
+                                                    />
+                                                    {t("rules.list.down")}
+                                                </DropdownMenuItem>
+                                            ) : null}
+                                            <DropdownMenuItem onSelect={() => run(rule)}>
+                                                <Play className="size-4 shrink-0" aria-hidden />
+                                                {t("rules.list.run")}
+                                            </DropdownMenuItem>
+                                            <DropdownMenuItem
+                                                disabled={
+                                                    mine.length >= core.MAIL_FILTER_LIMITS.filters
+                                                }
+                                                onSelect={() => duplicate(rule, index)}
+                                            >
+                                                <Copy className="size-4 shrink-0" aria-hidden />
+                                                {t("rules.list.duplicate")}
+                                            </DropdownMenuItem>
+                                            <DropdownMenuItem onSelect={() => void remove(rule)}>
+                                                <Trash2 className="size-4 shrink-0" aria-hidden />
+                                                {t("rules.list.delete")}
+                                            </DropdownMenuItem>
+                                        </DropdownMenuContent>
+                                    </DropdownMenu>
+                                </div>
                             </div>
-                            {conditions.length > 1 ? (
-                                <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    aria-label={t("rules.removeCondition")}
-                                    title={t("rules.removeCondition")}
-                                    onClick={() =>
-                                        setConditions((current) =>
-                                            current.filter((other) => other.key !== one.key)
-                                        )
-                                    }
-                                >
-                                    <X className="size-4 shrink-0" aria-hidden />
-                                </Button>
-                            ) : null}
-                            {/* What "similar" will actually compare, so the rule
-                                can be judged before it is saved. */}
-                            {one.operator === "similar" && one.value.trim() ? (
-                                <p className="w-full break-words pl-10 text-[12px] text-foreground-subtle [overflow-wrap:anywhere]">
-                                    {shape
-                                        ? t("rules.similarShape", { shape })
-                                        : t("rules.similarNothing")}
-                                </p>
-                            ) : problemHere ? (
-                                <p role="alert" className="w-full pl-10 text-[12px] text-danger">
-                                    {problemHere}
-                                </p>
-                            ) : null}
                         </li>
                     );
                 })}
-            </ul>
-            {conditions.length < 20 ? (
-                <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() =>
-                        setConditions((current) => [...current, draft("subject", "contains", "")])
-                    }
-                >
-                    <Plus className="size-4 shrink-0" aria-hidden />
-                    {t("rules.addCondition")}
-                </Button>
-            ) : null}
-
-            <div className="flex flex-wrap items-end gap-2">
-                <span className="pb-2 text-[13px] text-muted-foreground">{t("rules.then")}</span>
-                <Select
-                    value={actionKind}
-                    onValueChange={setActionKind}
-                    options={actionOptions}
-                    aria-label={t("rules.actionLabel")}
-                    className="w-56"
-                />
-                {actionKind === "move" ? (
-                    <Select
-                        value={folderId}
-                        onValueChange={setFolderId}
-                        options={folders.map((folder) => ({
-                            value: folder.id,
-                            label: folder.name
-                        }))}
-                        aria-label={t("rules.folderLabel")}
-                        className="w-48"
-                    />
-                ) : null}
-                {actionKind === "label" ? (
-                    <Select
-                        value={labelId}
-                        onValueChange={setLabelId}
-                        options={labels.map((label) => ({ value: label.id, label: label.name }))}
-                        aria-label={t("rules.labelLabel")}
-                        className="w-48"
-                    />
-                ) : null}
-                {forwarding ? (
-                    <div className="w-56">
-                        <Input
-                            value={forwardTo}
-                            inputMode="email"
-                            placeholder="them@example.com"
-                            aria-label={t("rules.forwardLabel")}
-                            aria-invalid={forwardAddress === "invalid" ? true : undefined}
-                            aria-describedby="forward-address"
-                            onChange={(event) => setForwardTo(event.target.value)}
-                        />
-                        <span
-                            id="forward-address"
-                            className="mt-1 block text-[12px] text-danger"
-                            role={forwardAddress === "invalid" ? "alert" : undefined}
-                        >
-                            {forwardAddress === "invalid" ? tm("errors.notEmail") : ""}
-                        </span>
-                    </div>
-                ) : null}
-            </div>
-
-            {actionKind === "forward" ? (
-                <p className="text-[12px] text-foreground-subtle">{t("rules.forwardHint")}</p>
-            ) : null}
-
-            <label className="flex items-center gap-2 text-[13px]">
-                <Switch checked={stop} onChange={setStop} aria-label={t("rules.stopLabel")} />
-                {t("rules.stop")}
-            </label>
-            <label className="flex items-center gap-2 text-[13px]">
-                <Switch
-                    checked={applyToExisting}
-                    onChange={setApplyToExisting}
-                    aria-label={t("rules.existingLabel")}
-                />
-                {t("rules.existing")}
-            </label>
-
-            {problem ? <p className="text-[13px] text-danger">{problem}</p> : null}
-
-            <div className="flex gap-2">
-                <Button
-                    disabled={
-                        saving ||
-                        !name.trim() ||
-                        !conditionsReady ||
-                        (forwarding && forwardAddress !== "ok")
-                    }
-                    onClick={() =>
-                        startSaving(async () => {
-                            setProblem("");
-                            const answer = await saveRuleAction(accountId, null, {
-                                name,
-                                enabled: true,
-                                match,
-                                conditions: conditions.map(({ field, operator, value }) => ({
-                                    field,
-                                    operator,
-                                    value
-                                })),
-                                actions: [action()],
-                                stop,
-                                applyToExisting
-                            });
-                            const said = refusalOf(answer);
-                            if (said) {
-                                setProblem(said);
-                                return;
-                            }
-                            toast.show({ title: t("rules.saved") });
-                            onDone();
-                        })
-                    }
-                >
-                    {t("rules.save")}
-                </Button>
-                <Button variant="ghost" onClick={onCancel}>
-                    {tc("actions.cancel")}
-                </Button>
-            </div>
+            </ol>
         </div>
     );
 }

@@ -40,13 +40,17 @@ export interface BlockedSender {
     readonly caught: number;
 }
 
-/** Whether a rule is a block, read off its shape. */
+/** Whether a rule is a block, read off its shape: one condition, on the sender
+ *  matching exactly, and one action that takes the message out of the inbox -
+ *  with or without "stop" after it. */
 export function blockedBy(rule: MailRuleView): BlockedSender | null {
-    if (rule.conditions.length !== 1 || rule.actions.length !== 1) return null;
-    const [condition] = rule.conditions;
-    const [action] = rule.actions;
-    if (!condition || !action) return null;
-    if (condition.field !== "from" || condition.operator !== "is") return null;
+    const { groups } = rule.definition.conditions;
+    const actions = core.mailFilterActions(rule.definition);
+    if (groups.length !== 1 || groups[0]!.items.length !== 1 || actions.length !== 1) return null;
+    const condition = groups[0]!.items[0]!;
+    const [action] = actions;
+    if (!action) return null;
+    if (condition.kind !== "from" || condition.operator !== "is") return null;
     if (action.kind !== "trash" && action.kind !== "junk") return null;
     return {
         address: condition.value,
@@ -88,11 +92,13 @@ export async function blockSender(
     await saveRule(userId, accountId, null, {
         name: `Block ${wanted}`,
         enabled: true,
-        match: "all",
-        conditions: [{ field: "from", operator: "is", value: wanted }],
-        actions: [{ kind: as }],
-        // Nothing after this needs to run: the message is leaving the inbox.
-        stop: true,
+        definition: core.mailFilterFromLegacy({
+            match: "all",
+            conditions: [{ field: "from", operator: "is", value: wanted }],
+            actions: [{ kind: as }],
+            // Nothing after this needs to run: the message is leaving the inbox.
+            stop: true
+        }),
         applyToExisting: true
     });
 }

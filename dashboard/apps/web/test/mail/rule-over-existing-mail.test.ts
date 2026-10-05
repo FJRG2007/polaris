@@ -26,6 +26,8 @@ vi.mock("@polaris/db", () => ({
 }));
 vi.mock("@/lib/mailbox/messages", () => ({ actOnMessages, moveMessages: vi.fn() }));
 vi.mock("@/lib/mailbox/access", () => ({ ownedAccount: vi.fn(async () => ({ id: "acc-1" })) }));
+vi.mock("@/lib/audit-service", () => ({ recordAudit: vi.fn(async () => undefined) }));
+vi.mock("@polaris/auth", () => ({ listUserEmails: vi.fn(async () => []) }));
 
 const { applyRuleToInbox, listRulesFor } = await import("@/lib/mailbox/rules");
 

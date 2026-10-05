@@ -16,13 +16,9 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { ArrowLeft, Filter, Loader2, Play, Plus, Zap } from "lucide-react";
+import { ArrowLeft, Filter, Loader2, Play, Zap } from "lucide-react";
 import {
     Button,
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuItem,
-    DropdownMenuTrigger,
     Input,
     SegmentedControl,
     Select,
@@ -31,6 +27,7 @@ import {
     Textarea,
     cn
 } from "@polaris/ui";
+import * as flow from "@polaris/ui/automation";
 import { RunLog } from "./run-log";
 import * as actions from "./actions";
 import { usePlacesT } from "../use-places-t";
@@ -40,8 +37,9 @@ import * as words from "../../lib/automation-words";
 import type { DeviceView } from "../../lib/device-kinds";
 import { dropAutomationsCache } from "./cache";
 import * as fields from "./flow-fields";
-import { within } from "../../lib/automation-graph";
-import { AutomationCanvas, type CanvasSelection, type NodeState } from "./automation-canvas";
+import { AutomationCanvas } from "./automation-canvas";
+import { swap, within } from "@polaris/ui/automation-graph";
+import type { CanvasSelection, NodeState } from "@polaris/ui/automation-canvas";
 
 const { runAction } = hostUi.runAction;
 const { useDisplayFormat } = hostUi.displayFormat;
@@ -51,28 +49,8 @@ export type Draft = auto.AutomationInput;
 
 type Tab = "flow" | "runs";
 
-/** The flow as a column of cards, or as a diagram. */
-type Layout = "form" | "visual";
-
-/** Where the reader's choice of layout is kept, in this browser only: a
- *  preference about how to look at the screen, not about the automation. */
+/** Where the reader's choice of layout is kept, in this browser only. */
 const LAYOUT_KEY = "polaris.places.automationLayout";
-
-function storedLayout(): Layout {
-    try {
-        return window.localStorage.getItem(LAYOUT_KEY) === "visual" ? "visual" : "form";
-    } catch {
-        return "form";
-    }
-}
-
-function storeLayout(layout: Layout): void {
-    try {
-        window.localStorage.setItem(LAYOUT_KEY, layout);
-    } catch {
-        // No storage here: the choice lasts as long as the page does.
-    }
-}
 
 /** Messages that mean "not filled in yet" rather than "wrong", which wait for a
  *  press of Save before they are said. */
@@ -91,14 +69,6 @@ const UNFINISHED = new Set([
 
 function pathKey(path: readonly (string | number)[]): string {
     return path.join(".");
-}
-
-function move<T>(list: readonly T[], index: number, by: number): T[] {
-    const next = [...list];
-    const target = index + by;
-    if (target < 0 || target >= next.length) return next;
-    [next[index], next[target]] = [next[target]!, next[index]!];
-    return next;
 }
 
 /** A new automation as a template starts it. */
@@ -187,17 +157,8 @@ export function AutomationEditor({
     const [running, setRunning] = useState(false);
     const [tab, setTab] = useState<Tab>(automationId ? initialTab : "flow");
     const [refreshKey, setRefreshKey] = useState(0);
-    const [layout, setLayout] = useState<Layout>("form");
+    const [layout, chooseLayout] = flow.useFlowLayout(LAYOUT_KEY);
     const readOnly = !canManage;
-
-    // Read after the first paint: the server has no storage to ask, and the two
-    // must draw the same thing first.
-    useEffect(() => setLayout(storedLayout()), []);
-
-    const chooseLayout = (next: Layout) => {
-        setLayout(next);
-        storeLayout(next);
-    };
 
     useEffect(() => {
         let cancelled = false;
@@ -274,7 +235,7 @@ export function AutomationEditor({
         });
     }, [normalized, devices, loaded, automationId]);
 
-    const issueLookup = useMemo<fields.IssueLookup>(() => {
+    const issueLookup = useMemo<flow.IssueLookup>(() => {
         const found = new Map<string, string>();
         for (const issue of issues) {
             const key = pathKey(issue.path);
@@ -381,7 +342,7 @@ export function AutomationEditor({
             </Button>
             <span className="flex-1" />
             {loaded && tab === "flow" && (
-                <SegmentedControl<Layout>
+                <SegmentedControl<flow.FlowLayout>
                     size="sm"
                     value={layout}
                     onValueChange={chooseLayout}
@@ -465,7 +426,7 @@ export function AutomationEditor({
                     ? () =>
                           editDefinition((current) => ({
                               ...current,
-                              triggers: move(current.triggers, index, -1)
+                              triggers: swap(current.triggers, index, -1)
                           }))
                     : undefined
             }
@@ -474,7 +435,7 @@ export function AutomationEditor({
                     ? () =>
                           editDefinition((current) => ({
                               ...current,
-                              triggers: move(current.triggers, index, 1)
+                              triggers: swap(current.triggers, index, 1)
                           }))
                     : undefined
             }
@@ -543,7 +504,7 @@ export function AutomationEditor({
                     ? () =>
                           editDefinition((current) => ({
                               ...current,
-                              actions: move(current.actions, index, -1)
+                              actions: swap(current.actions, index, -1)
                           }))
                     : undefined
             }
@@ -552,7 +513,7 @@ export function AutomationEditor({
                     ? () =>
                           editDefinition((current) => ({
                               ...current,
-                              actions: move(current.actions, index, 1)
+                              actions: swap(current.actions, index, 1)
                           }))
                     : undefined
             }
@@ -560,7 +521,7 @@ export function AutomationEditor({
     );
 
     const groupsMatch = definition.conditions.groups.length > 1 && (
-        <MatchPicker
+        <flow.MatchPicker
             value={definition.conditions.match}
             disabled={readOnly}
             label={t("automations.editor.groupsMatch")}
@@ -620,12 +581,12 @@ export function AutomationEditor({
     );
 
     return (
-        <fields.IssueProvider value={issueLookup}>
+        <flow.IssueProvider value={issueLookup}>
             <div className="flex flex-col gap-4">
                 {header}
 
                 <div className="flex flex-wrap items-end gap-3">
-                    <fields.Field
+                    <flow.Field
                         label={t("automations.editor.name")}
                         path={["name"]}
                         required
@@ -644,7 +605,7 @@ export function AutomationEditor({
                                 }
                             />
                         )}
-                    </fields.Field>
+                    </flow.Field>
                     <label className="flex h-8 items-center gap-2 text-xs text-muted-foreground">
                         <Switch
                             checked={draft.enabled}
@@ -728,7 +689,7 @@ export function AutomationEditor({
                     </div>
                 ) : (
                     <ol className="flex flex-col">
-                        <Stage
+                        <flow.Stage
                             icon={<Zap className="size-4" />}
                             title={t("automations.editor.when")}
                             hint={t("automations.editor.whenHint")}
@@ -736,7 +697,7 @@ export function AutomationEditor({
                         >
                             {definition.triggers.map(triggerCard)}
                             {!readOnly && definition.triggers.length < auto.LIMITS.triggers && (
-                                <AddMenu
+                                <flow.AddMenu
                                     label={t("automations.editor.addTrigger")}
                                     options={auto.TRIGGER_KINDS.map((kind) => ({
                                         value: kind,
@@ -753,9 +714,9 @@ export function AutomationEditor({
                                     }
                                 />
                             )}
-                        </Stage>
+                        </flow.Stage>
 
-                        <Stage
+                        <flow.Stage
                             icon={<Filter className="size-4" />}
                             title={t("automations.editor.if")}
                             hint={
@@ -768,7 +729,7 @@ export function AutomationEditor({
                             {definition.conditions.groups.map(groupCard)}
                             {!readOnly &&
                                 definition.conditions.groups.length < auto.LIMITS.groups && (
-                                    <AddMenu
+                                    <flow.AddMenu
                                         label={t("automations.editor.addCondition")}
                                         options={auto.CONDITION_KINDS.map((kind) => ({
                                             value: kind,
@@ -796,9 +757,9 @@ export function AutomationEditor({
                                         }
                                     />
                                 )}
-                        </Stage>
+                        </flow.Stage>
 
-                        <Stage
+                        <flow.Stage
                             icon={<Play className="size-4" />}
                             title={t("automations.editor.then")}
                             hint={t("automations.editor.thenHint")}
@@ -807,7 +768,7 @@ export function AutomationEditor({
                         >
                             {definition.actions.map(stepCard)}
                             {!readOnly && definition.actions.length < auto.LIMITS.steps && (
-                                <AddMenu
+                                <flow.AddMenu
                                     label={t("automations.editor.addStep")}
                                     options={auto.STEP_KINDS.map((kind) => ({
                                         value: kind,
@@ -824,137 +785,12 @@ export function AutomationEditor({
                                     }
                                 />
                             )}
-                        </Stage>
+                        </flow.Stage>
                         <li className="pt-2 text-[0.6875rem] text-foreground-subtle">{footnote}</li>
                     </ol>
                 )}
             </div>
-        </fields.IssueProvider>
-    );
-}
-
-/** One of WHEN, IF and THEN: a heading on the line, its cards, and the line
- *  carried down to the next. */
-function Stage({
-    icon,
-    title,
-    hint,
-    issue,
-    last,
-    children
-}: {
-    icon: ReactNode;
-    title: string;
-    hint: string;
-    issue?: string;
-    last?: boolean;
-    children: ReactNode;
-}) {
-    return (
-        <li className="relative flex gap-3 pb-5">
-            {!last && (
-                <span
-                    aria-hidden="true"
-                    className="absolute bottom-0 left-[0.9375rem] top-8 w-px bg-border"
-                />
-            )}
-            <span className="relative z-10 flex size-8 shrink-0 items-center justify-center rounded-full border border-border bg-card text-muted-foreground">
-                {icon}
-            </span>
-            <section className="flex min-w-0 flex-1 flex-col gap-2 pt-1">
-                <header className="flex flex-wrap items-baseline gap-x-2">
-                    <h2 className="text-xs font-semibold uppercase tracking-wide">{title}</h2>
-                    <p className="text-xs text-muted-foreground">{hint}</p>
-                </header>
-                {children}
-                {issue && <p className="text-xs text-danger">{issue}</p>}
-            </section>
-        </li>
-    );
-}
-
-function AddMenu({
-    label,
-    options,
-    onPick
-}: {
-    label: string;
-    options: readonly { value: string; label: string }[];
-    onPick: (value: string) => void;
-}) {
-    return (
-        <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-                <Button size="sm" variant="outline" className="self-start border-dashed">
-                    <Plus className="size-4 shrink-0" />
-                    {label}
-                </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="start">
-                {options.map((option) => (
-                    <DropdownMenuItem key={option.value} onSelect={() => onPick(option.value)}>
-                        {option.label}
-                    </DropdownMenuItem>
-                ))}
-            </DropdownMenuContent>
-        </DropdownMenu>
-    );
-}
-
-function MatchPicker({
-    value,
-    onChange,
-    label,
-    allLabel,
-    anyLabel,
-    disabled
-}: {
-    value: "all" | "any";
-    onChange: (value: "all" | "any") => void;
-    label: string;
-    allLabel: string;
-    anyLabel: string;
-    disabled?: boolean;
-}) {
-    return (
-        <Select
-            value={value}
-            disabled={disabled}
-            aria-label={label}
-            className="w-auto self-start"
-            options={[
-                { value: "all", label: allLabel },
-                { value: "any", label: anyLabel }
-            ]}
-            onValueChange={(next) => onChange(next as "all" | "any")}
-        />
-    );
-}
-
-function KindPicker<K extends string>({
-    value,
-    kinds: offered,
-    label,
-    text,
-    disabled,
-    onChange
-}: {
-    value: K;
-    kinds: readonly K[];
-    label: string;
-    text: (kind: K) => string;
-    disabled?: boolean;
-    onChange: (kind: K) => void;
-}) {
-    return (
-        <Select
-            value={value}
-            disabled={disabled}
-            aria-label={label}
-            className="h-7 w-auto max-w-full border-transparent bg-transparent px-1 font-medium hover:border-border"
-            options={offered.map((kind) => ({ value: kind, label: text(kind) }))}
-            onValueChange={(next) => onChange(next as K)}
-        />
+        </flow.IssueProvider>
     );
 }
 
@@ -993,9 +829,9 @@ function TriggerCard({
         else onChange({ ...trigger, deviceId: next.id });
     };
     return (
-        <fields.NodeCard
+        <flow.NodeCard
             kind={
-                <KindPicker
+                <flow.KindPicker
                     value={trigger.kind}
                     kinds={auto.TRIGGER_KINDS}
                     label={t("automations.editor.triggerKind")}
@@ -1153,7 +989,7 @@ function TriggerCard({
                         disabled={disabled}
                         onChange={(measure) => onChange({ ...trigger, measure })}
                     />
-                    <fields.Field
+                    <flow.Field
                         label={t("automations.fields.direction")}
                         path={[...path, "direction"]}
                     >
@@ -1193,7 +1029,7 @@ function TriggerCard({
                                 }
                             />
                         )}
-                    </fields.Field>
+                    </flow.Field>
                     <fields.FigureField
                         measure={trigger.measure}
                         label={t("automations.fields.value")}
@@ -1205,7 +1041,7 @@ function TriggerCard({
                     />
                 </>
             )}
-        </fields.NodeCard>
+        </flow.NodeCard>
     );
 }
 
@@ -1240,7 +1076,7 @@ function ConditionGroupCard({
         <div className="flex flex-col gap-2 rounded-lg border border-dashed border-border p-2">
             <div className="flex items-center gap-2">
                 {group.items.length > 1 ? (
-                    <MatchPicker
+                    <flow.MatchPicker
                         value={group.match}
                         disabled={disabled}
                         label={t("automations.editor.groupMatch")}
@@ -1280,12 +1116,12 @@ function ConditionGroupCard({
                     }
                     onUp={
                         index > 0
-                            ? () => onChange({ ...group, items: move(group.items, index, -1) })
+                            ? () => onChange({ ...group, items: swap(group.items, index, -1) })
                             : undefined
                     }
                     onDown={
                         index < group.items.length - 1
-                            ? () => onChange({ ...group, items: move(group.items, index, 1) })
+                            ? () => onChange({ ...group, items: swap(group.items, index, 1) })
                             : undefined
                     }
                 />
@@ -1294,7 +1130,7 @@ function ConditionGroupCard({
                 <p className="text-xs text-danger">{t("automations.errors.emptyGroup")}</p>
             )}
             {!disabled && group.items.length < auto.LIMITS.conditionsPerGroup && (
-                <AddMenu
+                <flow.AddMenu
                     label={t("automations.editor.addToGroup")}
                     options={auto.CONDITION_KINDS.map((kind) => ({
                         value: kind,
@@ -1338,9 +1174,9 @@ function ConditionCard({
     const t = usePlacesT();
     const device = "deviceId" in condition ? byId.get(condition.deviceId) : undefined;
     return (
-        <fields.NodeCard
+        <flow.NodeCard
             kind={
-                <KindPicker
+                <flow.KindPicker
                     value={condition.kind}
                     kinds={auto.CONDITION_KINDS}
                     label={t("automations.editor.conditionKind")}
@@ -1386,7 +1222,7 @@ function ConditionCard({
                             onChange={(attribute) => onChange({ ...condition, attribute, is: "" })}
                         />
                     )}
-                    <fields.Field label={t("automations.fields.test")} path={[...path, "negate"]}>
+                    <flow.Field label={t("automations.fields.test")} path={[...path, "negate"]}>
                         {(id) => (
                             <Select
                                 id={id}
@@ -1401,7 +1237,7 @@ function ConditionCard({
                                 }
                             />
                         )}
-                    </fields.Field>
+                    </flow.Field>
                     <fields.ValuePicker
                         device={device}
                         attribute={condition.attribute}
@@ -1440,7 +1276,7 @@ function ConditionCard({
                         disabled={disabled}
                         onChange={(measure) => onChange({ ...condition, measure })}
                     />
-                    <fields.Field label={t("automations.fields.compare")} path={[...path, "op"]}>
+                    <flow.Field label={t("automations.fields.compare")} path={[...path, "op"]}>
                         {(id) => (
                             <Select
                                 id={id}
@@ -1455,7 +1291,7 @@ function ConditionCard({
                                 }
                             />
                         )}
-                    </fields.Field>
+                    </flow.Field>
                     <fields.FigureField
                         measure={condition.measure}
                         label={t("automations.fields.value")}
@@ -1495,7 +1331,7 @@ function ConditionCard({
                     onChange={(days) => onChange({ ...condition, days })}
                 />
             )}
-        </fields.NodeCard>
+        </flow.NodeCard>
     );
 }
 
@@ -1531,10 +1367,10 @@ function StepCard({
     const t = usePlacesT();
     const device = "deviceId" in step ? byId.get(step.deviceId) : undefined;
     return (
-        <fields.NodeCard
+        <flow.NodeCard
             number={number}
             kind={
-                <KindPicker
+                <flow.KindPicker
                     value={step.kind}
                     kinds={auto.STEP_KINDS}
                     label={t("automations.editor.stepKind")}
@@ -1580,7 +1416,7 @@ function StepCard({
                             });
                         }}
                     />
-                    <fields.Field label={t("automations.fields.do")} path={[...path, "do"]}>
+                    <flow.Field label={t("automations.fields.do")} path={[...path, "do"]}>
                         {(id, invalid) => (
                             <Select
                                 id={id}
@@ -1607,7 +1443,7 @@ function StepCard({
                                 }}
                             />
                         )}
-                    </fields.Field>
+                    </flow.Field>
                     {step.setting && (
                         <fields.SettingFields
                             device={device}
@@ -1677,7 +1513,7 @@ function StepCard({
                         disabled={disabled}
                         onChange={(timeoutMinutes) => onChange({ ...step, timeoutMinutes })}
                     />
-                    <fields.Field
+                    <flow.Field
                         label={t("automations.fields.onTimeout")}
                         path={[...path, "onTimeout"]}
                         className="sm:col-span-2"
@@ -1699,11 +1535,11 @@ function StepCard({
                                 }
                             />
                         )}
-                    </fields.Field>
+                    </flow.Field>
                 </>
             )}
             {step.kind === "notify" && (
-                <fields.Field
+                <flow.Field
                     label={t("automations.fields.message")}
                     path={[...path, "message"]}
                     required
@@ -1721,10 +1557,10 @@ function StepCard({
                             onChange={(event) => onChange({ ...step, message: event.target.value })}
                         />
                     )}
-                </fields.Field>
+                </flow.Field>
             )}
             {step.kind === "run" && (
-                <fields.Field
+                <flow.Field
                     label={t("automations.fields.automation")}
                     path={[...path, "automationId"]}
                     required
@@ -1752,8 +1588,8 @@ function StepCard({
                             />
                         )
                     }
-                </fields.Field>
+                </flow.Field>
             )}
-        </fields.NodeCard>
+        </flow.NodeCard>
     );
 }

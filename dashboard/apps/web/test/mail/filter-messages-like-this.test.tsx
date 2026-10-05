@@ -3,10 +3,11 @@
 /**
  * "Filter messages like this", from an open message to a saved filter.
  *
- * The reading pane's menu leads to the filters screen with the filter already
- * written from the message: its sender, and a subject of the same shape. The
- * form shows what that shape is before it is saved, takes more than one
- * condition, and saves exactly what it shows.
+ * The reading pane's menu leads to the filters screen with the filter editor
+ * already open, written from the message: its sender, and a subject of the same
+ * shape. The editor shows what that shape is before it is saved, holds both
+ * conditions in one group that needs all of them, and saves exactly what it
+ * shows.
  */
 
 import { MessagesWrapper } from "../setup/i18n";
@@ -24,7 +25,11 @@ vi.mock("@/lib/auth", () => ({}));
 const saveRuleAction = vi.fn(async (..._args: unknown[]) => ({ id: "r1" }));
 vi.mock("@/app/(app)/mail/actions", () => ({
     saveRuleAction: (...args: unknown[]) => saveRuleAction(...args),
-    deleteRuleAction: async () => ({})
+    deleteRuleAction: async () => ({}),
+    duplicateRuleAction: async () => ({}),
+    reorderRulesAction: async () => ({}),
+    runRuleOverInboxAction: async () => ({}),
+    setRuleEnabledAction: async () => ({})
 }));
 
 const { RulesView } = await import("@/app/(app)/mail/settings/rules/rules-view");
@@ -55,6 +60,7 @@ function screenFor(params: URLSearchParams) {
                 folders={[]}
                 labels={[]}
                 rules={{ "acc-1": [], "acc-2": [] }}
+                forwardTargets={[]}
             />
         </MessagesWrapper>
     );
@@ -83,7 +89,7 @@ describe("filter messages like this", () => {
                 similar: SUBJECT
             })
         );
-        expect(screen.getByText("Filters on me@example.com")).toBeTruthy();
+        expect(screen.getByText("In me@example.com")).toBeTruthy();
         const values = screen.getAllByRole("textbox", {
             name: "What to look for"
         }) as HTMLInputElement[];
@@ -108,12 +114,29 @@ describe("filter messages like this", () => {
             "acc-2",
             null,
             expect.objectContaining({
-                match: "all",
-                conditions: [
-                    { field: "from", operator: "is", value: "notifications@github.example" },
-                    { field: "subject", operator: "similar", value: SUBJECT }
-                ],
-                actions: [{ kind: "archive" }]
+                definition: expect.objectContaining({
+                    triggers: [expect.objectContaining({ kind: "arrival" })],
+                    conditions: {
+                        match: "all",
+                        groups: [
+                            expect.objectContaining({
+                                match: "all",
+                                items: [
+                                    expect.objectContaining({
+                                        kind: "from",
+                                        operator: "is",
+                                        value: "notifications@github.example"
+                                    }),
+                                    expect.objectContaining({
+                                        kind: "subject",
+                                        operator: "similar",
+                                        value: SUBJECT
+                                    })
+                                ]
+                            })
+                        ]
+                    }
+                })
             })
         );
     });
@@ -122,8 +145,8 @@ describe("filter messages like this", () => {
         screenFor(new URLSearchParams({ account: "acc-2", similar: "#42" }));
         expect(screen.getByText(/would match nothing/)).toBeTruthy();
         expect(
-            (screen.getByRole("button", { name: "Save the filter" }) as HTMLButtonElement).disabled
-        ).toBe(true);
+            screen.getByRole("button", { name: "Save the filter" }).getAttribute("aria-disabled")
+        ).toBe("true");
     });
 
     it("opens on a plain screen when nothing asked for a filter", () => {

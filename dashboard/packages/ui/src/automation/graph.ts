@@ -2,6 +2,11 @@
  * An automation drawn as a graph: its triggers on the left, feeding one gate
  * that holds its condition groups, feeding its steps in order.
  *
+ * Shared by every automation editor in Polaris - Places' device automations and
+ * Mail's filters store different nodes, but both store the same shape: triggers,
+ * condition groups under one all/any, and an ordered list of steps. Everything
+ * here is about that shape and nothing about what a node does.
+ *
  * The graph is a view of the stored definition, never a second format. Every
  * node carries the very object it was drawn from, the layout is worked out from
  * the definition's order alone, and reading the graph back keeps everything it
@@ -9,12 +14,13 @@
  * the same JSON it was. Positions are not stored: where a node ends up after a
  * drag only decides its place in its list.
  *
- * Pure and client-safe, like `automation-kinds`.
+ * Issue paths are relative to the draft being edited, which holds the
+ * definition under `definition` - the shape both editors give their drafts.
+ *
+ * Pure and client-safe.
  */
 
-import type * as auto from "./automation-kinds";
-
-/** The gate's id. Not a node id the schema accepts, so it cannot collide with
+/** The gate's id. Not a node id any schema accepts, so it cannot collide with
  *  one. */
 export const GATE_ID = "$gate";
 
@@ -29,18 +35,45 @@ export const GROUP_PADDING = 12;
 
 export type Path = readonly (string | number)[];
 
+export type FlowMatch = "all" | "any";
+
+/** One trigger, condition or step: whatever else it holds, it has an id unique
+ *  within its automation and a kind. */
+export interface FlowItem {
+    readonly id: string;
+    readonly kind: string;
+}
+
+export interface FlowGroup<C extends FlowItem = FlowItem> {
+    readonly id: string;
+    readonly match: FlowMatch;
+    readonly items: readonly C[];
+}
+
+/** The shape every automation definition shares. */
+export interface FlowDefinition {
+    readonly triggers: readonly FlowItem[];
+    readonly conditions: { readonly match: FlowMatch; readonly groups: readonly FlowGroup[] };
+    readonly actions: readonly FlowItem[];
+}
+
+export type TriggerOf<D extends FlowDefinition> = D["triggers"][number];
+export type GroupOf<D extends FlowDefinition> = D["conditions"]["groups"][number];
+export type ConditionOf<D extends FlowDefinition> = GroupOf<D>["items"][number];
+export type StepOf<D extends FlowDefinition> = D["actions"][number];
+
 export interface Position {
     readonly x: number;
     readonly y: number;
 }
 
-export type GraphNode =
+export type GraphNode<D extends FlowDefinition = FlowDefinition> =
     | {
           readonly id: string;
           readonly type: "trigger";
           readonly position: Position;
           readonly data: {
-              readonly trigger: auto.Trigger;
+              readonly trigger: TriggerOf<D>;
               readonly index: number;
               readonly path: Path;
           };
@@ -50,7 +83,7 @@ export type GraphNode =
           readonly type: "gate";
           readonly position: Position;
           readonly data: {
-              readonly match: auto.AutomationDefinition["conditions"]["match"];
+              readonly match: FlowMatch;
               readonly groups: number;
           };
       }
@@ -61,7 +94,7 @@ export type GraphNode =
           readonly width: number;
           readonly height: number;
           readonly data: {
-              readonly group: auto.ConditionGroup;
+              readonly group: GroupOf<D>;
               readonly index: number;
               readonly path: Path;
           };
@@ -72,7 +105,7 @@ export type GraphNode =
           readonly parentId: string;
           readonly position: Position;
           readonly data: {
-              readonly condition: auto.Condition;
+              readonly condition: ConditionOf<D>;
               readonly group: number;
               readonly index: number;
               readonly path: Path;
@@ -82,7 +115,7 @@ export type GraphNode =
           readonly id: string;
           readonly type: "step";
           readonly position: Position;
-          readonly data: { readonly step: auto.Step; readonly index: number; readonly path: Path };
+          readonly data: { readonly step: StepOf<D>; readonly index: number; readonly path: Path };
       };
 
 export type GraphNodeType = GraphNode["type"];
@@ -98,8 +131,8 @@ export interface GraphEdge {
     readonly kind: "flow" | "feeds";
 }
 
-export interface AutomationGraph {
-    readonly nodes: readonly GraphNode[];
+export interface AutomationGraph<D extends FlowDefinition = FlowDefinition> {
+    readonly nodes: readonly GraphNode<D>[];
     readonly edges: readonly GraphEdge[];
 }
 
@@ -109,8 +142,8 @@ export function groupHeight(items: number): number {
 
 /** Lay an automation out as a graph. Deterministic: the same definition always
  *  draws the same nodes in the same places. */
-export function automationToGraph(definition: auto.AutomationDefinition): AutomationGraph {
-    const nodes: GraphNode[] = [];
+export function automationToGraph<D extends FlowDefinition>(definition: D): AutomationGraph<D> {
+    const nodes: GraphNode<D>[] = [];
     const edges: GraphEdge[] = [];
 
     definition.triggers.forEach((trigger, index) => {
@@ -202,16 +235,15 @@ function byHeight<
  * Read a graph back into the definition it was drawn from, `base`.
  *
  * Each list is put in the order its nodes stand in, top to bottom, which is all
- * a drag can change. Everything else - the time zone, every node's own fields,
- * the key order of each object - is `base`'s, so a graph nobody moved reads back
- * as exactly `base`.
+ * a drag can change. Everything else - any field of the definition beside the
+ * three lists, every node's own fields, the key order of each object - is
+ * `base`'s, so a graph nobody moved reads back as exactly `base`.
  */
-export function graphToAutomation(
-    graph: AutomationGraph,
-    base: auto.AutomationDefinition
-): auto.AutomationDefinition {
+export function graphToAutomation<D extends FlowDefinition>(graph: AutomationGraph<D>, base: D): D {
     const of = <K extends GraphNodeType>(type: K) =>
-        graph.nodes.filter((node): node is Extract<GraphNode, { type: K }> => node.type === type);
+        graph.nodes.filter(
+            (node): node is Extract<GraphNode<D>, { type: K }> => node.type === type
+        );
     const gate = of("gate")[0];
     const conditions = of("condition");
     return {
@@ -228,18 +260,24 @@ export function graphToAutomation(
             }))
         },
         actions: byHeight(of("step")).map((node) => node.data.step)
-    };
+    } as D;
 }
 
 /** A graph with one node somewhere else, as a drag leaves it. */
-export function moveNode(graph: AutomationGraph, id: string, position: Position): AutomationGraph {
+export function moveNode<D extends FlowDefinition>(
+    graph: AutomationGraph<D>,
+    id: string,
+    position: Position
+): AutomationGraph<D> {
     return {
         ...graph,
         nodes: graph.nodes.map((node) => (node.id === id ? { ...node, position } : node))
     };
 }
 
-function swap<T>(list: readonly T[], index: number, by: -1 | 1): T[] {
+/** A list with the entry at `index` swapped one place earlier (-1) or later
+ *  (1). Out of range leaves it as it was. */
+export function swap<T>(list: readonly T[], index: number, by: -1 | 1): T[] {
     const next = [...list];
     const target = index + by;
     if (index < 0 || target < 0 || target >= next.length) return next;
@@ -250,11 +288,7 @@ function swap<T>(list: readonly T[], index: number, by: -1 | 1): T[] {
 /** One node one place earlier (-1) or later (1) in its own list: a trigger
  *  among the triggers, a condition within its group, a group among the groups,
  *  a step among the steps. Anything else is left as it is. */
-export function shiftNode(
-    definition: auto.AutomationDefinition,
-    id: string,
-    by: -1 | 1
-): auto.AutomationDefinition {
+export function shiftNode<D extends FlowDefinition>(definition: D, id: string, by: -1 | 1): D {
     const trigger = definition.triggers.findIndex((node) => node.id === id);
     if (trigger >= 0) return { ...definition, triggers: swap(definition.triggers, trigger, by) };
     const step = definition.actions.findIndex((node) => node.id === id);
@@ -281,10 +315,7 @@ export function shiftNode(
 
 /** The definition without one node. A group goes with its conditions; the gate
  *  is not something that can go. */
-export function removeNode(
-    definition: auto.AutomationDefinition,
-    id: string
-): auto.AutomationDefinition {
+export function removeNode<D extends FlowDefinition>(definition: D, id: string): D {
     if (id === GATE_ID) return definition;
     const groups = definition.conditions.groups;
     return {
