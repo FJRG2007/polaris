@@ -598,21 +598,21 @@ new map:
 Everything below is part of the arena's own boxes: built into air with
 `keep`, and taken out with the rest.
 
-| Arena            | Look                                                                                                                                |
-| ---------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
-| Spleef           | each floor walled in its own color, a sea lantern on every corner post                                                              |
-| TNT run          | TNT floors, a rim in its own color at each one, glass walls, corner lanterns                                                        |
-| Dropper          | white walls banded by each floor's color, a ring of light round every hole                                                          |
-| Ice boat race    | packed ice, white walls with a glass rail and lights, an arch over each gate                                                        |
-| Parkour          | the course's theme, a light under every checkpoint                                                                                  |
-| King of the ring | polished stone edge, sea lanterns at the corners, the circle drawn in yellow                                                        |
-| Build battle     | a stone curb between plots and glowstone where the lines meet, at floor level                                                       |
-| Team duel        | a stone rim round the floor and a post of light at each corner                                                                      |
-| Hot potato       | a floor in orange and white stripes, glass walls on a stone rim, sea lanterns up the corners, a spruce gallery                      |
-| Hide and seek    | a stone brick house under a dark oak roof, spruce walls between nine rooms, oak closets, spruce hatches, birch lofts on log posts   |
-| SkyWars          | grass, dirt and flecked stone islands with oaks, boulders and flowers, invisible cages and gallery over the middle, barrier walls   |
-| Capture the flag | the duel's rim and posts, bases in red and blue, banners on sea lanterns, cover of stone brick, spruce and chiseled stone           |
-| Boss sky arena   | glass, with a pillar of sea lantern at each corner                                                                                  |
+| Arena            | Look                                                                                                                              |
+| ---------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| Spleef           | each floor walled in its own color, a sea lantern on every corner post                                                            |
+| TNT run          | TNT floors, a rim in its own color at each one, glass walls, corner lanterns                                                      |
+| Dropper          | white walls banded by each floor's color, a ring of light round every hole                                                        |
+| Ice boat race    | packed ice, white walls with a glass rail and lights, an arch over each gate                                                      |
+| Parkour          | the course's theme, a light under every checkpoint                                                                                |
+| King of the ring | polished stone edge, sea lanterns at the corners, the circle drawn in yellow                                                      |
+| Build battle     | a stone curb between plots and glowstone where the lines meet, at floor level                                                     |
+| Team duel        | a stone rim round the floor and a post of light at each corner                                                                    |
+| Hot potato       | a floor in orange and white stripes, glass walls on a stone rim, sea lanterns up the corners, a spruce gallery                    |
+| Hide and seek    | a stone brick house under a dark oak roof, spruce walls between nine rooms, oak closets, spruce hatches, birch lofts on log posts |
+| SkyWars          | grass, dirt and flecked stone islands with oaks, boulders and flowers, invisible cages and gallery over the middle, barrier walls |
+| Capture the flag | the duel's rim and posts, bases in red and blue, banners on sea lanterns, cover of stone brick, spruce and chiseled stone         |
+| Boss sky arena   | glass, with a pillar of sea lantern at each corner                                                                                |
 
 ## Lessons from real servers
 
