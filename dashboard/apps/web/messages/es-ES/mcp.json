@@ -156,6 +156,26 @@
             "refused": "Rechazada {time} desde {ip}",
             "unknownIp": "una IP desconocida",
             "failed": "No se ha podido guardar la regla de direcciones. Recarga e inténtalo de nuevo."
+        },
+        "exception": {
+            "title": "También desde",
+            "hint": "Las llamadas desde estos lugares pasan aunque las reglas de red de tu cuenta las rechacen. Solo esta conexión; la regla de direcciones de arriba sigue aplicándose.",
+            "adminOnly": "Solo un administrador puede dejar pasar una conexión por encima de las reglas de red que puso un administrador.",
+            "openai": {
+                "label": "Direcciones publicadas por OpenAI (ChatGPT)",
+                "hint": "La lista que OpenAI publica para los conectores de ChatGPT, siempre al día.",
+                "short": "Direcciones de OpenAI"
+            },
+            "addresses": "Direcciones",
+            "summary": "También permitido desde: {places}",
+            "failed": "No se ha podido guardar la excepción. Recarga e inténtalo de nuevo."
+        },
+        "restricted": {
+            "body": "Tu cuenta solo acepta llamadas desde ciertos lugares, así que los asistentes que llaman desde sus propios servidores, como ChatGPT o Claude en la web, se rechazan.",
+            "howTo": "Para dejar pasar uno, abre desde dónde puede conectarse esa conexión y añade su país o sus direcciones en También desde.",
+            "askAdmin": "Solo un administrador puede dejar pasar una conexión por encima de estas reglas.",
+            "rules": "Ver tus reglas de acceso",
+            "allow": "Permitir {app}"
         }
     }
 }

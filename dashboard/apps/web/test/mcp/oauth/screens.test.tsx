@@ -125,7 +125,8 @@ describe("the connected-assistants list", () => {
         ipPolicy: { mode: "none" as const, allow: [], deny: [] },
         approvedIp: "203.0.113.5",
         lastRefusedAt: null,
-        lastRefusedIp: null
+        lastRefusedIp: null,
+        networkException: { allowedCountries: [], allowedContinents: [], allowedCidrs: [], presets: [] }
     };
 
     it("lists each app with its mark, return address, a permission count and its actions", () => {
@@ -190,6 +191,59 @@ describe("the connected-assistants list", () => {
         const html = renderToStaticMarkup(withMessages(<ConnectedApps apps={[app]} />, "es-ES"));
         expect(html).toContain("Asistentes conectados");
         expect(html).toContain("3 permisos");
+    });
+
+    it("says nothing about network rules to an account that has none", () => {
+        for (const language of ["en-US", "es-ES"] as const) {
+            const html = renderToStaticMarkup(
+                withMessages(<ConnectedApps apps={[app]} canExcept />, language)
+            );
+            expect(html).not.toContain('role="note"');
+            expect(html).not.toContain("/account/access");
+        }
+    });
+
+    it("tells a restricted account why assistants on their own servers are refused, and how to allow one", () => {
+        const html = renderToStaticMarkup(
+            withMessages(<ConnectedApps apps={[app]} restricted canExcept />)
+        );
+        expect(html).toContain('role="note"');
+        expect(html).toContain("assistants that call from their own servers, such as ChatGPT");
+        expect(html).toContain("Also allow from");
+        expect(html).toContain("Allow Visual Studio Code");
+        expect(html).toContain('href="/account/access"');
+
+        const spanish = renderToStaticMarkup(
+            withMessages(<ConnectedApps apps={[app]} restricted canExcept />, "es-ES")
+        );
+        expect(spanish).toContain("desde sus propios servidores");
+        expect(spanish).toContain("Permitir Visual Studio Code");
+    });
+
+    it("tells somebody who is not an administrator that only one can allow it", () => {
+        const html = renderToStaticMarkup(withMessages(<ConnectedApps apps={[app]} restricted />));
+        expect(html).toContain("Only an administrator can let a connection past these rules.");
+        expect(html).not.toContain("Allow Visual Studio Code");
+    });
+
+    it("names where a connection is also allowed from", () => {
+        const excepted = {
+            ...app,
+            networkException: {
+                allowedCountries: ["US"],
+                allowedContinents: [],
+                allowedCidrs: ["198.51.100.0/24"],
+                presets: ["openai" as const]
+            }
+        };
+        const html = renderToStaticMarkup(withMessages(<ConnectedApps apps={[excepted]} />));
+        expect(html).toContain(
+            "Also allowed from: OpenAI&#x27;s addresses, United States, 198.51.100.0/24"
+        );
+        const spanish = renderToStaticMarkup(
+            withMessages(<ConnectedApps apps={[excepted]} />, "es-ES")
+        );
+        expect(spanish).toContain("También permitido desde: Direcciones de OpenAI, Estados Unidos");
     });
 });
 

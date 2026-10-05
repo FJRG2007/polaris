@@ -9,7 +9,9 @@
  * MCP right now and what this person holds - the boxes the screen drew are not
  * what is trusted. A scope the app did not ask for may be added: it is the
  * person's to give, and the screen says which those are. Setting where it may
- * call from applies on its next call and next token refresh.
+ * call from applies on its next call and next token refresh, and so does an
+ * exception to the account's network rules - which only an administrator may
+ * widen, since those rules are an administrator's.
  */
 
 import { z } from "zod";
@@ -24,10 +26,17 @@ import { MCP_SCOPES, expandScopes, orderScopes, type McpScope } from "@/lib/mcp/
 import { localized } from "@/app/(app)/account/security/action-messages";
 import { ipPolicyNarrows, ipPolicySchema, type IpPolicy } from "@/lib/mcp/oauth/ip-policy";
 import {
+    exceptionNarrows,
+    networkExceptionSchema,
+    sameException,
+    type NetworkException
+} from "@/lib/mcp/oauth/network-exception";
+import {
     changeGrantScopes,
     findConnectedApp,
     revokeConnectedApp,
-    setGrantIpPolicy
+    setGrantIpPolicy,
+    setGrantNetworkException
 } from "@/lib/mcp/oauth/grants";
 
 const PAGE = "/account/assistants";
@@ -150,4 +159,47 @@ export async function setAppIpPolicyAction(
     });
     revalidatePath(PAGE);
     return { policy: stored };
+}
+
+const exceptionSchema = z.object({ id: z.string().uuid(), exception: networkExceptionSchema });
+
+/**
+ * Set where a connected app may call from past the account's network rules.
+ * Answers with the exception now held.
+ *
+ * The rules it reaches past are the ones an administrator imposed, so only an
+ * administrator may add to it; anybody may take entries away. Anything that
+ * widens it waits out a new device, as any widening of a credential does.
+ */
+export async function setAppNetworkExceptionAction(
+    input: unknown
+): Promise<{ exception?: NetworkException; error?: string }> {
+    const user = await requireUser();
+    const t = await getTranslations("mcp");
+    const parsed = exceptionSchema.safeParse(input);
+    if (!parsed.success || user.viewingAs) return { error: t("connectedApps.exception.failed") };
+
+    const app = await findConnectedApp(user.id, parsed.data.id);
+    if (!app) return { error: t("connectedApps.exception.failed") };
+    const { exception } = parsed.data;
+    if (sameException(app.networkException, exception)) return { exception };
+
+    if (!exceptionNarrows(app.networkException, exception)) {
+        if (!user.isAdmin) return { error: t("connectedApps.exception.adminOnly") };
+        const blocked = await newDeviceRefusal(user);
+        if (blocked) return localized({ error: blocked });
+    }
+
+    if (!(await setGrantNetworkException(user.id, app.id, exception))) {
+        return { error: t("connectedApps.exception.failed") };
+    }
+    await recordAudit({
+        actorId: user.id,
+        action: "account.oauth.network-exception-changed",
+        targetType: "oauthGrant",
+        targetId: app.id,
+        metadata: { app: app.name, before: app.networkException, after: exception }
+    });
+    revalidatePath(PAGE);
+    return { exception };
 }

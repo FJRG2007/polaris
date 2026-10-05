@@ -16,7 +16,7 @@ import type { NamespaceKey } from "@/lib/i18n/types";
 
 /** A country as the reader's language names it. English keeps core's names, which
  *  are the same list the server writes. */
-function regionName(code: string, locale: string): string {
+export function regionName(code: string, locale: string): string {
     if (locale === "en-US") return countryName(code);
     try {
         return new Intl.DisplayNames([locale], { type: "region" }).of(code.toUpperCase()) ?? countryName(code);

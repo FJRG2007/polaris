@@ -72,6 +72,7 @@
         "account_oauth_connected": "Se ha conectado un asistente de IA a tu cuenta",
         "account_oauth_updated": "Se han cambiado los permisos de un asistente de IA conectado",
         "account_oauth_ip_rule_changed": "Se ha cambiado desde dónde puede conectarse un asistente de IA",
+        "account_oauth_network_exception_changed": "Se ha cambiado la excepción a las reglas de red de tu cuenta en un asistente de IA conectado",
         "account_oauth_replay_detected": "Se ha desconectado un asistente porque su token se usó dos veces",
         "advice": "Si no has sido tú, cambia tu contraseña y cierra la sesión en todos los demás dispositivos."
     },

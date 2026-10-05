@@ -348,6 +348,38 @@ may do, and when and from where it was last used.
 - **Disconnect** stops it at once: every token it holds is ended, and it has to
   be connected again through the consent screen.
 
+### Assistants that call from their own servers
+
+ChatGPT, Claude on the web and other hosted assistants call Polaris from their
+vendor's servers, not from your device. ChatGPT, for one, calls from OpenAI's
+servers in the United States. If an administrator limited your account to
+certain countries, continents or addresses, those calls are refused with a 403
+that says so, and **Account > AI assistants** shows a note explaining it.
+
+An administrator can let one connection through without opening the account:
+open **Where it may connect from** on that connection and fill in **Also allow
+from**:
+
+- countries and continents, picked from the same list as **Account > Access**;
+- IP addresses and ranges;
+- **OpenAI's published addresses (ChatGPT)**, the list OpenAI publishes for
+  ChatGPT connectors at <https://openai.com/chatgpt-connectors.json>
+  ([OpenAI's documentation](https://developers.openai.com/api/docs/guides/ip-addresses)).
+  Polaris reads it again every few hours, so the connection follows OpenAI's
+  changes. Until it has been read once it matches nothing.
+
+The exception applies only to calls made with that connection's tokens. You,
+your sessions, your API keys and every other connection stay held to the
+account's rules. The connection's own address rule still applies on top, so
+an exception never lets in an address that rule refuses. A country only matches
+when the address resolves to it.
+
+The rules are an administrator's, so only an administrator can add to an
+exception; anybody can remove entries. An exception set while the account was an
+administrator's stops counting if it no longer is. Each change is written to the
+activity and raises the security alert, and the connection shows where it is
+also allowed from.
+
 Connecting an assistant raises the same security alert as creating an API key,
 and so do changing what one may do and a connection Polaris ends on its own
 because one of its tokens was presented twice - which means somebody else held

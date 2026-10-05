@@ -72,6 +72,7 @@
         "account_oauth_connected": "An AI assistant was connected to your account",
         "account_oauth_updated": "A connected AI assistant was given different permissions",
         "account_oauth_ip_rule_changed": "Where a connected AI assistant may connect from was changed",
+        "account_oauth_network_exception_changed": "An exception to your account's network rules was changed on a connected AI assistant",
         "account_oauth_replay_detected": "A connected assistant was disconnected because its token was used twice",
         "advice": "If this was not you, change your password and sign out every other device."
     },

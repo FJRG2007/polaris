@@ -12,10 +12,11 @@ import { Suspense } from "react";
 import { requireUser } from "@/lib/session";
 import { McpAssistants } from "./mcp-assistants";
 import { ConnectedApps } from "./connected-apps";
-import { scopesAvailableTo } from "@polaris/auth";
+import { resolveEnforcedRules, scopesAvailableTo } from "@polaris/auth";
 import { editableScopes, mcpScopes } from "@/lib/mcp/oauth/scopes";
 import { getTranslations } from "@/lib/i18n/request";
 import { Messages } from "@/components/i18n/messages";
+import { rulesAreEmpty } from "@/lib/network-rules";
 import { listConnectedApps } from "@/lib/mcp/oauth/grants";
 import { Card, CardBody, CardHeader, Skeleton } from "@polaris/ui";
 
@@ -23,10 +24,11 @@ export const dynamic = "force-dynamic";
 
 /** The list, once the grants and what this person holds are read. */
 async function ConnectedAppsSection({ userId, isAdmin }: { userId: string; isAdmin: boolean }) {
-    const [apps, available, supported] = await Promise.all([
+    const [apps, available, supported, enforced] = await Promise.all([
         listConnectedApps(userId),
         scopesAvailableTo(userId, isAdmin),
-        mcpScopes()
+        mcpScopes(),
+        resolveEnforcedRules(userId)
     ]);
     // What each app could be given: what MCP offers now and the old scopes it
     // still holds, cut to what this person holds. The ones it did not ask for
@@ -37,7 +39,12 @@ async function ConnectedAppsSection({ userId, isAdmin }: { userId: string; isAdm
         const unrequested = offered.filter((scope) => !requestable.has(scope));
         return { ...app, offered, unrequested };
     });
-    return <ConnectedApps apps={rows} />;
+    // The rules a connected assistant is held to are the ones an administrator
+    // imposed (the account's own sign-in rules govern sign-ins, not
+    // assistants), so those are what decide whether the note is shown.
+    return (
+        <ConnectedApps apps={rows} restricted={!rulesAreEmpty(enforced)} canExcept={isAdmin} />
+    );
 }
 
 /** The shape of the list while it is read. */

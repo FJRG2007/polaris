@@ -12,9 +12,14 @@
  *
  * Changing permissions and disconnecting both show at once and are put back if
  * the server refused.
+ *
+ * When the account's network rules restrict where it may be used from, a note
+ * at the top says what that does to assistants calling from their own servers
+ * and how one connection is let through.
  */
 
 import { useMemo, useState } from "react";
+import { regionName } from "@/components/geo-picker";
 import { ClientLogo } from "@/components/client-logo";
 import { useRouter } from "next/navigation";
 import type { NamespaceKey } from "@/lib/i18n/types";
@@ -23,16 +28,31 @@ import { RelativeTime } from "@/components/relative-time";
 import { scopeLabelKey } from "@/lib/mcp/oauth/scope-labels";
 import type { ConnectedAppView } from "@/lib/mcp/oauth/grants";
 import { groupScopes, scopeGroupKey } from "@/lib/api-key-scopes";
-import { useTranslations } from "@/components/i18n/i18n-provider";
+import { useLocale, useTranslations } from "@/components/i18n/i18n-provider";
 import { expandScopes, scopeRequires, isMcpScope, type McpScope } from "@/lib/mcp/scope-table";
 import { McpScopeChecklist } from "@/components/mcp-scope-checklist";
 import { IpRuleDialog } from "./ip-rule-dialog";
 import type { IpPolicy } from "@/lib/mcp/oauth/ip-policy";
-import { Bot, ChevronRight, Network, Pencil, Search, ShieldAlert, Unplug } from "lucide-react";
+import {
+    exceptionIsEmpty,
+    sameException,
+    type NetworkException
+} from "@/lib/mcp/oauth/network-exception";
+import {
+    Bot,
+    ChevronRight,
+    Globe,
+    Network,
+    Pencil,
+    Search,
+    ShieldAlert,
+    Unplug
+} from "lucide-react";
 import {
     changeAppScopesAction,
     disconnectAppAction,
-    setAppIpPolicyAction
+    setAppIpPolicyAction,
+    setAppNetworkExceptionAction
 } from "./connected-app-actions";
 import {
     Badge,
@@ -68,7 +88,21 @@ function sameSet(a: readonly string[], b: readonly string[]): boolean {
     return b.every((entry) => set.has(entry));
 }
 
-export function ConnectedApps({ apps: initial }: { apps: ConnectedAppRow[] }) {
+function samePolicy(a: IpPolicy, b: IpPolicy): boolean {
+    return JSON.stringify(a) === JSON.stringify(b);
+}
+
+export function ConnectedApps({
+    apps: initial,
+    restricted = false,
+    canExcept = false
+}: {
+    apps: ConnectedAppRow[];
+    /** Whether the account's network rules restrict where it may be used from. */
+    restricted?: boolean;
+    /** Whether this person may let a connection past those rules. */
+    canExcept?: boolean;
+}) {
     const t = useTranslations("mcp");
     const router = useRouter();
     const [confirm, confirmElement] = useConfirm();
@@ -141,25 +175,54 @@ export function ConnectedApps({ apps: initial }: { apps: ConnectedAppRow[] }) {
         router.refresh();
     }
 
-    async function saveNetwork(app: ConnectedAppRow, policy: IpPolicy) {
+    async function saveNetwork(app: ConnectedAppRow, policy: IpPolicy, exception: NetworkException) {
         setNetwork(null);
         setError(null);
+        const policyChanged = !samePolicy(policy, app.ipPolicy);
+        const exceptionChanged = !sameException(exception, app.networkException);
         const before = apps;
         setApps((current) =>
             current.map((entry) =>
-                entry.id === app.id
-                    ? { ...entry, ipPolicy: policy, lastRefusedAt: null, lastRefusedIp: null }
-                    : entry
+                entry.id !== app.id
+                    ? entry
+                    : {
+                          ...entry,
+                          networkException: exception,
+                          ...(policyChanged
+                              ? { ipPolicy: policy, lastRefusedAt: null, lastRefusedIp: null }
+                              : {})
+                      }
             )
         );
-        const result = await setAppIpPolicyAction({ id: app.id, policy }).catch(() => ({
-            error: t("connectedApps.ip.failed"),
-            policy: undefined
-        }));
-        if (result.error || !result.policy) {
-            setApps(before);
-            setError(result.error ?? t("connectedApps.ip.failed"));
-            return;
+        if (policyChanged) {
+            const result = await setAppIpPolicyAction({ id: app.id, policy }).catch(() => ({
+                error: t("connectedApps.ip.failed"),
+                policy: undefined
+            }));
+            if (result.error || !result.policy) {
+                setApps(before);
+                setError(result.error ?? t("connectedApps.ip.failed"));
+                return;
+            }
+        }
+        if (exceptionChanged) {
+            const result = await setAppNetworkExceptionAction({ id: app.id, exception }).catch(
+                () => ({ error: t("connectedApps.exception.failed"), exception: undefined })
+            );
+            if (result.error || !result.exception) {
+                // The address rule, when it changed, did save: only the
+                // exception goes back.
+                setApps((current) =>
+                    current.map((entry) =>
+                        entry.id === app.id
+                            ? { ...entry, networkException: app.networkException }
+                            : entry
+                    )
+                );
+                setError(result.error ?? t("connectedApps.exception.failed"));
+                router.refresh();
+                return;
+            }
         }
         router.refresh();
     }
@@ -175,6 +238,13 @@ export function ConnectedApps({ apps: initial }: { apps: ConnectedAppRow[] }) {
                 <p className="text-sm text-muted-foreground">{t("connectedApps.intro")}</p>
             </CardHeader>
             <CardBody className="flex flex-col gap-3 text-sm">
+                {restricted ? (
+                    <RestrictionNotice
+                        canExcept={canExcept}
+                        single={apps.length === 1 ? apps[0]! : null}
+                        onOpen={(app) => setNetwork(app)}
+                    />
+                ) : null}
                 {error ? (
                     <p role="alert" className="text-danger">
                         {error}
@@ -233,13 +303,79 @@ export function ConnectedApps({ apps: initial }: { apps: ConnectedAppRow[] }) {
                     name={network.name || t("consent.unnamed")}
                     current={network.ipPolicy}
                     approvedIp={network.approvedIp}
+                    exception={network.networkException}
+                    restricted={restricted}
+                    canExcept={canExcept}
                     onCancel={() => setNetwork(null)}
-                    onSave={(policy) => void saveNetwork(network, policy)}
+                    onSave={(policy, exception) => void saveNetwork(network, policy, exception)}
                 />
             ) : null}
             {confirmElement}
         </Card>
     );
+}
+
+/** What the account's network rules do to assistants that call from their own
+ *  servers, and the way one connection is let through. */
+function RestrictionNotice({
+    canExcept,
+    single,
+    onOpen
+}: {
+    canExcept: boolean;
+    single: ConnectedAppRow | null;
+    onOpen: (app: ConnectedAppRow) => void;
+}) {
+    const t = useTranslations("mcp");
+    return (
+        <div
+            role="note"
+            className="flex min-w-0 items-start gap-2 rounded-md bg-warning-soft p-3 text-xs"
+        >
+            <Globe className="mt-0.5 size-3.5 shrink-0 text-warning-ink" aria-hidden />
+            <div className="flex min-w-0 flex-col gap-1.5">
+                <p className="[overflow-wrap:anywhere]">{t("connectedApps.restricted.body")}</p>
+                <p className="text-muted-foreground [overflow-wrap:anywhere]">
+                    {canExcept
+                        ? t("connectedApps.restricted.howTo")
+                        : t("connectedApps.restricted.askAdmin")}{" "}
+                    <a href="/account/access" className="underline underline-offset-2">
+                        {t("connectedApps.restricted.rules")}
+                    </a>
+                </p>
+                {canExcept && single ? (
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        className="w-fit"
+                        onClick={() => onOpen(single)}
+                    >
+                        <Network className="size-3.5" aria-hidden />
+                        {t("connectedApps.restricted.allow", {
+                            app: single.name || t("consent.unnamed")
+                        })}
+                    </Button>
+                ) : null}
+            </div>
+        </div>
+    );
+}
+
+/** The places a connection's exception lets it call from, named. */
+function exceptionSummary(
+    t: ReturnType<typeof useTranslations<"mcp">>,
+    tc: ReturnType<typeof useTranslations<"components">>,
+    locale: string,
+    exception: NetworkException
+): string {
+    return [
+        ...(exception.presets.includes("openai") ? [t("connectedApps.exception.openai.short")] : []),
+        ...exception.allowedContinents.map((code) =>
+            tc(`geo.continentNames.${code}` as NamespaceKey<"components">)
+        ),
+        ...exception.allowedCountries.map((code) => regionName(code, locale)),
+        ...exception.allowedCidrs
+    ].join(", ");
 }
 
 /** The connection's address rule in a few words. */
@@ -268,6 +404,8 @@ function AppRow({
     onDisconnect: () => void;
 }) {
     const t = useTranslations("mcp");
+    const tc = useTranslations("components");
+    const locale = useLocale();
     const [open, setOpen] = useState(false);
     const name = app.name || t("consent.unnamed");
     const recent =
@@ -321,6 +459,16 @@ function AppRow({
                         <Network className="mt-0.5 size-3 shrink-0" aria-hidden />
                         <span className="min-w-0 [overflow-wrap:anywhere]">
                             {ruleSummary(t, app)}
+                        </span>
+                    </p>
+                ) : null}
+                {!exceptionIsEmpty(app.networkException) ? (
+                    <p className="flex min-w-0 items-start gap-1.5 text-xs text-muted-foreground">
+                        <Globe className="mt-0.5 size-3 shrink-0" aria-hidden />
+                        <span className="min-w-0 [overflow-wrap:anywhere]">
+                            {t("connectedApps.exception.summary", {
+                                places: exceptionSummary(t, tc, locale, app.networkException)
+                            })}
                         </span>
                     </p>
                 ) : null}

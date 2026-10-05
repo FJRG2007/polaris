@@ -153,6 +153,10 @@ const SECURITY_CHANGES: Readonly<Record<string, SecurityChange>> = {
         key: "security.account_oauth_ip_rule_changed",
         href: "/account/assistants"
     },
+    "account.oauth.network-exception-changed": {
+        key: "security.account_oauth_network_exception_changed",
+        href: "/account/assistants"
+    },
     "account.oauth.replay-detected": {
         key: "security.account_oauth_replay_detected",
         href: "/account/assistants"

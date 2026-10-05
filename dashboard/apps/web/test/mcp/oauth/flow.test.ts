@@ -105,6 +105,7 @@ vi.mock("@/lib/network-rules", () => ({
             ? { allowed: true, reason: null, country: null }
             : { allowed: false, reason: "country", country: "US" }
 }));
+vi.mock("@/lib/geo-service", () => ({ resolveGeo: async () => ({ countryCode: "US" }) }));
 vi.mock("@/lib/agents/session-service", () => ({
     sessionForToken: async (token: string) =>
         token.startsWith("session-token-") ? { id: token.slice(14) } : null,
@@ -149,9 +150,9 @@ const serverMetadata = await import(
 );
 const { answerAuthorizationAction } = await import("@/app/oauth/authorize/actions");
 const { listConnectedApps, revokeConnectedApp } = await import("@/lib/mcp/oauth/grants");
-const { changeAppScopesAction, setAppIpPolicyAction } = await import(
-    "@/app/(app)/account/assistants/connected-app-actions"
-);
+const { changeAppScopesAction, setAppIpPolicyAction, setAppNetworkExceptionAction } =
+    await import("@/app/(app)/account/assistants/connected-app-actions");
+const { clearPresetRanges } = await import("@/lib/mcp/oauth/preset-ranges");
 
 const REDIRECT = "http://127.0.0.1/callback";
 
@@ -258,6 +259,7 @@ beforeEach(() => {
     state.documents = new Map();
     state.fetches = [];
     ADA.bannedAt = null;
+    ADA.isAdmin = false;
 });
 
 describe("discovery", () => {
@@ -1397,5 +1399,146 @@ describe("the finer scopes, and the grants made before them", () => {
         const [app] = await listConnectedApps(ADA.id);
         const result = await changeAppScopesAction({ id: app!.id, scopes: ["tasks.read"] });
         expect(result.scopes).toEqual(["tasks.read"]);
+    });
+});
+
+describe("a connection's exception to the account's network rules", () => {
+    const whoami = { method: "tools/call", params: { name: "polaris_whoami", arguments: {} } };
+    const US_ONLY = { allowedCountries: ["us"] };
+
+    /** Ada is an administrator whose account an administrator held to Spain;
+     *  the address every call below comes from resolves to the United States. */
+    beforeEach(() => {
+        ADA.isAdmin = true;
+        state.user = { ...state.user, isAdmin: true };
+        state.networkAllowed = false;
+        clearPresetRanges();
+    });
+
+    async function connectedApp() {
+        const result = await connect();
+        const apps = await listConnectedApps(ADA.id);
+        const grant = state.db.tables.oAuthGrant!.at(-1)!;
+        const app = apps.find((entry) => entry.id === grant.id)!;
+        return { app, access: String(result.tokens.body.access_token) };
+    }
+
+    it("is refused from abroad with no exception", async () => {
+        const { app, access } = await connectedApp();
+        expect(app.networkException.allowedCountries).toEqual([]);
+        const refused = await mcpCall(access, whoami);
+        expect(refused.status).toBe(403);
+        expect(refused.body?.error).toBe("access_denied");
+    });
+
+    it("lets that one connection in from the United States, and nothing else", async () => {
+        const chatgpt = await connectedApp();
+        const other = await connectedApp();
+
+        const saved = await setAppNetworkExceptionAction({
+            id: chatgpt.app.id,
+            exception: US_ONLY
+        });
+        expect(saved.exception?.allowedCountries).toEqual(["US"]);
+        expect((await mcpCall(chatgpt.access, whoami)).status).toBe(200);
+
+        // Another connection of the same person is still held to the rules.
+        expect((await mcpCall(other.access, whoami)).status).toBe(403);
+
+        // Shown on the connection, and audited like any change to access.
+        const apps = await listConnectedApps(ADA.id);
+        expect(apps.find((entry) => entry.id === chatgpt.app.id)!.networkException).toMatchObject(
+            { allowedCountries: ["US"] }
+        );
+        expect(apps.find((entry) => entry.id === other.app.id)!.networkException).toMatchObject({
+            allowedCountries: []
+        });
+        expect(state.audit.map((entry) => entry.action)).toContain(
+            "account.oauth.network-exception-changed"
+        );
+
+        // Taken away, it is refused again on the very next call.
+        await setAppNetworkExceptionAction({ id: chatgpt.app.id, exception: {} });
+        expect((await mcpCall(chatgpt.access, whoami)).status).toBe(403);
+    });
+
+    it("does not let a country it does not name through", async () => {
+        const { app, access } = await connectedApp();
+        await setAppNetworkExceptionAction({ id: app.id, exception: { allowedCountries: ["FR"] } });
+        expect((await mcpCall(access, whoami)).status).toBe(403);
+    });
+
+    it("still applies the connection's own address rule", async () => {
+        const { app, access } = await connectedApp();
+        await setAppNetworkExceptionAction({ id: app.id, exception: US_ONLY });
+        await setAppIpPolicyAction({
+            id: app.id,
+            policy: { mode: "list", allow: ["198.51.100.0/24"], deny: [] }
+        });
+        const refused = await mcpCall(access, whoami);
+        expect(refused.status).toBe(403);
+        expect(refused.body?.error_description).toContain("not allowed from this IP address");
+        state.ip = "198.51.100.20";
+        expect((await mcpCall(access, whoami)).status).toBe(200);
+    });
+
+    it("is only an administrator's to add, and stops counting when the account is not one", async () => {
+        const { app, access } = await connectedApp();
+        state.user = { ...state.user, isAdmin: false };
+        expect((await setAppNetworkExceptionAction({ id: app.id, exception: US_ONLY })).error).toBe(
+            "connectedApps.exception.adminOnly"
+        );
+        expect(state.db.tables.oAuthGrant!.at(-1)!.networkException ?? null).toBeNull();
+        expect(state.audit.map((entry) => entry.action)).not.toContain(
+            "account.oauth.network-exception-changed"
+        );
+
+        // Set while an administrator, then the account is one no longer.
+        state.user = { ...state.user, isAdmin: true };
+        await setAppNetworkExceptionAction({ id: app.id, exception: US_ONLY });
+        expect((await mcpCall(access, whoami)).status).toBe(200);
+        ADA.isAdmin = false;
+        expect((await mcpCall(access, whoami)).status).toBe(403);
+
+        // Anybody may take an exception away.
+        state.user = { ...state.user, isAdmin: false };
+        expect(
+            (await setAppNetworkExceptionAction({ id: app.id, exception: {} })).exception
+        ).toMatchObject({ allowedCountries: [] });
+    });
+
+    it("refuses a place it does not know, another person's connection, and a view", async () => {
+        const { app } = await connectedApp();
+        expect(
+            (await setAppNetworkExceptionAction({ id: app.id, exception: { allowedCountries: ["XX"] } }))
+                .error
+        ).toBe("connectedApps.exception.failed");
+        state.user = { ...state.user, id: BOB.id };
+        expect((await setAppNetworkExceptionAction({ id: app.id, exception: US_ONLY })).error).toBe(
+            "connectedApps.exception.failed"
+        );
+        state.user = { ...state.user, id: ADA.id, viewingAs: { id: BOB.id } };
+        expect((await setAppNetworkExceptionAction({ id: app.id, exception: US_ONLY })).error).toBe(
+            "connectedApps.exception.failed"
+        );
+    });
+
+    it("follows the address list OpenAI publishes for ChatGPT", async () => {
+        const { app, access } = await connectedApp();
+        state.documents.set("https://openai.com/chatgpt-connectors.json", {
+            creationTime: "2026-09-22T18:18:05",
+            prefixes: [{ ipv4Prefix: "203.0.113.0/28" }, { ipv4Prefix: "not a range" }]
+        });
+        await setAppNetworkExceptionAction({ id: app.id, exception: { presets: ["openai"] } });
+        expect((await mcpCall(access, whoami)).status).toBe(200);
+        expect(state.fetches).toContain("https://openai.com/chatgpt-connectors.json");
+        state.ip = "198.51.100.20";
+        expect((await mcpCall(access, whoami)).status).toBe(403);
+    });
+
+    it("matches nothing from a list it could not read", async () => {
+        const { app, access } = await connectedApp();
+        await setAppNetworkExceptionAction({ id: app.id, exception: { presets: ["openai"] } });
+        expect((await mcpCall(access, whoami)).status).toBe(403);
     });
 });

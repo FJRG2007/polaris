@@ -42,7 +42,7 @@ import { serverIcons } from "@/lib/mcp/server-icons";
 import { evaluateAccountAccess } from "@/lib/network-rules";
 import { mcpResource, wwwAuthenticate } from "@/lib/mcp/oauth/urls";
 import { ACCESS_TOKEN_PREFIX, touchGrant, verifyAccessToken } from "@/lib/mcp/oauth/grants";
-import { IP_REFUSED_DESCRIPTION, grantAllowsIp } from "@/lib/mcp/oauth/ip-guard";
+import { IP_REFUSED_DESCRIPTION, exceptionLetsThrough, grantAllowsIp } from "@/lib/mcp/oauth/ip-guard";
 import {
     type McpTool,
     MCP_PROTOCOL_VERSION,
@@ -142,7 +142,7 @@ const IP_REFUSED = Symbol("ip-refused");
 /** The account's own network rules (or an administrator's) refused the address. */
 const ACCOUNT_REFUSED = Symbol("account-refused");
 const ACCOUNT_REFUSED_DESCRIPTION =
-    "This account's network rules do not allow the address this call came from. An assistant that calls from its own servers, such as ChatGPT, needs that address or country allowed under Account > Access.";
+    "This account's network rules do not allow the address this call came from. An assistant that calls from its own servers, such as ChatGPT, needs that address or country allowed under Account > Access, or an exception on that connection under Account > AI assistants.";
 
 async function callerFor(
     request: Request
@@ -164,7 +164,13 @@ async function callerFor(
         // only loop, and it hid this refusal entirely - an assistant calling from
         // its own servers abroad was told "action discovery failed" and nothing
         // else. A 403 that says why, and a line in the log.
-        if (!decision.allowed) {
+        // Unless this one connection has an exception for where it calls from
+        // (ChatGPT calls from OpenAI's servers): that lets this grant's calls
+        // through and nothing else - not the person, not another connection.
+        if (
+            !decision.allowed &&
+            !(await exceptionLetsThrough(access, ip, decision.country ?? null))
+        ) {
             console.warn(
                 "polaris: mcp refused by account network rules",
                 JSON.stringify({ grantId: access.grantId, country: decision.country ?? null })

@@ -22,7 +22,7 @@ export interface NetworkDecision {
 }
 
 /** True when the rules impose no restriction at all. */
-function rulesAreEmpty(rules: EffectiveAccessRules): boolean {
+export function rulesAreEmpty(rules: EffectiveAccessRules): boolean {
     return (
         rules.allowedCidrs.length === 0 &&
         rules.allowedCountries.length === 0 &&

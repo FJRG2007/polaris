@@ -1519,6 +1519,10 @@ model OAuthGrant {
     // The last call that rule refused, shown on the connection.
     lastRefusedAt   DateTime?
     lastRefusedIp   String?
+    // JSON: where this connection may call from even though the account's
+    // network rules refuse it (see lib/mcp/oauth/network-exception.ts). Null
+    // reads as "no exception": held to the account's rules like everything else.
+    networkException String?
     revokedAt       DateTime?
 
     user   User         @relation(fields: [userId], references: [id], onDelete: Cascade)

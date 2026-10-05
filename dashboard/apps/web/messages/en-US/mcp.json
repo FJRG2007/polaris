@@ -156,6 +156,26 @@
             "refused": "Refused {time} from {ip}",
             "unknownIp": "an unknown address",
             "failed": "The address rule could not be saved. Reload and try again."
+        },
+        "exception": {
+            "title": "Also allow from",
+            "hint": "Calls from these places get through even where your account's network rules refuse them. Only this connection; the address rule above still applies.",
+            "adminOnly": "Only an administrator can let a connection past the network rules an administrator set.",
+            "openai": {
+                "label": "OpenAI's published addresses (ChatGPT)",
+                "hint": "The list OpenAI publishes for ChatGPT connectors, kept up to date.",
+                "short": "OpenAI's addresses"
+            },
+            "addresses": "Addresses",
+            "summary": "Also allowed from: {places}",
+            "failed": "The exception could not be saved. Reload and try again."
+        },
+        "restricted": {
+            "body": "Your account only accepts calls from certain places, so assistants that call from their own servers, such as ChatGPT or Claude on the web, are refused.",
+            "howTo": "To let one in, open where that connection may connect from and add its country or addresses under Also allow from.",
+            "askAdmin": "Only an administrator can let a connection past these rules.",
+            "rules": "See your access rules",
+            "allow": "Allow {app}"
         }
     }
 }

@@ -12,8 +12,12 @@
  */
 
 import { prisma } from "@polaris/db";
+import { continentOf } from "@polaris/core";
+import { resolveGeo } from "@/lib/geo-service";
+import { presetRanges } from "./preset-ranges";
 import { recordAudit } from "@/lib/audit-service";
 import { ipPolicyAllows, readIpPolicy } from "./ip-policy";
+import { exceptionAllows, exceptionIsEmpty, type NetworkException } from "./network-exception";
 
 const REFUSAL_STAMP_MS = 60 * 1000;
 /** Far more sessions than one person holds; the read stays bounded anyway. */
@@ -82,4 +86,27 @@ export async function grantAllowsIp(grant: GuardedGrant, ip: string | undefined)
         // The refusal stands whether or not it could be written down.
     }
     return false;
+}
+
+/**
+ * Whether a call the account's network rules refused is let through by the
+ * connection's exception.
+ *
+ * Honoured only while the account is an administrator's: those rules were
+ * imposed by an administrator, and only an administrator may make an exception
+ * to them - one set while the account was an administrator's stops counting the
+ * moment it no longer is. `knownCountry` is the location the account check
+ * already resolved, so it is not looked up twice.
+ */
+export async function exceptionLetsThrough(
+    grant: { readonly isAdmin: boolean; readonly networkException: NetworkException },
+    ip: string | undefined,
+    knownCountry: string | null
+): Promise<boolean> {
+    if (!grant.isAdmin || exceptionIsEmpty(grant.networkException)) return false;
+    return exceptionAllows(grant.networkException, ip, {
+        country: async () => knownCountry ?? (ip ? (await resolveGeo(ip)).countryCode : null),
+        presetRanges,
+        continentOf
+    });
 }
