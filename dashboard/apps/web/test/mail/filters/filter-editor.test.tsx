@@ -10,6 +10,7 @@
  */
 
 import * as core from "@polaris/core";
+import { ToastProvider } from "@polaris/ui";
 import { MessagesWrapper } from "../../setup/i18n";
 import type { MailRuleView } from "@/lib/mailbox/rules";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -80,7 +81,22 @@ const SECOND: MailRuleView = {
     matchCount: 0
 };
 
-function draw(rules: MailRuleView[] = [GITHUB]) {
+/** A filter that forwards instead of trashing, for the verified-address checks. */
+const FORWARDER: MailRuleView = {
+    ...GITHUB,
+    id: "r3",
+    name: "Forward invoices",
+    definition: core.mailFilterFromLegacy({
+        match: "all",
+        conditions: [{ field: "subject", operator: "contains", value: "invoice" }],
+        actions: [{ kind: "forward", to: "team@example.com" }],
+        stop: false
+    }),
+    position: 0,
+    matchCount: 0
+};
+
+function draw(rules: MailRuleView[] = [GITHUB], forwardTargets: string[] = []) {
     render(
         <MessagesWrapper>
             <RulesView
@@ -88,9 +104,26 @@ function draw(rules: MailRuleView[] = [GITHUB]) {
                 folders={[]}
                 labels={[]}
                 rules={{ "acc-1": rules }}
-                forwardTargets={[]}
+                forwardTargets={forwardTargets}
             />
         </MessagesWrapper>
+    );
+}
+
+/** The same screen, with a note stack mounted, for the toast a run over the
+ *  inbox raises. */
+function drawWithToast(rules: MailRuleView[] = [GITHUB], forwardTargets: string[] = []) {
+    render(
+        <ToastProvider>
+            <RulesView
+                accounts={[ACCOUNT] as never}
+                folders={[]}
+                labels={[]}
+                rules={{ "acc-1": rules }}
+                forwardTargets={forwardTargets}
+            />
+        </ToastProvider>,
+        { wrapper: MessagesWrapper }
     );
 }
 
@@ -231,6 +264,35 @@ describe("an existing filter", () => {
         });
         expect(
             screen.getByText("That pattern could take too long to check. Make it simpler")
+        ).toBeTruthy();
+    });
+});
+
+describe("a filter that forwards", () => {
+    it("warns in the list when its address is not a verified one, with a way to fix it", () => {
+        draw([FORWARDER], []);
+        expect(
+            screen.getByText("Not forwarding: team@example.com is not a verified address on your account.")
+        ).toBeTruthy();
+        expect(screen.getByRole("link", { name: "Manage your addresses" })).toBeTruthy();
+    });
+
+    it("says nothing once that address is verified", () => {
+        draw([FORWARDER], ["team@example.com"]);
+        expect(screen.queryByText(/is not a verified address/)).toBeNull();
+    });
+
+    it("says mail already here is not forwarded when run over the inbox", async () => {
+        drawWithToast([FORWARDER], ["team@example.com"]);
+        fireEvent.pointerDown(screen.getByRole("button", { name: `More for ${FORWARDER.name}` }), {
+            button: 0,
+            ctrlKey: false
+        });
+        fireEvent.click(await screen.findByRole("menuitem", { name: "Run over the inbox now" }));
+        expect(
+            await screen.findByText(
+                `Running ${FORWARDER.name} over the inbox. Mail already here is not forwarded.`
+            )
         ).toBeTruthy();
     });
 });
