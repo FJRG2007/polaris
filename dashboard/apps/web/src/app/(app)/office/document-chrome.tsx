@@ -82,91 +82,109 @@ export function DocumentChrome({
     };
 
     return (
-        <div className={cn(PAGE_BLEED, "flex min-h-0 flex-col")}>
-            <header className="flex shrink-0 items-center gap-2 border-b border-border px-3 py-2">
-                <Button variant="ghost" size="icon" asChild aria-label={t("chrome.backToOffice")} title={t("chrome.back")}>
-                    <Link href="/office">
-                        <ArrowLeft className="size-4 shrink-0" aria-hidden />
-                    </Link>
-                </Button>
+        // The slot wraps the header as well as the editor: the Export menu up
+        // here is what reads the exporter the editor down there registers, and
+        // a menu outside the provider never sees one - every in-browser format
+        // stayed greyed out.
+        <OfficeExportProvider>
+            <div className={cn(PAGE_BLEED, "flex min-h-0 flex-col")}>
+                <header className="flex shrink-0 items-center gap-2 border-b border-border px-3 py-2">
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        asChild
+                        aria-label={t("chrome.backToOffice")}
+                        title={t("chrome.back")}
+                    >
+                        <Link href="/office">
+                            <ArrowLeft className="size-4 shrink-0" aria-hidden />
+                        </Link>
+                    </Button>
 
-                {/* The title is the field, not a field beside a heading. Renaming
+                    {/* The title is the field, not a field beside a heading. Renaming
                     a document is the most ordinary thing anybody does to one, and
                     putting it behind a dialog is what makes people leave "Untitled
                     document" on things for months. */}
-                <input
-                    value={title}
-                    readOnly={!editable}
-                    aria-label={t("chrome.nameOfThisDocument")}
-                    className="min-w-0 flex-1 rounded-md bg-transparent px-2 py-1 text-[15px] font-medium text-foreground outline-none focus:bg-surface-hover read-only:cursor-default"
-                    onChange={(event) => setTitle(event.target.value)}
-                    onBlur={() => void rename()}
-                    onKeyDown={(event) => {
-                        if (event.key === "Enter") event.currentTarget.blur();
-                        if (event.key === "Escape") {
-                            setTitle(settled.current);
-                            event.currentTarget.blur();
-                        }
-                    }}
-                />
-
-                {saving ? (
-                    <Loader2 className="size-4 shrink-0 animate-spin text-muted-foreground" aria-hidden />
-                ) : null}
-
-                {/* What somebody who was given this can actually do, said plainly.
-                    A reader who cannot type needs to know that before they try. */}
-                {!owned ? (
-                    <span className="hidden items-center gap-1.5 rounded-md bg-muted px-2 py-1 text-[12px] text-muted-foreground sm:flex">
-                        <Users className="size-3.5 shrink-0" aria-hidden />
-                        {t(ROLE_KEYS[role])}
-                    </span>
-                ) : null}
-
-                <Button
-                    variant="ghost"
-                    size="icon"
-                    aria-pressed={starred}
-                    aria-label={starred ? t("chrome.unstarThis") : t("chrome.starThis")}
-                    title={starred ? t("chrome.unstar") : t("chrome.star")}
-                    onClick={async () => {
-                        const next = !starred;
-                        setStarred(next);
-                        const answer = await starDocumentAction(row.id, next);
-                        if (answer.error) {
-                            setStarred(!next);
-                            toast.show({ title: answer.error });
-                        }
-                    }}
-                >
-                    <Star
-                        className={cn("size-4 shrink-0", starred && "fill-current text-warning")}
-                        aria-hidden
+                    <input
+                        value={title}
+                        readOnly={!editable}
+                        aria-label={t("chrome.nameOfThisDocument")}
+                        className="min-w-0 flex-1 rounded-md bg-transparent px-2 py-1 text-[15px] font-medium text-foreground outline-none focus:bg-surface-hover read-only:cursor-default"
+                        onChange={(event) => setTitle(event.target.value)}
+                        onBlur={() => void rename()}
+                        onKeyDown={(event) => {
+                            if (event.key === "Enter") event.currentTarget.blur();
+                            if (event.key === "Escape") {
+                                setTitle(settled.current);
+                                event.currentTarget.blur();
+                            }
+                        }}
                     />
-                </Button>
 
-                <ExportMenu documentId={row.id} kind={row.kind} title={title} />
+                    {saving ? (
+                        <Loader2
+                            className="size-4 shrink-0 animate-spin text-muted-foreground"
+                            aria-hidden
+                        />
+                    ) : null}
 
-                {owned ? (
-                    <Button size="sm" variant="secondary" onClick={() => setSharing(true)}>
-                        <Share2 className="size-4 shrink-0" aria-hidden />
-                        {t("chrome.share")}
+                    {/* What somebody who was given this can actually do, said plainly.
+                    A reader who cannot type needs to know that before they try. */}
+                    {!owned ? (
+                        <span className="hidden items-center gap-1.5 rounded-md bg-muted px-2 py-1 text-[12px] text-muted-foreground sm:flex">
+                            <Users className="size-3.5 shrink-0" aria-hidden />
+                            {t(ROLE_KEYS[role])}
+                        </span>
+                    ) : null}
+
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        aria-pressed={starred}
+                        aria-label={starred ? t("chrome.unstarThis") : t("chrome.starThis")}
+                        title={starred ? t("chrome.unstar") : t("chrome.star")}
+                        onClick={async () => {
+                            const next = !starred;
+                            setStarred(next);
+                            const answer = await starDocumentAction(row.id, next);
+                            if (answer.error) {
+                                setStarred(!next);
+                                toast.show({ title: answer.error });
+                            }
+                        }}
+                    >
+                        <Star
+                            className={cn(
+                                "size-4 shrink-0",
+                                starred && "fill-current text-warning"
+                            )}
+                            aria-hidden
+                        />
                     </Button>
+
+                    <ExportMenu documentId={row.id} kind={row.kind} title={title} />
+
+                    {owned ? (
+                        <Button size="sm" variant="secondary" onClick={() => setSharing(true)}>
+                            <Share2 className="size-4 shrink-0" aria-hidden />
+                            {t("chrome.share")}
+                        </Button>
+                    ) : null}
+                </header>
+
+                {children}
+
+                {sharing ? (
+                    <ShareDialog
+                        open
+                        onOpenChange={setSharing}
+                        subject="office.document"
+                        subjectId={row.id}
+                        name={title}
+                        extra={<OfficeLinkPanel documentId={row.id} />}
+                    />
                 ) : null}
-            </header>
-
-            <OfficeExportProvider>{children}</OfficeExportProvider>
-
-            {sharing ? (
-                <ShareDialog
-                    open
-                    onOpenChange={setSharing}
-                    subject="office.document"
-                    subjectId={row.id}
-                    name={title}
-                    extra={<OfficeLinkPanel documentId={row.id} />}
-                />
-            ) : null}
-        </div>
+            </div>
+        </OfficeExportProvider>
     );
 }
