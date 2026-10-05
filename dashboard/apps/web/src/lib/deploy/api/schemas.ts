@@ -55,7 +55,9 @@ export const variableKeySchema = z
 const redeploySchema = z
     .boolean()
     .default(false)
-    .describe("Redeploy the services this reaches so they pick it up now. Needs the right to deploy.");
+    .describe(
+        "Redeploy the services this reaches so they pick it up now. Needs the right to deploy."
+    );
 
 /** A variable's value: whatever the service needs, newlines included - a PEM
  *  key is a variable. Bounded so one call cannot write a megabyte into every
