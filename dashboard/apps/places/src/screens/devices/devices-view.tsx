@@ -243,20 +243,14 @@ export function DevicesView({
         [reread]
     );
 
-    // The first open is the read above; every reopen after it - a tab brought
-    // back, a dropped connection - catches up on what it was not told.
-    const opens = useRef(0);
-    useEffect(() => {
-        opens.current = 0;
-    }, [placeId]);
+    // Every open - the first, a tab brought back, a dropped connection -
+    // catches up on what it was not told: a change that landed between the
+    // read above and the stream subscribing is never pushed afterwards.
     useDeviceStream({
         enabled: devices !== null,
         placeId,
         onChange: receive,
-        onReady: () => {
-            opens.current += 1;
-            if (opens.current > 1) void reread();
-        }
+        onReady: () => void reread()
     });
 
     /** Put a device back into both lists it can be in, so the row and the open
