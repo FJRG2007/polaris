@@ -387,9 +387,9 @@
         "zoomToFitViewport": "Zoom to fit in viewport"
     },
     "library": {
-        "hint_emptyLibrary": "Select an item on canvas to add it here, or install a library from the public repository, below.",
+        "hint_emptyLibrary": "Select something on the canvas and add it here to reuse it.",
         "hint_emptyPrivateLibrary": "Select an item on canvas to add it here.",
-        "noItems": "No items added yet..."
+        "noItems": "Nothing here yet"
     },
     "overwriteConfirm": {
         "action": {

@@ -387,9 +387,9 @@
         "zoomToFitViewport": "Ajustar a la vista"
     },
     "library": {
-        "hint_emptyLibrary": "Seleccione un elemento en el lienzo para añadirlo aquí, o instale una biblioteca del repositorio público, a continuación.",
+        "hint_emptyLibrary": "Selecciona algo en el lienzo y añádelo aquí para reutilizarlo.",
         "hint_emptyPrivateLibrary": "Seleccione un elemento del lienzo para añadirlo aquí.",
-        "noItems": "No hay elementos añadidos todavía..."
+        "noItems": "Aún no hay nada"
     },
     "overwriteConfirm": {
         "action": {

@@ -12,9 +12,10 @@
     width: 100%;
 
     &__label {
-      color: var(--color-primary);
-      font-weight: 700;
-      font-size: 1.125rem;
+      // An empty state's title, as Polaris draws one: the page's own ink.
+      color: var(--text-primary-color);
+      font-weight: 600;
+      font-size: 0.9375rem;
       margin-bottom: 0.75rem;
     }
   }
