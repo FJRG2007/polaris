@@ -45,6 +45,7 @@ COPY packages/config/package.json ./packages/config/
 COPY packages/core/package.json ./packages/core/
 COPY packages/db/package.json ./packages/db/
 COPY packages/deploy/package.json ./packages/deploy/
+COPY packages/diagrams/package.json ./packages/diagrams/
 COPY packages/docker/package.json ./packages/docker/
 COPY packages/docx/package.json ./packages/docx/
 COPY packages/electron-utils/package.json ./packages/electron-utils/

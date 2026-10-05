@@ -4,9 +4,9 @@
  * A drawing is not text, so the CRDT cannot merge inside a shape the way it
  * merges inside a paragraph: two people dragging one rectangle produce two
  * whole rectangles, and something has to choose. The rule every collaborative
- * canvas uses, Excalidraw's own included, is on the shape itself - each carries
- * a `version` that counts up and a `versionNonce` that breaks a tie - so the
- * choice is the same on every screen without anybody comparing clocks.
+ * canvas uses, the diagram canvas's own included, is on the shape itself - each
+ * carries a `version` that counts up and a `versionNonce` that breaks a tie - so
+ * the choice is the same on every screen without anybody comparing clocks.
  *
  * Kept here, pure and away from the editor, because it is the one piece of a
  * canvas that is genuinely hard to get right and trivially easy to test. The
@@ -28,9 +28,10 @@ export interface SceneElement {
  *
  * Higher version wins. Where they are equal - two people who both moved a shape
  * exactly once since they last spoke - the nonce decides, and the *lower* one
- * wins for the same reason Excalidraw picks it: any consistent rule works, and
- * being the same rule as theirs means a scene reconciled here and one reconciled
- * by their own code do not disagree.
+ * wins for the same reason the canvas picks it (`packages/diagrams`, its
+ * `reconcile.ts`): any consistent rule works, and being the same rule as the
+ * canvas's means a scene reconciled here and one reconciled there do not
+ * disagree.
  */
 export function laterOf<T extends SceneElement>(left: T, right: T): T {
     const ours = left.version ?? 0;

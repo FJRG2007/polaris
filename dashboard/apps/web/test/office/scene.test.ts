@@ -28,7 +28,7 @@ describe("which version of a shape is the later", () => {
     it("breaks a tie the same way on both screens", () => {
         // Two people who each moved a shape exactly once since they last spoke.
         // Any consistent rule works; what matters is that both sides pick the
-        // same one, so this is Excalidraw's own - the lower nonce.
+        // same one, so this is the canvas's own - the lower nonce.
         const mine = { id: "a", version: 4, versionNonce: 10 };
         const theirs = { id: "a", version: 4, versionNonce: 3 };
         expect(laterOf(mine, theirs).versionNonce).toBe(3);

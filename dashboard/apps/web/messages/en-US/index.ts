@@ -27,6 +27,7 @@ import common from "./common.json";
 import deploy from "./deploy.json";
 import office from "./office.json";
 import system from "./system.json";
+import diagram from "./diagram.json";
 import account from "./account.json";
 import backups from "./backups.json";
 import catalog from "./catalog.json";
@@ -86,6 +87,7 @@ export default {
     components,
     containers,
     databases,
+    diagram,
     deploy,
     deployConfig,
     deployData,

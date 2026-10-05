@@ -1,0 +1,488 @@
+{
+    "alerts": {
+        "cannotExportEmptyCanvas": "Cannot export empty canvas.",
+        "cannotRestoreFromImage": "Scene couldn't be restored from this image file",
+        "clearReset": "This will clear the whole canvas. Are you sure?",
+        "confirmAddLibrary": "This will add {numShapes} shape(s) to your library. Are you sure?",
+        "couldNotCopyToClipboard": "Couldn't copy to clipboard.",
+        "couldNotLoadInvalidFile": "Couldn't load invalid file",
+        "errorAddingToLibrary": "Couldn't add item to the library",
+        "errorRemovingFromLibrary": "Couldn't remove item from the library",
+        "removeItemsFromsLibrary": "Delete {count} item(s) from library?",
+        "resetLibrary": "This will clear your library. Are you sure?"
+    },
+    "buttons": {
+        "cancel": "Cancel",
+        "clearReset": "Reset the canvas",
+        "close": "Close",
+        "confirm": "Confirm",
+        "darkMode": "Dark mode",
+        "done": "Done",
+        "edit": "Edit",
+        "embeddableInteractionButton": "Click to interact",
+        "exitZenMode": "Exit zen mode",
+        "export": "Save to...",
+        "exportImage": "Export image...",
+        "lightMode": "Light mode",
+        "load": "Open",
+        "menu": "Menu",
+        "objectsSnapMode": "Snap to objects",
+        "redo": "Redo",
+        "remove": "Remove",
+        "resetLibrary": "Reset library",
+        "resetZoom": "Reset zoom",
+        "save": "Save to current file",
+        "saveAs": "Save as",
+        "scrollBackToContent": "Scroll back to content",
+        "systemMode": "System mode",
+        "undo": "Undo",
+        "zenMode": "Zen mode",
+        "zoomIn": "Zoom in",
+        "zoomOut": "Zoom out"
+    },
+    "canvasError": {
+        "cannotShowPreview": "Cannot show preview",
+        "canvasTooBig": "The canvas may be too big.",
+        "canvasTooBigTip": "Tip: try moving the farthest elements a bit closer together."
+    },
+    "clearCanvasDialog": {
+        "title": "Clear canvas"
+    },
+    "colorPicker": {
+        "colors": "Colors",
+        "hexCode": "Hex code",
+        "mostUsedCustomColors": "Most used custom colors",
+        "noShades": "No shades available for this color",
+        "shades": "Shades"
+    },
+    "colors": {
+        "black": "Black",
+        "blue": "Blue",
+        "bronze": "Bronze",
+        "cyan": "Cyan",
+        "grape": "Grape",
+        "gray": "Gray",
+        "green": "Green",
+        "orange": "Orange",
+        "pink": "Pink",
+        "red": "Red",
+        "teal": "Teal",
+        "transparent": "Transparent",
+        "violet": "Violet",
+        "white": "White",
+        "yellow": "Yellow"
+    },
+    "commandPalette": {
+        "itemNotAvailable": "Command is not available...",
+        "recents": "Recently used",
+        "search": {
+            "noMatch": "No matching commands...",
+            "placeholder": "Search menus, commands, and discover hidden gems"
+        },
+        "shortcutHint": "For Command palette, use {shortcut}",
+        "shortcuts": {
+            "close": "Close",
+            "confirm": "Confirm",
+            "select": "Select"
+        },
+        "title": "Command palette"
+    },
+    "confirmDialog": {
+        "removeItemsFromLib": "Remove selected items from library",
+        "resetLibrary": "Reset library"
+    },
+    "element": {
+        "arrow": "Arrow",
+        "diamond": "Diamond",
+        "ellipse": "Ellipse",
+        "embeddable": "Web Embed",
+        "frame": "Frame",
+        "freedraw": "Freedraw",
+        "group": "Group",
+        "iframe": "IFrame",
+        "image": "Image",
+        "line": "Line",
+        "magicframe": "Frame",
+        "rectangle": "Rectangle",
+        "selection": "Selection",
+        "text": "Text"
+    },
+    "elementLink": {
+        "desc": "Click on a shape on canvas or paste a link.",
+        "notFound": "Linked object wasn't found on canvas.",
+        "title": "Link to object"
+    },
+    "errorDialog": {
+        "title": "Error"
+    },
+    "errors": {
+        "asyncPasteFailedOnParse": "Couldn't paste.",
+        "asyncPasteFailedOnRead": "Couldn't paste (couldn't read from system clipboard).",
+        "brave_measure_text_error": {
+            "line1": "Looks like you are using Brave browser with the <bold>Aggressively Block Fingerprinting</bold> setting enabled.",
+            "line2": "This could result in breaking the <bold>Text Elements</bold> in your drawings."
+        },
+        "copyToSystemClipboardFailed": "Couldn't copy to clipboard.",
+        "failedToFetchImage": "Failed to fetch image.",
+        "fileTooBig": "File is too big. Maximum allowed size is {maxSize}.",
+        "imageInsertError": "Couldn't insert image. Try again later...",
+        "imageToolNotSupported": "Images are disabled.",
+        "importLibraryError": "Couldn't load library",
+        "libraryElementTypeError": {
+            "embeddable": "Embeddable elements cannot be added to the library.",
+            "iframe": "IFrame elements cannot be added to the library.",
+            "image": "Support for adding images to the library coming soon!"
+        },
+        "svgImageInsertError": "Couldn't insert SVG image. The SVG markup looks invalid.",
+        "unsupportedFileType": "Unsupported file type."
+    },
+    "exportDialog": {
+        "disk_button": "Save to file",
+        "disk_details": "Export the scene data to a file from which you can import later.",
+        "disk_title": "Save to disk",
+        "link_button": "Export to Link",
+        "link_details": "Export as a read-only link.",
+        "link_title": "Shareable link"
+    },
+    "fontList": {
+        "availableFonts": "Available fonts",
+        "badge": {
+            "old": "old"
+        },
+        "empty": "No fonts found",
+        "sceneFonts": "In this scene"
+    },
+    "headings": {
+        "canvasActions": "Canvas actions",
+        "selectedShapeActions": "Selected shape actions",
+        "shapes": "Shapes"
+    },
+    "helpDialog": {
+        "blog": "Read our blog",
+        "click": "click",
+        "createFlowchart": "Create a flowchart from a generic element",
+        "cropFinish": "Finish image cropping",
+        "cropStart": "Crop image",
+        "curvedArrow": "Curved arrow",
+        "curvedLine": "Curved line",
+        "deepBoxSelect": "Deep select within box, and prevent dragging",
+        "deepSelect": "Deep select",
+        "documentation": "Documentation",
+        "doubleClick": "double-click",
+        "drag": "drag",
+        "editLineArrowPoints": "Edit line/arrow points",
+        "editText": "Edit text / add label",
+        "editor": "Editor",
+        "github": "Found an issue? Submit",
+        "movePageLeftRight": "Move page left/right",
+        "movePageUpDown": "Move page up/down",
+        "navigateFlowchart": "Navigate a flowchart",
+        "or": "or",
+        "preventBinding": "Prevent arrow binding",
+        "shortcuts": "Keyboard shortcuts",
+        "textFinish": "Finish editing (text editor)",
+        "textNewLine": "Add new line (text editor)",
+        "title": "Help",
+        "toggleElementLock": "Lock/unlock selection",
+        "tools": "Tools",
+        "view": "View",
+        "zoomToFit": "Zoom to fit all elements",
+        "zoomToSelection": "Zoom to selection"
+    },
+    "hints": {
+        "arrowTool": "Click to start multiple points, drag for single line. Press {arrowShortcut} again to change arrow type.",
+        "bindTextToElement": "Press enter to add text",
+        "canvasPanning": "To move canvas, hold mouse wheel or spacebar while dragging, or use the hand tool",
+        "createFlowchart": "Hold CtrlOrCmd and Arrow key to create a flowchart",
+        "deepBoxSelect": "Hold CtrlOrCmd to deep select, and to prevent dragging",
+        "disableSnapping": "Hold CtrlOrCmd to disable snapping",
+        "dismissSearch": "Escape to dismiss search",
+        "embeddable": "Click-drag to create a website embed",
+        "enterCropEditor": "Double click the image or press ENTER to crop the image",
+        "eraserRevert": "Hold Alt to revert the elements marked for deletion",
+        "firefox_clipboard_write": "This feature can likely be enabled by setting the \"dom.events.asyncClipboard.clipboardItem\" flag to \"true\". To change the browser flags in Firefox, visit the \"about:config\" page.",
+        "freeDraw": "Click and drag, release when you're finished",
+        "leaveCropEditor": "Click outside the image or press ENTER or ESCAPE to finish cropping",
+        "lineEditor_info": "Hold CtrlOrCmd and Double-click or press CtrlOrCmd + Enter to edit points",
+        "lineEditor_nothingSelected": "Select a point to edit (hold SHIFT to select multiple),\nor hold Alt and click to add new points",
+        "lineEditor_pointSelected": "Press Delete to remove point(s),\nCtrlOrCmd+D to duplicate, or drag to move",
+        "linearElement": "Click to start multiple points, drag for single line",
+        "linearElementMulti": "Click on last point or press Escape or Enter to finish",
+        "lockAngle": "You can constrain angle by holding SHIFT",
+        "placeImage": "Click to place the image, or click and drag to set its size manually",
+        "resize": "You can constrain proportions by holding SHIFT while resizing,\nhold ALT to resize from the center",
+        "resizeImage": "You can resize freely by holding SHIFT,\nhold ALT to resize from the center",
+        "rotate": "You can constrain angles by holding SHIFT while rotating",
+        "text": "Tip: you can also add text by double-clicking anywhere with the selection tool",
+        "text_editing": "Press Escape or CtrlOrCmd+ENTER to finish editing",
+        "text_selected": "Double-click or press ENTER to edit text"
+    },
+    "imageExportDialog": {
+        "button": {
+            "copyPngToClipboard": "Copy to clipboard",
+            "exportToPng": "PNG",
+            "exportToSvg": "SVG"
+        },
+        "header": "Export image",
+        "label": {
+            "darkMode": "Dark mode",
+            "embedScene": "Embed scene",
+            "onlySelected": "Only selected",
+            "scale": "Scale",
+            "withBackground": "Background"
+        },
+        "scale": "Scale",
+        "title": {
+            "copyPngToClipboard": "Copy PNG to clipboard",
+            "exportToPng": "Export to PNG",
+            "exportToSvg": "Export to SVG"
+        },
+        "tooltip": {
+            "embedScene": "Scene data will be saved into the exported PNG/SVG file so that the scene can be restored from it.\nWill increase exported file size."
+        }
+    },
+    "labels": {
+        "actions": "Actions",
+        "addToLibrary": "Add to library",
+        "align": "Align",
+        "alignBottom": "Align bottom",
+        "alignLeft": "Align left",
+        "alignRight": "Align right",
+        "alignTop": "Align top",
+        "architect": "Architect",
+        "arrowhead_arrow": "Arrow",
+        "arrowhead_bar": "Bar",
+        "arrowhead_circle": "Circle",
+        "arrowhead_circle_outline": "Circle (outline)",
+        "arrowhead_crowfoot_many": "Crow's foot (many)",
+        "arrowhead_crowfoot_one": "Crow's foot (one)",
+        "arrowhead_crowfoot_one_or_many": "Crow's foot (one or many)",
+        "arrowhead_diamond": "Diamond",
+        "arrowhead_diamond_outline": "Diamond (outline)",
+        "arrowhead_none": "None",
+        "arrowhead_triangle": "Triangle",
+        "arrowhead_triangle_outline": "Triangle (outline)",
+        "arrowheads": "Arrowheads",
+        "arrowtype_elbowed": "Elbow arrow",
+        "arrowtype_round": "Curved arrow",
+        "arrowtype_sharp": "Sharp arrow",
+        "arrowtypes": "Arrow type",
+        "artist": "Artist",
+        "autoResize": "Enable text auto-resizing",
+        "background": "Background",
+        "bindText": "Bind text to the container",
+        "bold": "Bold",
+        "bringForward": "Bring forward",
+        "bringToFront": "Bring to front",
+        "canvasBackground": "Canvas background",
+        "cartoonist": "Cartoonist",
+        "center": "Center",
+        "centerHorizontally": "Center horizontally",
+        "centerVertically": "Center vertically",
+        "changeBackground": "Change background color",
+        "changeStroke": "Change stroke color",
+        "clearCanvas": "Clear canvas",
+        "code": "Code",
+        "collaborators": "Collaborators",
+        "colorPicker": "Color picker",
+        "copy": "Copy",
+        "copyAsPng": "Copy to clipboard as PNG",
+        "copyAsSvg": "Copy to clipboard as SVG",
+        "copyElementLink": "Copy link to object",
+        "copyStyles": "Copy styles",
+        "copyText": "Copy to clipboard as text",
+        "createContainerFromText": "Wrap text in a container",
+        "crossHatch": "Cross-hatch",
+        "cut": "Cut",
+        "decreaseFontSize": "Decrease font size",
+        "delete": "Delete",
+        "diagramLib": "Imported library",
+        "distributeHorizontally": "Distribute horizontally",
+        "distributeVertically": "Distribute vertically",
+        "drawingCanvas": "Drawing canvas",
+        "duplicateSelection": "Duplicate",
+        "edges": "Edges",
+        "elementLock": {
+            "lock": "Lock",
+            "lockAll": "Lock all",
+            "unlock": "Unlock",
+            "unlockAll": "Unlock all"
+        },
+        "extraBold": "Extra bold",
+        "eyeDropper": "Pick color from canvas",
+        "fileTitle": "File name",
+        "fill": "Fill",
+        "flipHorizontal": "Flip horizontal",
+        "flipVertical": "Flip vertical",
+        "fontFamily": "Font family",
+        "fontSize": "Font size",
+        "group": "Group selection",
+        "hachure": "Hachure",
+        "handDrawn": "Hand-drawn",
+        "imageCropping": "Image cropping",
+        "increaseFontSize": "Increase font size",
+        "large": "Large",
+        "layers": "Layers",
+        "left": "Left",
+        "libraryLoadingMessage": "Loading library…",
+        "lineEditor": {
+            "edit": "Edit line",
+            "editArrow": "Edit arrow"
+        },
+        "link": {
+            "create": "Add link",
+            "edit": "Edit link",
+            "editEmbed": "Edit embeddable link",
+            "empty": "No link is set",
+            "goToElement": "Go to target element",
+            "hint": "Type or paste your link here",
+            "label": "Link",
+            "labelEmbed": "Link & embed"
+        },
+        "linkToElement": "Link to object",
+        "loadingScene": "Loading scene…",
+        "medium": "Medium",
+        "more_options": "More options",
+        "moveCanvas": "Move canvas",
+        "multiSelect": "Add element to selection",
+        "normal": "Normal",
+        "opacity": "Opacity",
+        "paste": "Paste",
+        "pasteAsPlaintext": "Paste as plaintext",
+        "pasteCharts": "Paste charts",
+        "pasteStyles": "Paste styles",
+        "personalLib": "Personal Library",
+        "removeAllElementsFromFrame": "Remove all elements from frame",
+        "right": "Right",
+        "round": "Round",
+        "selectAll": "Select all",
+        "selectAllElementsInFrame": "Select all elements in frame",
+        "sendBackward": "Send backward",
+        "sendToBack": "Send to back",
+        "sharp": "Sharp",
+        "showBackground": "Show background color picker",
+        "showFonts": "Show font picker",
+        "showStroke": "Show stroke color picker",
+        "sidebarLock": "Keep sidebar open",
+        "sloppiness": "Sloppiness",
+        "small": "Small",
+        "solid": "Solid",
+        "stroke": "Stroke",
+        "strokeStyle": "Stroke style",
+        "strokeStyle_dashed": "Dashed",
+        "strokeStyle_dotted": "Dotted",
+        "strokeStyle_solid": "Solid",
+        "strokeWidth": "Stroke width",
+        "textAlign": "Text align",
+        "theme": "Theme",
+        "thin": "Thin",
+        "toggleGrid": "Toggle grid",
+        "toggleTheme": "Toggle light/dark theme",
+        "unCroppedDimension": "Uncropped dimension",
+        "unbindText": "Unbind text",
+        "ungroup": "Ungroup selection",
+        "untitled": "Untitled",
+        "updateFrameRendering": "Show frame contents",
+        "veryLarge": "Very large",
+        "viewMode": "View mode",
+        "wrapSelectionInFrame": "Wrap selection in frame",
+        "zigzag": "Zigzag",
+        "zoomToFitViewport": "Zoom to fit in viewport"
+    },
+    "library": {
+        "hint_emptyLibrary": "Select an item on canvas to add it here, or install a library from the public repository, below.",
+        "hint_emptyPrivateLibrary": "Select an item on canvas to add it here.",
+        "noItems": "No items added yet..."
+    },
+    "overwriteConfirm": {
+        "action": {
+            "exportToImage": {
+                "button": "Export as image",
+                "description": "Export the scene data as an image from which you can import later.",
+                "title": "Export as image"
+            },
+            "saveToDisk": {
+                "button": "Save to disk",
+                "description": "Export the scene data to a file from which you can import later.",
+                "title": "Save to disk"
+            }
+        },
+        "modal": {
+            "loadFromFile": {
+                "button": "Load from file",
+                "description": "Loading from a file will <bold>replace your existing content</bold>.<br></br>You can back up your drawing first using one of the options below.",
+                "title": "Load from file"
+            }
+        }
+    },
+    "quickSearch": {
+        "placeholder": "Quick search"
+    },
+    "search": {
+        "multipleResults": "results",
+        "noMatch": "No matches found...",
+        "placeholder": "Find text on canvas...",
+        "singleResult": "result",
+        "title": "Find on canvas"
+    },
+    "stats": {
+        "elementProperties": "Shape properties",
+        "fullTitle": "Canvas & Shape properties",
+        "generalStats": "General",
+        "height": "Height",
+        "scene": "Scene",
+        "shapes": "Shapes",
+        "title": "Properties",
+        "width": "Width"
+    },
+    "toast": {
+        "addedToLibrary": "Added to library",
+        "canvas": "canvas",
+        "copyStyles": "Copied styles.",
+        "copyToClipboardAsPng": "Copied {exportSelection} to clipboard as PNG\n({exportColorScheme})",
+        "copyToClipboardAsSvg": "Copied {exportSelection} to clipboard as SVG\n({exportColorScheme})",
+        "elementLinkCopied": "Link copied to clipboard",
+        "fileSaved": "File saved.",
+        "fileSavedToFilename": "Saved to {filename}",
+        "pasteAsSingleElement": "Use {shortcut} to paste as a single element,\nor paste into an existing text editor",
+        "selection": "selection",
+        "unableToEmbed": "Embedding this url is currently not allowed. Raise an issue on GitHub to request the url whitelisted",
+        "unrecognizedLinkFormat": "The link you embedded does not match the expected format. Please try to paste the 'embed' string provided by the source site"
+    },
+    "toolBar": {
+        "arrow": "Arrow",
+        "diamond": "Diamond",
+        "ellipse": "Ellipse",
+        "embeddable": "Web Embed",
+        "eraser": "Eraser",
+        "extraTools": "More tools",
+        "frame": "Frame tool",
+        "freedraw": "Draw",
+        "hand": "Hand (panning tool)",
+        "image": "Insert image",
+        "laser": "Laser pointer",
+        "library": "Library",
+        "line": "Line",
+        "link": "Add / Update link for a selected shape",
+        "lock": "Keep selected tool active after drawing",
+        "penMode": "Pen mode - prevent touch",
+        "rectangle": "Rectangle",
+        "selection": "Selection",
+        "text": "Text"
+    },
+    "userList": {
+        "empty": "No users found",
+        "hint": {
+            "followStatus": "You're currently following this user",
+            "inCall": "User is in a voice call",
+            "isSpeaking": "User is speaking",
+            "micMuted": "User's microphone is muted",
+            "text": "Click on user to follow"
+        }
+    },
+    "welcomeScreen": {
+        "defaults": {
+            "helpHint": "Shortcuts & help"
+        }
+    }
+}

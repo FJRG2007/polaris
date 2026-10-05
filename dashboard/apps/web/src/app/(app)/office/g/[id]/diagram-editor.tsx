@@ -3,11 +3,10 @@
 /**
  * A diagram, drawn.
  *
- * Excalidraw for the canvas - MIT, React, and the only complete open-source
- * whiteboard that can actually be shipped inside a product. The one that looks
- * nicer changed its licence in 2025 and now wants a commercial agreement or a
- * watermark on somebody else's drawing, which is not a thing Polaris will put on
- * a screen.
+ * The canvas is Polaris's own `@polaris/diagrams` - an MIT whiteboard kept in
+ * this repository rather than taken from a registry, so it calls no service of
+ * anybody else's, loads its fonts from this origin, speaks in Polaris's catalogs
+ * and wears Polaris's tokens.
  *
  * **Shapes are merged one at a time, not scene at a time.** Each element lives
  * under its own key in a shared map, so two people moving two different boxes is
@@ -16,15 +15,16 @@
  * whole rectangles - so the later version wins, by the rule on the shape itself:
  * see `lib/office/scene.ts`, which is where all of that reasoning lives.
  *
- * Loaded only in the browser. Excalidraw reaches for `window` as it initialises,
- * and a canvas rendered on a server is an error nobody can read.
+ * Loaded only in the browser. The canvas reaches for `window` as it
+ * initialises, and a canvas rendered on a server is an error nobody can read.
  */
 
 import * as Y from "yjs";
 import dynamic from "next/dynamic";
 import { Loader2 } from "lucide-react";
-import { useTranslations } from "@/components/i18n/i18n-provider";
-import "@excalidraw/excalidraw/index.css";
+import type { DiagramTranslator } from "@polaris/diagrams";
+import { useLocale, useTranslations } from "@/components/i18n/i18n-provider";
+import "@polaris/diagrams/styles.css";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { pageIsDark, watchPageTheme } from "@/lib/page-theme";
 import { reconcileScene, type SceneElement } from "@/lib/office/scene";
@@ -42,8 +42,8 @@ function CanvasLoading() {
     );
 }
 
-const Excalidraw = dynamic(
-    async () => (await import("@excalidraw/excalidraw")).Excalidraw,
+const DiagramCanvas = dynamic(
+    async () => (await import("@polaris/diagrams")).DiagramCanvas,
     {
         ssr: false,
         loading: () => <CanvasLoading />
@@ -69,10 +69,15 @@ export function DiagramEditor({
     editable: boolean;
 }) {
     const { doc } = useOfficeDocument({ documentId, content, editable });
+    const locale = useLocale();
+    // The canvas's own words, from the `diagram` catalog the page hands down.
+    // One translator per locale, so the canvas redraws its chrome exactly when
+    // the language changes and not on every render.
+    const translate = useTranslations("diagram") as unknown as DiagramTranslator;
     const shapes = useMemo(() => doc.getMap<SceneElement>(SHAPES), [doc]);
     const scene = useMemo(() => doc.getMap<unknown>(SCENE), [doc]);
 
-    /** Excalidraw's own handle, once it is up. Held rather than in state: it is
+    /** The canvas's own handle, once it is up. Held rather than in state: it is
      *  an imperative API and re-rendering on it would remount the canvas. */
     const api = useRef<{
         updateScene: (scene: { elements: readonly SceneElement[] }) => void;
@@ -89,14 +94,14 @@ export function DiagramEditor({
      * one format the server cannot make: rendering a drawing means having drawn
      * it, and the thing that has is this canvas.
      *
-     * Excalidraw's own exporters are loaded on demand for the same reason
+     * The canvas's exporters are loaded on demand for the same reason
      * everything else about it is: they pull in the whole renderer, and nobody
      * who never presses Export should pay for that.
      */
     useRegisterExporter(async (format) => {
         const handle = api.current;
         if (!handle) return null;
-        const { exportToBlob, exportToSvg } = await import("@excalidraw/excalidraw");
+        const { exportToBlob, exportToSvg } = await import("@polaris/diagrams");
         const scene = {
             elements: handle.getSceneElements(),
             appState: { ...handle.getAppState(), exportBackground: true },
@@ -116,13 +121,13 @@ export function DiagramEditor({
         return null;
     });
 
-    /** Whether the change being handled came off the wire. Excalidraw calls
+    /** Whether the change being handled came off the wire. The canvas calls
      *  `onChange` when the scene is updated programmatically too, and without
      *  this every arriving shape would be sent straight back out. */
     const applying = useRef(false);
 
     /** What was last written for each shape, so an unchanged one is not written
-     *  again. Excalidraw fires `onChange` on pointer moves that changed nothing
+     *  again. The canvas fires `onChange` on pointer moves that changed nothing
      *  at all - a selection, a hover - and writing on those is a write per
      *  frame. */
     const written = useRef(new Map<string, number>());
@@ -132,8 +137,8 @@ export function DiagramEditor({
      *
      * Cast at this one boundary on purpose. `lib/office/scene.ts` describes a
      * shape by the four fields the merge actually reads, so the rule can be
-     * tested without dragging a canvas library into a unit test; Excalidraw
-     * describes it by all twenty-one. They are the same objects - these came out
+     * tested without dragging a canvas into a unit test; the canvas describes
+     * it by all twenty-one. They are the same objects - these came out
      * of that canvas - and the cast is where the two descriptions meet.
      */
     const initial = useMemo(
@@ -191,7 +196,7 @@ export function DiagramEditor({
                     shapes.set(element.id, element);
                 }
                 // A shape this canvas no longer has at all - undone rather than
-                // deleted, which Excalidraw does not mark. Anything it deleted
+                // deleted, which the canvas does not mark. Anything it deleted
                 // is still in `elements` carrying `isDeleted`, and that has to
                 // travel: a deletion is a version of the shape, and dropping it
                 // is how a shape somebody else deleted comes back.
@@ -208,10 +213,10 @@ export function DiagramEditor({
 
     return (
         <div className="min-h-0 flex-1">
-            {/* Excalidraw measures its own container, so it needs one with a
+            {/* The canvas measures its own container, so it needs one with a
                 height rather than one that grows to fit it. */}
-            <div className="h-full w-full [&_.excalidraw]:!bg-transparent">
-                <Excalidraw
+            <div className="h-full w-full [&_.polaris-diagram]:!bg-transparent">
+                <DiagramCanvas
                     initialData={initial}
                     viewModeEnabled={!editable}
                     // The canvas has a light and a dark mode of its own and
@@ -219,7 +224,9 @@ export function DiagramEditor({
                     // its toolbar, its panels, its own menus - was a white
                     // application sitting inside a dark one.
                     theme={dark ? "dark" : "light"}
-                    excalidrawAPI={(handle: unknown) => {
+                    langCode={locale}
+                    translate={translate}
+                    diagramAPI={(handle: unknown) => {
                         api.current = handle as typeof api.current;
                     }}
                     onChange={onChange as never}

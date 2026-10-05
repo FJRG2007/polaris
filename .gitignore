@@ -58,6 +58,8 @@ dashboard/apps/web/public/video/
 # The embedded editors' fonts, staged into public/ at build time from the
 # genoffice packages and katex - see apps/web/scripts/copy-office-fonts.mjs
 dashboard/apps/web/public/office-fonts/
+# The diagram editor's fonts - see apps/web/scripts/copy-diagram-assets.mjs
+dashboard/apps/web/public/diagram-assets/
 # Prisma generated client + local dev database
 dashboard/packages/db/generated/
 dashboard/packages/db/prisma/schema.sqlite.prisma

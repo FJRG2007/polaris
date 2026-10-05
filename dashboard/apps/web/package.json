@@ -5,9 +5,9 @@
     "type": "module",
     "description": "Polaris dashboard - the Next.js control-plane app.",
     "scripts": {
-        "predev": "node scripts/copy-pdfjs-assets.mjs && node scripts/copy-audio-assets.mjs && node scripts/copy-video-assets.mjs && node scripts/copy-office-fonts.mjs",
+        "predev": "node scripts/copy-pdfjs-assets.mjs && node scripts/copy-audio-assets.mjs && node scripts/copy-video-assets.mjs && node scripts/copy-office-fonts.mjs && node scripts/copy-diagram-assets.mjs",
         "dev": "next dev",
-        "prebuild": "node scripts/copy-pdfjs-assets.mjs && node scripts/copy-audio-assets.mjs && node scripts/copy-video-assets.mjs && node scripts/copy-office-fonts.mjs",
+        "prebuild": "node scripts/copy-pdfjs-assets.mjs && node scripts/copy-audio-assets.mjs && node scripts/copy-video-assets.mjs && node scripts/copy-office-fonts.mjs && node scripts/copy-diagram-assets.mjs",
         "build": "next build",
         "start": "next start",
         "test": "vitest run --passWithNoTests",
@@ -18,7 +18,6 @@
     "dependencies": {
         "@better-auth/passkey": "1.6.25",
         "@enigmax/primitives": "0.28.0",
-        "@excalidraw/excalidraw": "0.18.1",
         "@giphy/js-fetch-api": "5.8.0",
         "@github/relative-time-element": "4.4.4",
         "@modelcontextprotocol/sdk": "1.26.0",
@@ -31,6 +30,7 @@
         "@polaris/core": "0.1.0",
         "@polaris/db": "0.1.0",
         "@polaris/deploy": "0.1.0",
+        "@polaris/diagrams": "0.1.0",
         "@polaris/docker": "0.1.0",
         "@polaris/docx": "*",
         "@polaris/genoffice-docs": "*",

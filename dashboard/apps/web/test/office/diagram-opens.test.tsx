@@ -16,7 +16,7 @@ import { OfficeExportProvider } from "@/app/(app)/office/export-slot";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { DiagramEditor } from "@/app/(app)/office/g/[id]/diagram-editor";
 
-vi.mock("@excalidraw/excalidraw/index.css", () => ({}));
+vi.mock("@polaris/diagrams/styles.css", () => ({}));
 
 // Next's loader waits on its own preload machinery, which never runs outside
 // Next; React's own lazy loading is the same thing without it.
@@ -155,7 +155,7 @@ describe.each([
         // long enough for it to run its first rounds of effects.
         await waitFor(
             () => {
-                if (!container.querySelector(".excalidraw")) throw new Error("not mounted yet");
+                if (!container.querySelector(".polaris-diagram")) throw new Error("not mounted yet");
             },
             { timeout: 25_000 }
         );
@@ -167,7 +167,7 @@ describe.each([
         );
         expect(loops).toEqual([]);
         // The canvas really mounted - otherwise this proves nothing.
-        expect(container.querySelector(".excalidraw")).not.toBeNull();
+        expect(container.querySelector(".polaris-diagram")).not.toBeNull();
         errors.mockRestore();
     });
 });

@@ -31,10 +31,6 @@ export default defineConfig({
         // replaces a dashboard module replaces it for the apps too.
         setupFiles: ["./test/setup/app-host.ts"],
         testTimeout: 30_000,
-        hookTimeout: 30_000,
-        // The diagram canvas ships ESM that imports JSON without the import
-        // attribute Node requires, which only a bundler forgives. Run through
-        // vite's own transform instead, so a test can mount the real canvas.
-        server: { deps: { inline: [/@excalidraw\//] } }
+        hookTimeout: 30_000
     }
 });
