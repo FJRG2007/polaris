@@ -13,6 +13,9 @@
 
 /** The MCP endpoint, which is the one resource these tokens are for. */
 export const MCP_PATH = "/api/mcp";
+/** The same endpoint over the legacy HTTP+SSE transport: the same resource,
+ *  so the same tokens open it. */
+export const SSE_PATH = "/api/mcp/sse";
 export const AUTHORIZE_PATH = "/oauth/authorize";
 export const TOKEN_PATH = "/api/oauth/token";
 export const REGISTER_PATH = "/api/oauth/register";

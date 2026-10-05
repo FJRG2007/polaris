@@ -1,7 +1,8 @@
 # Connecting AI assistants (MCP)
 
 Polaris is an MCP server. Claude, ChatGPT, Cursor, VS Code and any other client
-that speaks remote MCP over HTTP can connect to it, sign in as you, and work with
+that speaks remote MCP (Streamable HTTP or SSE, or stdio through mcp-remote) can
+connect to it, sign in as you, and work with
 your tasks, deployments, notes, chat, Drive and calendar. Each assistant can do
 only what you approve when it connects, and never more than your own account.
 
@@ -19,20 +20,15 @@ Use the address you open Polaris on. A connection made on one address (your
 domain) does not work on another (`polaris.local`); connect again there if you
 use both.
 
+A client that only speaks the older HTTP+SSE transport uses
+`https://<your-polaris-address>/api/mcp/sse` instead. It takes the same sign-in
+and the same permissions.
+
 ## Setting up each client
 
 Every client below signs in through Polaris's own consent screen. No key is
-copied anywhere.
-
-### Claude Code
-
-```sh
-claude mcp add --transport http polaris https://<your-polaris-address>/api/mcp
-```
-
-Then run `/mcp` inside Claude Code and choose `polaris` to sign in. Add
-`--scope user` to have it in every project, or `--scope project` to share it
-through `.mcp.json`.
+copied anywhere. **Account > AI assistants** has the same guides with your
+address filled in: pick your client from the grid.
 
 ### Claude (claude.ai and Claude Desktop)
 
@@ -43,6 +39,17 @@ through `.mcp.json`.
 On Team and Enterprise plans an owner adds the connector first, under
 **Organization settings > Connectors**. Claude connects from Anthropic's
 servers, so your Polaris must be reachable from the internet for this one.
+[Claude's guide](https://claude.com/docs/connectors/custom/remote-mcp)
+
+### Claude Code
+
+```sh
+claude mcp add --transport http polaris https://<your-polaris-address>/api/mcp
+```
+
+Then run `/mcp` inside Claude Code and choose `polaris` to sign in. Add
+`--scope user` to have it in every project, or `--scope project` to share it
+through `.mcp.json`. [Claude Code's guide](https://code.claude.com/docs/en/mcp)
 
 ### ChatGPT
 
@@ -64,10 +71,13 @@ is off. Those two are for packaged plugins and do not take a server URL.
 
 Like Claude on the web, ChatGPT connects from its own servers and needs Polaris
 reachable from the internet.
+[OpenAI's guide](https://developers.openai.com/api/docs/guides/developer-mode)
 
 ### Cursor
 
-Use **Add to Cursor** on the AI assistants page, or add this to `~/.cursor/mcp.json`:
+Use **Add to Cursor** on the AI assistants page (Cursor's documented
+`cursor://anysphere.cursor-deeplink/mcp/install` link), or add this to
+`~/.cursor/mcp.json`:
 
 ```json
 {
@@ -78,12 +88,13 @@ Use **Add to Cursor** on the AI assistants page, or add this to `~/.cursor/mcp.j
 ```
 
 Cursor asks you to sign in the first time it uses Polaris.
+[Cursor's guide](https://cursor.com/docs/context/mcp)
 
 ### Visual Studio Code
 
 Use **Add to VS Code** on the AI assistants page, run
 `code --add-mcp '{"name":"polaris","type":"http","url":"https://<your-polaris-address>/api/mcp"}'`,
-or add this to `.vscode/mcp.json`:
+or run **MCP: Open User Configuration** and add:
 
 ```json
 {
@@ -93,20 +104,154 @@ or add this to `.vscode/mcp.json`:
 }
 ```
 
-### Codex CLI and others
+[VS Code's guide](https://code.visualstudio.com/docs/copilot/customization/mcp-servers)
+
+### GitHub Copilot
+
+Copilot in VS Code uses the Visual Studio Code setup above. For Copilot CLI:
+
+```sh
+copilot mcp add --transport http polaris https://<your-polaris-address>/api/mcp
+```
+
+and sign in when Copilot asks. The Copilot cloud agent cannot sign in to
+servers, so it needs an API key instead (see below).
+[GitHub's guide](https://docs.github.com/en/copilot/how-tos/copilot-cli/customize-copilot/add-mcp-servers)
+
+### Codex CLI
 
 ```sh
 codex mcp add polaris --url https://<your-polaris-address>/api/mcp
 codex mcp login polaris
 ```
 
-Any other client that supports remote MCP servers with OAuth connects with the
-server URL alone.
+### Devin
+
+1. Open **Customize > MCPs**, choose **Add MCP**, then **Add custom MCP**.
+2. Name it Polaris, choose the **HTTP** transport, paste the server URL, and
+   **Save**.
+3. Choose **Connect** and sign in to Polaris.
+
+[Devin's guide](https://docs.devin.ai/work-with-devin/mcp)
+
+### Figma Make
+
+1. In a Figma Make chat, click **Add context**, hover over **Connectors** and
+   select **Manage**.
+2. On **Created by you**, click **Create**, name it Polaris and paste the server
+   URL.
+3. Click **Create**, then **Connect**, and sign in to Polaris.
+
+Needs a paid Figma plan; an admin can turn custom connectors off.
+[Figma's guide](https://help.figma.com/hc/en-us/articles/38147204302743-Create-and-use-custom-MCP-connectors-in-Figma-Make)
+
+### Grok
+
+1. Open [grok.com/connectors](https://grok.com/connectors).
+2. Click **New Connector**, then select **Custom**.
+3. Paste the server URL and sign in to Polaris when Grok asks.
+
+On Grok Business and Enterprise, an admin adds the connector first.
+[xAI's guide](https://docs.x.ai/grok/connectors)
+
+### Mistral Le Chat
+
+1. Open **Connectors**, click **+ Add Connector** and switch to **Custom MCP
+   Connector**.
+2. Name it `polaris` and paste the server URL.
+3. Click **Connect** and sign in to Polaris.
+
+Only an administrator can add a custom connector.
+[Mistral's guide](https://docs.mistral.ai/le-chat/knowledge-integrations/connectors/mcp-connectors)
+
+### Zapier
+
+1. Open **Apps**, click **+ Add connection** and choose **MCP Client**.
+2. Paste the server URL, set **Transport** to **Streamable HTTP** and **OAuth**
+   to **Yes**.
+3. Click **Yes, Continue to MCP Client** and sign in to Polaris.
+
+[Zapier's guide](https://help.zapier.com/hc/en-us/articles/38777069364109-Connect-remote-MCP-servers-to-Zapier-using-MCP-Client)
+
+### Make
+
+1. Add an **MCP Client** module to a scenario and click **Create a connection**.
+2. Under **MCP Server**, choose **+ New MCP Server** and paste the server URL.
+3. Click **Save**, and sign in to Polaris if Make asks.
+
+[Make's guide](https://apps.make.com/mcp-client)
+
+### OpenCode
+
+Add this to `opencode.json`:
+
+```json
+{
+    "mcp": {
+        "polaris": {
+            "type": "remote",
+            "url": "https://<your-polaris-address>/api/mcp",
+            "enabled": true
+        }
+    }
+}
+```
+
+Then sign in with `opencode mcp auth polaris`.
+[OpenCode's guide](https://opencode.ai/docs/mcp-servers/)
+
+### Kimi Code
+
+```sh
+kimi mcp add --transport http --auth oauth polaris https://<your-polaris-address>/api/mcp
+kimi mcp auth polaris
+```
+
+[Kimi Code's guide](https://moonshotai.github.io/kimi-cli/en/customization/mcp.html)
+
+### Any other client
+
+1. Open your client's MCP or connector settings.
+2. Choose a connection type.
+3. Copy the configuration for it.
+4. Sign in to Polaris when your client asks.
+
+Streamable HTTP, for clients that support remote servers (recommended):
+
+```json
+{ "mcpServers": { "polaris": { "url": "https://<your-polaris-address>/api/mcp" } } }
+```
+
+SSE, for clients that support remote servers but not Streamable HTTP:
+
+```json
+{
+    "mcpServers": {
+        "polaris": { "type": "sse", "url": "https://<your-polaris-address>/api/mcp/sse" }
+    }
+}
+```
+
+stdio, for clients that only run local commands. It needs Node.js;
+[mcp-remote](https://www.npmjs.com/package/mcp-remote) bridges to Polaris and
+opens the sign-in in your browser:
+
+```json
+{
+    "mcpServers": {
+        "polaris": {
+            "command": "npx",
+            "args": ["-y", "mcp-remote", "https://<your-polaris-address>/api/mcp"]
+        }
+    }
+}
+```
 
 ### With an API key instead
 
-A client that cannot sign in (a script, a CI job) can send a Polaris API key
-from **Account > API keys** as `Authorization: Bearer plk_...`. For Claude Code:
+A client that cannot sign in (a script, a CI job, the Copilot cloud agent) can
+send a Polaris API key from **Account > API keys** as
+`Authorization: Bearer plk_...`. For Claude Code:
 
 ```sh
 claude mcp add --transport http polaris https://<your-polaris-address>/api/mcp \
@@ -209,6 +354,7 @@ OAuth 2.1 with Polaris as its own authorization server.
 | Endpoint                                             | What it is                                      |
 | ---------------------------------------------------- | ----------------------------------------------- |
 | `POST /api/mcp`                                      | The MCP server (Streamable HTTP, JSON answers)  |
+| `GET`/`POST /api/mcp/sse`                            | The same server over the legacy HTTP+SSE transport |
 | `GET /.well-known/oauth-protected-resource[/api/mcp]` | Protected Resource Metadata (RFC 9728)         |
 | `GET /.well-known/oauth-authorization-server`        | Authorization Server Metadata (RFC 8414)        |
 | `POST /api/oauth/register`                           | Dynamic Client Registration (RFC 7591)          |
@@ -225,6 +371,12 @@ OAuth 2.1 with Polaris as its own authorization server.
   exactly, except that a loopback address may use any port (RFC 8252).
 - PKCE with S256 is required. Codes last five minutes and work once. Answers
   carry `iss` (RFC 9207).
+- The SSE endpoint is the same resource as `/api/mcp`: each request is
+  answered by the `/api/mcp` handler, so the token, permissions, address rules
+  and rate limits are the same. The GET opens a stream that names where to POST;
+  a POST is accepted only from the credential that opened its stream (a
+  refreshed token of the same connection counts), and its reply arrives on that
+  stream. One connection may hold four streams open at once.
 - Access tokens last an hour and work only on `/api/mcp` at the address they
   were issued for (RFC 8707 resource indicators). Refresh tokens last 30 days
   and change on every use; presenting an old one ends the whole connection, as

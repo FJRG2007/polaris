@@ -43,6 +43,7 @@ import deployData from "./deployData.json";
 import mailServer from "./mailServer.json";
 import tasksViews from "./tasksViews.json";
 import validation from "./validation.json";
+import mcpConnect from "./mcpConnect.json";
 import accountOrgs from "./accountOrgs.json";
 import drivePoints from "./drivePoints.json";
 import driveViewer from "./driveViewer.json";
@@ -104,6 +105,7 @@ export default {
     mailSettings,
     marketplace,
     mcp,
+    mcpConnect,
     nav,
     notes,
     notices,

@@ -1,10 +1,10 @@
 /**
- * The three screens of connecting an assistant, rendered in both languages:
- * the consent card, the connected-assistants list, and the setup steps. What
- * is pinned is what a person relies on - the return address shown beside the
- * app's own claimed name, the loopback warning, a box per scope, a mark that
- * only a recognised app gets, a Disconnect per app, and per client the exact
- * value to paste.
+ * Two screens of connecting an assistant, rendered in both languages: the
+ * consent card and the connected-assistants list. What is pinned is what a
+ * person relies on - the return address shown beside the app's own claimed
+ * name, the loopback warning, a box per scope, a mark that only a recognised
+ * app gets, and a Disconnect per app. The setup guides are pinned in
+ * test/mcp/connect-guides.test.tsx.
  */
 
 import { withMessages } from "../../setup/i18n";
@@ -32,7 +32,6 @@ vi.mock("@/lib/i18n/request", async () => {
 
 const { ConsentView } = await import("@/app/oauth/authorize/consent-view");
 const { ConnectedApps } = await import("@/app/(app)/account/assistants/connected-apps");
-const { McpAssistants } = await import("@/app/(app)/account/assistants/mcp-assistants");
 
 describe("the consent card", () => {
     const props = {
@@ -147,42 +146,5 @@ describe("the connected-assistants list", () => {
         const html = renderToStaticMarkup(withMessages(<ConnectedApps apps={[app]} />, "es-ES"));
         expect(html).toContain("Asistentes conectados");
         expect(html).toContain("3 permisos");
-    });
-});
-
-describe("the setup steps", () => {
-    it("gives every client the server URL in the form it takes", async () => {
-        locale.current = "en-US";
-        const html = renderToStaticMarkup(withMessages(await McpAssistants()));
-        const url = "https://polaris.example.test/api/mcp";
-        expect(html).toContain(url);
-        expect(html).toContain(`claude mcp add --transport http polaris ${url}`);
-        expect(html).toContain(
-            'href="cursor://anysphere.cursor-deeplink/mcp/install?name=polaris&amp;config='
-        );
-        expect(html).toContain('href="vscode:mcp/install?');
-        expect(html).toContain('href="https://claude.ai/customize/connectors"');
-        for (const name of [
-            "Claude Code",
-            "Claude (web and desktop)",
-            "ChatGPT",
-            "Cursor",
-            "Visual Studio Code"
-        ]) {
-            expect(html).toContain(name);
-        }
-        expect(html).toContain('src="/logos/vscode.svg"');
-        expect(html).toContain("Create MCP App");
-        expect(html).toContain("Set Authentication to OAuth");
-        expect(html).toContain(
-            'href="https://developers.openai.com/api/docs/guides/developer-mode"'
-        );
-    });
-
-    it("reads in Spanish", async () => {
-        locale.current = "es-ES";
-        const html = renderToStaticMarkup(withMessages(await McpAssistants(), "es-ES"));
-        expect(html).toContain("Conectar un asistente");
-        locale.current = "en-US";
     });
 });

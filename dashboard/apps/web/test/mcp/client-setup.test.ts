@@ -45,4 +45,42 @@ describe("client setup", () => {
             "codex mcp login polaris"
         ]);
     });
+
+    it("gives the generic guide its three connection types, exactly", () => {
+        const sse = "https://polaris.example.test/api/mcp/sse";
+        expect(setup.streamableHttpConfig(URL_)).toBe(
+            JSON.stringify({ mcpServers: { polaris: { url: URL_ } } }, null, 2)
+        );
+        expect(setup.sseConfig(sse)).toBe(
+            JSON.stringify({ mcpServers: { polaris: { type: "sse", url: sse } } }, null, 2)
+        );
+        expect(setup.stdioConfig(URL_)).toBe(
+            JSON.stringify(
+                { mcpServers: { polaris: { command: "npx", args: ["-y", "mcp-remote", URL_] } } },
+                null,
+                2
+            )
+        );
+    });
+
+    it("encodes Cursor's config as the base64 of its exact JSON", () => {
+        const expected = Buffer.from(JSON.stringify({ url: URL_ }), "utf8").toString("base64");
+        expect(setup.cursorInstallLink(URL_)).toBe(
+            `cursor://anysphere.cursor-deeplink/mcp/install?name=polaris&config=${encodeURIComponent(expected)}`
+        );
+    });
+
+    it("gives Copilot CLI, OpenCode and Kimi Code their documented forms", () => {
+        expect(setup.copilotCliCommand(URL_)).toBe(
+            `copilot mcp add --transport http polaris ${URL_}`
+        );
+        expect(JSON.parse(setup.opencodeConfig(URL_))).toEqual({
+            mcp: { polaris: { type: "remote", url: URL_, enabled: true } }
+        });
+        expect(setup.opencodeAuthCommand()).toBe("opencode mcp auth polaris");
+        expect(setup.kimiAddCommand(URL_)).toBe(
+            `kimi mcp add --transport http --auth oauth polaris ${URL_}`
+        );
+        expect(setup.kimiAuthCommand()).toBe("kimi mcp auth polaris");
+    });
 });
