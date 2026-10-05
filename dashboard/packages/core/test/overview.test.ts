@@ -36,16 +36,24 @@ describe("the catalogue the layout is written in", () => {
 
 describe("parseOverviewPreferences", () => {
     it("reads back what was stored", () => {
+        const appWidget = { id: "card0001", app: "places", kind: "devices", size: "md" as const, targets: ["lamp"] };
         const stored = stringifyOverviewPreferences({
             widgets: [{ id: "usage", size: "lg", hidden: true }],
+            appWidgets: [appWidget],
             shortcuts: [{ label: "Deploy", href: "/apps/deploy", context: "Apps" }],
             greeting: false
         });
         expect(parseOverviewPreferences(stored)).toEqual({
             widgets: [{ id: "usage", size: "lg", hidden: true }],
+            appWidgets: [appWidget],
             shortcuts: [{ label: "Deploy", href: "/apps/deploy", context: "Apps" }],
             greeting: false
         });
+    });
+
+    it("reads a layout saved before apps could add cards as having none", () => {
+        const stored = JSON.stringify({ widgets: [{ id: "usage", size: "lg", hidden: true }], shortcuts: [], greeting: true });
+        expect(parseOverviewPreferences(stored).appWidgets).toEqual([]);
     });
 
     it("costs the arrangement rather than the page when the blob is unusable", () => {
