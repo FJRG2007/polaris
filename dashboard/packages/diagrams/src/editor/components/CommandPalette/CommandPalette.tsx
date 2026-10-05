@@ -772,6 +772,7 @@ function CommandPaletteInner({
       title={false}
       size={720}
       autofocus
+      label={t("commandPalette.title")}
       className="command-palette-dialog"
     >
       <TextField

@@ -1,15 +1,23 @@
-import clsx from "clsx";
-import { Popover } from "./Popover";
+import React from "react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+  MenuShortcut,
+} from "@polaris/ui";
 import type { TranslationKeys } from "../i18n";
 import { t } from "../i18n";
 
-import "./ContextMenu.scss";
 import type { ShortcutName } from "../actions/shortcuts";
 import { getShortcutFromShortcutName } from "../actions/shortcuts";
 import type { Action } from "../actions/types";
 import type { ActionManager } from "../actions/manager";
 import { useDiagramAppState, useDiagramElements } from "./App";
-import React from "react";
+import { checkIcon } from "./icons";
+
+import "./ContextMenu.scss";
 
 export type ContextMenuItem = typeof CONTEXT_MENU_SEPARATOR | Action;
 
@@ -18,6 +26,7 @@ export type ContextMenuItems = (ContextMenuItem | false | null | undefined)[];
 type ContextMenuProps = {
   actionManager: ActionManager;
   items: ContextMenuItems;
+  /** Where the press was, relative to the editor's own box. */
   top: number;
   left: number;
   onClose: (callback?: () => void) => void;
@@ -25,6 +34,14 @@ type ContextMenuProps = {
 
 export const CONTEXT_MENU_SEPARATOR = "separator";
 
+/**
+ * The right-click menu, drawn with Polaris's own menu rather than the editor's.
+ *
+ * The menu opens at a point rather than under a button, so the trigger is an
+ * empty box pinned where the press was; the menu itself then flips and shifts
+ * to stay on screen and scrolls when it is taller than the space left, the same
+ * as every other menu in the app.
+ */
 export const ContextMenu = React.memo(
   ({ actionManager, items, top, left, onClose }: ContextMenuProps) => {
     const appState = useDiagramAppState();
@@ -48,31 +65,48 @@ export const ContextMenu = React.memo(
     }, []);
 
     return (
-      <Popover
-        onCloseRequest={() => {
-          onClose();
+      <DropdownMenu
+        open
+        onOpenChange={(open) => {
+          if (!open) {
+            onClose();
+          }
         }}
-        top={top}
-        left={left}
-        fitInViewport={true}
-        offsetLeft={appState.offsetLeft}
-        offsetTop={appState.offsetTop}
-        viewportWidth={appState.width}
-        viewportHeight={appState.height}
       >
-        <ul
-          className="context-menu"
+        <DropdownMenuTrigger asChild>
+          <span
+            aria-hidden
+            style={{
+              position: "fixed",
+              top: appState.offsetTop + top,
+              left: appState.offsetLeft + left,
+              width: 0,
+              height: 0,
+              pointerEvents: "none",
+            }}
+          />
+        </DropdownMenuTrigger>
+        <DropdownMenuContent
+          align="start"
+          side="bottom"
+          sideOffset={2}
+          className="polaris-diagram-context-menu"
+          data-testid="context-menu"
           onContextMenu={(event) => event.preventDefault()}
+          // The canvas takes the focus back itself once the menu is gone.
+          onCloseAutoFocus={(event) => event.preventDefault()}
         >
           {filteredItems.map((item, idx) => {
             if (item === CONTEXT_MENU_SEPARATOR) {
+              const previous = filteredItems[idx - 1];
               if (
-                !filteredItems[idx - 1] ||
-                filteredItems[idx - 1] === CONTEXT_MENU_SEPARATOR
+                !previous ||
+                previous === CONTEXT_MENU_SEPARATOR ||
+                idx === filteredItems.length - 1
               ) {
                 return null;
               }
-              return <hr key={idx} className="context-menu-item-separator" />;
+              return <DropdownMenuSeparator key={idx} />;
             }
 
             const actionName = item.name;
@@ -90,39 +124,40 @@ export const ContextMenu = React.memo(
                 label = t(item.label as unknown as TranslationKeys);
               }
             }
+            const shortcut = actionName
+              ? getShortcutFromShortcutName(actionName as ShortcutName)
+              : "";
+            const checked = item.checked?.(appState) ?? false;
 
             return (
-              <li
+              <DropdownMenuItem
                 key={idx}
                 data-testid={actionName}
-                onClick={() => {
-                  // we need update state before executing the action in case
-                  // the action uses the appState it's being passed (that still
-                  // contains a defined contextMenu) to return the next state.
+                variant={
+                  actionName === "deleteSelectedElements" ? "danger" : "default"
+                }
+                onSelect={() => {
+                  // State has to settle before the action runs, in case the
+                  // action reads the appState it is handed (which still holds
+                  // the open menu) to work out the next one.
                   onClose(() => {
                     actionManager.executeAction(item, "contextMenu");
                   });
                 }}
               >
-                <button
-                  type="button"
-                  className={clsx("context-menu-item", {
-                    dangerous: actionName === "deleteSelectedElements",
-                    checkmark: item.checked?.(appState),
-                  })}
+                <span
+                  className="polaris-diagram-context-menu__check"
+                  aria-hidden
                 >
-                  <div className="context-menu-item__label">{label}</div>
-                  <kbd className="context-menu-item__shortcut">
-                    {actionName
-                      ? getShortcutFromShortcutName(actionName as ShortcutName)
-                      : ""}
-                  </kbd>
-                </button>
-              </li>
+                  {checked ? checkIcon : null}
+                </span>
+                <span className="polaris-diagram-context-menu__label" title={label}>{label}</span>
+                {shortcut ? <MenuShortcut>{shortcut}</MenuShortcut> : null}
+              </DropdownMenuItem>
             );
           })}
-        </ul>
-      </Popover>
+        </DropdownMenuContent>
+      </DropdownMenu>
     );
   },
 );

@@ -1,54 +1,53 @@
 @import "../css/variables.module.scss";
 
+// The surface is Polaris's dialog (see Dialog.tsx). What is here only makes room
+// for the editor's content inside it.
+.polaris-diagram-dialog {
+  // Wider dialogs than Polaris's default `max-w-lg`; the width itself is set
+  // inline from the dialog's size and never passes the screen's gutter.
+  width: 100%;
+
+  &--fullscreen {
+    max-height: calc(100dvh - 2rem);
+  }
+}
+
+// The editor's own root rules lay it out as a full-size canvas host. Inside a
+// dialog it is only a scope for the editor's styles, so it flows like a block.
+.polaris-diagram.polaris-diagram-dialog__scope {
+  position: static;
+  display: block;
+  overflow: visible;
+  width: auto;
+  height: auto;
+  color: hsl(var(--foreground));
+  background: none;
+}
+
+.polaris-diagram-dialog__hidden-title {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 .polaris-diagram {
   .Dialog {
     user-select: text;
     cursor: auto;
   }
 
+  .Dialog__header {
+    // Clear of the corner close button.
+    padding-inline-end: 2rem;
+  }
+
   .Dialog__title {
     margin: 0;
-    text-align: left;
-    font-size: 1.25rem;
-    border-bottom: 1px solid var(--dialog-border-color);
-    padding: 0 0 0.75rem;
-    margin-bottom: 1.5rem;
-  }
-
-  .Dialog__close {
-    color: var(--color-gray-40);
-    margin: 0;
-    position: absolute;
-    top: 0.75rem;
-    right: 0.5rem;
-    border: 0;
-    background-color: transparent;
-    line-height: 0;
-    cursor: pointer;
-
-    &:hover {
-      color: var(--color-gray-60);
-    }
-    &:active {
-      color: var(--color-gray-40);
-    }
-
-    svg {
-      width: 1.5rem;
-      height: 1.5rem;
-    }
-
-    & + .Dialog__content {
-      --offset: 28px;
-      height: calc(100% - var(--offset)) !important;
-      margin-top: var(--offset) !important;
-    }
-  }
-
-  .Dialog--fullscreen {
-    .Dialog__close {
-      top: 1.25rem;
-      right: 1.25rem;
-    }
   }
 }

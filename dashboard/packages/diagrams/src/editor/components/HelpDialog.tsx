@@ -87,6 +87,7 @@ export const HelpDialog = ({ onClose }: { onClose?: () => void }) => {
       <Dialog
         onCloseRequest={handleClose}
         title={t("helpDialog.title")}
+        size={960}
         className={"HelpDialog"}
       >
         <Section title={t("helpDialog.shortcuts")}>

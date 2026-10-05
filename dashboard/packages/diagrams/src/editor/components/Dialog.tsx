@@ -1,20 +1,17 @@
 import clsx from "clsx";
-import React, { useEffect, useState } from "react";
-import { useCallbackRefState } from "../hooks/useCallbackRefState";
+import React, { useState } from "react";
 import {
-  useDiagramContainer,
-  useDevice,
-  useDiagramSetAppState,
-} from "./App";
-import { KEYS } from "../keys";
+  Dialog as PolarisDialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@polaris/ui";
+import { useDevice, useDiagramSetAppState } from "./App";
 import "./Dialog.scss";
-import { Island } from "./Island";
-import { Modal } from "./Modal";
-import { queryFocusableElements } from "../utils";
 import { isLibraryMenuOpenAtom } from "./LibraryMenu";
 import { useSetAtom } from "../editor-jotai";
-import { t } from "../i18n";
-import { CloseIcon } from "./icons";
+import { useUIAppState } from "../context/ui-appState";
+import { THEME } from "../constants";
 
 export type DialogSize = number | "small" | "regular" | "wide" | undefined;
 
@@ -26,6 +23,8 @@ export interface DialogProps {
   title: React.ReactNode | false;
   autofocus?: boolean;
   closeOnClickOutside?: boolean;
+  /** Read out as the dialog's name when it shows no title of its own. */
+  label?: string;
 }
 
 function getDialogSize(size: DialogSize): number {
@@ -44,51 +43,19 @@ function getDialogSize(size: DialogSize): number {
   }
 }
 
+/**
+ * Every dialog the editor opens, drawn as Polaris's own dialog: the same
+ * overlay, surface, title, corner close button, focus trap and Escape as the
+ * rest of the app.
+ *
+ * The dialog is portalled to the page body, outside the editor, so its body is
+ * wrapped in an editor scope (`polaris-diagram`, plus the theme) for the
+ * editor's own controls inside it to keep their styles.
+ */
 export const Dialog = (props: DialogProps) => {
-  const [islandNode, setIslandNode] = useCallbackRefState<HTMLDivElement>();
   const [lastActiveElement] = useState(document.activeElement);
-  const { id } = useDiagramContainer();
-  const isFullscreen = useDevice().viewport.isMobile;
-
-  useEffect(() => {
-    if (!islandNode) {
-      return;
-    }
-
-    const focusableElements = queryFocusableElements(islandNode);
-
-    setTimeout(() => {
-      if (focusableElements.length > 0 && props.autofocus !== false) {
-        // If there's an element other than close, focus it.
-        (focusableElements[1] || focusableElements[0]).focus();
-      }
-    });
-
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === KEYS.TAB) {
-        const focusableElements = queryFocusableElements(islandNode);
-        const { activeElement } = document;
-        const currentIndex = focusableElements.findIndex(
-          (element) => element === activeElement,
-        );
-
-        if (currentIndex === 0 && event.shiftKey) {
-          focusableElements[focusableElements.length - 1].focus();
-          event.preventDefault();
-        } else if (
-          currentIndex === focusableElements.length - 1 &&
-          !event.shiftKey
-        ) {
-          focusableElements[0].focus();
-          event.preventDefault();
-        }
-      }
-    };
-
-    islandNode.addEventListener("keydown", handleKeyDown);
-
-    return () => islandNode.removeEventListener("keydown", handleKeyDown);
-  }, [islandNode, props.autofocus]);
+  const isMobile = useDevice().viewport.isMobile;
+  const { theme } = useUIAppState();
 
   const setAppState = useDiagramSetAppState();
   const setIsLibraryMenuOpen = useSetAtom(isLibraryMenuOpenAtom);
@@ -96,39 +63,60 @@ export const Dialog = (props: DialogProps) => {
   const onClose = () => {
     setAppState({ openMenu: null });
     setIsLibraryMenuOpen(false);
-    (lastActiveElement as HTMLElement).focus();
+    (lastActiveElement as HTMLElement | null)?.focus?.();
     props.onCloseRequest();
   };
 
+  const width = getDialogSize(props.size);
+
   return (
-    <Modal
-      className={clsx("Dialog", props.className, {
-        "Dialog--fullscreen": isFullscreen,
-      })}
-      labelledBy="dialog-title"
-      maxWidth={getDialogSize(props.size)}
-      onCloseRequest={onClose}
-      closeOnClickOutside={props.closeOnClickOutside}
+    <PolarisDialog
+      open
+      onOpenChange={(open) => {
+        if (!open) {
+          onClose();
+        }
+      }}
     >
-      <Island ref={setIslandNode}>
-        {props.title && (
-          <h2 id={`${id}-dialog-title`} className="Dialog__title">
-            <span className="Dialog__titleContent">{props.title}</span>
-          </h2>
-        )}
-        {isFullscreen && (
-          <button
-            className="Dialog__close"
-            onClick={onClose}
-            title={t("buttons.close")}
-            aria-label={t("buttons.close")}
-            type="button"
-          >
-            {CloseIcon}
-          </button>
-        )}
-        <div className="Dialog__content">{props.children}</div>
-      </Island>
-    </Modal>
+      <DialogContent
+        aria-describedby={undefined}
+        className={clsx("polaris-diagram-dialog", {
+          "polaris-diagram-dialog--fullscreen": isMobile,
+        })}
+        style={{ maxWidth: `min(${width}px, calc(100vw - 2rem))` }}
+        data-prevent-outside-click
+        onInteractOutside={
+          props.closeOnClickOutside === false
+            ? (event) => event.preventDefault()
+            : undefined
+        }
+        onOpenAutoFocus={
+          props.autofocus === false
+            ? (event) => event.preventDefault()
+            : undefined
+        }
+        // Focus goes back to where it was by `onClose`, not to the body.
+        onCloseAutoFocus={(event) => event.preventDefault()}
+      >
+        <div
+          className={clsx("polaris-diagram", "polaris-diagram-dialog__scope", {
+            "theme--dark": theme === THEME.DARK,
+          })}
+        >
+          <div className={clsx("Dialog", props.className)}>
+            {props.title ? (
+              <DialogHeader className="Dialog__header">
+                <DialogTitle className="Dialog__title">{props.title}</DialogTitle>
+              </DialogHeader>
+            ) : (
+              <DialogTitle className="polaris-diagram-dialog__hidden-title">
+                {props.label ?? ""}
+              </DialogTitle>
+            )}
+            <div className="Dialog__content">{props.children}</div>
+          </div>
+        </div>
+      </DialogContent>
+    </PolarisDialog>
   );
 };

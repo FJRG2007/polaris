@@ -393,7 +393,12 @@ export const ImageExportDialog = ({
   });
 
   return (
-    <Dialog onCloseRequest={onCloseRequest} size="wide" title={false}>
+    <Dialog
+      onCloseRequest={onCloseRequest}
+      size="wide"
+      title={false}
+      label={t("imageExportDialog.header")}
+    >
       <ImageExportModal
         elementsSnapshot={elementsSnapshot}
         appStateSnapshot={appStateSnapshot}
