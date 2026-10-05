@@ -641,6 +641,13 @@ A new kind follows all of them. A change to an old kind must not undo one.
   (never a bare `/reload`, which on Paper is Bukkit's reload), armed and
   disarmed only while the switch still belongs to that arena (`e97e732cd`,
   `d301dcbc7`).
+- **Take the pack in between events, never at a start.** `/datapack enable`
+  reloads the server's data and pauses the game for a moment. Done as a game
+  started, after every update that changed the pack, players felt it as a
+  freeze just before a spleef with snowballs. The minute sweep brings the pack
+  up to date while no event is on (`refreshPackIdle`), once per pack version;
+  the check at a start then finds it current and reloads nothing
+  (`ef2954920`).
 - **A look under way is shared, never started twice.** The Events screen and
   the random draw's sweep can ask who is on at the same moment; `lookIfDue`
   now hands both the one look already running instead of firing a second RCON

@@ -48,6 +48,7 @@ import * as speechService from "../speech-service";
 import * as bossService from "./kinds/boss-service";
 import type { GameKey } from "../../../../messages";
 import * as stageService from "./kinds/stage-service";
+import * as snowballPackService from "./kinds/snowball-pack-service";
 import * as arenaService from "./kinds/arena-service";
 import * as stashService from "./kinds/stash-service";
 import * as search from "./place-search";
@@ -4902,6 +4903,44 @@ export async function sweepEvents(now = Date.now()): Promise<{ running: number; 
     return { running: loops.size, started };
 }
 
+/** The events pack version each server was last brought up to, in this
+ *  process: the files are read again only after an update changed them. */
+const packsFresh = new Map<string, string>();
+
+/** Forgets which servers have the current pack: the next sweep checks each
+ *  again (a world replaced, or a fresh start in the tests). */
+export function forgetFreshPacks(): void {
+    packsFresh.clear();
+}
+
+/**
+ * The events data pack brought up to date while no event is on. Taking it in
+ * (`/datapack enable`) reloads the server's data and pauses the game for a
+ * moment; done at an event's start, after every update that changed the pack,
+ * the players felt it as a freeze just before the game - a spleef with
+ * snowballs, a TNT run, a dropper or a boat race. An event still checks it
+ * before it starts, and finds it current.
+ */
+async function refreshPackIdle(
+    ownerId: string,
+    installedAppId: string,
+    presets: readonly catalog.EventPreset[]
+): Promise<void> {
+    if (!presets.some(stageService.usesPack)) return;
+    const version = snowballPackService.packVersion();
+    if (packsFresh.get(installedAppId) === version) return;
+    const fresh = await withServerContainer(ownerId, installedAppId, (server) =>
+        server.running ? snowballPackService.ensurePack(server) : Promise.resolve(false)
+    ).catch((error: unknown) => {
+        console.warn("polaris: refreshing the events pack failed", installedAppId, String(error));
+        return false;
+    });
+    if (fresh) {
+        if (packsFresh.size >= 256) packsFresh.delete(packsFresh.keys().next().value!);
+        packsFresh.set(installedAppId, version);
+    }
+}
+
 async function sweepOne(
     ownerId: string,
     installedAppId: string,
@@ -4939,6 +4978,8 @@ async function sweepOne(
         else startLoop(ownerId, installedAppId, state.run, settings.settings);
         return false;
     }
+    if (!loops.has(installedAppId))
+        await refreshPackIdle(ownerId, installedAppId, settings.presets);
     const pending = stored.livePending(state.pending, now);
     const wantsPlayers =
         pending.length > 0 ||

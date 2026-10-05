@@ -1170,6 +1170,15 @@ function needsPack(kind: catalog.EventKind): boolean {
     return kind === "tnt-run" || kind === "dropper" || kind === "boat-race";
 }
 
+/** Whether an event can need the events data pack when it runs: a kind
+ *  played by it, or a spleef that can draw its snowballs. */
+export function usesPack(preset: catalog.EventPreset): boolean {
+    if (needsPack(preset.kind)) return true;
+    if (preset.kind !== "spleef") return false;
+    const { variants } = preset.options as catalog.EventOptions<"spleef">;
+    return variants.includes("snowballs");
+}
+
 /**
  * One tick of a dropper. The pack does the play - it sends a racer who lands on
  * a floor back to the top, and notes how low each has been and when they

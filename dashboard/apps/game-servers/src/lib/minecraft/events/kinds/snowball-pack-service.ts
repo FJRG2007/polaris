@@ -10,6 +10,7 @@
  * runs while the players are still being told to get ready, not when they throw.
  */
 
+import { createHash } from "node:crypto";
 import { DATA_DIR } from "../../world";
 import * as pack from "./snowball-pack";
 import type { ServerContainer } from "../../service";
@@ -18,6 +19,14 @@ import { readContainerFiles, writeContainerFile } from "../../../container-files
 
 /** Whether the pack is on the server and switched on - the files written where
  *  they were missing or older, and the pack taken in again when they were. */
+/** The pack's files as this Polaris writes them, in short: what the minute
+ *  sweep compares to know a server already has them. */
+export function packVersion(): string {
+    const hash = createHash("sha256");
+    for (const [path, content] of pack.packFiles()) hash.update(path).update("\0").update(content);
+    return hash.digest("hex");
+}
+
 export async function ensurePack(server: ServerContainer): Promise<boolean> {
     const level = await levelOf(server);
     if (!level) return false;
