@@ -82,6 +82,14 @@ vi.mock("@polaris-app/places/src/screens/overview/actions", () => ({
             : Promise.resolve({ overview: served })
 }));
 
+const refreshed = vi.fn();
+const router = { replace: vi.fn(), push: vi.fn(), refresh: refreshed };
+
+vi.mock("next/navigation", async (original) => ({
+    ...(await original<typeof import("next/navigation")>()),
+    useRouter: () => router
+}));
+
 vi.mock("@polaris-app/places/src/screens/actions", () => ({
     deviceHistoryAction: async () => ({ events: [] }),
     deviceUsageAction: async () => ({ used: [] }),
@@ -102,6 +110,7 @@ beforeEach(() => {
     served = HOUSE;
     hold = false;
     pressed.length = 0;
+    refreshed.mockClear();
 });
 
 afterEach(cleanup);
@@ -195,6 +204,44 @@ describe("the Overview", () => {
             const fresh = screen.getByRole("switch", { name: "Turn Reading lamp on or off" });
             expect(fresh.hasAttribute("disabled")).toBe(false);
         });
+    });
+
+    it("does not draw a place that could not be read as an empty one", async () => {
+        hold = true;
+        draw();
+        await act(async () => reply({ error: "The place could not be read." }));
+        expect(await screen.findByRole("alert")).toBeTruthy();
+        expect(screen.queryByText("No devices yet")).toBeNull();
+        expect(screen.queryByText("No cameras at this place yet.")).toBeNull();
+    });
+
+    it("leaves another place's devices out, and reloads the page onto it", async () => {
+        writeSnapshot("places.overview.place-1", HOUSE);
+        hold = true;
+        draw();
+        const elsewhere: PlaceOverview = {
+            ...HOUSE,
+            placeId: "place-2",
+            devices: [device({ id: "garage", name: "Garage light", placeId: "place-2" })]
+        };
+        await act(async () => reply({ overview: elsewhere }));
+        expect(refreshed).toHaveBeenCalled();
+        expect(screen.queryByText("Garage light")).toBeNull();
+        const toggle = screen.getByRole("switch", { name: "Turn Reading lamp on or off" });
+        expect(toggle.hasAttribute("disabled") || toggle.getAttribute("aria-disabled") === "true").toBe(true);
+    });
+
+    it("rounds both ends of a temperature range", async () => {
+        served = {
+            ...HOUSE,
+            devices: [
+                device({ id: "a", kind: "sensor", name: "Hall sensor", reading: { value: "21.37", unit: "°C" } }),
+                device({ id: "b", kind: "sensor", name: "Attic sensor", reading: { value: "23", unit: "°C" } })
+            ]
+        };
+        draw();
+        await screen.findByText("Hall sensor");
+        expect(screen.getByRole("region", { name: "At a glance" }).textContent).toContain("21.4 to 23°C");
     });
 
     it("speaks Spanish", async () => {

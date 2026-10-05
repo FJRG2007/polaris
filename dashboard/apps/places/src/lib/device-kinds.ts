@@ -597,8 +597,13 @@ export function applyCommand(
 
 /** A temperature as a person reads it: no trailing ".0", the unit closed up. */
 export function temperatureText(value: number, unit: ClimateUnit): string {
+    return `${degreesText(value)}°${unit}`;
+}
+
+/** A temperature to one decimal, without its unit. */
+export function degreesText(value: number): string {
     const rounded = Math.round(value * 10) / 10;
-    return `${Number.isInteger(rounded) ? rounded.toFixed(0) : rounded.toFixed(1)}°${unit}`;
+    return Number.isInteger(rounded) ? rounded.toFixed(0) : rounded.toFixed(1);
 }
 
 export function climateModeText(mode: ClimateMode, t: PlacesTranslator = en): string {

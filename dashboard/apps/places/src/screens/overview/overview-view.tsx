@@ -37,7 +37,8 @@ import { drawsFromBattery } from "../../lib/camera-models";
 import * as automationActions from "../automations/actions";
 import { dropAutomationsCache } from "../automations/cache";
 import { Badge, Button, Card, Skeleton, cn } from "@polaris/ui";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { DeviceControls, DeviceIcon, DevicePanel, stateClass, toneClass } from "../devices/device-panel";
 import {
     AlertTriangle,
@@ -100,29 +101,42 @@ export function OverviewView({
     const [watching, setWatching] = useState<CameraView | null>(null);
     /** Bumped on each refresh, so the camera pictures are asked for again. */
     const [tick, setTick] = useState(0);
+    const router = useRouter();
+    const showing = useRef(placeId);
     const cacheKey = `${CACHE_PREFIX}${placeId}`;
 
     const load = useCallback(
         async (sync: boolean) => {
             const result = await actions.placeOverviewAction({ sync });
+            if (showing.current !== placeId) return;
             if (result.overview) {
+                if (result.overview.placeId !== placeId) {
+                    setFresh(false);
+                    router.refresh();
+                    return;
+                }
                 setData(result.overview);
                 setFresh(true);
                 writeSnapshot(cacheKey, result.overview);
                 setError("");
             } else if (result.error) {
                 setError(result.error);
-                setData((current) => current ?? EMPTY);
             }
         },
-        [cacheKey]
+        [cacheKey, placeId, router]
     );
 
     useEffect(() => {
+        showing.current = placeId;
         const cached = readSnapshot<actions.PlaceOverview>(cacheKey, REFRESH_MS);
-        if (cached) setData(cached.value);
+        setData(cached?.value ?? null);
+        setFresh(false);
+        setError("");
+        setOpened(null);
+        setEditing(null);
+        setWatching(null);
         void load(false);
-    }, [cacheKey, load]);
+    }, [cacheKey, placeId, load]);
 
     useEffect(() => {
         const refresh = () => {
@@ -149,6 +163,8 @@ export function OverviewView({
     const rooms = useMemo(() => (devices ? overview.groupByRoom(devices) : null), [devices]);
     // Nothing is pressed on a copy from earlier: it paints, and waits.
     const mayOperate = canControl && fresh;
+    // A place that could not be read is not drawn as one with nothing in it.
+    const unread = data === null && error !== "";
 
     const onAct = (device: DeviceView) => (action: kinds.DeviceAction, command?: kinds.DeviceCommand) => {
         // Thrown by `act` so the panel can show it; here the line above has it.
@@ -163,13 +179,13 @@ export function OverviewView({
                 </p>
             ) : null}
 
-            <SummaryTiles summary={summary} cameras={data?.cameras.length ?? null} />
+            {unread ? null : <SummaryTiles summary={summary} cameras={data?.cameras.length ?? null} />}
 
             {summary && summary.attention.length > 0 ? (
                 <AttentionCard items={summary.attention} onOpen={setOpened} />
             ) : null}
 
-            <div className="flex flex-col gap-6 lg:grid lg:grid-cols-3 lg:items-start">
+            <div className={unread ? "hidden" : "flex flex-col gap-6 lg:grid lg:grid-cols-3 lg:items-start"}>
                 <section aria-label={t("placeOverview.rooms.title")} className="order-2 flex min-w-0 flex-col gap-3 lg:order-none lg:col-span-2">
                     <h2 className="text-[0.6875rem] font-semibold uppercase tracking-wide text-foreground-subtle">
                         {t("placeOverview.rooms.title")}
@@ -275,15 +291,6 @@ export function OverviewView({
         </div>
     );
 }
-
-/** What a place that could not be read is drawn as, so the frame still settles. */
-const EMPTY: actions.PlaceOverview = {
-    placeId: "",
-    devices: [],
-    cameras: [],
-    automations: [],
-    events: []
-};
 
 /** A card in the Overview's own frame: a heading, a way into the screen behind it,
  *  and a body. */
@@ -432,10 +439,10 @@ export function summaryTiles(
     if (summary.climate > 0 || summary.temperatures) {
         const spread = summary.temperatures;
         const temperature = spread
-            ? spread.min === spread.max
+            ? kinds.degreesText(spread.min) === kinds.degreesText(spread.max)
                 ? kinds.temperatureText(spread.min, spread.unit)
                 : t("placeOverview.summary.temperatureRange", {
-                      min: spread.min,
+                      min: kinds.degreesText(spread.min),
                       max: kinds.temperatureText(spread.max, spread.unit)
                   })
             : null;
