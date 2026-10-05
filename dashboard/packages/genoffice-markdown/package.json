@@ -36,7 +36,7 @@
         "@tiptap/react": "3.31.0",
         "@tiptap/starter-kit": "3.31.0",
         "@tiptap/suggestion": "3.31.0",
-        "katex": "0.16.11",
+        "katex": "0.16.47",
         "react": "19.0.0",
         "react-dom": "19.0.0"
     },
