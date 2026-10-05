@@ -23,15 +23,15 @@
     },
     "//": "The agent CLIs (@anthropic-ai/claude-code, opencode-ai, agent-browser, skills) are NOT imported. utils/install.ts reads their version from this file and installs them into the run's workspace, so these entries are version pins and removing one breaks the run rather than the build.",
     "devDependencies": {
-        "@actions/core": "1.11.1",
-        "@anthropic-ai/claude-code": "2.1.150",
+        "@actions/core": "3.0.1",
+        "@anthropic-ai/claude-code": "2.1.289",
         "@modelcontextprotocol/sdk": "1.26.0",
         "@octokit/plugin-throttling": "11.0.3",
         "@octokit/rest": "22.0.0",
         "@octokit/webhooks-types": "7.6.1",
         "@opencode-ai/sdk": "1.18.5",
         "@standard-schema/spec": "1.1.0",
-        "@toon-format/toon": "1.0.0",
+        "@toon-format/toon": "4.1.1",
         "@types/node": "24.7.2",
         "@types/object-hash": "3.0.6",
         "@types/semver": "7.7.1",
@@ -43,7 +43,7 @@
         "dotenv": "17.2.3",
         "esbuild": "0.28.1",
         "fastmcp": "3.34.0",
-        "file-type": "21.3.0",
+        "file-type": "21.3.4",
         "lru-cache": "11.0.0",
         "object-hash": "3.0.0",
         "opencode-ai": "1.18.5",
@@ -53,7 +53,7 @@
         "table": "6.9.0",
         "turndown": "7.2.0",
         "typescript": "5.9.3",
-        "undici": "7.22.0",
+        "undici": "7.30.0",
         "zod": "3.24.1"
     }
 }

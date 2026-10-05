@@ -2,7 +2,10 @@ name: Dashboard Agent Maintenance
 
 # Weekly health sweep of the dashboard workspace: dependency audit, typecheck,
 # and an outdated-dependency report. When something needs attention it opens (or
-# updates) a single tracking issue instead of failing the run.
+# updates) a single tracking issue instead of failing the run. "Needs attention"
+# is a real type error or a high/critical advisory in a production dependency
+# that docs/dependencies.md has not accepted; everything else is in the report
+# without opening the issue.
 #
 # This is the extension point for autonomous maintenance: an agent can be wired
 # in here to read the same signals (audit / typecheck / outdated), propose fixes,
@@ -44,6 +47,11 @@ jobs:
 
       - run: npm ci
       - run: npm run db:generate
+      # The typecheck below reads the packages' published declarations, the same
+      # as dashboard-ci.yml. Without them every import of a workspace package is
+      # an unresolved module, and the report fills with thousands of errors that
+      # are not in the code.
+      - run: npm run build:packages
 
       - name: Run maintenance checks
         id: checks
@@ -58,10 +66,18 @@ jobs:
             echo
           } > "$report"
 
+          # Only what ships can open the issue: a high or critical advisory in a
+          # production dependency that scripts/audit-allowlist.json does not
+          # accept (or accepts past its expiry). Development-only findings and
+          # moderate ones are listed for whoever reads the report, and never
+          # open it on their own. The gate exits 2 when npm or the report
+          # itself failed, and that is a problem too: a silent audit is not a
+          # clean one.
           echo "### npm audit" >> "$report"
-          echo '```' >> "$report"
-          npm audit >> "$report" 2>&1 || problems=1
-          echo '```' >> "$report"
+          npm audit --omit=dev --json > "$RUNNER_TEMP/audit-prod.json" 2>/dev/null
+          node scripts/audit-gate.mjs "$RUNNER_TEMP/audit-prod.json" --title "Production dependencies" >> "$report" 2>&1 || problems=1
+          npm audit --json > "$RUNNER_TEMP/audit-all.json" 2>/dev/null
+          node scripts/audit-gate.mjs "$RUNNER_TEMP/audit-all.json" --warn-only --title "Including development dependencies (informational)" >> "$report" 2>&1
 
           echo "### typecheck" >> "$report"
           echo '```' >> "$report"

@@ -1,0 +1,53 @@
+{
+    "$comment": "High/critical npm advisories accepted by scripts/audit-gate.mjs. Each entry needs a GHSA id, the package npm reports it on, why it cannot reach Polaris, and an expiry date - an expired entry fails the gate again. Background and removal conditions: docs/dependencies.md.",
+    "accepted": [
+        {
+            "id": "GHSA-86w9-cpqp-85rv",
+            "package": "node-forge",
+            "reason": "No fixed node-forge release (<=1.4.0, the latest). Pulled in by acme-client, which only uses forge to generate keys, build CSRs and parse PEM; it never verifies an RSA PKCS#1 v1.5 signature, the only affected function.",
+            "expires": "2027-01-05"
+        },
+        {
+            "id": "GHSA-c475-qrg2-pj4r",
+            "package": "basic-ftp",
+            "reason": "No fixed release. Reached only through whatsapp-web.js -> puppeteer -> proxy-agent, which uses FTP to download a browser; the bridge image sets PUPPETEER_SKIP_DOWNLOAD and runs the system Chromium, so no FTP listing is ever parsed.",
+            "expires": "2027-01-05"
+        },
+        {
+            "id": "GHSA-jmr9-qjv8-65gv",
+            "package": "extract-zip",
+            "reason": "No fixed release. Used only by @puppeteer/browsers to unpack a downloaded browser; the bridge never downloads one (PUPPETEER_SKIP_DOWNLOAD, system Chromium), and Polaris extracts no user archive with it.",
+            "expires": "2027-01-05"
+        },
+        {
+            "id": "GHSA-7pqw-9j4j-h8q3",
+            "package": "extract-zip",
+            "reason": "No fixed release. Used only by @puppeteer/browsers to unpack a downloaded browser; the bridge never downloads one (PUPPETEER_SKIP_DOWNLOAD, system Chromium), and Polaris extracts no user archive with it.",
+            "expires": "2027-01-05"
+        },
+        {
+            "id": "GHSA-vfj7-8cjw-p6xm",
+            "package": "braces",
+            "reason": "No fixed release. Build- and install-time only: tailwindcss 3, patch-package and the diagram package's sass (watch mode, never used) expand glob patterns written in this repository, never a pattern from a request. The copy under dymo-api's tw-to-css sits on the SDK's sendEmail path, which Polaris never calls.",
+            "expires": "2027-01-05"
+        },
+        {
+            "id": "GHSA-6g55-p6wh-862q",
+            "package": "postcss",
+            "reason": "Two exact pins of 8.4.31 the root override does not reach: Next.js 15 (build time, on this repository's own stylesheets; fixed only in Next 16) and tw-to-css inside dymo-api, used only by the SDK's sendEmail path, which Polaris never calls.",
+            "expires": "2027-01-05"
+        },
+        {
+            "id": "GHSA-r28c-9q8g-f849",
+            "package": "postcss",
+            "reason": "Two exact pins of 8.4.31 the root override does not reach: Next.js 15 (build time, on this repository's own stylesheets; fixed only in Next 16) and tw-to-css inside dymo-api, used only by the SDK's sendEmail path, which Polaris never calls.",
+            "expires": "2027-01-05"
+        },
+        {
+            "id": "GHSA-28wg-ghj8-5hjv",
+            "package": "nanoid",
+            "reason": "@univerjs/core 0.25 pins nanoid 5.1.11 exactly, and npm does not apply an override to it. Univer calls generateRandomId with fixed positive sizes (4 to 21), never a negative one. Univer 1.x drops nanoid.",
+            "expires": "2027-01-05"
+        }
+    ]
+}

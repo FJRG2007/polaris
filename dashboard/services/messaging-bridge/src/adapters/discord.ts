@@ -12,7 +12,7 @@ import {
     GatewayIntentBits,
     Partials,
     type APIActionRowComponent,
-    type APIMessageActionRowComponent,
+    type APIComponentInMessageActionRow,
     type Message
 } from "discord.js";
 import { capabilitiesFor } from "@polaris/messaging";
@@ -194,8 +194,8 @@ export class DiscordAdapter implements ChannelAdapter {
 
     private buttonRows(
         prompt: InteractivePrompt
-    ): APIActionRowComponent<APIMessageActionRowComponent>[] {
-        const rows: APIActionRowComponent<APIMessageActionRowComponent>[] = [];
+    ): APIActionRowComponent<APIComponentInMessageActionRow>[] {
+        const rows: APIActionRowComponent<APIComponentInMessageActionRow>[] = [];
         const options = prompt.options.slice(0, MAX_BUTTONS);
         for (let i = 0; i < options.length; i += BUTTONS_PER_ROW) {
             rows.push({

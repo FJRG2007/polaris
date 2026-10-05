@@ -12,6 +12,6 @@
         "test": "vitest run --passWithNoTests"
     },
     "dependencies": {
-        "onnxruntime-node": "1.27.0"
+        "onnxruntime-node": "1.30.0"
     }
 }

@@ -81,6 +81,29 @@ that edge 404 - and the vacant page - as down rather than up, and republishes th
 app routes itself the first time it finds an address unrouted, since that is the
 one outage here Polaris can end without a terminal.
 
+## The browser bundle never carries this machine's paths
+
+Webpack compiles a bare `import.meta.url` to the module's absolute `file://`
+path on whichever machine ran the build. pdf.js and Excalidraw both read it
+(a Node-only canvas factory, a font-subset worker), so without the fix below
+every client that touched either one downloaded the builder's disk layout -
+account name included.
+
+- **The client webpack compilation answers `import.meta.url` with a
+  workspace-relative path instead**, via a plugin
+  (`PortableImportMetaUrl`, `apps/web/scripts/portable-import-meta.mjs`) wired
+  into the `webpack` hook in `apps/web/next.config.mjs` for `!isServer` only -
+  the server compilation keeps the real path, which `createRequire` needs.
+- **The web app's `postbuild` script re-checks this regardless**
+  (`apps/web/scripts/check-client-paths.mjs`, asserted by
+  `apps/web/test/build/client-paths.test.ts`): it scans every text asset under
+  `.next/static` for the workspace root and the home directory, in every
+  spelling a bundler writes a path, and fails the build if either one is
+  still there. A new dependency that reads `import.meta.url`, `__filename`, or
+  bakes a source path into an error string is caught here even if nothing
+  above knew to handle it - never silence or narrow this check to make a build
+  pass.
+
 ## Agent session environment
 
 The host daemon refuses to start a container if any environment value contains

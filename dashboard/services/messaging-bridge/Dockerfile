@@ -60,7 +60,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # bundle runs under `node index.js`.
 COPY --from=builder /build/services/messaging-bridge/dist/index.js ./index.js
 RUN echo '{"type":"module"}' > package.json && \
-    npm install --omit=dev discord.js@14.16.3 whatsapp-web.js@1.34.7 qrcode@1.5.4 && \
+    npm install --omit=dev discord.js@14.27.0 whatsapp-web.js@1.34.7 qrcode@1.5.4 && \
     mkdir -p /app/.sessions && chown -R node:node /app
 # That chown shares its RUN with the install that created the tree, so it costs
 # nothing: one layer either way. On its own it would be the mistake the vision

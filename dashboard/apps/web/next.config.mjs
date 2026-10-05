@@ -7,6 +7,7 @@
 
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
+import { PortableImportMetaUrl } from "./scripts/portable-import-meta.mjs";
 
 const workspaceRoot = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 
@@ -219,7 +220,7 @@ const nextConfig = {
         { source: "/vault/notifications/:path*", destination: "/api/bw/notifications/:path*" },
         { source: "/vault/events/:path*", destination: "/api/bw/events/:path*" }
     ],
-    webpack: (config) => {
+    webpack: (config, { isServer, webpack }) => {
         // @polaris/ui is transpiled from TypeScript source and, like the rest of
         // the repo, uses explicit .js import specifiers. Map them back to .ts/.tsx
         // so webpack resolves them the way tsc's bundler resolution does.
@@ -233,6 +234,10 @@ const nextConfig = {
         // the package is a native build nobody should be compiling to serve a
         // .pptx. Resolved to nothing so the optional require stays optional.
         config.resolve.alias = { ...config.resolve.alias, canvas: false };
+        // A bare `import.meta.url` would otherwise ship this machine's absolute
+        // path to every browser (scripts/portable-import-meta.mjs), and the
+        // postbuild check fails the build if any path still gets through.
+        if (!isServer) config.plugins.push(new PortableImportMetaUrl(workspaceRoot, webpack));
         return config;
     }
 };

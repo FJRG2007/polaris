@@ -21,7 +21,7 @@
         "cfb": "1.2.2",
         "fast-xml-parser": "5.11.1",
         "jszip": "3.10.1",
-        "pdfjs-dist": "6.1.200",
+        "pdfjs-dist": "6.4.299",
         "ppt-to-text": "1.0.1",
         "word-extractor": "1.0.4"
     }
