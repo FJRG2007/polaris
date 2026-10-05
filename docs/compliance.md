@@ -42,9 +42,12 @@ where copies of keys are kept outside the instance, and the organization's own p
   Code and others) reaches a person's own account over OAuth 2.1, scoped to the
   permissions they tick on Polaris's own consent screen and cut down live if they
   reconnect with fewer, or if the permissions are changed afterward from the
-  assistant's own page. Connecting one, changing what it may do, and a connection
-  Polaris ends itself because a token was presented twice all raise the same
-  security alert a new API key does (Account > AI assistants).
+  assistant's own page. A connection can also be restricted to the address it was
+  approved from, a chosen allow/deny list, or only while the person is signed in to
+  Polaris, checked on every call and refresh. Connecting one, changing what it may
+  do, changing where it may connect from, and a connection Polaris ends itself
+  because a token was presented twice all raise the same security alert a new API
+  key does (Account > AI assistants).
 - **Firewall** rules sit in front of every service and in front of Polaris itself:
   managed rule packs, custom rules, address allow and deny lists, a required Polaris
   sign-in, SQL injection and cross-site scripting checks, and bans (Firewall).
