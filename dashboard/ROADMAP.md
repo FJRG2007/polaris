@@ -648,8 +648,9 @@ Telemetry (what breaks):
   address it was approved from, a chosen allow/deny list, or only while the
   person is signed in to Polaris, checked on every call and token refresh.
 - Account > AI assistants has a guide for each client whose own docs say how
-  to add a custom remote server, with the server URL filled in, the value to
-  copy at each step, the documented one-click install where there is one
+  to add a custom remote server, with every value the step asks for - name,
+  URL, authentication, transport - filled in and ready to copy under the
+  field it goes in, the documented one-click install where there is one
   (Cursor, VS Code), and a link to the client's own guide; a generic guide
   covers Streamable HTTP, SSE and stdio through mcp-remote for everything
   else. `/api/mcp/sse` serves clients still on the legacy HTTP+SSE transport:
