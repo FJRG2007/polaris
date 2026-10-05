@@ -181,16 +181,22 @@ Platform:
 - [x] Full edition is the installer default (opt out with `install.sh --limited`): hostd runs by default so in-band updates and the local Docker host work with no flags. hostd + updater container images now build and publish (were missing entirely)
 - [x] Auto-update via hostd: `POST /v1/update` runs a one-shot `polaris-updater` container that re-runs `install.sh` (git pull -> reconcile .env -> pull images -> migrate -> redeploy -> verify)
 - [x] `plr`/`polaris`, the command-line client for developers (`packages/cli`,
-      see `docs/cli.md`): bundled by tsup into one file each Polaris serves at
-      `/cli`, installed by a one-line script with no root/Administrator. Signs in
-      from the browser (a device code, or `--browserless` on a machine with no
-      display) into a scoped CLI API key, kept in the OS keychain with a
-      `credentials.json` fallback. That key is also a Sessions row - shown,
-      locked to its address, and ended from Sessions or API keys like any other
-      session - with `deploy`, `logs`, `restart` and the rest of the read/deploy
-      commands behind it. The CLI and a Polaris server refuse to install on the
-      same machine, since both claim `polaris` and `plr`. A CLI section with
-      per-OS/browser icons on `/account/downloads` carries the install line.
+      see `docs/cli.md`): bundled by tsup into one file, installed from this
+      repository's GitHub releases (`cli-v*` tags) like the browser extension,
+      with no root/Administrator - then pointed at a Polaris with
+      `plr login --url`. Every call checks the CLI and that Polaris speak the
+      same API (`X-Polaris-Cli-Protocol`, `packages/cli/src/compat.ts`) and says
+      which side to update when they do not. Signs in from the browser (a device
+      code, or `--browserless` on a machine with no display) into a scoped CLI
+      API key, kept in the OS keychain with a `credentials.json` fallback. That
+      key is also a Sessions row - shown, locked to its address, and ended from
+      Sessions or API keys like any other session - with `deploy`, `logs`,
+      `restart` and the rest of the read/deploy commands behind it. The CLI and
+      a Polaris server refuse to install on the same machine, since both claim
+      `polaris` and `plr`. A Polaris still serves the bundle and the install
+      scripts at `/cli` for an older CLI's `plr update --url` and for lines
+      pasted from older docs. A CLI section with per-OS/browser icons on
+      `/account/downloads` carries the install line.
 - [x] Consumption (`/admin/consumption`): where the machine went, split into
       Polaris itself (totals only, since the part-by-part table already lives on
       the footprint card), marketplace installs, deployed services/databases (a

@@ -144,7 +144,8 @@ says otherwise. A running service keeps its old values until it is redeployed:
 A service is `project/service` (its default environment),
 `project/environment/service`, or its id. Read commands print JSON with
 `--json`. Every failure says what to do next; `POLARIS_DEBUG=1` adds the
-details of one the CLI did not expect.
+details of one the CLI did not expect. `PLR_DEBUG=1` prints where a command's
+time went - startup, the sign-in read, and each request - after its output.
 
 A Polaris on a private certificate authority is trusted by pointing
 `NODE_EXTRA_CA_CERTS` at the CA's certificate; there is no switch that turns
