@@ -36,7 +36,7 @@
         "@polaris/pptx-render": "*",
         "@polaris/project-store": "*",
         "acorn": "8.14.0",
-        "konva": "9.3.16",
+        "konva": "10.7.0",
         "react": "19.0.0",
         "react-dom": "19.0.0",
         "react-konva": "19.0.3"

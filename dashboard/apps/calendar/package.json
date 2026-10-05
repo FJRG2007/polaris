@@ -10,23 +10,23 @@
         "slot": "src/screens/extension-slot.tsx#CalendarSlot"
     },
     "dependencies": {
-        "@fullcalendar/core": "6.1.21",
+        "@fullcalendar/core": "7.1.0",
         "@fullcalendar/daygrid": "6.1.21",
         "@fullcalendar/interaction": "6.1.21",
         "@fullcalendar/list": "6.1.21",
         "@fullcalendar/multimonth": "6.1.21",
-        "@fullcalendar/react": "6.1.21",
+        "@fullcalendar/react": "7.1.0",
         "@fullcalendar/timegrid": "6.1.21",
         "@polaris/app-host": "0.1.0",
         "@polaris/core": "0.1.0",
         "@polaris/db": "0.1.0",
         "@polaris/ui": "0.1.0",
         "ical.js": "2.2.1",
-        "lucide-react": "0.469.0",
-        "zod": "3.24.1"
+        "lucide-react": "1.50.0",
+        "zod": "4.6.5"
     },
     "peerDependencies": {
-        "next": "*",
+        "next": "16.3.8",
         "react": "^19",
         "react-dom": "^19"
     }
