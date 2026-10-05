@@ -109,7 +109,8 @@ export function Composer({
     onMedia,
     onSaved,
     onSaveEdit,
-    onCancelEdit
+    onCancelEdit,
+    divided = true
 }: {
     /**
      * The conversation this box belongs to, or null where it is not one.
@@ -273,6 +274,14 @@ export function Composer({
     onSaved?: (savedId: string) => void | Promise<void>;
     onSaveEdit?: (messageId: string, body: string) => void | Promise<void>;
     onCancelEdit?: () => void;
+    /**
+     * Whether the box draws its own rule and padding along its top edge.
+     *
+     * Off where the box is not the foot of a column but sits inside something
+     * else - a reply under a comment - where a full-width rule cuts the
+     * comment from its own answer.
+     */
+    divided?: boolean;
 }) {
     const t = useTranslations("chat");
     const [body, setBody] = useState("");
@@ -844,7 +853,8 @@ export function Composer({
                 stage(event.dataTransfer.files);
             }}
             className={cn(
-                "shrink-0 border-t border-border p-3 transition-colors",
+                "shrink-0 transition-colors",
+                divided && "border-t border-border p-3",
                 dragging && "bg-primary/10"
             )}
         >
