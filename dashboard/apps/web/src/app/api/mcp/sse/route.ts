@@ -109,8 +109,9 @@ export async function GET(request: Request): Promise<Response> {
 }
 
 /**
- * A message for an open stream. Answered 202 once its reply is on the stream;
- * a refusal before the protocol (401, 413, a malformed body) is answered here
+ * A message for an open stream. Answered 202 once its reply is on the stream,
+ * and 410 when the message was handled but its stream closed before the reply
+ * could be put on it, so a client does not run it again; a refusal before the protocol (401, 413, a malformed body) is answered here
  * exactly as `/api/mcp` answers it.
  */
 export async function POST(request: Request): Promise<Response> {
@@ -136,6 +137,9 @@ export async function POST(request: Request): Promise<Response> {
     const delivered = await deliver(sessionId.data, Array.isArray(reply) ? reply : [reply]);
     if (!delivered)
         // i18n-ignore read by a machine, not shown to a person
-        return refusal(404, "The stream for this session closed. Open a new one with GET.");
+        return refusal(
+            410,
+            "This message was handled, but its stream closed before the reply could be sent."
+        );
     return new Response(null, { status: 202 });
 }

@@ -14,7 +14,8 @@
 /** The MCP endpoint, which is the one resource these tokens are for. */
 export const MCP_PATH = "/api/mcp";
 /** The same endpoint over the legacy HTTP+SSE transport: the same resource,
- *  so the same tokens open it. */
+ *  so the same tokens open it, and a client that names it as the resource is
+ *  given tokens for the MCP endpoint. */
 export const SSE_PATH = "/api/mcp/sse";
 export const AUTHORIZE_PATH = "/oauth/authorize";
 export const TOKEN_PATH = "/api/oauth/token";
@@ -44,7 +45,8 @@ export function resourceMetadataUrl(origin: string): string {
  * RFC 8707 makes it an absolute URI with no fragment; the MCP spec has clients
  * send it without a trailing slash and with the scheme and host lowercase, and
  * some send it with the slash anyway. Both spellings name the same endpoint, so
- * both are folded to one before they are compared.
+ * both are folded to one before they are compared. The SSE address is the
+ * same endpoint as the MCP one, so it is folded to that too.
  */
 export function canonicalResource(value: string): string | null {
     if (value.length > MAX_URI_LENGTH || value.includes("#")) return null;
@@ -56,7 +58,8 @@ export function canonicalResource(value: string): string | null {
     }
     if (url.protocol !== "https:" && url.protocol !== "http:") return null;
     if (url.username || url.password) return null;
-    const path = url.pathname.length > 1 ? url.pathname.replace(/\/+$/, "") : "";
+    let path = url.pathname.length > 1 ? url.pathname.replace(/\/+$/, "") : "";
+    if (path === SSE_PATH) path = MCP_PATH;
     return `${url.origin}${path}${url.search}`;
 }
 
