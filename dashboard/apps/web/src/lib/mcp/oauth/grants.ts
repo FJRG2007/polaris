@@ -27,7 +27,11 @@ import { verifierMatches } from "./pkce";
 import { clientBrand, type ClientBrand } from "./client-brand";
 import { IP_REFUSED_DESCRIPTION, grantAllowsIp } from "./ip-guard";
 import { readIpPolicy, type IpPolicy } from "./ip-policy";
-import { readNetworkException, storedNetworkException, type NetworkException } from "./network-exception";
+import {
+    readNetworkException,
+    storedNetworkException,
+    type NetworkException
+} from "./network-exception";
 import { getUserPermissions } from "@polaris/auth";
 import type { OAuthClientRecord } from "./clients";
 import { generateToken, hashToken } from "@polaris/core/tokens";

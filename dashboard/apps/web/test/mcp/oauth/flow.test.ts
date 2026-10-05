@@ -150,8 +150,9 @@ const serverMetadata = await import(
 );
 const { answerAuthorizationAction } = await import("@/app/oauth/authorize/actions");
 const { listConnectedApps, revokeConnectedApp } = await import("@/lib/mcp/oauth/grants");
-const { changeAppScopesAction, setAppIpPolicyAction, setAppNetworkExceptionAction } =
-    await import("@/app/(app)/account/assistants/connected-app-actions");
+const { changeAppScopesAction, setAppIpPolicyAction, setAppNetworkExceptionAction } = await import(
+    "@/app/(app)/account/assistants/connected-app-actions"
+);
 const { clearPresetRanges } = await import("@/lib/mcp/oauth/preset-ranges");
 
 const REDIRECT = "http://127.0.0.1/callback";
@@ -1447,9 +1448,9 @@ describe("a connection's exception to the account's network rules", () => {
 
         // Shown on the connection, and audited like any change to access.
         const apps = await listConnectedApps(ADA.id);
-        expect(apps.find((entry) => entry.id === chatgpt.app.id)!.networkException).toMatchObject(
-            { allowedCountries: ["US"] }
-        );
+        expect(apps.find((entry) => entry.id === chatgpt.app.id)!.networkException).toMatchObject({
+            allowedCountries: ["US"]
+        });
         expect(apps.find((entry) => entry.id === other.app.id)!.networkException).toMatchObject({
             allowedCountries: []
         });
@@ -1510,8 +1511,12 @@ describe("a connection's exception to the account's network rules", () => {
     it("refuses a place it does not know, another person's connection, and a view", async () => {
         const { app } = await connectedApp();
         expect(
-            (await setAppNetworkExceptionAction({ id: app.id, exception: { allowedCountries: ["XX"] } }))
-                .error
+            (
+                await setAppNetworkExceptionAction({
+                    id: app.id,
+                    exception: { allowedCountries: ["XX"] }
+                })
+            ).error
         ).toBe("connectedApps.exception.failed");
         state.user = { ...state.user, id: BOB.id };
         expect((await setAppNetworkExceptionAction({ id: app.id, exception: US_ONLY })).error).toBe(

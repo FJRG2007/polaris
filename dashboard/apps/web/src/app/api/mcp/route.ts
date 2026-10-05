@@ -42,7 +42,11 @@ import { serverIcons } from "@/lib/mcp/server-icons";
 import { evaluateAccountAccess } from "@/lib/network-rules";
 import { mcpResource, wwwAuthenticate } from "@/lib/mcp/oauth/urls";
 import { ACCESS_TOKEN_PREFIX, touchGrant, verifyAccessToken } from "@/lib/mcp/oauth/grants";
-import { IP_REFUSED_DESCRIPTION, exceptionLetsThrough, grantAllowsIp } from "@/lib/mcp/oauth/ip-guard";
+import {
+    IP_REFUSED_DESCRIPTION,
+    exceptionLetsThrough,
+    grantAllowsIp
+} from "@/lib/mcp/oauth/ip-guard";
 import {
     type McpTool,
     MCP_PROTOCOL_VERSION,

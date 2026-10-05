@@ -175,7 +175,11 @@ export function ConnectedApps({
         router.refresh();
     }
 
-    async function saveNetwork(app: ConnectedAppRow, policy: IpPolicy, exception: NetworkException) {
+    async function saveNetwork(
+        app: ConnectedAppRow,
+        policy: IpPolicy,
+        exception: NetworkException
+    ) {
         setNetwork(null);
         setError(null);
         const policyChanged = !samePolicy(policy, app.ipPolicy);
@@ -369,7 +373,9 @@ function exceptionSummary(
     exception: NetworkException
 ): string {
     return [
-        ...(exception.presets.includes("openai") ? [t("connectedApps.exception.openai.short")] : []),
+        ...(exception.presets.includes("openai")
+            ? [t("connectedApps.exception.openai.short")]
+            : []),
         ...exception.allowedContinents.map((code) =>
             tc(`geo.continentNames.${code}` as NamespaceKey<"components">)
         ),

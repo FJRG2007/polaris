@@ -42,9 +42,7 @@ async function ConnectedAppsSection({ userId, isAdmin }: { userId: string; isAdm
     // The rules a connected assistant is held to are the ones an administrator
     // imposed (the account's own sign-in rules govern sign-ins, not
     // assistants), so those are what decide whether the note is shown.
-    return (
-        <ConnectedApps apps={rows} restricted={!rulesAreEmpty(enforced)} canExcept={isAdmin} />
-    );
+    return <ConnectedApps apps={rows} restricted={!rulesAreEmpty(enforced)} canExcept={isAdmin} />;
 }
 
 /** The shape of the list while it is read. */

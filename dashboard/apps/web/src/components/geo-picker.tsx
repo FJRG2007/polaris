@@ -19,7 +19,10 @@ import type { NamespaceKey } from "@/lib/i18n/types";
 export function regionName(code: string, locale: string): string {
     if (locale === "en-US") return countryName(code);
     try {
-        return new Intl.DisplayNames([locale], { type: "region" }).of(code.toUpperCase()) ?? countryName(code);
+        return (
+            new Intl.DisplayNames([locale], { type: "region" }).of(code.toUpperCase()) ??
+            countryName(code)
+        );
     } catch {
         return countryName(code);
     }
@@ -97,7 +100,9 @@ export function GeoPicker({
                                     : "border-border text-muted-foreground hover:bg-muted"
                             )}
                         >
-                            {t(`geo.continentNames.${continent.code}` as NamespaceKey<"components">)}
+                            {t(
+                                `geo.continentNames.${continent.code}` as NamespaceKey<"components">
+                            )}
                         </button>
                     ))}
                 </div>

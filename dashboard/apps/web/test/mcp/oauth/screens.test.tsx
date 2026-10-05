@@ -126,7 +126,12 @@ describe("the connected-assistants list", () => {
         approvedIp: "203.0.113.5",
         lastRefusedAt: null,
         lastRefusedIp: null,
-        networkException: { allowedCountries: [], allowedContinents: [], allowedCidrs: [], presets: [] }
+        networkException: {
+            allowedCountries: [],
+            allowedContinents: [],
+            allowedCidrs: [],
+            presets: []
+        }
     };
 
     it("lists each app with its mark, return address, a permission count and its actions", () => {
