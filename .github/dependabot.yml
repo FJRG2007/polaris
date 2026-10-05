@@ -25,18 +25,21 @@ updates:
     commit-message:
       prefix: "⬆️ deps"
     labels: [dependencies]
-    # A dependency joins the FIRST group whose patterns it matches, so the order
-    # below is the policy: what needs reading comes out of the routine group.
+    # A dependency joins the FIRST group whose rules it matches; one that matches
+    # no group gets a pull request of its own. That is the policy below: only
+    # what is safe to read quickly is grouped, and everything that needs its
+    # changelog read - every major, a minor below 1.0, a minor of an auth or
+    # security library - arrives alone, at most five open at a time.
     groups:
       security:
         applies-to: security-updates
         patterns: ["*"]
       # Sign-in, sessions, keys, the MCP surface, outbound fetch, sanitizing and
-      # the database drivers that carry credentials: even a minor release here
-      # changes what an attacker meets. Its own pull request, read against the
-      # changelog, never folded into the routine one.
+      # the database drivers that carry credentials. Patches together; a minor
+      # changes what an attacker meets and comes alone.
       auth-and-security:
         applies-to: version-updates
+        update-types: [patch]
         patterns:
           - "better-auth"
           - "@better-auth/*"
@@ -53,7 +56,8 @@ updates:
           - "mysql2"
           - "mongodb"
           - "ioredis"
-      # The framework and the React it renders with move together.
+      # The framework and the React it renders with move together, at any level:
+      # the root's react override follows the root's own react version.
       framework:
         applies-to: version-updates
         patterns:
@@ -62,12 +66,13 @@ updates:
           - "react-dom"
           - "@types/react"
           - "@types/react-dom"
-      # Below 1.0 a minor release is allowed to break (semver 4): these go with
-      # the majors' care, not with the routine group. Every direct dependency
-      # pinned at 0.x must be listed - scripts/test/dependabot-groups.test.mjs
-      # fails when one is missing.
+      # Below 1.0 a minor release is allowed to break (semver item 4): agent-browser
+      # 0.25 -> 0.38 needs Node 24. Patches together; a minor comes alone. Every
+      # direct dependency pinned at 0.x must be listed here and excluded below -
+      # scripts/test/dependabot-groups.test.mjs fails otherwise.
       pre-1.0:
         applies-to: version-updates
+        update-types: [patch]
         patterns:
           - "@enigmax/primitives"
           - "@mediapipe/selfie_segmentation"
@@ -77,6 +82,7 @@ updates:
           - "agent-browser"
           - "arkregex"
           - "browser-fs-access"
+          - "canvas-roundrect-polyfill"
           - "class-variance-authority"
           - "esbuild"
           - "fuzzy"
@@ -92,12 +98,46 @@ updates:
         applies-to: version-updates
         update-types: [minor, patch]
         patterns: ["*"]
-      # Majors need reading a changelog and often a code change; they come in
-      # their own pull request so they never hold up the routine one.
-      major:
-        applies-to: version-updates
-        update-types: [major]
-        patterns: ["*"]
+        exclude-patterns:
+          - "better-auth"
+          - "@better-auth/*"
+          - "@modelcontextprotocol/*"
+          - "fastmcp"
+          - "acme-client"
+          - "ssh2"
+          - "hash-wasm"
+          - "aws4fetch"
+          - "ipaddr.js"
+          - "dompurify"
+          - "undici"
+          - "pg"
+          - "mysql2"
+          - "mongodb"
+          - "ioredis"
+          - "next"
+          - "react"
+          - "react-dom"
+          - "@types/react"
+          - "@types/react-dom"
+          - "@enigmax/primitives"
+          - "@mediapipe/selfie_segmentation"
+          - "@sapphi-red/web-noise-suppressor"
+          - "@univerjs/*"
+          - "@xterm/addon-*"
+          - "agent-browser"
+          - "arkregex"
+          - "browser-fs-access"
+          - "canvas-roundrect-polyfill"
+          - "class-variance-authority"
+          - "esbuild"
+          - "fuzzy"
+          - "iconv-lite"
+          - "jotai-scope"
+          - "katex"
+          - "lucide-react"
+          - "sharp"
+          - "tunnel-rat"
+          - "wxt"
 
   - package-ecosystem: github-actions
     directory: /

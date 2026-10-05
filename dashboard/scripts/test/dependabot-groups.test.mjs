@@ -5,27 +5,32 @@ import { dirname, join } from "node:path";
 import { readFileSync, readdirSync, existsSync } from "node:fs";
 
 /**
- * Below 1.0 a minor release may break, so Dependabot groups every 0.x
- * dependency apart from the routine minor-and-patch pull request - by name,
- * which is the only way its config can say it. A 0.x dependency added later
- * and not named there would ride in the routine group again; this fails first.
+ * Below 1.0 a minor release may break, and a minor of an auth library changes
+ * what an attacker meets, so neither may ride in Dependabot's routine
+ * minor-and-patch pull request. Its config can only say that by name: every 0.x
+ * dependency is listed in the pre-1.0 group, and every name of the special
+ * groups is excluded from the routine one. A dependency added later and not
+ * listed would slip back in; these fail first.
  */
 
 const dashboard = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 const config = readFileSync(join(dashboard, "..", ".github", "dependabot.yml"), "utf8");
 
-/** The patterns listed under one npm group of .github/dependabot.yml. */
-function groupPatterns(name) {
+/** The patterns (or exclude-patterns) listed under one npm group of .github/dependabot.yml. */
+function groupPatterns(name, key = "patterns") {
     const lines = config.split("\n");
     const start = lines.findIndex((line) => line.trim() === `${name}:`);
     assert.ok(start >= 0, `group ${name} is missing from dependabot.yml`);
     const indent = lines[start].search(/\S/);
     const patterns = [];
+    let field = null;
     for (const line of lines.slice(start + 1)) {
         const depth = line.search(/\S/);
         if (depth >= 0 && depth <= indent && !line.trim().startsWith("#")) break;
+        const named = /^\s*([a-z-]+):/.exec(line);
+        if (named) field = named[1];
         const item = /^\s*-\s*"([^"]+)"\s*$/.exec(line);
-        if (item) patterns.push(item[1]);
+        if (item && field === key) patterns.push(item[1]);
     }
     return patterns;
 }
@@ -70,7 +75,19 @@ test("every direct dependency below 1.0 is in the pre-1.0 group", () => {
     );
 });
 
-test("the pre-1.0 group comes before the routine one, so it wins", () => {
-    assert.ok(config.indexOf("pre-1.0:") < config.indexOf("minor-and-patch:"));
-    assert.ok(config.indexOf("auth-and-security:") < config.indexOf("minor-and-patch:"));
+test("the routine group excludes every name the special groups hold", () => {
+    const excluded = new Set(groupPatterns("minor-and-patch", "exclude-patterns"));
+    const special = ["auth-and-security", "framework", "pre-1.0"].flatMap((group) =>
+        groupPatterns(group)
+    );
+    assert.ok(special.length > 0);
+    assert.deepEqual(
+        special.filter((pattern) => !excluded.has(pattern)),
+        [],
+        "add these to minor-and-patch exclude-patterns in .github/dependabot.yml"
+    );
+});
+
+test("no group bundles majors: each one arrives alone", () => {
+    assert.doesNotMatch(config, /update-types: \[[^\]]*major/);
 });
