@@ -146,5 +146,22 @@ export const deployStartedSchema = z.object({ deploymentId: z.string() });
 /** POST /api/v1/deploy/services/:id/restart */
 export const restartedSchema = z.object({ restarted: z.literal(true) });
 
+/** GET /api/v1/deploy/services/:id/env - names only, never a value. */
+export const envNamesSchema = z.object({
+    variables: z.array(
+        z.object({ key: z.string(), isSecret: z.boolean(), updatedAt: z.string() }).strip()
+    )
+});
+
+/** PUT /api/v1/deploy/services/:id/env/:name */
+export const envSavedSchema = z.object({
+    saved: z.string(),
+    created: z.boolean(),
+    redeployed: z.boolean()
+});
+
+/** DELETE /api/v1/deploy/services/:id/env/:name */
+export const envRemovedSchema = z.object({ removed: z.string(), redeployed: z.boolean() });
+
 /** Any refusal: `{ error }`, with the scope that was missing on a 403. */
 export const refusalSchema = z.object({ error: z.string(), requiredScope: z.string().optional() });

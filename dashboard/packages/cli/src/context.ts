@@ -10,6 +10,7 @@ import { hostname } from "node:os";
 import { CliError } from "./errors.js";
 import { normalizeUrl, type Flags } from "./args.js";
 import type { Connection, Fetch } from "./api.js";
+import { readSecret } from "./secret-input.js";
 import { secrets, type Secrets } from "./secrets.js";
 import { createInterface } from "node:readline/promises";
 import { canOpenBrowser, openBrowser } from "./browser.js";
@@ -35,6 +36,9 @@ export interface Context {
     sleep(ms: number): Promise<void>;
     /** Ask one question; null when nobody can answer it. */
     prompt(question: string): Promise<string | null>;
+    /** A value that must not be seen: a prompt that does not echo, or stdin when
+     *  something is piped in. Null when it was abandoned or too large. */
+    readSecret(question: string): Promise<string | null>;
     machineName(): string;
 }
 
@@ -65,6 +69,7 @@ export function processContext(): Context {
                 reader.close();
             }
         },
+        readSecret,
         machineName: () => hostname()
     };
 }

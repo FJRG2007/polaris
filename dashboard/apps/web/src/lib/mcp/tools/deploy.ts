@@ -12,17 +12,24 @@
  * does not need a lookup first. Ambiguity is refused with the candidates named
  * rather than resolved by a guess.
  *
- * Deliberately not offered: reading a secret's value. An agent that needs one
- * to do its work should be given it by a person; handing it a tool that prints
- * them puts every secret it can reach one prompt injection away from a public
- * issue comment.
+ * Deliberately not offered: reading a variable's value, secret or plain. An
+ * agent that needs one to do its work should be given it by a person; handing it
+ * a tool that prints them puts every secret it can reach one prompt injection
+ * away from a public issue comment. So the listings name variables and nothing
+ * more, and a value an agent writes is never repeated back in what it reads.
  */
 
 import { z } from "zod";
 import * as surface from "@/lib/deploy/api/surface";
 import { publicFailure } from "@/lib/deploy/api/refusal";
 import { McpRefusal, type McpCaller, type McpTool } from "../protocol";
-import { addDomainSchema, serviceRefSchema, setVariableSchema } from "@/lib/deploy/api/schemas";
+import {
+    addDomainSchema,
+    putVariableSchema,
+    serviceRefSchema,
+    setVariableSchema,
+    variableKeySchema
+} from "@/lib/deploy/api/schemas";
 
 /** The deploy caller for an MCP call. */
 function deployCaller(caller: McpCaller): surface.DeployCaller {
@@ -229,26 +236,115 @@ const logsTool: McpTool<z.infer<typeof logsInput>> = {
     }
 };
 
+/** A listing of names, as the model reads it. */
+async function variableNames(caller: McpCaller, service: string) {
+    const variables = await attempt("list the variables", () =>
+        surface.listVariableNames(deployCaller(caller), { kind: "service", ref: service })
+    );
+    return {
+        text:
+            variables
+                .map(
+                    (row) =>
+                        `${row.key}${row.isSecret ? " (secret)" : ""}  updated ${row.updatedAt}`
+                )
+                .join("\n") || "No variables.",
+        structured: { variables }
+    };
+}
+
 const variablesTool: McpTool<z.infer<typeof serviceInput>> = {
     name: "deploy_variables",
     // i18n-ignore shown by the calling client, which has no locale to ask for
     title: "List variables",
     description:
         // i18n-ignore read by the calling model, not shown to a person
-        "A service's environment variables by name. Secret values are never shown - only that the variable exists.",
+        "A service's environment variables by name, with whether each is secret and when it changed. No value is ever shown. Same as env_list.",
     input: serviceInput,
     scope: "deploy.read",
     readOnly: true,
+    run: (input, caller) => variableNames(caller, input.service)
+};
+
+const envListTool: McpTool<z.infer<typeof serviceInput>> = {
+    name: "env_list",
+    // i18n-ignore shown by the calling client, which has no locale to ask for
+    title: "List environment variables",
+    description:
+        // i18n-ignore read by the calling model, not shown to a person
+        "A service's environment variable names, with whether each is secret and when it changed. Values are never returned, so do not ask for them.",
+    input: serviceInput,
+    scope: "deploy.read",
+    readOnly: true,
+    run: (input, caller) => variableNames(caller, input.service)
+};
+
+const envSetInput = serviceInput
+    .extend({ name: variableKeySchema.describe("The variable's name, e.g. DATABASE_URL.") })
+    .merge(putVariableSchema);
+
+const envSetTool: McpTool<z.infer<typeof envSetInput>> = {
+    name: "env_set",
+    // i18n-ignore shown by the calling client, which has no locale to ask for
+    title: "Set an environment variable",
+    description:
+        // i18n-ignore read by the calling model, not shown to a person
+        "Create or replace one environment variable on a service (secret by default). Write-only: the value is stored and never returned. The running service keeps its old value until it is redeployed: pass redeploy to do that now.",
+    input: envSetInput,
+    scope: "deploy.manage",
+    readOnly: false,
     async run(input, caller) {
-        const variables = await attempt("list the variables", () =>
-            surface.listVariables(deployCaller(caller), { kind: "service", ref: input.service })
+        const { created, redeployed } = await attempt("save the variable", () =>
+            surface.setVariable(
+                deployCaller(caller),
+                { kind: "service", ref: input.service },
+                {
+                    key: input.name,
+                    value: input.value,
+                    secret: input.secret,
+                    redeploy: input.redeploy
+                }
+            )
+        );
+        const verb = created ? "created" : "replaced";
+        return {
+            text: redeployed
+                ? `${input.name} is ${verb}. The service redeploys to pick it up if it is running.`
+                : `${input.name} is ${verb}. The service picks it up on its next deploy.`,
+            structured: { name: input.name, created, redeployed }
+        };
+    }
+};
+
+const envDeleteInput = serviceInput.extend({
+    name: variableKeySchema.describe("The variable's name."),
+    redeploy: putVariableSchema.shape.redeploy
+});
+
+const envDeleteTool: McpTool<z.infer<typeof envDeleteInput>> = {
+    name: "env_delete",
+    // i18n-ignore shown by the calling client, which has no locale to ask for
+    title: "Delete an environment variable",
+    description:
+        // i18n-ignore read by the calling model, not shown to a person
+        "Remove one environment variable from a service by name. The running service keeps it until it is redeployed: pass redeploy to do that now.",
+    input: envDeleteInput,
+    scope: "deploy.manage",
+    readOnly: false,
+    async run(input, caller) {
+        const { redeployed } = await attempt("remove the variable", () =>
+            surface.deleteVariableNamed(
+                deployCaller(caller),
+                { kind: "service", ref: input.service },
+                input.name,
+                { redeploy: input.redeploy }
+            )
         );
         return {
-            text:
-                variables
-                    .map((row) => `${row.key}=${row.isSecret ? "(secret)" : (row.value ?? "")}`)
-                    .join("\n") || "No variables.",
-            structured: { variables }
+            text: redeployed
+                ? `${input.name} is removed. The service redeploys without it.`
+                : `${input.name} is removed. The service drops it on its next deploy.`,
+            structured: { name: input.name, removed: true, redeployed }
         };
     }
 };
@@ -389,9 +485,12 @@ export const DEPLOY_TOOLS: readonly McpTool<never>[] = [
     deploymentTool,
     logsTool,
     variablesTool,
+    envListTool,
     domainsTool,
     startTool,
     setVariableTool,
+    envSetTool,
+    envDeleteTool,
     addDomainTool,
     restartTool,
     rollbackTool

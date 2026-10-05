@@ -39,7 +39,9 @@ import { deployTargetOrgId, recordDeployAudit } from "@/lib/deploy-audit";
 import type { AddDomainInput, ImportVariablesInput, SetVariableInput } from "./schemas";
 import {
     deleteEnvVar,
+    envVarIdByKey,
     envVarScope,
+    listEnvVarNames,
     listEnvVars,
     parseDotEnv,
     revealEnvVar,
@@ -138,7 +140,9 @@ export async function resolveService(
 ): Promise<ResolvedService> {
     const trimmed = ref.trim();
     if (UUID.test(trimmed)) {
-        const access = await guarded(() => requireApplicationAccess(trimmed, caller.userId, capability));
+        const access = await guarded(() =>
+            requireApplicationAccess(trimmed, caller.userId, capability)
+        );
         confine(caller, access);
         return { access, applicationId: trimmed };
     }
@@ -181,16 +185,24 @@ export async function resolveService(
         (app) =>
             named(app, serviceName) &&
             named(app.environment.project, projectName) &&
-            (environmentName === null ? app.environment.isDefault : named(app.environment, environmentName))
+            (environmentName === null
+                ? app.environment.isDefault
+                : named(app.environment, environmentName))
     );
     if (matches.length === 0) {
         throw new DeployApiRefusal(404, `No service called ${trimmed} that this key can reach.`);
     }
     if (matches.length > 1) {
         const listed = matches
-            .map((app) => `${app.environment.project.slug}/${app.environment.slug}/${app.slug} (${app.id})`)
+            .map(
+                (app) =>
+                    `${app.environment.project.slug}/${app.environment.slug}/${app.slug} (${app.id})`
+            )
             .join(", ");
-        throw new DeployApiRefusal(409, `${trimmed} names more than one service: ${listed}. Use one of those.`);
+        throw new DeployApiRefusal(
+            409,
+            `${trimmed} names more than one service: ${listed}. Use one of those.`
+        );
     }
     const id = matches[0]!.id;
     const access = await guarded(() => requireApplicationAccess(id, caller.userId, capability));
@@ -370,7 +382,8 @@ export interface DomainLine {
  *  the credentials it may carry. An unreadable config has none of these. */
 function sourceOf(sourceType: string, raw: string): ServiceDetail["source"] {
     const source = redactSource(raw);
-    const text = (key: string) => (typeof source[key] === "string" ? (source[key] as string) : null);
+    const text = (key: string) =>
+        typeof source[key] === "string" ? (source[key] as string) : null;
     const port = typeof source.port === "number" ? source.port : null;
     return {
         kind: sourceType,
@@ -446,7 +459,11 @@ export async function getService(caller: DeployCaller, ref: string): Promise<Ser
         name: app.name,
         slug: app.slug,
         project: app.environment.project,
-        environment: { id: app.environment.id, name: app.environment.name, slug: app.environment.slug },
+        environment: {
+            id: app.environment.id,
+            name: app.environment.name,
+            slug: app.environment.slug
+        },
         status: statuses[app.id] ?? "idle",
         currentDeploymentId: app.currentDeploymentId,
         source: sourceOf(app.sourceType, app.sourceConfig),
@@ -481,7 +498,9 @@ async function deploymentAccess(
     deploymentId: string,
     capability: ProjectCapability
 ): Promise<ProjectAccess & { environmentId: string }> {
-    const access = await guarded(() => requireDeploymentAccess(deploymentId, caller.userId, capability));
+    const access = await guarded(() =>
+        requireDeploymentAccess(deploymentId, caller.userId, capability)
+    );
     confine(caller, access);
     return access;
 }
@@ -538,7 +557,14 @@ export async function deploymentLog(
         };
     }
     const slice = await readLogSlice(path, options.offset ?? 0);
-    return { id: deploymentId, status: row.status, error: row.error, done, log: slice.text, nextOffset: slice.end };
+    return {
+        id: deploymentId,
+        status: row.status,
+        error: row.error,
+        done,
+        log: slice.text,
+        nextOffset: slice.end
+    };
 }
 
 /** How long one follow may run. A build that outlives this is still running;
@@ -586,7 +612,9 @@ export async function followDeploymentLog(
                     const last = await readLogSlice(path, position);
                     if (last.text) controller.enqueue(new TextEncoder().encode(last.text));
                     controller.enqueue(
-                        new TextEncoder().encode(`\n[polaris] deployment ${row?.status ?? "gone"}\n`)
+                        new TextEncoder().encode(
+                            `\n[polaris] deployment ${row?.status ?? "gone"}\n`
+                        )
                     );
                     controller.close();
                     return;
@@ -629,10 +657,20 @@ export async function deploy(caller: DeployCaller, ref: string): Promise<{ deplo
         // No free-subdomain base yet; the service still deploys without one,
         // exactly as it does from the dashboard.
     }
-    const deploymentId = await deployService.deployApplication(applicationId, access.ownerId, caller.userId, {
-        audit: callerAudit(caller)
+    const deploymentId = await deployService.deployApplication(
+        applicationId,
+        access.ownerId,
+        caller.userId,
+        {
+            audit: callerAudit(caller)
+        }
+    );
+    await activity.record({
+        subjectType: "app",
+        subjectId: applicationId,
+        userId: caller.userId,
+        action: "deployed"
     });
-    await activity.record({ subjectType: "app", subjectId: applicationId, userId: caller.userId, action: "deployed" });
     return { deploymentId };
 }
 
@@ -740,10 +778,87 @@ async function variableScopeAccess(
     return { access, envScope: "environment", scopeId: scope.environmentId };
 }
 
-/** A scope's variables with every secret value withheld. */
-export async function listVariables(caller: DeployCaller, scope: VariableScope): Promise<EnvVarView[]> {
+/** A variable in a listing that carries no value at all. */
+export interface VariableName {
+    readonly key: string;
+    readonly isSecret: boolean;
+    readonly updatedAt: string;
+}
+
+/**
+ * Thrown in place of whatever a write that carried a value threw from beneath the
+ * service layer. An ORM error can quote the arguments it was handed, so the
+ * original is dropped rather than logged; what it was is kept by its type and code.
+ * A subclass, so `publicFailure` treats it as internal: logged, never shown.
+ */
+export class VariableWriteFailure extends Error {
+    constructor(caught: unknown) {
+        const code = (caught as { code?: unknown } | null)?.code;
+        const kind = caught instanceof Error ? caught.name : typeof caught;
+        super(`The variable write failed (${kind}${typeof code === "string" ? ` ${code}` : ""}).`);
+        this.name = "VariableWriteFailure";
+    }
+}
+
+/**
+ * Run a write that carries values, so no error leaves it with one inside. A
+ * refusal, or a plain sentence from the service layer that quotes none of the
+ * values (they name the key, never the value), passes as written; anything else
+ * is replaced by a `VariableWriteFailure`.
+ */
+export async function withoutValues<T>(
+    values: readonly string[],
+    run: () => Promise<T>
+): Promise<T> {
+    try {
+        return await run();
+    } catch (caught) {
+        const quoted = (text: string | undefined) =>
+            Boolean(text) && values.some((value) => value.length > 0 && text!.includes(value));
+        const plain =
+            caught instanceof Error &&
+            (caught instanceof DeployApiRefusal ||
+                (Object.getPrototypeOf(caught) === Error.prototype && !("code" in caught)));
+        if (plain && !quoted(caught.message) && !quoted(caught.stack)) throw caught;
+        throw new VariableWriteFailure(caught);
+    }
+}
+
+/**
+ * A scope's variables by name: whether each is secret and when it last changed,
+ * and never a value - not even a plain one. This is the listing for anything
+ * that may be read by somebody other than the person who set the values, which
+ * is every assistant and every terminal that keeps a scrollback.
+ */
+export async function listVariableNames(
+    caller: DeployCaller,
+    scope: VariableScope
+): Promise<VariableName[]> {
     requireScope(caller, "deploy.read");
-    const { access, envScope, scopeId } = await variableScopeAccess(caller, scope, "variables.read");
+    const { access, envScope, scopeId } = await variableScopeAccess(
+        caller,
+        scope,
+        "variables.read"
+    );
+    const rows = await listEnvVarNames(envScope, scopeId, access.ownerId);
+    return rows.map((row) => ({
+        key: row.key,
+        isSecret: row.isSecret,
+        updatedAt: row.updatedAt.toISOString()
+    }));
+}
+
+/** A scope's variables with every secret value withheld. */
+export async function listVariables(
+    caller: DeployCaller,
+    scope: VariableScope
+): Promise<EnvVarView[]> {
+    requireScope(caller, "deploy.read");
+    const { access, envScope, scopeId } = await variableScopeAccess(
+        caller,
+        scope,
+        "variables.read"
+    );
     return listEnvVars(envScope, scopeId, access.ownerId);
 }
 
@@ -781,15 +896,21 @@ export async function setVariable(
     caller: DeployCaller,
     scope: VariableScope,
     input: SetVariableInput
-): Promise<{ redeployed: boolean }> {
+): Promise<{ redeployed: boolean; created: boolean }> {
     requireScope(caller, "deploy.manage");
-    const { access, envScope, scopeId } = await variableScopeAccess(caller, scope, "variables.write");
+    const { access, envScope, scopeId } = await variableScopeAccess(
+        caller,
+        scope,
+        "variables.write"
+    );
     requireRedeploy(access, input.redeploy);
-    await setEnvVar(envScope, scopeId, access.ownerId, {
-        key: input.key,
-        value: input.value,
-        isSecret: input.secret
-    });
+    const { created } = await withoutValues([input.value], () =>
+        setEnvVar(envScope, scopeId, access.ownerId, {
+            key: input.key,
+            value: input.value,
+            isSecret: input.secret
+        })
+    );
     await recordChange(caller, {
         action: "deploy.variable.set",
         targetType: envScope,
@@ -802,7 +923,7 @@ export async function setVariable(
             : {})
     });
     applyVariables(caller, envScope, scopeId, access.ownerId, input.redeploy);
-    return { redeployed: input.redeploy };
+    return { redeployed: input.redeploy, created };
 }
 
 export async function importVariables(
@@ -811,18 +932,32 @@ export async function importVariables(
     input: ImportVariablesInput
 ): Promise<{ count: number; redeployed: boolean }> {
     requireScope(caller, "deploy.manage");
-    const { access, envScope, scopeId } = await variableScopeAccess(caller, scope, "variables.write");
+    const { access, envScope, scopeId } = await variableScopeAccess(
+        caller,
+        scope,
+        "variables.write"
+    );
     requireRedeploy(access, input.redeploy);
     const parsed = parseDotEnv(input.text).map((item) => ({ ...item, isSecret: input.secret }));
-    if (parsed.length === 0) throw new DeployApiRefusal(422, "No KEY=value lines were found in that text.");
-    const count = await setEnvVars(envScope, scopeId, access.ownerId, parsed);
+    if (parsed.length === 0)
+        throw new DeployApiRefusal(422, "No KEY=value lines were found in that text.");
+    const count = await withoutValues(
+        parsed.map((item) => item.value),
+        () => setEnvVars(envScope, scopeId, access.ownerId, parsed)
+    );
     await recordChange(caller, {
         action: "deploy.variable.import",
         targetType: envScope,
         targetId: scopeId,
         metadata: { count, keys: parsed.map((item) => item.key).slice(0, 100) },
         ...(envScope === "application"
-            ? { activity: { applicationId: scopeId, action: "variables-imported", to: String(count) } }
+            ? {
+                  activity: {
+                      applicationId: scopeId,
+                      action: "variables-imported",
+                      to: String(count)
+                  }
+              }
             : {})
     });
     applyVariables(caller, envScope, scopeId, access.ownerId, input.redeploy);
@@ -853,20 +988,49 @@ export async function deleteVariable(
 ): Promise<{ redeployed: boolean }> {
     requireScope(caller, "deploy.manage");
     const { access } = await variableAccess(caller, variableId, "variables.write");
-    requireRedeploy(access, options.redeploy);
+    return removeVariable(caller, access, variableId, null, options.redeploy);
+}
+
+/** Remove the variable a scope holds under `key`: the same gates and the same
+ *  audit as removing it by id, for callers that know names rather than ids. */
+export async function deleteVariableNamed(
+    caller: DeployCaller,
+    scope: VariableScope,
+    key: string,
+    options: { redeploy: boolean } = { redeploy: false }
+): Promise<{ redeployed: boolean }> {
+    requireScope(caller, "deploy.manage");
+    const { access, envScope, scopeId } = await variableScopeAccess(
+        caller,
+        scope,
+        "variables.write"
+    );
+    const id = await envVarIdByKey(envScope, scopeId, key);
+    if (!id) throw new DeployApiRefusal(404, `There is no variable named ${key} here.`);
+    return removeVariable(caller, access, id, key, options.redeploy);
+}
+
+async function removeVariable(
+    caller: DeployCaller,
+    access: ProjectAccess,
+    variableId: string,
+    key: string | null,
+    redeploy: boolean
+): Promise<{ redeployed: boolean }> {
+    requireRedeploy(access, redeploy);
     const removed = await deleteEnvVar(variableId, access.ownerId);
     if (!removed) throw new DeployApiRefusal(404, "Not found");
     await recordChange(caller, {
         action: "deploy.variable.delete",
         targetType: removed.scope,
         targetId: removed.scopeId,
-        metadata: { variableId },
+        metadata: { variableId, ...(key ? { key } : {}) },
         ...(removed.scope === "application"
             ? { activity: { applicationId: removed.scopeId, action: "variable-removed" } }
             : {})
     });
-    applyVariables(caller, removed.scope, removed.scopeId, access.ownerId, options.redeploy);
-    return { redeployed: options.redeploy };
+    applyVariables(caller, removed.scope, removed.scopeId, access.ownerId, redeploy);
+    return { redeployed: redeploy };
 }
 
 /**
@@ -882,8 +1046,15 @@ export async function revealVariable(
     variableId: string
 ): Promise<{ key: string; value: string | null }> {
     requireScope(caller, "deploy.manage");
-    const { access, envScope, scopeId } = await variableAccess(caller, variableId, "variables.read");
-    const row = await prisma.envVar.findUnique({ where: { id: variableId }, select: { key: true } });
+    const { access, envScope, scopeId } = await variableAccess(
+        caller,
+        variableId,
+        "variables.read"
+    );
+    const row = await prisma.envVar.findUnique({
+        where: { id: variableId },
+        select: { key: true }
+    });
     const value = await revealEnvVar(variableId, access.ownerId);
     await recordChange(caller, {
         action: "deploy.variable.reveal",
@@ -964,7 +1135,9 @@ export async function addDomain(
 
 export async function removeDomain(caller: DeployCaller, domainId: string): Promise<void> {
     requireScope(caller, "deploy.manage");
-    const access = await guarded(() => requireDomainAccess(domainId, caller.userId, "domains.manage"));
+    const access = await guarded(() =>
+        requireDomainAccess(domainId, caller.userId, "domains.manage")
+    );
     confine(caller, access);
     // Read before the row goes: afterwards nothing names the organization.
     const orgId = await deployTargetOrgId("domain", domainId).catch(() => null);

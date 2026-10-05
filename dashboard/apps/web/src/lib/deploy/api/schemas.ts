@@ -55,13 +55,25 @@ export const variableKeySchema = z
 const redeploySchema = z
     .boolean()
     .default(false)
-    .describe("Redeploy the services this reaches so they pick it up now. Needs the right to deploy.");
+    .describe(
+        "Redeploy the services this reaches so they pick it up now. Needs the right to deploy."
+    );
+
+/** A variable's value: whatever the service needs, newlines included - a PEM
+ *  key is a variable. Bounded so one call cannot write a megabyte into every
+ *  deploy. The messages never quote what was sent. */
+const variableValueSchema = z.string({ invalid_type_error: "value must be text" }).max(65_536);
 
 export const setVariableSchema = z.object({
     key: variableKeySchema,
-    // Values are whatever the service needs, newlines included - a PEM key is a
-    // variable. Bounded so one call cannot write a megabyte into every deploy.
-    value: z.string().max(65_536),
+    value: variableValueSchema,
+    secret: z.boolean().default(true),
+    redeploy: redeploySchema
+});
+
+/** PUT /services/:id/env/:name - the value of a variable named in the path. */
+export const putVariableSchema = z.object({
+    value: variableValueSchema,
     secret: z.boolean().default(true),
     redeploy: redeploySchema
 });
@@ -105,5 +117,6 @@ export const rollbackSchema = z.object({
 });
 
 export type SetVariableInput = z.infer<typeof setVariableSchema>;
+export type PutVariableInput = z.infer<typeof putVariableSchema>;
 export type ImportVariablesInput = z.infer<typeof importVariablesSchema>;
 export type AddDomainInput = z.infer<typeof addDomainSchema>;

@@ -108,6 +108,22 @@ plr restart shop/web
 plr open [home|deploy|keys|downloads]
 ```
 
+## Environment variables
+
+```text
+plr env ls shop/web                     names, whether each is secret, when it changed
+plr env set shop/web DATABASE_URL       type the value at a prompt that does not echo
+plr env set shop/web DATABASE_URL < url.txt
+plr env set shop/web TLS_KEY --from-file key.txt --restart
+plr env rm shop/web DATABASE_URL        asks first; --yes skips the question
+```
+
+No command prints a value, and none takes one on the command line, where it
+would stay in your shell history. A value piped in or read from a file loses
+the one line break at its end. Values are stored as secrets unless `--plain`
+says otherwise. A running service keeps its old values until it is redeployed:
+`--restart` does that after the change.
+
 A service is `project/service` (its default environment),
 `project/environment/service`, or its id. Read commands print JSON with
 `--json`. Every failure says what to do next; `POLARIS_DEBUG=1` adds the
