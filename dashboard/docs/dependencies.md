@@ -18,10 +18,17 @@ a known advisory is accepted instead of fixed.
 - **Every Monday.** The maintenance workflow runs the same gate and the
   typecheck, and opens or updates one issue when either fails. Development-only
   and moderate findings are in its report and never open the issue on their own.
-- **As updates.** Dependabot opens grouped pull requests weekly: one for every
-  minor and patch release, one for majors, one for GitHub Actions. Security
-  updates arrive as soon as GitHub matches an advisory. None of them merges
-  itself.
+- **As updates.** Dependabot opens grouped pull requests weekly, and only the
+  routine one is safe to read quickly: `minor-and-patch` (1.0 and later).
+  Everything that needs a changelog read comes separately: `auth-and-security`
+  (sign-in, sessions, keys, MCP, outbound fetch, sanitizing, database drivers),
+  `framework` (Next and React together), `pre-1.0` (a 0.x minor may break; every
+  0.x dependency must be listed, which `scripts/test/dependabot-groups.test.mjs`
+  enforces), `major`, and GitHub Actions. Security updates arrive as soon as
+  GitHub matches an advisory. None of them merges itself.
+- **React is pinned once.** The root `overrides` point `react` and `react-dom`
+  at the root's own devDependencies (`$react`), so a bump of those moves the
+  whole tree instead of conflicting with a hard-coded override.
 
 ## Accepting an advisory
 
@@ -45,7 +52,7 @@ Accepted today (until 2027-01-05):
 | GHSA-c475-qrg2-pj4r                      | basic-ftp   | No fixed release. Only on Puppeteer's browser download, which the bridge image skips.                                           | whatsapp-web.js moves to a Puppeteer without proxy-agent's FTP path. |
 | GHSA-jmr9-qjv8-65gv, GHSA-7pqw-9j4j-h8q3 | extract-zip | No fixed release. Only unpacks Puppeteer's browser download, which the bridge image skips.                                      | Same as above.                                                       |
 | GHSA-vfj7-8cjw-p6xm                      | braces      | No fixed release. Expands globs written in this repository (Tailwind 3 content paths, patch-package, sass's unused watch mode). | Tailwind 4 migration; patch-package replaced.                        |
-| GHSA-6g55-p6wh-862q, GHSA-r28c-9q8g-f849 | postcss     | Next 15 and dymo-api's tw-to-css pin 8.4.31; see Overrides. Build-time CSS and an SDK path Polaris does not call.               | Next 16; dymo-api replaced by direct calls.                          |
+| GHSA-6g55-p6wh-862q, GHSA-r28c-9q8g-f849 | postcss     | Next 15 pins 8.4.31; see Overrides. Build-time CSS of this repository's own stylesheets.                                        | Next 16.                                                             |
 | GHSA-28wg-ghj8-5hjv                      | nanoid      | @univerjs/core 0.25 pins 5.1.11; every call passes a fixed positive size.                                                       | Univer 1.x, which drops nanoid.                                      |
 
 ## Overrides
@@ -57,10 +64,10 @@ one is a decision somebody has to undo later, so each is listed here.
 | ---------------------------- | ----------------------------------------------------------------------------------------------------------------------- | --------------------------------------------- |
 | `esbuild: >=0.25.0`          | GHSA-67mh-4wv8-2f99: esbuild's dev server answered any origin before 0.25.0, and tsup and Vite pulled older copies.     | No dependency requests esbuild below 0.25.    |
 | `postcss: ^8.5.29`           | GHSA-6g55-p6wh-862q, GHSA-r28c-9q8g-f849, GHSA-fxqj-rqcc-2cmp and the older `</style>` XSS: every postcss up to 8.5.22. | No dependency requests postcss below 8.5.29.  |
-| `react`, `react-dom: 19.0.0` | One React in the whole tree: two copies break hooks at runtime.                                                         | Never, while this is a monorepo with one app. |
+| `react`, `react-dom: $react` | One React in the whole tree: two copies break hooks at runtime. Follows the root devDependency.                         | Never, while this is a monorepo with one app. |
 
 npm does not apply these to every node. The ones it skips today are Next's own
-`postcss@8.4.31`, dymo-api's tw-to-css and Univer's exact nanoid pin, which is why
+`postcss@8.4.31` and Univer's exact nanoid pin, which is why
 those advisories are accepted above rather than overridden. Check with
 `npm ls <package>` after changing an override: a node it reached shows
 `overridden`.
@@ -78,9 +85,11 @@ Regenerating `package-lock.json` on Windows has dropped the platform-specific
 optional packages (`@next/swc-*`, `@esbuild/*`, `@rollup/*`, `@img/sharp-*`,
 `@parcel/watcher-*`, ...) and broken Linux CI. So:
 
-- Change it with `npm install <pkg>@<version> --package-lock-only` or
-  `npm update <pkg> --package-lock-only` starting from the committed lock, not
-  by deleting it.
+- Change it with the npm CI uses - npm 10, the one Node 22 ships
+  (`npx npm@10 install --package-lock-only`, `npx npm@10 update <pkg>
+--package-lock-only`) - starting from the committed lock, never by deleting
+  it. npm 11 prunes optional peers npm 10 still requires (vitest's `sass` and
+  its `@parcel/watcher-*` binaries), and `npm ci` in CI then fails.
 - Before committing, compare the package paths of the old and new lock and make
   sure no platform variant disappeared unless its parent did.
 - `npm ls --all --package-lock-only` must report nothing missing.
