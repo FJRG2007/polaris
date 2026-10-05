@@ -62,6 +62,8 @@ export function TemperatureTarget({
     const [issue, setIssue] = useState<string | null>(null);
     const linger = useRef<ReturnType<typeof setTimeout> | null>(null);
     const field = useRef<HTMLInputElement | null>(null);
+    const number = useRef<HTMLButtonElement | null>(null);
+    const refocus = useRef(false);
 
     const flush = () => {
         if (timer.current) clearTimeout(timer.current);
@@ -100,6 +102,18 @@ export function TemperatureTarget({
         if (typing !== null) field.current?.select();
         // eslint-disable-next-line react-hooks/exhaustive-deps -- only on opening.
     }, [typing !== null]);
+
+    useEffect(() => {
+        if (typing !== null || !refocus.current || disabled) return;
+        refocus.current = false;
+        const away = document.activeElement;
+        if (!away || away === document.body) number.current?.focus();
+    }, [typing, disabled]);
+
+    const close = (keyboard: boolean) => {
+        refocus.current = keyboard;
+        setTyping(null);
+    };
 
     const shown = draft ?? settings.target;
     const unit = `°${settings.unit}`;
@@ -153,18 +167,18 @@ export function TemperatureTarget({
         if (typing === null) return;
         const read = kinds.typedTemperature(typing, settings);
         if (read === null) {
-            setTyping(null);
+            close(!leaving);
             return;
         }
         if ("issue" in read) {
             setIssue(say(read.issue));
             if (leaving) {
-                setTyping(null);
+                close(false);
                 linger.current = setTimeout(() => setIssue(null), ISSUE_LINGER_MS);
             }
             return;
         }
-        setTyping(null);
+        close(!leaving);
         clearIssue();
         // Already what it is set to, or already on its way: nothing to send.
         if (read.target === (pending.current ?? settings.target)) return;
@@ -216,6 +230,7 @@ export function TemperatureTarget({
                 </Button>
                 {typing === null ? (
                     <button
+                        ref={number}
                         type="button"
                         aria-label={buttonLabel}
                         title={editLabel}
@@ -255,7 +270,7 @@ export function TemperatureTarget({
                                     event.preventDefault();
                                     event.stopPropagation();
                                     clearIssue();
-                                    setTyping(null);
+                                    close(true);
                                 }
                             }}
                             // 16px on a phone, or the browser zooms the page

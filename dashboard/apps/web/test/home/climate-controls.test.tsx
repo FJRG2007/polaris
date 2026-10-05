@@ -264,6 +264,27 @@ describe("typing the target", () => {
         ).toContain("24°C");
     });
 
+    it("hands the keyboard back to the number after Enter or Escape, not after leaving", async () => {
+        await drawn([unit()]);
+        const number = () =>
+            screen.getByRole("button", { name: /type the target for Bedroom AC$/ });
+        open();
+        fireEvent.change(field(), { target: { value: "27" } });
+        fireEvent.keyDown(field(), { key: "Enter" });
+        await act(async () => answer({ device: unit({ climate: { ...CLIMATE, target: 27 } }) }));
+        await waitFor(() => expect(document.activeElement).toBe(number()));
+        open();
+        fireEvent.keyDown(field(), { key: "Escape" });
+        expect(document.activeElement).toBe(number());
+        open();
+        fireEvent.change(field(), { target: { value: "" } });
+        fireEvent.keyDown(field(), { key: "Enter" });
+        expect(document.activeElement).toBe(number());
+        open();
+        fireEvent.blur(field());
+        expect(document.activeElement).not.toBe(number());
+    });
+
     it("refuses a value off the range, saying the range, and stays open on Enter", async () => {
         await drawn([unit()]);
         open();
