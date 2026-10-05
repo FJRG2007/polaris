@@ -158,7 +158,6 @@
         "shapes": "Shapes"
     },
     "helpDialog": {
-        "blog": "Read our blog",
         "click": "click",
         "createFlowchart": "Create a flowchart from a generic element",
         "cropFinish": "Finish image cropping",
@@ -167,13 +166,11 @@
         "curvedLine": "Curved line",
         "deepBoxSelect": "Deep select within box, and prevent dragging",
         "deepSelect": "Deep select",
-        "documentation": "Documentation",
         "doubleClick": "double-click",
         "drag": "drag",
         "editLineArrowPoints": "Edit line/arrow points",
         "editText": "Edit text / add label",
         "editor": "Editor",
-        "github": "Found an issue? Submit",
         "movePageLeftRight": "Move page left/right",
         "movePageUpDown": "Move page up/down",
         "navigateFlowchart": "Navigate a flowchart",
@@ -446,7 +443,7 @@
         "fileSavedToFilename": "Saved to {filename}",
         "pasteAsSingleElement": "Use {shortcut} to paste as a single element,\nor paste into an existing text editor",
         "selection": "selection",
-        "unableToEmbed": "Embedding this url is currently not allowed. Raise an issue on GitHub to request the url whitelisted",
+        "unableToEmbed": "This address can't be embedded.",
         "unrecognizedLinkFormat": "The link you embedded does not match the expected format. Please try to paste the 'embed' string provided by the source site"
     },
     "toolBar": {

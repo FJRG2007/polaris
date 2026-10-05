@@ -5,44 +5,43 @@
         "clearReset": "Esto limpiará todo el lienzo. Estás seguro?",
         "confirmAddLibrary": "Esto añadirá {numShapes} forma(s) a tu biblioteca. ¿Estás seguro?",
         "couldNotCopyToClipboard": "No se pudo copiar al portapapeles.",
-        "couldNotLoadInvalidFile": "No se pudo cargar el archivo no válido",
-        "errorAddingToLibrary": "No se pudo agregar el elemento a la biblioteca",
+        "couldNotLoadInvalidFile": "Archivo no válido",
+        "errorAddingToLibrary": "No se pudo añadir a la biblioteca",
         "errorRemovingFromLibrary": "No se pudo quitar el elemento de la biblioteca",
         "removeItemsFromsLibrary": "¿Eliminar {count} elemento(s) de la biblioteca?",
         "resetLibrary": "Esto borrará tu biblioteca. ¿Estás seguro?"
     },
     "buttons": {
         "cancel": "Cancelar",
-        "clearReset": "Limpiar lienzo y reiniciar el color de fondo",
+        "clearReset": "Vaciar el lienzo",
         "close": "Cerrar",
         "confirm": "Confirmar",
-        "copyLink": "Copiar enlace",
         "darkMode": "Modo oscuro",
         "done": "Hecho",
         "edit": "Editar",
         "embeddableInteractionButton": "Pulsa para interactuar",
-        "exitZenMode": "Salir del modo Zen",
+        "exitZenMode": "Salir de zen",
         "export": "Guardar en...",
         "exportImage": "Exportar imagen...",
         "lightMode": "Modo claro",
         "load": "Abrir",
         "menu": "Menú",
-        "objectsSnapMode": "Ajustar a los objetos",
+        "objectsSnapMode": "Ajustar a objetos",
         "redo": "Rehacer",
         "remove": "Eliminar",
-        "resetLibrary": "Reiniciar biblioteca",
-        "resetZoom": "Restablecer zoom",
+        "resetLibrary": "Vaciar biblioteca",
+        "resetZoom": "Zoom al 100%",
         "save": "Guardar en archivo actual",
-        "saveAs": "Guardar como",
+        "saveAs": "Guardar",
         "scrollBackToContent": "Volver al contenido",
-        "systemMode": "Modo del sistema",
+        "systemMode": "Del sistema",
         "undo": "Deshacer",
         "zenMode": "Modo Zen",
         "zoomIn": "Acercarse",
         "zoomOut": "Alejarse"
     },
     "canvasError": {
-        "cannotShowPreview": "No se puede mostrar la vista previa",
+        "cannotShowPreview": "Sin vista previa",
         "canvasTooBig": "El lienzo podría ser demasiado grande.",
         "canvasTooBigTip": "Sugerencia: intenta acercar un poco más los elementos más lejanos."
     },
@@ -51,10 +50,10 @@
     },
     "colorPicker": {
         "colors": "Colores",
-        "hexCode": "Código Hexadecimal",
-        "mostUsedCustomColors": "Colores personalizados más utilizados",
-        "noShades": "",
-        "shades": ""
+        "hexCode": "Código hex",
+        "mostUsedCustomColors": "Colores propios más usados",
+        "noShades": "Este color no tiene tonos",
+        "shades": "Tonos"
     },
     "colors": {
         "black": "Negro",
@@ -75,7 +74,7 @@
     },
     "commandPalette": {
         "itemNotAvailable": "El comando no está disponible...",
-        "recents": "Usados recientemente",
+        "recents": "Recientes",
         "search": {
             "noMatch": "No hay comandos que coincidan...",
             "placeholder": "Busca menús y comandos"
@@ -84,21 +83,21 @@
         "shortcuts": {
             "close": "Cerrar",
             "confirm": "Confirmar",
-            "select": "Seleccionar"
+            "select": "Elegir"
         },
         "title": "Paleta de comandos"
     },
     "confirmDialog": {
         "removeItemsFromLib": "Eliminar elementos seleccionados de la biblioteca",
-        "resetLibrary": "Reiniciar biblioteca"
+        "resetLibrary": "Vaciar biblioteca"
     },
     "element": {
         "arrow": "Flecha",
         "diamond": "Rombo",
         "ellipse": "Elipse",
-        "embeddable": "Contenido web",
+        "embeddable": "Web",
         "frame": "Marco",
-        "freedraw": "Dibujo libre",
+        "freedraw": "Trazo libre",
         "group": "Grupo",
         "iframe": "IFrame",
         "image": "Imagen",
@@ -111,7 +110,7 @@
     "elementLink": {
         "desc": "Haz clic en una forma del lienzo o pega un enlace.",
         "notFound": "El objeto enlazado no está en el lienzo.",
-        "title": "Enlazar a un objeto"
+        "title": "Enlazar a objeto"
     },
     "errorDialog": {
         "title": "Error"
@@ -127,67 +126,64 @@
         "failedToFetchImage": "Error al obtener la imagen.",
         "fileTooBig": "Archivo demasiado grande. El tamaño máximo permitido es {maxSize}.",
         "imageInsertError": "No se pudo insertar la imagen. Inténtelo de nuevo más tarde...",
-        "imageToolNotSupported": "",
-        "importLibraryError": "No se pudo cargar la librería",
+        "imageToolNotSupported": "Las imágenes están desactivadas.",
+        "importLibraryError": "Error al cargar biblioteca",
         "libraryElementTypeError": {
-            "embeddable": "",
+            "embeddable": "El contenido web no se puede añadir a la biblioteca.",
             "iframe": "Los elementos IFrame no se pueden agregar a la biblioteca.",
-            "image": ""
+            "image": "Las imágenes aún no se pueden añadir a la biblioteca."
         },
         "svgImageInsertError": "No se pudo insertar la imagen SVG. El código SVG parece inválido.",
         "unsupportedFileType": "Tipo de archivo no admitido."
     },
     "exportDialog": {
-        "disk_button": "Guardar en archivo",
+        "disk_button": "Guardar archivo",
         "disk_details": "Exportar los datos de la escena a un archivo desde el cual pueda importar más tarde.",
-        "disk_title": "Guardar en disco",
+        "disk_title": "Guardar archivo",
         "link_button": "Exportar a Link",
         "link_details": "Exportar como enlace de sólo lectura.",
-        "link_title": "Enlace para compartir"
+        "link_title": "Enlace"
     },
     "fontList": {
         "availableFonts": "Fuentes disponibles",
         "badge": {
-            "old": "antigua"
+            "old": "vieja"
         },
-        "empty": "No se han encontrado fuentes",
+        "empty": "Ninguna fuente",
         "sceneFonts": "En esta escena"
     },
     "headings": {
-        "canvasActions": "Acciones del lienzo",
-        "selectedShapeActions": "Acciones de la forma seleccionada",
+        "canvasActions": "Lienzo",
+        "selectedShapeActions": "Forma seleccionada",
         "shapes": "Formas"
     },
     "helpDialog": {
-        "blog": "Lea nuestro blog",
         "click": "click",
         "createFlowchart": "Crear un diagrama de flujo a partir de un elemento",
         "cropFinish": "Terminar el recorte",
-        "cropStart": "Recortar imagen",
+        "cropStart": "Recortar",
         "curvedArrow": "Flecha curva",
         "curvedLine": "Línea curva",
         "deepBoxSelect": "Seleccione en profundidad dentro de la caja, y evite arrastrar",
-        "deepSelect": "Selección profunda",
-        "documentation": "Documentación",
+        "deepSelect": "Selección fina",
         "doubleClick": "doble clic",
         "drag": "arrastrar",
-        "editLineArrowPoints": "Editar puntos de línea/flecha",
-        "editText": "Editar texto / añadir etiqueta",
+        "editLineArrowPoints": "Editar puntos de línea",
+        "editText": "Editar texto o etiqueta",
         "editor": "Editor",
-        "github": "¿Ha encontrado un problema? Envíelo",
-        "movePageLeftRight": "Mover página hacia la izquierda/derecha",
-        "movePageUpDown": "Mover página hacia arriba/abajo",
-        "navigateFlowchart": "Moverse por un diagrama de flujo",
+        "movePageLeftRight": "Mover página a los lados",
+        "movePageUpDown": "Página arriba/abajo",
+        "navigateFlowchart": "Recorrer un diagrama",
         "or": "o",
         "preventBinding": "Evitar enlace de flechas",
         "shortcuts": "Atajos del teclado",
         "textFinish": "Finalizar edición (editor de texto)",
-        "textNewLine": "Añadir nueva linea (editor de texto)",
+        "textNewLine": "Nueva línea (editor de texto)",
         "title": "Ayuda",
-        "toggleElementLock": "Bloquear/desbloquear selección",
-        "tools": "Herramientas",
+        "toggleElementLock": "Fijar o liberar selección",
+        "tools": "Útiles",
         "view": "Vista",
-        "zoomToFit": "Ajustar la vista para mostrar todos los elementos",
+        "zoomToFit": "Ajustar todo a la vista",
         "zoomToSelection": "Ampliar selección"
     },
     "hints": {
@@ -197,7 +193,7 @@
         "createFlowchart": "Mantén CtrlOrCmd y pulsa una flecha del teclado para crear un diagrama de flujo",
         "deepBoxSelect": "Mantén CtrlOrCmd para seleccionar en profundidad, y para evitar arrastrar",
         "disableSnapping": "Mantén pulsado CtrlOrCmd para desactivar el ajuste",
-        "dismissSearch": "Pulsa Escape para cerrar la búsqueda",
+        "dismissSearch": "Escape cierra la búsqueda",
         "embeddable": "Haga clic y arrastre para crear un sitio web incrustado",
         "enterCropEditor": "Haz doble clic en la imagen o pulsa INTRO para recortarla",
         "eraserRevert": "Mantenga pulsado Alt para revertir los elementos marcados para su eliminación",
@@ -227,8 +223,8 @@
         "header": "Exportar imagen",
         "label": {
             "darkMode": "Modo oscuro",
-            "embedScene": "Incrustar escena",
-            "onlySelected": "Sólo seleccionados",
+            "embedScene": "Incluir escena",
+            "onlySelected": "Solo selección",
             "scale": "Escalar",
             "withBackground": "Fondo"
         },
@@ -239,17 +235,17 @@
             "exportToSvg": "Exportar a SVG"
         },
         "tooltip": {
-            "embedScene": ""
+            "embedScene": "Los datos de la escena se guardan dentro del PNG o SVG exportado para poder restaurarla desde él.\nEl archivo ocupará más."
         }
     },
     "labels": {
         "actions": "Acciones",
-        "addToLibrary": "Añadir a la biblioteca",
+        "addToLibrary": "A la biblioteca",
         "align": "Alinear",
-        "alignBottom": "Alineación inferior",
-        "alignLeft": "Alinear a la izquierda",
-        "alignRight": "Alinear a la derecha",
-        "alignTop": "Alineación superior",
+        "alignBottom": "Abajo",
+        "alignLeft": "Izquierda",
+        "alignRight": "Derecha",
+        "alignTop": "Arriba",
         "architect": "Arquitecto",
         "arrowhead_arrow": "Flecha",
         "arrowhead_bar": "Barra",
@@ -263,17 +259,17 @@
         "arrowhead_none": "Ninguna",
         "arrowhead_triangle": "Triángulo",
         "arrowhead_triangle_outline": "Triángulo (contorno)",
-        "arrowheads": "Puntas de flecha",
+        "arrowheads": "Puntas",
         "arrowtype_elbowed": "Flecha en codo",
         "arrowtype_round": "Flecha curva",
         "arrowtype_sharp": "Flecha recta",
-        "arrowtypes": "Tipo de flecha",
+        "arrowtypes": "Tipo flecha",
         "artist": "Artista",
-        "autoResize": "Ajustar el tamaño del texto automáticamente",
+        "autoResize": "Ajuste automático del texto",
         "background": "Fondo",
         "bindText": "Vincular texto al contenedor",
         "bold": "Grueso",
-        "bringForward": "Traer hacia delante",
+        "bringForward": "Subir un nivel",
         "bringToFront": "Traer al frente",
         "canvasBackground": "Fondo del lienzo",
         "cartoonist": "Caricatura",
@@ -281,21 +277,21 @@
         "centerHorizontally": "Centrar horizontalmente",
         "centerVertically": "Centrar verticalmente",
         "changeBackground": "Cambiar el color de fondo",
-        "changeStroke": "Cambiar el color del trazo",
-        "clearCanvas": "Vaciar el lienzo",
+        "changeStroke": "Color del trazo",
+        "clearCanvas": "Vaciar lienzo",
         "code": "Código",
         "collaborators": "Colaboradores",
-        "colorPicker": "Selector de color",
+        "colorPicker": "Elegir color",
         "copy": "Copiar",
-        "copyAsPng": "Copiar al portapapeles como PNG",
-        "copyAsSvg": "Copiar al portapapeles como SVG",
+        "copyAsPng": "Copiar como PNG",
+        "copyAsSvg": "Copiar como SVG",
         "copyElementLink": "Copiar enlace al objeto",
         "copyStyles": "Copiar estilos",
-        "copyText": "Copiar al portapapeles como texto",
-        "createContainerFromText": "Envolver el texto en un contenedor",
-        "crossHatch": "Rayado transversal",
+        "copyText": "Copiar como texto",
+        "createContainerFromText": "Meter el texto en una forma",
+        "crossHatch": "Cruzado",
         "cut": "Cortar",
-        "decreaseFontSize": "Disminuir tamaño de letra",
+        "decreaseFontSize": "Reducir tamaño",
         "delete": "Borrar",
         "diagramLib": "Biblioteca importada",
         "distributeHorizontally": "Distribuir horizontalmente",
@@ -304,89 +300,89 @@
         "duplicateSelection": "Duplicar",
         "edges": "Bordes",
         "elementLock": {
-            "lock": "Bloquear",
-            "lockAll": "Bloquear todo",
-            "unlock": "Desbloquear",
-            "unlockAll": "Desbloquear todo"
+            "lock": "Fijar",
+            "lockAll": "Fijar todo",
+            "unlock": "Liberar",
+            "unlockAll": "Liberar todo"
         },
         "extraBold": "Extra negrita",
-        "eyeDropper": "Seleccionar un color del lienzo",
-        "fileTitle": "Nombre del archivo",
-        "fill": "Rellenar",
-        "flipHorizontal": "Girar horizontalmente",
-        "flipVertical": "Girar verticalmente",
+        "eyeDropper": "Tomar color del lienzo",
+        "fileTitle": "Nombre",
+        "fill": "Relleno",
+        "flipHorizontal": "Voltear horizontal",
+        "flipVertical": "Voltear vertical",
         "fontFamily": "Tipo de fuente",
-        "fontSize": "Tamaño de la fuente",
+        "fontSize": "Tamaño",
         "group": "Agrupar selección",
         "hachure": "Folleto",
-        "handDrawn": "Dibujado a mano",
+        "handDrawn": "A mano",
         "imageCropping": "Recorte de imagen",
-        "increaseFontSize": "Aumentar el tamaño de letra",
+        "increaseFontSize": "Aumentar tamaño",
         "large": "Grande",
         "layers": "Capas",
-        "left": "Izquierda",
+        "left": "Izq.",
         "libraryLoadingMessage": "Cargando biblioteca…",
         "lineEditor": {
             "edit": "Editar línea",
             "editArrow": "Editar flecha"
         },
         "link": {
-            "create": "Crear enlace",
+            "create": "Enlazar",
             "edit": "Editar enlace",
             "editEmbed": "Editar enlace e incrustar",
-            "empty": "No se ha establecido un enlace",
+            "empty": "Sin enlace",
             "goToElement": "Ir al objeto enlazado",
             "hint": "Escribe o pega aquí el enlace",
             "label": "Enlace",
-            "labelEmbed": "Enlazar e incrustar"
+            "labelEmbed": "Enlace o web"
         },
-        "linkToElement": "Enlazar a un objeto",
+        "linkToElement": "Enlazar a objeto",
         "loadingScene": "Cargando escena…",
         "medium": "Mediana",
         "more_options": "Más opciones",
-        "moveCanvas": "Mover el lienzo",
+        "moveCanvas": "Mover lienzo",
         "multiSelect": "Añadir elemento a la selección",
         "normal": "Normal",
         "opacity": "Opacidad",
         "paste": "Pegar",
-        "pasteAsPlaintext": "Pegar como texto sin formato",
+        "pasteAsPlaintext": "Pegar sin formato",
         "pasteCharts": "Pegar gráficos",
         "pasteStyles": "Pegar estilos",
         "personalLib": "Biblioteca personal",
         "removeAllElementsFromFrame": "Eliminar todos los elementos del marco",
         "right": "Derecha",
         "round": "Redondo",
-        "selectAll": "Seleccionar todo",
-        "selectAllElementsInFrame": "Seleccionar todos los elementos en el marco",
+        "selectAll": "Elegir todo",
+        "selectAllElementsInFrame": "Elegir todo en el marco",
         "sendBackward": "Enviar atrás",
         "sendToBack": "Enviar al fondo",
         "sharp": "Afilado",
-        "showBackground": "Mostrar el selector de color de fondo",
-        "showFonts": "Mostrar el selector de fuentes",
-        "showStroke": "Mostrar selector de color de trazo",
-        "sidebarLock": "Mantener barra lateral abierta",
-        "sloppiness": "Estilo de trazo",
+        "showBackground": "Mostrar color de fondo",
+        "showFonts": "Mostrar fuentes",
+        "showStroke": "Mostrar color de trazo",
+        "sidebarLock": "Fijar barra lateral",
+        "sloppiness": "Trazo",
         "small": "Pequeña",
         "solid": "Sólido",
         "stroke": "Trazo",
-        "strokeStyle": "Estilo del trazo",
-        "strokeStyle_dashed": "Discontinua",
+        "strokeStyle": "Estilo trazo",
+        "strokeStyle_dashed": "Guiones",
         "strokeStyle_dotted": "Punteado",
         "strokeStyle_solid": "Sólido",
-        "strokeWidth": "Grosor del trazo",
-        "textAlign": "Alineado de texto",
+        "strokeWidth": "Grosor",
+        "textAlign": "Alinear texto",
         "theme": "Tema",
         "thin": "Fino",
-        "toggleGrid": "Mostrar u ocultar la cuadrícula",
+        "toggleGrid": "Cuadrícula",
         "toggleTheme": "Cambiar tema",
         "unCroppedDimension": "Tamaño sin recortar",
-        "unbindText": "Desvincular texto",
+        "unbindText": "Separar texto",
         "ungroup": "Desagrupar selección",
         "untitled": "Sin título",
-        "updateFrameRendering": "Mostrar el contenido de los marcos",
+        "updateFrameRendering": "Ver contenido de marcos",
         "veryLarge": "Muy grande",
-        "viewMode": "Modo presentación",
-        "wrapSelectionInFrame": "Envolver la selección en un marco",
+        "viewMode": "Solo lectura",
+        "wrapSelectionInFrame": "Meter selección en un marco",
         "zigzag": "Zigzag",
         "zoomToFitViewport": "Ajustar a la vista"
     },
@@ -398,21 +394,21 @@
     "overwriteConfirm": {
         "action": {
             "exportToImage": {
-                "button": "Exportar como imagen",
-                "description": "",
-                "title": "Exportar como imagen"
+                "button": "Exportar imagen",
+                "description": "Exporta la escena como una imagen que luego se puede volver a importar.",
+                "title": "Exportar imagen"
             },
             "saveToDisk": {
-                "button": "Guardar en el disco",
+                "button": "Guardar archivo",
                 "description": "Exporta los datos de la escena a un archivo desde el cual podrás importar más tarde.",
-                "title": "Guardar en el disco"
+                "title": "Guardar archivo"
             }
         },
         "modal": {
             "loadFromFile": {
-                "button": "Cargar desde un archivo",
-                "description": "",
-                "title": "Cargar desde un archivo"
+                "button": "Abrir archivo",
+                "description": "Abrir un archivo <bold>sustituirá el contenido actual</bold>.<br></br>Puedes guardar antes una copia con una de estas opciones.",
+                "title": "Abrir archivo"
             }
         }
     },
@@ -424,20 +420,20 @@
         "noMatch": "No hay coincidencias...",
         "placeholder": "Buscar texto en el lienzo...",
         "singleResult": "resultado",
-        "title": "Buscar en el lienzo"
+        "title": "Buscar en lienzo"
     },
     "stats": {
-        "elementProperties": "Propiedades de la forma",
-        "fullTitle": "Propiedades del lienzo y de la forma",
+        "elementProperties": "Propiedades forma",
+        "fullTitle": "Propiedades de lienzo y forma",
         "generalStats": "General",
         "height": "Alto",
         "scene": "Escena",
         "shapes": "Formas",
-        "title": "Estadísticas para nerds",
+        "title": "Propiedades",
         "width": "Ancho"
     },
     "toast": {
-        "addedToLibrary": "Añadido a la biblioteca",
+        "addedToLibrary": "En la biblioteca",
         "canvas": "lienzo",
         "copyStyles": "Estilos copiados.",
         "copyToClipboardAsPng": "Copiado {exportSelection} al portapapeles como PNG\n({exportColorScheme})",
@@ -447,19 +443,19 @@
         "fileSavedToFilename": "Guardado en {filename}",
         "pasteAsSingleElement": "Usa {shortcut} para pegar como un solo elemento,\no pegar en un editor de texto existente",
         "selection": "selección",
-        "unableToEmbed": "",
-        "unrecognizedLinkFormat": ""
+        "unableToEmbed": "Esta dirección no se puede insertar.",
+        "unrecognizedLinkFormat": "El enlace no tiene el formato esperado. Pega el código para insertar que da el sitio de origen."
     },
     "toolBar": {
         "arrow": "Flecha",
         "diamond": "Diamante",
         "ellipse": "Elipse",
-        "embeddable": "Incrustar Web",
+        "embeddable": "Web",
         "eraser": "Borrar",
-        "extraTools": "Más herramientas",
-        "frame": "",
+        "extraTools": "Más útiles",
+        "frame": "Marco",
         "freedraw": "Dibujar",
-        "hand": "Mano (herramienta de panoramización)",
+        "hand": "Mano (desplazar)",
         "image": "Insertar imagen",
         "laser": "Puntero láser",
         "library": "Biblioteca",
@@ -472,13 +468,13 @@
         "text": "Texto"
     },
     "userList": {
-        "empty": "No se han encontrado usuarios",
+        "empty": "Ningún usuario",
         "hint": {
             "followStatus": "Estás siguiendo a este usuario",
-            "inCall": "El usuario está en una llamada de voz",
-            "isSpeaking": "El usuario está hablando",
-            "micMuted": "El micrófono del usuario está silenciado",
-            "text": "Haz clic en un usuario para seguirlo"
+            "inCall": "En una llamada de voz",
+            "isSpeaking": "Está hablando",
+            "micMuted": "Micrófono silenciado",
+            "text": "Clic para seguirle"
         }
     },
     "welcomeScreen": {
