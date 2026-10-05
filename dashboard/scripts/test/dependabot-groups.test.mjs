@@ -89,7 +89,8 @@ test("the routine group excludes every name the special groups hold", () => {
 });
 
 test("no group bundles majors: each one arrives alone", () => {
-    assert.doesNotMatch(config, /update-types: \[[^\]]*major/);
+    // An ignore rule's "version-update:semver-major" holds majors back; only a group's "major" bundles them.
+    assert.doesNotMatch(config, /update-types: \[[^\]]*(?<!semver-)\bmajor\b/);
     const npm = config.slice(0, config.indexOf("package-ecosystem: github-actions"));
     const groups = npm.split(/^ {6}(?=[a-z0-9.-]+:\s*$)/m).slice(1);
     const unbounded = groups
