@@ -42,7 +42,7 @@ const DiagramBase = (props: DiagramProps) => {
     onScrollChange,
     onDuplicate,
     children,
-    validateEmbeddable,
+    validateEmbeddable = false,
     renderEmbeddable,
     showDeprecatedFonts,
   } = props;

@@ -2,7 +2,7 @@ import decodePng from "png-chunks-extract";
 import tEXt from "png-chunk-text";
 import encodePng from "png-chunks-encode";
 import { encode, decode } from "./encode";
-import { EXPORT_DATA_TYPES, MIME_TYPES } from "../constants";
+import { MIME_TYPES, SCENE_DATA_TYPES, SCENE_MIME_TYPES } from "../constants";
 import { blobToArrayBuffer } from "./blob";
 
 // -----------------------------------------------------------------------------
@@ -46,14 +46,14 @@ export const encodePngMetadata = async ({
 
 export const decodePngMetadata = async (blob: Blob) => {
   const metadata = await getTEXtChunk(blob);
-  if (metadata?.keyword === MIME_TYPES.diagram) {
+  if (metadata && SCENE_MIME_TYPES.includes(metadata.keyword)) {
     try {
       const encodedData = JSON.parse(metadata.text);
       if (!("encoded" in encodedData)) {
         // legacy, un-encoded scene JSON
         if (
           "type" in encodedData &&
-          encodedData.type === EXPORT_DATA_TYPES.diagram
+          SCENE_DATA_TYPES.includes(encodedData.type)
         ) {
           return metadata.text;
         }

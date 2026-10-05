@@ -4,7 +4,9 @@ import {
   DEFAULT_FILENAME,
   EXPORT_DATA_TYPES,
   EXPORT_SOURCE,
+  LIBRARY_DATA_TYPES,
   MIME_TYPES,
+  SCENE_DATA_TYPES,
   VERSIONS,
 } from "../constants";
 import { clearElementsForDatabase, clearElementsForExport } from "../element";
@@ -115,7 +117,8 @@ export const isValidDiagramData = (data?: {
   appState?: any;
 }): data is ImportedDataState => {
   return (
-    data?.type === EXPORT_DATA_TYPES.diagram &&
+    !!data &&
+    SCENE_DATA_TYPES.includes(data.type) &&
     (!data.elements ||
       (Array.isArray(data.elements) &&
         (!data.appState || typeof data.appState === "object")))
@@ -126,7 +129,7 @@ export const isValidLibrary = (json: any): json is ImportedLibraryData => {
   return (
     typeof json === "object" &&
     json &&
-    json.type === EXPORT_DATA_TYPES.diagramLibrary &&
+    LIBRARY_DATA_TYPES.includes(json.type) &&
     (json.version === 1 || json.version === 2)
   );
 };

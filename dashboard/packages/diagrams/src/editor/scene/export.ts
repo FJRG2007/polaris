@@ -19,7 +19,8 @@ import {
   THEME,
   THEME_FILTER,
   MIME_TYPES,
-  EXPORT_DATA_TYPES,
+  SCENE_DATA_TYPES,
+  SCENE_MIME_TYPES,
 } from "../constants";
 import { getDefaultAppState } from "../appState";
 import { serializeAsJSON } from "../data/json";
@@ -500,7 +501,9 @@ export const encodeSvgBase64Payload = ({
 };
 
 export const decodeSvgBase64Payload = ({ svg }: { svg: string }) => {
-  if (svg.includes(`payload-type:${MIME_TYPES.diagram}`)) {
+  if (
+    SCENE_MIME_TYPES.some((type) => svg.includes(`payload-type:${type}`))
+  ) {
     const match = svg.match(
       /<!-- payload-start -->\s*(.+?)\s*<!-- payload-end -->/,
     );
@@ -518,7 +521,7 @@ export const decodeSvgBase64Payload = ({ svg }: { svg: string }) => {
         // legacy, un-encoded scene JSON
         if (
           "type" in encodedData &&
-          encodedData.type === EXPORT_DATA_TYPES.diagram
+          SCENE_DATA_TYPES.includes(encodedData.type)
         ) {
           return json;
         }

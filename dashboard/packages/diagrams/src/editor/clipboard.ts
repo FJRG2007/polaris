@@ -8,6 +8,7 @@ import { tryParseSpreadsheet, VALID_SPREADSHEET } from "./charts";
 import {
   ALLOWED_PASTE_MIME_TYPES,
   EXPORT_DATA_TYPES,
+  LEGACY_EXPORT_DATA_TYPES,
   MIME_TYPES,
 } from "./constants";
 import {
@@ -65,6 +66,9 @@ const clipboardContainsElements = (
       EXPORT_DATA_TYPES.diagram,
       EXPORT_DATA_TYPES.diagramClipboard,
       EXPORT_DATA_TYPES.diagramClipboardWithAPI,
+      LEGACY_EXPORT_DATA_TYPES.diagram,
+      LEGACY_EXPORT_DATA_TYPES.diagramClipboard,
+      LEGACY_EXPORT_DATA_TYPES.diagramClipboardWithAPI,
     ].includes(contents?.type) &&
     Array.isArray(contents.elements)
   ) {
@@ -388,7 +392,9 @@ export const parseClipboard = async (
   try {
     const systemClipboardData = JSON.parse(parsedEventData.value);
     const programmaticAPI =
-      systemClipboardData.type === EXPORT_DATA_TYPES.diagramClipboardWithAPI;
+      systemClipboardData.type === EXPORT_DATA_TYPES.diagramClipboardWithAPI ||
+      systemClipboardData.type ===
+        LEGACY_EXPORT_DATA_TYPES.diagramClipboardWithAPI;
     if (clipboardContainsElements(systemClipboardData)) {
       return {
         elements: systemClipboardData.elements,
