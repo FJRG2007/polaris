@@ -102,8 +102,11 @@ describe("the resource a token is for", () => {
         expect(sameResource("https://POLARIS.example.test/api/mcp", expected)).toBe(true);
         expect(sameResource("https://polaris.example.test/api/mcp/", expected)).toBe(true);
         expect(sameResource("https://polaris.example.test:443/api/mcp", expected)).toBe(true);
+        expect(sameResource("https://polaris.example.test/api/mcp/sse", expected)).toBe(true);
+        expect(canonicalResource("https://polaris.example.test/api/mcp/sse/")).toBe(expected);
         for (const other of [
             "https://polaris.example.test/api/mcp2",
+            "https://polaris.example.test/api/mcp/sse2",
             "https://polaris.example.test/api",
             "https://evil.example/api/mcp",
             "http://polaris.example.test/api/mcp",

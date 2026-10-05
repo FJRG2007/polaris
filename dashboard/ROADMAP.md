@@ -638,6 +638,19 @@ Telemetry (what breaks):
   Tools beyond Tasks and sessions: Deploy, Notes, Chat, Drive and Calendar,
   each gated by its own scope and offered only when the account holds the
   underlying permission.
+- Account > AI assistants has a guide for each client whose own docs say how
+  to add a custom remote server, with the server URL filled in, the value to
+  copy at each step, the documented one-click install where there is one
+  (Cursor, VS Code), and a link to the client's own guide; a generic guide
+  covers Streamable HTTP, SSE and stdio through mcp-remote for everything
+  else. `/api/mcp/sse` serves clients still on the legacy HTTP+SSE transport:
+  every request is answered by the `/api/mcp` handler itself, so the token,
+  scopes, address rules, rate limits and audit log are the streamable
+  endpoint's; what the SSE route adds is the session binding a POST to the
+  stream that opened it. A credential holds at most 4 streams, the instance
+  500, and a stream lives at most 12 hours. The protected-resource metadata
+  and the token audience treat `/api/mcp/sse` as the same resource as
+  `/api/mcp`, so a client that names either gets tokens that work on both.
 - Enigma resolves down four tiers - session, repository, account, instance -
   nearest wins for every field except its escape-hatch `config` map, which
   merges far-to-near instead: an instance-wide key an operator set is a

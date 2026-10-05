@@ -103,54 +103,5 @@
         "pickOne": "Choose at least one permission, or disconnect it.",
         "changeFailed": "The permissions could not be changed. Reload and try again.",
         "loading": "Loading connected assistants"
-    },
-    "assistants": {
-        "title": "Connect an assistant",
-        "intro": "Each assistant signs in here and asks before it gets anything. Pick yours for the steps.",
-        "serverUrl": "Server URL",
-        "commandLabel": "command",
-        "configLabel": "configuration",
-        "official": "Official setup guide",
-        "claudeCode": {
-            "name": "Claude Code",
-            "step1": "Run this in a terminal:",
-            "step2": "In Claude Code, run {command} and choose polaris to sign in."
-        },
-        "claude": {
-            "name": "Claude (web and desktop)",
-            "step1": "Open Customize > Connectors and choose Add custom connector.",
-            "step2": "Name it Polaris, paste the server URL and choose Add.",
-            "step3": "Choose Connect and sign in here.",
-            "teams": "On Team and Enterprise plans, an owner adds it under Organization settings > Connectors first.",
-            "open": "Open Connectors"
-        },
-        "chatgpt": {
-            "name": "ChatGPT",
-            "step1": "Open Settings > Security and login and turn on Developer mode.",
-            "step2": "Open Plugins, select Add, then Create MCP App.",
-            "step3": "Name it Polaris. Under Connection, keep Server URL and paste the server URL.",
-            "step4": "Set Authentication to OAuth. No client ID or secret is needed.",
-            "step5": "Check I understand and want to continue, then select Create.",
-            "step6": "Sign in here when ChatGPT asks.",
-            "missing": "If Add only offers Create plugin and Upload plugin, Developer mode is off. Those two are for packaged plugins, not for a server URL.",
-            "plans": "Needs a Plus, Pro, Business, Enterprise or Education plan, on the web. In a Business, Enterprise or Education workspace, an admin may have to allow Developer mode first."
-        },
-        "cursor": {
-            "name": "Cursor",
-            "install": "Add to Cursor",
-            "manual": "Or add this to ~/.cursor/mcp.json:",
-            "signIn": "Cursor asks you to sign in here the first time it uses Polaris."
-        },
-        "vscode": {
-            "name": "Visual Studio Code",
-            "install": "Add to VS Code",
-            "manual": "Or add this to .vscode/mcp.json:",
-            "signIn": "VS Code asks you to sign in here the first time it uses Polaris."
-        },
-        "other": {
-            "name": "Other assistants",
-            "body": "Any client that supports remote MCP servers over HTTP with OAuth connects with the server URL. For Codex CLI:",
-            "key": "A client that cannot sign in can use an API key instead: send it as {header}. <link>Create a key</link>"
-        }
     }
 }

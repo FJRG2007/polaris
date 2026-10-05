@@ -13,6 +13,15 @@
  *     its name (code.visualstudio.com/api/extension-guides/ai/mcp), and
  *     `servers` in .vscode/mcp.json with `type: "http"`.
  *   - Codex CLI: `codex mcp add <name> --url <url>`, then `codex mcp login`.
+ *   - OpenCode: `mcp.<name>` in opencode.json, `type: "remote"`, then
+ *     `opencode mcp auth <name>` (opencode.ai/docs/mcp-servers).
+ *   - Kimi Code: `kimi mcp add --transport http --auth oauth <name> <url>`, then
+ *     `kimi mcp auth <name>` (moonshotai.github.io/kimi-cli/en/customization/mcp.html).
+ *   - Copilot CLI: `copilot mcp add --transport http <name> <url>`
+ *     (docs.github.com/en/copilot/how-tos/copilot-cli/customize-copilot/add-mcp-servers).
+ *   - Any other client: the `mcpServers` entry most of them read, in the three
+ *     shapes there are - a URL (Streamable HTTP), `type: "sse"` with the SSE
+ *     endpoint, or mcp-remote over stdio for a client that only runs commands.
  * No credential appears in any of them: each client signs in through OAuth.
  */
 
@@ -23,12 +32,36 @@ export function claudeCodeCommand(url: string): string {
     return `claude mcp add --transport http ${SERVER_NAME} ${url}`;
 }
 
-export function cursorConfig(url: string): string {
+/** Base64 of a string's UTF-8 bytes, the same in the browser and on the server. */
+function base64(text: string): string {
+    return btoa(String.fromCharCode(...new TextEncoder().encode(text)));
+}
+
+/** The `mcpServers` entry for the Streamable HTTP endpoint: a bare URL. */
+export function streamableHttpConfig(url: string): string {
     return JSON.stringify({ mcpServers: { [SERVER_NAME]: { url } } }, null, 2);
 }
 
+/** The same for a client that only speaks the older HTTP+SSE transport. */
+export function sseConfig(sseUrl: string): string {
+    return JSON.stringify({ mcpServers: { [SERVER_NAME]: { type: "sse", url: sseUrl } } }, null, 2);
+}
+
+/** For a client that can only start a local command: mcp-remote bridges stdio
+ *  to the remote endpoint and runs the sign-in in a browser. */
+export function stdioConfig(url: string): string {
+    return JSON.stringify(
+        { mcpServers: { [SERVER_NAME]: { command: "npx", args: ["-y", "mcp-remote", url] } } },
+        null,
+        2
+    );
+}
+
+/** Cursor reads the plain `mcpServers` entry. */
+export const cursorConfig = streamableHttpConfig;
+
 export function cursorInstallLink(url: string): string {
-    const config = Buffer.from(JSON.stringify({ url }), "utf8").toString("base64");
+    const config = base64(JSON.stringify({ url }));
     return `cursor://anysphere.cursor-deeplink/mcp/install?name=${SERVER_NAME}&config=${encodeURIComponent(config)}`;
 }
 
@@ -44,14 +77,51 @@ export function codexCommands(url: string): string {
     return `codex mcp add ${SERVER_NAME} --url ${url}\ncodex mcp login ${SERVER_NAME}`;
 }
 
+export function copilotCliCommand(url: string): string {
+    return `copilot mcp add --transport http ${SERVER_NAME} ${url}`;
+}
+
+export function opencodeConfig(url: string): string {
+    return JSON.stringify(
+        { mcp: { [SERVER_NAME]: { type: "remote", url, enabled: true } } },
+        null,
+        2
+    );
+}
+
+export function opencodeAuthCommand(): string {
+    return `opencode mcp auth ${SERVER_NAME}`;
+}
+
+export function kimiAddCommand(url: string): string {
+    return `kimi mcp add --transport http --auth oauth ${SERVER_NAME} ${url}`;
+}
+
+export function kimiAuthCommand(): string {
+    return `kimi mcp auth ${SERVER_NAME}`;
+}
+
 /** Where Claude's connector settings open (claude.com/docs/connectors). */
 export const CLAUDE_CONNECTORS_URL = "https://claude.ai/customize/connectors";
+
+/** Where Grok's connectors open (docs.x.ai/grok/connectors). */
+export const GROK_CONNECTORS_URL = "https://grok.com/connectors";
 
 /** Each client's own page on adding a remote MCP server. */
 export const SETUP_GUIDES = {
     claudeCode: "https://code.claude.com/docs/en/mcp",
-    claude: "https://claude.com/docs/connectors/custom/add-unlisted",
+    claude: "https://claude.com/docs/connectors/custom/remote-mcp",
     chatgpt: "https://developers.openai.com/api/docs/guides/developer-mode",
     cursor: "https://cursor.com/docs/context/mcp",
-    vscode: "https://code.visualstudio.com/docs/copilot/customization/mcp-servers"
+    vscode: "https://code.visualstudio.com/docs/copilot/customization/mcp-servers",
+    copilot:
+        "https://docs.github.com/en/copilot/how-tos/copilot-cli/customize-copilot/add-mcp-servers",
+    devin: "https://docs.devin.ai/work-with-devin/mcp",
+    figma: "https://help.figma.com/hc/en-us/articles/38147204302743-Create-and-use-custom-MCP-connectors-in-Figma-Make",
+    grok: "https://docs.x.ai/grok/connectors",
+    mistral: "https://docs.mistral.ai/le-chat/knowledge-integrations/connectors/mcp-connectors",
+    zapier: "https://help.zapier.com/hc/en-us/articles/38777069364109-Connect-remote-MCP-servers-to-Zapier-using-MCP-Client",
+    make: "https://apps.make.com/mcp-client",
+    opencode: "https://opencode.ai/docs/mcp-servers/",
+    kimi: "https://moonshotai.github.io/kimi-cli/en/customization/mcp.html"
 } as const;
