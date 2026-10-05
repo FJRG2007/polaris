@@ -70,6 +70,7 @@
         "archiver-zip-encrypted": "2.0.0",
         "better-auth": "1.6.25",
         "dompurify": "3.4.16",
+        "dymo-api": "1.2.44",
         "fast-xml-parser": "5.11.1",
         "highlight.js": "11.11.1",
         "iconv-lite": "0.7.3",
