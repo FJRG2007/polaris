@@ -17,9 +17,10 @@
  * takes what was tagged since the last look in one batch (`TAKE`), so a hit
  * that lands while it reads is kept for the next.
  *
- * A third, `player_killed_entity` on a monster a horde summoned (`pe_mob`),
- * counts a horde defense's kills (`WAVE_KILLS`): the game's `killed`
- * statistics count every zombie a player kills, the night's own included.
+ * A third, `player_killed_entity` on a monster a horde sent to fight
+ * (`WAVE_FIGHTER_TAG`), counts a horde defense's kills (`WAVE_KILLS`): the
+ * game's `killed` statistics count every zombie a player kills, the night's
+ * own included. A jockey's mount is never one.
  *
  * Who hit a player is the game's own memory of it: `execute on attacker`
  * (1.19.4) is the last living thing that hurt them in the last five seconds.
@@ -47,9 +48,10 @@ const ADVANCEMENT = {
     kill: "polaris:hit/kill"
 } as const;
 
-/** A horde's monster (`waves.MOB_TAG`), and the count of them a player killed:
- *  only what the event summoned, never one of the night's own. */
-const WAVE_MOB_TAG = "pe_mob";
+/** A horde's fighter (`waves.summonWave`), and the count of them a player killed:
+ *  only what the event summoned to fight, never one of the night's own nor a
+ *  jockey's mount. */
+export const WAVE_FIGHTER_TAG = "pe_wfight";
 export const WAVE_KILLS = "pe_wkp";
 
 /** The reward functions, by name under `polaris:hit/`. Vanilla commands every
@@ -102,7 +104,7 @@ export const ADVANCEMENTS: Readonly<Record<string, unknown>> = {
         criteria: {
             hit: {
                 trigger: "minecraft:player_killed_entity",
-                conditions: { entity: { nbt: `{Tags:["${WAVE_MOB_TAG}"]}` } }
+                conditions: { entity: { nbt: `{Tags:["${WAVE_FIGHTER_TAG}"]}` } }
             }
         },
         rewards: { function: ADVANCEMENT.kill }

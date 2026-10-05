@@ -4783,7 +4783,7 @@ describe("a horde defense", () => {
             world.files.get(
                 "/data/world/datapacks/polaris-events/data/polaris/advancement/hit/kill.json"
             )
-        ).toContain('"nbt":"{Tags:[\\"pe_mob\\"]}"');
+        ).toContain('"nbt":"{Tags:[\\"pe_wfight\\"]}"');
     });
 
     it("counts kills by the game's statistics where the pack cannot go on", async () => {

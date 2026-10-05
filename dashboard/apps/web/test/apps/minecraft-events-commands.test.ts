@@ -1572,7 +1572,8 @@ describe("a horde defense", () => {
         expect(spider).not.toContain("pe_wmount");
         expect(waves.WAVE_ALIVE).toBe("execute if entity @e[tag=pe_mob,tag=!pe_wmount]");
         expect(waves.MOUNTS_GONE).toBe("kill @e[tag=pe_wmount]");
-        // Glowing and the wave's strength go to the fighters, never a mount.
+        // The kill tag, glowing and the wave's strength go to the fighters, never a mount.
+        expect(lines).toContain("tag @e[tag=pe_wnew,tag=!pe_wmount] add pe_wfight");
         expect(lines).toContain(
             "effect give @e[tag=pe_wnew,tag=!pe_wmount] minecraft:glowing 600 0 true"
         );

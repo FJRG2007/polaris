@@ -382,11 +382,12 @@ export function summonWave(
             );
         }
     }
-    // The fighters only - never a mount: glowing, to find the last one; fire
-    // resistance, so a wave in daylight is not burnt away by the sun before
+    // The fighters only - never a mount: tagged, so a kill of one is counted;
+    // glowing, to find the last one; fire resistance, so a wave in daylight is not burnt away by the sun before
     // anybody fights it.
     const fighters = `@e[tag=${NEW_TAG},tag=!${MOUNT_TAG}]`;
     lines.push(
+        `tag ${fighters} add ${hits.WAVE_FIGHTER_TAG}`,
         `effect give ${fighters} minecraft:glowing ${time} 0 true`,
         `effect give ${fresh} minecraft:fire_resistance ${time} 0 true`
     );

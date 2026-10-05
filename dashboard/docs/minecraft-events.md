@@ -300,7 +300,8 @@ left out.
       Otherwise the waves play out and the podium goes to the most kills.
     - Kills - here and in a horde defense - are counted by the events data
       pack where it goes on (`run.killsByPack`): an advancement on a kill of a
-      monster tagged `pe_mob`, so only what the event summoned counts. The
+      monster tagged `pe_wfight`, so only what the event summoned to fight
+      counts - never the night's own, nor a jockey's chicken or horse. The
       game's `killed` statistics, the fallback, count the night's own zombies
       killed near the point as well.
     - The end, a call-off or a restart kills exactly what carries the tag, and
@@ -799,7 +800,8 @@ A new kind follows all of them. A change to an old kind must not undo one.
   measure is now the most a player has had (`6c6bebac9`).
 - **A statistic for a kind of mob counts the world's own mobs too.** A horde
   or villager defense counted every zombie killed near the point at night,
-  summoned or not; the pack counts kills of `pe_mob` only (`d1e523362`).
+  summoned or not; the pack counts kills of `pe_wfight` only (`d1e523362`):
+  not `pe_mob`, which a jockey's mount carries too.
 - **Coming back is not starting over.** A boat racer who left and joined
   again lost every gate in the game while their clock kept running; they now
   come back at their last gate with their passes (`abb4aa37e`).
