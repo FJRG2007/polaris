@@ -310,6 +310,8 @@ interface Loop {
      *  in tries: where the last one had to come to before it found anything - an
      *  island, where nothing further out ever does. Forgotten on a restart. */
     placeFloor: number;
+    /** The server's AFK minutes, as last read (`loopAfkMinutes`). */
+    afkMinutes: { at: number; minutes: number } | null;
 }
 
 const loops = new Map<string, Loop>();
@@ -954,7 +956,8 @@ function startLoop(
         flavour: null,
         quiet: false,
         placeFloor: 0,
-        homes: null
+        homes: null,
+        afkMinutes: null
     };
     loop.timer.unref?.();
     loop.clock = setInterval(() => void showClock(installedAppId, loop), CLOCK_MS);
@@ -2938,6 +2941,16 @@ function fishEscaped(run: stored.EventRun): boolean {
 /** How often, in ticks, it looks for players who have started fishing since. */
 const FISHERS_EVERY = 8;
 
+/** The server's AFK minutes for a tick, read again once `FISHERS_EVERY` ticks
+ *  have passed rather than on every one. */
+async function loopAfkMinutes(installedAppId: string, loop: Loop): Promise<number> {
+    const cached = loop.afkMinutes;
+    if (cached && loop.ticks - cached.at < FISHERS_EVERY) return cached.minutes;
+    const minutes = await afkMinutesFor(installedAppId);
+    loop.afkMinutes = { at: loop.ticks, minutes };
+    return minutes;
+}
+
 /**
  * A boss fishing begun: the fish sized for everybody playing now - written
  * down before it is said, so a restart keeps the same fish - its catches
@@ -3019,7 +3032,7 @@ async function bossFishing(
     // just back on, or everybody after a restart - stays as they were last
     // seen until a look says otherwise.
     const seen = playing.seenOn(installedAppId);
-    const afkMinutes = await afkMinutesFor(installedAppId);
+    const afkMinutes = await loopAfkMinutes(installedAppId, loop);
     const now = Date.now();
     const names = (list: readonly plan.Seen[]) =>
         new Set(list.map((one) => one.name.toLowerCase()));
