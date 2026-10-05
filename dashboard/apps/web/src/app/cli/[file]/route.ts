@@ -1,12 +1,14 @@
 /**
  * GET /cli/polaris.mjs, /cli/install.sh, /cli/install.ps1 - the command-line
- * client and the scripts that install it (see `lib/cli/distribution`).
+ * client built into this image and the scripts that install it, kept for the
+ * install lines and CLIs that predate the GitHub releases (see
+ * `lib/cli/distribution`).
  *
  * Unauthenticated on purpose: the same public artefact for every caller, no
  * secret in it, and the person fetching it has not signed in to anything yet -
  * the CLI they are installing is how they will. Integrity is what matters, so
- * every file carries its SHA-256, which the install scripts and `plr update`
- * check before they replace anything.
+ * every file carries its SHA-256, which `plr update --url` checks before it
+ * replaces anything.
  */
 
 import { join } from "node:path";

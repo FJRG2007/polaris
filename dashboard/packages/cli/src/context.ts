@@ -14,6 +14,7 @@ import { readSecret } from "./secret-input.js";
 import { secrets, type Secrets } from "./secrets.js";
 import { createInterface } from "node:readline/promises";
 import { canOpenBrowser, openBrowser } from "./browser.js";
+import { timed } from "./timing.js";
 import { configDir, currentHost, type Host } from "./paths.js";
 import { loadConfig, profileNameSchema, type Profile } from "./config.js";
 
@@ -129,7 +130,9 @@ export async function requireSession(context: Context, flags: Flags): Promise<Se
         throw new CliError(
             `There is no profile named "${name}". plr profile list shows yours; plr login adds one.`
         );
-    const token = await context.secrets.read(name, profile.storage);
+    const token = await timed(`sign-in read from the ${profile.storage}`, () =>
+        context.secrets.read(name, profile.storage)
+    );
     if (!token) {
         throw new CliError(
             `The sign-in for "${name}" is missing from the ${profile.storage === "keychain" ? "keychain" : "credentials file"}. Run plr login --profile ${name}.`

@@ -112,6 +112,18 @@ describe("changing", () => {
         expect(seen.at(-1)?.url).toBe(`${URL}/api/v1/deploy/deployments/d2?follow=1`);
     });
 
+    it("stops following a build when the server speaks a newer API", async () => {
+        const { fetch } = scriptedFetch({
+            "GET /api/v1/deploy/deployments/d2": () =>
+                new Response("step 1\n", { headers: { "x-polaris-cli-protocol": "2-3" } })
+        });
+        const { context, stdout } = await testContext({ fetch, env });
+        await expect(run(["build-log", "d2", "--follow"], context, clean)).rejects.toThrow(
+            /too old.*plr update/
+        );
+        expect(stdout()).not.toContain("step 1");
+    });
+
     it("restarts", async () => {
         const { fetch } = deployServer();
         const { context, stdout } = await testContext({ fetch, env });

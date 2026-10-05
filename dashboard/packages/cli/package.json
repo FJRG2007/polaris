@@ -1,9 +1,9 @@
 {
     "name": "@polaris/cli",
-    "version": "0.1.0",
+    "version": "0.5.0",
     "private": true,
     "type": "module",
-    "description": "The Polaris command-line client for developers (plr / polaris): sign in once from the browser, then deploy, read logs and restart apps. Bundled into one file that each Polaris serves at /cli.",
+    "description": "The Polaris command-line client for developers (plr / polaris): sign in once from the browser, then deploy, read logs and restart apps. Bundled into one file, released on GitHub as cli-v<version>.",
     "bin": {
         "plr": "dist/polaris.mjs",
         "polaris": "dist/polaris.mjs"

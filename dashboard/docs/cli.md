@@ -6,18 +6,24 @@ sign-in. Installed as `plr` and as `polaris`.
 
 ## Install
 
-Each Polaris serves the CLI that matches it. Copy the line from
-**Account > Downloads > Command line**, or:
+Installed from this repository's GitHub releases (`cli-v*` tags), like the
+browser extension. Copy the line from **Account > Downloads > Command line**, or:
 
 ```sh
 # macOS and Linux
-curl -fsSL https://your-polaris/cli/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/FJRG2007/polaris/main/dashboard/packages/cli/scripts/install.sh | sh
 ```
 
 ```powershell
 # Windows
-irm https://your-polaris/cli/install.ps1 | iex
+irm https://raw.githubusercontent.com/FJRG2007/polaris/main/dashboard/packages/cli/scripts/install.ps1 | iex
 ```
+
+The script downloads `polaris.mjs` from the newest CLI release and checks it
+against the SHA-256 digest GitHub publishes for it. Then point it at your
+Polaris with `plr login --url` (below). The older lines served by a Polaris
+(`https://your-polaris/cli/install.sh` and `install.ps1`) keep working and now
+install the same release.
 
 It needs Node.js 20 or newer. Nothing needs root or Administrator:
 
@@ -26,9 +32,20 @@ It needs Node.js 20 or newer. Nothing needs root or Administrator:
 | macOS, Linux | `~/.local/share/polaris-cli/polaris.mjs`          | `~/.local/bin/plr`, `polaris`      |
 | Windows      | `%LOCALAPPDATA%\Programs\polaris-cli\polaris.mjs` | `plr.cmd`, `polaris.cmd` beside it |
 
-`plr update` replaces it with the one your Polaris serves now, after checking
-the download against the SHA-256 the server sends with it. `plr uninstall`
-signs every profile out, revokes their keys, and removes the CLI.
+`plr update` replaces it with the newest release, checked the same way.
+`plr update --url https://your-polaris` takes the CLI built into that Polaris
+instead (checked against the SHA-256 the server sends), for a Polaris older than
+the newest CLI or a computer that cannot reach GitHub. `plr uninstall` signs
+every profile out, revokes their keys, and removes the CLI.
+
+### Versions
+
+The CLI and your Polaris are updated separately, so every call checks that they
+speak the same API: Polaris names the CLI protocol versions it accepts in the
+`X-Polaris-Cli-Protocol` header. When they do not match, the command stops and
+says what to run: `plr update` when the CLI is too old, or updating Polaris from
+**Settings > Update** (or `plr update --url` for the CLI it serves) when Polaris
+is older than the CLI.
 
 ### Not on a Polaris server
 
@@ -127,7 +144,8 @@ says otherwise. A running service keeps its old values until it is redeployed:
 A service is `project/service` (its default environment),
 `project/environment/service`, or its id. Read commands print JSON with
 `--json`. Every failure says what to do next; `POLARIS_DEBUG=1` adds the
-details of one the CLI did not expect.
+details of one the CLI did not expect. `PLR_DEBUG=1` prints where a command's
+time went - startup, the sign-in read, and each request - after its output.
 
 A Polaris on a private certificate authority is trusted by pointing
 `NODE_EXTRA_CA_CERTS` at the CA's certificate; there is no switch that turns

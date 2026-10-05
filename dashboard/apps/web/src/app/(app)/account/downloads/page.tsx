@@ -25,6 +25,7 @@ import Link from "next/link";
 import { Suspense } from "react";
 import { loadEnv } from "@polaris/config";
 import { requireUser } from "@/lib/session";
+import { publicAppUrl } from "@/lib/domain-service";
 import { CliSection } from "./cli-section";
 import { ExtensionSteps } from "./extension-steps";
 import { getTranslations } from "@/lib/i18n/request";
@@ -48,8 +49,13 @@ function FilesSkeleton() {
 }
 
 export default async function DownloadsPage() {
-    await requireUser();
-    const t = await getTranslations("account");
+    const [, t, serverUrl] = await Promise.all([
+        requireUser(),
+        getTranslations("account"),
+        // The address the CLI signs in to. Null falls back to the one this page
+        // is open on, which the reader has just proven reaches this Polaris.
+        publicAppUrl().catch(() => null)
+    ]);
     const repo = loadEnv().POLARIS_REPO;
 
     return (
@@ -123,7 +129,7 @@ export default async function DownloadsPage() {
                 </CardBody>
             </Card>
 
-            <CliSection />
+            <CliSection repo={repo} serverUrl={serverUrl} />
 
             <Card>
                 <CardHeader>

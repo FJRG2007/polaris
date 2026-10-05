@@ -12,6 +12,9 @@ import type { z } from "zod";
 import { CliError } from "./errors.js";
 import { userAgent } from "./version.js";
 import { refusalSchema } from "./schemas.js";
+import { performance } from "node:perf_hooks";
+import { mark, timing } from "./timing.js";
+import { PROTOCOL_HEADER, compatibilityProblem } from "./compat.js";
 
 export interface Connection {
     /** The Polaris address, without a trailing slash. */
@@ -122,8 +125,11 @@ export async function send(
     options: CallOptions = {}
 ): Promise<Response> {
     const doFetch = options.fetch ?? fetch;
+    const startedAt = timing() ? performance.now() : 0;
+    // Named without its query, which can carry a service's name.
+    const label = `${method} ${path.split("?")[0]}`;
     try {
-        return await doFetch(`${connection.url}${path}`, {
+        const response = await doFetch(`${connection.url}${path}`, {
             method,
             headers: headers(connection, options.body !== undefined),
             body: options.body === undefined ? undefined : JSON.stringify(options.body),
@@ -132,9 +138,19 @@ export async function send(
             redirect: "manual",
             signal: AbortSignal.timeout(options.timeoutMs ?? 30_000)
         });
+        mark(`${label} ${response.status}`, startedAt);
+        return response;
     } catch (caught) {
+        mark(`${label} failed`, startedAt);
         throw new CliError(`Could not reach ${connection.url}: ${unreachableReason(caught)}.`);
     }
+}
+
+/** Refuse an answer from a Polaris on a different API, in a sentence that
+ *  names the command that brings the two back in step. */
+export function requireCompatible(connection: Connection, response: Response): void {
+    const mismatch = compatibilityProblem(connection.url, response.headers.get(PROTOCOL_HEADER));
+    if (mismatch) throw new CliError(mismatch);
 }
 
 /**
@@ -149,6 +165,9 @@ export async function call<Schema extends z.ZodTypeAny>(
     options: CallOptions = {}
 ): Promise<z.infer<Schema>> {
     const response = await send(connection, method, path, options);
+    // First: a server on a different API can answer anything at all, and the
+    // only useful thing to say then is how to get the two back in step.
+    requireCompatible(connection, response);
     if (response.status >= 300 && response.status < 400)
         throw new CliError(redirectMessage(connection.url, response));
     if (!response.ok)
@@ -158,7 +177,7 @@ export async function call<Schema extends z.ZodTypeAny>(
     const parsed = schema.safeParse(await response.json().catch(() => undefined));
     if (!parsed.success) {
         throw new CliError(
-            `${connection.url} answered in a shape this CLI does not understand. Check that it is a Polaris address; if it is, run plr update to get the CLI that matches it.`
+            `${connection.url} answered in a shape this CLI does not understand. Check that it is a Polaris address; if it is, run plr update.`
         );
     }
     return parsed.data;

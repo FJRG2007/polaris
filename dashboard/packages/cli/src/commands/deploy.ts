@@ -9,7 +9,7 @@
  * used from then on.
  */
 
-import { call, refusalMessage, send } from "../api.js";
+import { call, refusalMessage, requireCompatible, send } from "../api.js";
 import type { Flags } from "../args.js";
 import { CliError, usage } from "../errors.js";
 import { line, printJson, table } from "../output.js";
@@ -204,6 +204,7 @@ async function followBuild(
         // A build can run for a long time; the stream ends when it does.
         { fetch: context.fetch, timeoutMs: 6 * 60 * 60 * 1000 }
     );
+    requireCompatible(session.connection, response);
     if (!response.ok) {
         const refusal = (await response.json().catch(() => null)) as { error?: string } | null;
         throw new CliError(
