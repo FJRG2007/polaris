@@ -7,16 +7,16 @@
  *
  * What is asserted: every app is listed in the menu's order with move-up and
  * move-down buttons that call `arrangeApps` with the reordered list and disable
- * at each end; a star pins or unpins through `toggle`, and a locked app has
- * none; a star keeps the rows where they are while the menu is not arranged,
- * and a move reorders them; the way back to the automatic order shows only once the menu was
- * arranged; and it reads in Spanish.
+ * at each end; there is no star on any row; an order changed elsewhere keeps
+ * the rows where they are until a move reorders them; the way back to the
+ * automatic order shows only once the menu was arranged; and it reads in
+ * Spanish.
  */
 
 import { withMessages } from "../setup/i18n";
 import type { PolarisApp } from "@polaris/ui";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen, within } from "@testing-library/react";
 import { ArrangeAppsDialog } from "@/components/arrange-apps-dialog";
 import { Gamepad2, HardDrive, MessageCircle, Mail } from "lucide-react";
 import { FavoriteAppsContext, type FavoriteApps } from "@/components/favorite-apps-context";
@@ -36,7 +36,6 @@ function store(overrides: Partial<FavoriteApps> = {}): FavoriteApps {
     return {
         favorites: [],
         order: [],
-        toggle: vi.fn(),
         arrangeApps: vi.fn(),
         resetOrder: vi.fn(),
         launcherOpen: false,
@@ -94,17 +93,15 @@ describe("the arrange apps dialog", () => {
         expect(arrangeApps).not.toHaveBeenCalled();
     });
 
-    it("pins and unpins through toggle, and offers no star on a locked app", () => {
-        const { toggle, arrangeApps } = renderDialog({ favorites: ["chat"] });
-        screen.getByRole("button", { name: "Remove Chat from favorites" }).click();
-        expect(toggle).toHaveBeenCalledWith("chat");
-        screen.getByRole("button", { name: "Add Drive to favorites" }).click();
-        expect(toggle).toHaveBeenLastCalledWith("drive");
-        expect(screen.queryByRole("button", { name: "Add Mail to favorites" })).toBeNull();
-        expect(arrangeApps).not.toHaveBeenCalled();
+    it("offers moving and nothing else - no star on any row", () => {
+        renderDialog({ favorites: ["chat"] });
+        expect(screen.queryByRole("button", { name: /favorites/i })).toBeNull();
+        for (const row of screen.getAllByRole("listitem")) {
+            expect(within(row).getAllByRole("button")).toHaveLength(2);
+        }
     });
 
-    it("keeps the rows in place when a star moves an app in the menu, until a move", () => {
+    it("keeps the rows in place when the menu's order changes elsewhere, until a move", () => {
         const value = store();
         const tree = (order: string[], arranged: readonly string[] = value.order) =>
             withMessages(

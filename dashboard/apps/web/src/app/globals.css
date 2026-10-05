@@ -656,81 +656,46 @@ dialog.pdfSlick-dialog .dialogButton {
 }
 
 /*
- * The service panel's controls.
+ * The service panel's surface and switches.
  *
- * The deploy service panel is the one screen that is mostly controls laid out
- * on cards over the page ground, and with the global tokens a field there is a
- * recess two steps off the card with the card's own hairline round it, and an
- * off switch is a lozenge barely off the card. Everywhere else those tokens are
- * right, so the fix stays inside the panel (`data-service-panel` on its dialog)
- * and nothing outside it changes.
+ * The deploy service panel is a side sheet like the database panel beside it
+ * and the task panel elsewhere, and it is drawn the way they are: on the
+ * dialog's own surface, with every field, border and tab in the application's
+ * own tokens. It used to be the one panel that was not - its body was the page
+ * ground, near-black under a raised header, and its fields carried an edge of
+ * their own several steps brighter than any other field in the product, which
+ * read as a different application inside this one.
  *
- * Inside it a field is identified by its fill - a step above the card rather
- * than below it - and an edge that holds the control edge's 3:1 (WCAG 1.4.11),
- * clearer on hover and focus, with the application's focus ring on top. Section
- * hairlines move a step up from the application's so one card is told from the
- * next, and stay well under a field's edge so the cards do not read as boxes. An
- * unchecked switch is a solid track a step past the control edge, at 3:1 against
- * the card and the page: it is a small control with no other boundary.
- * test/deploy/service-panel-contrast.test.ts measures every pair per theme.
- *
- * `bg-field` is what every field in the application is filled with, so on an
- * input, a textarea or a select trigger it is also what finds one here; a
- * checkbox keeps its own box, and a field drawn in a status colour keeps that
- * colour.
+ * Two things stay its own. A card inside it is the dialog's surface with its
+ * hairline, as in the database panel, because the card tone is darker than a
+ * dialog in the dark themes and a card drawn in it read as a hole. And an
+ * unchecked switch keeps a solid track at 3:1 (WCAG 1.4.11) on that surface and
+ * on the page: the panel is mostly switches, and the application's own off
+ * track is barely off a raised surface. test/deploy/service-panel-contrast.test.ts
+ * measures both per theme.
  */
 [data-service-panel] {
-    --field: 225 11% 12%;
-    --field-edge: 225 9% 46%;
-    --border: 225 10% 25%;
-    --border-strong: 225 10% 36%;
+    --card: var(--elevated);
+    --card-hover: var(--option-hover);
     --switch-off: 225 9% 50%;
 }
 
 :root.light [data-service-panel] {
-    --field: 225 24% 97%;
-    --field-edge: 225 10% 54%;
-    --border: 225 16% 81%;
-    --border-strong: 225 12% 64%;
     --switch-off: 225 10% 50%;
 }
 
 @media (prefers-color-scheme: light) {
     :root.system [data-service-panel] {
-        --field: 225 24% 97%;
-        --field-edge: 225 10% 54%;
-        --border: 225 16% 81%;
-        --border-strong: 225 12% 64%;
         --switch-off: 225 10% 50%;
     }
 }
 
 :root.midnight [data-service-panel] {
-    --field: 225 12% 10%;
-    --field-edge: 225 9% 44%;
-    --border: 225 12% 23%;
-    --border-strong: 225 10% 33%;
     --switch-off: 225 9% 48%;
 }
 
 :root.graphite [data-service-panel] {
-    --field: 220 4% 14%;
-    --field-edge: 220 4% 46%;
-    --border: 220 4% 26%;
-    --border-strong: 220 4% 38%;
     --switch-off: 220 4% 50%;
-}
-
-[data-service-panel] :is(input, textarea, button).bg-field:not([aria-invalid="true"]) {
-    border-color: hsl(var(--field-edge));
-}
-
-[data-service-panel] :is(input, textarea, button).bg-field:not([aria-invalid="true"]):hover,
-[data-service-panel] :is(input, textarea, button).bg-field:not([aria-invalid="true"]):focus,
-[data-service-panel] :is(input, textarea, button).bg-field:not([aria-invalid="true"]):focus-within,
-[data-service-panel]
-    :is(input, textarea, button).bg-field:not([aria-invalid="true"])[data-state="open"] {
-    border-color: hsl(var(--muted-foreground));
 }
 
 [data-service-panel] [role="switch"][aria-checked="false"] {

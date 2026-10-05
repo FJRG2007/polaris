@@ -36,7 +36,9 @@ import * as catalog from "../catalog";
 import * as build from "./build-battle";
 import * as arrival from "./arrival";
 import * as hill from "./hill";
+import * as hits from "./hits";
 import * as hillService from "./hill-service";
+import * as hitsService from "./hits-service";
 import * as stashService from "./stash-service";
 import * as commands from "../commands";
 import * as speech from "../../speech";
@@ -70,8 +72,8 @@ const FILLS_PER_TRIP = 25;
 /** What one run keeps in memory between ticks: nothing that must survive a restart. */
 interface Memory {
     loadWaits: number;
-    dealt: Map<string, number>;
-    kills: Map<string, number>;
+    dealt: hits.Tally;
+    kills: hits.Tally;
     lastHit: Map<string, number>;
     shieldedUntil: Map<string, number>;
     tour: number;
@@ -86,8 +88,8 @@ function memoryOf(runId: string): Memory {
     if (!memory) {
         memory = {
             loadWaits: 0,
-            dealt: new Map(),
-            kills: new Map(),
+            dealt: hits.tally(),
+            kills: hits.tally(),
             lastHit: new Map(),
             shieldedUntil: new Map(),
             tour: -1,
@@ -149,7 +151,10 @@ export async function arenaTick(ctx: KindContext, lines: string[]): Promise<stri
     if (ctx.run.arena) lines.push(...commands.hostilesOut(ctx.run.arena.box));
     if (ctx.run.readyAt === null) {
         if (!ctx.run.enrolled) await enroll(ctx, lines);
-        else if (!ctx.run.arena) await raise(ctx);
+        else if (!ctx.run.arena) {
+            if (gameOf(ctx.run.preset.kind)?.hits) await hitsService.ensure(ctx);
+            await raise(ctx);
+        }
         // Nothing counts until everybody brought in is there (`arrival`).
         else if (arrival.isOpen(ctx.run.id)) await arrivalTick(ctx, lines);
         else await bringIn(ctx);
@@ -713,26 +718,38 @@ async function duelTick(ctx: KindContext, lines: string[]): Promise<void> {
     const memory = memoryOf(run.id);
     const now = ctx.now;
     const say = (line: string) => ctx.server.say([line]);
-    const health = commands.readScores(await say(duel.READ_HP));
+    const hp = commands.readScores(await say(duel.READ_HP));
     const dealt = commands.readScores(await say(duel.READ_DEALT));
     const died = commands.readScores(await say(duel.READ_DIED));
     const kills = commands.readScores(await say(duel.READ_KILLS));
     const here = new Map(
         commands.readWhere(await say(commands.IN_OVERWORLD)).map((one) => [lower(one.name), one])
     );
+    const health = duel.healthOf(
+        hp,
+        run.entrants.map((one) => one.name).filter((name) => here.has(lower(name)))
+    );
 
-    // Who struck and who killed since the last look; nothing on the first.
-    const killsSince = new Map<string, number>();
-    for (const [name, value] of kills) {
-        const before = memory.kills.get(name);
-        if (before !== undefined && value > before) killsSince.set(name, value - before);
-        memory.kills.set(name, value);
-    }
-    for (const [name, value] of dealt) {
-        const before = memory.dealt.get(name);
-        if (before !== undefined && value > before) memory.lastHit.set(name, now);
-        memory.dealt.set(name, value);
-    }
+    // Who struck and who killed since the last look; nothing on the first
+    // after a restart, and a first score counted from 0.
+    const on = new Set(here.keys());
+    const killsSince = hits.rose(memory.kills, kills, on);
+    for (const name of hits.rose(memory.dealt, dealt, on).keys()) memory.lastHit.set(name, now);
+    // Whom the game says last hurt whoever is brought low (from 1.19.4).
+    const attackers = await hitsService.attackers(
+        ctx,
+        run.entrants
+            .filter((one) => {
+                const hearts = health.get(one.name);
+                return (
+                    hearts !== undefined &&
+                    hearts > 0 &&
+                    hearts <= options.downHearts * 2 &&
+                    (memory.shieldedUntil.get(one.name) ?? 0) <= now
+                );
+            })
+            .map((one) => one.name)
+    );
 
     const points = { ...run.points };
     const tally = { ...run.tally };
@@ -754,7 +771,15 @@ async function duelTick(ctx: KindContext, lines: string[]): Promise<void> {
             hearts <= options.downHearts * 2 &&
             (memory.shieldedUntil.get(one.name) ?? 0) <= now;
         if (dead || low) {
-            const by = duel.creditFor(rivals, killsSince, memory.lastHit, now);
+            // A death is credited by the game's kill count: whoever comes back
+            // from one is a new player, and the game forgets who hurt them.
+            const by = duel.creditFor(
+                rivals,
+                killsSince,
+                memory.lastHit,
+                now,
+                dead ? undefined : attackers.get(lower(one.name))
+            );
             const other = String(1 - one.side);
             tally[other] = (tally[other] ?? 0) + 1;
             if (by) {

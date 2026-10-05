@@ -109,7 +109,12 @@ describe("marking it read", () => {
         expect(body).toContain("await refreshThreadsFor(accountIds)");
         // ...and the server after the answer has gone, on the same `after` the
         // folder catch-up already uses.
-        expect(body).toContain("after(push)");
+        expect(body).toContain("after(pushThenRelease)");
+        // And held until that push has finished, so a sync in between keeps the
+        // flag rather than the server's old one (see `sync-keeps-held-flags`).
+        expect(body.indexOf("holdFlag(")).toBeLessThan(
+            body.indexOf("prisma.mailMessage.updateMany")
+        );
     });
 
     it("leaves a move alone, which must not be believed before the server agrees", async () => {

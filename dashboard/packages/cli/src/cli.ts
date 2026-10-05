@@ -3,7 +3,7 @@
  *
  * Sign in once with `plr login` (in the browser, or with a code on a machine
  * that has none) and every command after that uses that sign-in. One file, run
- * by the developer's own Node, handed out by each Polaris at `/cli`.
+ * by the developer's own Node, installed from the project's GitHub releases.
  */
 
 import { env } from "./commands/env.js";
@@ -17,6 +17,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { update, uninstall } from "./commands/install.js";
 import { login, logout, whoami } from "./commands/auth.js";
 import { processContext, type Context } from "./context.js";
+import { mark, timed, timingReport } from "./timing.js";
 import { detectServerInstall, serverInstallMessage, type Probe } from "./guard.js";
 import {
     buildLog,
@@ -61,7 +62,7 @@ Environment variables (values are never shown)
 Other
   plr open [home|deploy|keys|downloads]
                          Open the dashboard in your browser
-  plr update             Get the CLI your Polaris serves
+  plr update [--url URL] Get the newest CLI, or the one a Polaris serves
   plr uninstall [--yes]  Sign out everywhere and remove the CLI
 
 SERVICE is project/service, project/environment/service, or its id.
@@ -102,7 +103,9 @@ export async function run(
 
     // Before anything that reads or writes a sign-in: on a machine with a
     // Polaris server, this CLI is the one that steps aside.
-    const server = detectServerInstall(context.host, probe);
+    const server = await timed("server-install check", async () =>
+        detectServerInstall(context.host, probe)
+    );
     if (server.found) throw new CliError(serverInstallMessage(server));
 
     await dispatch(command, args, flags, context);
@@ -157,6 +160,8 @@ async function dispatch(
 
 /** The process entry: run argv, print a failure as a sentence, set the exit code. */
 export async function main(): Promise<void> {
+    // From the process starting to here: Node itself and loading the bundle.
+    mark("startup (node and the bundle)", 0);
     const context = processContext();
     try {
         await run(process.argv.slice(2), context);
@@ -176,5 +181,8 @@ export async function main(): Promise<void> {
                 `${caught instanceof Error ? (caught.stack ?? caught.message) : String(caught)}\n`
             );
         process.exitCode = 1;
+    } finally {
+        // PLR_DEBUG=1: where the time went, after the command's own output.
+        context.io.err(timingReport());
     }
 }

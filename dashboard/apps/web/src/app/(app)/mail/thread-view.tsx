@@ -82,6 +82,7 @@ import {
     ChevronDown,
     Pin,
     PinOff,
+    ListFilter,
     Printer,
     CornerUpLeft,
     CornerUpRight,
@@ -128,11 +129,14 @@ export function ThreadView({
      *  a time, or on a phone - because then this is the only way back to it. */
     onBack?: () => void;
     /** Told the moment a message here is marked read, so the row in the list
-     *  stops being bold now rather than after the round trip. */
-    onRead?: () => void;
+     *  stops being bold now rather than after the round trip. May answer with
+     *  what to call once the server has said yes or no, which is what lets the
+     *  list keep the row read over answers asked for before it was. */
+    onRead?: () => ((accepted: boolean) => void) | void;
     /** Told when this conversation has been filed or thrown away from here, so
-     *  the address stops naming something the server no longer has. */
-    onGone?: () => void;
+     *  the address stops naming something the server no longer has. May answer
+     *  the same way as `onRead`. */
+    onGone?: () => ((accepted: boolean) => void) | void;
     /** Put the reader back, for a filing the server refused after this pane had
      *  already stepped out of the way. */
     onStayed?: () => void;
@@ -188,7 +192,7 @@ export function ThreadView({
             // the reader sat inside a message they had just deleted, watching
             // nothing happen. If it is refused, they are put back and told.
             const leaving = leavesTheView(action);
-            if (leaving) onGone?.();
+            const answered = leaving ? onGone?.() : undefined;
             startBusy(async () => {
                 const outcome = await actOnAction({ messageIds, action, scope: scopeOf(action) });
                 const missing = missingFolderRole(outcome);
@@ -196,16 +200,19 @@ export function ThreadView({
                     // Back where they were, so the question is answered with the
                     // conversation in front of them rather than about a message
                     // they can no longer see.
+                    answered?.(false);
                     if (leaving) onStayed?.();
                     askFolderRole(missing, () => act(action));
                     return;
                 }
                 const said = refusalOf(outcome);
                 if (said) {
+                    answered?.(false);
                     if (leaving) onStayed?.();
                     toast.show({ title: said });
                     return;
                 }
+                answered?.(true);
                 // Archived, trashed or deleted: this pane was looking at messages
                 // the server has now moved out from under it, and it closed
                 // before the round trip.
@@ -304,7 +311,10 @@ export function ThreadView({
                     </Button>
                 ) : null}
                 <div className="min-w-0 flex-1">
-                    <h2 className="truncate text-[17px] font-semibold tracking-tight">
+                    {/* The whole subject, wrapped, as every mail client shows the
+                        one being read: the list is where it is cut short, and the
+                        reading pane is where somebody goes to see the rest. */}
+                    <h2 className="break-words text-[17px] font-semibold tracking-tight [overflow-wrap:anywhere]">
                         {thread.subject || t("noSubject")}
                     </h2>
                     {accounts.length > 1 && account ? (
@@ -442,6 +452,7 @@ export function ThreadView({
                     <ConversationMenu
                         thread={thread}
                         messageIds={messages.map((message) => message.id)}
+                        sender={messages[0]?.from[0]?.address ?? ""}
                     />
                 </div>
             </header>
@@ -512,8 +523,20 @@ export function ThreadView({
 }
 
 /**
+ * Where "Filter messages like this" leads: the filters screen, opened on this
+ * mailbox with a filter already written from this message - its sender, and a
+ * subject of the same shape (see `mailSubjectShape`).
+ */
+export function filterLikeHref(accountId: string, sender: string, subject: string): string {
+    const query = new URLSearchParams({ account: accountId });
+    if (sender) query.set("from", sender);
+    if (subject.trim()) query.set("similar", subject.trim());
+    return `/mail/settings/rules?${query.toString()}`;
+}
+
+/**
  * What else can be done to the conversation as a whole: pin it to the top, mute
- * it, print it.
+ * it, print it, or filter the ones like it.
  *
  * A menu rather than three more icons, because the header already carries every
  * action somebody takes several times a day and these are the ones taken now and
@@ -523,10 +546,13 @@ export function ThreadView({
  */
 function ConversationMenu({
     thread,
-    messageIds
+    messageIds,
+    sender
 }: {
     thread: MailThreadView;
     messageIds: string[];
+    /** Who started it, for the filter written from it. */
+    sender: string;
 }) {
     const { refreshMailbox } = useMail();
     const toast = useToast();
@@ -594,6 +620,12 @@ function ConversationMenu({
                 >
                     <Printer className="size-3.5 shrink-0" aria-hidden />
                     {t("print.print")}
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                    <Link href={filterLikeHref(thread.accountId, sender, thread.subject)}>
+                        <ListFilter className="size-3.5 shrink-0" aria-hidden />
+                        {t("view.filterLike")}
+                    </Link>
                 </DropdownMenuItem>
             </DropdownMenuContent>
         </DropdownMenu>
@@ -757,7 +789,7 @@ function MessageCard({
     accountId: string;
     onBlock?: (accountId: string, address: string) => void;
     onToggle: () => void;
-    onRead?: () => void;
+    onRead?: () => ((accepted: boolean) => void) | void;
 }) {
     const format = useDisplayFormat();
     const t = useTranslations("mail");
@@ -868,14 +900,23 @@ function MessageCard({
             marked.current = true;
             // The list stops being bold now. The server is told in the same
             // breath, and the round trip is no longer something anybody watches.
-            onRead?.();
+            // Carried on past this pane closing: leaving at once is most of
+            // what triaging a mailbox is, and the answer still has to land.
+            const answered = onRead?.();
             void (async () => {
-                const outcome = await actOnAction({ messageIds: [message.id], action: "read" });
+                let accepted = false;
+                try {
+                    const outcome = await actOnAction({ messageIds: [message.id], action: "read" });
+                    accepted = !refusalOf(outcome);
+                } catch {
+                    accepted = false;
+                }
                 // A server that refused leaves it unread, which is the truth.
                 // Nothing is said about it: nobody asked for this, so a failure is
-                // not news - and the next refresh brings the bold row back on its
-                // own.
-                if (!refusalOf(outcome)) refreshMailbox();
+                // not news - and the row goes back to bold with the change taken
+                // away. Accepted, the list is read again so it says so itself.
+                answered?.(accepted);
+                if (accepted) refreshMailbox();
             })();
         };
 

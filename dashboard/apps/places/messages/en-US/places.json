@@ -2069,5 +2069,24 @@
             "eq": "Exactly",
             "ne": "Not"
         }
+    },
+    "overview": {
+        "statusLabel": "Devices at a glance",
+        "statusHint": "How the devices you pick are doing: temperatures, air quality, readings and batteries.",
+        "controlsLabel": "Quick controls",
+        "controlsHint": "Turn the devices you pick on or off, and set an air conditioner's temperature.",
+        "room": "Room",
+        "target": "Set to",
+        "mode": "Mode",
+        "air": "Air",
+        "pm25": "PM2.5",
+        "humidity": "Humidity",
+        "reading": "Reading",
+        "battery": "Battery",
+        "power": "Power",
+        "setTo": "Set to",
+        "offline": "Offline",
+        "watchOnly": "Set to be watched, not operated",
+        "noControl": "You cannot operate this from here"
     }
 }

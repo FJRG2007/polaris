@@ -4,8 +4,8 @@
  *
  * **The keychain through the tools each system ships**, not through a native
  * addon. The vetted option for Node (`@napi-rs/keyring`) is a compiled binary per
- * platform and architecture, and this CLI is one JavaScript file each Polaris
- * serves at `/cli/polaris.mjs` - a native addon cannot travel inside it, and
+ * platform and architecture, and this CLI is one JavaScript file (released on
+ * GitHub, and served by each Polaris at `/cli/polaris.mjs`) - a native addon cannot travel inside it, and
  * serving a dozen prebuilt binaries beside it would be a second distribution to
  * keep in step. The systems' own tools do the same job with no dependency:
  *
@@ -89,11 +89,14 @@ export interface SecretStore {
  * The Windows script. Fixed text passed as `-EncodedCommand`, so nothing in it is
  * interpolated; what it acts on arrives in the environment, and the secret on
  * stdin. Exit 3 means "no such entry".
+ *
+ * Every command is a .NET call rather than a cmdlet: the first cmdlet a fresh
+ * PowerShell runs makes it load and index its modules ("Preparing modules for
+ * first use"), which was over a second of every command's wait on Windows.
  */
 const WINDOWS_SCRIPT = `
 $ErrorActionPreference = 'Stop'
-[void][Windows.Security.Credentials.PasswordVault, Windows.Security.Credentials, ContentType = WindowsRuntime]
-$vault = New-Object Windows.Security.Credentials.PasswordVault
+$vault = [Windows.Security.Credentials.PasswordVault, Windows.Security.Credentials, ContentType = WindowsRuntime]::new()
 $service = $env:POLARIS_CLI_SERVICE
 $account = $env:POLARIS_CLI_ACCOUNT
 switch ($env:POLARIS_CLI_OP) {
@@ -105,7 +108,7 @@ switch ($env:POLARIS_CLI_OP) {
     'set' {
         $secret = [Console]::In.ReadToEnd()
         try { $vault.Remove($vault.Retrieve($service, $account)) } catch { }
-        $vault.Add((New-Object Windows.Security.Credentials.PasswordCredential($service, $account, $secret)))
+        $vault.Add([Windows.Security.Credentials.PasswordCredential, Windows.Security.Credentials, ContentType = WindowsRuntime]::new($service, $account, $secret))
     }
     'delete' {
         try { $vault.Remove($vault.Retrieve($service, $account)) } catch { exit 3 }
@@ -124,7 +127,13 @@ export function keychainStore(host: Host, run: Runner): SecretStore {
         const call = (op: string, account: string, input?: string) =>
             run(
                 "powershell.exe",
-                ["-NoProfile", "-NonInteractive", "-EncodedCommand", encodedWindowsScript()],
+                [
+                    "-NoLogo",
+                    "-NoProfile",
+                    "-NonInteractive",
+                    "-EncodedCommand",
+                    encodedWindowsScript()
+                ],
                 {
                     input,
                     env: {

@@ -80,6 +80,10 @@ export interface DeployCaller {
  *  and past this many the answer is to name it. */
 const MAX_PROJECTS = 200;
 
+/** How many project access lookups one listing runs at the same time, so a
+ *  long list does not queue all of its reads on the database pool at once. */
+const ACCESS_PARALLEL = 8;
+
 /** The most of a build log one read hands back, so a poller on a huge log
  *  catches up in steps rather than in one response the size of the file. */
 const MAX_LOG_SLICE = 1024 * 1024;
@@ -282,6 +286,24 @@ export interface ProjectLine {
     readonly environments: readonly EnvironmentLine[];
 }
 
+/** Run `work` over `items` with at most `width` calls in flight, in order. */
+async function mapBounded<T, R>(
+    items: readonly T[],
+    width: number,
+    work: (item: T) => Promise<R>
+): Promise<R[]> {
+    const results = new Array<R>(items.length);
+    let next = 0;
+    const worker = async () => {
+        while (next < items.length) {
+            const index = next++;
+            results[index] = await work(items[index] as T);
+        }
+    };
+    await Promise.all(Array.from({ length: Math.min(width, items.length) }, worker));
+    return results;
+}
+
 /** Every project this key can open, with the environments and services it can
  *  reach in each - an environment the access is limited away from is left out. */
 export async function listProjects(caller: DeployCaller): Promise<ProjectLine[]> {
@@ -313,15 +335,21 @@ export async function listProjects(caller: DeployCaller): Promise<ProjectLine[]>
             }
         }
     });
-    const statuses = await deployService.getApplicationDeployStatuses(
-        projects.flatMap((project) =>
-            project.environments.flatMap((environment) => environment.applications)
-        )
-    );
-
+    // Every project's access at once, beside the statuses, rather than one
+    // project after another: each access is a few reads of its own, and a list
+    // of eight projects was eight of those waits in a row before the answer.
+    // At most ACCESS_PARALLEL in flight, so a long list shares the pool.
+    const [statuses, accesses] = await Promise.all([
+        deployService.getApplicationDeployStatuses(
+            projects.flatMap((project) =>
+                project.environments.flatMap((environment) => environment.applications)
+            )
+        ),
+        mapBounded(projects, ACCESS_PARALLEL, (project) => projectAccess(project.id, caller.userId))
+    ]);
     const lines: ProjectLine[] = [];
-    for (const project of projects) {
-        const access = await projectAccess(project.id, caller.userId);
+    for (const [index, project] of projects.entries()) {
+        const access = accesses[index];
         if (!access) continue;
         lines.push({
             id: project.id,

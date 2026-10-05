@@ -5,18 +5,13 @@
  * server, so the list does not wait for it: the row is drawn as the action will
  * leave it, and a refusal takes the overlay away again - which is the rollback,
  * because the overlay is the only place the change ever lived. These pin the
- * three halves of that: what each action looks like before it is confirmed,
- * that overlays stack without losing each other, and that a row taken out of the
- * list stays out exactly as long as the list still sends it.
+ * two halves of that: what each action looks like before it is confirmed, and
+ * that overlays stack without losing each other. How long an overlay outlives
+ * the answers arriving under it is `pending-changes.test.ts`.
  */
 
 import { describe, expect, it } from "vitest";
-import {
-    optimistically,
-    stillOwed,
-    withPatch,
-    type ThreadPatch
-} from "@/app/(app)/mail/optimistic";
+import { optimistically, withPatch, type ThreadPatch } from "@/app/(app)/mail/optimistic";
 
 /** A row as the list draws it: the server's, with the overlay laid over. */
 function drawn<T extends object>(row: T & { id: string }, held: Record<string, ThreadPatch>): T {
@@ -66,22 +61,5 @@ describe("the overlay and its rollback", () => {
     it("only touches the rows it was aimed at", () => {
         const held = withPatch({}, ["t1"], optimistically("trash")!);
         expect(drawn({ id: "t2", starred: false }, held)).toEqual({ id: "t2", starred: false });
-    });
-});
-
-describe("a list arriving while an action is still out", () => {
-    it("keeps a row hidden while the list still sends it", () => {
-        // The list painted from what the tab held predates the delete.
-        const owed = stillOwed({ t1: { gone: true } }, new Set(["t1", "t2"]));
-        expect(owed).toEqual({ t1: { gone: true } });
-    });
-
-    it("lets it go once the list has stopped sending it", () => {
-        expect(stillOwed({ t1: { gone: true } }, new Set(["t2"]))).toEqual({});
-    });
-
-    it("keeps a change to a row that is still there", () => {
-        const owed = stillOwed({ t1: { starred: true }, t3: { gone: true } }, new Set(["t1"]));
-        expect(owed).toEqual({ t1: { starred: true } });
     });
 });

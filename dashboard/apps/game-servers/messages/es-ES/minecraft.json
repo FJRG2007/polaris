@@ -2442,5 +2442,25 @@
         "updateOnly": "Actualizar",
         "updateQueued": "El último {loader} se instala la próxima vez que arranque el servidor.",
         "updateStarted": "El servidor se está reiniciando con el último {loader}."
+    },
+    "disconnect": {
+        "refused": "Rechazado",
+        "serverSaid": "El servidor dijo: {raw}",
+        "reasons": {
+            "quit": "Salió",
+            "timeout": "Agotado",
+            "kicked": "Expulsado",
+            "banned": "Vetado",
+            "whitelist": "Sin permiso",
+            "outdated": "Otra versión",
+            "full": "Servidor lleno",
+            "duplicate": "Entró en otro",
+            "idle": "Inactivo",
+            "auth": "Sin verificar",
+            "flying": "Vuelo prohibido",
+            "shutdown": "Servidor parado",
+            "network": "Conexión perdida",
+            "other": "Otro motivo"
+        }
     }
 }

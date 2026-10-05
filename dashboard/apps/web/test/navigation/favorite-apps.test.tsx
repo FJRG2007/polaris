@@ -1,15 +1,17 @@
 // @vitest-environment jsdom
 
 /**
- * The favorites store - the favorites and the app menu's order - and the
- * Overview rail that reads it.
+ * The app menu's order - and the favorites an older menu saved with its star -
+ * and the Overview rail that reads them.
  *
- * What is asserted: a change is drawn before the server answers and taken back,
- * with the reason, when it refuses, back to the last lists the server accepted;
- * a later change is not undone by an earlier one failing; an order that did not
- * change sends nothing; an arrangement keeps apps this account cannot open in
- * their slots and can be forgotten; and the Overview's rail lists only the
- * favorites, in the menu's order, with a way to the rest - in both languages.
+ * What is asserted: an arrangement is drawn before the server answers and taken
+ * back, with the reason, when it refuses, back to the last lists the server
+ * accepted; a later change is not undone by an earlier one failing; an order
+ * that did not change sends nothing; the first arrangement folds the old
+ * favorites into the order without moving anything; an arrangement keeps apps
+ * this account cannot open in their slots and can be forgotten; and the
+ * Overview's rail lists the old favorites until the menu is arranged, then the
+ * first apps of the menu - in both languages.
  */
 
 import { withMessages } from "../setup/i18n";
@@ -75,16 +77,24 @@ function mount(initial: string[], extra?: ReactNode, initialOrder: string[] = []
 }
 
 describe("the favorites store", () => {
-    it("draws a new favorite at once and keeps it when the save lands", async () => {
+    it("folds the old favorites into the order the first time the menu is arranged", async () => {
         let answer: (value: { error?: string }) => void = () => undefined;
         save.mockReturnValue(new Promise((resolve) => (answer = resolve)));
-        const store = mount(["mail"]);
-        act(() => store.get().toggle("chat"));
-        expect(store.shown()).toBe("mail,chat");
-        expect(save).toHaveBeenCalledWith({ favorites: ["mail", "chat"], order: [] });
+        const store = mount(["mail", "chat"]);
+        act(() => store.get().arrangeApps(["chat", "mail", "drive"]));
+        expect(store.order()).toBe("chat,mail,drive");
+        expect(store.shown()).toBe("");
+        expect(save).toHaveBeenCalledWith({ favorites: [], order: ["chat", "mail", "drive"] });
         await act(async () => answer({}));
-        expect(store.shown()).toBe("mail,chat");
+        expect(store.order()).toBe("chat,mail,drive");
         expect(show).not.toHaveBeenCalled();
+    });
+
+    it("keeps a favorite this account cannot open today in the order it folds into", () => {
+        save.mockResolvedValue({});
+        const store = mount(["admin", "mail"]);
+        act(() => store.get().arrangeApps(["chat", "mail"]));
+        expect(save).toHaveBeenCalledWith({ favorites: [], order: ["admin", "chat", "mail"] });
     });
 
     it("puts the order back and says why when the server refuses", async () => {
@@ -92,8 +102,10 @@ describe("the favorites store", () => {
         const store = mount(["mail"], undefined, ["mail", "chat"]);
         act(() => store.get().arrangeApps(["chat", "mail"]));
         expect(store.order()).toBe("chat,mail");
-        expect(save).toHaveBeenCalledWith({ favorites: ["mail"], order: ["chat", "mail"] });
+        expect(save).toHaveBeenCalledWith({ favorites: [], order: ["chat", "mail"] });
         await waitFor(() => expect(store.order()).toBe("mail,chat"));
+        // Back to exactly what was saved, the old favorite included.
+        expect(store.shown()).toBe("mail");
         expect(show).toHaveBeenCalledWith({ title: "Those favorites could not be saved." });
     });
 
@@ -104,7 +116,7 @@ describe("the favorites store", () => {
         expect(store.order()).toBe("chat,mail");
         await waitFor(() => expect(store.order()).toBe(""));
         expect(show).toHaveBeenCalledWith({
-            title: "Your favorites could not be saved. Try again in a moment."
+            title: "Your app order could not be saved. Try again in a moment."
         });
     });
 
@@ -112,28 +124,29 @@ describe("the favorites store", () => {
         let fail: (reason: unknown) => void = () => undefined;
         save.mockReturnValueOnce(new Promise((_, reject) => (fail = reject)));
         save.mockResolvedValueOnce({});
-        const store = mount(["mail"]);
-        act(() => store.get().toggle("chat"));
-        act(() => store.get().toggle("drive"));
-        expect(store.shown()).toBe("mail,chat,drive");
+        const store = mount([], undefined, ["mail", "chat", "drive"]);
+        act(() => store.get().arrangeApps(["chat", "mail", "drive"]));
+        act(() => store.get().arrangeApps(["drive", "chat", "mail"]));
+        expect(store.order()).toBe("drive,chat,mail");
         await act(async () => fail(new Error("offline")));
-        expect(store.shown()).toBe("mail,chat,drive");
+        expect(store.order()).toBe("drive,chat,mail");
         expect(show).not.toHaveBeenCalled();
     });
 
     it("returns to the last saved list when every newer save fails too", async () => {
         const fails: Array<(reason: unknown) => void> = [];
         save.mockImplementation(() => new Promise((_, reject) => fails.push(reject)));
-        const store = mount(["mail"]);
-        act(() => store.get().toggle("chat"));
-        act(() => store.get().toggle("drive"));
+        const store = mount(["mail"], undefined, ["mail", "chat", "drive"]);
+        act(() => store.get().arrangeApps(["chat", "mail", "drive"]));
+        act(() => store.get().arrangeApps(["drive", "chat", "mail"]));
         await act(async () => fails[0](new Error("offline")));
-        expect(store.shown()).toBe("mail,chat,drive");
+        expect(store.order()).toBe("drive,chat,mail");
         await act(async () => fails[1](new Error("offline")));
+        expect(store.order()).toBe("mail,chat,drive");
         expect(store.shown()).toBe("mail");
         expect(show).toHaveBeenCalledTimes(1);
         expect(show).toHaveBeenCalledWith({
-            title: "Your favorites could not be saved. Try again in a moment."
+            title: "Your app order could not be saved. Try again in a moment."
         });
     });
 
@@ -154,7 +167,7 @@ describe("the favorites store", () => {
         const store = mount(["mail"], undefined, ["mail", "admin", "chat"]);
         act(() => store.get().arrangeApps(["chat", "mail"]));
         expect(save).toHaveBeenCalledWith({
-            favorites: ["mail"],
+            favorites: [],
             order: ["chat", "admin", "mail"]
         });
     });
@@ -181,7 +194,7 @@ describe("the Overview rail", () => {
         "office"
     ];
 
-    it("lists only the favorites, in their order, then a way to every other app", () => {
+    it("lists only the old favorites, in their order, then a way to every other app", () => {
         mount(["mail", "drive"], <AppSidebar appIds={appIds} />);
         const links = [...document.querySelectorAll("nav a")].map((link) =>
             link.getAttribute("href")
@@ -191,14 +204,20 @@ describe("the Overview rail", () => {
         expect(screen.getByRole("button", { name: "More apps" })).toBeTruthy();
     });
 
-    it("follows a favorite added elsewhere on the same frame", () => {
+    it("follows the menu's first apps once it is arranged, on the same frame", () => {
         save.mockReturnValue(new Promise(() => undefined));
         const store = mount(["mail"], <AppSidebar appIds={appIds} />);
-        act(() => store.get().toggle("notes"));
+        act(() =>
+            store
+                .get()
+                .arrangeApps(["notes", "mail", "drive", "vault", "apps", "tasks", "chat", "office"])
+        );
         const links = [...document.querySelectorAll("nav a")].map((link) =>
             link.getAttribute("href")
         );
-        expect(links).toEqual(["/mail", "/notes"]);
+        expect(links.slice(0, 2)).toEqual(["/notes", "/mail"]);
+        expect(links).toHaveLength(6);
+        expect(screen.queryByText("Favorites")).toBeNull();
     });
 
     it("lists the favorites in the order the app menu was arranged in", () => {

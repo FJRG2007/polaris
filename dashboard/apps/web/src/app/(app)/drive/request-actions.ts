@@ -15,12 +15,12 @@ import { revalidatePath } from "next/cache";
 import { requirePermission } from "@/lib/session";
 import { recordAudit } from "@/lib/audit-service";
 import { sharingBaseUrl } from "@/lib/domain-service";
-import { deleteDriveEntry } from "@/lib/drive-delete";
+import { deleteDriveEntryIfPresent, isMissingError } from "@/lib/drive-delete";
 import * as dropPoints from "@/lib/file-request-service";
 import { ensureShareReachability } from "@/lib/public-reach";
 import { clientIp, hashForLog } from "@/lib/request-context";
 import { invalidateFolderSizes } from "@/lib/drive-folder-size";
-import { StorageError, type StorageDriver } from "@polaris/storage";
+import type { StorageDriver } from "@polaris/storage";
 import { rateLimit, resetRateLimit } from "@/lib/rate-limit-service";
 import { getDriverForConnection, SmbShareRequiredError } from "@/lib/storage-service";
 import { authorizeDrive, DriveAccessError, DriveLockedError } from "@/lib/drive-authz";
@@ -100,7 +100,12 @@ export async function createFileRequestAction(
 ): Promise<{ url?: string; error?: string }> {
     const user = await requirePermission("requests.create");
     const parsed = createFileRequestSchema.safeParse(input);
-    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? (await getTranslations("drive"))("errors.invalidRequest") };
+    if (!parsed.success)
+        return {
+            error:
+                parsed.error.issues[0]?.message ??
+                (await getTranslations("drive"))("errors.invalidRequest")
+        };
 
     // A blank title gets a generated name; resolve it once so the drop point's
     // folder and its stored title match.
@@ -119,12 +124,15 @@ export async function createFileRequestAction(
     } catch (caught) {
         if (caught instanceof DriveAccessError)
             return { error: (await getTranslations("drive"))("errors.collectDenied") };
-        if (caught instanceof DriveLockedError) return { error: (await getTranslations("drive"))("errors.folderLocked") };
+        if (caught instanceof DriveLockedError)
+            return { error: (await getTranslations("drive"))("errors.folderLocked") };
         if (caught instanceof SmbShareRequiredError)
             return { error: (await getTranslations("drive"))("errors.shareFirst") };
         return {
             error:
-                caught instanceof Error ? caught.message : (await getTranslations("drive"))("errors.prepareFailed")
+                caught instanceof Error
+                    ? caught.message
+                    : (await getTranslations("drive"))("errors.prepareFailed")
         };
     }
 
@@ -330,8 +338,75 @@ export async function deleteFileRequestAction(
     deleteFolder: boolean
 ): Promise<{ error?: string }> {
     const user = await requirePermission("requests.create");
-    const request = await dropPoints.getFileRequestForOwner(user.id, requestId);
+    const result = await removeFileRequest(
+        user.id,
+        String(requestId),
+        Boolean(deleteFolder),
+        false
+    );
+    if (!result.error) revalidatePath("/drive/drop-points");
+    return result;
+}
+
+/** The most drop points one bulk delete takes. More than anybody selects by
+ *  hand, and a bound on how long one request may hold the server. */
+const BULK_DELETE_MAX = 500;
+
+const bulkDeleteSchema = z.object({
+    requestIds: z.array(z.string().uuid()).min(1).max(BULK_DELETE_MAX),
+    deleteFolders: z.boolean()
+});
+
+/**
+ * Delete several drop points at once, with or without their folders.
+ *
+ * One at a time on the server, each with exactly the rules a single delete
+ * has: the folder goes first and a refusal keeps that drop point, a folder
+ * already gone is not a refusal. A drop point that collects into the
+ * connection's own root has no folder of its own, so for those the choice is
+ * simply not applied rather than refused - the dialog says as much. What could
+ * not be deleted comes back by id with its reason, and the rest are gone.
+ */
+export async function deleteFileRequestsAction(
+    requestIds: string[],
+    deleteFolders: boolean
+): Promise<{ deleted: string[]; failed: { id: string; error: string }[]; error?: string }> {
+    const user = await requirePermission("requests.create");
+    const parsed = bulkDeleteSchema.safeParse({ requestIds, deleteFolders });
+    if (!parsed.success) {
+        return {
+            deleted: [],
+            failed: [],
+            error: (await getTranslations("drive"))("errors.dropPointGone")
+        };
+    }
+    const deleted: string[] = [];
+    const failed: { id: string; error: string }[] = [];
+    for (const id of new Set(parsed.data.requestIds)) {
+        const result = await removeFileRequest(user.id, id, parsed.data.deleteFolders, true);
+        if (result.error) failed.push({ id, error: result.error });
+        else deleted.push(id);
+    }
+    if (deleted.length > 0) revalidatePath("/drive/drop-points");
+    return { deleted, failed };
+}
+
+/**
+ * Delete one drop point the user owns, and its folder when asked.
+ *
+ * @param skipRootFolder - For a bulk delete: a drop point with no folder of its
+ *     own is deleted without one instead of being refused.
+ */
+async function removeFileRequest(
+    userId: string,
+    requestId: string,
+    deleteFolder: boolean,
+    skipRootFolder: boolean
+): Promise<{ error?: string }> {
+    const request = await dropPoints.getFileRequestForOwner(userId, requestId);
     if (!request) return { error: (await getTranslations("drive"))("errors.dropPointGone") };
+    const ownFolder = normalizeRelPath(request.destinationPath) !== "";
+    if (skipRootFolder && !ownFolder) deleteFolder = false;
 
     if (deleteFolder) {
         // The drop point collects into the connection's own root, so there is no
@@ -345,14 +420,16 @@ export async function deleteFileRequestAction(
         }
         try {
             await authorizeDrive(
-                user.id,
+                userId,
                 request.destinationConnectionId,
                 request.destinationPath,
                 "write"
             );
             const driver = await getDriverForConnection(request.destinationConnectionId);
             try {
-                await deleteDriveEntry(driver, request.destinationPath);
+                // Already gone is what was asked for: most often its owner deleted
+                // the folder before deleting the drop point.
+                await deleteDriveEntryIfPresent(driver, request.destinationPath);
             } finally {
                 await driver.dispose();
             }
@@ -360,24 +437,26 @@ export async function deleteFileRequestAction(
         } catch (caught) {
             if (caught instanceof DriveAccessError)
                 return { error: (await getTranslations("drive"))("errors.folderDeleteDenied") };
-            if (caught instanceof DriveLockedError) return { error: (await getTranslations("drive"))("errors.folderLocked") };
-            const code = caught instanceof StorageError ? caught.code : null;
-            if (code !== "not_found") {
+            if (caught instanceof DriveLockedError)
+                return { error: (await getTranslations("drive"))("errors.folderLocked") };
+            if (!isMissingError(caught)) {
                 return {
                     error:
                         caught instanceof Error
-                            ? (await getTranslations("drive"))("errors.folderDeleteReason", { reason: caught.message })
+                            ? (await getTranslations("drive"))("errors.folderDeleteReason", {
+                                  reason: caught.message
+                              })
                             : (await getTranslations("drive"))("errors.folderDeleteFailed")
                 };
             }
         }
     }
 
-    if (!(await dropPoints.deleteFileRequestForOwner(user.id, requestId))) {
+    if (!(await dropPoints.deleteFileRequestForOwner(userId, requestId))) {
         return { error: (await getTranslations("drive"))("errors.dropPointGone") };
     }
     await recordAudit({
-        actorId: user.id,
+        actorId: userId,
         action: "request.delete",
         targetType: "fileRequest",
         targetId: requestId,
@@ -387,7 +466,6 @@ export async function deleteFileRequestAction(
             folderDeleted: deleteFolder
         }
     });
-    revalidatePath("/drive/drop-points");
     return {};
 }
 
@@ -456,7 +534,8 @@ export async function saveDropPointTemplateAction(
     const trimmed = name.trim();
     if (!trimmed) return { error: (await getTranslations("drive"))("errors.templateName") };
     const parsed = templateConfigSchema.safeParse(config);
-    if (!parsed.success) return { error: (await getTranslations("drive"))("errors.templateInvalid") };
+    if (!parsed.success)
+        return { error: (await getTranslations("drive"))("errors.templateInvalid") };
     const { id } = await dropPoints.createTemplate(
         user.id,
         trimmed.slice(0, 120),

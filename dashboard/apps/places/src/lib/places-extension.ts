@@ -14,6 +14,7 @@ type AppExtension = AppHostTypes["AppExtension"];
 // registry, and what Places is built on reaches the session, the cameras and the
 // container runtime.
 const sweeps = () => import("./sweeps");
+const overviewCards = () => import("./overview-widgets");
 
 const MINUTE = 60 * 1000;
 
@@ -68,6 +69,27 @@ export const placesExtension: AppExtension = {
             run: async () => (await import("./automation-runtime")).tickAutomations()
         }
     ],
+
+    // The Overview's cards: the devices somebody picks, at a glance, and the
+    // controls they reach for. Loaded when a card is drawn or pressed; see
+    // `overview-widgets`.
+    overviewWidgets: () =>
+        (["status", "controls"] as const).map((mode) => ({
+            kind: mode === "status" ? "device-status" : "device-controls",
+            defaultSize: "md" as const,
+            describe: async () => (await overviewCards()).describeCard(mode),
+            targets: async () => (await overviewCards()).deviceTargets(mode),
+            read: async (targets: readonly string[]) =>
+                (await overviewCards()).readDevices(targets, mode),
+            ...(mode === "controls"
+                ? {
+                      act: async (
+                          targets: readonly string[],
+                          input: { item: string; control: string; value: boolean | number }
+                      ) => (await overviewCards()).operate(targets, input)
+                  }
+                : {})
+        })),
 
     onBoot: () => {
         // Bring Places' own containers - the camera relay, the vision worker, the

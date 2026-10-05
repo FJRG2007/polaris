@@ -45,9 +45,9 @@ describe("what the server will accept", () => {
     it("empties the mailboxes it is given, and says so when given none", () => {
         const parsed = mailEmptyFolderSchema.parse({ role: "trash" });
         expect(parsed.accountIds).toEqual([]);
-        expect(mailEmptyFolderSchema.parse({ role: "trash", accountIds: [anId] }).accountIds).toEqual([
-            anId
-        ]);
+        expect(
+            mailEmptyFolderSchema.parse({ role: "trash", accountIds: [anId] }).accountIds
+        ).toEqual([anId]);
     });
 });
 
@@ -146,12 +146,15 @@ describe("emptying it", () => {
 
     it("empties the screen on the press and puts it back if the server refuses", async () => {
         const view = await readFile(`${SRC}app/(app)/mail/mail-view.tsx`, "utf8");
-        const dialog = view.slice(view.indexOf('title={t("list.emptyTitle", { name: context.title })}'));
+        const dialog = view.slice(
+            view.indexOf('title={t("list.emptyTitle", { name: context.title })}')
+        );
         const body = dialog.slice(0, dialog.indexOf("/>"));
         expect(body.indexOf("patchUntilAnswered(here, { gone: true });")).toBeLessThan(
             body.indexOf("await emptyFolderAction(")
         );
-        expect(body).toContain("clearPatches();");
+        expect(body).toContain("pending.abandon();");
+        expect(body).toContain("pending.settle();");
     });
 
     it("empties the mailboxes on screen rather than every mailbox there is", async () => {
@@ -174,7 +177,9 @@ describe("where the two are offered", () => {
     it("is offered on a mailbox's own folder too, not only the merged screen", async () => {
         const page = await readFile(`${SRC}app/(app)/mail/f/[folderId]/page.tsx`, "utf8");
         expect(page).toContain('restorable: folder.role === "trash"');
-        expect(page).toContain('folder.role === "trash" || folder.role === "junk" ? folder.role : ""');
+        expect(page).toContain(
+            'folder.role === "trash" || folder.role === "junk" ? folder.role : ""'
+        );
     });
 
     it("reaches the row, the menu and the open conversation", async () => {
@@ -184,7 +189,9 @@ describe("where the two are offered", () => {
             readFile(`${SRC}app/(app)/mail/thread-view.tsx`, "utf8")
         ]);
         expect(view).toContain('onClick={() => onAct("restore", t("thread.announce.restored"))}');
-        expect(menu).toContain('onSelect={() => onAct("restore", ids, t("thread.announce.restored"))}');
+        expect(menu).toContain(
+            'onSelect={() => onAct("restore", ids, t("thread.announce.restored"))}'
+        );
         expect(mail.thread.announce.restored).toBe("Put back.");
         expect(thread).toContain('onClick={() => act("restore")}');
     });

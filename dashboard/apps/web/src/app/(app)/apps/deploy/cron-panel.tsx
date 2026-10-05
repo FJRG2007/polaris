@@ -418,7 +418,7 @@ function CronForm({
     }
 
     return (
-        <div className="flex flex-col gap-3 rounded-lg border border-border bg-surface p-4">
+        <div className="flex flex-col gap-3 rounded-lg border border-border bg-card p-4">
             <p className="text-sm font-medium">{draft.id ? t("cron.editJob") : t("cron.newJob")}</p>
             <label className="flex flex-col gap-1">
                 <span className="text-xs font-medium text-muted-foreground">

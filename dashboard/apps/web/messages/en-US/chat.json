@@ -246,6 +246,30 @@
                 "label": "Push to talk",
                 "note": "Your microphone is closed except while you hold a key."
             }
+        },
+        "look": {
+            "title": "Look",
+            "help": "Applied on this device before the picture is sent. Framing uses the same model as backgrounds.",
+            "light": {
+                "title": "Lighting",
+                "off": "As it is",
+                "auto": "Auto",
+                "bright": "Brighter"
+            },
+            "style": {
+                "title": "Style",
+                "none": "None",
+                "warm": "Warm",
+                "cool": "Cool",
+                "vivid": "Vivid",
+                "soft": "Soft",
+                "mono": "Black and white"
+            },
+            "frame": {
+                "title": "Framing",
+                "off": "Off",
+                "auto": "Keep me centered"
+            }
         }
     },
     "channelMenu": {
@@ -366,7 +390,7 @@
         "handsUpLower": "{count} {count, plural, one {hand is} other {hands are}} up. Lower yours",
         "handsUpRaise": "{count} {count, plural, one {hand is} other {hands are}} up. Raise yours",
         "deviceSettings": "{device} settings",
-        "noBackground": "No background is running. {problem}",
+        "noBackground": "Nothing is being applied to your camera. {problem}",
         "handUpPlace": "Hand up, {place} in the queue",
         "watchNamed": "Watch {name}",
         "devices": {

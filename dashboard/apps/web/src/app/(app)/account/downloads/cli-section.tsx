@@ -1,13 +1,14 @@
 "use client";
 
 /**
- * The command-line client on the downloads screen: the line that installs it for
- * the reader's system, and the one that signs it in.
+ * The command-line client on the downloads screen: the official line that
+ * installs it for the reader's system, the one that signs it in to this Polaris,
+ * and a first command to try.
  *
- * Both lines carry the address this page is open on. That is the one address
- * the reader has just proven reaches this Polaris, and it is the one the
- * installer downloads the CLI from - so the CLI they get is the one built with
- * this server, and `plr login` points at the same place without being told.
+ * Installed the way the extension is - from the project's GitHub releases - and
+ * pointed at this Polaris afterwards, so the install line is the same on every
+ * deployment and only the sign-in line carries this one's address: the one it is
+ * configured to be reached at, or the address this page is open on when none is.
  *
  * Its own component, like the extension's, so the page stays a list of cards.
  */
@@ -33,21 +34,29 @@ function CommandLine({ command }: { command: string }) {
     );
 }
 
-export function CliSection() {
+export function CliSection({
+    repo,
+    serverUrl
+}: {
+    /** The GitHub repository this deployment updates from. */
+    repo: string;
+    /** This Polaris's configured address, or null to use the one the page is on. */
+    serverUrl: string | null;
+}) {
     const t = useTranslations("account");
-    // Both read in an effect: this renders on the server too, where there is no
+    // Read in an effect: this renders on the server too, where there is no
     // navigator and no address bar, and seeding from them would hydrate markup
-    // the HTML does not contain. Until then only the two lines that carry the
-    // address wait, as skeletons of their own size.
+    // the HTML does not contain. Only a sign-in line with no configured address
+    // waits, as a skeleton of its own size.
     const [platform, setPlatform] = useState<InstallPlatform>("linux");
-    const [origin, setOrigin] = useState("");
+    const [origin, setOrigin] = useState(serverUrl ?? "");
 
     useEffect(() => {
         setPlatform(detectPlatform(navigator.userAgent));
-        setOrigin(window.location.origin);
-    }, []);
+        if (!serverUrl) setOrigin(window.location.origin);
+    }, [serverUrl]);
 
-    const install = cliInstallLine(platform, origin);
+    const install = cliInstallLine(platform, repo);
 
     return (
         <Card>
@@ -70,11 +79,7 @@ export function CliSection() {
                             onChange={setPlatform}
                         />
                     </div>
-                    {origin ? (
-                        <CommandLine command={install.command} />
-                    ) : (
-                        <Skeleton className="h-9 w-full" />
-                    )}
+                    <CommandLine command={install.command} />
                     <p className="text-xs text-muted-foreground">
                         {t("downloads.cli.hint", { shell: install.shell })}
                     </p>

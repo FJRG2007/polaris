@@ -141,6 +141,11 @@ interface World {
     /** A duel's counts, per player: health (20 when not said), damage dealt,
      *  deaths and players killed. */
     hp: Record<string, number>;
+    /** Health not said is no score at all, as the game has it until a
+     *  player's health first changes after the count was made. */
+    hpUnset: boolean;
+    /** Called with every line as the game takes it, before it answers. */
+    onLine: ((line: string) => void) | null;
     dealt: Record<string, number>;
     died: Record<string, number>;
     pk: Record<string, number>;
@@ -170,6 +175,8 @@ interface World {
     scoreTitle: string;
     /** Players carrying each tag. */
     tags: Record<string, Set<string>>;
+    /** Who last hurt each player in the last five seconds (`execute on attacker`). */
+    attackers: Record<string, string>;
     /** How long the rain lasts, in ticks, as the last `weather rain` left it. */
     stormTicks: number;
     /** Players linked to a Polaris account, and each account's language. */
@@ -467,7 +474,7 @@ function quickAnswer(line: string): string | null {
  * score range for everybody inside, and set for everybody in a range.
  */
 function stageScoreAnswer(line: string): string | null {
-    const objectives = /^pe_(drop|low|back|gate|next|last|fin|cut)$/;
+    const objectives = /^(pe_(drop|low|back|gate|next|last|fin|cut)|polaris_tntrun)$/;
     const set = /^scoreboard players set (\w+) (\w+) (-?\d+)$/.exec(line);
     if (set && objectives.test(set[2]!)) {
         (world.stageScores[set[2]!] ??= {})[set[1]!] = Number(set[3]);
@@ -775,6 +782,7 @@ const ESSENTIALS =
     /(^|^execute .*? run )(kill|give|tp|teleport|gamemode|clear|xp|experience|time|weather|item) /;
 
 function answer(sent: string): string {
+    world.onLine?.(sent);
     world.sent.push(sent);
     let line = sent;
     // A data pack is found once the folder is looked at again, and on once enabled.
@@ -1089,6 +1097,7 @@ function answer(sent: string): string {
             pe_pk: world.pk
         }[objective];
         return world.online
+            .filter((name) => !(objective === "pe_hp" && world.hpUnset && !(name in table)))
             .map(
                 (name) =>
                     `${name} has ${table[name] ?? (objective === "pe_hp" ? 20 : 0)} [${objective}]`
@@ -1571,6 +1580,16 @@ function answer(sent: string): string {
             .map((name) => `${name} has ${table[name]} [${board[1]}]`)
             .join("\n");
     }
+    // Who last hurt a player, where they are: from 1.19.4, which has `on`.
+    const attacked = /^execute as (\w+) on attacker run data get entity @s Pos$/.exec(line);
+    if (attacked) {
+        if (!events.atLeast(world.version, [1, 19, 4]))
+            return "Unknown or incomplete command, see below for error";
+        const by = world.attackers[attacked[1]!];
+        if (!by) return "No entity was found";
+        const [x, y, z] = world.at[by] ?? [0, 64, 0];
+        return `${by} has the following entity data: [${x}d, ${y}d, ${z}d]`;
+    }
     // Who carries a tag, where they are.
     const carrying = /^execute as @a\[tag=(pe_\w+)\] run data get entity @s Pos$/.exec(line);
     if (carrying) {
@@ -1996,6 +2015,9 @@ beforeEach(() => {
     world.display = {};
     world.scoreTitle = "Event title";
     world.tags = {};
+    world.attackers = {};
+    world.hpUnset = false;
+    world.onLine = null;
     world.links = {};
     world.locales = {};
     world.bag = {};
@@ -4749,6 +4771,34 @@ describe("a horde defense", () => {
                 `execute in minecraft:overworld run forceload add ${chunk.x * 16} ${chunk.z * 16}`
         );
 
+    it("counts only the kills of the monsters it summoned, by its data pack, where the pack goes on", async () => {
+        setUp([newPreset("waves", "waves")]);
+        await start();
+        await play(10_100);
+        expect(state().run?.killsByPack).toBe(true);
+        expect(world.sent).toContain('datapack enable "file/polaris-events"');
+        expect(world.sent).toContain("scoreboard objectives add pe_wkp dummy");
+        expect(world.sent.some((line) => line.includes("minecraft.killed:"))).toBe(false);
+        expect(
+            world.files.get(
+                "/data/world/datapacks/polaris-events/data/polaris/advancement/hit/kill.json"
+            )
+        ).toContain('"nbt":"{Tags:[\\"pe_wfight\\"]}"');
+    });
+
+    it("counts kills by the game's statistics where the pack cannot go on", async () => {
+        world.properties = "pvp=true\ndifficulty=normal\nlevel-name=../elsewhere\n";
+        setUp([newPreset("waves", "waves")]);
+        await start();
+        await play(10_100);
+        expect(state().run?.killsByPack).toBe(false);
+        expect(
+            world.sent.some((line) =>
+                /^scoreboard objectives add pe_wk0 minecraft\.killed:minecraft\./.test(line)
+            )
+        ).toBe(true);
+    });
+
     it("waits for defenders, sends every wave, and rewards everybody who held the point", async () => {
         setUp([newPreset("waves", "waves")]);
         await start();
@@ -6453,6 +6503,28 @@ describe("a TNT run", () => {
         ).toBe(true);
     });
 
+    it("names a winner when the last two fall within one look, by the tick each fell", async () => {
+        setUp([run()]);
+        await startArena("tnt");
+        await play(2_100);
+        chat(["Ana", "join"], ["Ben", "join"]);
+        await play(52_000);
+        const arena = arenaNow();
+        expect(world.sent).toContain("scoreboard players set #on polaris_tntrun 1");
+        // Both on the net by the next look; Ben, two seconds' worth of ticks
+        // after Ana, stood the longest.
+        const under = arena.floors.at(-1)! - 3;
+        world.at.Ana = [arena.center.x, under, arena.center.z];
+        world.at.Ben = [arena.center.x + 1, under, arena.center.z];
+        world.stageScores.polaris_tntrun = { Ana: 4000, Ben: 4030 };
+        await play(2_100);
+        const after = state();
+        expect(after.run).toBeNull();
+        expect(after.history[0]?.note).toBe("Ben was the last one standing");
+        expect(after.history[0]?.podium?.[0]).toMatchObject({ place: 1, name: "Ben" });
+        expect(after.history[0]?.podium?.[1]).toMatchObject({ place: 2, name: "Ana" });
+    });
+
     it("called off mid-game, puts its fuses out and takes every floor down", async () => {
         setUp([run()]);
         await startArena("tnt");
@@ -6641,6 +6713,39 @@ describe("a dropper", () => {
         expect(world.inside.size).toBe(0);
         keptTheRules(["water"]);
         expect(after.stageLeftovers).toEqual([]);
+    });
+
+    it("names the places of two who reach the water in one look by the game's tick", async () => {
+        setUp([run()]);
+        await startArena("drop");
+        await play(2_100);
+        chat(["Ana", "join"], ["Ben", "unirse"]);
+        await play(44_000);
+        const shaft = shaftNow();
+        const spawn = dropperKind.spawn(shaft);
+        expect(state().run!.readyAt).not.toBeNull();
+        // Both in the water by the next look: Ben, who joined second, first.
+        const tick = Math.floor(Date.now() / 50) % 2147483647;
+        world.at.Ana = [spawn.x, shaft.water, spawn.z];
+        world.at.Ben = [spawn.x, shaft.water, spawn.z];
+        scores("pe_drop").Ana = tick;
+        scores("pe_drop").Ben = tick - 10;
+        await play(2_100);
+        const said = (text: string) =>
+            world.sent.some(
+                (line) => line.startsWith("tellraw @a") && visible(line).includes(text)
+            );
+        expect(said("Ben reached the finish")).toBe(true);
+        const line = (name: string) =>
+            visible(
+                world.sent.find(
+                    (one) =>
+                        one.startsWith("tellraw @a") &&
+                        visible(one).includes(`${name} reached the finish`)
+                )!
+            );
+        expect(line("Ben")).toContain("(place 1)");
+        expect(line("Ana")).toContain("(place 2)");
     });
 
     it("is called off before anything is built when too few join", async () => {
@@ -6909,6 +7014,31 @@ describe("an ice boat race", () => {
         expect(coords(cy!, "Cy")).not.toBe(coords(dan!, "Dan"));
     });
 
+    it("takes a racer who left back in at their last gate, with the gates they passed", async () => {
+        setUp([race()]);
+        await startArena("boats");
+        await play(2_100);
+        chat(["Ana", "join"], ["Ben", "join"]);
+        await play(52_000);
+        const track = trackNow();
+        expect(world.sent).toContain("scoreboard players set #on polaris_boat 1");
+        // Ben three passes on - the line and two gates - then out and back in.
+        scores("pe_gate").Ben = 3;
+        await play(2_100);
+        expect(state().run!.stage!.racers.find((one) => one.name === "Ben")!.best).toBe(3);
+        chat(["Ben", "leave"]);
+        await play(2_100);
+        world.sent = [];
+        chat(["Ben", "join"]);
+        await play(2_100);
+        expect(world.sent).toContain("scoreboard players set Ben pe_gate 3");
+        expect(world.sent).not.toContain("scoreboard players set Ben pe_gate 0");
+        const spot = track.respawns[2]!;
+        expect(world.sent).toContain(
+            `execute in minecraft:overworld run tp Ben ${spot.x.toFixed(3)} ${spot.y.toFixed(3)} ${spot.z.toFixed(3)} ${spot.yaw.toFixed(1)} 0.0`
+        );
+    });
+
     it("hands a marked boat to put down before 1.19.4, where nobody can be put in one", async () => {
         world.version = "1.19.2";
         setUp([race()]);
@@ -7148,6 +7278,7 @@ describe("players' own things through an arena", () => {
         await play(6_100);
         world.dealt = { Ana: 60 };
         world.hp = { Ben: 4 };
+        world.attackers = { Ben: "Ana" };
         await play(2_100);
         world.hp = {};
         const from = world.sent.length;
@@ -7299,6 +7430,7 @@ describe("players' own things through an arena", () => {
         await play(6_100);
         world.dealt = { Ana: 60 };
         world.hp = { Ben: 4 };
+        world.attackers = { Ben: "Ana" };
         await play(2_100);
         world.hp = {};
         // Ben logs off before the end.
@@ -8145,6 +8277,7 @@ describe("a team duel", () => {
         await play(6_100);
         world.dealt = { Ana: 60 };
         world.hp = { Ben: 4 };
+        world.attackers = { Ben: "Ana" };
         await play(2_100);
         world.hp = {};
         expect(state().run?.points).toEqual({ Ana: 1 });
@@ -9358,9 +9491,16 @@ describe("a villager defense", () => {
         await start();
         await play(10_100 + 46_000);
         expect(state().run?.round).toBe(0);
-        // Missed once - loading after a restart - and back: still on.
+        // Hurt, then missed once - loading after a restart - and back: still
+        // on, and the bar never shows it whole while it cannot be read.
+        world.kinds.villager.health = 7;
+        await play(2_000);
+        world.sent = [];
         world.kinds.villager.alive = false;
         await play(2_000);
+        const bar = world.sent.filter((line) => line.startsWith("bossbar set polaris:event value"));
+        expect(bar.length).toBeGreaterThan(0);
+        expect(bar.some((line) => line.endsWith(" value 20"))).toBe(false);
         world.kinds.villager.alive = true;
         await play(2_000);
         expect(state().run).not.toBeNull();
@@ -9603,6 +9743,22 @@ describe("a bingo rush", () => {
         expect(entry.note).toBe("Ana completed a line");
         expect(entry.podium).toEqual([{ place: 1, name: "Ana", score: 3 }]);
         expect(entry.disqualified).toContain("Ben");
+    });
+
+    it("never lets somebody win who went into creative between two of the run's samples", async () => {
+        setUp([made("line")]);
+        await start();
+        await play(2_100);
+        // Ben switches to creative for one look - crafting there counts as
+        // much as anywhere - and back before the fifteen-second sample.
+        world.creative = ["Ben"];
+        await play(2_100);
+        world.creative = [];
+        world.kinds.bingo.masks = { Ben: 0b111 };
+        await play(2_100);
+        expect(state().run).not.toBeNull();
+        expect(state().run!.offMode).toContain("Ben");
+        expect(state().run!.bingo!.winner).toBeNull();
     });
 
     it("called off, takes its counts away and pays nobody", async () => {
@@ -9966,6 +10122,7 @@ describe("capture the flag", () => {
         expect(flag.stateOf(state().run!.game).flags[1].carrier).toBe("Ana");
         world.dealt = { Ben: 40 };
         world.hp = { Ana: 4 };
+        world.attackers = { Ana: "Ben" };
         await play(2_100);
         world.hp = {};
         const game = flag.stateOf(state().run!.game);
@@ -9979,6 +10136,88 @@ describe("capture the flag", () => {
             world.sent.some((line) => line.startsWith("effect give Ana minecraft:resistance 5 4"))
         ).toBe(true);
         expect(saidToAll("dropped the Blue flag")).toBe(true);
+    });
+
+    it("never hands a flag to somebody sent back for a mark made before they were moved", async () => {
+        const flag = await ctf();
+        setUp([ctfOf(1)]);
+        await joinAndStart("ctf");
+        const box = state().run!.arena!.box;
+        const blue = flag.standAt(box, 1);
+        // Ana fights by the blue flag and is brought low there; the quick look
+        // marks her at it after the tick took the marks, before it moves her.
+        world.at = {
+            Ana: [blue.x + 2.5, blue.y, blue.z - 2.5],
+            Ben: [blue.x + 3.5, blue.y, blue.z - 2.5]
+        };
+        world.hp = { Ana: 4 };
+        world.attackers = { Ana: "Ben" };
+        world.onLine = (line) => {
+            if (!line.startsWith("execute in minecraft:overworld run tp Ana ")) return;
+            (world.tags.pe_ctf_t1 ??= new Set()).add("Ana");
+            const spot = /tp Ana (\S+) (\S+) (\S+)/.exec(line)!;
+            world.at.Ana = [Number(spot[1]), Number(spot[2]), Number(spot[3])];
+        };
+        await play(2_100);
+        world.onLine = null;
+        world.hp = {};
+        expect(flag.stateOf(state().run!.game).kills).toEqual({ Ben: 1 });
+        // Back home, two blocks from her own flag: no flag taken, none captured.
+        await play(2_100);
+        expect(flag.stateOf(state().run!.game).flags[1].carrier).toBeNull();
+        expect(state().run).not.toBeNull();
+        expect(state().run!.tally).toEqual({});
+    });
+
+    it("never hands a flag to a player dead beside it, and lets one nobody has hurt yet take it", async () => {
+        const flag = await ctf();
+        setUp([ctfOf(3)]);
+        await joinAndStart("ctf");
+        const box = state().run!.arena!.box;
+        const blue = flag.standAt(box, 1);
+        const red = flag.standAt(box, 0);
+        world.at = {
+            Ana: [blue.x + 0.5, blue.y, blue.z + 0.5],
+            Ben: [red.x + 4.5, red.y, red.z + 3.5]
+        };
+        // Dead by the blue flag, and still on the death screen the look after.
+        world.died = { Ana: 1 };
+        world.hp = { Ana: 0 };
+        await play(2_100);
+        world.died = {};
+        await play(2_100);
+        expect(flag.stateOf(state().run!.game).flags[1].carrier).toBeNull();
+        // Back, and never hurt since the counts were made: the game has no
+        // health score for her at all, and she takes it.
+        world.hp = {};
+        world.hpUnset = true;
+        await play(2_100);
+        expect(flag.stateOf(state().run!.game).flags[1].carrier).toBe("Ana");
+    });
+
+    it("credits a player brought low to the rival the game says hurt them, not whoever struck last", async () => {
+        const flag = await ctf();
+        const four = ["Ana", "Ben", "Cy", "Dee"];
+        world.online = [...four];
+        setUp([ctfOf(3)]);
+        await joinAndStart("ctf", four);
+        expect(state().run!.entrants.map((one) => [one.name, one.side])).toEqual([
+            ["Ana", 0],
+            ["Ben", 1],
+            ["Cy", 0],
+            ["Dee", 1]
+        ]);
+        await play(2_100);
+        // Dee wears Ana down; on the next look Ben strikes Cy, and Ana is low.
+        world.dealt = { Dee: 30 };
+        await play(2_100);
+        world.dealt = { Dee: 30, Ben: 10 };
+        world.hp = { Ana: 4 };
+        world.attackers = { Ana: "Dee" };
+        await play(2_100);
+        world.hp = {};
+        expect(flag.stateOf(state().run!.game).kills).toEqual({ Dee: 1 });
+        expect(saidToAll("Ana is out - Dee")).toBe(true);
     });
 
     it("picked up after a restart, keeps who carries which flag and still captures", async () => {
@@ -10062,19 +10301,32 @@ describe("hot potato", () => {
         import("@polaris-app/game-servers/src/lib/minecraft/events/kinds/hot-potato");
     const holderNow = async () => (await kind()).stateOf(state().run!.game)?.holder ?? null;
 
+    /** A punch as the events data pack sees it: the striker and the one hit
+     *  tagged by its advancements, and the game remembering who hurt whom. */
+    const punch = (by: string, victim: string) => {
+        (world.tags.pe_hit_struck ??= new Set()).add(by);
+        (world.tags.pe_hit_hurt ??= new Set()).add(victim);
+        world.attackers[victim] = by;
+    };
+
     it("passes the potato with a hit, puts its holder out when the fuse runs down, and ends on the last one", async () => {
         const potato = await kind();
         world.online = ["Ana", "Ben", "Cy"];
-        world.board = { pe_hpd: { Ana: 0, Ben: 0, Cy: 0 }, pe_hpt: { Ana: 0, Ben: 0, Cy: 0 } };
         setUp([potatoOf(40)]);
         await joinAndStart("potato", ["Ana", "Ben", "Cy"]);
         const run = state().run!;
         // Half a minute in at the most: the first fuse is still burning.
         expect(Date.now() - run.readyAt!).toBeLessThan(30_000);
         expect(run.readyAt).not.toBeNull();
-        expect(world.sent).toContain(
-            "scoreboard objectives add pe_hpd minecraft.custom:minecraft.damage_dealt"
-        );
+        // Hits are read off the events data pack, put on before anything was built.
+        const enabled = world.sent.indexOf('datapack enable "file/polaris-events"');
+        expect(enabled).toBeGreaterThanOrEqual(0);
+        expect(enabled).toBeLessThan(world.sent.findIndex((line) => / fill .* keep$/.test(line)));
+        expect(
+            world.files.get(
+                "/data/world/datapacks/polaris-events/data/polaris/advancement/hit/hurt.json"
+            )
+        ).toContain("minecraft:entity_hurt_player");
         // Who is left is on the boss bar: no side panel with nothing on it.
         expect(
             world.sent.some((line) => line.startsWith("scoreboard objectives add pe_score"))
@@ -10099,11 +10351,12 @@ describe("hot potato", () => {
         // The holder strikes; the nearest of those hurt has it now.
         const [near, far] = others as [string, string];
         world.at[near] = [world.at[first!]![0] + 1, world.at[first!]![1], world.at[first!]![2]];
-        world.board.pe_hpd![first!] = 2;
-        world.board.pe_hpt![near] = 2;
-        world.board.pe_hpt![far] = 2;
+        punch(first!, near);
+        punch(first!, far);
         await play(2_100);
         expect(await holderNow()).toBe(near);
+        // Taken once: the hit is not read again.
+        expect(world.tags.pe_hit_hurt?.size ?? 0).toBe(0);
         expect(world.sent).toContain(
             `clear ${first} minecraft:tnt[minecraft:custom_data={polaris_event:1b}]`
         );
@@ -10156,6 +10409,77 @@ describe("hot potato", () => {
         expect(world.sent).toContain("scoreboard objectives remove pe_hpt");
         expect(done.arenaLeftovers).toEqual([]);
         onlyOurBlocks();
+    });
+
+    it("hands it only to whom the holder hit, not to somebody nearer hurt by another", async () => {
+        world.online = ["Ana", "Ben", "Cy"];
+        setUp([potatoOf(40)]);
+        await joinAndStart("potato", ["Ana", "Ben", "Cy"]);
+        await play(2_100);
+        const first = (await holderNow())!;
+        const [near, far] = ["Ana", "Ben", "Cy"].filter((name) => name !== first) as [
+            string,
+            string
+        ];
+        const at = world.at[first]!;
+        world.at[near] = [at[0] + 1, at[1], at[2]];
+        world.at[far] = [at[0] + 4, at[1], at[2]];
+        // The one nearer was hurt as well, by somebody else - the last holder,
+        // say, before the tick made them weak again.
+        punch(far, near);
+        punch(first, far);
+        await play(2_100);
+        expect(await holderNow()).toBe(far);
+    });
+
+    it("reads no hit from before Go - another arena's fight - as one of the game's", async () => {
+        world.online = ["Ana", "Ben", "Cy"];
+        // Tagged by the pack in an earlier fight, and never taken.
+        world.tags.pe_hit_struck = new Set(["Ana", "Ben", "Cy"]);
+        world.tags.pe_hit_hurt = new Set(["Ana", "Ben", "Cy"]);
+        setUp([potatoOf(40)]);
+        await joinAndStart("potato", ["Ana", "Ben", "Cy"]);
+        // Cleared with "Go!", before the first holder is handed it.
+        const cleared = world.sent.indexOf("tag @a remove pe_hit_hurt");
+        const handed = world.sent.findIndex((line) =>
+            line.includes("armor.head with minecraft:tnt")
+        );
+        expect(cleared).toBeGreaterThan(-1);
+        expect(cleared).toBeLessThan(handed);
+        expect(world.tags.pe_hit_hurt.size).toBe(0);
+        expect(world.tags.pe_hit_struck.size).toBe(0);
+    });
+
+    it("by the game's statistics where the pack is not on, passes on the holder's first punch", async () => {
+        world.properties = "pvp=true\ndifficulty=normal\nlevel-name=../elsewhere\n";
+        world.online = ["Ana", "Ben", "Cy"];
+        // No count yet: the game makes a statistic's score only when it first moves.
+        world.board = { pe_hpd: {}, pe_hpt: {} };
+        setUp([potatoOf(40)]);
+        await joinAndStart("potato", ["Ana", "Ben", "Cy"]);
+        expect(state().run!.readyAt).not.toBeNull();
+        expect(world.sent).toContain(
+            "scoreboard objectives add pe_hpd minecraft.custom:minecraft.damage_dealt"
+        );
+        await play(2_100);
+        const first = (await holderNow())!;
+        const near = ["Ana", "Ben", "Cy"].find((name) => name !== first)!;
+        await play(2_100);
+        // The first punch of the game: both counts appear for the first time.
+        world.board.pe_hpd![first] = 2;
+        world.board.pe_hpt![near] = 2;
+        world.attackers[near] = first;
+        await play(2_100);
+        expect(await holderNow()).toBe(near);
+        // Hurt by nothing a player did - a fall - is no hit, whoever struck.
+        const other = ["Ana", "Ben", "Cy"].find((name) => name !== first && name !== near)!;
+        world.at[other] = [...world.at[near]!];
+        await play(2_100);
+        world.board.pe_hpd![near] = 2;
+        world.board.pe_hpt![other] = 2;
+        delete world.attackers[other];
+        await play(2_100);
+        expect(await holderNow()).toBe(near);
     });
 
     it("picked up after a restart, keeps the round, its holder and its fuse", async () => {
@@ -10235,13 +10559,16 @@ describe("hide and seek", () => {
         import("@polaris-app/game-servers/src/lib/minecraft/events/kinds/hide-and-seek");
     const names = ["Ana", "Ben", "Cy"];
 
+    /** A hit as the events data pack sees it, and the game remembering who hurt whom. */
+    const hit = (by: string, victim: string) => {
+        (world.tags.pe_hit_struck ??= new Set()).add(by);
+        (world.tags.pe_hit_hurt ??= new Set()).add(victim);
+        world.attackers[victim] = by;
+    };
+
     it("lets the seeker out after the hiding time, finds hiders with a hit and ends when all are found", async () => {
         const hs = await kind();
         world.online = [...names];
-        world.board = {
-            pe_hsd: { Ana: 0, Ben: 0, Cy: 0 },
-            pe_hst: { Ana: 0, Ben: 0, Cy: 0 }
-        };
         setUp([hideOf(60)]);
         await joinAndStart("hide", names);
         const run = state().run!;
@@ -10270,8 +10597,7 @@ describe("hide and seek", () => {
         // The seeker strikes beside a hider who was hurt: found, and seeking now.
         const at = world.at[hiders[0]]!;
         world.at[seeker] = [at[0] + 1, at[1], at[2]];
-        world.board.pe_hsd![seeker] = 2;
-        world.board.pe_hst![hiders[0]] = 2;
+        hit(seeker, hiders[0]);
         await play(2_100);
         const game = hs.stateOf(state().run!.game)!;
         expect(game.finds.map((one) => [one.hider, one.by])).toEqual([[hiders[0], seeker]]);
@@ -10281,16 +10607,16 @@ describe("hide and seek", () => {
         expect(saidToAll(`${seeker} found ${hiders[0]}`)).toBe(true);
         // The side panel keeps up: a find is worth its points at once.
         expect(world.sent).toContain(`scoreboard players set ${seeker} pe_score ${hs.FIND_POINTS}`);
-        // A hider hurt with no seeker striking near: nobody found.
-        world.board.pe_hst![hiders[1]] = 2;
+        // A seeker strikes beside a hider who was not hit: nobody found.
+        (world.tags.pe_hit_struck ??= new Set()).add(seeker);
+        world.at[seeker] = [...world.at[hiders[1]]!];
         await play(2_100);
         expect(hs.stateOf(state().run!.game)!.finds).toHaveLength(1);
 
         // The one found finds the last: every hider found, and it ends.
         const last = world.at[hiders[1]]!;
         world.at[hiders[0]] = [last[0], last[1], last[2] + 1];
-        world.board.pe_hsd![hiders[0]] = 2;
-        world.board.pe_hst![hiders[1]] = 4;
+        hit(hiders[0], hiders[1]);
         await play(2_100);
         const done = state();
         expect(done.run).toBeNull();
@@ -10311,6 +10637,33 @@ describe("hide and seek", () => {
         expect(world.sent).toContain("scoreboard objectives remove pe_hsd");
         expect(done.arenaLeftovers).toEqual([]);
         onlyOurBlocks();
+    });
+
+    it("by the game's statistics where the pack is not on, finds on the first hit and never by a fall", async () => {
+        const hs = await kind();
+        world.properties = "pvp=true\ndifficulty=normal\nlevel-name=../elsewhere\n";
+        world.online = [...names];
+        // No count yet: the game makes a statistic's score only when it first moves.
+        world.board = { pe_hsd: {}, pe_hst: {} };
+        setUp([hideOf(15)]);
+        await joinAndStart("hide", names);
+        const run = state().run!;
+        const [seeker] = hs.seekersFor(run.id, names, 1) as [string];
+        const [first, second] = names.filter((name) => name !== seeker) as [string, string];
+        await play(run.readyAt! + 15_000 - Date.now() + 2_100);
+        expect(hs.stateOf(state().run!.game)?.released).toBe(true);
+        // A hider drops off the gallery beside the seeker, who has just struck
+        // the other: the fall is no find.
+        world.at[seeker] = [...world.at[first]!];
+        world.at[second] = [world.at[first]![0] + 1, world.at[first]![1], world.at[first]![2]];
+        world.board.pe_hsd![seeker] = 2;
+        world.board.pe_hst![second] = 10;
+        world.board.pe_hst![first] = 2;
+        world.attackers[first] = seeker;
+        await play(2_100);
+        const finds = hs.stateOf(state().run!.game)!.finds;
+        // The seeker's first hit of the game counted, and only on whom they hit.
+        expect(finds.map((one) => [one.hider, one.by])).toEqual([[first, seeker]]);
     });
 
     it("picked up after a restart, neither lets the seekers out early nor builds the cage again", async () => {
@@ -10437,6 +10790,7 @@ describe("SkyWars", () => {
         world.at.Ben = [ana[0] + 1.5, ana[1], ana[2]];
         world.dealt.Ana = 30;
         world.board.pe_swt!.Ben = 30;
+        world.attackers.Ben = "Ana";
         world.hp = { Ben: 3 };
         await play(2_100);
         const done = state();
@@ -10469,6 +10823,37 @@ describe("SkyWars", () => {
         expect(world.sent).toContain("scoreboard objectives remove pe_swb");
         expect(done.arenaLeftovers).toEqual([]);
         onlyOurBlocks();
+    });
+
+    it("credits whoever the game says hurt a player, never a striker beside one hurt by a fall", async () => {
+        const sw = await kind();
+        world.online = [...names];
+        // No count yet: the game makes a statistic's score only when it first moves.
+        world.board = { pe_swt: {}, pe_swb: {} };
+        world.dealt = {};
+        setUp([warOf()]);
+        await joinAndStart("war", names);
+        await play(2_100);
+        // Cy jumps off a tree beside Ana, who has just struck Ben: hurt by the
+        // fall, by nobody.
+        const ana = world.at.Ana!;
+        world.at.Cy = [ana[0] + 1, ana[1], ana[2]];
+        world.at.Ben = [ana[0] - 1, ana[1], ana[2]];
+        world.dealt.Ana = 30;
+        world.board.pe_swt!.Ben = 30;
+        world.board.pe_swt!.Cy = 20;
+        world.attackers.Ben = "Ana";
+        world.hp = { Cy: 3 };
+        await play(2_100);
+        expect(sw.stateOf(state().run!.game).out.map((one) => one.name)).toEqual(["Cy"]);
+        expect(sw.stateOf(state().run!.game).kills).toEqual({});
+        expect(saidToAll("Cy is out (Ana).")).toBe(false);
+        // Ben, struck by Ana on the first hit of the game, brought low now:
+        // Ana's, and the last one left.
+        world.hp = { Ben: 3 };
+        await play(2_100);
+        expect(saidToAll("Ben is out (Ana).")).toBe(true);
+        expect(state().history[0]).toMatchObject({ note: "Only one player was left" });
     });
 
     it("picked up after a restart, keeps who is out and does not put them out again", async () => {

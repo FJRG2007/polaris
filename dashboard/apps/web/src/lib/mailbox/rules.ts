@@ -43,22 +43,39 @@ function toRule(row: {
 /** Everything a rule needs to know about a message. The body is the plain text
  *  only, and only what has already been fetched: a rule that matched on a body
  *  would otherwise download every arriving message to decide. */
+const SUBJECT_COLUMNS = {
+    subject: true,
+    snippet: true,
+    bodyText: true,
+    listId: true,
+    hasAttachments: true,
+    size: true,
+    fromJson: true,
+    toJson: true,
+    ccJson: true
+} as const;
+
 async function subjectFor(messageId: string): Promise<core.MailRuleSubject | null> {
     const message = await prisma.mailMessage.findUnique({
         where: { id: messageId },
-        select: {
-            subject: true,
-            snippet: true,
-            bodyText: true,
-            listId: true,
-            hasAttachments: true,
-            size: true,
-            fromJson: true,
-            toJson: true,
-            ccJson: true
-        }
+        select: SUBJECT_COLUMNS
     });
     if (!message) return null;
+    return asSubject(message);
+}
+
+/** A message row, as a rule reads it. */
+function asSubject(message: {
+    subject: string;
+    snippet: string;
+    bodyText: string | null;
+    listId: string;
+    hasAttachments: boolean;
+    size: number;
+    fromJson: unknown;
+    toJson: unknown;
+    ccJson: unknown;
+}): core.MailRuleSubject {
     return {
         from: addressesFrom(message.fromJson),
         to: addressesFrom(message.toJson),
@@ -363,6 +380,34 @@ export interface MailRuleView {
     readonly matchCount: number;
 }
 
+/**
+ * The rules of several mailboxes, in one query, by mailbox.
+ *
+ * For a screen that lists every mailbox's rules: one read rather than one per
+ * mailbox. `accountIds` must already be mailboxes this person may read - they
+ * come from the same listing that decides which mailboxes the screen shows.
+ */
+export async function listRulesFor(
+    accountIds: readonly string[]
+): Promise<Record<string, MailRuleView[]>> {
+    const out: Record<string, MailRuleView[]> = Object.fromEntries(
+        accountIds.map((id) => [id, []])
+    );
+    if (accountIds.length === 0) return out;
+    const rows = await prisma.mailRule.findMany({
+        where: { accountId: { in: [...accountIds] } },
+        orderBy: [{ accountId: "asc" }, { position: "asc" }]
+    });
+    for (const row of rows) {
+        out[row.accountId]?.push({
+            ...toRule(row),
+            position: row.position,
+            matchCount: row.matchCount
+        });
+    }
+    return out;
+}
+
 export async function listRules(userId: string, accountId: string): Promise<MailRuleView[]> {
     await ownedAccount(userId, accountId);
     const rows = await prisma.mailRule.findMany({
@@ -424,26 +469,84 @@ export async function saveRule(
     // Running a new rule over what is already there is what somebody expects
     // from "and do this to the ones I already have", and it is the reason the
     // checkbox exists. Behind the response, because it can move thousands of
-    // messages and nobody should watch a spinner for it.
-    if (rule.applyToExisting) void applyToInbox(accountId).catch(() => undefined);
+    // messages and nobody should watch a spinner for it. Only this rule: running
+    // every rule again would do again what the others already did - and a
+    // forwarding rule would send old mail a second time.
+    if (rule.applyToExisting) {
+        const saved = id;
+        void applyRuleToInbox(accountId, saved).catch((caught) => console.error(caught));
+    }
     return id;
 }
 
-/** Run every rule over what is already in the inbox. Bounded, because it moves
- *  mail and a runaway pass is worse than an unfinished one. */
-export async function applyToInbox(accountId: string, limit = 1000): Promise<number> {
-    const messages = await prisma.mailMessage.findMany({
-        where: { accountId, folder: { role: "inbox" } },
-        select: { id: true },
-        orderBy: { sentAt: "desc" },
-        take: limit
+/** How many inbox messages a rule is run over when it is saved with "and the
+ *  ones already here", and how many are read at a time. */
+const EXISTING_LIMIT = 5000;
+const EXISTING_PAGE = 250;
+
+/**
+ * Run one rule over what is already in the inbox, newest first.
+ *
+ * Read a page at a time with only the columns a rule looks at, matched in
+ * memory, and acted on only where it matched - so a rule that matches ten
+ * messages out of five thousand costs twenty reads, not five thousand. Bounded,
+ * because it moves mail and a runaway pass is worse than an unfinished one.
+ */
+export async function applyRuleToInbox(
+    accountId: string,
+    ruleId: string,
+    limit = EXISTING_LIMIT
+): Promise<number> {
+    const row = await prisma.mailRule.findFirst({
+        where: { id: ruleId, accountId },
+        select: {
+            id: true,
+            name: true,
+            enabled: true,
+            match: true,
+            conditions: true,
+            actions: true,
+            stop: true
+        }
     });
-    let moved = 0;
-    for (const message of messages) {
-        const outcome = await applyRulesToMessage(accountId, message.id).catch(() => null);
-        if (outcome?.applied) moved += 1;
+    if (!row) return 0;
+    const rule = toRule(row);
+    // The inbox by id, so the pages below walk the folder's own sent-date index.
+    const inbox = (
+        await prisma.mailFolder.findMany({
+            where: { accountId, role: "inbox" },
+            select: { id: true }
+        })
+    ).map((folder) => folder.id);
+    if (inbox.length === 0) return 0;
+    let matched = 0;
+    let cursor: string | undefined;
+    for (let read = 0; read < limit; read += EXISTING_PAGE) {
+        const page = await prisma.mailMessage.findMany({
+            where: { folderId: { in: inbox } },
+            select: { id: true, ...SUBJECT_COLUMNS },
+            orderBy: [{ sentAt: "desc" }, { id: "desc" }],
+            take: Math.min(EXISTING_PAGE, limit - read),
+            ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {})
+        });
+        if (page.length === 0) break;
+        cursor = page.at(-1)!.id;
+        for (const message of page) {
+            if (!core.mailRuleMatches(rule, asSubject(message))) continue;
+            await performActions(accountId, message.id, rule.actions).catch((caught) =>
+                console.error(caught)
+            );
+            matched += 1;
+        }
+        if (page.length < EXISTING_PAGE) break;
     }
-    return moved;
+    if (matched > 0) {
+        await prisma.mailRule.update({
+            where: { id: rule.id },
+            data: { matchCount: { increment: matched }, lastRunAt: new Date() }
+        });
+    }
+    return matched;
 }
 
 export async function deleteRule(userId: string, accountId: string, ruleId: string): Promise<void> {

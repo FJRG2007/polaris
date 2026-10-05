@@ -696,7 +696,13 @@ export function armLines(shaft: Shaft): string[] {
         // Feet on the lowest floor are a block over it; a little under that,
         // for a server that reads a standing player a hair low.
         set("fy1", from(lowest + 1) - SCALE / 4),
-        set("fy2", to(shaft.top + 1)),
+        // Up to just under the spot a racer is let fall from (`spawn`, the
+        // stand): `tp` leaves its target on the ground, so with that spot
+        // inside, every racer put there - at "Go!", and each time they were
+        // sent back - counted as landed on the next tick and was put there
+        // again, held in mid-air every tick until the server kicked them for
+        // floating. Nothing can be stood on up there once the lid is gone.
+        set("fy2", from(shaft.top + 1) - 1),
         set("fz1", from(z - HALF)),
         set("fz2", to(z + HALF)),
         set("wy", from(shaft.water + 1)),

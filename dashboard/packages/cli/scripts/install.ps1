@@ -1,9 +1,15 @@
 # Polaris CLI installer for Windows (Windows PowerShell 5.1 or PowerShell 7).
-# Each Polaris serves this at /cli/install.ps1 with its own address filled in
-# below, so the line on its Account > Downloads screen installs the CLI that
-# matches that server:
+# It installs the newest CLI release from the project's GitHub repository, the
+# way the browser extension is installed, and you point it at your Polaris
+# afterwards:
 #
-#   irm https://your-polaris/cli/install.ps1 | iex
+#   irm https://raw.githubusercontent.com/FJRG2007/polaris/main/dashboard/packages/cli/scripts/install.ps1 | iex
+#   plr login --url https://your-polaris
+#
+# The download is checked against the SHA-256 digest GitHub publishes for it.
+# A Polaris also serves this script at /cli/install.ps1 with its own address
+# filled in, so the last line it prints names that Polaris; the CLI itself still
+# comes from GitHub.
 #
 # It puts the bundle and two launchers, plr.cmd and polaris.cmd, in
 # %LOCALAPPDATA%\Programs\polaris-cli and adds that folder to your user PATH.
@@ -20,19 +26,19 @@ function Install-PolarisCli {
     param()
 
     $ErrorActionPreference = "Stop"
+    $repo = if ($env:POLARIS_REPO) { $env:POLARIS_REPO } else { "FJRG2007/polaris" }
+    # Where GitHub's API is. Only ever changed to test this script against a stand-in.
+    $api = if ($env:POLARIS_GITHUB_API) { $env:POLARIS_GITHUB_API } else { "https://api.github.com" }
+    # The Polaris to sign in to next, when a Polaris served this script; anything
+    # that is not an address (the placeholder, unfilled) means none.
     $url = if ($env:POLARIS_URL) { $env:POLARIS_URL } else { "__POLARIS_URL__" }
+    if ($url -notmatch '^https?://') { $url = $null }
     # Written into every file this installs, so `plr uninstall` and the server's
     # installer can tell them apart from anything else called polaris.
     $marker = "polaris-developer-cli"
 
     function Write-Log { param($Message) Write-Host "polaris-cli: $Message" }
     function Write-Problem { param($Message) Write-Host "polaris-cli: $Message" -ForegroundColor Red }
-
-    if ($url -notmatch '^https?://') {
-        Write-Problem "this script does not know which Polaris it came from."
-        Write-Problem "copy the install line from Account > Downloads on your Polaris instead."
-        return
-    }
 
     $node = Get-Command node -ErrorAction SilentlyContinue
     if (-not $node) {
@@ -81,22 +87,45 @@ function Install-PolarisCli {
     # Windows PowerShell 5.1 still offers TLS 1.0 first.
     [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
 
-    $tmp = Join-Path $dir ("polaris.mjs." + [Guid]::NewGuid().ToString("N"))
-    Write-Log "downloading the CLI from $url"
+    # The newest CLI release. This repository releases the dashboard and the
+    # extension too, so the tag prefix is what tells them apart; drafts and
+    # prereleases are skipped, and so is a release with no digest to check.
+    $asset = $null
     try {
-        $response = Invoke-WebRequest -UseBasicParsing -Uri "$url/cli/polaris.mjs" -OutFile $tmp -PassThru
+        # A page at a time, up to ten, while a full page has none.
+        for ($page = 1; $page -le 10 -and -not $asset; $page++) {
+            $listed = Invoke-RestMethod -UseBasicParsing -Uri "$api/repos/$repo/releases?per_page=100&page=$page" -Headers @{ "User-Agent" = "polaris-cli-installer"; "Accept" = "application/vnd.github+json" }
+            $releases = @($listed)
+            foreach ($release in $releases) {
+                if ($release.draft -or $release.prerelease -or -not ([string]$release.tag_name).StartsWith("cli-v")) { continue }
+                $candidate = @($release.assets) | Where-Object { $_.name -eq "polaris.mjs" -and ([string]$_.digest) -match '^sha256:[0-9a-fA-F]{64}$' } | Select-Object -First 1
+                if ($candidate) { $asset = $candidate; break }
+            }
+            if ($releases.Count -lt 100) { break }
+        }
+    }
+    catch { $asset = $null }
+    if (-not $asset) {
+        Write-Problem "could not find a CLI release on github.com/$repo. Check that this computer can open github.com, then try again."
+        return
+    }
+
+    $tmp = Join-Path $dir ("polaris.mjs." + [Guid]::NewGuid().ToString("N"))
+    Write-Log "downloading the CLI from $($asset.browser_download_url)"
+    try {
+        Invoke-WebRequest -UseBasicParsing -Uri $asset.browser_download_url -OutFile $tmp -Headers @{ "User-Agent" = "polaris-cli-installer" }
     }
     catch {
-        Write-Problem "could not download it from $url/cli/polaris.mjs. Check that this computer can open $url."
+        Write-Problem "could not download it from $($asset.browser_download_url). Check that this computer can open github.com, then try again."
         if (Test-Path $tmp) { Remove-Item -Force $tmp }
         return
     }
 
-    # Checked against the digest the server sent with it, so a truncated or
-    # rewritten download is never installed.
-    $expected = [string]$response.Headers["x-content-sha256"]
+    # Checked against the digest GitHub published for it, so a truncated or
+    # swapped download is never installed.
+    $expected = ([string]$asset.digest).Substring(7).ToLowerInvariant()
     $actual = (Get-FileHash -Algorithm SHA256 -Path $tmp).Hash.ToLowerInvariant()
-    if (-not $expected -or $expected.Trim().ToLowerInvariant() -ne $actual) {
+    if ($expected -ne $actual) {
         Remove-Item -Force $tmp
         Write-Problem "the download did not match its checksum; nothing was installed. Try again."
         return
@@ -104,7 +133,7 @@ function Install-PolarisCli {
     Move-Item -Force -Path $tmp -Destination (Join-Path $dir "polaris.mjs")
 
     $installed = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ssZ")
-    $json = "{`n    `"marker`": `"$marker`",`n    `"origin`": `"$url`",`n    `"sha256`": `"$actual`",`n    `"installedAt`": `"$installed`"`n}`n"
+    $json = "{`n    `"marker`": `"$marker`",`n    `"origin`": `"https://github.com/$repo`",`n    `"repo`": `"$repo`",`n    `"sha256`": `"$actual`",`n    `"installedAt`": `"$installed`"`n}`n"
     [System.IO.File]::WriteAllText((Join-Path $dir "polaris-cli.json"), $json)
 
     # `(goto) 2>nul` ends the batch file's own context before node runs, so cmd
@@ -137,7 +166,7 @@ function Install-PolarisCli {
     if (($env:Path -split ";") -notcontains $dir) { $env:Path = "$env:Path;$dir" }
 
     Write-Log "installed plr (also polaris)."
-    Write-Log "next: plr login --url $url"
+    Write-Log "next: plr login --url $(if ($url) { $url } else { 'https://your-polaris' })"
 }
 
 Install-PolarisCli

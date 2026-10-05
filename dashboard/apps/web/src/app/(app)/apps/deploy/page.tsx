@@ -6,6 +6,7 @@ import { requirePermission, userHasManage } from "@/lib/session";
 import { getOrCreateLocalTarget } from "@/lib/deploy-target-service";
 import { ProjectsGrid, type ProjectCardData } from "./projects-grid";
 import { getApplicationDeployStatuses, listProjects } from "@/lib/deploy-service";
+import { isManagedProject, polarisManagedApplications } from "@/lib/deploy/managed-projects";
 
 export const dynamic = "force-dynamic";
 
@@ -38,14 +39,22 @@ export default async function DeployPage() {
     }));
     // Live status per service, so a card counts what is actually up rather than what
     // has ever been deployed, and can say a build is running before it has a release.
-    const statuses = await getApplicationDeployStatuses(
-        shown.flatMap(({ environment }) =>
-            (environment?.applications ?? []).map((app) => ({
-                id: app.id,
-                currentDeploymentId: app.currentDeploymentId
-            }))
-        )
+    // Every service in every environment, not only the default one: a project is
+    // Polaris's own only when all of it is.
+    const everyApplicationId = projects.flatMap((project) =>
+        project.environments.flatMap((environment) => environment.applications.map((app) => app.id))
     );
+    const [statuses, managed] = await Promise.all([
+        getApplicationDeployStatuses(
+            shown.flatMap(({ environment }) =>
+                (environment?.applications ?? []).map((app) => ({
+                    id: app.id,
+                    currentDeploymentId: app.currentDeploymentId
+                }))
+            )
+        ),
+        polarisManagedApplications(everyApplicationId)
+    ]);
     const cards: ProjectCardData[] = shown.map(({ project, environment }) => {
         const apps = environment?.applications ?? [];
         const databases = environment?.databases ?? [];
@@ -61,6 +70,19 @@ export default async function DeployPage() {
         return {
             id: project.id,
             name: project.name,
+            managed: isManagedProject(
+                {
+                    slug: project.slug,
+                    applicationIds: project.environments.flatMap((one) =>
+                        one.applications.map((app) => app.id)
+                    ),
+                    databaseCount: project.environments.reduce(
+                        (sum, one) => sum + one.databases.length,
+                        0
+                    )
+                },
+                managed
+            ),
             environmentName: environment?.name ?? "production",
             services,
             online,
@@ -71,5 +93,15 @@ export default async function DeployPage() {
         };
     });
 
-    return <ProjectsGrid projects={cards} canManage={canManage} localReady={localReady} />;
+    return (
+        <ProjectsGrid
+            projects={cards}
+            canManage={canManage}
+            localReady={localReady}
+            viewerId={user.id}
+            // The instance's administrator is who sees every install land here;
+            // for them the list opens on their own projects.
+            hideManagedByDefault={user.isAdmin}
+        />
+    );
 }

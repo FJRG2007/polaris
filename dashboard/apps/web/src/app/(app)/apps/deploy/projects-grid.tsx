@@ -11,6 +11,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ServiceIcon, type ServiceKind } from "./deploy-view";
 import { RegistryCredentialsButton } from "./registry-credentials";
+import { useShowManaged } from "./show-managed";
 import { createProjectAction, deleteProjectAction } from "./actions";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { NamespaceTranslator } from "@/lib/i18n/types";
@@ -50,12 +51,16 @@ import {
     DialogHeader,
     DialogTitle,
     Input,
+    Switch,
     cn
 } from "@polaris/ui";
 
 export interface ProjectCardData {
     id: string;
     name: string;
+    /** Polaris runs it for itself - the Marketplace project, or one holding only
+     *  its mail server. Kept behind a switch on the list. */
+    managed: boolean;
     environmentName: string;
     services: ServiceKind[];
     online: number;
@@ -72,15 +77,22 @@ const PROJECT_FIELDS: readonly SearchField<ProjectCardData>[] = [
 export function ProjectsGrid({
     projects,
     canManage,
-    localReady
+    localReady,
+    viewerId,
+    hideManagedByDefault = false
 }: {
     projects: ProjectCardData[];
     canManage: boolean;
     localReady: boolean;
+    /** Whose choice the switch below remembers. */
+    viewerId: string;
+    /** Whether the projects Polaris runs for itself start hidden. */
+    hideManagedByDefault?: boolean;
 }) {
     const router = useRouter();
     const t = useTranslations("deploy");
     const [layout, setLayout] = useState<"grid" | "list">("grid");
+    const [showManaged, setShowManaged] = useShowManaged(viewerId, !hideManagedByDefault);
     const [search, setSearch] = useState("");
     // Projects whose delete is in flight. Deleting one now takes its services off
     // their servers as well as its rows out of the database, which is seconds of
@@ -117,9 +129,14 @@ export function ProjectsGrid({
         return () => clearInterval(timer);
     }, [settling, router]);
 
-    const visible = useMemo(
+    const kept = useMemo(
         () => projects.filter((project) => !removing.includes(project.id)),
         [projects, removing]
+    );
+    const managedCount = kept.filter((project) => project.managed).length;
+    const visible = useMemo(
+        () => (showManaged ? kept : kept.filter((project) => !project.managed)),
+        [kept, showManaged]
     );
     const filtered = useMemo(() => searchItems(visible, search, PROJECT_FIELDS), [visible, search]);
     const count = visible.length;
@@ -175,27 +192,53 @@ export function ProjectsGrid({
                         className="h-8 pl-8"
                     />
                 </div>
-                <div className="flex items-center gap-1 rounded-md border border-border p-0.5">
-                    <button
-                        type="button"
-                        onClick={() => setLayout("grid")}
-                        aria-label={t("projects.gridView")}
-                        className={`rounded p-1.5 transition-colors ${layout === "grid" ? "bg-muted text-foreground" : "text-muted-foreground hover:text-foreground"}`}
-                    >
-                        <LayoutGrid className="size-4" />
-                    </button>
-                    <button
-                        type="button"
-                        onClick={() => setLayout("list")}
-                        aria-label={t("projects.listView")}
-                        className={`rounded p-1.5 transition-colors ${layout === "list" ? "bg-muted text-foreground" : "text-muted-foreground hover:text-foreground"}`}
-                    >
-                        <List className="size-4" />
-                    </button>
+                <div className="flex shrink-0 items-center gap-3">
+                    {/* Only when there is something it would hide. */}
+                    {managedCount > 0 && (
+                        <label className="flex cursor-pointer items-center gap-2 text-xs text-muted-foreground">
+                            <Switch
+                                checked={showManaged}
+                                onChange={setShowManaged}
+                                aria-label={t("projects.showManaged")}
+                            />
+                            <span className="hidden sm:inline">
+                                {t("projects.showManagedCount", { count: managedCount })}
+                            </span>
+                        </label>
+                    )}
+                    <div className="flex items-center gap-1 rounded-md border border-border p-0.5">
+                        <button
+                            type="button"
+                            onClick={() => setLayout("grid")}
+                            aria-label={t("projects.gridView")}
+                            className={`rounded p-1.5 transition-colors ${layout === "grid" ? "bg-muted text-foreground" : "text-muted-foreground hover:text-foreground"}`}
+                        >
+                            <LayoutGrid className="size-4" />
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setLayout("list")}
+                            aria-label={t("projects.listView")}
+                            className={`rounded p-1.5 transition-colors ${layout === "list" ? "bg-muted text-foreground" : "text-muted-foreground hover:text-foreground"}`}
+                        >
+                            <List className="size-4" />
+                        </button>
+                    </div>
                 </div>
             </div>
 
-            {count === 0 ? (
+            {count === 0 && managedCount > 0 && !showManaged ? (
+                <p className="py-16 text-center text-sm text-muted-foreground">
+                    {t("projects.onlyManaged", { count: managedCount })}{" "}
+                    <button
+                        type="button"
+                        onClick={() => setShowManaged(true)}
+                        className="font-medium text-primary hover:underline"
+                    >
+                        {t("projects.showThem")}
+                    </button>
+                </p>
+            ) : count === 0 ? (
                 <div
                     className="relative flex flex-col items-center gap-3 overflow-hidden rounded-xl border border-border/60 px-6 py-24 text-center"
                     style={DOT_CANVAS}

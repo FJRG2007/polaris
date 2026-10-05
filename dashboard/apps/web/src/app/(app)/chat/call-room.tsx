@@ -49,6 +49,8 @@ import {
     type CameraBackground
 } from "./camera-background";
 import { ChatPeoplePicker } from "./chat-people-picker";
+import { CameraLookMenu } from "./camera-look-menu";
+import type { CameraLook } from "./camera-look";
 import { NoAudioNotice } from "./no-audio-notice";
 import { QuietMicNotice } from "./quiet-mic-notice";
 import { SlowConnectionNotice } from "@/components/connection-banner";
@@ -1145,6 +1147,8 @@ export function CallRoom({
                     onScene={call.chooseBackgroundScene}
                     backgroundRunning={call.backgroundRunning}
                     backgroundProblem={call.backgroundProblem}
+                    look={call.look}
+                    onLook={call.setLook}
                 />
 
                 <Split
@@ -1354,6 +1358,8 @@ function Split({
     onScene,
     backgroundRunning,
     backgroundProblem,
+    look,
+    onLook,
     title
 }: {
     label: string;
@@ -1412,6 +1418,9 @@ function Split({
      *  arrive is not yet what was asked for. */
     backgroundRunning?: CameraBackground | null;
     backgroundProblem?: string | null;
+    /** Camera only: its light, colour and framing. */
+    look?: CameraLook;
+    onLook?: (patch: Partial<CameraLook>) => void;
 }) {
     const t = useTranslations("chat");
     // The picker lives outside the menu on purpose: a menu that has closed has
@@ -1430,6 +1439,7 @@ function Split({
         onCleanMic !== undefined ||
         onQuality !== undefined ||
         onBackground !== undefined ||
+        onLook !== undefined ||
         onMirror !== undefined;
     const showing = ladder && level ? ladder.rungs[level] : null;
 
@@ -1674,6 +1684,7 @@ function Split({
                                 )}
                             </>
                         )}
+                        {onLook && look && <CameraLookMenu look={look} onLook={onLook} />}
                         {onCleanMic && (
                             <>
                                 <DropdownMenuLabel>

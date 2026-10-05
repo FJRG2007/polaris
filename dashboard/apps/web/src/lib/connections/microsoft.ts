@@ -72,7 +72,7 @@ export function microsoftAuthorizeUrl(
     client: MicrosoftOAuthClient,
     redirectUri: string,
     state: string,
-    flow: "link" | "signin" | "storage" | "mail" | "calendar" = "link",
+    flow: "link" | "signin" | "storage" | "mail" | "calendar" | "office" = "link",
     /** Which account to open on - see `googleAuthorizeUrl`. */
     loginHint?: string
 ): string {

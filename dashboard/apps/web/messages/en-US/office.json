@@ -253,5 +253,44 @@
         "checkDetails": "Check the details.",
         "linkNotShown": "That link cannot be shown again. Revoke it and make another.",
         "notCreated": "That could not be created"
+    },
+    "google": {
+        "fromGoogle": "From Google",
+        "importTitle": "Open from Google Drive",
+        "importBody": "Google Docs and Sheets open here as a copy. Your original in Drive is left as it is.",
+        "unavailable": "Google isn't connected to this Polaris yet. An administrator can add it under Integrations.",
+        "connectFirst": "Link your Google account to see your Docs and Sheets.",
+        "reauthorize": "Your Google account is linked, but not for Drive. Link it again and allow Drive access.",
+        "connect": "Link Google Drive",
+        "account": "Google account",
+        "search": "Search by name",
+        "retry": "Try again",
+        "none": "No Docs, Sheets or Slides in this account",
+        "noMatch": "Nothing with that name",
+        "more": "Show more",
+        "slidesLater": "Slides can't be opened here yet",
+        "saveBack": "Save to Google Drive",
+        "openInGoogle": "Open the Google copy",
+        "openCopy": "Press to open it in Google.",
+        "saved": "Saved to Google Drive",
+        "notYours": "Only the person who brought this in from Google can save it back.",
+        "outcome": {
+            "cancelled": "Google Drive wasn't linked. Nothing changed.",
+            "taken": "That Google account is already linked to someone else here.",
+            "notPublic": "Google can't reach this Polaris at its current address.",
+            "failed": "Google Drive couldn't be linked. Try again."
+        },
+        "errors": {
+            "no-client": "Google isn't connected to this Polaris yet. An administrator can add it under Integrations.",
+            "no-account": "That Google account isn't linked anymore. Link it again.",
+            "relink": "Google needs you to link this account again before it shares Drive files.",
+            "not-supported": "Only Google Docs and Sheets can be opened and saved here.",
+            "too-large": "That file is too large for Google to hand over. Google's limit is 10 MB.",
+            "not-found": "That file isn't there anymore, or this account can't see it.",
+            "denied": "Google refused. Check the file is shared with this account.",
+            "failed": "Google didn't answer. Try again in a moment.",
+            "api-off": "The Google Drive API is off in this Polaris's Google project. An administrator can switch it on under Integrations.",
+            "busy": "Google is busy right now. Try again in a minute."
+        }
     }
 }

@@ -208,8 +208,8 @@ export function ServiceDetail({
     return (
         <Dialog open onOpenChange={(open) => !open && onClose()}>
             <DialogContent
-                // Its fields, switches and section edges are drawn a step clearer
-                // than the application's (globals.css, "The service panel's controls").
+                // Its cards and switches are tuned for a raised surface
+                // (globals.css, "The service panel's surface and switches").
                 data-service-panel=""
                 className={cn(
                     "right-0 left-auto top-0 flex h-full max-h-none translate-x-0 translate-y-0 flex-col gap-0 rounded-none rounded-l-xl border-y-0 border-r-0 p-0 data-[state=open]:slide-in-from-right-4",
@@ -299,10 +299,9 @@ export function ServiceDetail({
                     })}
                 </ScrollRow>
 
-                {/* The body is the page ground, so the cards on it rise off it the way
-                    they do everywhere else - a card on the dialog's own raised tone
-                    read as a hole. */}
-                <div className="flex-1 overflow-y-auto overscroll-contain bg-background px-5 py-4">
+                {/* The dialog's own surface, as every other side panel has; the
+                    cards on it are that surface with a hairline (globals.css). */}
+                <div className="flex-1 overflow-y-auto overscroll-contain px-5 py-4">
                     {tab !== "Settings" && (
                         <TabFrame tab={tab} id={app.id}>
                             {tab === "Deployments" && (

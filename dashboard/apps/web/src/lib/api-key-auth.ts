@@ -65,7 +65,10 @@ export async function authenticateApiKey(request: Request): Promise<ApiKeyPrinci
     // it is signed out rather than let through.
     if (verified.kind === "cli" && !(await cliAddressAllows(verified, ip))) return null;
 
-    await touchApiKey(verified.id, ip, userAgent);
+    // Not waited for: a usage stamp is two or three writes that decide nothing
+    // about this request, and every API call was paying for them before its
+    // answer. touchApiKey never throws.
+    void touchApiKey(verified.id, ip, userAgent);
     return {
         keyId: verified.id,
         userId: verified.userId,

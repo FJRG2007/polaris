@@ -21,6 +21,7 @@ const getForOwner = vi.fn();
 const deleteForOwner = vi.fn(async () => true);
 const authorizeDrive = vi.fn(async () => undefined);
 const driverDelete = vi.fn(async () => undefined);
+const driverStat = vi.fn(async () => ({ kind: "dir" }));
 const dispose = vi.fn(async () => undefined);
 const recordAudit = vi.fn(async () => undefined);
 const invalidateFolderSizes = vi.fn(async () => undefined);
@@ -45,7 +46,7 @@ vi.mock("@/lib/rate-limit-service", () => ({
     resetRateLimit: async () => undefined
 }));
 vi.mock("@/lib/storage-service", () => ({
-    getDriverForConnection: async () => ({ delete: driverDelete, dispose }),
+    getDriverForConnection: async () => ({ delete: driverDelete, stat: driverStat, dispose }),
     SmbShareRequiredError: class extends Error {}
 }));
 vi.mock("@/lib/drive-authz", () => ({ authorizeDrive, DriveAccessError, DriveLockedError }));
@@ -54,7 +55,9 @@ vi.mock("@/lib/file-request-service", () => ({
     deleteFileRequestForOwner: deleteForOwner
 }));
 
-const { deleteFileRequestAction } = await import("../../src/app/(app)/drive/request-actions");
+const { deleteFileRequestAction, deleteFileRequestsAction } = await import(
+    "../../src/app/(app)/drive/request-actions"
+);
 
 beforeEach(() => {
     // clearAllMocks forgets the calls, not the one-off outcomes a case installed,
@@ -62,6 +65,7 @@ beforeEach(() => {
     vi.clearAllMocks();
     deleteForOwner.mockResolvedValue(true);
     driverDelete.mockResolvedValue(undefined);
+    driverStat.mockResolvedValue({ kind: "dir" });
     authorizeDrive.mockResolvedValue(undefined);
     getForOwner.mockResolvedValue({
         id: REQUEST,
@@ -128,6 +132,35 @@ describe("deleting a drop point", () => {
         expect(deleteForOwner).toHaveBeenCalledWith(OWNER, REQUEST);
     });
 
+    it("still deletes the drop point when the local disk says the folder is not there", async () => {
+        // The local driver's delete hands Node's own error back rather than a
+        // not_found, and that reached the screen as "ENOENT: no such file".
+        driverDelete.mockRejectedValue(
+            Object.assign(new Error("ENOENT: no such file or directory, rm"), { code: "ENOENT" })
+        );
+
+        expect(await deleteFileRequestAction(REQUEST, true)).toEqual({});
+        expect(deleteForOwner).toHaveBeenCalledWith(OWNER, REQUEST);
+    });
+
+    it("asks the backend whether the folder is there when the delete fails another way", async () => {
+        driverDelete.mockRejectedValue(new StorageError("io_error", "the server said 500"));
+        driverStat.mockRejectedValue(new StorageError("not_found", "nothing here"));
+
+        expect(await deleteFileRequestAction(REQUEST, true)).toEqual({});
+        expect(driverStat).toHaveBeenCalledWith(FOLDER);
+        expect(deleteForOwner).toHaveBeenCalledWith(OWNER, REQUEST);
+    });
+
+    it("keeps the failure when the folder is still there after it", async () => {
+        driverDelete.mockRejectedValue(new StorageError("io_error", "the server said 500"));
+
+        const result = await deleteFileRequestAction(REQUEST, true);
+
+        expect(result.error).toContain("could not be deleted");
+        expect(deleteForOwner).not.toHaveBeenCalled();
+    });
+
     it("says so when the drop point is not the caller's, and touches no storage", async () => {
         getForOwner.mockResolvedValue(null);
 
@@ -169,5 +202,60 @@ describe("a drop point that collects into the connection itself", () => {
         expect(await deleteFileRequestAction(REQUEST, false)).toEqual({});
         expect(deleteForOwner).toHaveBeenCalledWith(OWNER, REQUEST);
         expect(driverDelete).not.toHaveBeenCalled();
+    });
+});
+
+describe("deleting several drop points at once", () => {
+    const A = "018f2b7a-0000-7000-8000-0000000000c1";
+    const B = "018f2b7a-0000-7000-8000-0000000000c2";
+    const ROOT = "018f2b7a-0000-7000-8000-0000000000c3";
+
+    beforeEach(() => {
+        getForOwner.mockImplementation(async (_owner: string, id: string) => ({
+            id,
+            destinationConnectionId: CONNECTION,
+            destinationPath: id === ROOT ? "" : `Drop Points/${id}`
+        }));
+    });
+
+    it("deletes each with its folder, and keeps the one whose folder would not go", async () => {
+        driverDelete.mockImplementation(async (path: string) => {
+            if (path === `Drop Points/${B}`) throw new StorageError("io_error", "share offline");
+        });
+
+        const result = await deleteFileRequestsAction([A, B, ROOT], true);
+
+        expect(result.deleted).toEqual([A, ROOT]);
+        expect(result.failed).toHaveLength(1);
+        expect(result.failed[0]?.id).toBe(B);
+        expect(result.failed[0]?.error).toContain("could not be deleted");
+        // One with no folder of its own is deleted without one, not refused, and
+        // the connection itself is never touched.
+        expect(driverDelete).not.toHaveBeenCalledWith("", expect.anything());
+        expect(deleteForOwner).toHaveBeenCalledWith(OWNER, ROOT);
+        expect(deleteForOwner).not.toHaveBeenCalledWith(OWNER, B);
+    });
+
+    it("leaves every folder alone when the choice is off", async () => {
+        const result = await deleteFileRequestsAction([A, B], false);
+        expect(result.deleted).toEqual([A, B]);
+        expect(driverDelete).not.toHaveBeenCalled();
+    });
+
+    it("treats folders that are already gone as done", async () => {
+        driverDelete.mockRejectedValue(
+            Object.assign(new Error("ENOENT: no such file or directory"), { code: "ENOENT" })
+        );
+        const result = await deleteFileRequestsAction([A, B], true);
+        expect(result.deleted).toEqual([A, B]);
+        expect(result.failed).toEqual([]);
+    });
+
+    it("refuses a list that is not a list of drop point ids", async () => {
+        const result = await deleteFileRequestsAction(["../etc"], true);
+        expect(result.deleted).toEqual([]);
+        expect(result.error).toBeTruthy();
+        expect(getForOwner).not.toHaveBeenCalled();
+        expect((await deleteFileRequestsAction([], true)).error).toBeTruthy();
     });
 });

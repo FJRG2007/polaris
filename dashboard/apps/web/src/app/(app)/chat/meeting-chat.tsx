@@ -306,7 +306,7 @@ export function MeetingChat({
                 </p>
             )}
 
-            <div className="shrink-0 border-t border-border">
+            <div className="shrink-0">
                 <Composer
                     inCall
                     channelId={meetingId}

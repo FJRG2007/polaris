@@ -175,5 +175,24 @@
         "assigned": "<big>{count}</big><rest> assigned</rest>",
         "overdue": " - {count} overdue",
         "dueToday": " - {count} due today"
+    },
+    "appCards": {
+        "section": "From your apps",
+        "add": "Add",
+        "full": "Up to {count} cards from apps",
+        "setupTitle": "What should {name} show?",
+        "setupHint": "Pick up to {count}. Only what you can see in the app is listed.",
+        "nothingToPick": "There is nothing here you can add yet.",
+        "cancel": "Cancel",
+        "save": "Show these",
+        "change": "Change what it shows",
+        "remove": "Remove card",
+        "gone": "The app this card is from is not available right now.",
+        "readFailed": "This card could not be read just now. It will try again.",
+        "cannotDo": "That could not be done.",
+        "empty": "Nothing to show yet.",
+        "pick": "Choose what to show",
+        "increase": "Raise {label} on {name}",
+        "decrease": "Lower {label} on {name}"
     }
 }

@@ -89,12 +89,18 @@ export function TemplatesView({
                             key={template.id}
                             className="flex items-center gap-2 rounded-md border border-border bg-card px-3 py-2"
                         >
-                            <FileText className="size-4 shrink-0 text-foreground-subtle" aria-hidden />
+                            <FileText
+                                className="size-4 shrink-0 text-foreground-subtle"
+                                aria-hidden
+                            />
                             <div className="min-w-0 flex-1">
                                 <span className="block truncate text-[13px]" title={template.name}>
                                     {template.name}
                                 </span>
-                                <span className="block truncate text-[12px] text-foreground-subtle">
+                                <span
+                                    className="block truncate text-[12px] text-foreground-subtle"
+                                    title={template.subject || undefined}
+                                >
                                     {accountLabel(template.accountId)}
                                     {template.subject ? ` - ${template.subject}` : ""}
                                 </span>
@@ -127,9 +133,7 @@ export function TemplatesView({
                     key={editing || "new"}
                     templateId={editing || null}
                     initial={
-                        editing
-                            ? (templates.find((one) => one.id === editing) ?? EMPTY)
-                            : EMPTY
+                        editing ? (templates.find((one) => one.id === editing) ?? EMPTY) : EMPTY
                     }
                     accounts={accounts}
                     onClose={() => setEditing(null)}
@@ -213,7 +217,8 @@ function TemplateEditor({
             const said = refusalOf(answer);
             if (said) {
                 setProblem({
-                    field: "field" in answer && typeof answer.field === "string" ? answer.field : "",
+                    field:
+                        "field" in answer && typeof answer.field === "string" ? answer.field : "",
                     message: said
                 });
                 return;
@@ -234,7 +239,9 @@ function TemplateEditor({
         <Dialog open onOpenChange={(next) => (next ? undefined : onClose())}>
             <DialogContent className="max-w-2xl">
                 <DialogHeader>
-                    <DialogTitle>{templateId ? t("templates.change") : t("templates.new")}</DialogTitle>
+                    <DialogTitle>
+                        {templateId ? t("templates.change") : t("templates.new")}
+                    </DialogTitle>
                 </DialogHeader>
                 <div className="space-y-3">
                     <label className="block">
@@ -251,7 +258,9 @@ function TemplateEditor({
                             }}
                         />
                         {nameProblem ? (
-                            <span className="mt-1 block text-[12px] text-danger">{nameProblem}</span>
+                            <span className="mt-1 block text-[12px] text-danger">
+                                {nameProblem}
+                            </span>
                         ) : null}
                     </label>
 
@@ -279,7 +288,9 @@ function TemplateEditor({
                     </label>
 
                     <label className="block">
-                        <span className="mb-1 block text-[12px] text-muted-foreground">{tm("print.subject")}</span>
+                        <span className="mb-1 block text-[12px] text-muted-foreground">
+                            {tm("print.subject")}
+                        </span>
                         <Input
                             value={draft.subject}
                             placeholder={t("templates.subjectPlaceholder")}
@@ -302,7 +313,9 @@ function TemplateEditor({
                             />
                         </div>
                         {invalid && invalid.path[0] === "body" ? (
-                            <span className="mt-1 block text-[12px] text-danger">{mailRefusalText(tm, invalid.message)}</span>
+                            <span className="mt-1 block text-[12px] text-danger">
+                                {mailRefusalText(tm, invalid.message)}
+                            </span>
                         ) : null}
                     </div>
 
@@ -315,7 +328,11 @@ function TemplateEditor({
                             disabled={saving || !complete || !dirty || Boolean(invalid)}
                             onClick={save}
                         >
-                            {saving ? t("shortcuts.saving") : templateId ? tc("actions.save") : t("labels.make")}
+                            {saving
+                                ? t("shortcuts.saving")
+                                : templateId
+                                  ? tc("actions.save")
+                                  : t("labels.make")}
                         </Button>
                         <Button variant="ghost" onClick={onClose}>
                             {tc("actions.cancel")}

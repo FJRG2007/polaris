@@ -2069,5 +2069,24 @@
             "eq": "Justo",
             "ne": "No es"
         }
+    },
+    "overview": {
+        "statusLabel": "Estado de dispositivos",
+        "statusHint": "Cómo están los dispositivos que elijas: temperaturas, calidad del aire, lecturas y baterías.",
+        "controlsLabel": "Controles rápidos",
+        "controlsHint": "Enciende o apaga los dispositivos que elijas y fija la temperatura de un aire acondicionado.",
+        "room": "Sala",
+        "target": "Fijado a",
+        "mode": "Modo",
+        "air": "Aire",
+        "pm25": "PM2,5",
+        "humidity": "Humedad",
+        "reading": "Lectura",
+        "battery": "Batería",
+        "power": "Energía",
+        "setTo": "Fijar a",
+        "offline": "Sin red",
+        "watchOnly": "Solo para vigilar, no para manejar",
+        "noControl": "No puedes manejarlo desde aquí"
     }
 }

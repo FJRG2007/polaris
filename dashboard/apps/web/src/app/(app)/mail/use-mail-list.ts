@@ -40,6 +40,11 @@ export interface MailListAnswer {
     readonly threads: MailThreadView[];
     /** Where this page ended, or "" when it is the whole list. */
     readonly cursor: string;
+    /** When this tab asked for it, in milliseconds since the epoch. Stamped
+     *  here, never by the server, and kept with the copy on the device: it is
+     *  what decides whether a change the reader just made can already be in it
+     *  (see `pending-changes`). */
+    readonly requestedAt?: number;
 }
 
 /** One conversation and its messages, as the endpoint answers it. */
@@ -149,6 +154,8 @@ export function useMailList(
 ): {
     threads: MailThreadView[];
     cursor: string;
+    /** When what is on screen was asked for; 0 for nothing fetched yet. */
+    requestedAt: number;
     loading: boolean;
     refreshing: boolean;
     failed: string | null;
@@ -169,7 +176,9 @@ export function useMailList(
         // written under the key it was asked for. The tab's own kept copy is
         // not written back: it is older than what the device may already hold.
         async (signal: AbortSignal) => {
-            const answer = await readJson<MailListAnswer>(`/api/mail/threads?${params}`, signal);
+            const requestedAt = Date.now();
+            const fetched = await readJson<MailListAnswer>(`/api/mail/threads?${params}`, signal);
+            const answer: MailListAnswer = { ...fetched, requestedAt };
             mailCache.write("list", keptId, answer, mailbox);
             return answer;
         },
@@ -183,6 +192,7 @@ export function useMailList(
     return {
         threads: answer.threads,
         cursor: answer.cursor,
+        requestedAt: answer.requestedAt ?? 0,
         loading: read.loading && kept === null,
         refreshing: read.refreshing,
         // Only when there is nothing on screen. A refresh that failed over a list

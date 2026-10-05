@@ -175,5 +175,24 @@
         "assigned": "<big>{count}</big><rest> {count, plural, one {asignada} other {asignadas}}</rest>",
         "overdue": " - {count, plural, one {# atrasada} other {# atrasadas}}",
         "dueToday": " - {count, plural, one {# vence hoy} other {# vencen hoy}}"
+    },
+    "appCards": {
+        "section": "De tus apps",
+        "add": "Añadir",
+        "full": "Hasta {count} tarjetas de apps",
+        "setupTitle": "¿Qué debe mostrar {name}?",
+        "setupHint": "Elige hasta {count}. Solo aparece lo que puedes ver en la app.",
+        "nothingToPick": "Todavía no hay nada que puedas añadir.",
+        "cancel": "Cancelar",
+        "save": "Mostrar",
+        "change": "Cambiar qué muestra",
+        "remove": "Quitar tarjeta",
+        "gone": "La app de esta tarjeta no está disponible ahora mismo.",
+        "readFailed": "No se ha podido leer esta tarjeta. Lo volverá a intentar.",
+        "cannotDo": "No se ha podido hacer.",
+        "empty": "Todavía no hay nada que mostrar.",
+        "pick": "Elegir qué mostrar",
+        "increase": "Subir {label} en {name}",
+        "decrease": "Bajar {label} en {name}"
     }
 }

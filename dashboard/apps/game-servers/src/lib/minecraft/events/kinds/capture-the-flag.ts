@@ -423,13 +423,41 @@ export function touchLines(box: Box): string[] {
     return lines;
 }
 
-/** The marks of the last look taken off, once read. */
-export const UNTOUCH = [...TOUCH_TAGS, ...HOME_TAGS].map((tag) => `tag @a remove ${tag}`);
+/** A mark as the tick took it: what it reads, while the quick look marks anew. */
+export function takenTag(tag: string): string {
+    return `${tag}_r`;
+}
 
-/** Every tag the game gave, taken off at the end. */
-export const TAGS_OFF = [...SIDE_TAGS, ...TOUCH_TAGS, ...HOME_TAGS].map(
-    (tag) => `tag @a remove ${tag}`
-);
+/**
+ * The quick look's marks taken, in one batch - so no quick look comes in
+ * between: each copied to what the tick reads (`takenTag`), and cleared.
+ * Read and cleared in separate trips, a mark made in between was lost.
+ */
+export const TAKE_MARKS: readonly string[] = [...TOUCH_TAGS, ...HOME_TAGS].flatMap((tag) => [
+    `tag @a remove ${takenTag(tag)}`,
+    `tag @a[tag=${tag}] add ${takenTag(tag)}`,
+    `tag @a remove ${tag}`
+]);
+
+/**
+ * Whatever the quick look marked on somebody just sent back: made where they
+ * were before the tick moved them - by the other team's flag, say - and read
+ * on the next tick, they took a flag from their own base, and with it there,
+ * captured it. Sent straight after the move.
+ */
+export function unmarkLines(name: string): string[] {
+    return [...TOUCH_TAGS, ...HOME_TAGS].map((tag) => `tag ${name} remove ${tag}`);
+}
+
+/** Every tag the game gave, taken off at the end - and off anybody coming in,
+ *  who may carry one from a game a crash never ended. */
+export const TAGS = [
+    ...SIDE_TAGS,
+    ...TOUCH_TAGS,
+    ...HOME_TAGS,
+    ...[...TOUCH_TAGS, ...HOME_TAGS].map(takenTag)
+] as const;
+export const TAGS_OFF = TAGS.map((tag) => `tag @a remove ${tag}`);
 
 /** The carrier, seen by all: glowing, and a little slower than the rest. */
 export function carrierLines(name: string): string[] {

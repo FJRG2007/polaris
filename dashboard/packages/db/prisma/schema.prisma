@@ -6219,6 +6219,7 @@ model OfficeDocument {
     org   Organization? @relation(fields: [orgId], references: [id], onDelete: Cascade)
     opens OfficeDocumentOpen[]
     links OfficeLink[]
+    google OfficeGoogleFile?
 
     // "everything of mine", "everything this organization has", and the two
     // orders a list is ever in.
@@ -6277,6 +6278,34 @@ model OfficeLink {
     document OfficeDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
 
     @@index([documentId])
+}
+
+/// Where an Office document came from in Google Drive, and the copy it is saved
+/// back to.
+///
+/// Imported from a Google Doc, Sheet or Slides file through somebody's linked
+/// Google account; saving back writes a Google copy that Polaris created (the
+/// only files the `drive.file` grant lets it write) and updates that same copy on
+/// every later save. One row per document at most.
+model OfficeGoogleFile {
+    id           String    @id @default(uuid(7)) @db.Uuid
+    documentId   String    @unique @db.Uuid
+    /// The linked Google account it was read through. A bare id: unlinking the
+    /// account must not take the document with it, and every use checks that
+    /// the link is still the reader's.
+    connectionId String    @db.Uuid
+    /// The Drive file it was imported from, and its Google type.
+    sourceFileId String
+    sourceMime   String
+    sourceName   String    @default("")
+    /// The Google copy Polaris writes saves to, once there is one.
+    copyFileId   String?
+    importedAt   DateTime  @default(now())
+    savedAt      DateTime?
+
+    document OfficeDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+    @@index([connectionId])
 }
 
 // When one person last opened one document, and whether they keep it to hand.

@@ -1,0 +1,94 @@
+name: Publish CLI
+
+# Build the developer CLI (plr / polaris) and attach it to a release.
+#
+# The CLI is installed from this repository's releases, the same way the browser
+# extension is: the install scripts in `dashboard/packages/cli/scripts` ask GitHub
+# for the newest `cli-v*` release, download its `polaris.mjs`, and check it
+# against the SHA-256 digest GitHub publishes for every uploaded asset. `plr
+# update` does the same. A Polaris server is then named afterwards, with
+# `plr login --url`, and the two check that they speak the same API on every
+# call (`packages/cli/src/compat.ts`).
+#
+# Tag-driven, like the extension: a release is something somebody decides to
+# cut. Push a tag `cli-v<version>` matching `version` in
+# `dashboard/packages/cli/package.json`; the build refuses a tag that does not
+# match, because `plr --version` reads the package's version.
+
+on:
+  push:
+    tags:
+      - "cli-v*"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    working-directory: dashboard
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: dashboard/package-lock.json
+
+      - name: The tag has to match the version the CLI reports
+        if: startsWith(github.ref, 'refs/tags/cli-v')
+        run: |
+          expected="cli-v$(node -p "require('./packages/cli/package.json').version")"
+          if [ "$expected" != "$GITHUB_REF_NAME" ]; then
+            echo "The tag is $GITHUB_REF_NAME but package.json says $expected." >&2
+            exit 1
+          fi
+
+      - run: npm ci --prefer-offline
+
+      # The bundle carries zod and everything else inside it; nothing else in the
+      # workspace has to be built for it.
+      - run: npm run build --workspace @polaris/cli
+      - run: npm test --workspace @polaris/cli
+
+      # The installers ride along with the bundle, so a release carries the whole
+      # way in, as well as the file it installs.
+      - name: Stage the release files
+        run: |
+          mkdir -p "$RUNNER_TEMP/cli"
+          cp packages/cli/dist/polaris.mjs packages/cli/scripts/install.sh packages/cli/scripts/install.ps1 "$RUNNER_TEMP/cli/"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: polaris-cli
+          path: ${{ runner.temp }}/cli/*
+          if-no-files-found: error
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/cli-v')
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: polaris-cli
+          path: cli
+      - name: Attach to release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: Polaris CLI ${{ github.ref_name }}
+          # This repository releases the dashboard too, and that is what "latest"
+          # should keep meaning.
+          make_latest: "false"
+          files: |
+            cli/polaris.mjs
+            cli/install.sh
+            cli/install.ps1

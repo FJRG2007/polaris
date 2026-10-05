@@ -580,10 +580,17 @@ async function admit(
     for (const [index, one] of fresh.entries()) {
         if (stashing && !(await stashSaved(loop, server, tools, one.name, false))) continue;
         const racer = state(loop).racers.find((each) => same(each.name, one.name))!;
+        // Back in a boat race already on, after leaving it: from the last gate
+        // they passed, with every pass they made - not from nothing, on a clock
+        // that kept running while they were away.
+        const resumed =
+            layout.kind === "boat-race" && !holding(loop) && racer.best > 0 ? racer.best : 0;
         const spot =
             layout.kind === "parkour"
                 ? parkour.spotOn(layout.course, racer.checkpoint)
-                : places[index]!;
+                : resumed > 0 && layout.kind === "boat-race"
+                  ? boatRace.resumeSpot(layout.track, resumed)
+                  : places[index]!;
         await server.sayAll([
             ...stage.admitLines(one.name, spot),
             `title ${one.name} times 5 50 15`,
@@ -602,7 +609,10 @@ async function admit(
             // dropper's racer, nowhere yet.
             ...(layout.kind === "parkour" ? parkour.racerScores(one.name, racer.checkpoint) : []),
             ...(layout.kind === "dropper" ? dropper.racerScores(one.name, layout.shaft) : []),
-            ...(layout.kind === "boat-race" ? boatRace.racerScores(one.name) : []),
+            ...(layout.kind === "tnt-run" ? tntRun.racerLines(one.name) : []),
+            ...(layout.kind === "boat-race"
+                ? boatRace.racerScores(one.name, resumed, layout.track.gates.length)
+                : []),
             ...(way ? boatRace.boatLines(one.name, way) : [])
         ]);
         brought.push(one.name);
@@ -1095,6 +1105,19 @@ function lowered(scores: ReadonlyMap<string, number>): Map<string, number> {
 }
 
 /**
+ * The racers in the order they finished by the game's own tick, the rest after
+ * in their own order: two who finish within one look are told their places
+ * the way they reached the line, not the way they joined.
+ */
+export function byFinish<T extends { name: string }>(
+    racers: readonly T[],
+    finished: ReadonlyMap<string, number>
+): T[] {
+    const tick = (one: T) => finished.get(one.name.toLowerCase()) ?? Number.POSITIVE_INFINITY;
+    return [...racers].sort((a, b) => tick(a) - tick(b));
+}
+
+/**
  * The quick look at a parkour race, run far oftener than the tick: whoever fell
  * is sent back to their checkpoint, and whoever stepped onto a checkpoint or
  * the finish is told and has it marked - with selectors over the checkpoints the
@@ -1218,7 +1241,7 @@ async function dropperTick(
     // The game's own tick, asked only when somebody has reached the water.
     let gameNow: number | null | undefined;
     const levels = shaft.floors.length;
-    for (const racer of state(loop).racers) {
+    for (const racer of byFinish(state(loop).racers, finished)) {
         if (racer.outAt !== null) continue;
         const at = where.find((one) => same(one.name, racer.name));
         if (!at) continue;
@@ -1347,7 +1370,7 @@ async function boatTick(
     let gameNow: number | null | undefined;
     const gates = track.gates.length;
     const total = track.laps * gates + 1;
-    for (const racer of state(loop).racers) {
+    for (const racer of byFinish(state(loop).racers, finished)) {
         if (racer.outAt !== null) continue;
         const at = where.find((one) => same(one.name, racer.name));
         if (!at) continue;
@@ -1528,9 +1551,25 @@ async function spleefTick(
     }
     if (out.length > 0) {
         // Everybody out on the same look shares the place: one point for each
-        // player already out, and one for taking part.
-        const points = state(loop).racers.filter((one) => one.outAt !== null).length + 1;
-        for (const name of out) markOut(loop, name, now, points);
+        // player already out, and one for taking part. A TNT run's pack notes
+        // the tick each racer fell, which tells those of one look apart - and
+        // the last two, when only one of them fell last (`tntRun.fallOrder`).
+        const othersStanding = state(loop).racers.filter(
+            (one) => one.outAt === null && !out.some((name) => same(name, one.name))
+        ).length;
+        const order =
+            tnt && out.length > 1
+                ? tntRun.fallOrder(
+                      out,
+                      lowered(commands.readScores(await server.say([tntRun.READ_FELL]))),
+                      othersStanding
+                  )
+                : { groups: [out], survivor: null };
+        for (const group of order.groups) {
+            const points = state(loop).racers.filter((one) => one.outAt !== null).length + 1;
+            for (const name of group) markOut(loop, name, now, points);
+        }
+        out.splice(0, out.length, ...order.groups.flat());
         const left = state(loop).racers.filter((one) => one.outAt === null).length;
         for (const name of out) {
             await sendHome(loop, server, tools, name);

@@ -5,16 +5,17 @@
  * reader, where dragging tiles in the menu is the way with a mouse.
  *
  * Nextcloud's navigation bar settings are the model - the apps in the order the
- * menu draws them, each with a button to move it up or down - plus the star
- * that makes it a favorite, which a finger cannot reach in the menu. Every
- * change is saved as it is made (see `favorite-apps`), so there is nothing to
- * confirm and nothing to lose by closing it.
+ * menu draws them, each with a button to move it up or down. That is all there
+ * is to arrange: what comes first is what somebody moved first, the same as
+ * dragging in the menu. Every change is saved as it is made (see
+ * `favorite-apps`), so there is nothing to confirm and nothing to lose by
+ * closing it.
  */
 
 import { useState, type ReactNode } from "react";
 import type { PolarisApp } from "@polaris/ui";
 import { moveFavorite } from "@/lib/app-launcher";
-import { ArrowDown, ArrowUp, Star } from "lucide-react";
+import { ArrowDown, ArrowUp } from "lucide-react";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useFavoriteApps } from "@/components/favorite-apps-context";
 import {
@@ -44,7 +45,7 @@ export function ArrangeAppsDialog({
     order: readonly string[];
 }) {
     const t = useTranslations("nav");
-    const { favorites, order: arranged, toggle, arrangeApps, resetOrder } = useFavoriteApps();
+    const { order: arranged, arrangeApps, resetOrder } = useFavoriteApps();
     const synced = open ? arranged : null;
     const [shownFor, setShownFor] = useState(synced);
     const [shown, setShown] = useState(order);
@@ -67,25 +68,8 @@ export function ArrangeAppsDialog({
                 </DialogHeader>
                 <ol className="mt-4 flex flex-col">
                     {listed.map((app, at) => {
-                        const pinned = favorites.includes(app.id);
                         return (
                             <Row key={app.id} app={app}>
-                                {app.locked ? null : (
-                                    <IconButton
-                                        label={t(pinned ? "switcher.unpin" : "switcher.pin", {
-                                            app: app.label
-                                        })}
-                                        onClick={() => toggle(app.id)}
-                                    >
-                                        <Star
-                                            className={cn(
-                                                "size-4",
-                                                pinned && "fill-current text-primary"
-                                            )}
-                                            aria-hidden="true"
-                                        />
-                                    </IconButton>
-                                )}
                                 <IconButton
                                     label={t("switcher.moveEarlier", { app: app.label })}
                                     blocked={at === 0}

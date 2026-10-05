@@ -29,6 +29,8 @@ import { clearRecentPlaces } from "@/lib/overview/recent-places";
 import { overviewRequestGroups } from "@/lib/overview/request-groups";
 import { ActivityWidget, SessionsWidget } from "./widgets/account";
 import { CalendarWidget } from "./widgets/calendar";
+import { AppWidgetCatalog, AppWidgetGridItems, useAppWidgets } from "./app-widgets";
+import type { AppWidgetKind } from "@/lib/overview/app-widgets";
 import type { OverviewData } from "@/lib/overview/overview-service";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { overviewSize, overviewWidget } from "@/lib/overview/catalog";
@@ -129,7 +131,8 @@ export function OverviewGrid({
     available,
     layout,
     apps,
-    gate
+    gate,
+    appKinds = []
 }: {
     name: string;
     isAdmin: boolean;
@@ -144,8 +147,14 @@ export function OverviewGrid({
     /** What narrows the screens offered for pinning, the way the rail is
      *  narrowed (see `SectionGate`). */
     gate: { held: string[]; installed: string[] };
+    /** The cards the installed apps offer (see `app-widgets`). */
+    appKinds?: readonly AppWidgetKind[];
 }) {
     const [widgets, setWidgets] = useState(layout);
+    const appState = useAppWidgets(preferences.appWidgets);
+    const appCardsShown = appState.cards.some((card) =>
+        appKinds.some((kind) => kind.app === card.app && kind.kind === card.kind)
+    );
     const [shortcuts, setShortcuts] = useState<OverviewShortcut[]>(preferences.shortcuts);
     const [greeting, setGreeting] = useState(preferences.greeting);
     const [data, setData] = useState<OverviewData>({});
@@ -467,7 +476,7 @@ export function OverviewGrid({
                 </p>
             ) : null}
 
-            {visible.length === 0 ? (
+            {visible.length === 0 && !appCardsShown ? (
                 <div className="flex flex-col items-center justify-center gap-3 rounded-lg border border-dashed border-border py-16 text-center">
                     <LayoutGrid className="size-6 text-muted-foreground" aria-hidden="true" />
                     <p className="text-sm text-muted-foreground">{t("allOff")}</p>
@@ -563,6 +572,8 @@ export function OverviewGrid({
                             </div>
                         );
                     })}
+                    {/* The installed apps' cards, after the Overview's own. */}
+                    <AppWidgetGridItems state={appState} kinds={appKinds} />
                 </div>
             )}
 
@@ -577,6 +588,7 @@ export function OverviewGrid({
                 onResize={resize}
                 onGreetingChange={(value) => persist({ ...current(), greeting: value })}
                 onReset={reset}
+                extra={<AppWidgetCatalog kinds={appKinds} state={appState} />}
             />
             <ShortcutPicker
                 open={picking}

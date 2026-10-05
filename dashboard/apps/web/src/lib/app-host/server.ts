@@ -35,6 +35,8 @@ import type { InstalledSlotHost } from "@/components/app-extensions/installed-cl
 import type {
     AppExtension,
     AppJob,
+    AppWidgetDefinition,
+    AppWidgetView,
     AppSlot,
     ChatGameLink,
     RelayedChannelMessage
@@ -434,6 +436,8 @@ declare module "@polaris/app-host" {
     interface AppHostTypes {
         AppExtension: AppExtension;
         AppJob: AppJob;
+        AppWidgetDefinition: AppWidgetDefinition;
+        AppWidgetView: AppWidgetView;
         AppSlot: AppSlot;
         BackupSource: BackupSource;
         CalendarLink: CalendarLink;

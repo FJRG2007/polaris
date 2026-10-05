@@ -3,8 +3,8 @@
 /**
  * The switcher opened: one grid of icons and names with no headings, the first
  * screenful and a More button for the rest, a search that reaches every app,
- * arrow keys that walk it as a grid, a star that pins an app without closing the
- * menu, and an order that moves with a drag or with Alt and an arrow.
+ * arrow keys that walk it as a grid, and an order that moves with a drag or with
+ * Alt and an arrow - which is the whole of arranging it: no star on any tile.
  */
 
 import userEvent from "@testing-library/user-event";
@@ -74,8 +74,7 @@ describe("the app switcher grid", () => {
                 apps={APPS}
                 currentAppId="drive"
                 order={["games", "drive", "chat"]}
-                pinned={["games"]}
-                onTogglePin={() => undefined}
+                onArrange={() => undefined}
             />
         );
         const menu = await openMenu(user, /drive/i);
@@ -88,19 +87,9 @@ describe("the app switcher grid", () => {
         expect(within(menu).queryByText("Favorites")).toBeNull();
         expect(within(menu).queryByText("Recent")).toBeNull();
         expect(menu.textContent).not.toContain("Files across every NAS");
-        expect(
-            within(menu).getByRole("menuitem", { name: "Remove Game servers from favorites" })
-        ).toBeTruthy();
-    });
-
-    it("pins an app from its star and keeps the menu open", async () => {
-        const user = userEvent.setup();
-        const onTogglePin = vi.fn();
-        render(<AppSwitcher apps={APPS} currentAppId="drive" onTogglePin={onTogglePin} />);
-        await openMenu(user, /drive/i);
-        await user.click(await screen.findByRole("menuitem", { name: "Add Chat to favorites" }));
-        expect(onTogglePin).toHaveBeenCalledWith("chat");
-        expect(screen.getByRole("menu")).toBeTruthy();
+        // Arranged by dragging alone: no star, on any tile.
+        expect(within(menu).queryByRole("menuitem", { name: /favorites/i })).toBeNull();
+        expect(menu.querySelector("[data-launcher-star]")).toBeNull();
     });
 
     it("shows no More button when every app fits the first screen", async () => {
@@ -211,29 +200,16 @@ describe("walking the app switcher with the keyboard", () => {
         expect(document.activeElement).toBe(screen.getByRole("textbox", { name: "Search apps" }));
     });
 
-    it("reaches each app's star with tab", async () => {
+    it("walks tile to tile with tab", async () => {
         const user = userEvent.setup();
-        render(<AppSwitcher apps={APPS} currentAppId="drive" onTogglePin={() => undefined} />);
+        render(<AppSwitcher apps={APPS} currentAppId="drive" onArrange={() => undefined} />);
         await openMenu(user, /drive/i);
         await user.keyboard("{ArrowDown}");
         expect(document.activeElement).toBe(tile("drive"));
         await user.keyboard("{Tab}");
-        expect(document.activeElement?.getAttribute("aria-label")).toBe("Add Drive to favorites");
-        await user.keyboard("{Tab}");
         expect(document.activeElement).toBe(tile("chat"));
-    });
-
-    it("skips a star that is not drawn, so tab never stalls on a tile", async () => {
-        const user = userEvent.setup();
-        render(<AppSwitcher apps={APPS} currentAppId="drive" onTogglePin={() => undefined} />);
-        await openMenu(user, /drive/i);
-        for (const star of document.querySelectorAll<HTMLElement>('[aria-label$="to favorites"]')) {
-            star.style.display = "none";
-        }
-        await user.keyboard("{ArrowDown}");
+        await user.keyboard("{Shift>}{Tab}{/Shift}");
         expect(document.activeElement).toBe(tile("drive"));
-        await user.keyboard("{Tab}");
-        expect(document.activeElement).toBe(tile("chat"));
     });
 
     it("goes on to the options under the grid from the last row and the last tab stop", async () => {

@@ -32,6 +32,16 @@ import { filterMic, type FilteredMic } from "@/app/(app)/chat/mic-filter";
 import { Camera, ImagePlus, Loader2, Mic, Square } from "lucide-react";
 import { useCameras } from "@/app/(app)/chat/camera-device";
 import { afterPaint, maskCamera, type MaskedCamera } from "@/app/(app)/chat/camera-filter";
+import type { NamespaceKey } from "@/lib/i18n/types";
+import {
+    FRAME_CHOICES,
+    LIGHT_CHOICES,
+    lookIsPlain,
+    lookKey,
+    STYLE_CHOICES,
+    useCameraLook,
+    type CameraLook
+} from "@/app/(app)/chat/camera-look";
 import { useMicrophones } from "@/app/(app)/chat/mic-device";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useHeldCall } from "@/app/(app)/chat/call-hold";
@@ -375,6 +385,10 @@ function CameraCard() {
         chooseScene,
         pickImage
     } = useCameraBackground();
+    const { look, change: changeLook } = useCameraLook();
+    /** The look as a value an effect can depend on: the object is new on every
+     *  read, the key only when something in it changed. */
+    const looking = lookKey(look);
     /** Whether the picture in use is one of theirs rather than one of ours. */
     const own = image !== null && sceneOf(image) === null;
     const [showing, setShowing] = useState(false);
@@ -451,12 +465,13 @@ function CameraCard() {
         if (!camera) return;
 
         let dropped = false;
-        setBuilding(background !== "off");
+        const wanted = lookFrom(looking);
+        setBuilding(background !== "off" || !lookIsPlain(wanted));
         void (async () => {
             // So the line that says it is starting is on the glass before the
             // model takes the thread for a second - see `afterPaint`.
             await afterPaint();
-            const built = await maskCamera(camera, background, image);
+            const built = await maskCamera(camera, background, image, wanted);
             // The setting moved again, or the preview was stopped, while the
             // model was loading.
             if (dropped) {
@@ -474,7 +489,7 @@ function CameraCard() {
         return () => {
             dropped = true;
         };
-    }, [background, image, inCall, show, showing]);
+    }, [background, image, inCall, looking, show, showing]);
 
     const start = async () => {
         setError("");
@@ -588,6 +603,32 @@ function CameraCard() {
                         {tChat(`callSettings.backgrounds.${background}.help` as const)}
                     </span>
                 </label>
+
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                    <LookSelect
+                        label={tChat("callSettings.look.light.title")}
+                        choices={LIGHT_CHOICES}
+                        value={look.light}
+                        // A call in progress follows this by itself, the way it
+                        // follows the background - see the call's own effect.
+                        onPick={(light) => changeLook({ light })}
+                    />
+                    <LookSelect
+                        label={tChat("callSettings.look.style.title")}
+                        choices={STYLE_CHOICES}
+                        value={look.style}
+                        onPick={(style) => changeLook({ style })}
+                    />
+                    <LookSelect
+                        label={tChat("callSettings.look.frame.title")}
+                        choices={FRAME_CHOICES}
+                        value={look.frame}
+                        onPick={(frame) => changeLook({ frame })}
+                    />
+                </div>
+                <span className="-mt-2 text-xs text-muted-foreground">
+                    {tChat("callSettings.look.help")}
+                </span>
 
                 <div className="flex flex-col gap-2">
                     <span className="text-sm">{t("devices.camera.pictures")}</span>
@@ -930,5 +971,47 @@ function Toggle({
             </div>
             <Switch checked={checked} onChange={onChange} aria-label={label} />
         </div>
+    );
+}
+
+/** The look a key was made from - see `lookKey`. */
+function lookFrom(key: string): CameraLook {
+    const [light, style, frame] = key.split("/");
+    return {
+        light: LIGHT_CHOICES.find((choice) => choice.value === light)?.value ?? "off",
+        style: STYLE_CHOICES.find((choice) => choice.value === style)?.value ?? "none",
+        frame: FRAME_CHOICES.find((choice) => choice.value === frame)?.value ?? "off"
+    };
+}
+
+/** One of the three look settings, as a labelled select. */
+function LookSelect<T extends string>({
+    label,
+    choices,
+    value,
+    onPick
+}: {
+    label: string;
+    choices: readonly { value: T; label: NamespaceKey<"chat"> }[];
+    value: T;
+    onPick: (value: T) => void;
+}) {
+    const tChat = useTranslations("chat");
+    return (
+        <label className="flex min-w-0 flex-col gap-1 text-sm">
+            {label}
+            <Select
+                value={value}
+                onValueChange={(next) => {
+                    const picked = choices.find((choice) => choice.value === next);
+                    if (picked) onPick(picked.value);
+                }}
+                aria-label={label}
+                options={choices.map((choice) => ({
+                    value: choice.value,
+                    label: tChat(choice.label)
+                }))}
+            />
+        </label>
     );
 }

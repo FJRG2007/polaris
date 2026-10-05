@@ -11,6 +11,7 @@ import type { MeetingView } from "@/lib/chat/meetings";
 import type { CallAudioReport } from "./call-diagnosis";
 import type { FilteredMic, MicFilter } from "./mic-filter";
 import type { BackgroundScene, CameraBackground } from "./camera-background";
+import type { CameraLook } from "./camera-look";
 import type { CallLevel, CallQuality } from "./call-quality";
 import type { Reaction, ShownReaction } from "./call-signals";
 import type { AudioRole, CombineRequest } from "./call-combine";
@@ -153,6 +154,9 @@ export interface CallState {
     readonly backgroundRunning: CameraBackground | null;
     /** Why the background that was asked for is not running. */
     readonly backgroundProblem: string | null;
+    /** The camera's light, colour and framing - see `camera-look`. */
+    readonly look: CameraLook;
+    setLook: (patch: Partial<CameraLook>) => void;
     toggleMic: () => void;
     toggleCamera: () => void;
     toggleShare: () => void;

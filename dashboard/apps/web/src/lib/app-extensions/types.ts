@@ -125,6 +125,9 @@ export interface AppExtension {
     /** The ports the router has to forward for it. */
     readonly forwardedPorts?: () => Promise<readonly GamePortRow[]>;
 
+    /** The cards it offers for the Overview - see `AppWidgetDefinition`. */
+    readonly overviewWidgets?: () => readonly AppWidgetDefinition[];
+
     /** The same, with the advice the Domains card shows, knocking when asked. */
     readonly readForwardedPorts?: (probe: boolean) => Promise<GamePortsReading>;
 
@@ -307,4 +310,105 @@ export interface RelayedChatMessage {
     readonly forwarded: boolean;
     /** The conversation it was said in. */
     readonly channelId: string;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Overview cards                                                              */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * A card an installed app offers for the Overview.
+ *
+ * Generic on purpose: an app says what to show and what can be pressed, as
+ * data, and the dashboard draws it with its own components - so any app can
+ * add a card without shipping a component of its own, and every card looks like
+ * every other one. What a card watches is a list of the app's own ids that the
+ * reader picked (`targets`); everything shown about them, and whether the reader
+ * may still see or operate each one, is the app's to answer on every read and
+ * every press - the stored list is a preference, never a grant.
+ *
+ * Every function runs inside the reader's request, so an app checks the session
+ * the way its own screens and actions do.
+ */
+export interface AppWidgetDefinition {
+    /** Unique within the app, and stable: it is stored in layouts. */
+    readonly kind: string;
+    /** How wide it starts. */
+    readonly defaultSize: "sm" | "md" | "lg" | "xl";
+    /** The name and one line about it, in the reader's language. */
+    readonly describe: () => Promise<{ readonly label: string; readonly hint: string }>;
+    /** What the reader may pick for it, or an empty list when there is nothing
+     *  to pick (or they may see none of it). */
+    readonly targets: () => Promise<readonly AppWidgetTarget[]>;
+    /** What to draw for these targets. Ids the reader may no longer see are
+     *  left out rather than reported. */
+    readonly read: (targets: readonly string[]) => Promise<AppWidgetView>;
+    /** Press one of the controls `read` drew. Refused in a sentence, through
+     *  the same checks the app's own screens use. */
+    readonly act?: (
+        targets: readonly string[],
+        input: AppWidgetInput
+    ) => Promise<{ readonly error?: string }>;
+}
+
+/** Something a card can watch, as the picker lists it. */
+export interface AppWidgetTarget {
+    readonly id: string;
+    readonly label: string;
+    /** Where it is, or what it is - the second line of the picker. */
+    readonly detail?: string;
+}
+
+/** One figure about one target. */
+export interface AppWidgetReading {
+    readonly label: string;
+    readonly value: string;
+    readonly tone?: "ok" | "warn" | "bad";
+}
+
+/** Something a card lets the reader change about one target. `disabled` is the
+ *  reason it cannot be changed right now, said where the control is. */
+export type AppWidgetControl =
+    | {
+          readonly kind: "toggle";
+          readonly id: string;
+          readonly label: string;
+          readonly on: boolean;
+          readonly disabled?: string | null;
+      }
+    | {
+          readonly kind: "number";
+          readonly id: string;
+          readonly label: string;
+          readonly value: number | null;
+          readonly min: number;
+          readonly max: number;
+          readonly step: number;
+          readonly unit: string;
+          readonly disabled?: string | null;
+      };
+
+/** One target as a card draws it. */
+export interface AppWidgetItem {
+    readonly id: string;
+    readonly title: string;
+    readonly subtitle?: string;
+    /** Its state in a word ("On", "Cooling"), with how it should read. */
+    readonly state?: string;
+    readonly tone?: "ok" | "warn" | "bad" | "off";
+    readonly readings: readonly AppWidgetReading[];
+    readonly controls: readonly AppWidgetControl[];
+    /** Where its own screen is. */
+    readonly href?: string;
+}
+
+export interface AppWidgetView {
+    readonly items: readonly AppWidgetItem[];
+}
+
+/** One press on a card. Validated by the dashboard before an app sees it. */
+export interface AppWidgetInput {
+    readonly item: string;
+    readonly control: string;
+    readonly value: boolean | number;
 }

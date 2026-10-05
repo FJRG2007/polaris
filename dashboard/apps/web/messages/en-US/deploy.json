@@ -341,7 +341,11 @@
         "newTitle": "New project",
         "name": "Project name",
         "cancel": "Cancel",
-        "create": "Create"
+        "create": "Create",
+        "showManaged": "Show apps Polaris runs for itself",
+        "showManagedCount": "{count, plural, one {Show # app Polaris runs} other {Show # apps Polaris runs}}",
+        "onlyManaged": "{count, plural, one {The only project here is one Polaris runs for itself.} other {The only projects here are # that Polaris runs for itself.}}",
+        "showThem": "Show them"
     },
     "observability": {
         "requests": "Requests",

@@ -112,6 +112,9 @@ export interface ArenaGame {
     kit(run: stored.EventRun): string[];
     /** Two when it is played by two teams: both must have somebody in it. */
     readonly teams?: number;
+    /** Whether it reads hits off the events data pack (`hits.ts`): the pack is
+     *  put on before anything is built, while taking it in pauses nobody's game. */
+    readonly hits?: boolean;
     /** The side the `index`th of those who joined plays on. */
     side(run: stored.EventRun, index: number): number;
     /** Where an entrant stands at "Go!" and is put back to while waiting. */

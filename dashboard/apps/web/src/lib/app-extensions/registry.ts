@@ -18,6 +18,7 @@ import type {
     AppExtension,
     AppJob,
     AppSlot,
+    AppWidgetDefinition,
     ChatCommandSpec,
     ChatGameLink,
     ExtensionInstall,
@@ -189,6 +190,19 @@ export async function gameServerSummaries(userId: string): Promise<GameServerSum
         extensions().map((extension) => extension.gameServerSummaries?.(userId) ?? [])
     );
     return lists.flat();
+}
+
+/** Every card the installed apps offer for the Overview, with the app it is
+ *  from. An app that is not installed offers none. */
+export async function appWidgetDefinitions(): Promise<
+    { readonly app: string; readonly definition: AppWidgetDefinition }[]
+> {
+    return (await installedWith("overviewWidgets")).flatMap((extension) =>
+        (extension.overviewWidgets?.() ?? []).map((definition) => ({
+            app: extension.id,
+            definition
+        }))
+    );
 }
 
 /** Every port a router has to forward for the installed apps. */

@@ -27,7 +27,9 @@ import { OFFICE_KIND_HINT_KEYS, OFFICE_KIND_KEYS } from "./office-kinds";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { PickedFile } from "@/components/file-picker/picked-file";
 import { FilePickerDialog } from "@/components/file-picker/file-picker-dialog";
+import { GoogleImportDialog } from "./google-import-dialog";
 import {
+    Cloud,
     Columns3,
     FileText,
     Loader2,
@@ -158,6 +160,34 @@ export function OfficeView({
     );
     const [importing, setImporting] = useState(false);
     const [reading, setReading] = useState(false);
+    const [fromGoogle, setFromGoogle] = useState(false);
+
+    /**
+     * Back from linking Google for Office. Linked is the dialog it was started
+     * from, open again; anything else is said once. The query is dropped either
+     * way, so a reload does not say it twice.
+     */
+    useEffect(() => {
+        const params = new URLSearchParams(window.location.search);
+        if (params.get("provider") !== "google") return;
+        const outcome = params.get("connection");
+        if (!outcome) return;
+        window.history.replaceState(null, "", window.location.pathname);
+        if (outcome === "linked") {
+            setFromGoogle(true);
+            return;
+        }
+        toast.show({
+            title:
+                outcome === "cancelled"
+                    ? t("google.outcome.cancelled")
+                    : outcome === "taken"
+                      ? t("google.outcome.taken")
+                      : outcome === "not_public"
+                        ? t("google.outcome.notPublic")
+                        : t("google.outcome.failed")
+        });
+    }, [t, toast]);
 
     const load = useCallback(async () => {
         const answer = await listDocumentsAction({ shelf, kind, starredOnly, sort, query });
@@ -227,7 +257,9 @@ export function OfficeView({
                         error?: string;
                     } | null;
                     if (!answer.ok || !body?.id || !body.kind) {
-                        toast.show({ title: body?.error ?? t("view.openFailed", { name: file.name }) });
+                        toast.show({
+                            title: body?.error ?? t("view.openFailed", { name: file.name })
+                        });
                         continue;
                     }
                     opened.push({ id: body.id, kind: body.kind });
@@ -326,6 +358,7 @@ export function OfficeView({
                     <NewButton
                         onPick={make}
                         onImport={() => setImporting(true)}
+                        onGoogle={() => setFromGoogle(true)}
                         busy={reading}
                     />
                 ) : null}
@@ -383,6 +416,7 @@ export function OfficeView({
                             <NewButton
                                 onPick={make}
                                 onImport={() => setImporting(true)}
+                                onGoogle={() => setFromGoogle(true)}
                                 busy={reading}
                             />
                         ) : undefined
@@ -423,6 +457,10 @@ export function OfficeView({
                     ))}
                 </ul>
             )}
+
+            {fromGoogle ? (
+                <GoogleImportDialog orgId={on ?? null} onClose={() => setFromGoogle(false)} />
+            ) : null}
 
             {importing ? (
                 <FilePickerDialog
@@ -526,7 +564,9 @@ function Row({
                     {row.editedBy ? (
                         <>
                             <span aria-hidden>-</span>
-                            <span className="truncate">{t("view.editedBy", { name: row.editedBy })}</span>
+                            <span className="truncate">
+                                {t("view.editedBy", { name: row.editedBy })}
+                            </span>
                         </>
                     ) : null}
                 </p>
@@ -620,10 +660,13 @@ function Row({
 function NewButton({
     onPick,
     onImport,
+    onGoogle,
     busy
 }: {
     onPick: (kind: core.OfficeKind) => void;
     onImport: () => void;
+    /** A Google Doc or Sheet, brought in through the reader's own account. */
+    onGoogle: () => void;
     /** A file is being read. The row stays put and the one button that started
      *  it says so, rather than the whole header being replaced by a spinner. */
     busy: boolean;
@@ -659,6 +702,10 @@ function NewButton({
                     <Upload className="size-4 shrink-0" aria-hidden />
                 )}
                 {t("view.import")}
+            </Button>
+            <Button size="sm" variant="secondary" onClick={onGoogle}>
+                <Cloud className="size-4 shrink-0" aria-hidden />
+                {t("google.fromGoogle")}
             </Button>
         </ScrollRow>
     );

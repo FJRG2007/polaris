@@ -503,7 +503,7 @@
             "pictureStays": "Una imagen tuya se queda en este navegador y no se envía a ningún sitio.",
             "pictureFailed": "Polaris no ha podido usar esa imagen.",
             "starting": "Iniciando. La primera vez en un ordenador se descarga el modelo.",
-            "failed": "No se ha podido iniciar, así que no hay nada detrás de ti: {problem}",
+            "failed": "No pudo iniciarse, así que no se aplica nada a tu cámara: {problem}",
             "running": "Funcionando. Esto es lo que envía una llamada."
         },
         "input": {
@@ -1007,9 +1007,9 @@
             "description": "Despliega, lee registros y reinicia tus apps desde una terminal. Inicia sesión una vez desde el navegador; cada comando posterior usa esa sesión.",
             "install": "Instalar",
             "system": "En qué sistema la instalas",
-            "hint": "Pégala en {shell}. Necesita Node.js 20 o posterior e instala la versión que corresponde a este Polaris, como plr y polaris.",
-            "signIn": "Inicia sesión",
-            "signInHint": "Abre este Polaris en el navegador para aprobarlo. En un equipo sin navegador muestra un código para escribirlo aquí.",
+            "hint": "Pégala en {shell}. Necesita Node.js 20 o posterior. Instala la última versión desde GitHub como plr y polaris; plr update la mantiene al día.",
+            "signIn": "Entrar",
+            "signInHint": "Conecta la CLI a este Polaris y lo abre en el navegador para aprobarlo. Sin navegador, muestra un código para escribirlo aquí.",
             "server": "No se instala en un equipo que ejecuta un servidor Polaris: ambos responden a plr y polaris.",
             "next": "Prueba"
         }

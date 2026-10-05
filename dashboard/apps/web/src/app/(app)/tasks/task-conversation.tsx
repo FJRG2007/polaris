@@ -264,6 +264,7 @@ export function ActivityStream({
                     <div className="mt-2 flex flex-col gap-1">
                         <Composer
                             channelId={null}
+                            divided={false}
                             rules={COMMENT_RULES}
                             disabled={busy}
                             placeholder={t("conversation.replyPlaceholder")}
@@ -332,7 +333,9 @@ export function ActivityStream({
                 )}
             </div>
 
-            <div className="border-t border-border p-4">
+            {/* The box draws the rule above itself; a bordered wrapper here
+                drew a second one right on top of it. */}
+            <div>
                 {/* Files, pictures, voice notes and screen clips, which is the
                     same composer the chat uses and therefore the same set of
                     affordances - a task thread is a conversation, and the one
@@ -429,7 +432,11 @@ export function TimeSection({
                 <h3 className="text-sm font-medium">{t("time.title")}</h3>
                 <div className="flex items-center gap-2 text-xs text-muted-foreground">
                     <span>{t("time.tracked", { time: core.formatTrackedSeconds(tracked) })}</span>
-                    {estimate ? <span>{t("time.ofEstimate", { time: core.formatDurationMinutes(estimate) })}</span> : null}
+                    {estimate ? (
+                        <span>
+                            {t("time.ofEstimate", { time: core.formatDurationMinutes(estimate) })}
+                        </span>
+                    ) : null}
                     {used !== null && (
                         <span className={cn(used > 100 && "text-warning")}>({used}%)</span>
                     )}
@@ -495,7 +502,9 @@ export function TimeSection({
                                 {entry.note ? ` - ${entry.note}` : ""}
                             </span>
                             {entry.billable && (
-                                <span className="text-[0.6875rem] text-success">{t("time.billableTag")}</span>
+                                <span className="text-[0.6875rem] text-success">
+                                    {t("time.billableTag")}
+                                </span>
                             )}
                             {(canModerate || entry.userId === currentUserId) && !entry.running && (
                                 <button

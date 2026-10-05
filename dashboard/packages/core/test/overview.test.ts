@@ -36,16 +36,34 @@ describe("the catalogue the layout is written in", () => {
 
 describe("parseOverviewPreferences", () => {
     it("reads back what was stored", () => {
+        const appWidget = {
+            id: "card0001",
+            app: "places",
+            kind: "devices",
+            size: "md" as const,
+            targets: ["lamp"]
+        };
         const stored = stringifyOverviewPreferences({
             widgets: [{ id: "usage", size: "lg", hidden: true }],
+            appWidgets: [appWidget],
             shortcuts: [{ label: "Deploy", href: "/apps/deploy", context: "Apps" }],
             greeting: false
         });
         expect(parseOverviewPreferences(stored)).toEqual({
             widgets: [{ id: "usage", size: "lg", hidden: true }],
+            appWidgets: [appWidget],
             shortcuts: [{ label: "Deploy", href: "/apps/deploy", context: "Apps" }],
             greeting: false
         });
+    });
+
+    it("reads a layout saved before apps could add cards as having none", () => {
+        const stored = JSON.stringify({
+            widgets: [{ id: "usage", size: "lg", hidden: true }],
+            shortcuts: [],
+            greeting: true
+        });
+        expect(parseOverviewPreferences(stored).appWidgets).toEqual([]);
     });
 
     it("costs the arrangement rather than the page when the blob is unusable", () => {
@@ -66,10 +84,14 @@ describe("what may be pinned", () => {
         // A protocol-relative path is a link off the deployment wearing an
         // internal path's clothes.
         expect(
-            overviewPreferencesSchema.safeParse({ shortcuts: [{ label: "Elsewhere", href: "//example.com" }] }).success
+            overviewPreferencesSchema.safeParse({
+                shortcuts: [{ label: "Elsewhere", href: "//example.com" }]
+            }).success
         ).toBe(false);
         expect(
-            overviewPreferencesSchema.safeParse({ shortcuts: [{ label: "Deploy", href: "/apps/deploy" }] }).success
+            overviewPreferencesSchema.safeParse({
+                shortcuts: [{ label: "Deploy", href: "/apps/deploy" }]
+            }).success
         ).toBe(true);
     });
 });
@@ -109,7 +131,10 @@ describe("resolveOverviewLayout", () => {
         // hard-coded, so this keeps testing the rule when the order changes.
         const available = ["services", "usage", "tasks"] as const;
         const resolved = resolveOverviewLayout(
-            { ...EMPTY_OVERVIEW_PREFERENCES, widgets: [{ id: "services", size: "sm", hidden: true }] },
+            {
+                ...EMPTY_OVERVIEW_PREFERENCES,
+                widgets: [{ id: "services", size: "sm", hidden: true }]
+            },
             available
         );
         const catalogue = DEFAULT_OVERVIEW_LAYOUT.map((widget) => widget.id).filter((id) =>
@@ -140,12 +165,20 @@ describe("resolveOverviewLayout", () => {
 });
 
 describe("mergeRecentPlaces", () => {
-    const place = (href: string, visitedAt: string) => ({ href, label: href, context: null, visitedAt });
+    const place = (href: string, visitedAt: string) => ({
+        href,
+        label: href,
+        context: null,
+        visitedAt
+    });
 
     it("keeps one entry per page, at the time it was last opened", () => {
         const merged = mergeRecentPlaces(
             [place("/tasks", "2026-08-12T10:00:00.000Z")],
-            [place("/tasks", "2026-08-11T10:00:00.000Z"), place("/drive", "2026-08-12T09:00:00.000Z")]
+            [
+                place("/tasks", "2026-08-11T10:00:00.000Z"),
+                place("/drive", "2026-08-12T09:00:00.000Z")
+            ]
         );
         expect(merged.map((entry) => entry.href)).toEqual(["/tasks", "/drive"]);
         expect(merged[0]?.visitedAt).toBe("2026-08-12T10:00:00.000Z");

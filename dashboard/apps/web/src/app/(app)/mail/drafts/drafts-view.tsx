@@ -105,7 +105,10 @@ export function DraftsView({ drafts }: { drafts: MailDraftView[] }) {
                                     }
                                 >
                                     <span className="flex items-baseline gap-2">
-                                        <span className="min-w-0 flex-1 truncate text-[13px] font-medium">
+                                        <span
+                                            className="min-w-0 flex-1 truncate text-[13px] font-medium"
+                                            title={draft.subject || t("noSubject")}
+                                        >
                                             {draft.subject || t("noSubject")}
                                         </span>
                                         <span className="shrink-0 text-[11px] text-foreground-subtle">
@@ -129,13 +132,21 @@ export function DraftsView({ drafts }: { drafts: MailDraftView[] }) {
                                             <span className="flex items-center gap-1.5">
                                                 <Send className="size-3 shrink-0" aria-hidden />
                                                 {draft.sendAt
-                                                    ? t("drafts.waitingAt", { time: format.dateTime(new Date(draft.sendAt)) })
+                                                    ? t("drafts.waitingAt", {
+                                                          time: format.dateTime(
+                                                              new Date(draft.sendAt)
+                                                          )
+                                                      })
                                                     : t("drafts.waiting")}
                                             </span>
                                         ) : (
                                             <span className="block truncate">
                                                 {draft.to.length > 0
-                                                    ? t("drafts.to", { names: draft.to.map((one) => one.address).join(", ") })
+                                                    ? t("drafts.to", {
+                                                          names: draft.to
+                                                              .map((one) => one.address)
+                                                              .join(", ")
+                                                      })
                                                     : t("drafts.toNobody")}
                                             </span>
                                         )}

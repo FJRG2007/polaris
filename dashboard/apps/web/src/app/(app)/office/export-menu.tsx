@@ -14,12 +14,20 @@
  * hand-rolled PDF writer would produce something worse than the thing it was
  * made from. Saying "Print" rather than offering a PDF that is not as good is
  * the honest version.
+ *
+ * **A document that came from Google can go back to it.** Not over the file it
+ * came from - Polaris may only write the files it created - but to a Google copy
+ * made on the first save and updated on every one after. Only for the person
+ * whose account brought it in; see `lib/office/google.ts`.
  */
 
 import * as core from "@polaris/core";
 import { useTranslations } from "@/components/i18n/i18n-provider";
-import { Download, Printer } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Cloud, Download, ExternalLink, Printer } from "lucide-react";
 import { useBrowserExporter } from "./export-slot";
+import { officeGoogleLinkAction, saveToGoogleAction } from "./google-actions";
+import type { OfficeGoogleLink } from "@/lib/office/google";
 import {
     Button,
     DropdownMenu,
@@ -43,6 +51,40 @@ export function ExportMenu({
     const toast = useToast();
     const exporter = useBrowserExporter();
     const formats = core.OFFICE_EXPORTS[kind] as readonly string[];
+    const [google, setGoogle] = useState<OfficeGoogleLink | null>(null);
+    const [saving, setSaving] = useState(false);
+    const savesToGoogle = kind === "doc" || kind === "sheet";
+
+    useEffect(() => {
+        if (!savesToGoogle) return;
+        let live = true;
+        void officeGoogleLinkAction(documentId).then((answer) => {
+            if (live) setGoogle(answer.link ?? null);
+        });
+        return () => {
+            live = false;
+        };
+    }, [documentId, savesToGoogle]);
+
+    async function saveToGoogle(): Promise<void> {
+        if (saving) return;
+        setSaving(true);
+        const answer = await saveToGoogleAction(documentId);
+        setSaving(false);
+        if (answer.error || !answer.link) {
+            toast.show({ title: answer.error ?? t("google.errors.failed") });
+            return;
+        }
+        const link = answer.link;
+        setGoogle((held) =>
+            held ? { ...held, copyLink: link, savedAt: new Date().toISOString() } : held
+        );
+        toast.show({
+            title: t("google.saved"),
+            body: t("google.openCopy"),
+            onPress: () => window.open(link, "_blank", "noopener,noreferrer")
+        });
+    }
 
     /** A drawing, made here and saved. The link is built, clicked and thrown
      *  away in the same breath: a blob URL left behind is a copy of the drawing
@@ -91,6 +133,27 @@ export function ExportMenu({
                         </DropdownMenuItem>
                     )
                 )}
+                {google ? (
+                    <>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                            disabled={!google.mine || saving}
+                            title={google.mine ? undefined : t("google.notYours")}
+                            onSelect={() => void saveToGoogle()}
+                        >
+                            <Cloud className="size-4 shrink-0" aria-hidden />
+                            {t("google.saveBack")}
+                        </DropdownMenuItem>
+                        {google.copyLink ? (
+                            <DropdownMenuItem asChild>
+                                <a href={google.copyLink} target="_blank" rel="noopener noreferrer">
+                                    <ExternalLink className="size-4 shrink-0" aria-hidden />
+                                    {t("google.openInGoogle")}
+                                </a>
+                            </DropdownMenuItem>
+                        ) : null}
+                    </>
+                ) : null}
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onSelect={() => window.print()}>
                     <Printer className="size-4 shrink-0" aria-hidden />

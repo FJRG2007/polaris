@@ -77,6 +77,7 @@ import { callMuted, setCallMuted } from "./call-muted";
 import type { MeetingView } from "@/lib/chat/meetings";
 import { pressDeafen, pressMic } from "./call-voice-controls";
 import { afterPaint, maskCamera, type MaskedCamera } from "./camera-filter";
+import { cameraLook, lookIsPlain, lookKey, useCameraLook, type CameraLook } from "./camera-look";
 import type { CallDevice, CallState, PeerState } from "./call-state";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { filterMic, type FilteredMic, type MicFilter } from "./mic-filter";
@@ -587,7 +588,7 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
      * rather than keep the one it joined with. Null until the first build, so
      * joining does not build the same background twice.
      */
-    const maskApplied = useRef<CameraBackground | null>(null);
+    const maskApplied = useRef<string | null>(null);
     const licensed = useRef<{ moduleUrl: string; token: string } | null>(null);
     const me = useRef<string | null>(null);
     /**
@@ -1236,10 +1237,14 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
         // turned on instead - see `toggleCamera`.
         const usable = track?.readyState === "live" && track.enabled;
         const wanted = usable ? cameraBackground() : "off";
+        // The light, colour and framing go through the same canvas, so they are
+        // built - and swapped - on exactly the same terms as the background.
+        const look = cameraLook();
+        const nothing = !usable || (wanted === "off" && lookIsPlain(look));
         // What was asked for, which is not always what is buildable: a camera
         // that is off gets nothing built, and the answer to "has this already
         // been acted on" is still yes.
-        maskApplied.current = cameraBackground();
+        maskApplied.current = effectsKey(cameraBackground(), look);
 
         /**
          * The one that is running stays running until the next one is ready.
@@ -1255,8 +1260,8 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
         // The same yield the devices screen makes, for the same second of main
         // thread: the menu's "Starting" line, and the call's own controls, get
         // drawn before it is taken.
-        if (wanted !== "off") await afterPaint();
-        const built = wanted === "off" || !track ? null : await maskCamera(track, wanted);
+        if (!nothing) await afterPaint();
+        const built = nothing || !track ? null : await maskCamera(track, wanted, undefined, look);
 
         // Somebody moved on while the model was loading. Whatever was built
         // belongs to nobody, and the round that came after this one owns what is
@@ -2776,6 +2781,9 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
         pickImage
     } = useCameraBackground();
 
+    /** Light, colour and framing: the rest of what is done to the camera. */
+    const { look, change: rememberLook } = useCameraLook();
+
     const swapBackground = useCallback(async () => {
         await startBackground();
         if (cameraOn) await publish(CAMERA, outgoingCamera());
@@ -2788,6 +2796,14 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
             void swapBackground();
         },
         [rememberBackground, swapBackground]
+    );
+
+    const setLook = useCallback(
+        (patch: Partial<CameraLook>) => {
+            rememberLook(patch);
+            void swapBackground();
+        },
+        [rememberLook, swapBackground]
     );
 
     /** Take a picture from this machine, keep it, and put it behind the camera.
@@ -2825,9 +2841,10 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
      * the call lasted, downloading the model each time.
      */
     useEffect(() => {
-        if (maskApplied.current === null || maskApplied.current === background) return;
+        if (maskApplied.current === null || maskApplied.current === effectsKey(background, look))
+            return;
         void swapBackground();
-    }, [background, swapBackground]);
+    }, [background, look, swapBackground]);
 
     /**
      * Move the quality bar, mid-call.
@@ -3578,6 +3595,8 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
         pickBackground,
         chooseBackgroundScene,
         backgroundRunning: cameraMask,
+        look,
+        setLook,
         backgroundProblem: maskProblem,
         micOn,
         cameraOn,
@@ -3637,4 +3656,10 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
         audio,
         outgoing: filteredTrack ?? micTrack
     };
+}
+
+/** What the camera pipeline was last built for: the background and the look,
+ *  as one value, so a change to either is a rebuild and neither is twice. */
+function effectsKey(background: CameraBackground, look: CameraLook): string {
+    return `${background}|${lookKey(look)}`;
 }

@@ -47,6 +47,7 @@ import type {
     MinecraftStatus
 } from "../../lib/minecraft/service";
 import {
+    DisconnectLabel,
     ExperienceDialog,
     HistoryDialog,
     InventoryDialog,
@@ -1214,13 +1215,25 @@ function StatusCell({
         <Badge>{playerPresence.offline}</Badge>
     );
 
+    // Why they last went, or why the server last turned them away - the line
+    // somebody looking at an offline player is usually asking about.
+    const lastWord = player.presence === "playing" ? null : (player.sessions.at(-1) ?? null);
+    const visits = player.sessions.some((event) => event.kind !== "refused");
+
     return (
         <div className="flex flex-col items-start gap-0.5">
             {badge}
+            {lastWord && lastWord.kind !== "join" && lastWord.reason ? (
+                <span className="text-xs">
+                    {lastWord.kind === "refused" ? (
+                        <span className="text-warning">{t("disconnect.refused")}</span>
+                    ) : null}
+                    <DisconnectLabel reason={lastWord.reason} />
+                </span>
+            ) : null}
             {/* Somebody playing gets a line only with the start of the visit they are
                 on: nothing is better than a time that answers another question. */}
-            {(player.lastSeen !== null ||
-                (player.presence !== "playing" && player.sessions.length > 0)) && (
+            {(player.lastSeen !== null || (player.presence !== "playing" && visits)) && (
                 <button
                     type="button"
                     onClick={() => onOpen("history")}

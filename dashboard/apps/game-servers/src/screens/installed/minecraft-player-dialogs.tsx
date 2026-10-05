@@ -31,7 +31,7 @@ import { PlayerRecordPanel } from "../../components/player-history";
 import type { MinecraftEdition } from "../../lib/minecraft/service";
 import type { PlayerRecord } from "../../lib/games-activity-service";
 import { useCallback, useEffect, useState, useTransition } from "react";
-import type { PlayerSessionEvent } from "../../lib/minecraft/sessions";
+import type { DisconnectReason, PlayerSessionEvent } from "../../lib/minecraft/sessions";
 import { isAddressRule, isPlayerName } from "../../lib/minecraft/access";
 import { PlayerFormDialog, PlayerFormField } from "../../components/player-form-dialog";
 import { Loader2, Locate, MapPin, RefreshCw, TriangleAlert, UserSearch, X } from "lucide-react";
@@ -567,18 +567,29 @@ export function HistoryDialog({
                         {newestFirst.map((event, index) => (
                             <li
                                 key={`${event.at ?? "unknown"}-${event.kind}-${index}`}
-                                className="flex items-center justify-between gap-3 py-1.5"
+                                className="flex items-start justify-between gap-3 py-1.5 [&>span:first-child]:min-w-0"
                             >
                                 <span
                                     className={
                                         event.kind === "join"
                                             ? "text-success"
-                                            : "text-muted-foreground"
+                                            : event.kind === "refused"
+                                              ? "text-warning"
+                                              : "text-muted-foreground"
                                     }
                                 >
                                     {event.kind === "join"
                                         ? t("players.joined")
-                                        : t("players.left")}
+                                        : event.kind === "refused"
+                                          ? t("disconnect.refused")
+                                          : t("players.left")}
+                                    {/* Why, in words, with exactly what the server
+                                        printed a hover away - a kick message or a
+                                        plugin's own words are the detail somebody
+                                        reading this wants. */}
+                                    {event.reason ? (
+                                        <DisconnectLabel reason={event.reason} detailed />
+                                    ) : null}
                                 </span>
                                 <span className="flex items-center gap-3 text-xs text-muted-foreground">
                                     {event.address && (
@@ -1182,5 +1193,32 @@ export function PlayerAccessDialog({
                 </PlayerFormField>
             )}
         </PlayerFormDialog>
+    );
+}
+
+/**
+ * Why somebody went or was turned away, as a short label beside the event, with
+ * the server's own words on hover and for a screen reader.
+ */
+export function DisconnectLabel({
+    reason,
+    detailed = false
+}: {
+    reason: DisconnectReason;
+    /** Print the server's words under the label rather than only on hover - in
+     *  the history, where there is room and no pointer may be. */
+    detailed?: boolean;
+}) {
+    const t = useGameText("minecraft");
+    const said = reason.raw ? t("disconnect.serverSaid", { raw: reason.raw }) : undefined;
+    return (
+        <span className="ml-1.5 text-xs text-muted-foreground" title={said}>
+            - {t(`disconnect.reasons.${reason.kind}`)}
+            {said && detailed ? (
+                <span className="block break-words [overflow-wrap:anywhere]">{said}</span>
+            ) : said ? (
+                <span className="sr-only">. {said}</span>
+            ) : null}
+        </span>
     );
 }

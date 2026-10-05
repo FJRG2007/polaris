@@ -16,12 +16,14 @@
  *   narrows every app - shown or behind More - to the ones that match, ranked,
  *   and enter opens the first.
  * - The grid arranged by dragging, as in Google's launcher, or from the keyboard
- *   with Alt and an arrow.
+ *   with Alt and an arrow. That is the whole of it: what somebody wants first,
+ *   they drag first. There is no star - a second way to say "put this first"
+ *   beside dragging it there was two controls for one wish.
  * - The arrow keys walk the grid as a grid: left and right along it, up and down
- *   a row; tab reaches the star beside each app.
+ *   a row; tab walks the tiles.
  *
  * Which order the apps come in is the caller's decision (it knows what was
- * pinned, arranged and used); this only draws it.
+ * arranged and used); this only draws it.
  *
  * Locked apps stay visible but badged so the platform's scope is legible even in
  * the limited edition; clicking one routes to its unlock explainer.
@@ -32,7 +34,7 @@
 
 import { cn } from "../lib/cn";
 import { MenuSearch } from "../components/menu-search";
-import { ChevronDown, Lock, Star, type LucideIcon } from "lucide-react";
+import { ChevronDown, Lock, type LucideIcon } from "lucide-react";
 import { searchItems, type SearchField } from "@polaris/core/search-text";
 import {
     useLayoutEffect,
@@ -73,9 +75,6 @@ export interface AppSwitcherStrings {
     readonly search: string;
     /** What the grid says when nothing matches. */
     readonly noMatch: (query: string) => string;
-    /** The star's name for an app not yet pinned, and for one that is. */
-    readonly pin: (appLabel: string) => string;
-    readonly unpin: (appLabel: string) => string;
     /** Said to a screen reader after an app is moved with the keyboard. */
     readonly moved: (appLabel: string, position: number, total: number) => string;
     /** The button under the first screenful that opens the rest. */
@@ -85,8 +84,6 @@ export interface AppSwitcherStrings {
 const ENGLISH: AppSwitcherStrings = {
     search: "Search apps",
     noMatch: (query) => `No app matches ${query}`,
-    pin: (appLabel) => `Add ${appLabel} to favorites`,
-    unpin: (appLabel) => `Remove ${appLabel} from favorites`,
     moved: (appLabel, position, total) => `${appLabel} moved to position ${position} of ${total}`,
     more: "More"
 };
@@ -112,7 +109,6 @@ function quoted(value: string): string {
 }
 
 const TILE = "data-launcher-tile";
-const STAR = "data-launcher-star";
 const MORE = "data-launcher-more";
 
 export function AppSwitcher({
@@ -122,8 +118,6 @@ export function AppSwitcher({
     linkAs: Anchor = "a",
     alert = false,
     order,
-    pinned = [],
-    onTogglePin,
     onArrange,
     firstScreen = FIRST_SCREEN,
     open,
@@ -160,10 +154,6 @@ export function AppSwitcher({
     /** The ids of the grid, in order. Absent, every app is drawn in the order
      *  given. An app the order does not name is not drawn until searched. */
     order?: readonly string[];
-    /** The ids pinned to the favorites, which is what the star says. */
-    pinned?: readonly string[];
-    /** Pin or unpin one app. Absent, no star is drawn. */
-    onTogglePin?: (appId: string) => void;
     /** The grid's whole new order, after a drag or a keyboard move. Only called
      *  when the order actually changed. Absent, the grid cannot be arranged. */
     onArrange?: (ids: string[]) => void;
@@ -232,7 +222,6 @@ export function AppSwitcher({
         onOpenChange?.(next);
     }
 
-    const pinnedIds = new Set(pinned);
     const byId = new Map(apps.map((app) => [app.id, app]));
     const searching = query.trim().length > 0;
     const arrangeable = Boolean(onArrange) && !searching;
@@ -311,7 +300,6 @@ export function AppSwitcher({
         const target = event.target as HTMLElement;
         const root = event.currentTarget;
         const isTile = target.hasAttribute(TILE);
-        const isStar = target.hasAttribute(STAR);
 
         // More sits between the grid and the options under it: up goes back to
         // the last row, down on to the options.
@@ -328,13 +316,12 @@ export function AppSwitcher({
             if (next instanceof HTMLElement) next.focus();
             return;
         }
-        if (!isTile && !isStar) return;
+        if (!isTile) return;
 
-        // Tab walks every tile and every star in reading order, which is the one
-        // way a keyboard reaches the stars - a menu refuses tab otherwise.
+        // Tab walks every tile in reading order - a menu refuses tab otherwise.
         if (event.key === "Tab") {
             const stops = [
-                ...root.querySelectorAll<HTMLElement>(`[${TILE}]:not([data-disabled]), [${STAR}]`)
+                ...root.querySelectorAll<HTMLElement>(`[${TILE}]:not([data-disabled])`)
             ].filter((stop) => stop === target || getComputedStyle(stop).display !== "none");
             const at = stops.indexOf(target);
             const next = stops[at + (event.shiftKey ? -1 : 1)];
@@ -345,7 +332,6 @@ export function AppSwitcher({
             else belowGrid(root)?.focus();
             return;
         }
-        if (!isTile) return;
 
         const id = target.getAttribute(TILE) ?? "";
         if (event.altKey && arrangeable) {
@@ -422,10 +408,7 @@ export function AppSwitcher({
                             key={app.id}
                             app={app}
                             active={app.id === currentAppId}
-                            pinned={pinnedIds.has(app.id)}
-                            onTogglePin={onTogglePin}
                             Anchor={Anchor}
-                            strings={strings}
                             drag={
                                 arrangeable
                                     ? {
@@ -526,31 +509,18 @@ function gridStep(
 }
 
 /**
- * One app: the icon, the name under it, and what is waiting inside it.
- *
- * The star is a menu item of its own laid over the tile's corner rather than a
- * button inside the link, which a menu item cannot hold - so tab lands on it
- * right after its app, and choosing it keeps the menu open. Shown on hover or
- * focus, and always on an app that is pinned, so what is pinned is never a
- * secret. Not drawn for a finger, which has no hover to reveal it with and
- * would only pin things by accident: apps are pinned and arranged from the
- * menu's own option on a phone.
+ * One app: the icon, the name under it, and what is waiting inside it. Dragged
+ * to arrange; a finger arranges from the menu's own option instead.
  */
 function AppTile({
     app,
     active,
-    pinned,
-    onTogglePin,
     Anchor,
-    strings,
     drag
 }: {
     app: PolarisApp;
     active: boolean;
-    pinned: boolean;
-    onTogglePin?: (appId: string) => void;
     Anchor: ElementType;
-    strings: AppSwitcherStrings;
     drag?: {
         start: (event: DragEvent<HTMLElement>) => void;
         over: (event: DragEvent<HTMLElement>) => void;
@@ -560,7 +530,6 @@ function AppTile({
     };
 }) {
     const Icon = app.icon;
-    const pinLabel = pinned ? strings.unpin(app.label) : strings.pin(app.label);
     return (
         <div
             className={cn("group/tile relative min-w-0", drag?.lifted && "opacity-40")}
@@ -605,25 +574,6 @@ function AppTile({
                     </span>
                 </Anchor>
             </DropdownMenuItem>
-            {onTogglePin && !app.locked ? (
-                <DropdownMenuItem
-                    {...{ [STAR]: app.id }}
-                    aria-label={pinLabel}
-                    title={pinLabel}
-                    onSelect={(event) => {
-                        event.preventDefault();
-                        onTogglePin(app.id);
-                    }}
-                    className={cn(
-                        "absolute right-0.5 top-0.5 size-6 justify-center rounded-md p-0 text-foreground-subtle hover:text-foreground focus:text-foreground",
-                        pinned
-                            ? "text-primary opacity-100"
-                            : "opacity-0 focus:opacity-100 group-hover/tile:opacity-100 [@media(hover:none)]:hidden"
-                    )}
-                >
-                    <Star className={cn("!size-3.5", pinned && "fill-current")} />
-                </DropdownMenuItem>
-            ) : null}
         </div>
     );
 }

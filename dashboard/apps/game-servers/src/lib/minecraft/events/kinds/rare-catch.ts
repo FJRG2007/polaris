@@ -95,9 +95,17 @@ export function catchLook(options: EventOptions<"rare-catch">): string[] {
 /** Whoever landed the treasure off a line this look. */
 export const READ_CATCHERS = `execute as @a[scores={${COUNT_NOW}=1..,${RECENT}=1..}] run data get entity @s Pos`;
 
+/**
+ * This look made the one the next is measured from. The count measured from is
+ * the most a player has had, never less: dropped on one look and picked up
+ * after a cast on another, a treasure - brought from before the start, or the
+ * one just caught - came back to where it was and was read as a new catch,
+ * over and over. A treasure dropped and genuinely caught again counts only
+ * once the count passes what it was.
+ */
 export function catchCommit(): string[] {
     return [
-        `execute as @a run scoreboard players operation @s ${COUNT_BEFORE} = @s ${COUNT}`,
+        `execute as @a run scoreboard players operation @s ${COUNT_BEFORE} > @s ${COUNT}`,
         `execute as @a run scoreboard players operation @s ${ROD_BEFORE} = @s ${ROD}`
     ];
 }
