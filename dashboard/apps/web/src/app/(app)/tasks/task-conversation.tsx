@@ -432,7 +432,11 @@ export function TimeSection({
                 <h3 className="text-sm font-medium">{t("time.title")}</h3>
                 <div className="flex items-center gap-2 text-xs text-muted-foreground">
                     <span>{t("time.tracked", { time: core.formatTrackedSeconds(tracked) })}</span>
-                    {estimate ? <span>{t("time.ofEstimate", { time: core.formatDurationMinutes(estimate) })}</span> : null}
+                    {estimate ? (
+                        <span>
+                            {t("time.ofEstimate", { time: core.formatDurationMinutes(estimate) })}
+                        </span>
+                    ) : null}
                     {used !== null && (
                         <span className={cn(used > 100 && "text-warning")}>({used}%)</span>
                     )}
@@ -498,7 +502,9 @@ export function TimeSection({
                                 {entry.note ? ` - ${entry.note}` : ""}
                             </span>
                             {entry.billable && (
-                                <span className="text-[0.6875rem] text-success">{t("time.billableTag")}</span>
+                                <span className="text-[0.6875rem] text-success">
+                                    {t("time.billableTag")}
+                                </span>
                             )}
                             {(canModerate || entry.userId === currentUserId) && !entry.running && (
                                 <button
