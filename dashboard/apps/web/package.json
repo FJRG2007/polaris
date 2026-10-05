@@ -9,6 +9,7 @@
         "dev": "next dev",
         "prebuild": "node scripts/copy-pdfjs-assets.mjs && node scripts/copy-audio-assets.mjs && node scripts/copy-video-assets.mjs && node scripts/copy-office-fonts.mjs && node scripts/copy-diagram-assets.mjs",
         "build": "next build",
+        "postbuild": "node scripts/check-client-paths.mjs",
         "start": "next start",
         "test": "vitest run --passWithNoTests",
         "typecheck": "tsc --noEmit",
