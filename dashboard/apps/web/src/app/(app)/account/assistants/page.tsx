@@ -73,9 +73,7 @@ export default async function AssistantsPage() {
     return (
         <div className="mx-auto flex max-w-2xl flex-col gap-4">
             <div>
-                <h1 className="text-[1.0625rem] font-semibold tracking-tight">
-                    {t("page.title")}
-                </h1>
+                <h1 className="text-[1.0625rem] font-semibold tracking-tight">{t("page.title")}</h1>
                 <p className="text-sm text-muted-foreground">{t("page.intro")}</p>
             </div>
             <Messages namespaces={["mcp"]}>

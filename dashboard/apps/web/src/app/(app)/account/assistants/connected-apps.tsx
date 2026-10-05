@@ -304,7 +304,10 @@ function ScopeGroups({ id, scopes }: { id: string; scopes: readonly string[] }) 
         return ta.has(key) ? ta(key as NamespaceKey<"account">) : title;
     };
     const rows = [
-        ...groups.map((group) => ({ title: areaName(group.title), scopes: group.scopes as string[] })),
+        ...groups.map((group) => ({
+            title: areaName(group.title),
+            scopes: group.scopes as string[]
+        })),
         ...(rest.length > 0 ? [{ title: ta("apiKeys.scopes.other"), scopes: rest }] : [])
     ];
     return (
@@ -370,17 +373,12 @@ function EditScopes({
                         )
                     }
                 />
-                {empty ? (
-                    <p className="text-xs text-danger">{t("connectedApps.pickOne")}</p>
-                ) : null}
+                {empty ? <p className="text-xs text-danger">{t("connectedApps.pickOne")}</p> : null}
                 <div className="mt-4 flex justify-end gap-2">
                     <Button variant="ghost" onClick={onCancel}>
                         {tc("actions.cancel")}
                     </Button>
-                    <Button
-                        disabled={unchanged || empty}
-                        onClick={() => onSave([...effective])}
-                    >
+                    <Button disabled={unchanged || empty} onClick={() => onSave([...effective])}>
                         {t("connectedApps.save")}
                     </Button>
                 </div>

@@ -174,7 +174,9 @@ describe("the setup steps", () => {
         expect(html).toContain('src="/logos/vscode.svg"');
         expect(html).toContain("Create MCP App");
         expect(html).toContain("Set Authentication to OAuth");
-        expect(html).toContain('href="https://developers.openai.com/api/docs/guides/developer-mode"');
+        expect(html).toContain(
+            'href="https://developers.openai.com/api/docs/guides/developer-mode"'
+        );
     });
 
     it("reads in Spanish", async () => {

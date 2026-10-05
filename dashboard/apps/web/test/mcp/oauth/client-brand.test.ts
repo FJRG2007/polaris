@@ -27,7 +27,9 @@ describe("recognising a connected app", () => {
 
     it("gives a borrowed name no mark", () => {
         expect(clientBrand("ChatGPT", ["https://chatgpt.com.example.test/cb"])).toBeNull();
-        expect(clientBrand("Claude", ["https://claude.ai/cb", "https://example.test/cb"])).toBeNull();
+        expect(
+            clientBrand("Claude", ["https://claude.ai/cb", "https://example.test/cb"])
+        ).toBeNull();
         expect(clientBrand("Cursor", ["http://cursor.com/cb"])).toBeNull();
         expect(clientBrand("Zed", ["http://127.0.0.1/cb"])).toBeNull();
         expect(clientBrand("", ["http://127.0.0.1/cb"])).toBeNull();

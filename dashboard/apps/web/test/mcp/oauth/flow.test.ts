@@ -806,15 +806,15 @@ describe("changing what a connected app may do", () => {
         );
 
         state.user = { ...state.user, id: BOB.id };
-        expect(
-            (await changeAppScopesAction({ id: app!.id, scopes: ["tasks.read"] })).error
-        ).toBe("connectedApps.changeFailed");
+        expect((await changeAppScopesAction({ id: app!.id, scopes: ["tasks.read"] })).error).toBe(
+            "connectedApps.changeFailed"
+        );
 
         state.user = { ...state.user, id: ADA.id };
         await revokeConnectedApp(ADA.id, app!.id);
-        expect(
-            (await changeAppScopesAction({ id: app!.id, scopes: ["tasks.read"] })).error
-        ).toBe("connectedApps.changeFailed");
+        expect((await changeAppScopesAction({ id: app!.id, scopes: ["tasks.read"] })).error).toBe(
+            "connectedApps.changeFailed"
+        );
         expect(
             (await changeAppScopesAction({ id: "not-a-uuid", scopes: ["tasks.read"] })).error
         ).toBe("connectedApps.changeFailed");
