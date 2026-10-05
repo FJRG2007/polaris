@@ -126,7 +126,7 @@
                 },
                 "origin": {
                     "label": "Solo desde la dirección en la que se aprobó",
-                    "hint": "{ip}"
+                    "hint": "{ip}. Para asistentes en tu propio equipo o red."
                 },
                 "list": {
                     "label": "Direcciones que elija",
@@ -134,7 +134,7 @@
                 },
                 "sessions": {
                     "label": "Solo donde tengo sesión iniciada",
-                    "hint": "Las direcciones de tus sesiones activas de Polaris. Deja de funcionar si cierras sesión en todas partes."
+                    "hint": "Las direcciones de tus sesiones activas de Polaris, para asistentes en tus propios equipos. Deja de funcionar si cierras sesión en todas partes."
                 }
             },
             "noOrigin": "No se guardó para esta conexión. Vuelve a conectarla para usar esta opción.",

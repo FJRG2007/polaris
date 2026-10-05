@@ -22,7 +22,7 @@ import { getTranslations } from "@/lib/i18n/request";
 import { newDeviceRefusal } from "@/lib/device-grace";
 import { MCP_SCOPES, expandScopes, orderScopes, type McpScope } from "@/lib/mcp/scope-table";
 import { localized } from "@/app/(app)/account/security/action-messages";
-import { ipPolicySchema, type IpPolicy } from "@/lib/mcp/oauth/ip-policy";
+import { ipPolicyNarrows, ipPolicySchema, type IpPolicy } from "@/lib/mcp/oauth/ip-policy";
 import {
     changeGrantScopes,
     findConnectedApp,
@@ -133,7 +133,7 @@ export async function setAppIpPolicyAction(
 
     // Narrowing where an app may call from is always allowed; anything that
     // could widen it is a change to a credential and waits out a new device.
-    if (stored.mode === "none" || stored.mode === "list") {
+    if (!ipPolicyNarrows(app.ipPolicy, stored)) {
         const blocked = await newDeviceRefusal(user);
         if (blocked) return localized({ error: blocked });
     }

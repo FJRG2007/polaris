@@ -104,3 +104,17 @@ export async function ipPolicyAllows(
         .filter((rule): rule is string => rule !== null);
     return rules.length > 0 && ipAllowed(ip, rules);
 }
+
+/** Whether `after` lets through nothing `before` did not: the one kind of rule
+ *  change that never needs waiting out a new device. */
+export function ipPolicyNarrows(before: IpPolicy, after: IpPolicy): boolean {
+    if (before.mode === "none") return true;
+    if (before.mode !== after.mode) return false;
+    if (after.mode !== "list") return true;
+    const allowed = new Set(before.allow);
+    const allowNarrows =
+        before.allow.length === 0 ||
+        (after.allow.length > 0 && after.allow.every((rule) => allowed.has(rule)));
+    const denied = new Set(after.deny);
+    return allowNarrows && before.deny.every((rule) => denied.has(rule));
+}

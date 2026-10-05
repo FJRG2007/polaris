@@ -146,7 +146,11 @@ export function ConnectedApps({ apps: initial }: { apps: ConnectedAppRow[] }) {
         setError(null);
         const before = apps;
         setApps((current) =>
-            current.map((entry) => (entry.id === app.id ? { ...entry, ipPolicy: policy } : entry))
+            current.map((entry) =>
+                entry.id === app.id
+                    ? { ...entry, ipPolicy: policy, lastRefusedAt: null, lastRefusedIp: null }
+                    : entry
+            )
         );
         const result = await setAppIpPolicyAction({ id: app.id, policy }).catch(() => ({
             error: t("connectedApps.ip.failed"),

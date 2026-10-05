@@ -126,7 +126,7 @@
                 },
                 "origin": {
                     "label": "Only the address it was approved from",
-                    "hint": "{ip}"
+                    "hint": "{ip}. For assistants on your own device or network."
                 },
                 "list": {
                     "label": "Addresses I choose",
@@ -134,7 +134,7 @@
                 },
                 "sessions": {
                     "label": "Only where I am signed in",
-                    "hint": "Addresses of your active Polaris sessions. It stops working when you sign out everywhere."
+                    "hint": "Addresses of your active Polaris sessions, for assistants on your own devices. It stops working when you sign out everywhere."
                 }
             },
             "noOrigin": "Not recorded for this connection. Connect it again to use this.",

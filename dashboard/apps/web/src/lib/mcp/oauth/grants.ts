@@ -636,7 +636,11 @@ export async function setGrantIpPolicy(
 ): Promise<boolean> {
     const changed = await prisma.oAuthGrant.updateMany({
         where: { id: grantId, userId, revokedAt: null },
-        data: { ipPolicy: policy.mode === "none" ? null : JSON.stringify(policy) }
+        data: {
+            ipPolicy: policy.mode === "none" ? null : JSON.stringify(policy),
+            lastRefusedAt: null,
+            lastRefusedIp: null
+        }
     });
     return changed.count === 1;
 }
