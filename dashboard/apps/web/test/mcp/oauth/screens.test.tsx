@@ -195,6 +195,7 @@ describe("the connected-assistants list", () => {
 
 describe("the boxes an app's permissions are changed with", () => {
     it("marks what the app never asked for, and ticks none of it", () => {
+        const toggle = vi.fn();
         const html = renderToStaticMarkup(
             withMessages(
                 <McpScopeChecklist
@@ -202,28 +203,32 @@ describe("the boxes an app's permissions are changed with", () => {
                     selected={["tasks.read"]}
                     effective={new Set(["tasks.read"])}
                     unrequested={new Set(["mail.read", "calendar.manage"])}
-                    onToggle={() => undefined}
+                    onToggle={toggle}
                 />
             )
         );
         expect((html.match(/Not asked for by this app/g) ?? []).length).toBe(2);
         expect((html.match(/checked=""/g) ?? []).length).toBe(1);
         expect(html).toContain("Create, change and delete events");
+        // Drawing the boxes changes nothing: only a click does.
+        expect(toggle).not.toHaveBeenCalled();
     });
 
     it("says that a reading scope comes with the managing one", () => {
+        const toggle = vi.fn();
         const html = renderToStaticMarkup(
             withMessages(
                 <McpScopeChecklist
                     offered={["calendar.read", "calendar.manage"]}
                     selected={["calendar.manage"]}
                     effective={new Set(["calendar.read", "calendar.manage"])}
-                    onToggle={() => undefined}
+                    onToggle={toggle}
                 />,
                 "es-ES"
             )
         );
         expect(html).toContain("Crear, cambiar y eliminar eventos");
         expect(html).toContain("Incluido con Crear, cambiar y eliminar eventos");
+        expect(toggle).not.toHaveBeenCalled();
     });
 });
