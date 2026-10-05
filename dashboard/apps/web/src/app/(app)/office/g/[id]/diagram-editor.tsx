@@ -42,13 +42,10 @@ function CanvasLoading() {
     );
 }
 
-const DiagramCanvas = dynamic(
-    async () => (await import("@polaris/diagrams")).DiagramCanvas,
-    {
-        ssr: false,
-        loading: () => <CanvasLoading />
-    }
-);
+const DiagramCanvas = dynamic(async () => (await import("@polaris/diagrams")).DiagramCanvas, {
+    ssr: false,
+    loading: () => <CanvasLoading />
+});
 
 /** Where the shapes live in the shared document. A map keyed by element id
  *  rather than an array: an array would make every move a change to the whole

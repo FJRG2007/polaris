@@ -257,7 +257,11 @@ describe("the diagram canvas's assets", () => {
         };
         walk(join(packageRoot, "src"));
         const styled = new Set(
-            [...built(".css").join("\n").matchAll(/\.((?:polaris-)?diagram[\w-]*)/g)].map((m) => m[1]!)
+            [
+                ...built(".css")
+                    .join("\n")
+                    .matchAll(/\.((?:polaris-)?diagram[\w-]*)/g)
+            ].map((m) => m[1]!)
         );
         expect([...styled].filter((name) => !code.includes(name))).toEqual([]);
     });
@@ -281,9 +285,10 @@ describe("a diagram saved before", () => {
                 // An empty list of bindings is stored as null by older saves and
                 // read back as an empty list, as the upstream editor always did.
                 const expected = key === "boundElements" ? (original[key] ?? []) : original[key];
-                expect((element as unknown as Record<string, unknown>)[key], `${original.id}.${key}`).toEqual(
-                    expected
-                );
+                expect(
+                    (element as unknown as Record<string, unknown>)[key],
+                    `${original.id}.${key}`
+                ).toEqual(expected);
             }
         }
     });
@@ -297,7 +302,9 @@ describe("a diagram saved before", () => {
         const back = [...copy.getMap<unknown>("shapes").values()];
         expect(back).toEqual(saved());
         const restored = canvas.restoreElements(back as never, null);
-        expect(restored.map((element) => [element.id, element.version, element.versionNonce])).toEqual([
+        expect(
+            restored.map((element) => [element.id, element.version, element.versionNonce])
+        ).toEqual([
             ["r1", 7, 42],
             ["t1", 3, 7]
         ]);

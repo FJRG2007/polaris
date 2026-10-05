@@ -55,7 +55,10 @@ export function laterOf<T extends SceneElement>(left: T, right: T): T {
  * shape, and forgetting it is how a shape somebody else deleted comes back the
  * next time this screen sends its scene.
  */
-export function reconcileScene<T extends SceneElement>(mine: readonly T[], theirs: readonly T[]): T[] {
+export function reconcileScene<T extends SceneElement>(
+    mine: readonly T[],
+    theirs: readonly T[]
+): T[] {
     const held = new Map<string, T>();
     for (const element of theirs) held.set(element.id, element);
     for (const element of mine) {
@@ -95,7 +98,11 @@ export function changedElements<T extends SceneElement>(
         const other = theirs.get(element.id);
         if (!other || laterOf(element, other) === element) {
             if (other && laterOf(element, other) === other) continue;
-            if (other && element.version === other.version && element.versionNonce === other.versionNonce) {
+            if (
+                other &&
+                element.version === other.version &&
+                element.versionNonce === other.versionNonce
+            ) {
                 continue;
             }
             changed.push(element);

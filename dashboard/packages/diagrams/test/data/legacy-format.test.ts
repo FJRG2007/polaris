@@ -6,7 +6,11 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { isValidDiagramData, isValidLibrary, serializeLibraryAsJSON } from "../../src/editor/data/json";
+import {
+    isValidDiagramData,
+    isValidLibrary,
+    serializeLibraryAsJSON
+} from "../../src/editor/data/json";
 import { decodeSvgBase64Payload } from "../../src/editor/scene/export";
 import { stringToBase64, encode } from "../../src/editor/data/encode";
 import { normalizeFile, getMimeType } from "../../src/editor/data/blob";
@@ -34,9 +38,17 @@ describe("legacy diagram files", () => {
 
     it("reads the scene from an SVG exported under the upstream MIME type", () => {
         const scene = { type: "excalidraw", elements: [] };
-        expect(JSON.parse(decodeSvgBase64Payload({ svg: svgWith("application/vnd.excalidraw+json", scene) }))).toEqual(scene);
-        expect(JSON.parse(decodeSvgBase64Payload({ svg: svgWith(MIME_TYPES.diagram, scene) }))).toEqual(scene);
-        expect(() => decodeSvgBase64Payload({ svg: svgWith("application/x-other", scene) })).toThrow("INVALID");
+        expect(
+            JSON.parse(
+                decodeSvgBase64Payload({ svg: svgWith("application/vnd.excalidraw+json", scene) })
+            )
+        ).toEqual(scene);
+        expect(
+            JSON.parse(decodeSvgBase64Payload({ svg: svgWith(MIME_TYPES.diagram, scene) }))
+        ).toEqual(scene);
+        expect(() =>
+            decodeSvgBase64Payload({ svg: svgWith("application/x-other", scene) })
+        ).toThrow("INVALID");
     });
 
     it("recognizes the upstream file extensions", async () => {

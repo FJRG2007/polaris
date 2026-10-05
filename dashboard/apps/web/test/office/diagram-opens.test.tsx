@@ -155,7 +155,8 @@ describe.each([
         // long enough for it to run its first rounds of effects.
         await waitFor(
             () => {
-                if (!container.querySelector(".polaris-diagram")) throw new Error("not mounted yet");
+                if (!container.querySelector(".polaris-diagram"))
+                    throw new Error("not mounted yet");
             },
             { timeout: 25_000 }
         );
@@ -184,7 +185,8 @@ describe("the diagram canvas's toolbar", () => {
         );
         await waitFor(
             () => {
-                if (!container.querySelector(".polaris-diagram")) throw new Error("not mounted yet");
+                if (!container.querySelector(".polaris-diagram"))
+                    throw new Error("not mounted yet");
             },
             { timeout: 25_000 }
         );
