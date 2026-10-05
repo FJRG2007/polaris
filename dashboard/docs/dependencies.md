@@ -39,25 +39,25 @@ those.
 
 Accepted today (until 2027-01-05):
 
-| Advisory | Package | Why it stays | Goes away when |
-| --- | --- | --- | --- |
-| GHSA-86w9-cpqp-85rv | node-forge | No fixed release. acme-client uses forge for keys, CSRs and PEM, never RSA signature verification. | node-forge ships a fix, or acme-client drops forge. |
-| GHSA-c475-qrg2-pj4r | basic-ftp | No fixed release. Only on Puppeteer's browser download, which the bridge image skips. | whatsapp-web.js moves to a Puppeteer without proxy-agent's FTP path. |
-| GHSA-jmr9-qjv8-65gv, GHSA-7pqw-9j4j-h8q3 | extract-zip | No fixed release. Only unpacks Puppeteer's browser download, which the bridge image skips. | Same as above. |
-| GHSA-vfj7-8cjw-p6xm | braces | No fixed release. Expands globs written in this repository (Tailwind 3 content paths, patch-package, sass's unused watch mode). | Tailwind 4 migration; patch-package replaced. |
-| GHSA-6g55-p6wh-862q, GHSA-r28c-9q8g-f849 | postcss | Next 15 and dymo-api's tw-to-css pin 8.4.31; see Overrides. Build-time CSS and an SDK path Polaris does not call. | Next 16; dymo-api replaced by direct calls. |
-| GHSA-28wg-ghj8-5hjv | nanoid | @univerjs/core 0.25 pins 5.1.11; every call passes a fixed positive size. | Univer 1.x, which drops nanoid. |
+| Advisory                                 | Package     | Why it stays                                                                                                                    | Goes away when                                                       |
+| ---------------------------------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------- |
+| GHSA-86w9-cpqp-85rv                      | node-forge  | No fixed release. acme-client uses forge for keys, CSRs and PEM, never RSA signature verification.                              | node-forge ships a fix, or acme-client drops forge.                  |
+| GHSA-c475-qrg2-pj4r                      | basic-ftp   | No fixed release. Only on Puppeteer's browser download, which the bridge image skips.                                           | whatsapp-web.js moves to a Puppeteer without proxy-agent's FTP path. |
+| GHSA-jmr9-qjv8-65gv, GHSA-7pqw-9j4j-h8q3 | extract-zip | No fixed release. Only unpacks Puppeteer's browser download, which the bridge image skips.                                      | Same as above.                                                       |
+| GHSA-vfj7-8cjw-p6xm                      | braces      | No fixed release. Expands globs written in this repository (Tailwind 3 content paths, patch-package, sass's unused watch mode). | Tailwind 4 migration; patch-package replaced.                        |
+| GHSA-6g55-p6wh-862q, GHSA-r28c-9q8g-f849 | postcss     | Next 15 and dymo-api's tw-to-css pin 8.4.31; see Overrides. Build-time CSS and an SDK path Polaris does not call.               | Next 16; dymo-api replaced by direct calls.                          |
+| GHSA-28wg-ghj8-5hjv                      | nanoid      | @univerjs/core 0.25 pins 5.1.11; every call passes a fixed positive size.                                                       | Univer 1.x, which drops nanoid.                                      |
 
 ## Overrides
 
 `overrides` in `package.json` force a version on transitive dependencies. Each
 one is a decision somebody has to undo later, so each is listed here.
 
-| Override | Why | Remove when |
-| --- | --- | --- |
-| `esbuild: >=0.25.0` | GHSA-67mh-4wv8-2f99: esbuild's dev server answered any origin before 0.25.0, and tsup and Vite pulled older copies. | No dependency requests esbuild below 0.25. |
-| `postcss: ^8.5.29` | GHSA-6g55-p6wh-862q, GHSA-r28c-9q8g-f849, GHSA-fxqj-rqcc-2cmp and the older `</style>` XSS: every postcss up to 8.5.22. | No dependency requests postcss below 8.5.29. |
-| `react`, `react-dom: 19.0.0` | One React in the whole tree: two copies break hooks at runtime. | Never, while this is a monorepo with one app. |
+| Override                     | Why                                                                                                                     | Remove when                                   |
+| ---------------------------- | ----------------------------------------------------------------------------------------------------------------------- | --------------------------------------------- |
+| `esbuild: >=0.25.0`          | GHSA-67mh-4wv8-2f99: esbuild's dev server answered any origin before 0.25.0, and tsup and Vite pulled older copies.     | No dependency requests esbuild below 0.25.    |
+| `postcss: ^8.5.29`           | GHSA-6g55-p6wh-862q, GHSA-r28c-9q8g-f849, GHSA-fxqj-rqcc-2cmp and the older `</style>` XSS: every postcss up to 8.5.22. | No dependency requests postcss below 8.5.29.  |
+| `react`, `react-dom: 19.0.0` | One React in the whole tree: two copies break hooks at runtime.                                                         | Never, while this is a monorepo with one app. |
 
 npm does not apply these to every node. The ones it skips today are Next's own
 `postcss@8.4.31`, dymo-api's tw-to-css and Univer's exact nanoid pin, which is why

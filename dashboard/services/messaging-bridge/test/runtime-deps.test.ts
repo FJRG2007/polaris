@@ -24,14 +24,15 @@ describe("runtime image dependencies", () => {
     );
 
     it("installs every external runtime dependency", () => {
-        const external = Object.keys(manifest.dependencies).filter((name) => !name.startsWith("@polaris/"));
+        const external = Object.keys(manifest.dependencies).filter(
+            (name) => !name.startsWith("@polaris/")
+        );
         expect([...pinned.keys()].sort()).toEqual(external.sort());
     });
 
-    it.each(Object.entries(manifest.dependencies).filter(([name]) => !name.startsWith("@polaris/")))(
-        "installs %s at the version package.json pins",
-        (name, version) => {
-            expect(pinned.get(name)).toBe(version);
-        }
-    );
+    it.each(
+        Object.entries(manifest.dependencies).filter(([name]) => !name.startsWith("@polaris/"))
+    )("installs %s at the version package.json pins", (name, version) => {
+        expect(pinned.get(name)).toBe(version);
+    });
 });

@@ -21,7 +21,8 @@ const NAME = "PortableImportMetaUrl";
 /** The stand-in for a module's `import.meta.url`: workspace-relative, never absolute. */
 export function portableModuleUrl(resource, root) {
     const path = relative(root, resource).split(sep).join("/");
-    const inside = path && !path.startsWith("../") && !/^[A-Za-z]:/.test(path) && !path.startsWith("/");
+    const inside =
+        path && !path.startsWith("../") && !/^[A-Za-z]:/.test(path) && !path.startsWith("/");
     return `file:///${inside ? path : resource.split(/[\\/]/).pop()}`;
 }
 
@@ -36,9 +37,13 @@ export class PortableImportMetaUrl {
     apply(compiler) {
         compiler.hooks.compilation.tap(NAME, (_compilation, { normalModuleFactory }) => {
             const handler = (parser) => {
-                const urlOf = () => portableModuleUrl(parser.state.module.resource ?? "", this.root);
+                const urlOf = () =>
+                    portableModuleUrl(parser.state.module.resource ?? "", this.root);
                 parser.hooks.expression.for("import.meta.url").tap(NAME, (expression) => {
-                    const dependency = new this.ConstDependency(JSON.stringify(urlOf()), expression.range);
+                    const dependency = new this.ConstDependency(
+                        JSON.stringify(urlOf()),
+                        expression.range
+                    );
                     dependency.loc = expression.loc;
                     parser.state.module.addPresentationalDependency(dependency);
                     return true;
@@ -46,9 +51,13 @@ export class PortableImportMetaUrl {
                 // Constant folding (`import.meta.url ? a : b`, comparisons) reads the
                 // evaluated value, so it has to be the portable one too.
                 if (this.BasicEvaluatedExpression) {
-                    parser.hooks.evaluateIdentifier.for("import.meta.url").tap(NAME, (expression) =>
-                        new this.BasicEvaluatedExpression().setString(urlOf()).setRange(expression.range)
-                    );
+                    parser.hooks.evaluateIdentifier
+                        .for("import.meta.url")
+                        .tap(NAME, (expression) =>
+                            new this.BasicEvaluatedExpression()
+                                .setString(urlOf())
+                                .setRange(expression.range)
+                        );
                 }
             };
             for (const type of ["javascript/auto", "javascript/esm", "javascript/dynamic"]) {
