@@ -50,6 +50,7 @@ import { MuteOptions, type MenuParts } from "./mute-menu";
 import { LeaveDialog } from "./leave-dialog";
 import { runAction } from "@/lib/run-action";
 import { NicknameDialog } from "./nickname-dialog";
+import { useRemoveFriend } from "./remove-friend";
 import { ChannelSettingsDialog } from "./channel-settings-dialog";
 import { DuplicateChannelDialog } from "./duplicate-channel-dialog";
 import { InviteDialog } from "./invite-dialog";
@@ -82,6 +83,7 @@ import {
     ShieldOff,
     Star,
     Trash2,
+    UserMinus,
     UserPlus,
     Video,
     Volume2,
@@ -111,7 +113,8 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
     Input,
-    Skeleton
+    Skeleton,
+    useToast
 } from "@polaris/ui";
 
 /** How the shared mute list draws itself inside a right-click menu. */
@@ -363,7 +366,9 @@ export function ChatSidebar() {
                     className="flex h-8 w-full items-center gap-2 rounded-md border border-border bg-field px-2 text-left text-sm text-foreground-subtle transition-colors hover:border-border-strong hover:text-muted-foreground"
                 >
                     <Search className="size-3.5 shrink-0" aria-hidden="true" />
-                    <span className="min-w-0 flex-1 truncate">{t("sidebar.findOrStartAConversation")}</span>
+                    <span className="min-w-0 flex-1 truncate">
+                        {t("sidebar.findOrStartAConversation")}
+                    </span>
                 </button>
             </div>
 
@@ -413,7 +418,9 @@ export function ChatSidebar() {
                         onToggle={() => toggle("dm")}
                     >
                         {directs.length === 0 ? (
-                            <p className="px-2 py-1 text-xs text-foreground-subtle">{t("sidebar.nobodyYet")}</p>
+                            <p className="px-2 py-1 text-xs text-foreground-subtle">
+                                {t("sidebar.nobodyYet")}
+                            </p>
                         ) : (
                             directs.map((channel) => (
                                 <Row
@@ -564,9 +571,11 @@ export function ChatSidebar() {
                                                             channel.unread > 0
                                                     )
                                                     .map((channel) => channel.id);
-                                                const result = await actions.markChannelsReadAction({
-                                                    channelIds: ids
-                                                });
+                                                const result = await actions.markChannelsReadAction(
+                                                    {
+                                                        channelIds: ids
+                                                    }
+                                                );
                                                 setError(result.error ?? "");
                                                 refresh();
                                             }}
@@ -576,7 +585,8 @@ export function ChatSidebar() {
                                                     fold
                                                         ? categories
                                                               .filter(
-                                                                  (entry) => entry.spaceId === space.id
+                                                                  (entry) =>
+                                                                      entry.spaceId === space.id
                                                               )
                                                               .map((entry) => entry.id)
                                                         : []
@@ -613,7 +623,9 @@ export function ChatSidebar() {
                                                 <DropdownMenuTrigger asChild>
                                                     <button
                                                         type="button"
-                                                        aria-label={t("sidebar.moreFor", { name: category.name })}
+                                                        aria-label={t("sidebar.moreFor", {
+                                                            name: category.name
+                                                        })}
                                                         className="rounded p-1 text-muted-foreground transition-colors hover:text-foreground"
                                                     >
                                                         <Plus className="size-3.5" />
@@ -977,27 +989,27 @@ function Section({
     children: React.ReactNode;
 }) {
     const heading = (
-            <div {...handle} className="group relative flex items-center gap-1 rounded px-1 data-[state=open]:bg-card-hover">
-                <DropLine shown={dropping === "before"} where="top" />
-                <DropLine shown={dropping === "after"} where="bottom" />
-                <button
-                    type="button"
-                    onClick={onToggle}
-                    aria-expanded={!folded}
-                    className="flex min-w-0 flex-1 items-center gap-1 rounded px-1 py-1 text-left text-[0.6875rem] font-medium uppercase tracking-[0.04em] text-foreground-subtle transition-colors hover:text-foreground"
-                >
-                    <ChevronDown
-                        className={cn(
-                            "size-3 shrink-0 transition-transform",
-                            folded && "-rotate-90"
-                        )}
-                    />
-                    <span className="truncate" title={label}>
-                        {label}
-                    </span>
-                </button>
-                {action}
-            </div>
+        <div
+            {...handle}
+            className="group relative flex items-center gap-1 rounded px-1 data-[state=open]:bg-card-hover"
+        >
+            <DropLine shown={dropping === "before"} where="top" />
+            <DropLine shown={dropping === "after"} where="bottom" />
+            <button
+                type="button"
+                onClick={onToggle}
+                aria-expanded={!folded}
+                className="flex min-w-0 flex-1 items-center gap-1 rounded px-1 py-1 text-left text-[0.6875rem] font-medium uppercase tracking-[0.04em] text-foreground-subtle transition-colors hover:text-foreground"
+            >
+                <ChevronDown
+                    className={cn("size-3 shrink-0 transition-transform", folded && "-rotate-90")}
+                />
+                <span className="truncate" title={label}>
+                    {label}
+                </span>
+            </button>
+            {action}
+        </div>
     );
     return (
         <div
@@ -1204,13 +1216,20 @@ function Row({
             {/* Said quietly, and only because a row that sits above a newer
                 conversation with nothing to explain it reads as a bug. */}
             {channel?.pinned && (
-                <Pin className="size-3 shrink-0 text-foreground-subtle" aria-label={t("sidebar.pinned")} />
+                <Pin
+                    className="size-3 shrink-0 text-foreground-subtle"
+                    aria-label={t("sidebar.pinned")}
+                />
             )}
             {occupancy && (
                 <span
                     className="shrink-0 rounded bg-muted px-1 text-[0.625rem] font-medium tabular-nums leading-4 text-muted-foreground"
-                    aria-label={t("sidebar.placesTaken", { places: occupancy.replace("/", t("sidebar.of")) })}
-                    title={t("sidebar.placesTaken", { places: occupancy.replace("/", t("sidebar.of")) })}
+                    aria-label={t("sidebar.placesTaken", {
+                        places: occupancy.replace("/", t("sidebar.of"))
+                    })}
+                    title={t("sidebar.placesTaken", {
+                        places: occupancy.replace("/", t("sidebar.of"))
+                    })}
                 >
                     {occupancy}
                 </span>
@@ -1274,8 +1293,12 @@ function RowMenu({
     const baseUrl = useAppUrl();
     const router = useRouter();
     const here = usePathname();
-    const { blocked, refresh, spaces } = useChat();
+    const { blocked, friends, refresh, spaces } = useChat();
     const t = useTranslations("chat");
+    const toast = useToast();
+    const [removeFriend, removeFriendDialog] = useRemoveFriend((message) =>
+        toast.show({ title: message })
+    );
     const [naming, setNaming] = useState(false);
     const [leaving, setLeaving] = useState(false);
     const [inviting, setInviting] = useState(false);
@@ -1284,7 +1307,8 @@ function RowMenu({
     const space = channel.spaceId
         ? (spaces.find((entry) => entry.id === channel.spaceId) ?? null)
         : null;
-    const mayInvite = space !== null && (space.access !== "member" || space.visibility !== "private");
+    const mayInvite =
+        space !== null && (space.access !== "member" || space.visibility !== "private");
     const [error, setError] = useState("");
     // A one-to-one conversation, which is the only kind where there is one
     // person to have a name for. A group is called what the group is called.
@@ -1427,6 +1451,18 @@ function RowMenu({
                     {person && (
                         <>
                             <ContextMenuSeparator />
+                            {/* Lighter than blocking, and above it: only for a
+                                friend, and asked first. */}
+                            {friends.has(person.id) && (
+                                <ContextMenuItem
+                                    onSelect={() =>
+                                        void removeFriend({ id: person.id, name: person.name })
+                                    }
+                                >
+                                    <UserMinus className="size-3.5" />
+                                    {t("removeFriend.menu")}
+                                </ContextMenuItem>
+                            )}
                             <ContextMenuItem
                                 variant={blocked.has(person.id) ? undefined : "danger"}
                                 onSelect={async () => {
@@ -1502,6 +1538,7 @@ function RowMenu({
             </ContextMenu>
             {/* Outside the menu, which closes on the item that opens this: a dialog
             mounted inside one is unmounted the moment it is asked for. */}
+            {removeFriendDialog}
             <NicknameDialog
                 open={naming}
                 onOpenChange={setNaming}

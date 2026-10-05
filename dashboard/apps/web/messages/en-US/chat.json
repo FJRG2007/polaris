@@ -1390,5 +1390,11 @@
         "quiet": "You arrive about {db} dB quieter than everyone else. Turn your microphone up, set Background noise to Standard, or check the input level your computer gives this microphone.",
         "atMax": "You arrive about {db} dB quieter than everyone else, with your microphone volume already at its highest. Move closer to it, set Background noise to Standard, or raise the input level your computer gives this microphone.",
         "turnUp": "Turn up"
+    },
+    "removeFriend": {
+        "menu": "Remove friend",
+        "title": "Stop being friends with {name}?",
+        "description": "They lose what you show your friends and keep everything else. Either of you can ask again.",
+        "confirm": "Remove friend"
     }
 }

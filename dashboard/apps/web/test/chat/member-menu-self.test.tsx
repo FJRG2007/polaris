@@ -20,7 +20,12 @@ vi.mock("next/navigation", () => ({
     useRouter: () => ({ push: (to: string) => pushed.push(to) })
 }));
 vi.mock("@/app/(app)/chat/chat-context", () => ({
-    useChat: () => ({ spaces: [], blocked: new Set<string>(), refresh: () => undefined })
+    useChat: () => ({
+        spaces: [],
+        blocked: new Set<string>(),
+        friends: new Set<string>(),
+        refresh: () => undefined
+    })
 }));
 vi.mock("@/app/(app)/chat/actions", () => ({}));
 vi.mock("@/app/(app)/account/privacy/actions", () => ({
@@ -59,7 +64,8 @@ function open(viewerId: string, onMention?: (text: string) => void) {
             >
                 <button type="button">Ana row</button>
             </MemberMenu>
-        </PersonPressContext.Provider>, { wrapper: MessagesWrapper }
+        </PersonPressContext.Provider>,
+        { wrapper: MessagesWrapper }
     );
     fireEvent.contextMenu(screen.getByText("Ana row"));
     return cards;
@@ -112,7 +118,8 @@ describe("the menu opened without a right-click", () => {
                 >
                     <button type="button">Ana row</button>
                 </MemberMenu>
-            </PersonPressContext.Provider>, { wrapper: MessagesWrapper }
+            </PersonPressContext.Provider>,
+            { wrapper: MessagesWrapper }
         );
         fireEvent.pointerDown(screen.getByText("Ana row"), {
             button: 0,

@@ -42,6 +42,7 @@ vi.mock("@/app/(app)/account/report-actions", () => ({
 vi.mock("@/app/(app)/chat/chat-context", () => ({
     useChat: () => ({
         blocked: new Set<string>(),
+        friends: new Set<string>(),
         refresh: () => undefined,
         spaces: [],
         channels: [
@@ -127,7 +128,8 @@ function list(
             onReact={() => undefined}
             onStar={() => undefined}
             onDelete={() => undefined}
-        />, { wrapper: MessagesWrapper }
+        />,
+        { wrapper: MessagesWrapper }
     );
 }
 

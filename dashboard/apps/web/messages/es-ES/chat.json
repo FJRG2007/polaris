@@ -1390,5 +1390,11 @@
         "quiet": "Llegas unos {db} dB más bajo que los demás. Sube el micrófono, pon Ruido de fondo en Estándar o revisa el nivel de entrada que tu equipo da a este micrófono.",
         "atMax": "Llegas unos {db} dB más bajo que los demás, con el volumen del micrófono ya al máximo. Acércate a él, pon Ruido de fondo en Estándar o sube el nivel de entrada que tu equipo le da.",
         "turnUp": "Subir"
+    },
+    "removeFriend": {
+        "menu": "Quitar amigo",
+        "title": "¿Dejar de ser amigos de {name}?",
+        "description": "Pierde lo que muestras a tus amigos y conserva todo lo demás. Cualquiera de los dos puede volver a pedirlo.",
+        "confirm": "Quitar amigo"
     }
 }

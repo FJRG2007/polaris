@@ -71,6 +71,7 @@ vi.mock("@/app/(app)/account/report-actions", () => ({
 vi.mock("@/app/(app)/chat/chat-context", () => ({
     useChat: () => ({
         blocked: new Set<string>(),
+        friends: new Set<string>(),
         refresh: () => undefined,
         viewerId: "ada",
         viewerName: "Ada",

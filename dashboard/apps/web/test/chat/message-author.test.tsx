@@ -43,6 +43,7 @@ vi.mock("@/app/(app)/account/report-actions", () => ({
 vi.mock("@/app/(app)/chat/chat-context", () => ({
     useChat: () => ({
         blocked: new Set<string>(),
+        friends: new Set<string>(),
         refresh: () => undefined,
         channels: [
             {
@@ -103,7 +104,8 @@ function list() {
             onReact={() => undefined}
             onStar={() => undefined}
             onDelete={() => undefined}
-        />, { wrapper: MessagesWrapper }
+        />,
+        { wrapper: MessagesWrapper }
     );
 }
 
@@ -138,7 +140,10 @@ describe("right-clicking somebody's name", () => {
         // its menu altogether, which is the way this actually breaks.
         const user = userEvent.setup();
         list();
-        await user.pointer({ target: screen.getByRole("button", { name: "grace" }), keys: "[MouseRight]" });
+        await user.pointer({
+            target: screen.getByRole("button", { name: "grace" }),
+            keys: "[MouseRight]"
+        });
 
         expect(screen.queryByText("Report this account")).not.toBeNull();
         // And the message menu is not the one that opened: the two menus name

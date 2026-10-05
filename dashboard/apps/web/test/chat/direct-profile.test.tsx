@@ -73,6 +73,7 @@ vi.mock("@/app/(app)/chat/chat-context", () => ({
     useChat: () => ({
         viewerId: "ada",
         blocked: new Set<string>(),
+        friends: new Set<string>(),
         spaces: [],
         channels: [CHANNEL],
         refresh: () => undefined
@@ -100,7 +101,8 @@ function panel() {
             open
             onOpenChange={() => undefined}
             onMention={() => undefined}
-        />, { wrapper: MessagesWrapper }
+        />,
+        { wrapper: MessagesWrapper }
     );
 }
 

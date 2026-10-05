@@ -98,7 +98,8 @@ function buildChat(): Record<string, unknown> {
         setActiveSpaceId: () => undefined,
         refresh: () => undefined,
         loaded: true,
-        blocked: new Set<string>()
+        blocked: new Set<string>(),
+        friends: new Set<string>()
     };
 }
 
@@ -146,7 +147,12 @@ describe("right-clicking a channel", () => {
         const offered = items();
         expect(offered).toContain("Mark as unread");
         expect(offered).toContain("Copy link");
-        for (const admin of ["Invite people", "Edit channel", "Duplicate channel", "Delete channel"]) {
+        for (const admin of [
+            "Invite people",
+            "Edit channel",
+            "Duplicate channel",
+            "Delete channel"
+        ]) {
             expect(offered).not.toContain(admin);
         }
     });

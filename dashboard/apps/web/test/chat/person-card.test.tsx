@@ -86,6 +86,7 @@ vi.mock("@/app/(app)/chat/chat-context", () => ({
     useChat: () => ({
         viewerId: ADA,
         blocked: new Set<string>(),
+        friends: new Set<string>(),
         spaces: [],
         channels: [CHANNEL],
         refresh: () => undefined
@@ -171,7 +172,8 @@ function conversation(body?: string) {
                 onStar={() => undefined}
                 onDelete={() => undefined}
             />
-        </PersonCardProvider>, { wrapper: MessagesWrapper }
+        </PersonCardProvider>,
+        { wrapper: MessagesWrapper }
     );
 }
 
@@ -231,7 +233,11 @@ describe("pressing a name on a message", () => {
         await user.click(screen.getByRole("button", { name: "Ada" }));
         const card = await openCard();
         expect(await within(card).findByText("Ada Lovelace")).toBeDefined();
-        expect(within(card).getByRole("link", { name: /Edit profile/ }).getAttribute("href")).toBe("/account");
+        expect(
+            within(card)
+                .getByRole("link", { name: /Edit profile/ })
+                .getAttribute("href")
+        ).toBe("/account");
         expect(within(card).queryByRole("button", { name: /^Message$/ })).toBeNull();
     });
 });
@@ -270,7 +276,9 @@ describe("a mention", () => {
     });
 
     it("stays a label where nothing opens a card, as under a task", () => {
-        render(<RichText value={`ask [@Grace Hopper](polaris:user/${GRACE}) about it`} />, { wrapper: MessagesWrapper });
+        render(<RichText value={`ask [@Grace Hopper](polaris:user/${GRACE}) about it`} />, {
+            wrapper: MessagesWrapper
+        });
         expect(screen.queryByRole("button", { name: "@Grace Hopper" })).toBeNull();
         expect(screen.getByText("@Grace Hopper")).toBeDefined();
     });
@@ -285,7 +293,8 @@ describe("the roster", () => {
                 open
                 onOpenChange={() => undefined}
                 onMention={() => undefined}
-            />, { wrapper: MessagesWrapper }
+            />,
+            { wrapper: MessagesWrapper }
         );
         await user.click(await screen.findByRole("button", { name: /Grace Hopper/ }));
         const card = await openCard();
