@@ -20,7 +20,7 @@
  */
 
 import { cn } from "@polaris/ui";
-import type { SVGProps } from "react";
+import type { JSX, SVGProps } from "react";
 import { initialsInk, tintFor } from "@polaris/core";
 import type { AppManifest } from "@/lib/apps/catalog";
 import { DiscordMark, SteamMark } from "@/components/brand-icons";
