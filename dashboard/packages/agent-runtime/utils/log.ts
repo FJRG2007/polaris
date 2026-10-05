@@ -4,10 +4,10 @@
 
 import { AsyncLocalStorage } from "node:async_hooks";
 import * as core from "@actions/core";
-import { table } from "table";
 import { type AgentUsage, formatCostUsd } from "../agents/shared.ts";
 import { isDebugEnabled } from "./activity.ts";
 import { isGitHubActions, isInsideDocker } from "./globals.ts";
+import { textTable } from "./textTable.ts";
 
 // --- log prefix via AsyncLocalStorage ---
 
@@ -212,7 +212,7 @@ export async function writeSummary(text: string): Promise<void> {
 }
 
 /**
- * Print a formatted table using the table package
+ * Print a formatted, box-drawn table (utils/textTable.ts)
  */
 function printTable(
   rows: Array<Array<{ data: string; header?: boolean } | string>>,
@@ -222,7 +222,7 @@ function printTable(
 ): void {
   const { title } = options || {};
 
-  // Convert rows to string arrays for the table package
+  // Plain strings per cell; the header flag only marked them for the old package
   const tableData = rows.map((row) =>
     row.map((cell) => {
       if (typeof cell === "string") {
@@ -232,7 +232,7 @@ function printTable(
     })
   );
 
-  const formatted = table(tableData);
+  const formatted = textTable(tableData);
 
   if (title) {
     core.info(prefixLines(`\n${title}`));
@@ -286,7 +286,7 @@ export const log = {
   /** Print a formatted box with text */
   box,
 
-  /** Print a formatted table using the table package */
+  /** Print a formatted, box-drawn table */
   table: printTable,
 
   /** Print a separator line */

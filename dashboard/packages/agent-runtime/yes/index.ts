@@ -1,7 +1,6 @@
 import { performance } from "node:perf_hooks";
 import { setTimeout as sleep } from "node:timers/promises";
-import { LRUCache } from "lru-cache";
-import hash from "object-hash";
+import { hashKey, TtlLru } from "./cache.ts";
 import type { StandardSchemaV1 } from "./standard-schema.ts";
 
 export type { StandardSchemaV1 } from "./standard-schema.ts";
@@ -15,7 +14,7 @@ function getCacheKeyString(value: unknown): string {
   }
   try {
     if (typeof value === "string") return value;
-    return hash(value as object, { unorderedObjects: true, unorderedArrays: true });
+    return hashKey(value);
   } catch (error) {
     throw new Error(
       `cache key cannot be hashed: ${error instanceof Error ? error.message : String(error)}`
@@ -236,17 +235,11 @@ function _op(fn: AnyAsyncFn, options: OpOptions): OpFunction<AnyAsyncFn> {
   const shouldCache = options.ttl !== undefined;
 
   const lruCache = shouldCache
-    ? new LRUCache<string, {}>({
-        max: options.maxItems ?? 1000,
-        ttl: options.ttl!,
-      })
+    ? new TtlLru<string, {}>(options.maxItems ?? 1000, options.ttl!)
     : null;
 
   const keyMap = shouldCache
-    ? new LRUCache<string, {}>({
-        max: options.maxItems ?? 1000,
-        ttl: options.ttl!,
-      })
+    ? new TtlLru<string, {}>(options.maxItems ?? 1000, options.ttl!)
     : null;
 
   const inFlightPromises = new Map<string, Promise<unknown>>();
