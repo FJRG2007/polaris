@@ -4,7 +4,18 @@ import { WorkerInTheMainChunkError, WorkerUrlNotDefinedError } from "../errors";
 
 import type { Commands } from "./subset-shared.chunk";
 
-let shouldUseWorkers = typeof Worker !== "undefined";
+/**
+ * Subsetting runs on the page's own thread.
+ *
+ * Upstream started a worker from this chunk's own `import.meta.url`. The host
+ * app's bundler rewrites a bare `import.meta.url` to the file path the module
+ * was built from, so the worker could never start (a `file://` script) and that
+ * path - the build machine's directory layout - shipped in every client bundle.
+ * Subsetting is only done for an SVG export with text in it, so the main thread
+ * is the simple, honest answer; the worker pool stays for a host that can load
+ * one.
+ */
+let shouldUseWorkers = false;
 
 /**
  * Tries to subset glyphs in a font based on the used codepoints, returning the font as dataurl.

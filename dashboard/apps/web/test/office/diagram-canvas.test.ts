@@ -236,6 +236,13 @@ describe("the diagram canvas's assets", () => {
         expect([...hosts].filter((host) => !NAMED_NOT_FETCHED.has(host))).toEqual([]);
     });
 
+    it("never asks where its own file is", () => {
+        // A host bundler rewrites a bare `import.meta.url` to the path the module
+        // was built from: a worker that cannot start, and the build machine's
+        // directory layout in every client bundle.
+        expect(built(".js").join("\n")).not.toContain("import.meta.url");
+    });
+
     it("style only classes the canvas actually puts on its elements", () => {
         // The canvas's own class names were renamed on the way in; a selector
         // renamed one way and the markup another is a canvas whose layers stack

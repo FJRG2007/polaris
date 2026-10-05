@@ -53,7 +53,7 @@ export class WorkerPool<T, R> {
       throw new WorkerUrlNotDefinedError();
     }
 
-    if (!import.meta.url || workerUrl.toString() === import.meta.url) {
+    if (workerUrl.protocol === "file:") {
       // in case the worker code is bundled into the main chunk
       throw new WorkerInTheMainChunkError();
     }
