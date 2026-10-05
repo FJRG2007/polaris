@@ -481,6 +481,8 @@
             "deleted": "Filter deleted.",
             "full": "This mailbox has as many filters as it can hold.",
             "savedRunning": "Filter saved. Running it over the inbox.",
+            "notForwarded": "Mail already here is not forwarded.",
+            "unverified": "Not forwarding: {to} is not a verified address on your account.",
             "unreachable": "Polaris could not be reached. Try again."
         }
     }

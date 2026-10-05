@@ -1114,10 +1114,12 @@ export function mailPatternProblem(source: string): "invalid" | "unsafe" | null 
 }
 
 /** Runs a filter's pattern over a stretch of text. The server passes one that
- *  gives up after a time limit; the default runs it as it is. */
+ *  gives up after a time limit, so a pattern saved before the save-time check
+ *  still runs there; the default has no limit and refuses what that check would. */
 export type MailPatternTest = (pattern: string, text: string) => boolean;
 
-const plainPatternTest: MailPatternTest = (pattern, text) => new RegExp(pattern, "i").test(text);
+const plainPatternTest: MailPatternTest = (pattern, text) =>
+    !mailPatternProblem(pattern) && new RegExp(pattern, "i").test(text);
 
 /**
  * Text as a filter compares it: one plain space wherever there was any run of
@@ -1178,7 +1180,6 @@ export function mailConditionHolds(
         case "ends-with":
             return haystack.trimEnd().endsWith(needle);
         case "matches":
-            if (mailPatternProblem(condition.value)) return false;
             try {
                 return testPattern(
                     condition.value,

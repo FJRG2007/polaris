@@ -481,6 +481,8 @@
             "deleted": "Filtro eliminado.",
             "full": "Este buzón ya tiene todos los filtros que puede tener.",
             "savedRunning": "Filtro guardado. Aplicándolo a la bandeja de entrada.",
+            "notForwarded": "El correo que ya está aquí no se reenvía.",
+            "unverified": "No se reenvía: {to} no es una dirección verificada de tu cuenta.",
             "unreachable": "No se ha podido conectar con Polaris. Inténtalo de nuevo."
         }
     }

@@ -663,24 +663,32 @@ export async function saveRule(
         action: ruleId ? "mail.filter.update" : "mail.filter.create",
         targetType: "mail-filter",
         targetId: id,
-        // The filter's name and switch; what it matches on can quote somebody's
-        // correspondence and stays out of the log.
-        metadata: { accountId, name: rule.name, enabled: rule.enabled }
+        // The switch only: the name can be a subject or an address, and what it
+        // matches on can quote somebody's correspondence, so both stay out.
+        metadata: { accountId, enabled: rule.enabled }
     });
 
     // Running a new rule over what is already there is what somebody expects
     // from "and do this to the ones I already have", and it is the reason the
     // checkbox exists. Behind the response, because it can move thousands of
     // messages and nobody should watch a spinner for it. Only this rule: running
-    // every rule again would do again what the others already did - and a
-    // forwarding rule would send old mail a second time.
+    // every rule again would do again what the others already did. Its forward
+    // steps are left out of that run (see `applyRuleToInbox`).
     if (rule.applyToExisting) runOverInbox(accountId, id);
     return id;
 }
 
+/** The filters being run over an inbox right now, so a second click waits for
+ *  the first run instead of doing everything again alongside it. */
+const inboxRuns = new Set<string>();
+
 /** Start a run of one filter over the inbox, behind the caller. */
 function runOverInbox(accountId: string, ruleId: string): void {
-    void applyRuleToInbox(accountId, ruleId).catch((caught) => console.error(caught));
+    if (inboxRuns.has(ruleId)) return;
+    inboxRuns.add(ruleId);
+    void applyRuleToInbox(accountId, ruleId)
+        .catch((caught) => console.error(caught))
+        .finally(() => inboxRuns.delete(ruleId));
 }
 
 /** Run a saved filter over the mail already in the inbox, from the list's own
@@ -760,7 +768,7 @@ export async function duplicateRule(
         action: "mail.filter.create",
         targetType: "mail-filter",
         targetId: id,
-        metadata: { accountId, name, copyOf: ruleId }
+        metadata: { accountId, copyOf: ruleId }
     });
     return id;
 }
@@ -771,7 +779,8 @@ const EXISTING_LIMIT = 5000;
 const EXISTING_PAGE = 250;
 
 /**
- * Run one rule over what is already in the inbox, newest first.
+ * Run one rule over what is already in the inbox, newest first, without its
+ * forward steps.
  *
  * Read a page at a time with only the columns a rule looks at, matched in
  * memory, and acted on only where it matched - so a rule that matches ten
@@ -789,7 +798,11 @@ export async function applyRuleToInbox(
     });
     if (!row) return 0;
     const rule = toRule(row);
-    const actions = core.mailFilterActions(rule.definition);
+    // Never forwarded: mail already here has had its chance to be sent on when it
+    // arrived, and a run that can be started again would send it again each time.
+    const actions = core
+        .mailFilterActions(rule.definition)
+        .filter((action) => action.kind !== "forward");
     if (actions.length === 0) return 0;
     // The inbox by id, so the pages below walk the folder's own sent-date index.
     const inbox = (

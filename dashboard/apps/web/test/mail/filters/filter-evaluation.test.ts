@@ -194,6 +194,15 @@ describe("a filter's pattern", () => {
         expect(Date.now() - started).toBeLessThan(2_000);
         expect(timedPatternTest("^PR run", "PR run failed")).toBe(true);
     });
+
+    it("still runs on the server a pattern saved before the static check", () => {
+        const older = filter(
+            [{ match: "all", items: [condition("subject", "matches", ".*PR.*run.*CI.*main.*")] }],
+            []
+        );
+        expect(core.mailFilterMatches(older, MESSAGE, timedPatternTest)).toBe(true);
+        expect(core.mailFilterMatches(older, MESSAGE)).toBe(false);
+    });
 });
 
 describe("the filter schema", () => {

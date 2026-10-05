@@ -15,6 +15,7 @@
  * deleting it, saving it - shows at once and is put back if the server refuses.
  */
 
+import Link from "next/link";
 import * as core from "@polaris/core";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
@@ -142,6 +143,13 @@ export function RulesView({
         labelName: (id) => labels.find((label) => label.id === id)?.name
     };
 
+    /** A run over the inbox leaves forwards out, which the toast says when the
+     *  filter has one. */
+    const notForwarded = (definition: core.MailFilterDefinition) =>
+        definition.actions.some((step) => step.kind === "forward")
+            ? ` ${t("rules.list.notForwarded")}`
+            : "";
+
     /** A row the server has taken: its own id from now on, and no spinner. The
      *  refresh that follows brings the server's copy, but the row must not wait
      *  on it to stop saying it is saving. */
@@ -215,7 +223,9 @@ export function RulesView({
             }
             landed(accountKey, temporary, answer);
             toast.show({
-                title: draft.applyToExisting ? t("rules.list.savedRunning") : t("rules.saved")
+                title: draft.applyToExisting
+                    ? `${t("rules.list.savedRunning")}${notForwarded(definition)}`
+                    : t("rules.saved")
             });
             router.refresh();
         })();
@@ -316,7 +326,7 @@ export function RulesView({
             `run-${rule.id}`,
             (current) => current,
             () => runRuleOverInboxAction(account.id, rule.id),
-            t("rules.list.running", { name: rule.name })
+            `${t("rules.list.running", { name: rule.name })}${notForwarded(rule.definition)}`
         );
 
     if (editing) {
@@ -396,6 +406,14 @@ export function RulesView({
                 {mine.map((rule, index) => {
                     const stops = core.mailFilterStops(rule.definition);
                     const sentence = words.describeFilter(rule.definition, lookup, t);
+                    // Forwards are only sent to a verified address, so one that is
+                    // not verified (any more) is a step that does nothing.
+                    const unverified = rule.definition.actions.flatMap((step) =>
+                        step.kind === "forward" &&
+                        !forwardTargets.some((one) => core.sameAddress(one, step.to))
+                            ? [step.to]
+                            : []
+                    );
                     return (
                         <li
                             key={rule.id}
@@ -426,6 +444,19 @@ export function RulesView({
                                             ? t("rules.matched", { count: rule.matchCount })
                                             : ""}
                                     </p>
+                                    {unverified.length > 0 ? (
+                                        <p className="break-words text-[11px] text-warning [overflow-wrap:anywhere]">
+                                            {t("rules.list.unverified", {
+                                                to: unverified.join(", ")
+                                            })}{" "}
+                                            <Link
+                                                href="/account/details"
+                                                className="underline underline-offset-2 hover:text-foreground"
+                                            >
+                                                {t("rules.editor.verifyAddress")}
+                                            </Link>
+                                        </p>
+                                    ) : null}
                                 </div>
                                 <div className="flex shrink-0 items-center gap-0.5">
                                     <Switch
