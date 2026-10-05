@@ -373,14 +373,18 @@ OAuth 2.1 with Polaris as its own authorization server.
   carry `iss` (RFC 9207).
 - The SSE endpoint is the same resource as `/api/mcp`: each request is
   answered by the `/api/mcp` handler, so the token, permissions, address rules
-  and rate limits are the same. The GET opens a stream that names where to POST;
+  and rate limits are the same, and naming `/api/mcp/sse` as the resource gets
+  tokens for `/api/mcp` too. The GET opens a stream that names where to POST;
   a POST is accepted only from the credential that opened its stream (a
   refreshed token of the same connection counts), and its reply arrives on that
-  stream. One connection may hold four streams open at once.
-- Access tokens last an hour and work only on `/api/mcp` at the address they
-  were issued for (RFC 8707 resource indicators). Refresh tokens last 30 days
-  and change on every use; presenting an old one ends the whole connection, as
-  does exchanging a code twice.
+  stream. One connection may hold four streams open at once, 500 across the
+  whole instance; a stream stays open at most 12 hours, and a credential may
+  open no more than 30 a minute.
+- Access tokens last an hour and work only on `/api/mcp` (and, as the same
+  resource, `/api/mcp/sse`) at the address they were issued for (RFC 8707
+  resource indicators). Refresh tokens last 30 days and change on every use;
+  presenting an old one ends the whole connection, as does exchanging a code
+  twice.
 - Polaris stores only SHA-256 hashes of codes, tokens and client secrets.
 - The consent page cannot be shown inside a frame.
 
