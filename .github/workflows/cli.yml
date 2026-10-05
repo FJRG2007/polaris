@@ -32,9 +32,9 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: "22"
           cache: npm
@@ -63,7 +63,7 @@ jobs:
           mkdir -p "$RUNNER_TEMP/cli"
           cp packages/cli/dist/polaris.mjs packages/cli/scripts/install.sh packages/cli/scripts/install.ps1 "$RUNNER_TEMP/cli/"
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: polaris-cli
           path: ${{ runner.temp }}/cli/*
@@ -76,12 +76,12 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: polaris-cli
           path: cli
       - name: Attach to release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ github.ref_name }}
           name: Polaris CLI ${{ github.ref_name }}

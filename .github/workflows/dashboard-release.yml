@@ -19,7 +19,7 @@ jobs:
   hostd:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
@@ -43,7 +43,7 @@ jobs:
           cp target/x86_64-unknown-linux-musl/release/polaris-hostd "$STAGE/polaris-hostd-x86_64"
 
       - name: Attach to release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ github.ref_name }}
           name: ${{ github.ref_name }}
