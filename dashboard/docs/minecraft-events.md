@@ -968,7 +968,8 @@ A new kind follows all of them. A change to an old kind must not undo one.
   given (`stash.sameExperience`), and a retry finds it so and adds nothing.
   An add is believed only when the experience moved. A player seen gone
   before their experience could be asked for keeps it owed on the run, given
-  when they are next on, instead of being marked failed for the operator.
+  when they are next on, instead of being marked failed for the operator
+  (`46f60e0a0`).
 
 ### The flow of a run
 
