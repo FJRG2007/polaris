@@ -23,6 +23,7 @@ import { prisma } from "@polaris/db";
 import * as fetcher from "@/lib/safe-fetch";
 import { parseStringList, stringifyList } from "@polaris/core";
 import { generateToken, hashToken, tokenMatchesHash } from "@polaris/core/tokens";
+import { hostOf, logRefusal } from "./log";
 import {
     MAX_URI_LENGTH,
     TOKEN_AUTH_METHODS,
@@ -290,37 +291,71 @@ const metadataSchema = z.object({
     client_name: z.string().max(1000).optional(),
     client_uri: z.string().max(MAX_URI_LENGTH).optional(),
     redirect_uris: z.array(z.string().max(MAX_URI_LENGTH)).min(1).max(MAX_REDIRECT_URIS),
-    token_endpoint_auth_method: z.string().max(64).optional()
+    token_endpoint_auth_method: z.string().max(64).optional(),
+    token_endpoint_auth_methods_supported: z.array(z.string().max(64)).max(20).optional()
 });
+
+/** A metadata document accepted, or why it was not. */
+export type MetadataCheck =
+    | { ok: true; name: string; clientUri: string | null; redirectUris: string[] }
+    | { ok: false; reason: string };
 
 /**
  * Check a fetched metadata document against the address it came from. Pure.
  *
  * The document's client_id has to be that address exactly - otherwise any page
  * could claim to be any app - and every redirect address has to be one this
- * server would accept from a registration. Only public clients: a document that
- * says it authenticates with a key pair is one this server cannot verify, so it
- * is refused rather than treated as if it said `none`.
+ * server would accept from a registration.
+ *
+ * Only public clients: this server holds no secret for such an app and does not
+ * verify a key pair. The method used is one both ends support, as SEP-3149 and
+ * OpenAI's client have it, so a document that lists its methods
+ * (`token_endpoint_auth_methods_supported`) is accepted when `none` is among
+ * them, whatever its single legacy `token_endpoint_auth_method` prefers -
+ * ChatGPT's prefers `private_key_jwt` and lists `none` beside it. A document
+ * that can only authenticate with a key is refused rather than treated as if it
+ * said `none`.
  */
-export function checkMetadataDocument(
-    address: string,
-    body: unknown
-): { name: string; clientUri: string | null; redirectUris: string[] } | null {
+export function checkMetadataDocument(address: string, body: unknown): MetadataCheck {
     const parsed = metadataSchema.safeParse(body);
-    if (!parsed.success || parsed.data.client_id !== address) return null;
-    const method = parsed.data.token_endpoint_auth_method ?? "none";
-    if (method !== "none") return null;
-    const redirectUris = [...new Set(parsed.data.redirect_uris)];
-    if (!redirectUris.every((uri) => acceptableRedirectUri(uri))) return null;
+    if (!parsed.success) {
+        const issue = parsed.error.issues[0];
+        const where = issue?.path.join(".") || "body";
+        return {
+            ok: false,
+            reason: `not a client metadata document (${where}: ${issue?.message ?? "not valid"})`
+        };
+    }
+    const document = parsed.data;
+    if (document.client_id !== address) {
+        return { ok: false, reason: "its client_id is not the address it was read from" };
+    }
+    const methods = document.token_endpoint_auth_methods_supported ?? [
+        document.token_endpoint_auth_method ?? "none"
+    ];
+    if (!methods.includes("none")) {
+        return {
+            ok: false,
+            reason: `no public-client token method (offers ${methods.join(", ") || "nothing"})`
+        };
+    }
+    const redirectUris = [...new Set(document.redirect_uris)];
+    const unsafe = redirectUris.find((uri) => !acceptableRedirectUri(uri));
+    if (unsafe !== undefined) {
+        return { ok: false, reason: `redirect address not accepted (host ${hostOf(unsafe)})` };
+    }
     return {
-        name: cleanClientName(parsed.data.client_name),
-        clientUri: cleanClientUri(parsed.data.client_uri),
+        ok: true,
+        name: cleanClientName(document.client_name),
+        clientUri: cleanClientUri(document.client_uri),
         redirectUris
     };
 }
 
-/** Read a metadata document from its address, or null when it cannot be had. */
-async function fetchMetadataDocument(url: URL): Promise<unknown> {
+/** Read a metadata document from its address, or say why it could not be. */
+async function fetchMetadataDocument(
+    url: URL
+): Promise<{ ok: true; body: unknown } | { ok: false; reason: string }> {
     try {
         const response = await fetcher.configuredRequest(
             url.toString(),
@@ -332,15 +367,22 @@ async function fetchMetadataDocument(url: URL): Promise<unknown> {
             { allowPrivate: false }
         );
         // No redirects: the document is the one at the address the app named.
-        if (response.status !== 200) return null;
+        if (response.status !== 200) {
+            return { ok: false, reason: `the address answered ${response.status}, not 200` };
+        }
         const bytes = await fetcher.readCapped(
             response as unknown as Parameters<typeof fetcher.readCapped>[0],
             METADATA_MAX_BYTES
         );
-        if (!bytes) return null;
-        return JSON.parse(new TextDecoder().decode(bytes)) as unknown;
-    } catch {
-        return null;
+        if (!bytes) return { ok: false, reason: `empty, or over ${METADATA_MAX_BYTES} bytes` };
+        try {
+            return { ok: true, body: JSON.parse(new TextDecoder().decode(bytes)) as unknown };
+        } catch {
+            return { ok: false, reason: "not JSON" };
+        }
+    } catch (error) {
+        const name = error instanceof Error ? error.name : "error";
+        return { ok: false, reason: `could not be fetched (${name})` };
     }
 }
 
@@ -363,22 +405,43 @@ export async function storedClient(clientId: string): Promise<OAuthClientRecord 
     return row ? record(row) : null;
 }
 
+/** Why a metadata-document client could not be had: its document could not be
+ *  read this time (`unreachable`), or it was read and is not one this server
+ *  accepts (`rejected`), which no retry changes. */
+export type ClientFailure = "unreachable" | "rejected";
+
+/** A client looked up for an authorization request, or why there is none. */
+export type ClientLookup =
+    | { readonly client: OAuthClientRecord; readonly failure?: undefined }
+    | { readonly client: null; readonly failure?: ClientFailure };
+
 /**
  * The client an authorization request names. A metadata document is read when
  * it has not been, or not for a day; a copy that cannot be refreshed is kept
  * rather than locking its app out because its host was briefly down.
  */
-export async function resolveClient(clientId: string): Promise<OAuthClientRecord | null> {
-    if (!clientId || clientId.length > MAX_URI_LENGTH) return null;
+export async function lookupClient(clientId: string): Promise<ClientLookup> {
+    if (!clientId || clientId.length > MAX_URI_LENGTH) return { client: null };
     const row = await prisma.oAuthClient.findUnique({ where: { clientId }, select: SELECT });
     const address = metadataDocumentUrl(clientId);
-    if (!address) return row && row.source === "registered" ? record(row) : null;
+    if (!address) return { client: row && row.source === "registered" ? record(row) : null };
 
     const fresh = row?.fetchedAt && Date.now() - row.fetchedAt.getTime() < METADATA_TTL_MS;
-    if (row && fresh) return record(row);
+    if (row && fresh) return { client: record(row) };
 
-    const document = checkMetadataDocument(clientId, await fetchMetadataDocument(address));
-    if (!document) return row ? record(row) : null;
+    const fetched = await fetchMetadataDocument(address);
+    const document = fetched.ok
+        ? checkMetadataDocument(clientId, fetched.body)
+        : { ok: false as const, reason: fetched.reason };
+    if (!document.ok) {
+        logRefusal("metadata document", {
+            client_id: clientId,
+            reason: document.reason,
+            kept: row ? "the copy read earlier" : undefined
+        });
+        if (row) return { client: record(row) };
+        return { client: null, failure: fetched.ok ? "rejected" : "unreachable" };
+    }
     const saved = await prisma.oAuthClient.upsert({
         where: { clientId },
         create: {
@@ -398,7 +461,12 @@ export async function resolveClient(clientId: string): Promise<OAuthClientRecord
         },
         select: SELECT
     });
-    return record(saved);
+    return { client: record(saved) };
+}
+
+/** The client an authorization request names, or null. */
+export async function resolveClient(clientId: string): Promise<OAuthClientRecord | null> {
+    return (await lookupClient(clientId)).client;
 }
 
 /**

@@ -438,6 +438,13 @@ OAuth 2.1 with Polaris as its own authorization server.
   their Client ID Metadata Document, which Polaris fetches. Redirect addresses
   must be https, or http to `localhost`, `127.0.0.1` or `[::1]`; they are matched
   exactly, except that a loopback address may use any port (RFC 8252).
+- Only public clients are accepted: a registration or metadata document that
+  can only authenticate with a key pair is refused. One that lists several
+  token methods (as ChatGPT's does) is accepted when `none` is among them,
+  whatever method it prefers.
+- A registration, metadata document or authorization Polaris refuses is
+  logged on the server with its reason, so a connection that fails on screen
+  can be diagnosed without guessing.
 - PKCE with S256 is required. Codes last five minutes and work once. Answers
   carry `iss` (RFC 9207).
 - The SSE endpoint is the same resource as `/api/mcp`: each request is
@@ -463,9 +470,11 @@ OAuth 2.1 with Polaris as its own authorization server.
   connect from their own servers, so Polaris has to be reachable from the
   internet on the address you gave them. Claude Code, Cursor and VS Code only
   need to reach it from your computer.
-- **"This connection cannot continue".** The link did not come from an app
-  Polaris can identify, or would send you to an address the app never
-  registered. Start the connection again from the app.
+- **"This connection cannot continue".** Polaris does not recognize the app,
+  could not read the details it publishes about itself, does not accept those
+  details, or the link would send you to an address the app never registered.
+  Start the connection again from the app; if it keeps happening, remove
+  Polaris from the app and add it back.
 - **A tool says the connection needs a scope.** Connect the app again and tick
   that permission, or ask an administrator for it if it is not offered.
 - **It stopped working.** Check **Account > AI assistants**: if it is not

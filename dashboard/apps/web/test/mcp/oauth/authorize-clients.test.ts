@@ -43,7 +43,15 @@ const client = {
     source: "registered" as const
 };
 
-const resolve = async (id: string) => (id === client.clientId ? client : null);
+const UNREACHABLE = "https://app.example/oauth/client.json";
+const REFUSED = "https://app.example/oauth/refused.json";
+
+const resolve = async (id: string) => {
+    if (id === client.clientId) return { client };
+    if (id === UNREACHABLE) return { client: null, failure: "unreachable" as const };
+    if (id === REFUSED) return { client: null, failure: "rejected" as const };
+    return { client: null };
+};
 
 function params(overrides: Record<string, string | undefined> = {}) {
     return {
@@ -79,6 +87,16 @@ describe("an authorization request", () => {
             reason: "client"
         });
         expect(await check({ client_id: undefined })).toEqual({ kind: "unsafe", reason: "client" });
+        // An app named by a metadata address whose document could not be read,
+        // or was read and refused, is told apart, and still never redirected.
+        expect(await check({ client_id: UNREACHABLE })).toEqual({
+            kind: "unsafe",
+            reason: "clientDetails"
+        });
+        expect(await check({ client_id: REFUSED })).toEqual({
+            kind: "unsafe",
+            reason: "clientRefused"
+        });
         for (const redirect of [
             "https://attacker.example/cb",
             "https://app.example/cb/../steal",
@@ -238,29 +256,54 @@ describe("client metadata documents", () => {
             redirect_uris: ["http://localhost/callback", "http://127.0.0.1/callback"],
             token_endpoint_auth_method: "none"
         });
-        expect(document?.name).toBe("Claude Code");
+        expect(document.ok && document.name).toBe("Claude Code");
+    });
+
+    it("settles the token method on one both ends support (SEP-3149)", () => {
+        const base = { client_id: address, redirect_uris: ["https://a.example/cb"] };
+        // ChatGPT: prefers a key, supports none as well.
+        expect(
+            checkMetadataDocument(address, {
+                ...base,
+                token_endpoint_auth_method: "private_key_jwt",
+                token_endpoint_auth_methods_supported: ["none", "private_key_jwt"]
+            }).ok
+        ).toBe(true);
+        // Only a key: nothing this server can check.
+        expect(
+            checkMetadataDocument(address, {
+                ...base,
+                token_endpoint_auth_method: "none",
+                token_endpoint_auth_methods_supported: ["private_key_jwt"]
+            }).ok
+        ).toBe(false);
+        expect(
+            checkMetadataDocument(address, { ...base, token_endpoint_auth_methods_supported: [] })
+                .ok
+        ).toBe(false);
     });
 
     it("refuses one that claims to be another app, uses keys, or registers unsafe addresses", () => {
+        const refusal = (body: unknown) => {
+            const result = checkMetadataDocument(address, body);
+            return result.ok ? null : result.reason;
+        };
         expect(
-            checkMetadataDocument(address, {
+            refusal({
                 client_id: "https://evil.example/meta",
                 redirect_uris: ["https://a.example/cb"]
             })
-        ).toBeNull();
+        ).toContain("client_id");
         expect(
-            checkMetadataDocument(address, {
+            refusal({
                 client_id: address,
                 redirect_uris: ["https://a.example/cb"],
                 token_endpoint_auth_method: "private_key_jwt"
             })
-        ).toBeNull();
+        ).toContain("private_key_jwt");
         expect(
-            checkMetadataDocument(address, {
-                client_id: address,
-                redirect_uris: ["http://evil.example/cb"]
-            })
-        ).toBeNull();
-        expect(checkMetadataDocument(address, "nope")).toBeNull();
+            refusal({ client_id: address, redirect_uris: ["http://evil.example/cb"] })
+        ).toContain("evil.example");
+        expect(refusal("nope")).toContain("not a client metadata document");
     });
 });

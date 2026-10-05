@@ -19,7 +19,9 @@
         "later": "Puedes cambiarla o desconectarla cuando quieras en Cuenta > Asistentes de IA.",
         "errorTitle": "Esta conexión no puede continuar",
         "errors": {
-            "client": "Este enlace no indica una app que Polaris pueda identificar. Vuelve a iniciar la conexión desde la app.",
+            "client": "Polaris no reconoce la app que intenta conectarse. Vuelve a iniciar la conexión desde la app. Si vuelve a pasar, quita Polaris de la app y añádelo de nuevo.",
+            "clientDetails": "Polaris no ha podido leer los datos que esta app publica sobre sí misma, así que no puede comprobar adónde devolverte. Vuelve a conectar desde la app dentro de unos minutos.",
+            "clientRefused": "Polaris no acepta los datos que esta app publica sobre sí misma, así que no puede conectarla. Volver a intentarlo no lo cambiará.",
             "redirect": "Este enlace te enviaría a una dirección que la app nunca registró, así que se ha detenido. Vuelve a iniciar la conexión desde la app.",
             "viewingAs": "Estás viendo Polaris como otra persona. Deja de verlo como ella para conectar una app a tu propia cuenta.",
             "tooMany": "Demasiados intentos de conexión. Espera unos minutos y vuelve a empezar desde la app.",

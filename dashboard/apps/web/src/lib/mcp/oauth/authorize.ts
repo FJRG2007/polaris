@@ -15,8 +15,9 @@
 
 import { validChallenge } from "./pkce";
 import { requestedScopes } from "./scopes";
+import { hostOf, logRefusal } from "./log";
 import type { McpScope } from "@/lib/mcp/scope-table";
-import { resolveClient, type OAuthClientRecord } from "./clients";
+import { lookupClient, type ClientLookup, type OAuthClientRecord } from "./clients";
 import {
     MAX_URI_LENGTH,
     canonicalResource,
@@ -40,8 +41,11 @@ export interface AuthorizationRequest {
 }
 
 /** Why the screen cannot even send the app an error: there is no address that
- *  is safe to send it to. */
-export type UnsafeReason = "client" | "redirect";
+ *  is safe to send it to. `clientDetails` is an app named by its metadata
+ *  address whose document could not be read; `clientRefused` is one whose
+ *  document was read and is not one this server accepts; `client` is an id
+ *  this instance does not recognize. */
+export type UnsafeReason = "client" | "clientDetails" | "clientRefused" | "redirect";
 
 export type AuthorizationCheck =
     | { readonly kind: "ok"; readonly request: AuthorizationRequest }
@@ -62,18 +66,39 @@ export function answerUrl(
 }
 
 /**
- * Check one request. `resolve` is the client lookup, a parameter so a test can
+ * Check one request. `lookup` is the client lookup, a parameter so a test can
  * hand one in without a database.
  */
 export async function checkAuthorizationRequest(
     params: AuthorizationParams,
     origin: string,
     supportedScopes: readonly McpScope[],
-    resolve: (clientId: string) => Promise<OAuthClientRecord | null> = resolveClient
+    lookup: (clientId: string) => Promise<ClientLookup> = lookupClient
 ): Promise<AuthorizationCheck> {
     const clientId = params.client_id ?? "";
-    const client = clientId && clientId.length <= MAX_URI_LENGTH ? await resolve(clientId) : null;
-    if (!client) return { kind: "unsafe", reason: "client" };
+    const found: ClientLookup =
+        clientId && clientId.length <= MAX_URI_LENGTH ? await lookup(clientId) : { client: null };
+    const client = found.client;
+    if (!client) {
+        // A document that could not be read is worth retrying; one that was
+        // read and refused is not, and an unrecognized id is neither.
+        const reason: UnsafeReason =
+            found.failure === "unreachable"
+                ? "clientDetails"
+                : found.failure === "rejected"
+                  ? "clientRefused"
+                  : "client";
+        logRefusal("authorization", {
+            reason: {
+                clientDetails: "app details could not be read",
+                clientRefused: "app details were refused",
+                client: "unknown client_id"
+            }[reason],
+            client_id: clientId || null,
+            redirect_host: hostOf(params.redirect_uri)
+        });
+        return { kind: "unsafe", reason };
+    }
 
     // OAuth 2.1 lets an app with exactly one registered address leave it out.
     // Not a loopback one: its port is chosen at run time, so the registered
@@ -84,6 +109,12 @@ export async function checkAuthorizationRequest(
         if (!only.startsWith("http://")) redirectUri = only;
     }
     if (!redirectUri || !redirectMatches(client.redirectUris, redirectUri)) {
+        logRefusal("authorization", {
+            reason: "redirect_uri is not one the app registered",
+            client_id: clientId,
+            redirect_host: hostOf(redirectUri),
+            registered_hosts: client.redirectUris.map(hostOf).join(", ")
+        });
         return { kind: "unsafe", reason: "redirect" };
     }
 

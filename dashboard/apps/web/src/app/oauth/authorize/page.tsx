@@ -31,7 +31,11 @@ import { Messages } from "@/components/i18n/messages";
 import { currentOrigin } from "@/lib/mcp/oauth/origin";
 import { guardedUser, requireUser, resolveSession } from "@/lib/session";
 import { Card, CardBody, CardHeader, CardTitle, PolarisMark } from "@polaris/ui";
-import { checkAuthorizationRequest, readParams } from "@/lib/mcp/oauth/authorize";
+import {
+    checkAuthorizationRequest,
+    readParams,
+    type UnsafeReason
+} from "@/lib/mcp/oauth/authorize";
 
 export const dynamic = "force-dynamic";
 
@@ -42,11 +46,7 @@ const WINDOW_MS = 10 * 60 * 1000;
 
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;
 
-async function ConsentError({
-    reason
-}: {
-    reason: "client" | "redirect" | "viewingAs" | "tooMany";
-}) {
+async function ConsentError({ reason }: { reason: UnsafeReason | "viewingAs" | "tooMany" }) {
     const t = await getTranslations("mcp");
     return (
         <main className="grid min-h-dvh place-items-center p-4">
