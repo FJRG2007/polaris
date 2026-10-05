@@ -523,6 +523,19 @@ describe("registration", () => {
         expect(body.error).toBe("slow_down");
     });
 
+    it("logs a throttled address once per window, not once per request", async () => {
+        state.rateLimited = true;
+        state.ip = "198.51.100.77";
+        const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+        try {
+            for (let i = 0; i < 5; i++) expect((await registerClient()).status).toBe(429);
+            const lines = warn.mock.calls.map(([line]) => String(line));
+            expect(lines.filter((line) => line.includes("rate limited"))).toHaveLength(1);
+        } finally {
+            warn.mockRestore();
+        }
+    });
+
     it("refuses a body over the cap without reading it", async () => {
         const response = await register.POST(
             new Request(`${ORIGIN}/api/oauth/register`, {

@@ -26,6 +26,21 @@ const HOUR = 60 * 60 * 1000;
 const PER_ADDRESS_PER_HOUR = 20;
 /** For the whole instance, so many addresses together cannot fill the table. */
 const PER_INSTANCE_PER_HOUR = 500;
+/** Throttled keys already logged, until their window ends; bounded so many addresses cannot grow it. */
+const loggedUntil = new Map<string, number>();
+const MAX_LOGGED_KEYS = 1000;
+
+/** True the first time a key is refused in its window, so a flood logs one line instead of one per request. */
+function firstRefusalInWindow(key: string, retryAfterMs: number): boolean {
+    const now = Date.now();
+    if ((loggedUntil.get(key) ?? 0) > now) return false;
+    if (loggedUntil.size >= MAX_LOGGED_KEYS) {
+        for (const [logged, until] of loggedUntil) if (until <= now) loggedUntil.delete(logged);
+        if (loggedUntil.size >= MAX_LOGGED_KEYS) return false;
+    }
+    loggedUntil.set(key, now + retryAfterMs);
+    return true;
+}
 
 export async function POST(request: Request): Promise<Response> {
     const ip = (await clientIp()) ?? "unknown";
@@ -35,11 +50,14 @@ export async function POST(request: Request): Promise<Response> {
     ] as const) {
         const throttle = await rateLimit(key, limit, HOUR);
         if (!throttle.ok) {
-            logRefusal("registration", {
-                reason: key.endsWith(":all")
-                    ? "rate limited (whole instance)"
-                    : "rate limited (per address)"
-            });
+            if (firstRefusalInWindow(key, throttle.retryAfterMs)) {
+                logRefusal("registration", {
+                    reason: key.endsWith(":all")
+                        ? "rate limited (whole instance)"
+                        : "rate limited (per address)",
+                    retry_after_s: Math.ceil(throttle.retryAfterMs / 1000)
+                });
+            }
             return slowDown(throttle.retryAfterMs);
         }
     }
