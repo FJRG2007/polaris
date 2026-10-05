@@ -62,7 +62,6 @@ export interface ClientGuide {
 
 const url: CopyField = { kind: "url", value: (urls) => urls.http };
 const name: CopyField = { kind: "name", value: () => setup.DISPLAY_NAME };
-const oauth: CopyField = { kind: "auth", value: () => "OAuth" };
 const command = (value: CopyField["value"]): CopyField => ({ kind: "command", value });
 const config = (value: CopyField["value"]): CopyField => ({ kind: "config", value });
 const transport = (value: string): CopyField => ({ kind: "transport", value: () => value });
@@ -98,7 +97,9 @@ export const CLIENT_GUIDES: readonly ClientGuide[] = [
             { key: "step1" },
             { key: "step2" },
             { key: "step3", copy: [name, url] },
-            { key: "step4", copy: [oauth] },
+            // Authentication is picked from a list, not typed: bold in the
+            // step is enough, there is nothing to copy.
+            { key: "step4" },
             { key: "step5" },
             { key: "step6" }
         ],

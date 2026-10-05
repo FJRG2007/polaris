@@ -139,8 +139,14 @@ const NO_RULES_OF_ITS_OWN = { allowedCidrs: [], allowedCountries: [], allowedCon
  */
 /** A connected app whose own address rule refused this call. */
 const IP_REFUSED = Symbol("ip-refused");
+/** The account's own network rules (or an administrator's) refused the address. */
+const ACCOUNT_REFUSED = Symbol("account-refused");
+const ACCOUNT_REFUSED_DESCRIPTION =
+    "This account's network rules do not allow the address this call came from. An assistant that calls from its own servers, such as ChatGPT, needs that address or country allowed under Account > Access.";
 
-async function callerFor(request: Request): Promise<McpCaller | typeof IP_REFUSED | null> {
+async function callerFor(
+    request: Request
+): Promise<McpCaller | typeof IP_REFUSED | typeof ACCOUNT_REFUSED | null> {
     const header = request.headers.get("authorization") ?? "";
     const [scheme, ...rest] = header.trim().split(/\s+/);
     if (scheme?.toLowerCase() !== "bearer") return null;
@@ -154,7 +160,17 @@ async function callerFor(request: Request): Promise<McpCaller | typeof IP_REFUSE
         if (!access) return null;
         const ip = await clientIp();
         const decision = await evaluateAccountAccess(access.userId, ip, NO_RULES_OF_ITS_OWN);
-        if (!decision.allowed) return null;
+        // The token is good: telling the client to sign in again (a 401) would
+        // only loop, and it hid this refusal entirely - an assistant calling from
+        // its own servers abroad was told "action discovery failed" and nothing
+        // else. A 403 that says why, and a line in the log.
+        if (!decision.allowed) {
+            console.warn(
+                "polaris: mcp refused by account network rules",
+                JSON.stringify({ grantId: access.grantId, country: decision.country ?? null })
+            );
+            return ACCOUNT_REFUSED;
+        }
         // The rule the person set on this one connection, read on every call
         // so a change applies at once.
         const guarded = {
@@ -294,9 +310,49 @@ async function answer(
 ): Promise<JsonRpcResponse | null> {
     const refused = await overBudget(message, caller, tools);
     if (refused) return refused;
-    const reply = await handleMcpMessage(message, tools, caller, server);
+    let reply: JsonRpcResponse | null;
+    try {
+        reply = await handleMcpMessage(message, tools, caller, server);
+    } catch (error) {
+        logMcp(message, caller, null, error);
+        throw error;
+    }
+    logMcp(message, caller, reply, null);
     await auditChange(message, reply, caller, tools);
     return reply;
+}
+
+/**
+ * One line per MCP message, so a client that says it could not discover the
+ * tools can be diagnosed from the container's log: the method, how the caller
+ * signed in, the protocol it asked for, how many tools it was given, and the
+ * error if there was one. Never arguments, results, tokens or names of people.
+ * A successful tool call is left to the audit trail; everything else is rare.
+ */
+function logMcp(
+    message: Record<string, unknown>,
+    caller: McpCaller,
+    reply: JsonRpcResponse | null,
+    thrown: unknown
+): void {
+    const method = typeof message.method === "string" ? message.method.slice(0, 64) : "?";
+    const error = (reply as { error?: { code?: number; message?: string } } | null)?.error;
+    if (method === "tools/call" && !error && thrown === null) return;
+    const params = message.params as { protocolVersion?: unknown } | undefined;
+    const result = (reply as { result?: { tools?: unknown[] } } | null)?.result;
+    const line = {
+        method,
+        via: caller.grantId ? "oauth" : caller.keyId ? "api-key" : "agent-session",
+        ...(caller.grantId ? { grantId: caller.grantId } : {}),
+        ...(typeof params?.protocolVersion === "string"
+            ? { protocol: params.protocolVersion.slice(0, 32) }
+            : {}),
+        ...(Array.isArray(result?.tools) ? { tools: result.tools.length } : {}),
+        ...(error ? { code: error.code, error: String(error.message ?? "").slice(0, 200) } : {}),
+        ...(thrown !== null ? { thrown: String(thrown).slice(0, 200) } : {})
+    };
+    const log = error || thrown !== null ? console.warn : console.info;
+    log("polaris: mcp", JSON.stringify(line));
 }
 
 /** What tells a client how to get a credential: a 401 that points at the
@@ -321,6 +377,11 @@ export async function POST(request: Request): Promise<Response> {
     if (caller === IP_REFUSED)
         return Response.json(
             { error: "access_denied", error_description: IP_REFUSED_DESCRIPTION },
+            { status: 403 }
+        );
+    if (caller === ACCOUNT_REFUSED)
+        return Response.json(
+            { error: "access_denied", error_description: ACCOUNT_REFUSED_DESCRIPTION },
             { status: 403 }
         );
     // A 401 here rather than a JSON-RPC error: the call never reached the

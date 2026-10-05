@@ -29,6 +29,8 @@ const state = vi.hoisted(() => ({
     },
     rateLimited: false,
     ip: "203.0.113.5" as string | undefined,
+    /** Whether the account's network rules let the caller's address in. */
+    networkAllowed: true,
     buckets: [] as string[],
     audit: [] as { action: string; actorId: string | null }[],
     /** What a metadata-document address serves, by address. */
@@ -97,7 +99,12 @@ vi.mock("@/lib/audit-service", () => ({
         state.audit.push({ action: event.action, actorId: event.actorId });
     }
 }));
-vi.mock("@/lib/network-rules", () => ({ evaluateAccountAccess: async () => ({ allowed: true }) }));
+vi.mock("@/lib/network-rules", () => ({
+    evaluateAccountAccess: async () =>
+        state.networkAllowed
+            ? { allowed: true, reason: null, country: null }
+            : { allowed: false, reason: "country", country: "US" }
+}));
 vi.mock("@/lib/agents/session-service", () => ({
     sessionForToken: async (token: string) =>
         token.startsWith("session-token-") ? { id: token.slice(14) } : null,
@@ -246,6 +253,7 @@ beforeEach(() => {
     state.user = { id: ADA.id, name: "Ada", email: ADA.email, isAdmin: false, sessionId: "s1" };
     state.rateLimited = false;
     state.ip = "203.0.113.5";
+    state.networkAllowed = true;
     state.audit = [];
     state.documents = new Map();
     state.fetches = [];
@@ -763,6 +771,22 @@ describe("calling /api/mcp with the token", () => {
             client_id: client.client_id!
         });
         expect(refreshed.body.scope).toBe("tasks.read");
+    });
+
+    it("says why when the account's network rules refuse the assistant's address, instead of asking it to sign in again", async () => {
+        // ChatGPT calls from OpenAI's servers, not from where its person is: an
+        // account that only allows one country used to answer it with a bare
+        // 401, which ChatGPT shows as "action discovery failed".
+        const { tokens } = await connect();
+        state.networkAllowed = false;
+        const answer = await mcpCall(String(tokens.body.access_token), { method: "tools/list" });
+        expect(answer.status).toBe(403);
+        expect(answer.headers.get("www-authenticate")).toBeNull();
+        expect(answer.body?.error).toBe("access_denied");
+        expect(answer.body?.error_description).toContain("Account > Access");
+        state.networkAllowed = true;
+        const again = await mcpCall(String(tokens.body.access_token), { method: "tools/list" });
+        expect(again.status).toBe(200);
     });
 
     it("is refused on another origin of the same instance (audience binding)", async () => {

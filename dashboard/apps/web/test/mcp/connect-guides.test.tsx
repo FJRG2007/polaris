@@ -100,7 +100,8 @@ describe("a client's guide", () => {
         const steps = screen.getAllByRole("listitem");
         expect(steps).toHaveLength(6);
         expect(fields(steps[2])).toEqual(["Name: Polaris", `Server URL: ${URLS.http}`]);
-        expect(fields(steps[3])).toEqual(["Authentication: OAuth"]);
+        // Picked from a list, not typed: shown in bold, with nothing to copy.
+        expect(fields(steps[3])).toEqual([]);
         expect([...steps[3].querySelectorAll("strong")].map((node) => node.textContent)).toEqual([
             "Authentication",
             "OAuth"
@@ -109,7 +110,7 @@ describe("a client's guide", () => {
             "Settings > Security and login",
             "Developer mode"
         ]);
-        expect(screen.getByRole("button", { name: /Copy authentication/i })).toBeTruthy();
+        expect(screen.queryByRole("button", { name: /Copy authentication/i })).toBeNull();
     });
 
     it("never prints a tag as text, in any guide or locale", () => {
