@@ -1,0 +1,22 @@
+{
+    // Vendored editor code, held to the contract it was written under rather than
+    // to this repository's stricter defaults - see `packages/genoffice-docs`.
+    "extends": "../../tsconfig.base.json",
+    "compilerOptions": {
+        "rootDir": "src",
+        "outDir": "dist/types",
+        "target": "ES2022",
+        "jsx": "react-jsx",
+        "lib": ["ES2022", "DOM", "DOM.Iterable"],
+        "types": ["node"],
+        "moduleResolution": "Node",
+        "verbatimModuleSyntax": false,
+        "noUncheckedIndexedAccess": false,
+        "noImplicitOverride": false,
+        "noUnusedLocals": false,
+        "noUnusedParameters": false,
+        "declarationMap": false,
+        "sourceMap": false
+    },
+    "include": ["src"]
+}

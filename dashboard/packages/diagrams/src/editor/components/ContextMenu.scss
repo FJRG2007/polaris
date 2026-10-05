@@ -1,0 +1,27 @@
+// The right-click menu is Polaris's own dropdown (see ContextMenu.tsx), which
+// draws its surface, items and shortcuts. This only lays out what the editor
+// adds to an item: the tick for a setting that is on, and a label that keeps
+// to one line.
+.polaris-diagram-context-menu {
+  user-select: none;
+
+  &__check {
+    display: inline-flex;
+    width: 1rem;
+    flex-shrink: 0;
+    justify-content: center;
+
+    svg {
+      width: 0.875rem;
+      height: 0.875rem;
+    }
+  }
+
+  &__label {
+    min-width: 0;
+    flex: 1 1 auto;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}

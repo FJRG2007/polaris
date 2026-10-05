@@ -1,0 +1,48 @@
+.polaris-diagram {
+  .polaris-diagram-eye-dropper-container,
+  .polaris-diagram-eye-dropper-backdrop {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    z-index: var(--zIndex-eyeDropperBackdrop);
+    touch-action: none;
+  }
+
+  .polaris-diagram-eye-dropper-container {
+    pointer-events: none;
+  }
+
+  .polaris-diagram-eye-dropper-backdrop {
+    pointer-events: all;
+  }
+
+  .polaris-diagram-eye-dropper-preview {
+    pointer-events: none;
+    width: 3rem;
+    height: 3rem;
+    position: fixed;
+    z-index: var(--zIndex-eyeDropperPreview);
+    border-radius: 1rem;
+    border: 1px solid var(--default-border-color);
+    filter: var(--theme-filter);
+  }
+
+  .polaris-diagram-eye-dropper-trigger {
+    width: 1.25rem;
+    height: 1.25rem;
+    cursor: pointer;
+    padding: 4px;
+    margin-right: -4px;
+    margin-left: -2px;
+    border-radius: 0.5rem;
+    color: var(--icon-fill-color);
+
+    &:hover {
+      background: var(--button-hover-bg);
+    }
+    &.selected {
+      color: var(--color-primary);
+      background: var(--color-primary-light);
+    }
+  }
+}

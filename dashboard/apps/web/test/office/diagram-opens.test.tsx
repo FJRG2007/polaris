@@ -11,12 +11,12 @@
 
 import * as Y from "yjs";
 import { MessagesWrapper } from "../setup/i18n";
-import { act, cleanup, render, waitFor } from "@testing-library/react";
 import { OfficeExportProvider } from "@/app/(app)/office/export-slot";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { DiagramEditor } from "@/app/(app)/office/g/[id]/diagram-editor";
+import { act, cleanup, fireEvent, render, waitFor } from "@testing-library/react";
 
-vi.mock("@excalidraw/excalidraw/index.css", () => ({}));
+vi.mock("@polaris/diagrams/styles.css", () => ({}));
 
 // Next's loader waits on its own preload machinery, which never runs outside
 // Next; React's own lazy loading is the same thing without it.
@@ -155,7 +155,8 @@ describe.each([
         // long enough for it to run its first rounds of effects.
         await waitFor(
             () => {
-                if (!container.querySelector(".excalidraw")) throw new Error("not mounted yet");
+                if (!container.querySelector(".polaris-diagram"))
+                    throw new Error("not mounted yet");
             },
             { timeout: 25_000 }
         );
@@ -167,7 +168,40 @@ describe.each([
         );
         expect(loops).toEqual([]);
         // The canvas really mounted - otherwise this proves nothing.
-        expect(container.querySelector(".excalidraw")).not.toBeNull();
+        expect(container.querySelector(".polaris-diagram")).not.toBeNull();
         errors.mockRestore();
+    });
+});
+
+describe("the diagram canvas's toolbar", () => {
+    it("offers no web-embed tool, since Office renders no embeds for it", async () => {
+        const { container } = render(
+            <OfficeExportProvider>
+                <div style={{ height: 600 }}>
+                    <DiagramEditor documentId="d1" content={null} editable />
+                </div>
+            </OfficeExportProvider>,
+            { wrapper: MessagesWrapper }
+        );
+        await waitFor(
+            () => {
+                if (!container.querySelector(".polaris-diagram"))
+                    throw new Error("not mounted yet");
+            },
+            { timeout: 25_000 }
+        );
+        const trigger = container.querySelector<HTMLButtonElement>(
+            ".App-toolbar__extra-tools-trigger"
+        );
+        expect(trigger).not.toBeNull();
+        await act(async () => {
+            fireEvent.click(trigger!);
+        });
+        // The frame and laser tools still open; the web-embed tool - which
+        // Office never gives a renderer, since it would point the canvas at a
+        // third party - is not offered at all.
+        expect(container.querySelector('[data-testid="toolbar-frame"]')).not.toBeNull();
+        expect(container.querySelector('[data-testid="toolbar-laser"]')).not.toBeNull();
+        expect(container.querySelector('[data-testid="toolbar-embeddable"]')).toBeNull();
     });
 });

@@ -1,0 +1,123 @@
+@import "../css/variables.module.scss";
+
+.polaris-diagram {
+  --DiagramTextField--color: var(--color-on-surface);
+  --DiagramTextField--label-color: var(--color-on-surface);
+  --DiagramTextField--background: var(--color-surface-low);
+  --DiagramTextField--readonly--background: var(--color-surface-high);
+  --DiagramTextField--readonly--color: var(--color-on-surface);
+  --DiagramTextField--border: var(--color-gray-20);
+  --DiagramTextField--readonly--border: var(--color-border-outline-variant);
+  --DiagramTextField--border-hover: var(--color-brand-hover);
+  --DiagramTextField--border-active: var(--color-brand-active);
+  --DiagramTextField--placeholder: var(--color-border-outline-variant);
+
+  .DiagramTextField {
+    position: relative;
+
+    svg {
+      position: absolute;
+      top: 50%; // 50% is not exactly in the center of the input
+      transform: translateY(-50%);
+      left: 0.75rem;
+      width: 1.25rem;
+      height: 1.25rem;
+      color: var(--color-gray-40);
+      z-index: 1;
+    }
+
+    &--fullWidth {
+      width: 100%;
+      flex-grow: 1;
+    }
+
+    &__label {
+      font-family: var(--ui-font);
+      font-style: normal;
+      font-weight: 600;
+      font-size: 0.875rem;
+      line-height: 150%;
+
+      color: var(--DiagramTextField--label-color);
+
+      margin-bottom: 0.25rem;
+      user-select: none;
+    }
+
+    &__input {
+      box-sizing: border-box;
+
+      display: flex;
+      flex-direction: row;
+      align-items: center;
+
+      height: 3rem;
+
+      background: var(--DiagramTextField--background);
+      border: 1px solid var(--DiagramTextField--border);
+      border-radius: 0.5rem;
+
+      padding: 0 0.75rem;
+
+      &:not(&--readonly) {
+        &:hover {
+          border-color: var(--DiagramTextField--border-hover);
+        }
+
+        &:active,
+        &:focus-within {
+          border-color: var(--DiagramTextField--border-active);
+        }
+      }
+
+      & input {
+        display: flex;
+        align-items: center;
+
+        border: none;
+        outline: none;
+        padding: 0;
+        margin: 0;
+
+        height: 1.5rem;
+
+        color: var(--DiagramTextField--color);
+
+        font-family: var(--ui-font);
+        font-style: normal;
+        font-weight: 400;
+        font-size: 1rem;
+        line-height: 150%;
+        text-overflow: ellipsis;
+
+        background: transparent;
+
+        width: 100%;
+
+        &:not(:focus) {
+          &:hover {
+            background-color: initial;
+          }
+        }
+
+        &:focus {
+          outline: initial;
+          box-shadow: initial;
+        }
+      }
+
+      &--readonly {
+        background: var(--DiagramTextField--readonly--background);
+        border-color: var(--DiagramTextField--readonly--border);
+
+        & input {
+          color: var(--DiagramTextField--readonly--color);
+        }
+      }
+    }
+
+    &--hasIcon .DiagramTextField__input {
+      padding-left: 2.5rem;
+    }
+  }
+}
