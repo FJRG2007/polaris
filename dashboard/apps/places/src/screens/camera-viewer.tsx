@@ -268,6 +268,7 @@ export function CameraViewer({
      *  had started and then dropped is reconnected as it was instead. */
     const failed = (started = false) => {
         setPlaying(false);
+        setHeld(null);
         if (reconnect.dropped(started)) return;
         const next = nextTransport(transport);
         if (!next) {
@@ -357,10 +358,16 @@ export function CameraViewer({
      * it again.
      */
     const [held, setHeld] = useState<string | null>(null);
+    const still = useRef<HTMLImageElement | null>(null);
     const togglePause = () => {
         if (!paused) {
             const element = video.current;
-            setHeld(element ? captureFrame(element) : null);
+            setHeld(
+                (element ? captureFrame(element) : null) ??
+                    lastFrame(camera.id) ??
+                    still.current?.getAttribute("src") ??
+                    null
+            );
         }
         setPaused((current) => !current);
     };
@@ -510,6 +517,7 @@ export function CameraViewer({
                         frame is never the same twice, so there is nothing for the
                         image optimizer to cache and it would only add a hop. */}
                         <img
+                            ref={still}
                             src={
                                 held ??
                                 (seed && stamp === 0

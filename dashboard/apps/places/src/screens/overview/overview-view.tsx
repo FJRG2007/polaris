@@ -794,7 +794,8 @@ function CameraThumb({
     onWatch: (camera: CameraView) => void;
 }) {
     const t = usePlacesT();
-    const [failed, setFailed] = useState(false);
+    const [failedAt, setFailedAt] = useState<number | null>(null);
+    const failed = failedAt === tick;
     const battery = drawsFromBattery(camera.power);
     const picture = camera.enabled && !battery && !failed;
     return (
@@ -812,7 +813,7 @@ function CameraThumb({
                     alt=""
                     loading="lazy"
                     className="size-full object-cover"
-                    onError={() => setFailed(true)}
+                    onError={() => setFailedAt(tick)}
                 />
             ) : (
                 <span className="flex size-full items-center justify-center px-2 text-center text-[0.6875rem] text-muted-foreground">
