@@ -26,6 +26,7 @@ const state = vi.hoisted(() => ({
         viewingAs?: unknown;
     },
     rateLimited: false,
+    ip: "203.0.113.5" as string | undefined,
     buckets: [] as string[],
     audit: [] as { action: string; actorId: string | null }[],
     db: null as unknown as ReturnType<typeof import("./fake-db").createFakeDb>
@@ -60,7 +61,7 @@ vi.mock("@/lib/deploy/api/http", () => ({
     throttleDeployKey: async () => null,
     tooManyCalls: (seconds: number) => `Too many calls. Try again in ${seconds}s.`
 }));
-vi.mock("@/lib/request-context", () => ({ clientIp: async () => "203.0.113.5" }));
+vi.mock("@/lib/request-context", () => ({ clientIp: async () => state.ip }));
 vi.mock("@/lib/rate-limit-service", () => ({
     rateLimit: async (bucket: string) => {
         state.buckets.push(bucket);
@@ -115,6 +116,10 @@ const resourceMetadata = await import(
 );
 const { answerAuthorizationAction } = await import("@/app/oauth/authorize/actions");
 const { STREAMS_PER_CREDENTIAL, openSessionCount } = await import("@/lib/mcp/sse-sessions");
+const { listConnectedApps } = await import("@/lib/mcp/oauth/grants");
+const { setAppIpPolicyAction } = await import(
+    "@/app/(app)/account/assistants/connected-app-actions"
+);
 
 const REDIRECT = "http://127.0.0.1/callback";
 
@@ -196,6 +201,7 @@ beforeEach(() => {
     state.permissions = new Set(["tasks.read", "tasks.manage", "deploy.read"]);
     state.user = { id: ADA.id, name: "Ada", email: ADA.email, isAdmin: false, sessionId: "s1" };
     state.rateLimited = false;
+    state.ip = "203.0.113.5";
     state.audit = [];
     ADA.bannedAt = null;
 });
@@ -402,5 +408,27 @@ describe("posting to the session", () => {
         const message = JSON.parse((await next()).data) as { result: any };
         expect(message.result.isError).toBe(true);
         expect(message.result.content[0].text).toContain("Too many calls");
+    });
+});
+
+describe("a connection's own address rule", () => {
+    it("holds on the SSE transport too: no stream and no call from an address it refuses", async () => {
+        const credential = String((await connect()).tokens.body.access_token);
+        const { endpoint } = await session(credential);
+        const [app] = await listConnectedApps(ADA.id);
+        await setAppIpPolicyAction({
+            id: app!.id,
+            policy: { mode: "list", allow: ["198.51.100.0/24"], deny: [] }
+        });
+
+        state.ip = "203.0.113.5";
+        const refusedOpen = await openStream(credential);
+        expect(refusedOpen.response.status).toBe(403);
+        const refusedCall = await post(endpoint, credential, whoami);
+        expect(refusedCall.status).toBe(403);
+
+        state.ip = "198.51.100.20";
+        const allowed = await openStream(credential);
+        expect(allowed.response.status).toBe(200);
     });
 });
