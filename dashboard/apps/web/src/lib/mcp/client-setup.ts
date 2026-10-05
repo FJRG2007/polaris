@@ -28,6 +28,12 @@
 /** What the server is called in every client's configuration. */
 export const SERVER_NAME = "polaris";
 
+/** What a client that shows the name to people is told to call it. */
+export const DISPLAY_NAME = "Polaris";
+
+/** What VS Code's Command Palette runs to open the user's mcp.json. */
+export const VSCODE_OPEN_CONFIG = "MCP: Open User Configuration";
+
 export function claudeCodeCommand(url: string): string {
     return `claude mcp add --transport http ${SERVER_NAME} ${url}`;
 }

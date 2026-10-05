@@ -3,8 +3,9 @@
 /**
  * "Connect an MCP client", rendered and clicked through in both languages: the
  * logo grid, search, each client's numbered steps with the exact value to copy
- * and the install link it documents, the generic guide's three connection
- * types, and the guide kept in the address. Every key a guide names must exist
+ * in the step that needs it, the labels to look for in bold, and the install
+ * link it documents, the generic guide's three connection types, and the guide
+ * kept in the address. Every key a guide names must exist
  * in every locale - a missing one would draw as its key.
  */
 
@@ -33,9 +34,10 @@ function copied(): string[] {
 }
 
 describe("the client picker", () => {
-    it("shows the server URL and a tile per client, plus any other client", () => {
+    it("shows a tile per client, plus any other client, and no value before one is chosen", () => {
         draw();
-        expect(copied()).toContain(URLS.http);
+        // The URL is shown in the step that pastes it, not above the grid.
+        expect(copied()).toEqual([]);
         for (const guide of CLIENT_GUIDES) expect(screen.getByText(guide.name)).toBeTruthy();
         expect(screen.getByText("Any other client")).toBeTruthy();
     });
@@ -66,16 +68,61 @@ describe("a client's guide", () => {
         fireEvent.click(screen.getByText(name));
     }
 
-    it("numbers Claude's steps, with the URL to paste and its connectors page", () => {
+    /** The labelled values a step shows, as `label: value`. */
+    function fields(step: HTMLElement): string[] {
+        return [...step.querySelectorAll("code")].map((code) => {
+            const label = code.parentElement?.previousElementSibling?.textContent;
+            return label ? `${label}: ${code.textContent}` : (code.textContent ?? "");
+        });
+    }
+
+    it("numbers Claude's steps, with the name and URL to enter and its connectors page", () => {
         open("Claude");
         expect(window.location.hash).toBe("#connect-claude");
-        expect(
-            screen.getByText("Open Customize > Connectors and choose Add custom connector.")
-        ).toBeTruthy();
-        expect(copied()).toContain(URLS.http);
+        const steps = screen.getAllByRole("listitem");
+        expect(steps[0].textContent).toBe(
+            "1Open Customize > Connectors and choose Add custom connector."
+        );
+        expect([...steps[0].querySelectorAll("strong")].map((node) => node.textContent)).toEqual([
+            "Customize > Connectors",
+            "Add custom connector"
+        ]);
+        expect(fields(steps[1])).toEqual(["Name: Polaris", `Server URL: ${URLS.http}`]);
+        // The URL appears once, where it is pasted.
+        expect(copied().filter((value) => value === URLS.http)).toHaveLength(1);
         const link = screen.getByRole("link", { name: /Open Connectors/ });
         expect(link.getAttribute("href")).toBe("https://claude.ai/customize/connectors");
         expect(screen.getAllByRole("listitem").length).toBe(3);
+    });
+
+    it("gives ChatGPT every value it asks for in the step that asks, OAuth in bold", () => {
+        open("ChatGPT");
+        const steps = screen.getAllByRole("listitem");
+        expect(steps).toHaveLength(6);
+        expect(fields(steps[2])).toEqual(["Name: Polaris", `Server URL: ${URLS.http}`]);
+        expect(fields(steps[3])).toEqual(["Authentication: OAuth"]);
+        expect([...steps[3].querySelectorAll("strong")].map((node) => node.textContent)).toEqual([
+            "Authentication",
+            "OAuth"
+        ]);
+        expect([...steps[0].querySelectorAll("strong")].map((node) => node.textContent)).toEqual([
+            "Settings > Security and login",
+            "Developer mode"
+        ]);
+        expect(screen.getByRole("button", { name: /Copy authentication/i })).toBeTruthy();
+    });
+
+    it("never prints a tag as text, in any guide or locale", () => {
+        for (const locale of ["en-US", "es-ES"] as const)
+            for (const guide of CLIENT_GUIDES) {
+                window.history.replaceState(null, "", `/account/assistants#connect-${guide.id}`);
+                const { container, unmount } = render(
+                    withMessages(<ConnectGuides urls={URLS} />, locale)
+                );
+                expect(container.textContent, `${locale} ${guide.id}`).not.toMatch(/<\/?b>/);
+                expect(screen.getByRole("region", { name: /./ })).toBeTruthy();
+                unmount();
+            }
     });
 
     it("gives Cursor its documented install link and mcp.json entry", () => {
