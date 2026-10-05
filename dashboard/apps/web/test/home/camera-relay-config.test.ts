@@ -76,7 +76,9 @@ describe("the relay allowlist", () => {
             pathOnly(streamPath("cam1", "webrtc")),
             pathOnly(streamPath("cam1", "ws")),
             "/api/frame.jpeg",
-            "/api/streams"
+            "/api/streams",
+            // What the warm-camera pass reads and changes.
+            "/api/preload"
         ]) {
             expect(allowed).toContain(path);
         }

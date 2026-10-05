@@ -453,7 +453,9 @@ export async function testCameraStreamAction(
             user.id,
             relay.relayServerFor(camera.reachVia)
         );
-        await relay.publishCamera(endpoint, target, camera.vendor);
+        await relay.publishCamera(endpoint, target, camera.vendor, {
+            warm: relay.keepsWarm(camera)
+        });
         // Both streams, small one first, because which of them a camera actually
         // publishes is the answer here rather than a detail. A camera that has
         // only the good one draws nothing anywhere in Polaris while every check
@@ -556,7 +558,9 @@ export async function startCameraAction(id: string): Promise<{ error?: string }>
             user.id,
             relay.relayServerFor(camera.reachVia)
         );
-        await relay.publishCamera(endpoint, target, camera.vendor);
+        await relay.publishCamera(endpoint, target, camera.vendor, {
+            warm: relay.keepsWarm(camera)
+        });
         // A rung Polaris runs itself needs something to run it on, and that
         // machine is the one the owner chose on the form. Installed here rather
         // than when the camera was saved, for the same reason as the relay: it is

@@ -56,12 +56,16 @@ import {
 } from "lucide-react";
 import { Button, Dialog, DialogContent, DialogTitle, cn } from "@polaris/ui";
 import {
-    otherTransport,
+    captureFrame,
+    lastFrame,
+    nextTransport,
     preferredTransport,
+    rememberFrame,
     stillSrc,
     streamSrc,
     type Transport
 } from "../lib/player";
+import { playLive } from "../lib/live-player";
 
 /**
  * Paced by arrival rather than by a clock, so a slow link stretches the gap
@@ -174,6 +178,17 @@ export function CameraViewer({
     const [chromeUp, setChromeUp] = useState(false);
     const settling = useRef<ReturnType<typeof setTimeout> | null>(null);
     const video = useRef<HTMLVideoElement | null>(null);
+    /**
+     * The element itself, held as state as well as in the ref: a stream fed by
+     * hand has to start when the element exists, and inside a dialog that is a
+     * render after the first one - an effect that only read the ref saw nothing
+     * and never started the stream.
+     */
+    const [videoElement, setVideoElement] = useState<HTMLVideoElement | null>(null);
+    const attachVideo = useCallback((found: HTMLVideoElement | null) => {
+        video.current = found;
+        setVideoElement(found);
+    }, []);
     const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     const [full, setFull] = useState(false);
@@ -181,8 +196,15 @@ export function CameraViewer({
     const [drawn, setDrawn] = useState<boolean | null>(null);
     const [playing, setPlaying] = useState(false);
     const [trying, setTrying] = useState(true);
-    const [transport, setTransport] = useState<Transport>("mp4");
-    const [swapped, setSwapped] = useState(false);
+    const [transport, setTransport] = useState<Transport>("mse");
+    /**
+     * The picture the tile this was opened from was showing, if there was one.
+     *
+     * Drawn first, out of the browser's cache, so the dialog opens on this
+     * camera rather than on a black rectangle while the first fresh frame is
+     * fetched. Read once per camera: after that the fresh frames take over.
+     */
+    const seed = useMemo(() => lastFrame(camera.id), [camera.id]);
     /** The camera's own shape, width over height, learned from whichever of the
      *  two is on screen. */
     const [shape, setShape] = useState<number | null>(null);
@@ -229,23 +251,29 @@ export function CameraViewer({
             if (timer.current) clearTimeout(timer.current);
             return;
         }
-        after(0);
+        // With a picture already on screen the next one can wait its turn; the
+        // seed's own load schedules it.
+        if (!(seed && stamp === 0)) after(0);
         return () => {
             if (timer.current) clearTimeout(timer.current);
         };
+        // eslint-disable-next-line react-hooks/exhaustive-deps -- only the
+        // stream starting or stopping restarts the pictures.
     }, [playing]);
 
-    /** The other format, then nothing. Giving up on the stream is not giving up
+    /** The next format, then nothing. Giving up on the stream is not giving up
      *  on the camera: the frames are on screen and keep coming. */
     const failed = () => {
         setPlaying(false);
-        if (swapped) {
+        const next = nextTransport(transport);
+        if (!next) {
             setTrying(false);
             return;
         }
-        setSwapped(true);
-        setTransport(otherTransport(transport));
+        setTransport(next);
     };
+    const failedRef = useRef(failed);
+    failedRef.current = failed;
 
     /** Anything the element does that proves the stream is alive, so the clock
      *  below runs against silence rather than against the picture. */
@@ -314,6 +342,33 @@ export function CameraViewer({
      *  was buffered is a minute old by then, and a live view showing a minute ago
      *  is worse than one that skipped it. */
     const [paused, setPaused] = useState(false);
+
+    /**
+     * The frame on screen when it was stopped, kept over the picture until the
+     * stream is playing again.
+     *
+     * A stream fed by hand has nothing to show once it is let go of - the
+     * element is emptied so the relay can drop the connection - so without this
+     * stopping it turned the picture black, and so did the moment of starting
+     * it again.
+     */
+    const [held, setHeld] = useState<string | null>(null);
+    const togglePause = () => {
+        if (!paused) {
+            const element = video.current;
+            setHeld(element ? captureFrame(element) : null);
+        }
+        setPaused((current) => !current);
+    };
+
+    // The stream fed by hand: the first keyframe is the first frame on screen.
+    // Keyed like the element, which is re-created for each attempt.
+    useEffect(() => {
+        if (!trying || paused || transport !== "mse" || !videoElement) return;
+        return playLive(videoElement, streamSrc(camera.id, "main", "mse"), () =>
+            failedRef.current()
+        );
+    }, [videoElement, camera.id, transport, trying, paused]);
 
     /** Where the pointer is inside the frame, as fractions from its centre, which
      *  is what the zoom aims at. */
@@ -451,18 +506,30 @@ export function CameraViewer({
                         frame is never the same twice, so there is nothing for the
                         image optimizer to cache and it would only add a hop. */}
                         <img
-                            src={stillSrc(
-                                camera.id,
-                                stamp,
-                                trying ? MOVING_WIDTH : FRAME_WIDTH,
-                                // Only while the pictures are the view. Once the
-                                // stream is playing nothing asks for one at all.
-                                trying
-                            )}
+                            src={
+                                held ??
+                                (seed && stamp === 0
+                                    ? seed
+                                    : stillSrc(
+                                          camera.id,
+                                          stamp,
+                                          trying ? MOVING_WIDTH : FRAME_WIDTH,
+                                          // Only while the pictures are the view.
+                                          // Once the stream is playing nothing
+                                          // asks for one at all.
+                                          trying
+                                      ))
+                            }
                             alt={camera.name}
-                            className={cn("w-full bg-black", surface, playing && "invisible")}
+                            className={cn(
+                                "w-full bg-black",
+                                surface,
+                                playing && !held && "invisible"
+                            )}
                             onLoad={(loaded) => {
                                 setDrawn(true);
+                                const shownSrc = loaded.currentTarget.getAttribute("src");
+                                if (shownSrc) rememberFrame(camera.id, shownSrc);
                                 const { naturalWidth, naturalHeight } = loaded.currentTarget;
                                 if (naturalWidth > 0 && naturalHeight > 0) {
                                     setShape(naturalWidth / naturalHeight);
@@ -470,13 +537,19 @@ export function CameraViewer({
                                 if (!playing) after(trying ? FRAME_GAP_MS : COLD_GAP_MS);
                             }}
                             onError={() => {
+                                // A seed the cache no longer had is not a camera
+                                // that is down: ask for a fresh frame straight away.
+                                if (seed && stamp === 0) {
+                                    after(0);
+                                    return;
+                                }
                                 setDrawn(false);
                                 if (!playing) after(FRAME_RETRY_MS);
                             }}
                         />
                         {trying ? (
                             <video
-                                ref={video}
+                                ref={attachVideo}
                                 // Keyed on the format so swapping really re-creates the
                                 // element: a <video> handed a new src after an error
                                 // keeps the error and never tries again.
@@ -484,11 +557,17 @@ export function CameraViewer({
                                 // re-creates the element and reconnects to live
                                 // rather than resuming a buffer from a minute ago.
                                 key={`${transport}-${paused ? "held" : "live"}`}
-                                src={streamSrc(camera.id, "main", transport)}
+                                // Fed by hand for "mse" (see the effect above),
+                                // so no address of its own.
+                                src={
+                                    transport === "mse"
+                                        ? undefined
+                                        : streamSrc(camera.id, "main", transport)
+                                }
                                 className={cn(
                                     "absolute inset-0 w-full bg-black",
                                     surface,
-                                    !playing && "invisible"
+                                    (!playing || held) && "invisible"
                                 )}
                                 autoPlay={!paused}
                                 muted={muted}
@@ -506,7 +585,10 @@ export function CameraViewer({
                                 }}
                                 onProgress={stirred}
                                 onCanPlay={stirred}
-                                onPlaying={() => setPlaying(true)}
+                                onPlaying={() => {
+                                    setPlaying(true);
+                                    setHeld(null);
+                                }}
                                 onError={failed}
                             />
                         ) : null}
@@ -546,7 +628,6 @@ export function CameraViewer({
                                         className="pointer-events-auto underline underline-offset-2"
                                         onClick={() => {
                                             setTransport(preferredTransport());
-                                            setSwapped(false);
                                             setTrying(true);
                                         }}
                                     >
@@ -620,7 +701,7 @@ export function CameraViewer({
                             <>
                                 <Control
                                     label={paused ? t("viewer.play") : t("viewer.pause")}
-                                    onClick={() => setPaused((current) => !current)}
+                                    onClick={togglePause}
                                 >
                                     {paused ? (
                                         <Play className="size-4 shrink-0" />

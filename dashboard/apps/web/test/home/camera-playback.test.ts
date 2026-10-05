@@ -16,10 +16,16 @@ import {
     streamName
 } from "@polaris-app/places/src/lib/relay";
 import {
+    FRAME_FRESH_MS,
+    VERSIONED_STILL,
+    lastFrame,
+    nextTransport,
     otherTransport,
     preferredTransport,
+    rememberFrame,
     stillSrc,
-    streamSrc
+    streamSrc,
+    transportOrder
 } from "@polaris-app/places/src/lib/player";
 
 describe("the master playlist", () => {
@@ -64,8 +70,18 @@ describe("what the relay is asked for", () => {
 });
 
 describe("choosing a format", () => {
-    it("falls back to MP4 where there is no browser to ask", () => {
-        expect(preferredTransport()).toBe("mp4");
+    it("renders a stream fed by hand where there is no browser to ask, so the markup fetches nothing", () => {
+        expect(preferredTransport()).toBe("mse");
+    });
+
+    it("tries every format once, best first, and then stops", () => {
+        const order = transportOrder();
+        expect(order[0]).toBe("mse");
+        const tried = [order[0]!];
+        for (let next = nextTransport(order[0]!); next; next = nextTransport(next))
+            tried.push(next);
+        expect(tried).toEqual(order);
+        expect(new Set(tried).size).toBe(tried.length);
     });
 
     it("swaps to the other one, and back", () => {
@@ -94,8 +110,37 @@ describe("the frame a tile draws", () => {
         expect(stillSrc("cam1", 1)).not.toBe(stillSrc("cam1", 2));
     });
 
+    it("is unique to this page as well, so the browser may keep it without freezing a picture", () => {
+        const versioned = new URL(stillSrc("cam1", 4), "http://polaris.invalid").searchParams.get(
+            "v"
+        );
+        expect(versioned).toMatch(VERSIONED_STILL);
+        expect(versioned!.endsWith(".4")).toBe(true);
+    });
+
+    it("keeps the first one plain, so the server's markup matches the page that wakes up", () => {
+        const first = new URL(stillSrc("cam1", 0), "http://polaris.invalid").searchParams.get("v");
+        expect(first).toBe("0");
+        expect(first).not.toMatch(VERSIONED_STILL);
+    });
+
     it("asks for the size it will be drawn at", () => {
         expect(stillSrc("cam1", 0, 640)).toContain("w=640");
         expect(stillSrc("cam1", 0)).not.toContain("w=");
+    });
+});
+
+describe("the frame a camera opens on", () => {
+    it("is the one its tile showed a moment ago", () => {
+        rememberFrame("cam-open", "/api/home/cameras/cam-open/snapshot?v=abc123.7", 1_000);
+        expect(lastFrame("cam-open", 1_000 + FRAME_FRESH_MS)).toBe(
+            "/api/home/cameras/cam-open/snapshot?v=abc123.7"
+        );
+    });
+
+    it("is nothing once that picture is old enough to show something that is not there", () => {
+        rememberFrame("cam-stale", "/api/home/cameras/cam-stale/snapshot?v=abc123.1", 1_000);
+        expect(lastFrame("cam-stale", 1_001 + FRAME_FRESH_MS)).toBeNull();
+        expect(lastFrame("cam-never")).toBeNull();
     });
 });

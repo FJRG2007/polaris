@@ -45,6 +45,16 @@ export const placesExtension: AppExtension = {
             run: async () => (await import("./reachability")).sweepCameraReachability()
         },
         {
+            key: "home-warm",
+            // A minute. It only tops up and lets go - a relay already holding
+            // the right cameras is asked one question and told nothing.
+            everyMs: Number(process.env.POLARIS_HOME_WARM_MS) || MINUTE,
+            // Leased: two runners telling the same relay to warm the same camera
+            // is the camera dropped and dialled twice.
+            leaseMs: 5 * MINUTE,
+            run: async () => (await import("./warm")).sweepWarmCameras()
+        },
+        {
             key: "home-retention",
             // Footage is the only part of the house that grows whether or not anybody
             // uses it, so this is the job that decides whether a disk fills.
