@@ -158,8 +158,9 @@ updates:
       actions:
         update-types: [minor, patch]
         patterns: ["*"]
-    # Used by the release jobs, which only a real tag runs: their next major is
-    # taken together with a release where it can be watched, not on its own.
+    # Used by the release jobs, which only a real tag runs (the artifact actions
+    # also by the hostd publish and the weekly maintenance report): their next
+    # major is taken together with a release where it can be watched, not on its own.
     ignore:
       - dependency-name: "actions/upload-artifact"
         update-types: ["version-update:semver-major"]

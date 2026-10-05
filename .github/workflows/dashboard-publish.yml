@@ -1,4 +1,5 @@
 name: Publish dashboard image
+run-name: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run && format('Dry run on {0}', github.ref_name) || '' }}
 
 # Build and push the dashboard images to GHCR on every change to main, keeping
 # only the `latest` tag (no versioned tags). Installs then pull instead of
@@ -132,7 +133,7 @@ jobs:
           # measured from there - thousands of files "changed", and every image,
           # the vision and face workers included, rebuilt for a one-line change.
           LAST=$(gh api "repos/$REPO/actions/workflows/dashboard-publish.yml/runs?branch=main&status=success&per_page=30" \
-            --jq '[.workflow_runs[]] | sort_by(.created_at) | last | .head_sha // empty' 2>/dev/null || true)
+            --jq '[.workflow_runs[] | select((.event == "workflow_dispatch" and (.display_title | startswith("Dry run"))) | not)] | sort_by(.created_at) | last | .head_sha // empty' 2>/dev/null || true)
           if [ -n "$LAST" ] && [ "$LAST" != "$SHA" ] && git cat-file -e "${LAST}^{commit}" 2>/dev/null \
              && git merge-base --is-ancestor "$LAST" "$SHA"; then
             echo "Measuring from the last published commit $LAST (push base was ${BEFORE:-none})."
