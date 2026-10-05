@@ -90,6 +90,30 @@ jobs:
           cache-dependency-path: dashboard/package-lock.json
 
       - run: npm ci --prefer-offline
+
+      # A high or critical advisory in a production dependency fails the pull
+      # request that changes the dependencies, unless scripts/audit-allowlist.json
+      # accepts it with a reason and an expiry (docs/dependencies.md). Anywhere
+      # else - a push, the publish workflow's call, a pull request that touches no
+      # manifest - it is reported and does not fail: an advisory published today
+      # against a package nobody changed is not that change's fault, and the
+      # weekly maintenance run opens the issue for it.
+      - name: Audit production dependencies
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          mode=--warn-only
+          if [ -n "$BASE_SHA" ]; then
+            # Not knowing what changed is treated as a dependency change.
+            if ! git fetch --no-tags --depth=1 origin "$BASE_SHA" \
+              || git diff --name-only "$BASE_SHA" HEAD -- . | grep -qE '(^|/)package(-lock)?\.json$|^dashboard/scripts/audit-allowlist\.json$'; then
+              mode=
+            fi
+          fi
+          npm audit --omit=dev --json > "$RUNNER_TEMP/audit.json" || true
+          node scripts/audit-gate.mjs "$RUNNER_TEMP/audit.json" $mode --title "Production dependencies" | tee -a "$GITHUB_STEP_SUMMARY"
+          exit "${PIPESTATUS[0]}"
+
       - run: npm run db:generate
       # The packages only. They publish the declarations everything below reads;
       # the app's own build is another job's problem and nothing here waits on it.

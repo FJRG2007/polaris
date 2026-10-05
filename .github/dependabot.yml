@@ -1,0 +1,57 @@
+version: 2
+
+# Updates arrive as a few grouped pull requests a week instead of one per
+# package. Every one goes through Dashboard CI like any other branch (including
+# the production-audit gate) and is merged by a person: nothing here merges on
+# its own or pushes to main.
+#
+# Security updates are not on this schedule: GitHub opens them as soon as an
+# advisory matches a locked version, grouped into one pull request per
+# ecosystem below. They need "Dependabot security updates" switched on in the
+# repository's Code security settings.
+
+updates:
+  - package-ecosystem: npm
+    # The workspace root: one lockfile for every app, package and service.
+    directory: /dashboard
+    schedule:
+      interval: weekly
+      day: monday
+      time: "07:00"
+      timezone: Etc/UTC
+    open-pull-requests-limit: 5
+    # Manifests pin exact versions (.npmrc save-exact); keep them exact.
+    versioning-strategy: increase
+    commit-message:
+      prefix: "⬆️ deps"
+    labels: [dependencies]
+    groups:
+      security:
+        applies-to: security-updates
+        patterns: ["*"]
+      # Minor and patch releases of everything, together.
+      minor-and-patch:
+        applies-to: version-updates
+        update-types: [minor, patch]
+        patterns: ["*"]
+      # Majors need reading a changelog and often a code change; they come in
+      # their own pull request so they never hold up the routine one.
+      major:
+        applies-to: version-updates
+        update-types: [major]
+        patterns: ["*"]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "07:00"
+      timezone: Etc/UTC
+    open-pull-requests-limit: 2
+    commit-message:
+      prefix: "👷 ci"
+    labels: [dependencies]
+    groups:
+      actions:
+        patterns: ["*"]
