@@ -211,6 +211,18 @@ export function readExperienceCount(output: string): number | null {
     return match ? Number(match[1]) : null;
 }
 
+/**
+ * Whether `now` is `wanted`, as the game can say it back. The game keeps the
+ * points into the next level as a fraction of that level, a float, and answers
+ * `xp query ... points` rounded down from it: some values come back one point
+ * under what was set - 235 points at level 49 reads 234, 16 at level 112 reads
+ * 15. Asking for the exact number called experience that was given back not
+ * given back, and a retry from the panel then gave it a second time.
+ */
+export function sameExperience(now: Experience, wanted: Experience): boolean {
+    return now.levels === wanted.levels && Math.abs(now.points - wanted.points) <= 1;
+}
+
 /** Their experience set to exactly this: levels first, then the points into the next. */
 export function setExperience(name: string, experience: Experience): string[] {
     return [

@@ -21,7 +21,12 @@
  * Each player's catches are added up in the game and shown on the side panel.
  * Whoever was AFK from the start, or seen in creative or spectator, wears the
  * fish down for nothing: their catches are left out of its strength, as they
- * are left off the podium (`afkCounts`).
+ * are left off the podium (`afkCounts`). And a catch made by anybody AFK at the
+ * time never counts, whoever they are: kept on the run (`idle`) and taken off
+ * their catches on the side panel, the podium and the fish alike. Moving once
+ * does not make what an AFK farm caught before it count, and who is AFK is
+ * kept on the run too (`afk`), so neither a restart nor logging off and on -
+ * after which nobody is known to be either yet - lifts it.
  *
  * Pure, like the rest of the commands; everything is kept on the server's
  * scoreboard under `pe_fb`, so a Polaris restart finds it where it was.
@@ -29,6 +34,7 @@
 
 import { z } from "zod";
 import { SCORE } from "../commands";
+import { PLAYER_NAME } from "../catalog";
 import * as rareCatch from "./rare-catch";
 
 /** What one treasure off the line is worth, in catches. */
@@ -46,6 +52,8 @@ const FISH = "pe_fbf";
 const TREASURE = "pe_fbt";
 /** Both together: a player's catches. */
 const CATCHES = "pe_fbs";
+/** The catches made while AFK, set by Polaris from the run (`idle`). */
+const IDLE = "pe_fbi";
 
 /** What a run keeps of its fish. */
 export const fishSchema = z.object({
@@ -55,6 +63,10 @@ export const fishSchema = z.object({
     fishers: z.array(z.string()).default([]),
     /** Each player's catches as last read, kept for whoever goes offline. */
     caught: z.record(z.number().int()).default({}),
+    /** Of those, the ones made while they were AFK: never counted. */
+    idle: z.record(z.number().int()).default({}),
+    /** Who was AFK at the last reading, lowercased: until seen moving. */
+    afk: z.array(z.string()).default([]),
     /** How many of `STAGES` have been said. */
     told: z.number().int().default(0),
     /** It was landed: the event ended there. */
@@ -73,6 +85,8 @@ export function hooked(catches: number, fishers: readonly string[]): FishState {
         max: strengthFor(catches, fishers.length),
         fishers: [...new Set(fishers)],
         caught: {},
+        idle: {},
+        afk: [],
         told: 0,
         landed: false
     };
@@ -103,24 +117,54 @@ export function grown(
     };
 }
 
-/** Catches as last read, every reading only ever adding: a player who logs
- *  off keeps what they caught. */
-export function withCatches(state: FishState, read: ReadonlyMap<string, number>): FishState {
+/**
+ * Catches as last read, every reading only ever adding: a player who logs off
+ * keeps what they caught. What `afk` players (lowercased) caught since the last
+ * reading is written down as made while AFK, and never counts.
+ */
+export function withCatches(
+    state: FishState,
+    read: ReadonlyMap<string, number>,
+    afk: ReadonlySet<string> = new Set()
+): FishState {
     const caught = { ...state.caught };
+    const idle = { ...state.idle };
     const known = new Map(Object.keys(caught).map((name) => [name.toLowerCase(), name]));
     for (const [name, value] of read) {
         const key = known.get(name.toLowerCase()) ?? name;
-        if (value > (caught[key] ?? 0)) caught[key] = value;
+        const more = value - (caught[key] ?? 0);
+        if (more <= 0) continue;
+        caught[key] = value;
+        if (afk.has(name.toLowerCase())) idle[key] = (idle[key] ?? 0) + more;
     }
-    return { ...state, caught };
+    return { ...state, caught, idle };
 }
 
-/** How much of its strength is left: its whole, less every catch by anybody
- *  not `excluded` (lowercased names). */
+/**
+ * Who is AFK now, lowercased: everybody seen still for the AFK time (`idle`),
+ * and whoever was AFK before and has not been seen moving since (`active`) -
+ * so a restart, or logging off and on, which leave a player not known to be
+ * either for a while, never lifts it.
+ */
+export function stillAfk(
+    before: readonly string[],
+    active: ReadonlySet<string>,
+    idle: ReadonlySet<string>
+): string[] {
+    return [...new Set([...idle, ...before.filter((name) => !active.has(name))])].sort();
+}
+
+/** What a player's catches count for: those not made while AFK. */
+export function counted(state: FishState, name: string): number {
+    return Math.max(0, (state.caught[name] ?? 0) - (state.idle[name] ?? 0));
+}
+
+/** How much of its strength is left: its whole, less every catch that counts
+ *  by anybody not `excluded` (lowercased names). */
 export function strengthLeft(state: FishState, excluded: ReadonlySet<string>): number {
-    const taken = Object.entries(state.caught)
-        .filter(([name]) => !excluded.has(name.toLowerCase()))
-        .reduce((sum, [, count]) => sum + Math.max(0, count), 0);
+    const taken = Object.keys(state.caught)
+        .filter((name) => !excluded.has(name.toLowerCase()))
+        .reduce((sum, name) => sum + counted(state, name), 0);
     return Math.max(0, state.max - taken);
 }
 
@@ -142,6 +186,7 @@ export function fishSetup(): string[] {
     add(FISH, "minecraft.custom:minecraft.fish_caught");
     add(TREASURE, "dummy");
     add(CATCHES, "dummy");
+    add(IDLE, "dummy");
     return lines;
 }
 
@@ -162,14 +207,25 @@ export function treasureLine(name: string): string {
     return `scoreboard players add ${name} ${TREASURE} ${TREASURE_WORTH}`;
 }
 
-/** Every player's catches added up, and onto the side panel once they have any. */
-export function fishTick(): string[] {
+/** Every player's catches added up, and onto the side panel once they have
+ *  any - less those made while AFK (`idle`, by name), which never count. */
+export function fishTick(idle: Readonly<Record<string, number>> = {}): string[] {
     return [
         `scoreboard players add @a ${TREASURE} 0`,
+        `scoreboard players add @a ${IDLE} 0`,
+        ...idleLines(idle),
         `execute as @a store result score @s ${CATCHES} run scoreboard players get @s ${FISH}`,
         `execute as @a run scoreboard players operation @s ${CATCHES} += @s ${TREASURE}`,
-        `execute as @a[scores={${CATCHES}=1..}] run scoreboard players operation @s ${SCORE} = @s ${CATCHES}`
+        `execute as @a[scores={${CATCHES}=1..}] run scoreboard players operation @s ${SCORE} = @s ${CATCHES}`,
+        `execute as @a[scores={${CATCHES}=1..}] run scoreboard players operation @s ${SCORE} -= @s ${IDLE}`
     ];
+}
+
+/** The catches made while AFK, written where the game takes them off. */
+function idleLines(idle: Readonly<Record<string, number>>): string[] {
+    return Object.entries(idle)
+        .filter(([name, count]) => PLAYER_NAME.test(name) && count > 0)
+        .map(([name, count]) => `scoreboard players set ${name} ${IDLE} ${count}`);
 }
 
 /** Everybody's catches: `Ana has 7 [pe_fbs]`. */
@@ -197,6 +253,8 @@ export function landedLines(): string[] {
 export function fishCleanup(): string[] {
     return [
         ...rareCatch.catchCleanup(),
-        ...[FISH, TREASURE, CATCHES].map((objective) => `scoreboard objectives remove ${objective}`)
+        ...[FISH, TREASURE, CATCHES, IDLE].map(
+            (objective) => `scoreboard objectives remove ${objective}`
+        )
     ];
 }

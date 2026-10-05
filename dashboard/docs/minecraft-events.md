@@ -354,6 +354,15 @@ left out.
     - Catches by anybody AFK from the start or seen in creative or spectator
       take nothing off it, and keep them off the podium (`afkCounts`). What a
       player caught is kept on the run, so logging off loses none of it.
+    - A catch made while AFK never counts, whoever made it: each reading,
+      what an AFK player (still for the server's AFK minutes) caught since
+      the last is written on the run (`fish.idle`) and taken off their catches
+      on the fish's strength, the side panel and the podium (`pe_fbi`). Moving
+      once counts what they catch from then, never what the farm caught
+      before. Who is AFK is kept on the run too (`fish.afk`,
+      `boss-fishing.stillAfk`): somebody just back on, or everybody after a
+      Polaris restart, is not known to be either for a while, and stays as
+      they were last seen until a look sees them move or stand still.
     - It is said to tire at three quarters, half and a quarter. Landed before
       the time is up, the most catches win, with a closing line and a display
       of firework sparks and sounds - particles, never rockets, which hurt
@@ -949,6 +958,17 @@ A new kind follows all of them. A change to an old kind must not undo one.
   player who fell from a build battle died (`3dda1f25f`, `199eb82b2`).
 - **`keepInventory` is held for every event players can die in**, and put
   back only once everybody is home.
+- **Experience given back is checked as the game can say it back.** The game
+  keeps the points into a level as a float fraction of it and answers
+  `xp query ... points` rounded down, so some values read back a point under
+  what was set: 235 points at level 49 read 234. A spleef gave a player's 49
+  levels back (`Set 49 experience levels`, `Set 235 experience points` in the
+  server log) and the panel still said "experience not given back" - where
+  "Give back now" would have added them a second time. Within a point is
+  given (`stash.sameExperience`), and a retry finds it so and adds nothing.
+  An add is believed only when the experience moved. A player seen gone
+  before their experience could be asked for keeps it owed on the run, given
+  when they are next on, instead of being marked failed for the operator.
 
 ### The flow of a run
 

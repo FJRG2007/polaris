@@ -196,6 +196,22 @@ export function activePlayers(
     );
 }
 
+/**
+ * The players seen standing still for all of the last `afkMinutes`: since they
+ * last moved, or - never seen to - since they were first seen. Somebody first
+ * seen less than that ago who has not moved yet is neither this nor active:
+ * not known yet.
+ */
+export function idlePlayers(
+    seen: ReadonlyMap<string, Seen>,
+    afkMinutes: number,
+    now: number
+): Seen[] {
+    return [...seen.values()].filter(
+        (one) => now - (one.movedAt ?? one.since) > afkMinutes * 60_000
+    );
+}
+
 // ------------------------------------------------------------------ when
 
 /** The minute-grained clock an automatic event is read against. */

@@ -781,6 +781,19 @@ function itemReadable(item: string): boolean {
 const ESSENTIALS =
     /(^|^execute .*? run )(kill|give|tp|teleport|gamemode|clear|xp|experience|time|weather|item) /;
 
+/**
+ * The points into the next level as the game says them back once set: it keeps
+ * them as a float fraction of the level (`Player.setExperiencePoints`) and
+ * answers `xp query ... points` rounded down from it, so some values come back
+ * a point under - 235 at level 49 reads 234.
+ */
+function pointsAsKept(level: number, points: number): number {
+    const needed = Math.fround(
+        level >= 30 ? 9 * level - 158 : level >= 15 ? 5 * level - 38 : 2 * level + 7
+    );
+    return Math.floor(Math.fround(Math.fround(points / needed) * needed));
+}
+
 function answer(sent: string): string {
     world.onLine?.(sent);
     world.sent.push(sent);
@@ -1505,8 +1518,10 @@ function answer(sent: string): string {
     const setXp = /^xp set (\S+) (\d+) (levels|points)$/.exec(line);
     if (setXp) {
         if (!world.online.includes(setXp[1]!)) return "No player was found";
-        (setXp[3] === "levels" ? world.levels : world.points)[setXp[1]!] = Number(setXp[2]);
-        return `Set ${setXp[2]} experience ${setXp[3]} on ${setXp[1]}`;
+        const who = setXp[1]!;
+        if (setXp[3] === "levels") world.levels[who] = Number(setXp[2]);
+        else world.points[who] = pointsAsKept(world.levels[who] ?? 0, Number(setXp[2]));
+        return `Set ${setXp[2]} experience ${setXp[3]} on ${who}`;
     }
     // Somebody sent home is on the ground, unless still in the air.
     const airborne =
@@ -6022,6 +6037,44 @@ describe("spleef", () => {
         expect(after.stageLeftovers).toEqual([]);
     });
 
+    it("gives back experience the game says back a point under, and owes none of it", async () => {
+        // Seen on a live server: 49 levels and 235 points taken for a spleef,
+        // set back at the end - and read back as 234 points, so the history
+        // said "experience not given back" for experience that was.
+        world.online = ["Ana", "Ben", "Cy"];
+        world.levels = { Ana: 49 };
+        world.points = { Ana: 235 };
+        setUp([floor()]);
+        await startArena("floor");
+        await play(2_100);
+        chat(["Ana", "join"], ["Ben", "join"], ["Cy", "join"]);
+        await play(44_000);
+        const run = state().run!;
+        expect(run.stage?.racers.map((one) => one.name)).toEqual(["Ana", "Ben", "Cy"]);
+        expect(world.levels.Ana).toBe(0);
+        expect(world.points.Ana).toBe(0);
+        await play(8_000);
+        const arenaAt = spleef.arena(floor().options, run.stage!.origin!, run.stage!.origin!.y);
+        for (const name of ["Ana", "Ben"]) {
+            world.at[name] = [arenaAt.center.x, arenaAt.floors.at(-1)! - 3, arenaAt.center.z];
+            await play(4_100);
+        }
+        expect(state().run).toBeNull();
+        // Set back as it was taken; what she is paid for playing comes on top.
+        const back = world.sent.indexOf("xp set Ana 49 levels");
+        expect(back).toBeGreaterThan(-1);
+        expect(world.sent[back + 1]).toBe("xp set Ana 235 points");
+        expect(world.points.Ana).toBe(234);
+        expect(world.sent.slice(back).filter((line) => line.startsWith("xp set Ana"))).toHaveLength(
+            2
+        );
+        const stashService = await import(
+            "@polaris-app/game-servers/src/lib/minecraft/events/kinds/stash-service"
+        );
+        expect(await stashService.failedStashes(SERVER)).toEqual([]);
+        expect(stashRows.size).toBe(0);
+    });
+
     it("in the decay game, turns the snow underfoot red and takes it, and clears every red block at the end", async () => {
         world.online = ["Ana", "Ben"];
         setUp([floor("decay")]);
@@ -7546,6 +7599,127 @@ describe("players' own things through an arena", () => {
         expect(world.levels.Ana).toBe(17);
         expect(world.points.Ana).toBe(7);
         expect(world.sent.slice(from).some((line) => line.startsWith("xp set Ana"))).toBe(false);
+    });
+
+    it("keeps their experience owed when they leave before it is given back, and gives it next time", async () => {
+        world.online = ["Ana", "Ben"];
+        world.inv = { Ana: stuffed(), Ben: new Map() };
+        world.levels = { Ana: 12 };
+        world.points = { Ana: 7 };
+        const ana = copyOf(world.inv.Ana!);
+        setUp([duelOf()]);
+        await joinAndStart("duel");
+        const kept = state().run!.entrants.find((one) => one.name === "Ana")!.stash!;
+        const stashService = await import(
+            "@polaris-app/game-servers/src/lib/minecraft/events/kinds/stash-service"
+        );
+        await fakeServer().say(["clear Ana *[minecraft:custom_data={polaris_event:1b}]"]);
+        // Every stack back, then gone the moment her experience is asked for.
+        world.onLine = (line) => {
+            if (line === "xp query Ana levels") world.online = ["Ben"];
+        };
+        let left: typeof kept | null = kept;
+        expect(
+            await stashService.giveBack(fakeServer(), "Ana", kept, async (next) => {
+                left = next;
+            })
+        ).toBe("offline");
+        world.onLine = null;
+        expect(world.inv.Ana).toEqual(ana);
+        expect(left).toMatchObject({ kept: [], experience: { levels: 12, points: 7 } });
+        // Owed, not failed: nothing on the panel for the operator to give by hand.
+        expect(await stashService.failedStashes(SERVER)).toEqual([]);
+        // On again: given then, once.
+        world.online = ["Ana", "Ben"];
+        expect(await stashService.giveBack(fakeServer(), "Ana", left!, async () => undefined)).toBe(
+            "done"
+        );
+        expect(world.levels.Ana).toBe(12);
+        expect(world.points.Ana).toBe(7);
+        expect(world.inv.Ana).toEqual(ana);
+        expect(stashRows.size).toBe(0);
+    });
+
+    it("gives experience back once, however often the give-back runs, and never twice from the panel", async () => {
+        world.online = ["Ana", "Ben"];
+        world.inv = { Ana: stuffed(), Ben: new Map() };
+        world.levels = { Ana: 49 };
+        world.points = { Ana: 235 };
+        setUp([duelOf()]);
+        await joinAndStart("duel");
+        const kept = state().run!.entrants.find((one) => one.name === "Ana")!.stash!;
+        const stashService = await import(
+            "@polaris-app/game-servers/src/lib/minecraft/events/kinds/stash-service"
+        );
+        await fakeServer().say(["clear Ana *[minecraft:custom_data={polaris_event:1b}]"]);
+        expect(await stashService.giveBack(fakeServer(), "Ana", kept, async () => undefined)).toBe(
+            "done"
+        );
+        expect([world.levels.Ana, world.points.Ana]).toEqual([49, 234]);
+        // The same give-back again, from the stale record: nothing more.
+        const from = world.sent.length;
+        expect(await stashService.giveBack(fakeServer(), "Ana", kept, async () => undefined)).toBe(
+            "done"
+        );
+        expect(world.sent.slice(from).some((line) => line.startsWith("xp "))).toBe(false);
+        // A row left failed by the version before, for experience that was
+        // given and read back a point under: retried from the panel, nothing
+        // is added on top.
+        stashRows.set("00000000-0000-7000-8000-000000000098", {
+            id: "00000000-0000-7000-8000-000000000098",
+            installedAppId: SERVER,
+            player: "Ana",
+            event: "Spleef",
+            items: "[]",
+            barrels: "[]",
+            casing: "[]",
+            status: "failed",
+            note: "experience",
+            missing: "[]",
+            experience: JSON.stringify({ levels: 49, points: 235 }),
+            dismissedAt: null,
+            updatedAt: new Date()
+        });
+        const retried = world.sent.length;
+        expect(
+            await stashService.retryStash(
+                fakeServer(),
+                SERVER,
+                "00000000-0000-7000-8000-000000000098"
+            )
+        ).toBe("done");
+        expect(world.sent.slice(retried).some((line) => /^xp (add|set) /.test(line))).toBe(false);
+        expect([world.levels.Ana, world.points.Ana]).toEqual([49, 234]);
+        expect(stashRows.size).toBe(0);
+    });
+
+    it("adds nothing it cannot see arrive: a point owed that never lands is not given", async () => {
+        world.online = ["Ana", "Ben"];
+        world.inv = { Ana: stuffed(), Ben: new Map() };
+        world.levels = { Ana: 0 };
+        world.points = { Ana: 1 };
+        setUp([duelOf()]);
+        await joinAndStart("duel");
+        const kept = state().run!.entrants.find((one) => one.name === "Ana")!.stash!;
+        expect(kept.experience).toEqual({ levels: 0, points: 1 });
+        const stashService = await import(
+            "@polaris-app/game-servers/src/lib/minecraft/events/kinds/stash-service"
+        );
+        await fakeServer().say(["clear Ana *[minecraft:custom_data={polaris_event:1b}]"]);
+        // Earned since, so it is added; and the server refuses the add.
+        world.levels.Ana = 3;
+        world.onLine = (line) => {
+            if (line.startsWith("xp add Ana")) world.online = ["Ben"];
+            else if (line.startsWith("xp query Ana")) world.online = ["Ana", "Ben"];
+        };
+        expect(await stashService.giveBack(fakeServer(), "Ana", kept, async () => undefined)).toBe(
+            "failed"
+        );
+        world.onLine = null;
+        expect(world.levels.Ana).toBe(3);
+        expect(await stashService.failedStashes(SERVER)).toMatchObject([
+            { player: "Ana", note: "experience" }
+        ]);
     });
 
     it("gives nothing back to somebody still falling, and gives it once they are down", async () => {
@@ -9920,6 +10094,88 @@ describe("a boss fishing", () => {
         const entry = state().history[0]!;
         expect(entry.podium).toEqual([]);
         expect(said("got away with 7 strength left")).toBe(true);
+    });
+
+    it("never counts a catch made while AFK - not after moving once, nor after logging off and on", async () => {
+        setUp([made(30)]);
+        await start();
+        await play(2_100);
+        expect(state().run?.fish).toMatchObject({ max: 20, fishers: ["Ana", "Ben"] });
+        // Ben leaves a farm running and stands still past the AFK time.
+        world.still = ["Ben"];
+        await play(5 * 60_000 + 30_000);
+        world.kinds.fish.caught = { Ana: 3, Ben: 30 };
+        await play(2_100);
+        expect(state().run?.fish).toMatchObject({ caught: { Ana: 3, Ben: 30 }, idle: { Ben: 30 } });
+        await play(1_000);
+        expect(bar()).toContain("17/20");
+        // Taken off his catches in the game too: the side panel and the podium.
+        expect(world.sent).toContain("scoreboard players set Ben pe_fbi 30");
+        expect(world.sent).toContain(
+            "execute as @a[scores={pe_fbs=1..}] run scoreboard players operation @s pe_score -= @s pe_fbi"
+        );
+        // He moves once: what the farm caught still does not count, what he
+        // catches now does.
+        world.still = [];
+        await play(20_000);
+        expect(bar()).toContain("17/20");
+        world.kinds.fish.caught = { Ana: 3, Ben: 32 };
+        await play(3_100);
+        expect(bar()).toContain("15/20");
+        // AFK again, then off and on: just back, nobody knows yet whether he
+        // is playing - he is still AFK until he is seen moving, and what the
+        // farm catches meanwhile never counts.
+        world.still = ["Ben"];
+        await play(5 * 60_000 + 30_000);
+        expect(state().run?.fish?.afk).toEqual(["ben"]);
+        world.online = ["Ana"];
+        await play(20_000);
+        world.online = ["Ana", "Ben"];
+        world.kinds.fish.caught = { Ana: 3, Ben: 50 };
+        await play(3_100);
+        expect(state().run?.fish).toMatchObject({ caught: { Ben: 50 }, idle: { Ben: 48 } });
+        await play(1_000);
+        expect(bar()).toContain("15/20");
+    });
+
+    it("keeps who is AFK across a restart: the farm's catches after it never count", async () => {
+        const preset = made(30);
+        setUp([preset]);
+        const now = Date.now();
+        config[catalog.EVENT_STATE_KEY] = {
+            run: {
+                id: "resumed",
+                trigger: "manual",
+                startedBy: null,
+                preset,
+                phase: "running",
+                createdAt: now - 10 * 60_000,
+                startsAt: now - 10 * 60_000,
+                endsAt: now + 20 * 60_000,
+                readyAt: now - 10 * 60_000,
+                participants: ["Ana", "Ben"],
+                fish: {
+                    max: 20,
+                    fishers: ["Ana", "Ben"],
+                    caught: { Ana: 2, Ben: 30 },
+                    idle: { Ben: 30 },
+                    afk: ["ben"],
+                    told: 0
+                }
+            }
+        };
+        world.still = ["Ben"];
+        world.kinds.fish.caught = { Ana: 4, Ben: 45 };
+        await events.sweepEvents();
+        await play(4_100);
+        expect(state().run?.fish).toMatchObject({
+            caught: { Ana: 4, Ben: 45 },
+            idle: { Ben: 45 },
+            afk: ["ben"]
+        });
+        await play(1_000);
+        expect(bar()).toContain("16/20");
+        expect(world.sent).toContain("scoreboard players set Ben pe_fbi 45");
     });
 
     it("grows for a player who starts fishing later, keeping what was already taken off it", async () => {

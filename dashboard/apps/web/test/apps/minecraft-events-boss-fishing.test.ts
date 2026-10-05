@@ -50,6 +50,30 @@ describe("the legendary fish", () => {
         ).toBe(0);
     });
 
+    it("never counts a catch made while AFK, and keeps who is AFK until they are seen moving", () => {
+        let state = fishing.hooked(10, ["Ana", "Ben"]);
+        state = fishing.withCatches(state, new Map([["Ben", 4]]));
+        // Ben AFK: what he catches from here is written down, and counts nothing.
+        state = fishing.withCatches(state, new Map([["Ben", 30]]), new Set(["ben"]));
+        expect(state).toMatchObject({ caught: { Ben: 30 }, idle: { Ben: 26 } });
+        expect(fishing.counted(state, "Ben")).toBe(4);
+        expect(fishing.strengthLeft(state, new Set())).toBe(16);
+        // Moving again: only what comes after counts.
+        state = fishing.withCatches(state, new Map([["Ben", 33]]));
+        expect(fishing.counted(state, "Ben")).toBe(7);
+        // Not known either way (back on, a restart): as last seen.
+        expect(fishing.stillAfk(["ben"], new Set(), new Set())).toEqual(["ben"]);
+        expect(fishing.stillAfk(["ben"], new Set(["ben"]), new Set())).toEqual([]);
+        expect(fishing.stillAfk([], new Set(), new Set(["ana"]))).toEqual(["ana"]);
+        // Taken off the side panel in the game, by name.
+        const tick = fishing.fishTick({ Ben: 26, "bad name": 3 });
+        expect(tick).toContain("scoreboard players set Ben pe_fbi 26");
+        expect(tick.some((line) => line.includes("bad name"))).toBe(false);
+        expect(tick.at(-1)).toBe(
+            "execute as @a[scores={pe_fbs=1..}] run scoreboard players operation @s pe_score -= @s pe_fbi"
+        );
+    });
+
     it("is said to tire at three quarters, half and a quarter of its strength", () => {
         expect(fishing.stagesDue(20, 20)).toBe(0);
         expect(fishing.stagesDue(15, 20)).toBe(1);

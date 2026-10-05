@@ -2998,7 +2998,7 @@ async function bossFishing(
     await server.sayAll([
         ...fishing.treasureCommit(),
         ...treasures.map(fishing.treasureLine),
-        ...fishing.fishTick()
+        ...fishing.fishTick(state.idle)
     ]);
     for (const name of treasures)
         lines.push(
@@ -3013,13 +3013,29 @@ async function bossFishing(
         )
     );
     const before = state;
-    state = fishing.withCatches(state, read);
+    // A catch made while AFK never counts: whoever is AFK as it is read has
+    // what they caught since the last reading written down on the run. Who is
+    // AFK is kept on the run as well, so a player not known yet either way -
+    // just back on, or everybody after a restart - stays as they were last
+    // seen until a look says otherwise.
+    const seen = playing.seenOn(installedAppId);
+    const afkMinutes = await afkMinutesFor(installedAppId);
+    const now = Date.now();
+    const names = (list: readonly plan.Seen[]) =>
+        new Set(list.map((one) => one.name.toLowerCase()));
+    const afk = fishing.stillAfk(
+        state.afk,
+        names(seen ? plan.activePlayers(seen, afkMinutes, now) : []),
+        names(seen ? plan.idlePlayers(seen, afkMinutes, now) : [])
+    );
+    state = { ...fishing.withCatches(state, read, new Set(afk)), afk };
+    if (JSON.stringify(state.idle) !== JSON.stringify(before.idle))
+        await server.sayAll(fishing.fishTick(state.idle));
     // Somebody who has started playing since it began makes it bigger.
     if (loop.ticks % FISHERS_EVERY === 0) {
-        const seen = playing.seenOn(installedAppId);
         if (seen) {
             const active = plan
-                .playersFor(loop.run.preset, seen, await afkMinutesFor(installedAppId), Date.now())
+                .playersFor(loop.run.preset, seen, afkMinutes, Date.now())
                 .map((one) => one.name);
             const { state: next, added } = fishing.grown(state, catches, active);
             const more = next.max - state.max;
@@ -4645,7 +4661,7 @@ async function results(
     if (preset.kind === "bingo") return bingoResults(server, run);
     // It got away: nobody wins, and nobody is paid for taking part.
     if (fishEscaped(run)) return { scores: new Map(), took: [] };
-    if (preset.kind === "boss-fishing") await server.sayAll(fishing.fishTick());
+    if (preset.kind === "boss-fishing") await server.sayAll(fishing.fishTick(run.fish?.idle));
     if (catalog.takesJoiners(preset)) return stageService.results(run);
     // One last count first, so the final seconds are in it.
     await server.sayAll(commands.scoreTick(preset));

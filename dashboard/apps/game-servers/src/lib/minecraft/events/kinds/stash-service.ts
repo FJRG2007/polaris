@@ -528,10 +528,26 @@ export async function giveBack(
     // twice gives it once, and added to what they have earned since otherwise -
     // written down as given the moment it is.
     let experience = kept.experience ?? copy.experience;
-    if (experience && (await experienceBack(server, name, experience, kept.state === "taking"))) {
+    const back = experience
+        ? await experienceBack(server, name, experience, kept.state === "taking")
+        : "given";
+    if (experience && back === "given") {
         experience = null;
         await owing(kept.record, owed, null);
         await save({ ...kept, kept: owed, experience: null });
+    }
+    // Gone before their experience could be asked for - and seen gone: an
+    // answer that only could not be read is no proof of it - every stack is
+    // theirs again, nothing of the experience was given, and it stays owed:
+    // given when they are next on, as a whole give-back for somebody not on is.
+    if (
+        experience &&
+        back === "unasked" &&
+        owed.length === 0 &&
+        !(await readLiveInventory(askerOf(server), name)).answered
+    ) {
+        await save({ ...kept, kept: owed, experience });
+        return "offline";
     }
 
     if (owed.length > 0 || experience) {
@@ -590,33 +606,37 @@ async function readDropped(server: ServerContainer, tag: string): Promise<Invent
     return value === null ? null : parseStack(value);
 }
 
-/** Give back `experience` to `name`: set when they have none - or the stash may
- *  never have taken it - and added to what they have otherwise. Answers whether
- *  it is theirs now. */
+/**
+ * Give back `experience` to `name`: set when they have none - or the stash may
+ * never have taken it - and added to what they have otherwise. Answers whether
+ * it is theirs now, or could not be asked for what they have - nothing is
+ * given then. A point under is theirs all the same: the game can say back no
+ * closer (`stash.sameExperience`).
+ */
 async function experienceBack(
     server: ServerContainer,
     name: string,
     experience: stash.Experience,
     taking: boolean
-): Promise<boolean> {
-    const same = (left: stash.Experience) =>
-        left.levels === experience.levels && left.points === experience.points;
+): Promise<"given" | "unasked" | "failed"> {
     const now = await experienceOf(server, name);
-    if (!now) return false;
-    if (same(now)) return true;
+    if (!now) return "unasked";
+    if (stash.sameExperience(now, experience)) return "given";
     if (taking || (now.levels === 0 && now.points === 0)) {
         await server.sayAll(stash.setExperience(name, experience));
         const after = await experienceOf(server, name);
-        return after !== null && same(after);
+        return after !== null && stash.sameExperience(after, experience) ? "given" : "failed";
     }
     await server.sayAll(stash.addExperience(name, experience));
     const after = await experienceOf(server, name);
     const levels = now.levels + experience.levels;
-    return (
-        after !== null &&
+    // Nothing moved: not given, however little was owed.
+    const moved = after !== null && (after.levels !== now.levels || after.points !== now.points);
+    return moved &&
         (after.levels > levels ||
-            (after.levels === levels && after.points >= now.points + experience.points))
-    );
+            (after.levels === levels && after.points >= now.points + experience.points - 1))
+        ? "given"
+        : "failed";
 }
 
 /** A stack a command cannot carry, from a stash kept in barrels: copied from its
