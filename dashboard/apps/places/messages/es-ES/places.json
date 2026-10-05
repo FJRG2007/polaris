@@ -1634,6 +1634,11 @@
             "targetName": "Temperatura objetivo de {name}",
             "lower": "Bajar el objetivo de {name}",
             "raise": "Subir el objetivo de {name}",
+            "typeTarget": "Escribir el objetivo de {name}",
+            "typeTargetNow": "{value}, escribir el objetivo de {name}",
+            "typedNumber": "Escribe un número",
+            "typedRange": "Entre {min} y {max}",
+            "typedStep": "En pasos de {step}",
             "optionName": "{option} en {name}",
             "unknown": "Aún no ha dicho qué admite. Lo hará en cuanto responda a una comprobación."
         },

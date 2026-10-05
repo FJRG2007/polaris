@@ -1634,6 +1634,11 @@
             "targetName": "Target temperature of {name}",
             "lower": "Lower the target on {name}",
             "raise": "Raise the target on {name}",
+            "typeTarget": "Type the target for {name}",
+            "typeTargetNow": "{value}, type the target for {name}",
+            "typedNumber": "Type a number",
+            "typedRange": "Between {min} and {max}",
+            "typedStep": "In steps of {step}",
             "optionName": "{option} on {name}",
             "unknown": "It has not said what it can be set to yet. It will once it answers a check."
         },
