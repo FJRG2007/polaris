@@ -23,6 +23,8 @@ const importFile = vi.fn();
 const createDocument = vi.fn();
 const applyUpdate = vi.fn();
 const readDocument = vi.fn();
+const deleteDocument = vi.fn();
+const documentAccess = vi.fn();
 const exportDocument = vi.fn();
 const officeGoogleFile = {
     create: vi.fn(),
@@ -41,7 +43,7 @@ vi.mock("@/lib/google-calendar/service", () => ({
     googleAccessToken
 }));
 vi.mock("@/lib/office/import", () => ({ importFile, OfficeImportError }));
-vi.mock("@/lib/office/documents", () => ({ applyUpdate, createDocument, readDocument }));
+vi.mock("@/lib/office/documents", () => ({ applyUpdate, createDocument, deleteDocument, documentAccess, readDocument }));
 vi.mock("@/lib/office/export", () => ({ exportDocument }));
 
 const google = await import("../../src/lib/office/google");
@@ -71,6 +73,8 @@ beforeEach(() => {
         createDocument,
         applyUpdate,
         readDocument,
+        deleteDocument,
+        documentAccess,
         exportDocument,
         officeGoogleFile.create,
         officeGoogleFile.findUnique,
@@ -230,6 +234,19 @@ describe("importing", () => {
         });
     });
 
+    it("takes the new document away again when its Google link cannot be written", async () => {
+        fetchMock
+            .mockResolvedValueOnce(json({ id: "d1", name: "Plan", mimeType: DOC_MIME }))
+            .mockResolvedValueOnce(new Response(new Uint8Array([1])));
+        importFile.mockResolvedValue({ kind: "doc", title: "Plan", update: new Uint8Array([9]) });
+        createDocument.mockResolvedValue("doc1");
+        deleteDocument.mockResolvedValue(undefined);
+        officeGoogleFile.create.mockRejectedValue(new Error("db down"));
+
+        await expect(google.importGoogleFile({ id: "u1" }, CONNECTION, "d1", null)).rejects.toThrow("db down");
+        expect(deleteDocument).toHaveBeenCalledWith({ id: "u1" }, "doc1");
+    });
+
     it("refuses Slides by Google's word, before exporting anything", async () => {
         fetchMock.mockResolvedValueOnce(json({ id: "p1", name: "Deck", mimeType: SLIDES_MIME }));
         await expect(google.importGoogleFile({ id: "u1" }, CONNECTION, "p1", null)).rejects.toMatchObject({
@@ -333,5 +350,41 @@ describe("the multipart body", () => {
         expect(new TextDecoder().decode(body)).toBe(
             '--b0\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n{"name":"A"}\r\n--b0\r\nContent-Type: text/plain\r\n\r\nhi\r\n--b0--'
         );
+    });
+});
+
+describe("the Google side of a document", () => {
+    it("says nothing about a document the reader cannot open", async () => {
+        documentAccess.mockResolvedValue(null);
+        officeGoogleFile.findUnique.mockResolvedValue({
+            connectionId: CONNECTION,
+            sourceName: "Secret",
+            savedAt: null,
+            copyFileId: "copy1",
+            sourceMime: DOC_MIME
+        });
+
+        expect(await google.googleLinkOf("u2", "doc1")).toBeNull();
+        expect(officeGoogleFile.findUnique).not.toHaveBeenCalled();
+    });
+
+    it("describes it to somebody who can open it", async () => {
+        documentAccess.mockResolvedValue({ role: "viewer", owned: false });
+        officeGoogleFile.findUnique.mockResolvedValue({
+            connectionId: CONNECTION,
+            sourceName: "Plan",
+            savedAt: null,
+            copyFileId: "copy1",
+            sourceMime: DOC_MIME
+        });
+        getConnection.mockResolvedValue(null);
+
+        expect(await google.googleLinkOf("u2", "doc1")).toEqual({
+            sourceName: "Plan",
+            mine: false,
+            savedAt: null,
+            copyLink: "https://docs.google.com/document/d/copy1/edit"
+        });
+        expect(documentAccess).toHaveBeenCalledWith({ id: "u2" }, "doc1");
     });
 });

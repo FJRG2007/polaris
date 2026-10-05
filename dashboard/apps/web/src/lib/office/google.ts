@@ -36,7 +36,7 @@ import { prisma } from "@polaris/db";
 import * as core from "@polaris/core";
 import { exportDocument } from "./export";
 import { importFile, OfficeImportError } from "./import";
-import { applyUpdate, createDocument, readDocument } from "./documents";
+import { applyUpdate, createDocument, deleteDocument, documentAccess, readDocument } from "./documents";
 import { getConnection, listConnections, readCredential } from "@/lib/connections/store";
 import {
     GOOGLE_DRIVE_FILE_SCOPE,
@@ -324,16 +324,21 @@ export async function importGoogleFile(
         throw new OfficeGoogleError("failed");
     }
     const documentId = await createDocument(user, { kind: imported.kind, title: imported.title, orgId });
-    await applyUpdate(user, documentId, imported.update);
-    await prisma.officeGoogleFile.create({
-        data: {
-            documentId,
-            connectionId,
-            sourceFileId: meta.data.id,
-            sourceMime: meta.data.mimeType,
-            sourceName: meta.data.name.slice(0, 500)
-        }
-    });
+    try {
+        await applyUpdate(user, documentId, imported.update);
+        await prisma.officeGoogleFile.create({
+            data: {
+                documentId,
+                connectionId,
+                sourceFileId: meta.data.id,
+                sourceMime: meta.data.mimeType,
+                sourceName: meta.data.name.slice(0, 500)
+            }
+        });
+    } catch (caught) {
+        await deleteDocument(user, documentId).catch(() => undefined);
+        throw caught;
+    }
     return { id: documentId, kind: imported.kind, title: imported.title };
 }
 
@@ -347,6 +352,7 @@ export interface OfficeGoogleLink {
 }
 
 export async function googleLinkOf(userId: string, documentId: string): Promise<OfficeGoogleLink | null> {
+    if (!(await documentAccess({ id: userId }, documentId))) return null;
     const row = await prisma.officeGoogleFile.findUnique({
         where: { documentId },
         select: { connectionId: true, sourceName: true, savedAt: true, copyFileId: true, sourceMime: true }
