@@ -240,7 +240,7 @@ export function GoogleImportDialog({
                                 title={search ? t("google.noMatch") : t("google.none")}
                             />
                         ) : (
-                            <ul className="-mx-2 flex max-h-80 flex-col gap-0.5 overflow-y-auto">
+                            <ul className="-mx-2 flex max-h-80 flex-col gap-0.5 overflow-y-auto overscroll-contain">
                                 {files.map((file) => {
                                     const Icon = MIME_ICONS[file.mime];
                                     return (
