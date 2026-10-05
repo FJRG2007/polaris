@@ -1,0 +1,7 @@
+@import "../css/theme";
+
+.polaris-diagram {
+  .polaris-diagram-button {
+    @include outlineButtonStyles;
+  }
+}

@@ -1,0 +1,7 @@
+@import "../css/variables.module.scss";
+
+.polaris-diagram {
+  .Avatar {
+    @include avatarStyles;
+  }
+}
