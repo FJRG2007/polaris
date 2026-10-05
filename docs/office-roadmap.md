@@ -99,7 +99,9 @@ already agrees on. A document is a `Y.Doc`; every app binds its own model to it:
 - Docs - `y-prosemirror`, which binds straight to the editor Polaris already has.
 - Sheets - Univer's mutations applied into a shared type.
 - Slides - the slide model in a `Y.Map` per slide.
-- Diagrams - Excalidraw's elements, which it already models as a flat array.
+- Diagrams - each element in its own key of a shared `Y.Map`, rather than
+  Excalidraw's own flat array bound whole: two people moving two different
+  shapes is then two independent changes instead of one array both rewrite.
 
 The transport is Polaris', not a new server: the in-process bus and the
 scope-filtered stream that Chat and Tasks already run on ([[tasks-realtime]]),

@@ -11,8 +11,9 @@
  * second copy of React, Radix or jotai inside this file.
  *
  * Stylesheets are SCSS, compiled here and collected into `dist/index.css`. The
- * fonts the canvas draws with are emitted as files under `dist/fonts`, which the
- * web app stages under its own origin - see `apps/web/scripts/copy-diagram-assets.mjs`.
+ * fonts the canvas draws with are emitted as files under `dist/editor/fonts`,
+ * which the web app stages under its own origin - see
+ * `apps/web/scripts/copy-diagram-assets.mjs`.
  *
  *   npm run build -w @polaris/diagrams
  */
