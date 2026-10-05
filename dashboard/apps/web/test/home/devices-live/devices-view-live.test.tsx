@@ -214,4 +214,29 @@ describe("the devices screen, live", () => {
         await act(async () => answer({ device: device({ state: "on" }) }));
         expect(toggle.getAttribute("aria-checked")).toBe("true");
     });
+
+    it("does not let a read that began before a push put the older state back", async () => {
+        listed = [device()];
+        draw();
+        await screen.findByText("Desk lamp");
+        await act(async () => latest().send({ kind: "ready" }));
+
+        // A reconnect starts a reread that answers slowly, with the old state.
+        gate = new Promise((resolve) => {
+            release = resolve;
+        });
+        await act(async () => latest().send({ kind: "ready" }));
+        await act(async () =>
+            latest().send({
+                kind: "devices",
+                devices: [device({ state: "on" })],
+                removed: [],
+                seen: null
+            })
+        );
+        const toggle = screen.getByRole("switch", { name: "Turn Desk lamp on or off" });
+        expect(toggle.getAttribute("aria-checked")).toBe("true");
+        await act(async () => release());
+        expect(toggle.getAttribute("aria-checked")).toBe("true");
+    });
 });

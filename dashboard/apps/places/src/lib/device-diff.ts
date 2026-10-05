@@ -69,20 +69,22 @@ export function sameAccounts(
  */
 export function mergeDevices(
     current: readonly DeviceView[] | null,
-    next: readonly DeviceView[]
+    next: readonly DeviceView[],
+    pushedSince: (id: string) => boolean = () => false
 ): DeviceView[] {
     if (!current) return [...next];
     const held = new Map(current.map((device) => [device.id, device]));
-    let changed = current.length !== next.length;
-    const merged = next.map((device, index) => {
+    // A device pushed after this read began is newer than the read: the read
+    // must not put its old state back, and nothing would push it again until it
+    // changed. What the screen holds of it wins - including its absence.
+    const merged = next.flatMap((device) => {
         const before = held.get(device.id);
-        if (before && sameDevice(before, device)) {
-            if (current[index] !== before) changed = true;
-            return before;
-        }
-        changed = true;
-        return device;
+        if (pushedSince(device.id)) return before ? [before] : [];
+        return [before && sameDevice(before, device) ? before : device];
     });
+    const changed =
+        merged.length !== current.length ||
+        merged.some((device, index) => device !== current[index]);
     return changed ? merged : (current as DeviceView[]);
 }
 

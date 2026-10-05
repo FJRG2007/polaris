@@ -116,14 +116,24 @@ export function DevicesView({
     const groups = useMemo(() => groupDevices(devices ?? [], t), [devices, t]);
 
     /** A full list from the server, moving only the devices that differ. */
+    /** When each device was last pushed, so a full read that began before a
+     *  push cannot put the older state back. */
+    const pushedAt = useRef(new Map<string, number>());
     const take = useCallback(
-        (result: { devices?: DeviceView[]; accounts?: DeviceAccountView[] }) => {
+        (
+            result: { devices?: DeviceView[]; accounts?: DeviceAccountView[] },
+            /** When the read began; a read with none is taken whole. */
+            startedAt = Number.POSITIVE_INFINITY
+        ) => {
             if (result.devices) {
                 const next = result.devices;
-                markRead(next);
-                setDevices((current) => mergeDevices(current, next));
+                const newer = (id: string) => (pushedAt.current.get(id) ?? -1) >= startedAt;
+                markRead(next.filter((entry) => !newer(entry.id)));
+                setDevices((current) => mergeDevices(current, next, newer));
                 setOpened((current) =>
-                    current ? (next.find((entry) => entry.id === current.id) ?? current) : current
+                    current && !newer(current.id)
+                        ? (next.find((entry) => entry.id === current.id) ?? current)
+                        : current
                 );
             }
             if (result.accounts) {
@@ -136,7 +146,8 @@ export function DevicesView({
 
     /** The stored list, read again: no account is called. */
     const reread = useCallback(async () => {
-        take(await actions.listDevicesAction());
+        const startedAt = Date.now();
+        take(await actions.listDevicesAction(), startedAt);
     }, [take]);
 
     /** Which screen the list on display belongs to, so another place's doors
@@ -158,11 +169,12 @@ export function DevicesView({
     useEffect(() => {
         let cancelled = false;
         void (async () => {
+            const startedAt = Date.now();
             const result = await actions.listDevicesAction();
             if (cancelled) return;
             if (result.error) setError(result.error);
             listedFor.current = cacheKey;
-            take({ devices: result.devices ?? [], accounts: result.accounts ?? [] });
+            take({ devices: result.devices ?? [], accounts: result.accounts ?? [] }, startedAt);
         })();
         return () => {
             cancelled = true;
@@ -191,9 +203,10 @@ export function DevicesView({
     const sync = useCallback(
         async (quiet = false) => {
             if (!quiet) setRefreshing(true);
+            const startedAt = Date.now();
             const result = await actions.syncDevicesAction({ probe: !quiet });
             if (!quiet) setRefreshing(false);
-            take(result);
+            take(result, startedAt);
             if (!quiet) setError(result.error ?? "");
         },
         [take]
@@ -222,6 +235,9 @@ export function DevicesView({
                 devices: pushed.devices.filter((entry) => entry.id !== pressing.current)
             };
             if (change.devices.length || change.removed.length) {
+                const now = Date.now();
+                for (const entry of change.devices) pushedAt.current.set(entry.id, now);
+                for (const id of change.removed) pushedAt.current.set(id, now);
                 setDevices((current) => applyDeviceChange(current, change));
                 const gone = new Set(change.removed);
                 setOpened((current) => {

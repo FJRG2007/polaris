@@ -76,6 +76,17 @@ describe("merging a full list into the one on screen", () => {
         expect(reordered[0]).toBe(fan);
     });
 
+    it("keeps what was pushed after the read began, present or removed", () => {
+        const lampOn = device({ state: "on" });
+        const fan = device({ id: "device-2", name: "Fan" });
+        // The read began before the lamp was pushed on and the fan pushed away.
+        const stale = [device({ state: "off" }), fan];
+        const pushed = new Set(["device-1", "device-2"]);
+        const merged = mergeDevices([lampOn], stale, (id) => pushed.has(id));
+        expect(merged).toEqual([lampOn]);
+        expect(merged[0]).toBe(lampOn);
+    });
+
     it("takes the list whole when there was none", () => {
         expect(mergeDevices(null, [device()])).toEqual([device()]);
     });
