@@ -498,19 +498,24 @@ left out.
   wins; everybody else is ranked by when they went out, a tie broken by
   eliminations.
 - **Hits** (`kinds/hits.ts`, `hits-service.ts`): who hit whom in an arena is
-  read off the game, never guessed from statistics where it can be helped. - The events data pack carries two advancements with no display:
-  `entity_hurt_player` (hurt by a player, not blocked by a shield) and
-  `player_hurt_entity` (hurt a player). Their reward functions tag a
-  player an arena took in (`pe_hit_hurt`, `pe_hit_struck`) and revoke
-  the advancement, so the next hit fires it again. They fire on any
-  damage that gets through, however small after Resistance, and never
-  for a fall. A kind that reads them says so (`ArenaGame.hits`) and the
-  pack is put on before its arena is built. - The tick takes the tags in one batch (`TAKE`: copied, then cleared),
-  so a hit landing while it reads is kept for the next look. - Who hurt a player is asked of the game (`execute as <player> on
-attacker`, from 1.19.4): the last living thing that hurt them in the
-  last five seconds, nothing after a fall. Before 1.19.4, the nearest of
-  those who struck. - Where the pack cannot be put on, the damage statistics are read, a
-  first score counted as a rise from 0 (`hits.rose`).
+  read off the game, never guessed from statistics where it can be helped.
+    - The events data pack carries two advancements with no display:
+      `entity_hurt_player` (hurt by a player, not blocked by a shield) and
+      `player_hurt_entity` (hurt a player). Their reward functions tag a
+      player an arena took in (`pe_hit_hurt`, `pe_hit_struck`) and revoke
+      the advancement, so the next hit fires it again. They fire on any
+      damage that gets through, however small after Resistance, and never
+      for a fall. A kind that reads them says so (`ArenaGame.hits`), the
+      pack is put on before its arena is built, and the tags are cleared at
+      "Go!": any arena's fight leaves them.
+    - The tick takes the tags in one batch (`TAKE`: copied, then cleared),
+      so a hit landing while it reads is kept for the next look.
+    - Who hurt a player is asked of the game (`hits.attackerLine`, an
+      `execute on attacker`, from 1.19.4): the last living thing that hurt
+      them in the last five seconds, nothing after a fall. Before 1.19.4,
+      the nearest of those who struck.
+    - Where the pack cannot be put on, the damage statistics are read, a
+      first score counted as a rise from 0 (`hits.rose`).
 
 ## Building a map
 
@@ -757,6 +762,10 @@ A new kind follows all of them. A change to an old kind must not undo one.
   elimination. A hit is the events data pack's advancement (see "Hits" in
   the kind notes), and who hurt whom is the game's own memory of it,
   `execute on attacker` (`2f5400563`, `4606a3bb8`).
+- **A tag the game sets for anybody is cleared before a game reads it.** The
+  pack tags a hit in any arena, and only hot potato and hide and seek take
+  the tags: one left from an earlier fight was read on their first look as a
+  pass or a find of their own. Both clear them at "Go!" (`fac62a154`).
 - **Credit goes to whoever hurt that player, not whoever struck last.** "The
   rival who struck last" was anybody's strike at anybody: with more than one
   a side, eliminations went to the wrong rival (`9b351dc35`).
