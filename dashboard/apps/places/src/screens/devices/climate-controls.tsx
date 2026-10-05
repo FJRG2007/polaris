@@ -6,9 +6,9 @@
  *
  * Every one of them moves the moment it is used. The screen above applies the
  * change to the device before the answer arrives and puts it back if the answer
- * is a refusal, so these read the device and nothing else. The one exception is
- * the temperature: pressing + four times is one change to 26 degrees, not four
- * commands, so the presses are gathered for a moment and sent as one.
+ * is a refusal, so these read the device and nothing else. The temperature is
+ * its own control (`TemperatureTarget`), stepped or typed, and used wherever a
+ * target is set from a device's controls.
  *
  * What a unit can be set to is the unit's own - the modes it has, its range and
  * its step, the extras it was built with - so nothing here offers a choice the
@@ -18,14 +18,12 @@
 
 import { usePlacesT } from "../use-places-t";
 import * as kinds from "../../lib/device-kinds";
-import { Minus, Plus, Thermometer } from "lucide-react";
-import { Button, Select, Switch, cn } from "@polaris/ui";
-import { useEffect, useId, useRef, useState } from "react";
+import { Thermometer } from "lucide-react";
+import { Select, Switch, cn } from "@polaris/ui";
+import { useId } from "react";
 import { DeviceSwitch, controlReason } from "./device-switch";
+import { TemperatureTarget } from "./temperature-target";
 import type { ClimateCommand, DeviceAction, DeviceView } from "../../lib/device-kinds";
-
-/** How long the stepper waits for another press before it sends the total. */
-const STEP_SETTLE_MS = 700;
 
 export function ClimateControls({
     device,
@@ -49,38 +47,6 @@ export function ClimateControls({
     const climate = device.climate ?? null;
     const reason = controlReason(device, canControl, t);
     const locked = reason !== "";
-
-    // The target as the stepper is showing it while presses are being gathered;
-    // null whenever nothing is waiting, so the device's own value is shown.
-    const [draft, setDraft] = useState<number | null>(null);
-    const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
-    const pending = useRef<number | null>(null);
-    const send = useRef(onAct);
-    send.current = onAct;
-
-    const flush = () => {
-        if (timer.current) clearTimeout(timer.current);
-        timer.current = null;
-        const target = pending.current;
-        pending.current = null;
-        setDraft(null);
-        if (target !== null) send.current("set-temperature", { action: "set-temperature", target });
-    };
-
-    // Leaving with a change gathered sends it rather than dropping it: closing
-    // the panel straight after pressing + is still pressing +.
-    useEffect(() => () => flush(), []);
-
-    // Pressed back to where the device already is: nothing to send.
-    const settledTarget = climate?.target ?? null;
-    useEffect(() => {
-        if (draft !== null && draft === settledTarget && pending.current === settledTarget) {
-            if (timer.current) clearTimeout(timer.current);
-            timer.current = null;
-            pending.current = null;
-            setDraft(null);
-        }
-    }, [draft, settledTarget]);
 
     const describedBy = locked ? reasonId : undefined;
     const reasonNote = locked ? (
@@ -106,20 +72,6 @@ export function ClimateControls({
             </div>
         );
     }
-
-    const shown = draft ?? climate.target;
-    const nudge = (direction: 1 | -1) => {
-        const from = pending.current ?? climate.target ?? climate.min;
-        const next =
-            Math.round(
-                Math.min(climate.max, Math.max(climate.min, from + direction * climate.step)) * 100
-            ) / 100;
-        if (next === (pending.current ?? climate.target)) return;
-        pending.current = next;
-        setDraft(next);
-        if (timer.current) clearTimeout(timer.current);
-        timer.current = setTimeout(flush, STEP_SETTLE_MS);
-    };
 
     const disabled = locked || busy !== null;
     const label = (text: string) =>
@@ -160,41 +112,15 @@ export function ClimateControls({
     const target = (
         <div className="flex flex-col gap-1" title={reason || undefined}>
             {label(t("devicePanel.climate.target"))}
-            <div
-                role="group"
-                aria-label={t("devicePanel.climate.targetName", { name: device.name })}
-                aria-describedby={describedBy}
-                className="inline-flex h-8 items-center rounded-md border border-border"
-            >
-                <Button
-                    size="sm"
-                    variant="ghost"
-                    className="h-full rounded-r-none px-2"
-                    aria-label={t("devicePanel.climate.lower", { name: device.name })}
-                    title={t("devicePanel.climate.lower", { name: device.name })}
-                    disabled={disabled || (shown !== null && shown <= climate.min)}
-                    onClick={() => nudge(-1)}
-                >
-                    <Minus className="size-4" aria-hidden="true" />
-                </Button>
-                <output
-                    aria-live="polite"
-                    className="min-w-[4.5rem] px-1 text-center text-sm font-medium tabular-nums"
-                >
-                    {shown === null ? "-" : kinds.temperatureText(shown, climate.unit)}
-                </output>
-                <Button
-                    size="sm"
-                    variant="ghost"
-                    className="h-full rounded-l-none px-2"
-                    aria-label={t("devicePanel.climate.raise", { name: device.name })}
-                    title={t("devicePanel.climate.raise", { name: device.name })}
-                    disabled={disabled || (shown !== null && shown >= climate.max)}
-                    onClick={() => nudge(1)}
-                >
-                    <Plus className="size-4" aria-hidden="true" />
-                </Button>
-            </div>
+            <TemperatureTarget
+                name={device.name}
+                settings={climate}
+                disabled={disabled}
+                describedBy={describedBy}
+                onSet={(value) =>
+                    onAct("set-temperature", { action: "set-temperature", target: value })
+                }
+            />
         </div>
     );
 

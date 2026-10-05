@@ -140,6 +140,9 @@ describe("the work Polaris runs on a schedule", () => {
             "home-availability",
             "home-recording",
             "home-retention",
+            // Two passes would each tell a relay to hold the same camera, and a
+            // relay told twice drops the camera and dials it again.
+            "home-warm",
             "host-space",
             // Two passes would each remove the same volume, and the one that lost
             // would fail on a volume the other already took.

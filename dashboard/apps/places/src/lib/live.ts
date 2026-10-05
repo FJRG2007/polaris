@@ -19,6 +19,12 @@
  * seconds behind, and the only thing they will play. Both come down the same
  * authenticated path, so both work from outside the house.
  *
+ * Wherever the browser has Media Source Extensions - every desktop browser, and
+ * an iPhone since iOS 17.1 - the same MP4 is read by the page and fed to the
+ * player a fragment at a time instead of being handed to it as a file (see
+ * live-player). That is what turns "about fourteen seconds and then several
+ * behind" into the first keyframe on screen and a quarter of a second behind.
+ *
  * Server-only.
  */
 

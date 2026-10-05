@@ -17,7 +17,8 @@
  * Server-only.
  */
 
-import { redactSource, relaySource } from "./vendors";
+import { cameraVendor, redactSource, relaySource } from "./vendors";
+import { drawsFromBattery } from "./camera-models";
 import { RELAY_LOG_TAIL, UNEXPLAINED, explainRelayFailure, relaySaid } from "./relay-failure";
 import { HomeError } from "./home-error";
 import type { CameraTarget } from "./cameras";
@@ -160,7 +161,8 @@ async function relayFetch(
 export async function publishCamera(
     endpoint: RelayEndpoint,
     camera: CameraTarget,
-    vendor: string
+    vendor: string,
+    options: { warm?: boolean } = {}
 ): Promise<void> {
     const auth = { username: camera.username, password: camera.password };
     const shape = {
@@ -180,12 +182,107 @@ export async function publishCamera(
         // reason is about a URL that carries a password, so it is not passed on.
         if (!response.ok) throw new HomeError("The relay would not accept that camera");
     }
+    // Asked again every time, not only when it changes: writing a stream
+    // replaces it inside the relay, and a warm connection held on the one it
+    // replaced is a second connection to the camera that nothing can see or
+    // close. Pointing the warm connection at the stream again moves it over and
+    // lets the old one stop.
+    await warmStream(endpoint, streamName(camera.id, "main"), options.warm === true);
+}
+
+/**
+ * Whether a camera's good stream is kept connected with nobody watching.
+ *
+ * This is what makes opening a camera fast. A relay connects to a camera when
+ * somebody asks to watch it and lets go when the last viewer leaves, so every
+ * opening paid for a fresh conversation with the camera - its handshake, then
+ * its next keyframe - before there was anything to send. A camera the relay
+ * already holds only costs the keyframe.
+ *
+ * It costs the relay nothing worth counting: holding a stream is copying
+ * packets, and nothing decodes them. It costs the camera one connection it was
+ * going to give the first viewer anyway. What it would cost a battery camera is
+ * the battery, so those are never kept - they wake when somebody opens them, as
+ * the maker's own app does. A camera that is switched off is not kept either.
+ */
+export function keepsWarm(camera: { enabled: boolean; power: string; vendor: string }): boolean {
+    if (!camera.enabled) return false;
+    if (drawsFromBattery(camera.power)) return false;
+    return cameraVendor(camera.vendor).battery !== true;
+}
+
+/**
+ * The streams a relay is holding open with nobody watching.
+ *
+ * Null when it could not be asked - a relay that is down, and a relay from a
+ * build before it was allowed to be asked, which answers that it does not know
+ * the path. Neither is an empty list: reading one as "nothing is warm" would
+ * have the next step try to warm everything on a relay that will refuse it.
+ */
+export async function warmStreams(endpoint: RelayEndpoint): Promise<string[] | null> {
+    const response = await relayFetch(endpoint, "/api/preload", { timeoutMs: 3000 }).catch(
+        () => null
+    );
+    if (!response?.ok) return null;
+    const body = (await response.json().catch(() => null)) as Record<string, unknown> | null;
+    return body && typeof body === "object" ? Object.keys(body) : null;
+}
+
+/**
+ * Hold a stream open with nobody watching, or let it go.
+ *
+ * Best effort and quiet about it. Keeping a camera warm is about how fast it
+ * opens, never about whether it works, so a relay that will not do it - an old
+ * one, or one that has not seen the camera yet - is a camera that opens the way
+ * it always did, not an error on anybody's screen.
+ */
+export async function warmStream(
+    endpoint: RelayEndpoint,
+    name: string,
+    on: boolean
+): Promise<boolean> {
+    const response = await relayFetch(endpoint, `/api/preload?src=${encodeURIComponent(name)}`, {
+        method: on ? "PUT" : "DELETE"
+    }).catch(() => null);
+    return response?.ok === true;
+}
+
+/**
+ * What to change so a relay holds exactly the cameras it should.
+ *
+ * Only cameras the relay is already serving are warmed: it refuses to hold a
+ * stream it has not been given. Anything it holds that is not wanted - a camera
+ * switched off, deleted, or moved to a battery - is let go.
+ *
+ * Pure, so the rules are tests.
+ */
+export function warmPlan(
+    cameras: readonly { id: string; enabled: boolean; power: string; vendor: string }[],
+    published: readonly string[],
+    warm: readonly string[]
+): { add: string[]; drop: string[] } {
+    const serving = new Set(published);
+    const wanted = new Set(
+        cameras
+            .filter(keepsWarm)
+            .map((camera) => streamName(camera.id, "main"))
+            .filter((name) => serving.has(name))
+    );
+    const held = new Set(warm);
+    return {
+        add: [...wanted].filter((name) => !held.has(name)),
+        drop: [...held].filter((name) => !wanted.has(name))
+    };
 }
 
 /** Stop serving a camera, both qualities. Best effort: a relay that has already
  *  forgotten it is the state we were asking for. */
 export async function unpublishCamera(endpoint: RelayEndpoint, cameraId: string): Promise<void> {
     for (const quality of ["main", "sub"] as const) {
+        // The warm connection first. Forgetting a stream does not close what is
+        // attached to it, so a camera removed while warm would otherwise stay
+        // connected to a relay that no longer lists it.
+        await warmStream(endpoint, streamName(cameraId, quality), false);
         await relayFetch(
             endpoint,
             `/api/streams?src=${encodeURIComponent(streamName(cameraId, quality))}`,

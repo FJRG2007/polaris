@@ -37,7 +37,7 @@
 
 import Link from "next/link";
 import { Badge, Button, cn } from "@polaris/ui";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { CameraView } from "../lib/cameras";
 import { Camera, Maximize2, VideoOff } from "lucide-react";
 import type { LiveBox } from "@polaris/core";
@@ -47,12 +47,16 @@ import { usePlacesT } from "./use-places-t";
 import { drawsFromBattery } from "../lib/camera-models";
 import { quietSince } from "../lib/availability";
 import {
-    otherTransport,
+    captureFrame,
+    nextTransport,
     preferredTransport,
+    rememberFrame,
     stillSrc,
     streamSrc,
     type Transport
 } from "../lib/player";
+import { playLive } from "../lib/live-player";
+import { useReconnect } from "./use-reconnect";
 import { hostUi } from "@polaris/app-host/client";
 
 const { useDisplayFormat } = hostUi.displayFormat;
@@ -149,11 +153,11 @@ export function CameraTile({
     /** Which stream is being tried, or null once video has been given up on for
      *  now - the frames carry the tile either way. */
     const [attempt, setAttempt] = useState<"sub" | "main" | null>("sub");
-    const [transport, setTransport] = useState<Transport>("mp4");
-    const [swapped, setSwapped] = useState(false);
+    const [transport, setTransport] = useState<Transport>("mse");
     /** Whether the stream is actually playing. Until it is, the frames are what
      *  is on screen. */
     const [playing, setPlaying] = useState(false);
+    const reconnect = useReconnect();
     /** The camera's own shape, width over height, learned from whichever of the
      *  two is on screen. Null until one has arrived. */
     const [shape, setShape] = useState<number | null>(null);
@@ -170,6 +174,17 @@ export function CameraTile({
 
     const frame = useRef<HTMLDivElement | null>(null);
     const video = useRef<HTMLVideoElement | null>(null);
+    /**
+     * The element itself, held as state as well as in the ref: a stream fed by
+     * hand has to start when the element exists, and inside a dialog that is a
+     * render after the first one - an effect that only read the ref saw nothing
+     * and never started the stream.
+     */
+    const [videoElement, setVideoElement] = useState<HTMLVideoElement | null>(null);
+    const attachVideo = useCallback((found: HTMLVideoElement | null) => {
+        video.current = found;
+        setVideoElement(found);
+    }, []);
     const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     /**
@@ -231,25 +246,54 @@ export function CameraTile({
      * What to try when the stream does not start.
      *
      * The good stream next, because some cameras publish only one and some
-     * publish a second the relay cannot open. Then the other format: a browser
-     * that will not take one usually takes the other, and finding out by trying
+     * publish a second the relay cannot open. Then the next format: a browser
+     * that will not take one usually takes another, and finding out by trying
      * is more reliable than deciding from what the browser calls itself. Then
      * nothing - which costs the viewer nothing, because the frames are already
      * on screen and keep coming.
+     *
+     * A stream that had started and then dropped is none of that: it is
+     * reconnected as it was.
      */
-    const failed = () => {
+    const failed = (started = false) => {
         setPlaying(false);
+        if (reconnect.dropped(started)) return;
         if (attempt === "sub") {
             setAttempt("main");
             return;
         }
-        if (!swapped) {
-            setSwapped(true);
-            setTransport(otherTransport(transport));
+        const next = nextTransport(transport);
+        if (next) {
+            setTransport(next);
             setAttempt("sub");
             return;
         }
         setAttempt(null);
+    };
+    const failedRef = useRef(failed);
+    failedRef.current = failed;
+
+    /** Whether a stream is being tried at all right now. */
+    const streaming = attempt !== null && visible && !idle && !battery && !reconnect.waiting;
+
+    // The stream fed by hand: the first keyframe is the first frame on screen,
+    // and the picture stays live instead of drifting behind. Keyed like the
+    // element, which is re-created for each attempt.
+    useEffect(() => {
+        if (!streaming || !attempt || transport !== "mse" || !videoElement) return;
+        return playLive(videoElement, streamSrc(camera.id, attempt, "mse"), (_, started) =>
+            failedRef.current(started)
+        );
+    }, [videoElement, camera.id, attempt, transport, streaming]);
+
+    /** Open it big, starting from what this tile is showing right now. */
+    const open = () => {
+        const element = video.current;
+        if (playing && element) {
+            const picture = captureFrame(element);
+            if (picture) rememberFrame(camera.id, picture);
+        }
+        onOpen();
     };
 
     /**
@@ -262,13 +306,13 @@ export function CameraTile({
     const stirred = () => setAlive((value) => value + 1);
 
     useEffect(() => {
-        if (!attempt || playing || !wantFrames) return;
-        const watchdog = setTimeout(failed, VIDEO_SILENCE_MS);
+        if (!attempt || playing || !wantFrames || reconnect.waiting) return;
+        const watchdog = setTimeout(() => failed(), VIDEO_SILENCE_MS);
         return () => clearTimeout(watchdog);
         // eslint-disable-next-line react-hooks/exhaustive-deps -- restarting the
         // clock is the point whenever what is being tried changes, and whenever
         // the stream shows a sign of life.
-    }, [attempt, transport, playing, wantFrames, alive]);
+    }, [attempt, transport, playing, wantFrames, alive, reconnect.waiting, reconnect.round]);
 
     // Give up for a minute, not forever: a camera that was rebooting when the
     // page loaded should not need a reload.
@@ -276,7 +320,6 @@ export function CameraTile({
         if (attempt !== null) return;
         const retry = setTimeout(() => {
             setTransport(preferredTransport());
-            setSwapped(false);
             setAttempt("sub");
         }, 60_000);
         return () => clearTimeout(retry);
@@ -338,6 +381,8 @@ export function CameraTile({
                             )}
                             onLoad={(loaded) => {
                                 setDrawn(true);
+                                const shownSrc = loaded.currentTarget.getAttribute("src");
+                                if (shownSrc) rememberFrame(camera.id, shownSrc);
                                 const { naturalWidth, naturalHeight } = loaded.currentTarget;
                                 if (naturalWidth > 0 && naturalHeight > 0) {
                                     setShape(naturalWidth / naturalHeight);
@@ -349,15 +394,21 @@ export function CameraTile({
                                 if (wantFrames) after(FRAME_RETRY_MS);
                             }}
                         />
-                        {attempt && visible && !idle && !battery ? (
+                        {streaming && attempt ? (
                             <video
-                                ref={video}
+                                ref={attachVideo}
                                 // Keyed so switching quality or format really
                                 // re-creates the element: a <video> handed a new
                                 // src after an error keeps the error and never
                                 // tries again.
-                                key={`${transport}-${attempt}`}
-                                src={streamSrc(camera.id, attempt, transport)}
+                                key={`${transport}-${attempt}-${reconnect.round}`}
+                                // Fed by hand for "mse" (see the effect above),
+                                // so no address of its own.
+                                src={
+                                    transport === "mse"
+                                        ? undefined
+                                        : streamSrc(camera.id, attempt, transport)
+                                }
                                 className={cn(
                                     "absolute inset-0 size-full object-cover",
                                     playing ? "opacity-100" : "opacity-0"
@@ -378,8 +429,11 @@ export function CameraTile({
                                 }}
                                 onProgress={stirred}
                                 onCanPlay={stirred}
-                                onPlaying={() => setPlaying(true)}
-                                onError={failed}
+                                onPlaying={() => {
+                                    setPlaying(true);
+                                    reconnect.played();
+                                }}
+                                onError={() => failed(playing)}
                             />
                         ) : null}
                         {showing && visible && !idle
@@ -445,7 +499,7 @@ export function CameraTile({
                     stays a sibling and keeps its own clicks. */}
                 <button
                     type="button"
-                    onClick={onOpen}
+                    onClick={open}
                     aria-label={t("camera.open", { name: camera.name })}
                     className="absolute inset-0 cursor-zoom-in"
                 />
@@ -461,7 +515,7 @@ export function CameraTile({
                 <div className="min-w-0">
                     <button
                         type="button"
-                        onClick={onOpen}
+                        onClick={open}
                         className="block max-w-full truncate text-left text-[0.8125rem] font-medium text-foreground hover:underline"
                     >
                         {camera.name}
@@ -528,7 +582,12 @@ function Unavailable({
 }) {
     const t = usePlacesT();
     if (!camera.enabled)
-        return <Placeholder icon={<VideoOff className="size-5 shrink-0" />} label={t("camera.switchedOff")} />;
+        return (
+            <Placeholder
+                icon={<VideoOff className="size-5 shrink-0" />}
+                label={t("camera.switchedOff")}
+            />
+        );
     if (since)
         return (
             <Placeholder
@@ -537,8 +596,18 @@ function Unavailable({
             />
         );
     if (!live)
-        return <Placeholder icon={<Camera className="size-5 shrink-0" />} label={t("camera.starting")} />;
-    return <Placeholder icon={<Camera className="size-5 shrink-0" />} label={t("camera.notAnswering")} />;
+        return (
+            <Placeholder
+                icon={<Camera className="size-5 shrink-0" />}
+                label={t("camera.starting")}
+            />
+        );
+    return (
+        <Placeholder
+            icon={<Camera className="size-5 shrink-0" />}
+            label={t("camera.notAnswering")}
+        />
+    );
 }
 
 function Placeholder({ icon, label }: { icon: React.ReactNode; label: string }) {

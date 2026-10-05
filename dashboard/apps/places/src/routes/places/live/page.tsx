@@ -1,0 +1,57 @@
+/**
+ * A place's cameras, live: the wall.
+ *
+ * It was the front page of Places until the Overview took that over; it is the
+ * screen the Overview's cameras card and the "Live" entry open.
+ *
+ * The server hands over the frame and nothing else. Every camera on this wall is
+ * fetched by the client, so the heading and the buttons are on screen before a
+ * single camera has been asked for - which matters here more than anywhere,
+ * because a camera that is asleep takes a moment to answer and there is no
+ * reason for that to be a moment of blank page.
+ */
+
+import Link from "next/link";
+import { Plus } from "lucide-react";
+import { Wall } from "../../../screens/wall";
+import { Button, PageHeader } from "@polaris/ui";
+import { placesT } from "../../../lib/i18n";
+import { requireHomeReach } from "../../../lib/access";
+import { currentPlace } from "../../../lib/current-place";
+import { PlaceSwitcher } from "../../../screens/place-switcher";
+
+export const dynamic = "force-dynamic";
+
+export default async function LivePage() {
+    const t = await placesT();
+    // A visitor lent one camera lands here too, and the wall draws that one.
+    const { install, canManage, canControl } = await requireHomeReach();
+    const place = await currentPlace(install.id);
+
+    return (
+        <div className="mx-auto flex w-full max-w-6xl flex-col gap-6">
+            <div className="flex flex-wrap items-start justify-between gap-2">
+                <PageHeader
+                    title={t("pages.live.title")}
+                    description={t("pages.place.description")}
+                />
+                <div className="flex flex-wrap items-center gap-2">
+                    <PlaceSwitcher
+                        places={place.places}
+                        current={place.current}
+                        canManage={canManage}
+                    />
+                    {canManage ? (
+                        <Button asChild size="sm" variant="ghost">
+                            <Link href="/places/cameras">
+                                <Plus className="size-4 shrink-0" />
+                                {t("pages.place.addCamera")}
+                            </Link>
+                        </Button>
+                    ) : null}
+                </div>
+            </div>
+            <Wall canManage={canManage} canControl={canControl} />
+        </div>
+    );
+}

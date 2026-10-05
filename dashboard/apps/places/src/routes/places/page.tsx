@@ -1,28 +1,26 @@
 /**
- * The front page of a place: its cameras, live.
+ * The front page of a place: how it is doing, at a glance.
  *
- * The server hands over the frame and nothing else. Every camera on this wall is
- * fetched by the client, so the heading and the buttons are on screen before a
- * single camera has been asked for - which matters here more than anywhere,
- * because a camera that is asleep takes a moment to answer and there is no
- * reason for that to be a moment of blank page.
+ * What is on, what needs somebody, each room with its controls, and the cameras
+ * as one card among those - the live wall is a press away at /places/live. The
+ * server hands over the frame and who may do what; everything inside it is read
+ * by the client, so the page is on screen before any device account or camera
+ * has been asked anything.
  */
 
-import Link from "next/link";
-import { Plus } from "lucide-react";
-import { Wall } from "../../screens/wall";
-import { Button, PageHeader } from "@polaris/ui";
 import { placesT } from "../../lib/i18n";
+import { PageHeader } from "@polaris/ui";
 import { requireHomeReach } from "../../lib/access";
 import { currentPlace } from "../../lib/current-place";
 import { PlaceSwitcher } from "../../screens/place-switcher";
+import { OverviewView } from "../../screens/overview/overview-view";
 
 export const dynamic = "force-dynamic";
 
 export default async function PlacePage() {
     const t = await placesT();
-    // A visitor lent one camera lands here too, and the wall draws that one.
-    const { install, canManage, canControl } = await requireHomeReach();
+    // A visitor lent one door or one camera lands here too, and is shown that.
+    const { install, reach, canManage, canControl } = await requireHomeReach();
     const place = await currentPlace(install.id);
 
     return (
@@ -30,25 +28,21 @@ export default async function PlacePage() {
             <div className="flex flex-wrap items-start justify-between gap-2">
                 <PageHeader
                     title={place.current.name}
-                    description={t("pages.place.description")}
+                    description={t("pages.overview.description")}
                 />
-                <div className="flex flex-wrap items-center gap-2">
-                    <PlaceSwitcher
-                        places={place.places}
-                        current={place.current}
-                        canManage={canManage}
-                    />
-                    {canManage ? (
-                        <Button asChild size="sm" variant="ghost">
-                            <Link href="/places/cameras">
-                                <Plus className="size-4 shrink-0" />
-                                {t("pages.place.addCamera")}
-                            </Link>
-                        </Button>
-                    ) : null}
-                </div>
+                <PlaceSwitcher
+                    places={place.places}
+                    current={place.current}
+                    canManage={canManage}
+                />
             </div>
-            <Wall canManage={canManage} canControl={canControl} />
+            <OverviewView
+                placeId={place.current.id}
+                places={place.places}
+                resident={reach.everything}
+                canControl={canControl}
+                canManage={canManage}
+            />
         </div>
     );
 }

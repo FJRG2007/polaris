@@ -878,8 +878,24 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
     ],
     home: [
         {
-            label: "Live", // i18n-ignore
+            // The landing page: the place at a glance, rooms and cameras together.
+            label: "Overview", // i18n-ignore
             href: "/places",
+            icon: LayoutDashboard,
+            keywords: [
+                "home",
+                "summary",
+                "rooms",
+                "areas",
+                "dashboard",
+                "lights on",
+                "climate",
+                "what needs attention"
+            ]
+        },
+        {
+            label: "Live", // i18n-ignore
+            href: "/places/live",
             icon: Cctv,
             group: CAMERAS_GROUP,
             keywords: ["cameras", "wall", "watch", "stream", "view", "rtsp"]

@@ -213,6 +213,197 @@ describe("an air conditioner's row", () => {
     });
 });
 
+describe("typing the target", () => {
+    const field = () =>
+        screen.getByRole("textbox", { name: "Type the target for Bedroom AC" }) as HTMLInputElement;
+    const open = () =>
+        fireEvent.click(screen.getByRole("button", { name: /type the target for Bedroom AC$/ }));
+
+    it("opens the number as a field with a decimal keypad, holding the current target", async () => {
+        await drawn([unit()]);
+        open();
+        expect(field().value).toBe("24");
+        expect(field().getAttribute("inputmode")).toBe("decimal");
+        expect(document.activeElement).toBe(field());
+    });
+
+    it("sends what was typed on Enter, at once, and shows it while it is on its way", async () => {
+        await drawn([unit()]);
+        open();
+        fireEvent.change(field(), { target: { value: "27" } });
+        fireEvent.keyDown(field(), { key: "Enter" });
+        expect(pressed).toEqual([
+            ["ac-1", "set-temperature", { action: "set-temperature", target: 27 }]
+        ]);
+        expect(
+            screen.getByRole("group", { name: "Target temperature of Bedroom AC" }).textContent
+        ).toContain("27°C");
+    });
+
+    it("applies on leaving the field too", async () => {
+        await drawn([unit()]);
+        open();
+        fireEvent.change(field(), { target: { value: "22" } });
+        fireEvent.blur(field());
+        expect(pressed).toEqual([
+            ["ac-1", "set-temperature", { action: "set-temperature", target: 22 }]
+        ]);
+    });
+
+    it("puts the number back on Escape and sends nothing", async () => {
+        await drawn([unit()]);
+        open();
+        fireEvent.change(field(), { target: { value: "29" } });
+        fireEvent.keyDown(field(), { key: "Escape" });
+        expect(pressed).toEqual([]);
+        expect(
+            screen.queryByRole("textbox", { name: "Type the target for Bedroom AC" })
+        ).toBeNull();
+        expect(
+            screen.getByRole("group", { name: "Target temperature of Bedroom AC" }).textContent
+        ).toContain("24°C");
+    });
+
+    it("hands the keyboard back to the number after Enter or Escape, not after leaving", async () => {
+        await drawn([unit()]);
+        const number = () =>
+            screen.getByRole("button", { name: /type the target for Bedroom AC$/ });
+        open();
+        fireEvent.change(field(), { target: { value: "27" } });
+        fireEvent.keyDown(field(), { key: "Enter" });
+        await act(async () => answer({ device: unit({ climate: { ...CLIMATE, target: 27 } }) }));
+        await waitFor(() => expect(document.activeElement).toBe(number()));
+        open();
+        fireEvent.keyDown(field(), { key: "Escape" });
+        expect(document.activeElement).toBe(number());
+        open();
+        fireEvent.change(field(), { target: { value: "" } });
+        fireEvent.keyDown(field(), { key: "Enter" });
+        expect(document.activeElement).toBe(number());
+        open();
+        fireEvent.blur(field());
+        expect(document.activeElement).not.toBe(number());
+    });
+
+    it("refuses a value off the range, saying the range, and stays open on Enter", async () => {
+        await drawn([unit()]);
+        open();
+        fireEvent.change(field(), { target: { value: "35" } });
+        expect(field().getAttribute("aria-invalid")).toBe("true");
+        const said = document.getElementById(field().getAttribute("aria-describedby") ?? "");
+        expect(said?.textContent).toBe("Between 16°C and 30°C");
+        fireEvent.keyDown(field(), { key: "Enter" });
+        expect(pressed).toEqual([]);
+        expect(field()).toBeTruthy();
+    });
+
+    it("refuses a value off the step rather than rounding it", async () => {
+        await drawn([unit()]);
+        open();
+        fireEvent.change(field(), { target: { value: "24.5" } });
+        fireEvent.blur(field());
+        expect(pressed).toEqual([]);
+        expect(screen.getByText("In steps of 1°C")).toBeTruthy();
+    });
+
+    it("takes a decimal comma on a unit that steps by half a degree", async () => {
+        await drawn([unit({ climate: { ...CLIMATE, step: 0.5 } })]);
+        open();
+        fireEvent.change(field(), { target: { value: "24,5" } });
+        fireEvent.keyDown(field(), { key: "Enter" });
+        expect(pressed).toEqual([
+            ["ac-1", "set-temperature", { action: "set-temperature", target: 24.5 }]
+        ]);
+    });
+
+    it("does not complain about a number that is still being typed", async () => {
+        await drawn([unit()]);
+        open();
+        fireEvent.change(field(), { target: { value: "2" } });
+        expect(field().getAttribute("aria-invalid")).toBeNull();
+    });
+
+    it("sends nothing when the typed value is the one it already has", async () => {
+        await drawn([unit()]);
+        open();
+        fireEvent.change(field(), { target: { value: "24" } });
+        fireEvent.keyDown(field(), { key: "Enter" });
+        expect(pressed).toEqual([]);
+    });
+
+    it("puts the typed target back when the unit refuses", async () => {
+        await drawn([unit()]);
+        open();
+        fireEvent.change(field(), { target: { value: "20" } });
+        fireEvent.keyDown(field(), { key: "Enter" });
+        const group = () =>
+            screen.getByRole("group", { name: "Target temperature of Bedroom AC" }).textContent;
+        expect(group()).toContain("20°C");
+        await act(async () => answer({ error: "The unit did not answer." }));
+        await waitFor(() => expect(group()).toContain("24°C"));
+    });
+
+    it("cannot be opened on a unit that cannot be operated", async () => {
+        await drawn([unit({ online: false, state: "unknown" })]);
+        expect(
+            screen
+                .getByRole("button", { name: "24°C, type the target for Bedroom AC" })
+                .hasAttribute("disabled")
+        ).toBe(true);
+    });
+
+    it("speaks Spanish", async () => {
+        await drawn([unit()], true, "es-ES");
+        fireEvent.click(
+            screen.getByRole("button", { name: "24°C, escribir el objetivo de Bedroom AC" })
+        );
+        const input = screen.getByRole("textbox", { name: "Escribir el objetivo de Bedroom AC" });
+        fireEvent.change(input, { target: { value: "40" } });
+        expect(screen.getByText("Entre 16°C y 30°C")).toBeTruthy();
+    });
+});
+
+describe("reading a typed temperature", () => {
+    const settings = { min: 16, max: 30, step: 0.5 };
+
+    it("reads a number with a comma, a degree sign or a unit after it", () => {
+        expect(kinds.typedTemperature(" 24,5 ", settings)).toEqual({ target: 24.5 });
+        expect(kinds.typedTemperature("24°", settings)).toEqual({ target: 24 });
+        expect(kinds.typedTemperature("24 °C", settings)).toEqual({ target: 24 });
+    });
+
+    it("treats an empty field as left alone, not as a mistake", () => {
+        expect(kinds.typedTemperature("   ", settings)).toBeNull();
+    });
+
+    it("names what is wrong rather than fixing it", () => {
+        expect(kinds.typedTemperature("warm", settings)).toEqual({ issue: "number" });
+        expect(kinds.typedTemperature("2.4.5", settings)).toEqual({ issue: "number" });
+        expect(kinds.typedTemperature("31", settings)).toEqual({ issue: "range" });
+        expect(kinds.typedTemperature("15.5", settings)).toEqual({ issue: "range" });
+        expect(kinds.typedTemperature("24.3", settings)).toEqual({ issue: "step" });
+    });
+
+    it("agrees with what the service accepts", () => {
+        for (const text of ["16", "16.5", "29.5", "30", "24.3", "31"]) {
+            const read = kinds.typedTemperature(text, settings);
+            const issue = kinds.climateCommandIssue(
+                { ...CLIMATE, ...settings },
+                { action: "set-temperature", target: Number(text) }
+            );
+            expect(read !== null && "target" in read).toBe(issue === null);
+        }
+    });
+
+    it("knows a whole number that is only too small because it is unfinished", () => {
+        expect(kinds.mayStillGrow("2", settings)).toBe(true);
+        expect(kinds.mayStillGrow("3", settings)).toBe(true);
+        expect(kinds.mayStillGrow("4", settings)).toBe(false);
+        expect(kinds.mayStillGrow("2.", settings)).toBe(false);
+        expect(kinds.mayStillGrow("12", settings)).toBe(false);
+    });
+});
+
 describe("what an air conditioner accepts", () => {
     const settings = { ...CLIMATE };
 

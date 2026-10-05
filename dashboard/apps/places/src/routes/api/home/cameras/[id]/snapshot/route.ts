@@ -9,6 +9,7 @@
 import { homeInstall } from "../../../../../../lib/access";
 import { mayWatchCamera } from "../../../../../../lib/sharing";
 import { cameraStill, CameraOfflineError } from "../../../../../../lib/live";
+import { VERSIONED_STILL } from "../../../../../../lib/player";
 import { host } from "@polaris/app-host";
 
 const { apiUser } = host.apiSession;
@@ -41,6 +42,10 @@ export async function GET(
     // tiles at four frames a second is the cost the shared cache exists to
     // refuse.
     const smooth = query.get("smooth") === "1";
+    // An address made unique to one page and one picture is never asked for
+    // again except on purpose - by a camera opened from the tile that drew it,
+    // which then has a picture on screen before anything else has answered.
+    const versioned = VERSIONED_STILL.test(query.get("v") ?? "");
     try {
         const image = await cameraStill(install.id, id, {
             ...(width ? { width } : {}),
@@ -51,11 +56,12 @@ export async function GET(
         return new Response(new Uint8Array(image), {
             headers: {
                 "content-type": "image/jpeg",
-                // Not cached by the browser: the wall asks for a new one on a
-                // timer and a cached answer is a picture that never changes,
-                // which is the whole complaint. Sharing the cost between tiles is
-                // the relay's job, and it does it with its own one-second window.
-                "cache-control": "no-store"
+                // Only a versioned address is kept, and only by this browser:
+                // the wall asks for a new one on a timer, and a plain address
+                // served from a cache is a picture that never changes, which is
+                // the whole complaint. Sharing the cost between tiles is the
+                // relay's job, and it does it with its own one-second window.
+                "cache-control": versioned && !smooth ? "private, max-age=60" : "no-store"
             }
         });
     } catch (caught) {

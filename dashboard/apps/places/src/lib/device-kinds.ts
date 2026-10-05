@@ -478,6 +478,58 @@ function onStep(value: number, settings: ClimateSettings): boolean {
     return Math.abs(steps - Math.round(steps)) < 1e-6;
 }
 
+/** Why a typed target cannot be sent, in the terms the field explains it in. */
+export type TypedTemperatureIssue = "number" | "range" | "step";
+
+/**
+ * A target temperature somebody typed, read the way they meant it.
+ *
+ * Trimmed, with a decimal comma read as a point - "24,5" is how half of Europe
+ * writes it - and a trailing degree sign or unit allowed, since that is what the
+ * field shows beside the number. Then held to the same rule the service applies
+ * (`climateCommandIssue`): inside the unit's range and on its step. A value off
+ * either is refused and said, never moved to the nearest one that fits: the
+ * person typed 31 because they wanted 31, and silently sending 30 is a setting
+ * they did not choose.
+ *
+ * Null for nothing typed, which is not a mistake - it is a field left alone.
+ */
+export function typedTemperature(
+    text: string,
+    settings: Pick<ClimateSettings, "min" | "max" | "step">
+): { target: number } | { issue: TypedTemperatureIssue } | null {
+    const cleaned = text
+        .trim()
+        .replace(/\s*°?\s*[cfCF]?$/, "")
+        .replace(",", ".");
+    if (cleaned === "") return null;
+    if (!/^-?\d+(\.\d+)?$/.test(cleaned)) return { issue: "number" };
+    const target = Number(cleaned);
+    if (!Number.isFinite(target)) return { issue: "number" };
+    if (target < settings.min || target > settings.max) return { issue: "range" };
+    const steps = (target - settings.min) / settings.step;
+    if (Math.abs(steps - Math.round(steps)) >= 1e-6) return { issue: "step" };
+    return { target };
+}
+
+/**
+ * Whether a number being typed could still become one in range by typing more.
+ *
+ * "2" on a unit that takes 16 to 30 is the start of "24", not a mistake, and a
+ * field that shouts "between 16 and 30" at the first keystroke is one people
+ * learn to ignore. Only whole numbers grow this way: once there is a decimal
+ * point, more digits cannot make a too-small number big enough.
+ */
+export function mayStillGrow(
+    text: string,
+    settings: Pick<ClimateSettings, "min" | "max">
+): boolean {
+    const cleaned = text.trim().replace(",", ".");
+    if (!/^\d+$/.test(cleaned)) return false;
+    const value = Number(cleaned);
+    return value < settings.min && value * 10 <= settings.max;
+}
+
 /**
  * Why a command cannot go to this unit, as the sentence the service refuses
  * with, or null when it can. The same answer in the browser, where it decides
@@ -597,8 +649,13 @@ export function applyCommand(
 
 /** A temperature as a person reads it: no trailing ".0", the unit closed up. */
 export function temperatureText(value: number, unit: ClimateUnit): string {
+    return `${degreesText(value)}°${unit}`;
+}
+
+/** A temperature to one decimal, without its unit. */
+export function degreesText(value: number): string {
     const rounded = Math.round(value * 10) / 10;
-    return `${Number.isInteger(rounded) ? rounded.toFixed(0) : rounded.toFixed(1)}°${unit}`;
+    return Number.isInteger(rounded) ? rounded.toFixed(0) : rounded.toFixed(1);
 }
 
 export function climateModeText(mode: ClimateMode, t: PlacesTranslator = en): string {
