@@ -1,4 +1,5 @@
 name: Publish dashboard image
+run-name: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run && format('Dry run on {0}', github.ref_name) || '' }}
 
 # Build and push the dashboard images to GHCR on every change to main, keeping
 # only the `latest` tag (no versioned tags). Installs then pull instead of
@@ -51,6 +52,11 @@ on:
       - "Cargo.lock"
       - ".github/workflows/dashboard-publish.yml"
   workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Build every image and run every job without pushing, caching to the registry or moving any tag"
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -66,8 +72,16 @@ permissions:
 # removes; the next successful run measures its changes from the last one that
 # succeeded, so nothing the cancelled run carried is skipped.
 concurrency:
-  group: dashboard-publish
+  # A dry run has a queue of its own: it must never cancel a real publish.
+  group: dashboard-publish${{ inputs.dry_run && '-dry-run' || '' }}
   cancel-in-progress: true
+
+# 'false' only for a manual run asked to be dry: every job and every step that
+# only reads still runs, exactly as a publish would, and nothing reaches the
+# registry - no image, no build cache, no bundle, no manifest list, no tag. How a
+# change to the build itself (an action's new major) is proven before merging.
+env:
+  PUBLISH: ${{ github.event_name != 'workflow_dispatch' || !inputs.dry_run }}
 
 jobs:
   # Decide which images need rebuilding from the paths that changed in this push.
@@ -88,7 +102,7 @@ jobs:
       vision: ${{ steps.filter.outputs.vision }}
       face: ${{ steps.filter.outputs.face }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
       - id: filter
@@ -119,7 +133,7 @@ jobs:
           # measured from there - thousands of files "changed", and every image,
           # the vision and face workers included, rebuilt for a one-line change.
           LAST=$(gh api "repos/$REPO/actions/workflows/dashboard-publish.yml/runs?branch=main&status=success&per_page=30" \
-            --jq '[.workflow_runs[]] | sort_by(.created_at) | last | .head_sha // empty' 2>/dev/null || true)
+            --jq '[.workflow_runs[] | select((.event == "workflow_dispatch" and (.display_title | startswith("Dry run"))) | not)] | sort_by(.created_at) | last | .head_sha // empty' 2>/dev/null || true)
           if [ -n "$LAST" ] && [ "$LAST" != "$SHA" ] && git cat-file -e "${LAST}^{commit}" 2>/dev/null \
              && git merge-base --is-ancestor "$LAST" "$SHA"; then
             echo "Measuring from the last published commit $LAST (push base was ${BEFORE:-none})."
@@ -239,15 +253,15 @@ jobs:
       # {"<app>": "<manifest digest>"} for the bundles this image names.
       bundles: ${{ steps.bundles.outputs.list }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: docker/setup-buildx-action@v3
-      - uses: docker/login-action@v3
+      - uses: actions/checkout@v7
+      - uses: docker/setup-buildx-action@v4
+      - uses: docker/login-action@v4
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
       - id: build
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: dashboard
           file: dashboard/docker/Dockerfile
@@ -256,8 +270,8 @@ jobs:
             NODE_BUILD_OPTIONS=--max-old-space-size=8192
             POLARIS_APP_BUNDLES=publish
           cache-from: type=registry,ref=ghcr.io/fjrg2007/polaris-buildcache:web
-          cache-to: type=registry,ref=ghcr.io/fjrg2007/polaris-buildcache:web,mode=max
-          outputs: type=image,name=ghcr.io/fjrg2007/polaris-dashboard,push-by-digest=true,name-canonical=true,push=true
+          cache-to: ${{ env.PUBLISH == 'true' && 'type=registry,ref=ghcr.io/fjrg2007/polaris-buildcache:web,mode=max' || '' }}
+          outputs: type=image,name=ghcr.io/fjrg2007/polaris-dashboard,push-by-digest=true,name-canonical=true,push=${{ env.PUBLISH }}
           # No attestation manifests. buildx attaches one to the index by
           # default, and it is an extra untagged child that every puller then has
           # to resolve: a daemon on the containerd image store fetches the whole
@@ -271,7 +285,7 @@ jobs:
       # in this builder, so this only writes out the stage the image took its
       # index from - the files the image names by digest, and nothing else.
       - name: Export the app bundles
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: dashboard
           file: dashboard/docker/Dockerfile
@@ -287,6 +301,7 @@ jobs:
       # names, so one pushed here and never tagged is never fetched by anybody.
       - name: Publish the app bundles
         id: bundles
+        if: env.PUBLISH == 'true'
         env:
           REGISTRY_USER: ${{ github.actor }}
           REGISTRY_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -299,20 +314,20 @@ jobs:
     if: ${{ needs.changes.outputs.mdns == 'true' || github.event_name == 'workflow_dispatch' }}
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: docker/setup-buildx-action@v3
-      - uses: docker/login-action@v3
+      - uses: actions/checkout@v7
+      - uses: docker/setup-buildx-action@v4
+      - uses: docker/login-action@v4
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      - uses: docker/build-push-action@v6
+      - uses: docker/build-push-action@v7
         with:
           context: dashboard/mdns
-          push: true
+          push: ${{ env.PUBLISH == 'true' }}
           tags: ghcr.io/fjrg2007/polaris-mdns:latest
           cache-from: type=registry,ref=ghcr.io/fjrg2007/polaris-buildcache:mdns
-          cache-to: type=registry,ref=ghcr.io/fjrg2007/polaris-buildcache:mdns,mode=max
+          cache-to: ${{ env.PUBLISH == 'true' && 'type=registry,ref=ghcr.io/fjrg2007/polaris-buildcache:mdns,mode=max' || '' }}
 
   # Privileged host daemon (Rust workspace at the repo root). Built per-arch on
   # NATIVE runners - amd64 on ubuntu-latest, arm64 on ubuntu-24.04-arm - instead of
@@ -336,22 +351,22 @@ jobs:
             runner: ubuntu-24.04-arm
     runs-on: ${{ matrix.runner }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: docker/setup-buildx-action@v3
-      - uses: docker/login-action@v3
+      - uses: actions/checkout@v7
+      - uses: docker/setup-buildx-action@v4
+      - uses: docker/login-action@v4
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
       - id: build
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: .
           file: crates/polaris-hostd/Dockerfile
           platforms: ${{ matrix.platform }}
           cache-from: type=registry,ref=ghcr.io/fjrg2007/polaris-buildcache:hostd-${{ matrix.arch }}
-          cache-to: type=registry,ref=ghcr.io/fjrg2007/polaris-buildcache:hostd-${{ matrix.arch }},mode=max
-          outputs: type=image,name=ghcr.io/fjrg2007/polaris-hostd,push-by-digest=true,name-canonical=true,push=true
+          cache-to: ${{ env.PUBLISH == 'true' && format('type=registry,ref=ghcr.io/fjrg2007/polaris-buildcache:hostd-{0},mode=max', matrix.arch) || '' }}
+          outputs: type=image,name=ghcr.io/fjrg2007/polaris-hostd,push-by-digest=true,name-canonical=true,push=${{ env.PUBLISH }}
           # No attestation manifests. buildx attaches one to the index by
           # default, and it is an extra untagged child that every puller then has
           # to resolve: a daemon on the containerd image store fetches the whole
@@ -387,13 +402,14 @@ jobs:
           path: ${{ runner.temp }}/digests
           pattern: hostd-digest-*
           merge-multiple: true
-      - uses: docker/setup-buildx-action@v3
-      - uses: docker/login-action@v3
+      - uses: docker/setup-buildx-action@v4
+      - uses: docker/login-action@v4
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
       - name: Create manifest list
+        if: env.PUBLISH == 'true'
         working-directory: ${{ runner.temp }}/digests
         run: |
           docker buildx imagetools create -t ghcr.io/fjrg2007/polaris-hostd:latest \
@@ -405,22 +421,22 @@ jobs:
     if: ${{ needs.changes.outputs.updater == 'true' || github.event_name == 'workflow_dispatch' }}
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: docker/setup-qemu-action@v3
-      - uses: docker/setup-buildx-action@v3
-      - uses: docker/login-action@v3
+      - uses: actions/checkout@v7
+      - uses: docker/setup-qemu-action@v4
+      - uses: docker/setup-buildx-action@v4
+      - uses: docker/login-action@v4
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      - uses: docker/build-push-action@v6
+      - uses: docker/build-push-action@v7
         with:
           context: dashboard/docker/updater
           platforms: linux/amd64,linux/arm64
-          push: true
+          push: ${{ env.PUBLISH == 'true' }}
           tags: ghcr.io/fjrg2007/polaris-updater:latest
           cache-from: type=registry,ref=ghcr.io/fjrg2007/polaris-buildcache:updater
-          cache-to: type=registry,ref=ghcr.io/fjrg2007/polaris-buildcache:updater,mode=max
+          cache-to: ${{ env.PUBLISH == 'true' && 'type=registry,ref=ghcr.io/fjrg2007/polaris-buildcache:updater,mode=max' || '' }}
 
   # Messaging bridge sidecar. The marketplace installs this image as a managed
   # Deploy app (it is not part of the web image), so it must be published for
@@ -433,21 +449,21 @@ jobs:
     outputs:
       digest: ${{ steps.build.outputs.digest }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: docker/setup-buildx-action@v3
-      - uses: docker/login-action@v3
+      - uses: actions/checkout@v7
+      - uses: docker/setup-buildx-action@v4
+      - uses: docker/login-action@v4
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
       - id: build
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: dashboard
           file: dashboard/services/messaging-bridge/Dockerfile
           cache-from: type=registry,ref=ghcr.io/fjrg2007/polaris-buildcache:bridge
-          cache-to: type=registry,ref=ghcr.io/fjrg2007/polaris-buildcache:bridge,mode=max
-          outputs: type=image,name=ghcr.io/fjrg2007/polaris-messaging-bridge,push-by-digest=true,name-canonical=true,push=true
+          cache-to: ${{ env.PUBLISH == 'true' && 'type=registry,ref=ghcr.io/fjrg2007/polaris-buildcache:bridge,mode=max' || '' }}
+          outputs: type=image,name=ghcr.io/fjrg2007/polaris-messaging-bridge,push-by-digest=true,name-canonical=true,push=${{ env.PUBLISH }}
           # No attestation manifests. buildx attaches one to the index by
           # default, and it is an extra untagged child that every puller then has
           # to resolve: a daemon on the containerd image store fetches the whole
@@ -469,21 +485,21 @@ jobs:
     outputs:
       digest: ${{ steps.build.outputs.digest }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: docker/setup-buildx-action@v3
-      - uses: docker/login-action@v3
+      - uses: actions/checkout@v7
+      - uses: docker/setup-buildx-action@v4
+      - uses: docker/login-action@v4
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
       - id: build
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: dashboard
           file: dashboard/services/edge-guard/Dockerfile
           cache-from: type=registry,ref=ghcr.io/fjrg2007/polaris-buildcache:guard
-          cache-to: type=registry,ref=ghcr.io/fjrg2007/polaris-buildcache:guard,mode=max
-          outputs: type=image,name=ghcr.io/fjrg2007/polaris-edge-guard,push-by-digest=true,name-canonical=true,push=true
+          cache-to: ${{ env.PUBLISH == 'true' && 'type=registry,ref=ghcr.io/fjrg2007/polaris-buildcache:guard,mode=max' || '' }}
+          outputs: type=image,name=ghcr.io/fjrg2007/polaris-edge-guard,push-by-digest=true,name-canonical=true,push=${{ env.PUBLISH }}
           # No attestation manifests. buildx attaches one to the index by
           # default, and it is an extra untagged child that every puller then has
           # to resolve: a daemon on the containerd image store fetches the whole
@@ -505,21 +521,21 @@ jobs:
     outputs:
       digest: ${{ steps.build.outputs.digest }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: docker/setup-buildx-action@v3
-      - uses: docker/login-action@v3
+      - uses: actions/checkout@v7
+      - uses: docker/setup-buildx-action@v4
+      - uses: docker/login-action@v4
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
       - id: build
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: dashboard
           file: dashboard/services/hytale/Dockerfile
           cache-from: type=registry,ref=ghcr.io/fjrg2007/polaris-buildcache:hytale
-          cache-to: type=registry,ref=ghcr.io/fjrg2007/polaris-buildcache:hytale,mode=max
-          outputs: type=image,name=ghcr.io/fjrg2007/polaris-hytale,push-by-digest=true,name-canonical=true,push=true
+          cache-to: ${{ env.PUBLISH == 'true' && 'type=registry,ref=ghcr.io/fjrg2007/polaris-buildcache:hytale,mode=max' || '' }}
+          outputs: type=image,name=ghcr.io/fjrg2007/polaris-hytale,push-by-digest=true,name-canonical=true,push=${{ env.PUBLISH }}
           provenance: false
           sbom: false
 
@@ -534,22 +550,22 @@ jobs:
     outputs:
       digest: ${{ steps.build.outputs.digest }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: docker/setup-buildx-action@v3
-      - uses: docker/login-action@v3
+      - uses: actions/checkout@v7
+      - uses: docker/setup-buildx-action@v4
+      - uses: docker/login-action@v4
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
       - id: build
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: dashboard
           file: dashboard/services/camera-relay/Dockerfile
           # A camera can be on an arm board at the far end of the house, so the
           # relay follows the servers people actually have.
           platforms: linux/amd64,linux/arm64
-          outputs: type=image,name=ghcr.io/fjrg2007/polaris-camera-relay,push-by-digest=true,name-canonical=true,push=true
+          outputs: type=image,name=ghcr.io/fjrg2007/polaris-camera-relay,push-by-digest=true,name-canonical=true,push=${{ env.PUBLISH }}
           # No attestation manifests. buildx attaches one to the index by
           # default, and it is an extra untagged child that every puller then has
           # to resolve: a daemon on the containerd image store fetches the whole
@@ -570,22 +586,22 @@ jobs:
     outputs:
       digest: ${{ steps.build.outputs.digest }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: docker/setup-buildx-action@v3
-      - uses: docker/login-action@v3
+      - uses: actions/checkout@v7
+      - uses: docker/setup-buildx-action@v4
+      - uses: docker/login-action@v4
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
       - id: build
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: dashboard
           file: dashboard/services/vision/Dockerfile
           # Detection is the work most likely to be sent to a small board in a
           # cupboard, so it follows the servers people actually have.
           platforms: linux/amd64,linux/arm64
-          outputs: type=image,name=ghcr.io/fjrg2007/polaris-vision,push-by-digest=true,name-canonical=true,push=true
+          outputs: type=image,name=ghcr.io/fjrg2007/polaris-vision,push-by-digest=true,name-canonical=true,push=${{ env.PUBLISH }}
           # No attestation manifests. buildx attaches one to the index by
           # default, and it is an extra untagged child that every puller then has
           # to resolve: a daemon on the containerd image store fetches the whole
@@ -607,16 +623,16 @@ jobs:
     outputs:
       digest: ${{ steps.build.outputs.digest }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: docker/setup-qemu-action@v3
-      - uses: docker/setup-buildx-action@v3
-      - uses: docker/login-action@v3
+      - uses: actions/checkout@v7
+      - uses: docker/setup-qemu-action@v4
+      - uses: docker/setup-buildx-action@v4
+      - uses: docker/login-action@v4
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
       - id: build
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: dashboard
           file: dashboard/services/face/Dockerfile
@@ -624,7 +640,7 @@ jobs:
           # a house that runs detection on a small board will want to run
           # recognition beside it rather than send frames across the network.
           platforms: linux/amd64,linux/arm64
-          outputs: type=image,name=ghcr.io/fjrg2007/polaris-face,push-by-digest=true,name-canonical=true,push=true
+          outputs: type=image,name=ghcr.io/fjrg2007/polaris-face,push-by-digest=true,name-canonical=true,push=${{ env.PUBLISH }}
           # No attestation manifests. buildx attaches one to the index by
           # default, and it is an extra untagged child that every puller then has
           # to resolve: a daemon on the containerd image store fetches the whole
@@ -652,13 +668,13 @@ jobs:
     if: ${{ !cancelled() && (needs.dashboard-ci.result == 'success' || needs.dashboard-ci.result == 'skipped') }}
     runs-on: ubuntu-latest
     steps:
-      - uses: docker/setup-buildx-action@v3
-      - uses: docker/login-action@v3
+      - uses: docker/setup-buildx-action@v4
+      - uses: docker/login-action@v4
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         if: ${{ needs.web.result == 'success' }}
         with:
           sparse-checkout: dashboard/docker/app-bundles.sh
@@ -666,42 +682,42 @@ jobs:
       # Before the dashboard: a `latest` that names bundles nobody tagged would
       # lose them to the next prune.
       - name: Tag the app bundles
-        if: ${{ needs.web.result == 'success' && needs.web.outputs.bundles != '' }}
+        if: ${{ env.PUBLISH == 'true' && needs.web.result == 'success' && needs.web.outputs.bundles != '' }}
         env:
           REGISTRY_USER: ${{ github.actor }}
           REGISTRY_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           BUNDLES: ${{ needs.web.outputs.bundles }}
         run: bash dashboard/docker/app-bundles.sh tag "$BUNDLES"
       - name: Tag the dashboard
-        if: ${{ needs.web.result == 'success' }}
+        if: ${{ env.PUBLISH == 'true' && needs.web.result == 'success' }}
         run: |
           docker buildx imagetools create -t ghcr.io/fjrg2007/polaris-dashboard:latest \
             ghcr.io/fjrg2007/polaris-dashboard@${{ needs.web.outputs.digest }}
       - name: Tag the messaging bridge
-        if: ${{ needs.bridge.result == 'success' }}
+        if: ${{ env.PUBLISH == 'true' && needs.bridge.result == 'success' }}
         run: |
           docker buildx imagetools create -t ghcr.io/fjrg2007/polaris-messaging-bridge:latest \
             ghcr.io/fjrg2007/polaris-messaging-bridge@${{ needs.bridge.outputs.digest }}
       - name: Tag the edge guard
-        if: ${{ needs.guard.result == 'success' }}
+        if: ${{ env.PUBLISH == 'true' && needs.guard.result == 'success' }}
         run: |
           docker buildx imagetools create -t ghcr.io/fjrg2007/polaris-edge-guard:latest \
             ghcr.io/fjrg2007/polaris-edge-guard@${{ needs.guard.outputs.digest }}
       - name: Tag the Hytale runtime
-        if: ${{ needs.hytale.result == 'success' && needs.hytale.outputs.digest != '' }}
+        if: ${{ env.PUBLISH == 'true' && needs.hytale.result == 'success' && needs.hytale.outputs.digest != '' }}
         run: |
           docker buildx imagetools create -t ghcr.io/fjrg2007/polaris-hytale:latest \
             ghcr.io/fjrg2007/polaris-hytale@${{ needs.hytale.outputs.digest }}
       - name: Tag the camera relay
-        if: ${{ needs.relay.result == 'success' }}
+        if: ${{ env.PUBLISH == 'true' && needs.relay.result == 'success' }}
         run: |
           docker buildx imagetools create -t ghcr.io/fjrg2007/polaris-camera-relay:latest \
             ghcr.io/fjrg2007/polaris-camera-relay@${{ needs.relay.outputs.digest }}
       - name: Tag the vision worker
-        if: ${{ needs.vision.result == 'success' }}
+        if: ${{ env.PUBLISH == 'true' && needs.vision.result == 'success' }}
         run: |
           docker buildx imagetools create -t ghcr.io/fjrg2007/polaris-vision:latest             ghcr.io/fjrg2007/polaris-vision@${{ needs.vision.outputs.digest }}
       - name: Tag the face recognizer
-        if: ${{ needs.face.result == 'success' }}
+        if: ${{ env.PUBLISH == 'true' && needs.face.result == 'success' }}
         run: |
           docker buildx imagetools create -t ghcr.io/fjrg2007/polaris-face:latest             ghcr.io/fjrg2007/polaris-face@${{ needs.face.outputs.digest }}
