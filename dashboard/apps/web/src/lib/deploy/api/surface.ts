@@ -345,9 +345,7 @@ export async function listProjects(caller: DeployCaller): Promise<ProjectLine[]>
                 project.environments.flatMap((environment) => environment.applications)
             )
         ),
-        mapBounded(projects, ACCESS_PARALLEL, (project) =>
-            projectAccess(project.id, caller.userId)
-        )
+        mapBounded(projects, ACCESS_PARALLEL, (project) => projectAccess(project.id, caller.userId))
     ]);
     const lines: ProjectLine[] = [];
     for (const [index, project] of projects.entries()) {
