@@ -6280,15 +6280,6 @@ model OfficeLink {
     @@index([documentId])
 }
 
-// When one person last opened one document, and whether they keep it to hand.
-//
-// Its own row rather than a column, because both facts are about the pair rather
-// than about the document: a shared deck somebody else edited this morning is
-// not more relevant to me than the one I was in yesterday, and starring is
-// mine - a document I star must not appear starred to the person who wrote it.
-//
-// Written on every open, so it is the smallest row that gets the most writes:
-// nothing else belongs on it.
 /// Where an Office document came from in Google Drive, and the copy it is saved
 /// back to.
 ///
@@ -6317,6 +6308,15 @@ model OfficeGoogleFile {
     @@index([connectionId])
 }
 
+// When one person last opened one document, and whether they keep it to hand.
+//
+// Its own row rather than a column, because both facts are about the pair rather
+// than about the document: a shared deck somebody else edited this morning is
+// not more relevant to me than the one I was in yesterday, and starring is
+// mine - a document I star must not appear starred to the person who wrote it.
+//
+// Written on every open, so it is the smallest row that gets the most writes:
+// nothing else belongs on it.
 model OfficeDocumentOpen {
     documentId String   @db.Uuid
     userId     String   @db.Uuid
