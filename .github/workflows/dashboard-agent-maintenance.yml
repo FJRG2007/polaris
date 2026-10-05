@@ -75,8 +75,31 @@ jobs:
           npm outdated >> "$report" 2>&1 || true
           echo '```' >> "$report"
 
+          # An issue body holds at most 65,536 characters; a typecheck that
+          # fails across the workspace writes far more. The issue gets the start
+          # of the report and the whole of it is kept as this run's artifact.
+          full="$RUNNER_TEMP/report-full.md"
+          cp "$report" "$full"
+          if [ "$(wc -c < "$full")" -gt 60000 ]; then
+            {
+              head -c 60000 "$full"
+              echo
+              echo '```'
+              echo
+              echo "_Report cut at 60,000 characters. The full report is the \`maintenance-report\` artifact of [this run]($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID)._"
+            } > "$report"
+          fi
+
           echo "problems=$problems" >> "$GITHUB_OUTPUT"
           echo "report=$report" >> "$GITHUB_OUTPUT"
+          echo "full=$full" >> "$GITHUB_OUTPUT"
+
+      - name: Keep the full report
+        if: always() && steps.checks.outputs.full != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: maintenance-report
+          path: ${{ steps.checks.outputs.full }}
 
       - name: Open or update tracking issue
         if: steps.checks.outputs.problems == '1'
@@ -86,6 +109,8 @@ jobs:
         run: |
           set -euo pipefail
           title="Dashboard maintenance: audit/typecheck attention needed"
+          # The label is created the first time; it already existing is fine.
+          gh label create maintenance --color BFD4F2 --description "Weekly dashboard maintenance report" 2>/dev/null || true
           existing=$(gh issue list --state open --search "$title in:title" --json number --jq '.[0].number' || echo "")
           if [ -n "$existing" ]; then
             gh issue comment "$existing" --body-file "$REPORT"
