@@ -614,13 +614,14 @@ export const optionsSchemas = {
     }),
     "hide-and-seek": z.object({
         place: placeSchema.default({ mode: "players" }),
-        /** How long the hiders have before the seekers can move. */
+        /** How long the hiders have before the seekers can move: the house has
+         *  nine rooms to run through, so longer than a hall would need. */
         hideSeconds: z
             .number()
             .int()
             .min(15, problem("atLeast", { count: 15 }))
-            .max(60, problem("atMost", { count: 60 }))
-            .default(30),
+            .max(90, problem("atMost", { count: 90 }))
+            .default(45),
         /** Seekers at the start; everybody found becomes one. */
         seekers: z
             .number()
@@ -1283,7 +1284,7 @@ export const DEFAULT_MINUTES: Readonly<Record<EventKind, number>> = {
     "boat-race": 5,
     dropper: 4,
     "capture-the-flag": 8,
-    "hide-and-seek": 5,
+    "hide-and-seek": 7,
     "hot-potato": 5,
     "sky-wars": 8,
     "village-defense": 10,
