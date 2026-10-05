@@ -56,6 +56,7 @@ import {
     type Transport
 } from "../lib/player";
 import { playLive } from "../lib/live-player";
+import { useReconnect } from "./use-reconnect";
 import { hostUi } from "@polaris/app-host/client";
 
 const { useDisplayFormat } = hostUi.displayFormat;
@@ -156,6 +157,7 @@ export function CameraTile({
     /** Whether the stream is actually playing. Until it is, the frames are what
      *  is on screen. */
     const [playing, setPlaying] = useState(false);
+    const reconnect = useReconnect();
     /** The camera's own shape, width over height, learned from whichever of the
      *  two is on screen. Null until one has arrived. */
     const [shape, setShape] = useState<number | null>(null);
@@ -249,9 +251,13 @@ export function CameraTile({
      * is more reliable than deciding from what the browser calls itself. Then
      * nothing - which costs the viewer nothing, because the frames are already
      * on screen and keep coming.
+     *
+     * A stream that had started and then dropped is none of that: it is
+     * reconnected as it was.
      */
-    const failed = () => {
+    const failed = (started = false) => {
         setPlaying(false);
+        if (reconnect.dropped(started)) return;
         if (attempt === "sub") {
             setAttempt("main");
             return;
@@ -268,15 +274,15 @@ export function CameraTile({
     failedRef.current = failed;
 
     /** Whether a stream is being tried at all right now. */
-    const streaming = attempt !== null && visible && !idle && !battery;
+    const streaming = attempt !== null && visible && !idle && !battery && !reconnect.waiting;
 
     // The stream fed by hand: the first keyframe is the first frame on screen,
     // and the picture stays live instead of drifting behind. Keyed like the
     // element, which is re-created for each attempt.
     useEffect(() => {
         if (!streaming || !attempt || transport !== "mse" || !videoElement) return;
-        return playLive(videoElement, streamSrc(camera.id, attempt, "mse"), () =>
-            failedRef.current()
+        return playLive(videoElement, streamSrc(camera.id, attempt, "mse"), (_, started) =>
+            failedRef.current(started)
         );
     }, [videoElement, camera.id, attempt, transport, streaming]);
 
@@ -300,13 +306,13 @@ export function CameraTile({
     const stirred = () => setAlive((value) => value + 1);
 
     useEffect(() => {
-        if (!attempt || playing || !wantFrames) return;
-        const watchdog = setTimeout(failed, VIDEO_SILENCE_MS);
+        if (!attempt || playing || !wantFrames || reconnect.waiting) return;
+        const watchdog = setTimeout(() => failed(), VIDEO_SILENCE_MS);
         return () => clearTimeout(watchdog);
         // eslint-disable-next-line react-hooks/exhaustive-deps -- restarting the
         // clock is the point whenever what is being tried changes, and whenever
         // the stream shows a sign of life.
-    }, [attempt, transport, playing, wantFrames, alive]);
+    }, [attempt, transport, playing, wantFrames, alive, reconnect.waiting, reconnect.round]);
 
     // Give up for a minute, not forever: a camera that was rebooting when the
     // page loaded should not need a reload.
@@ -395,7 +401,7 @@ export function CameraTile({
                                 // re-creates the element: a <video> handed a new
                                 // src after an error keeps the error and never
                                 // tries again.
-                                key={`${transport}-${attempt}`}
+                                key={`${transport}-${attempt}-${reconnect.round}`}
                                 // Fed by hand for "mse" (see the effect above),
                                 // so no address of its own.
                                 src={
@@ -423,8 +429,11 @@ export function CameraTile({
                                 }}
                                 onProgress={stirred}
                                 onCanPlay={stirred}
-                                onPlaying={() => setPlaying(true)}
-                                onError={failed}
+                                onPlaying={() => {
+                                    setPlaying(true);
+                                    reconnect.played();
+                                }}
+                                onError={() => failed(playing)}
                             />
                         ) : null}
                         {showing && visible && !idle

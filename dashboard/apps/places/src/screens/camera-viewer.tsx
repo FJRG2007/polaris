@@ -66,6 +66,7 @@ import {
     type Transport
 } from "../lib/player";
 import { playLive } from "../lib/live-player";
+import { useReconnect } from "./use-reconnect";
 
 /**
  * Paced by arrival rather than by a clock, so a slow link stretches the gap
@@ -196,6 +197,7 @@ export function CameraViewer({
     const [drawn, setDrawn] = useState<boolean | null>(null);
     const [playing, setPlaying] = useState(false);
     const [trying, setTrying] = useState(true);
+    const reconnect = useReconnect();
     const [transport, setTransport] = useState<Transport>("mse");
     /**
      * The picture the tile this was opened from was showing, if there was one.
@@ -262,9 +264,11 @@ export function CameraViewer({
     }, [playing]);
 
     /** The next format, then nothing. Giving up on the stream is not giving up
-     *  on the camera: the frames are on screen and keep coming. */
-    const failed = () => {
+     *  on the camera: the frames are on screen and keep coming. A stream that
+     *  had started and then dropped is reconnected as it was instead. */
+    const failed = (started = false) => {
         setPlaying(false);
+        if (reconnect.dropped(started)) return;
         const next = nextTransport(transport);
         if (!next) {
             setTrying(false);
@@ -281,13 +285,13 @@ export function CameraViewer({
     const stirred = () => setAlive((value) => value + 1);
 
     useEffect(() => {
-        if (!trying || playing) return;
-        const watchdog = setTimeout(failed, VIDEO_SILENCE_MS);
+        if (!trying || playing || reconnect.waiting) return;
+        const watchdog = setTimeout(() => failed(), VIDEO_SILENCE_MS);
         return () => clearTimeout(watchdog);
         // eslint-disable-next-line react-hooks/exhaustive-deps -- restarting the
         // clock is the point whenever what is being tried changes, and whenever
         // the stream shows a sign of life.
-    }, [transport, trying, playing, alive]);
+    }, [transport, trying, playing, alive, reconnect.waiting, reconnect.round]);
 
     // Closing has to end the request rather than hide it: a stream left running
     // holds a slot on the relay for a camera nobody is watching. Read at teardown
@@ -364,11 +368,11 @@ export function CameraViewer({
     // The stream fed by hand: the first keyframe is the first frame on screen.
     // Keyed like the element, which is re-created for each attempt.
     useEffect(() => {
-        if (!trying || paused || transport !== "mse" || !videoElement) return;
-        return playLive(videoElement, streamSrc(camera.id, "main", "mse"), () =>
-            failedRef.current()
+        if (!trying || paused || reconnect.waiting || transport !== "mse" || !videoElement) return;
+        return playLive(videoElement, streamSrc(camera.id, "main", "mse"), (_, started) =>
+            failedRef.current(started)
         );
-    }, [videoElement, camera.id, transport, trying, paused]);
+    }, [videoElement, camera.id, transport, trying, paused, reconnect.waiting]);
 
     /** Where the pointer is inside the frame, as fractions from its centre, which
      *  is what the zoom aims at. */
@@ -556,7 +560,7 @@ export function CameraViewer({
                                 // Keyed on the pause as well, so starting again
                                 // re-creates the element and reconnects to live
                                 // rather than resuming a buffer from a minute ago.
-                                key={`${transport}-${paused ? "held" : "live"}`}
+                                key={`${transport}-${paused ? "held" : "live"}-${reconnect.round}`}
                                 // Fed by hand for "mse" (see the effect above),
                                 // so no address of its own.
                                 src={
@@ -588,8 +592,9 @@ export function CameraViewer({
                                 onPlaying={() => {
                                     setPlaying(true);
                                     setHeld(null);
+                                    reconnect.played();
                                 }}
-                                onError={failed}
+                                onError={() => failed(playing)}
                             />
                         ) : null}
 

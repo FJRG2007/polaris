@@ -87,13 +87,45 @@ export function keepLive(
     return { seekTo, trimTo };
 }
 
-/** Why live playback stopped on its own. The caller only needs to know that it
- *  did - every one of these means "try the next format" - but a name is what
- *  makes a report from somebody's phone readable. */
+/** Why live playback stopped on its own. A name is what makes a report from
+ *  somebody's phone readable; what the caller acts on is whether anything had
+ *  played before it stopped. */
 export type LiveFailure = "unsupported" | "network" | "refused" | "codec" | "decode" | "ended";
+
+/** First wait before reconnecting a stream that played and then dropped. */
+export const RECONNECT_MIN_MS = 1_000;
+
+/** Longest wait between reconnects, however many drops came before. */
+export const RECONNECT_MAX_MS = 15_000;
+
+/** Reconnects tried in a row, without the stream playing in between, before
+ *  it is treated as one that does not start - long enough for a camera to
+ *  finish rebooting. */
+export const RECONNECT_TRIES = 6;
+
+/** How long a stream has to have played for its next drop to count as the
+ *  first again rather than one more in a run. */
+export const STEADY_MS = 60_000;
+
+/**
+ * How long to wait before reconnecting after `drops` drops in a row.
+ *
+ * A stream that played and then stopped - a camera rebooting, the relay
+ * restarting, a moment without network - is the same stream on the same
+ * format, and is reconnected rather than demoted to the slower formats a
+ * browser falls back to when one never starts. Doubling from a second, so a
+ * blip costs a second and a camera that keeps dropping is not hammered.
+ */
+export function reconnectDelay(drops: number): number {
+    return Math.min(RECONNECT_MAX_MS, RECONNECT_MIN_MS * 2 ** Math.max(0, drops));
+}
 
 /**
  * Play a live fragmented-MP4 stream into a video element.
+ *
+ * `onFail` is told whether anything was buffered before it stopped: a stream
+ * that never started is one to replace with the next format, and one that did
+ * is one to reconnect.
  *
  * Answers the function that stops it. Stopping closes the request as well as
  * the picture: a stream left running holds a consumer on the relay for somebody
@@ -102,23 +134,24 @@ export type LiveFailure = "unsupported" | "network" | "refused" | "codec" | "dec
 export function playLive(
     video: HTMLVideoElement,
     url: string,
-    onFail: (reason: LiveFailure) => void
+    onFail: (reason: LiveFailure, started: boolean) => void
 ): () => void {
     const Source = mediaSourceType();
     if (!Source) {
-        onFail("unsupported");
+        onFail("unsupported", false);
         return () => {};
     }
 
     const request = new AbortController();
     const source = new Source();
     let stopped = false;
+    let started = false;
 
     const fail = (reason: LiveFailure) => {
         if (stopped) return;
         stopped = true;
         request.abort();
-        onFail(reason);
+        onFail(reason, started);
     };
 
     // The managed source refuses to open on an element that could be sent to
@@ -186,6 +219,7 @@ export function playLive(
             }
         };
         buffer.addEventListener("updateend", () => {
+            if (!stopped && buffer.buffered.length > 0) started = true;
             pump();
             // Autoplay is set on the element, but a play() that was refused
             // before there was anything to play is not retried by the browser.

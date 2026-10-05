@@ -61,7 +61,7 @@ export async function GET(
                 // served from a cache is a picture that never changes, which is
                 // the whole complaint. Sharing the cost between tiles is the
                 // relay's job, and it does it with its own one-second window.
-                "cache-control": versioned ? "private, max-age=60" : "no-store"
+                "cache-control": versioned && !smooth ? "private, max-age=60" : "no-store"
             }
         });
     } catch (caught) {

@@ -14,8 +14,11 @@ import {
     EDGE_S,
     KEEP_BEHIND_S,
     MAX_LAG_S,
+    RECONNECT_MAX_MS,
+    RECONNECT_MIN_MS,
     keepLive,
-    mediaSourceType
+    mediaSourceType,
+    reconnectDelay
 } from "@polaris-app/places/src/lib/live-player";
 
 describe("the live edge", () => {
@@ -62,5 +65,17 @@ describe("finding a media source", () => {
         );
         expect(mediaSourceType({ ManagedMediaSource: Managed })).toBe(Managed);
         expect(mediaSourceType({})).toBeNull();
+    });
+});
+
+describe("reconnecting a stream that dropped", () => {
+    it("tries again after a second the first time", () => {
+        expect(reconnectDelay(0)).toBe(RECONNECT_MIN_MS);
+    });
+
+    it("waits longer with each drop in a row, up to a ceiling", () => {
+        expect(reconnectDelay(1)).toBe(RECONNECT_MIN_MS * 2);
+        expect(reconnectDelay(2)).toBe(RECONNECT_MIN_MS * 4);
+        expect(reconnectDelay(50)).toBe(RECONNECT_MAX_MS);
     });
 });
