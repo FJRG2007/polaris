@@ -162,7 +162,11 @@
         "listNotLoaded": "That list could not be loaded.",
         "notOpened": "That message could not be opened.",
         "folderNotInMailbox": "That folder is not in that mailbox.",
-        "ruleNotOnMailbox": "That rule is not on this mailbox."
+        "ruleNotOnMailbox": "That rule is not on this mailbox.",
+        "labelNotYours": "That label is not one of yours.",
+        "forwardLoop": "That address is a mailbox here. Forwarding to it would loop.",
+        "forwardUnverified": "Forward only to an address you have verified on your account.",
+        "filtersFull": "This mailbox has as many filters as it can hold."
     },
     "schema": {
         "matchOn": "Add something to match on",
@@ -185,7 +189,27 @@
         "timePassed": "That time has passed",
         "writeWhat": "Write what it should say",
         "writeTemplate": "Write what the template says",
-        "waitNotOffered": "That is not one of the waits on offer."
+        "waitNotOffered": "That is not one of the waits on offer.",
+        "similarSubjectOnly": "Only a subject can be similar",
+        "similarNoWords": "That subject has no fixed words to match on",
+        "operatorMismatch": "That comparison does not fit what it looks at",
+        "headerName": "Name the header",
+        "notHeaderName": "That is not a header name",
+        "sizeBytes": "Give a size as a whole number of bytes",
+        "yesOrNo": "Say yes or no",
+        "patternInvalid": "That pattern is not valid",
+        "patternUnsafe": "That pattern could take too long to check. Make it simpler",
+        "conditionTooLong": "That is longer than a condition can be",
+        "filterDamaged": "That filter is damaged. Open it again",
+        "groupEmpty": "A group needs a condition",
+        "groupFull": "That is more than a group can hold",
+        "tooManyGroups": "That is more groups than one filter can hold",
+        "tooManySteps": "That is more steps than one filter can hold",
+        "tooManyConditions": "That is more conditions than one filter can hold",
+        "stopTwice": "Stop is already in this filter",
+        "chooseFolder": "Choose a folder",
+        "chooseLabel": "Choose a label",
+        "chooseForward": "Choose where to send it"
     },
     "noSubject": "(no subject)",
     "notify": {

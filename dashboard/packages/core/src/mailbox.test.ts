@@ -17,7 +17,13 @@
 import * as mailbox from "./mailbox.js";
 import { describe, expect, it } from "vitest";
 import * as providers from "./mailbox-providers.js";
-import type { MailEnvelope, MailRule, MailRuleSubject } from "./mailbox.js";
+import type {
+    MailEnvelope,
+    MailRule,
+    MailRuleAction,
+    MailRuleCondition,
+    MailRuleSubject
+} from "./mailbox.js";
 
 function envelope(over: Partial<MailEnvelope> = {}): MailEnvelope {
     return {
@@ -320,43 +326,58 @@ describe("rules", () => {
         ).toBe(false);
     });
 
+    /** A filter saved the old way, read as the automation it now is. */
+    const legacy = (
+        id: string,
+        enabled: boolean,
+        match: "all" | "any",
+        conditions: MailRuleCondition[],
+        actions: MailRuleAction[],
+        stop: boolean
+    ): MailRule => ({
+        id,
+        name: id,
+        enabled,
+        definition: mailbox.mailFilterFromLegacy({ match, conditions, actions, stop })
+    });
+
     it("collects the actions of every matching rule, and stops where told", () => {
         const rules: MailRule[] = [
-            {
-                id: "1",
-                name: "Invoices",
-                enabled: true,
-                match: "all",
-                conditions: [{ field: "from", operator: "contains", value: "invoices@" }],
-                actions: [{ kind: "star" }],
-                stop: true
-            },
-            {
-                id: "2",
-                name: "Everything else",
-                enabled: true,
-                match: "any",
-                conditions: [{ field: "subject", operator: "contains", value: "invoice" }],
-                actions: [{ kind: "trash" }],
-                stop: false
-            }
+            legacy(
+                "1",
+                true,
+                "all",
+                [{ field: "from", operator: "contains", value: "invoices@" }],
+                [{ kind: "star" }],
+                true
+            ),
+            legacy(
+                "2",
+                true,
+                "any",
+                [{ field: "subject", operator: "contains", value: "invoice" }],
+                [{ kind: "trash" }],
+                false
+            )
         ];
         expect(mailbox.mailActionsFor(rules, message)).toEqual([{ kind: "star" }]);
     });
 
     it("ignores a rule that is switched off, and one with nothing to match on", () => {
-        const off: MailRule = {
-            id: "1",
-            name: "Off",
-            enabled: false,
-            match: "all",
-            conditions: [{ field: "from", operator: "contains", value: "invoices@" }],
-            actions: [{ kind: "trash" }],
-            stop: false
-        };
+        const off = legacy(
+            "1",
+            false,
+            "all",
+            [{ field: "from", operator: "contains", value: "invoices@" }],
+            [{ kind: "trash" }],
+            false
+        );
         expect(mailbox.mailActionsFor([off], message)).toEqual([]);
         expect(
-            mailbox.mailActionsFor([{ ...off, enabled: true, conditions: [] }], message)
+            mailbox.mailActionsFor(
+                [legacy("2", true, "all", [], [{ kind: "trash" }], false)],
+                message
+            )
         ).toEqual([]);
     });
 });

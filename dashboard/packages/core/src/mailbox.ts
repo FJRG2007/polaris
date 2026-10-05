@@ -863,10 +863,13 @@ export function folderLabel(path: string, delimiter: string): string {
 export type MailRuleField =
     | "from"
     | "to"
+    | "cc"
     | "recipient"
     | "subject"
     | "body"
     | "list"
+    /** One header by name, named in the condition's `header`. */
+    | "header"
     | "attachment"
     | "size";
 
@@ -884,10 +887,58 @@ export type MailRuleOperator =
      *  `mailSubjectShape`. Subject only. */
     | "similar";
 
+/** The fields a filter could look at before conditions could look at one
+ *  header or the Cc line alone. A rule saved by an older Polaris only ever
+ *  names these, and only these can be written back to its old columns. */
+export const MAIL_LEGACY_FIELDS: readonly MailRuleField[] = [
+    "from",
+    "to",
+    "recipient",
+    "subject",
+    "body",
+    "list",
+    "attachment",
+    "size"
+];
+
+/**
+ * A header's name a filter may look at, as Polaris stores it: lowercase.
+ *
+ * Narrower than RFC 5322 allows on purpose. The name is also sent to the mail
+ * server, in the list of headers the inbox sync fetches, and IMAP reads `%`,
+ * `*` and quotes there as something else - one such name in one filter would
+ * break every sync of that inbox. Real header names are letters, digits and
+ * hyphens.
+ */
+export const MAIL_HEADER_NAME = /^[a-z0-9][a-z0-9_.-]{0,75}$/;
+
+/** What compares text, what compares a number, and the one yes-or-no field. */
+export const MAIL_TEXT_OPERATORS: readonly MailRuleOperator[] = [
+    "contains",
+    "not-contains",
+    "is",
+    "is-not",
+    "starts-with",
+    "ends-with",
+    "matches"
+];
+
+/** The comparisons a field can make. "Similar" is about a subject's shape, a
+ *  size is a number, and whether there are attachments is yes or no. */
+export function mailOperatorsFor(field: MailRuleField): readonly MailRuleOperator[] {
+    if (field === "size") return ["greater-than", "less-than"];
+    if (field === "attachment") return ["is"];
+    if (field === "subject") return [...MAIL_TEXT_OPERATORS, "similar"];
+    return MAIL_TEXT_OPERATORS;
+}
+
+/** One condition: a field, a comparison and what to compare it with. `header`
+ *  names the header when the field is one. */
 export interface MailRuleCondition {
     readonly field: MailRuleField;
     readonly operator: MailRuleOperator;
     readonly value: string;
+    readonly header?: string;
 }
 
 export type MailRuleAction =
@@ -904,10 +955,11 @@ export type MailRuleAction =
      * Send it on to somebody else.
      *
      * The one action here that leaves the building, which is why it is the one
-     * with rules of its own: it is refused to an address on this account, it is
-     * refused on a message that has already been forwarded once, and the copy
-     * carries a header saying so. A forward that can reach a mailbox which
-     * forwards back is a loop that fills two mail servers overnight.
+     * with rules of its own: it goes only to an address its owner has proved
+     * they read, it is refused to an address on this account, it is refused on
+     * a message that has already been forwarded once, and the copy carries a
+     * header saying so. A forward that can reach a mailbox which forwards back
+     * is a loop that fills two mail servers overnight.
      */
     | { readonly kind: "forward"; readonly to: string };
 
@@ -922,57 +974,198 @@ export interface MailRuleSubject {
     readonly listId: string;
     readonly hasAttachments: boolean;
     readonly size: number;
+    /** The headers kept with the message, by lowercased name. */
+    readonly headers?: Readonly<Record<string, unknown>>;
 }
 
-function fieldText(field: MailRuleField, message: MailRuleSubject): string {
-    switch (field) {
+/** How much of a filter there can be, and how much of a message a pattern is
+ *  run over. Bounds on work done for every message that arrives. */
+export const MAIL_FILTER_LIMITS = {
+    filters: 100,
+    groups: 6,
+    conditionsPerGroup: 10,
+    conditions: 20,
+    steps: 10,
+    value: 500,
+    /** A pattern is run over this many characters of what it looks at. */
+    patternText: 10_000,
+    /** At most this many `*`, `+` or `{n,}` in one pattern. */
+    patternRepeats: 3
+} as const;
+
+function joinAddresses(list: readonly MailAddress[]): string {
+    return list.map((entry) => `${entry.name} ${entry.address}`).join(" ");
+}
+
+function fieldText(condition: MailRuleCondition, message: MailRuleSubject): string {
+    switch (condition.field) {
         case "from":
-            return message.from.map((entry) => `${entry.name} ${entry.address}`).join(" ");
+            return joinAddresses(message.from);
         case "to":
-            return message.to.map((entry) => `${entry.name} ${entry.address}`).join(" ");
+            return joinAddresses(message.to);
+        case "cc":
+            return joinAddresses(message.cc);
         case "recipient":
-            return [...message.to, ...message.cc]
-                .map((entry) => `${entry.name} ${entry.address}`)
-                .join(" ");
+            return joinAddresses([...message.to, ...message.cc]);
         case "subject":
             return message.subject;
         case "body":
             return message.text;
         case "list":
             return message.listId;
+        case "header": {
+            const value = message.headers?.[(condition.header ?? "").trim().toLowerCase()];
+            if (Array.isArray(value)) return value.map(String).join(" ");
+            return typeof value === "string" || typeof value === "number" ? String(value) : "";
+        }
         case "attachment":
             return message.hasAttachments ? "yes" : "no";
         case "size":
             return String(message.size);
+        default:
+            // A field this build does not know, from a newer one: it holds nothing.
+            return "";
     }
+}
+
+/**
+ * Why a pattern somebody typed cannot be a filter's, or null when it can.
+ *
+ * A filter's pattern runs on every message that arrives, on the server, and a
+ * pattern can take longer than the age of the universe on a short line: `(a+)+$`
+ * against forty a's and an exclamation mark. JavaScript has no timeout on a
+ * regular expression, so the shapes that backtrack exponentially are refused
+ * before one is saved - a repeated group that itself repeats or branches, and a
+ * back-reference - along with more than a few unbounded repeats, which is how
+ * the merely polynomial ones get slow. What is left is run over a bounded
+ * stretch of text (`MAIL_FILTER_LIMITS.patternText`), and the server runs it
+ * under a time limit as well.
+ */
+export function mailPatternProblem(source: string): "invalid" | "unsafe" | null {
+    try {
+        new RegExp(source, "i");
+    } catch {
+        return "invalid";
+    }
+    /** One open group: whether anything inside it repeats or branches. */
+    const groups: { risky: boolean }[] = [];
+    let repeats = 0;
+    let last: { risky: boolean } | null = null;
+    const quantifierAt = (
+        at: number
+    ): { length: number; unbounded: boolean; many: boolean } | null => {
+        const char = source[at];
+        if (char === "*" || char === "+") return { length: 1, unbounded: true, many: true };
+        if (char === "?") return { length: 1, unbounded: false, many: false };
+        if (char !== "{") return null;
+        const found = /^\{(\d+)(,(\d*))?\}/.exec(source.slice(at));
+        if (!found) return null;
+        const upper =
+            found[2] === undefined ? Number(found[1]) : found[3] ? Number(found[3]) : Infinity;
+        return { length: found[0].length, unbounded: upper === Infinity, many: upper > 1 };
+    };
+    for (let at = 0; at < source.length; at++) {
+        const char = source[at]!;
+        let atom: { risky: boolean } | null = { risky: false };
+        if (char === "\\") {
+            const next = source[at + 1] ?? "";
+            // \1 or \k<name>: a back-reference, which no bound on repeats tames.
+            if (/[1-9]/.test(next) || next === "k") return "unsafe";
+            at += 1;
+        } else if (char === "[") {
+            for (at += 1; at < source.length && source[at] !== "]"; at++) {
+                if (source[at] === "\\") at += 1;
+            }
+        } else if (char === "(") {
+            groups.push({ risky: false });
+            last = null;
+            continue;
+        } else if (char === ")") {
+            atom = groups.pop() ?? { risky: false };
+        } else if (char === "|") {
+            const open = groups.at(-1);
+            if (open) open.risky = true;
+            last = null;
+            continue;
+        } else {
+            const quantifier = quantifierAt(at);
+            if (quantifier && last) {
+                if (quantifier.unbounded) repeats += 1;
+                // A group that repeats and holds a repeat or a choice: the
+                // shape that backtracks exponentially.
+                if (quantifier.many && last.risky) return "unsafe";
+                const open = groups.at(-1);
+                if (open && quantifier.many) open.risky = true;
+                at += quantifier.length - 1;
+                // A lazy or possessive mark after a quantifier is part of it.
+                if (source[at + 1] === "?") at += 1;
+                last = null;
+                continue;
+            }
+        }
+        last = atom;
+        // Whatever a closed group held makes the group around it risky too.
+        if (char === ")" && atom.risky) {
+            const open = groups.at(-1);
+            if (open) open.risky = true;
+        }
+    }
+    return repeats > MAIL_FILTER_LIMITS.patternRepeats ? "unsafe" : null;
+}
+
+/** Runs a filter's pattern over a stretch of text. The server passes one that
+ *  gives up after a time limit, so a pattern saved before the save-time check
+ *  still runs there; the default has no limit and refuses what that check would. */
+export type MailPatternTest = (pattern: string, text: string) => boolean;
+
+const plainPatternTest: MailPatternTest = (pattern, text) =>
+    !mailPatternProblem(pattern) && new RegExp(pattern, "i").test(text);
+
+/**
+ * Text as a filter compares it: one plain space wherever there was any run of
+ * whitespace, and compatibility forms folded together.
+ *
+ * What a subject looks like on screen is not always what is stored. A long
+ * header folded by the sender's mail system keeps its line break and the indent
+ * after it when a server hands it over unfolded, a no-break space reads as a
+ * space, and a full-width colon reads as a colon - so "contains 'PR run
+ * failed:'" missed subjects that showed exactly those words.
+ */
+export function mailSpacing(text: string): string {
+    return text.normalize("NFKC").replace(/\s+/g, " ");
+}
+
+/** The same, trimmed and lowercased, for the comparisons that ignore case. */
+export function mailComparable(text: string): string {
+    return mailSpacing(text).trim().toLowerCase();
 }
 
 /**
  * Whether one condition holds.
  *
- * `matches` is a regular expression somebody typed, so it is compiled inside a
- * try and a broken one is false rather than an exception that stops every other
- * rule in the list. A rule that never fires is a bad rule; a rule that breaks
- * filing is a lost message.
+ * `matches` is a regular expression somebody typed, so a broken or unsafe one is
+ * false rather than an exception that stops every other rule in the list. A rule
+ * that never fires is a bad rule; a rule that breaks filing is a lost message.
  */
 export function mailConditionHolds(
     condition: MailRuleCondition,
-    message: MailRuleSubject
+    message: MailRuleSubject,
+    testPattern: MailPatternTest = plainPatternTest
 ): boolean {
     if (condition.operator === "similar") {
         // Stored as a shape already (see the schema), and shaped again here so a
         // rule written by hand through the API with an example subject works too.
         const shape = mailSubjectShape(condition.value);
-        return shape.length > 0 && mailSubjectShape(fieldText(condition.field, message)) === shape;
+        return shape.length > 0 && mailSubjectShape(fieldText(condition, message)) === shape;
     }
     if (condition.operator === "greater-than" || condition.operator === "less-than") {
-        const left = Number(fieldText(condition.field, message));
+        const left = Number(fieldText(condition, message));
         const right = Number(condition.value);
         if (!Number.isFinite(left) || !Number.isFinite(right)) return false;
         return condition.operator === "greater-than" ? left > right : left < right;
     }
-    const haystack = fieldText(condition.field, message).toLowerCase();
-    const needle = condition.value.trim().toLowerCase();
+    const haystack = mailComparable(fieldText(condition, message));
+    const needle = mailComparable(condition.value);
     switch (condition.operator) {
         case "contains":
             return haystack.includes(needle);
@@ -988,10 +1181,18 @@ export function mailConditionHolds(
             return haystack.trimEnd().endsWith(needle);
         case "matches":
             try {
-                return new RegExp(condition.value, "i").test(fieldText(condition.field, message));
+                return testPattern(
+                    condition.value,
+                    mailSpacing(fieldText(condition, message)).slice(
+                        0,
+                        MAIL_FILTER_LIMITS.patternText
+                    )
+                );
             } catch {
                 return false;
             }
+        default:
+            return false;
     }
 }
 
@@ -1044,43 +1245,257 @@ export function mailSubjectShape(subject: string): string {
     return /[\p{L}]/u.test(shape.replace(/\[\*\]|"\*"|#\*|\*/g, "")) ? shape : "";
 }
 
+/* -------------------------------------------------------------------------- */
+/* Filters as automations                                                      */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * A filter, as the automation editor holds it: WHEN a message arrives, IF these
+ * groups of conditions hold, THEN these steps, in order.
+ *
+ * The same shape as every Polaris automation (`@polaris/ui/automation-graph`),
+ * so the editor that draws Places' device automations draws these too. Within
+ * a group the conditions combine all-or-any; the groups combine all-or-any at
+ * the gate - "the subject is X and the sender is Y, or it comes from this list".
+ *
+ * "Stop here" is a step rather than a switch, because in an editor where the
+ * steps are the end of the line, the last thing a filter does is where somebody
+ * looks for "and nothing after this".
+ */
+export type MailFilterMatch = "all" | "any";
+
+export interface MailFilterTrigger {
+    readonly id: string;
+    /** On arrival in the inbox. The only trigger a mailbox has; "and the mail
+     *  already here" is a run of the same filter, not a second trigger. */
+    readonly kind: "arrival";
+}
+
+export interface MailFilterCondition {
+    readonly id: string;
+    /** The field it looks at. Called `kind` because that is what every
+     *  automation calls a node's sort. */
+    readonly kind: MailRuleField;
+    readonly operator: MailRuleOperator;
+    readonly value: string;
+    readonly header?: string;
+}
+
+export interface MailFilterGroup {
+    readonly id: string;
+    readonly match: MailFilterMatch;
+    readonly items: readonly MailFilterCondition[];
+}
+
+export type MailFilterStep = (MailRuleAction | { readonly kind: "stop" }) & { readonly id: string };
+
+export type MailFilterStepKind = MailFilterStep["kind"];
+
+export interface MailFilterDefinition {
+    readonly triggers: readonly MailFilterTrigger[];
+    readonly conditions: {
+        readonly match: MailFilterMatch;
+        readonly groups: readonly MailFilterGroup[];
+    };
+    readonly actions: readonly MailFilterStep[];
+}
+
 export interface MailRule {
     readonly id: string;
     readonly name: string;
     readonly enabled: boolean;
-    /** All conditions have to hold, or any one of them. */
-    readonly match: "all" | "any";
+    readonly definition: MailFilterDefinition;
+}
+
+/** A filter as an older Polaris stored it: one flat list of conditions under
+ *  one all/any, the actions, and a separate "stop" switch. */
+export interface MailLegacyRule {
+    readonly match: MailFilterMatch;
     readonly conditions: readonly MailRuleCondition[];
     readonly actions: readonly MailRuleAction[];
-    /** Whether a match here stops the rules below it from being considered. */
     readonly stop: boolean;
 }
 
-export function mailRuleMatches(rule: MailRule, message: MailRuleSubject): boolean {
-    if (!rule.enabled || rule.conditions.length === 0) return false;
-    return rule.match === "all"
-        ? rule.conditions.every((condition) => mailConditionHolds(condition, message))
-        : rule.conditions.some((condition) => mailConditionHolds(condition, message));
+/** One condition as the evaluator reads it. */
+export function mailConditionOf(condition: MailFilterCondition): MailRuleCondition {
+    return {
+        field: condition.kind,
+        operator: condition.operator,
+        value: condition.value,
+        ...(condition.header !== undefined ? { header: condition.header } : {})
+    };
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+    return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 /**
- * Everything a person's rules say to do with one message, in order.
+ * A filter stored the old way, as a definition. How every filter saved before
+ * filters were automations opens in the editor and runs on arrival.
  *
- * Returned rather than performed, so the same list can be shown on a "what would
- * this rule have done" screen without a message being moved to find out. A rule
- * with `stop` ends the walk after its own actions are collected.
+ * Read at the time it is needed rather than rewritten in the database, so
+ * nothing about an existing filter changes until somebody saves it. The ids are
+ * fixed from the positions, so the same row always reads back as the same
+ * definition - an editor that compares what it loaded with what it would save
+ * finds nothing to save. Entries that are not what a condition or an action
+ * is are left out rather than guessed at: the JSON columns are only as tidy as
+ * whatever wrote them.
  */
-export function mailActionsFor(
+export function mailFilterFromLegacy(legacy: {
+    readonly match?: unknown;
+    readonly conditions?: unknown;
+    readonly actions?: unknown;
+    readonly stop?: unknown;
+}): MailFilterDefinition {
+    const conditions = (Array.isArray(legacy.conditions) ? legacy.conditions : [])
+        .filter(isRecord)
+        .filter(
+            (entry) =>
+                typeof entry.field === "string" &&
+                typeof entry.operator === "string" &&
+                typeof entry.value === "string"
+        );
+    const actions = (Array.isArray(legacy.actions) ? legacy.actions : [])
+        .filter(isRecord)
+        .filter((entry) => typeof entry.kind === "string" && entry.kind !== "stop");
+    const items: MailFilterCondition[] = conditions.map((entry, index) => ({
+        id: `cond${index}`,
+        kind: entry.field as MailRuleField,
+        operator: entry.operator as MailRuleOperator,
+        value: entry.value as string,
+        ...(typeof entry.header === "string" ? { header: entry.header } : {})
+    }));
+    const steps = actions.map(
+        (entry, index) => ({ ...entry, id: `step${index}` }) as unknown as MailFilterStep
+    );
+    return {
+        triggers: [{ id: "arrival", kind: "arrival" }],
+        conditions: {
+            match: "all",
+            groups:
+                items.length > 0
+                    ? [{ id: "group0", match: legacy.match === "any" ? "any" : "all", items }]
+                    : []
+        },
+        actions: legacy.stop === true ? [...steps, { id: "stop", kind: "stop" }] : steps
+    };
+}
+
+/**
+ * A definition in the old columns' shape, so a Polaris rolled back to before
+ * filters were automations still reads every filter safely.
+ *
+ * Exact where the old shape can say it - one group, or groups of one condition
+ * each, on the fields it knew. Where it cannot, the conditions are left empty,
+ * which the old evaluator reads as "never matches": a filter that stops working
+ * after a rollback is a nuisance, one that matches what it was never meant to
+ * is lost mail.
+ */
+export function mailFilterLegacy(definition: MailFilterDefinition): MailLegacyRule {
+    const { groups } = definition.conditions;
+    const flat =
+        groups.length === 1
+            ? { match: groups[0]!.match, items: groups[0]!.items }
+            : groups.every((group) => group.items.length === 1)
+              ? {
+                    match: definition.conditions.match,
+                    items: groups.flatMap((group) => group.items)
+                }
+              : null;
+    const expressible =
+        flat !== null && flat.items.every((item) => MAIL_LEGACY_FIELDS.includes(item.kind));
+    return {
+        match: flat?.match ?? "all",
+        conditions:
+            expressible && flat
+                ? flat.items.map(({ kind, operator, value }) => ({ field: kind, operator, value }))
+                : [],
+        actions: definition.actions
+            .filter((step): step is MailRuleAction & { id: string } => step.kind !== "stop")
+            .map(({ id: _id, ...action }) => action as MailRuleAction),
+        stop: mailFilterStops(definition)
+    };
+}
+
+/** Whether a filter, once it has matched, ends the walk down the list. */
+export function mailFilterStops(definition: MailFilterDefinition): boolean {
+    return definition.actions.some((step) => step.kind === "stop");
+}
+
+/** What a filter does to a message it matches, in order, without "stop". */
+export function mailFilterActions(definition: MailFilterDefinition): MailRuleAction[] {
+    return definition.actions
+        .filter((step): step is MailRuleAction & { id: string } => step.kind !== "stop")
+        .map(({ id: _id, ...action }) => action as MailRuleAction);
+}
+
+/** Whether a message meets a filter's conditions. No conditions at all is never
+ *  a match: a filter that caught everything would be one slip from emptying an
+ *  inbox. */
+export function mailFilterMatches(
+    definition: MailFilterDefinition,
+    message: MailRuleSubject,
+    testPattern?: MailPatternTest
+): boolean {
+    const groups = definition.conditions.groups.filter((group) => group.items.length > 0);
+    if (groups.length === 0) return false;
+    const holds = (group: MailFilterGroup) =>
+        group.match === "any"
+            ? group.items.some((item) =>
+                  mailConditionHolds(mailConditionOf(item), message, testPattern)
+              )
+            : group.items.every((item) =>
+                  mailConditionHolds(mailConditionOf(item), message, testPattern)
+              );
+    return definition.conditions.match === "any" ? groups.some(holds) : groups.every(holds);
+}
+
+export function mailRuleMatches(
+    rule: MailRule,
+    message: MailRuleSubject,
+    testPattern?: MailPatternTest
+): boolean {
+    return rule.enabled && mailFilterMatches(rule.definition, message, testPattern);
+}
+
+/** What one walk down a mailbox's filters decided: which filters matched, and
+ *  everything they say to do, in order. */
+export interface MailFilterOutcome {
+    readonly matched: readonly string[];
+    readonly actions: readonly MailRuleAction[];
+}
+
+/**
+ * Walk a person's filters, top to bottom, over one message.
+ *
+ * Returned rather than performed, so the same answer can be shown on a "what
+ * would this have done" screen without a message being moved to find out. A
+ * filter with a "stop" step ends the walk after its own actions are collected.
+ */
+export function mailFiltersFor(
     rules: readonly MailRule[],
-    message: MailRuleSubject
-): readonly MailRuleAction[] {
+    message: MailRuleSubject,
+    testPattern?: MailPatternTest
+): MailFilterOutcome {
+    const matched: string[] = [];
     const actions: MailRuleAction[] = [];
     for (const rule of rules) {
-        if (!mailRuleMatches(rule, message)) continue;
-        actions.push(...rule.actions);
-        if (rule.stop) break;
+        if (!mailRuleMatches(rule, message, testPattern)) continue;
+        matched.push(rule.id);
+        actions.push(...mailFilterActions(rule.definition));
+        if (mailFilterStops(rule.definition)) break;
     }
-    return actions;
+    return { matched, actions };
+}
+
+/** Everything a person's rules say to do with one message, in order. */
+export function mailActionsFor(
+    rules: readonly MailRule[],
+    message: MailRuleSubject,
+    testPattern?: MailPatternTest
+): readonly MailRuleAction[] {
+    return mailFiltersFor(rules, message, testPattern).actions;
 }
 
 /* -------------------------------------------------------------------------- */

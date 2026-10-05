@@ -10,7 +10,7 @@
 
 import { describe, expect, it } from "vitest";
 import * as auto from "@polaris-app/places/src/lib/automation-kinds";
-import * as graphs from "@polaris-app/places/src/lib/automation-graph";
+import * as graphs from "@polaris/ui/automation-graph";
 
 /** One of everything the schema has, with the optional fields both ways. */
 const EVERYTHING: auto.AutomationDefinition = {

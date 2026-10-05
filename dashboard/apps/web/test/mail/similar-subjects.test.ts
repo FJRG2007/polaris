@@ -96,17 +96,19 @@ describe("a similar-subject condition", () => {
             id: "r1",
             name: "CI failures",
             enabled: true,
-            match: "all",
-            conditions: [
-                { field: "from", operator: "contains", value: "notifications@github.example" },
-                core.mailRuleConditionSchema.parse({
-                    field: "subject",
-                    operator: "similar",
-                    value: "[acme/api] Run failed: CI - main (3f2a9c1)"
-                })
-            ],
-            actions: [{ kind: "archive" }],
-            stop: false
+            definition: core.mailFilterFromLegacy({
+                match: "all",
+                conditions: [
+                    { field: "from", operator: "contains", value: "notifications@github.example" },
+                    core.mailRuleConditionSchema.parse({
+                        field: "subject",
+                        operator: "similar",
+                        value: "[acme/api] Run failed: CI - main (3f2a9c1)"
+                    })
+                ],
+                actions: [{ kind: "archive" }],
+                stop: false
+            })
         };
         expect(core.mailActionsFor([rule], MESSAGE)).toEqual([{ kind: "archive" }]);
         expect(

@@ -30,6 +30,7 @@ import * as compose from "@/lib/mailbox/compose";
 import * as reading from "@/lib/mailbox/reading";
 import { syncAccount } from "@/lib/mailbox/sync";
 import * as folders from "@/lib/mailbox/folders";
+import { isUuid } from "@/lib/uuid";
 import { requirePermission } from "@/lib/session";
 import { getTranslations } from "@/lib/i18n/request";
 import type { NamespaceKey } from "@/lib/i18n/types";
@@ -65,7 +66,11 @@ async function actorId(): Promise<string> {
 async function failure(
     caught: unknown,
     fallback: MailErrorKey
-): Promise<{ error: string; field?: string; needsFolderRole?: { role: string; accountId: string } }> {
+): Promise<{
+    error: string;
+    field?: string;
+    needsFolderRole?: { role: string; accountId: string };
+}> {
     const t = await getTranslations("mail");
     const said = (error: Error) => mailRefusalText(t, error.message);
     // The one refusal a screen answers with a question rather than a sentence:
@@ -83,7 +88,9 @@ async function failure(
     if (caught instanceof MailAuthError) return { error: said(caught) };
     if (caught instanceof labels.MailLabelNameTaken) return { error: said(caught) };
     if (caught instanceof folders.MailFolderError) return { error: said(caught) };
-    if (caught instanceof templates.MailTemplateNameTaken) return { error: said(caught), field: "name" };
+    if (caught instanceof rules.MailRuleError) return { error: said(caught) };
+    if (caught instanceof templates.MailTemplateNameTaken)
+        return { error: said(caught), field: "name" };
     if (caught instanceof subscriptions.MailSubscriptionMissing) return { error: said(caught) };
     console.error("polaris: a mail action failed:", caught);
     return { error: t(fallback) };
@@ -304,7 +311,8 @@ export async function editAccountAction(accountId: string, input: unknown) {
     // A patch: only what the screen sent is written, so one switch never puts
     // every other setting back to its default.
     const parsed = core.mailAccountPatchSchema.safeParse(input);
-    if (!parsed.success) return { error: await inputError(parsed.error.issues[0]?.message, "errors.checkDetails") };
+    if (!parsed.success)
+        return { error: await inputError(parsed.error.issues[0]?.message, "errors.checkDetails") };
     try {
         const account = await accounts.editAccount(userId, accountId, parsed.data);
         refresh();
@@ -474,11 +482,7 @@ export async function emptyFolderAction(input: unknown) {
     const parsed = core.mailEmptyFolderSchema.safeParse(input);
     if (!parsed.success) return { error: await errorText("errors.sayWhichFolder") };
     try {
-        const done = await emptyEveryFolderOfRole(
-            userId,
-            parsed.data.role,
-            parsed.data.accountIds
-        );
+        const done = await emptyEveryFolderOfRole(userId, parsed.data.role, parsed.data.accountIds);
         return { done };
     } catch (caught) {
         return failure(caught, "errors.serverRefused");
@@ -590,7 +594,8 @@ export async function suggestContactsAction(query: string) {
 export async function createLabelAction(input: unknown) {
     const userId = await actorId();
     const parsed = core.mailLabelSchema.safeParse(input);
-    if (!parsed.success) return { error: await inputError(parsed.error.issues[0]?.message, "errors.checkName") };
+    if (!parsed.success)
+        return { error: await inputError(parsed.error.issues[0]?.message, "errors.checkName") };
     try {
         const id = await labels.createLabel(userId, parsed.data.name, parsed.data.color);
         refresh();
@@ -603,7 +608,8 @@ export async function createLabelAction(input: unknown) {
 export async function renameLabelAction(labelId: string, input: unknown) {
     const userId = await actorId();
     const parsed = core.mailLabelSchema.safeParse(input);
-    if (!parsed.success) return { error: await inputError(parsed.error.issues[0]?.message, "errors.checkName") };
+    if (!parsed.success)
+        return { error: await inputError(parsed.error.issues[0]?.message, "errors.checkName") };
     try {
         await labels.renameLabel(userId, labelId, parsed.data.name, parsed.data.color);
         refresh();
@@ -768,12 +774,42 @@ export async function deleteIdentityAction(accountId: string, identityId: string
     }
 }
 
+/**
+ * Save a filter, new or in place.
+ *
+ * Takes the editor's shape (`mailFilterSchema`: a definition with groups and
+ * steps) and, from anything still sending it, the flat shape filters had before
+ * they were automations - converted, never refused for its age. A refusal comes
+ * back with every complaint at the path it is about, so the editor can put each
+ * one under its own field.
+ */
 export async function saveRuleAction(accountId: string, ruleId: string | null, input: unknown) {
     const userId = await actorId();
-    const parsed = core.mailRuleSchema.safeParse(input);
+    if (!isUuid(accountId) || (ruleId !== null && !isUuid(ruleId)))
+        return { error: await errorText("errors.ruleSave") };
+    const flat = typeof input === "object" && input !== null && !("definition" in input);
+    const parsed = flat
+        ? core.mailRuleSchema
+              .transform((rule) => ({
+                  name: rule.name,
+                  enabled: rule.enabled,
+                  applyToExisting: rule.applyToExisting,
+                  definition: core.mailFilterFromLegacy(rule)
+              }))
+              .pipe(core.mailFilterSchema)
+              .safeParse(input)
+        : core.mailFilterSchema.safeParse(input);
     if (!parsed.success) {
         const issue = parsed.error.issues[0];
-        return { error: await inputError(issue?.message, "errors.checkRule"), field: String(issue?.path[0] ?? "") };
+        const t = await getTranslations("mail");
+        return {
+            error: await inputError(issue?.message, "errors.checkRule"),
+            field: String(issue?.path[0] ?? ""),
+            issues: parsed.error.issues.map((one) => ({
+                path: one.path,
+                message: mailRefusalText(t, one.message)
+            }))
+        };
     }
     try {
         const id = await rules.saveRule(userId, accountId, ruleId, parsed.data);
@@ -784,8 +820,53 @@ export async function saveRuleAction(accountId: string, ruleId: string | null, i
     }
 }
 
+/** Switch a filter on or off from the list. */
+export async function setRuleEnabledAction(accountId: string, ruleId: string, enabled: boolean) {
+    const userId = await actorId();
+    if (!isUuid(accountId) || !isUuid(ruleId)) return { error: await errorText("errors.ruleSave") };
+    if (typeof enabled !== "boolean") return { error: await errorText("errors.checkRule") };
+    try {
+        await rules.setRuleEnabled(userId, accountId, ruleId, enabled);
+        refresh();
+        return {};
+    } catch (caught) {
+        return failure(caught, "errors.ruleSave");
+    }
+}
+
+/** A copy of a filter, below it and switched off, under the name the screen
+ *  gave it in the reader's language. */
+export async function duplicateRuleAction(accountId: string, ruleId: string, name: unknown) {
+    const userId = await actorId();
+    if (!isUuid(accountId) || !isUuid(ruleId)) return { error: await errorText("errors.ruleSave") };
+    const parsed = core.mailFilterSchema.shape.name.safeParse(name);
+    if (!parsed.success)
+        return { error: await inputError(parsed.error.issues[0]?.message, "errors.checkRule") };
+    try {
+        const id = await rules.duplicateRule(userId, accountId, ruleId, parsed.data);
+        refresh();
+        return { id };
+    } catch (caught) {
+        return failure(caught, "errors.ruleSave");
+    }
+}
+
+/** Run a saved filter over the mail already in the inbox. */
+export async function runRuleOverInboxAction(accountId: string, ruleId: string) {
+    const userId = await actorId();
+    if (!isUuid(accountId) || !isUuid(ruleId)) return { error: await errorText("errors.ruleSave") };
+    try {
+        await rules.runRuleOverInbox(userId, accountId, ruleId);
+        return {};
+    } catch (caught) {
+        return failure(caught, "errors.ruleSave");
+    }
+}
+
 export async function deleteRuleAction(accountId: string, ruleId: string) {
     const userId = await actorId();
+    if (!isUuid(accountId) || !isUuid(ruleId))
+        return { error: await errorText("errors.ruleRemove") };
     try {
         await rules.deleteRule(userId, accountId, ruleId);
         refresh();
@@ -797,6 +878,8 @@ export async function deleteRuleAction(accountId: string, ruleId: string) {
 
 export async function reorderRulesAction(accountId: string, orderedIds: string[]) {
     const userId = await actorId();
+    if (!isUuid(accountId) || !Array.isArray(orderedIds) || !orderedIds.every(isUuid))
+        return { error: await errorText("errors.orderSave") };
     try {
         await rules.reorderRules(userId, accountId, orderedIds);
         refresh();

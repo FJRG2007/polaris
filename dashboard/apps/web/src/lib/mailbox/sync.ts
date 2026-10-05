@@ -33,7 +33,7 @@ import { replyIfAway } from "./vacation";
 import { ACCOUNT_COLUMNS } from "./access";
 import { decodePart, unflow } from "./decode";
 import { rememberContacts } from "./contacts";
-import { applyRulesToMessage } from "./rules";
+import { applyRulesToMessage, filterHeaderNames } from "./rules";
 import { heldFlags } from "./pending-flags";
 import { MailAuthError } from "./credentials";
 import { addressesFrom, asJson } from "./json";
@@ -339,9 +339,12 @@ async function syncFolder(
         }
 
         const known = validityMoved ? null : folder.uidNext;
+        // The inbox is where filters run, so it also fetches the headers they
+        // look at - a header nobody stored is a filter that never matches.
+        const extraHeaders = folder.role === "inbox" ? await filterHeaderNames(account.id) : [];
         const arrived = known
-            ? await fetchSince(client, known)
-            : await fetchNewest(client, mailbox.exists);
+            ? await fetchSince(client, known, extraHeaders)
+            : await fetchNewest(client, mailbox.exists, extraHeaders);
         if (arrived.length > 0) await storeMessages(client, account, folder, arrived);
 
         // What has arrived, and a few of whatever is still only a headline.
@@ -411,10 +414,14 @@ const QUERY = {
 async function collect(
     client: ImapFlow,
     range: string,
-    options: { uid: boolean }
+    options: { uid: boolean },
+    /** Headers this mailbox's filters look at, beyond the ones always fetched. */
+    extraHeaders: readonly string[] = []
 ): Promise<Fetched[]> {
     const out: Fetched[] = [];
-    for await (const message of client.fetch(range, QUERY, options)) {
+    const extra = extraHeaders.filter((name) => !QUERY.headers.includes(name));
+    const query = extra.length > 0 ? { ...QUERY, headers: [...QUERY.headers, ...extra] } : QUERY;
+    for await (const message of client.fetch(range, query, options)) {
         out.push({
             uid: message.uid,
             flags: message.flags ?? new Set<string>(),
@@ -434,17 +441,25 @@ async function collect(
 }
 
 /** Everything that has arrived since the uid this folder was last read to. */
-function fetchSince(client: ImapFlow, uidNext: bigint): Promise<Fetched[]> {
-    return collect(client, `${uidNext}:*`, { uid: true });
+function fetchSince(
+    client: ImapFlow,
+    uidNext: bigint,
+    extraHeaders: readonly string[]
+): Promise<Fetched[]> {
+    return collect(client, `${uidNext}:*`, { uid: true }, extraHeaders);
 }
 
 /** The newest page of a folder nobody has read yet, by sequence number, because
  *  uids are not contiguous and counting back from the newest one would ask for
  *  a range that is mostly gaps. */
-function fetchNewest(client: ImapFlow, exists: number): Promise<Fetched[]> {
+function fetchNewest(
+    client: ImapFlow,
+    exists: number,
+    extraHeaders: readonly string[]
+): Promise<Fetched[]> {
     if (exists === 0) return Promise.resolve([]);
     const from = Math.max(1, exists - WINDOW + 1);
-    return collect(client, `${from}:${exists}`, { uid: false });
+    return collect(client, `${from}:${exists}`, { uid: false }, extraHeaders);
 }
 
 /** Headers as a flat map, lowercased. Repeated ones are joined, which is what

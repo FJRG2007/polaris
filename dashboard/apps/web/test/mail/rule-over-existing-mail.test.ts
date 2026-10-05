@@ -26,8 +26,10 @@ vi.mock("@polaris/db", () => ({
 }));
 vi.mock("@/lib/mailbox/messages", () => ({ actOnMessages, moveMessages: vi.fn() }));
 vi.mock("@/lib/mailbox/access", () => ({ ownedAccount: vi.fn(async () => ({ id: "acc-1" })) }));
+vi.mock("@/lib/audit-service", () => ({ recordAudit: vi.fn(async () => undefined) }));
+vi.mock("@polaris/auth", () => ({ listUserEmails: vi.fn(async () => []) }));
 
-const { applyRuleToInbox, listRulesFor } = await import("@/lib/mailbox/rules");
+const { applyRuleToInbox, listRulesFor, runRuleOverInbox } = await import("@/lib/mailbox/rules");
 
 const message = (id: string, subject: string) => ({
     id,
@@ -86,6 +88,36 @@ describe("running one filter over the inbox", () => {
         ruleFind.mockResolvedValue(null);
         expect(await applyRuleToInbox("acc-1", "nope")).toBe(0);
         expect(messageFind).not.toHaveBeenCalled();
+    });
+
+    it("never forwards the mail already here, so running it again sends nothing", async () => {
+        ruleFind.mockResolvedValue({
+            id: "r1",
+            name: "CI",
+            enabled: true,
+            match: "all",
+            conditions: [{ field: "subject", operator: "similar", value: "run failed: ci (*)" }],
+            actions: [{ kind: "forward", to: "me@example.com" }],
+            stop: false
+        });
+        expect(await applyRuleToInbox("acc-1", "r1")).toBe(0);
+        expect(messageFind).not.toHaveBeenCalled();
+    });
+
+    it("runs a filter once at a time, however often it is asked", async () => {
+        let release: (page: unknown[]) => void = () => undefined;
+        messageFind.mockImplementationOnce(() => new Promise((resolve) => (release = resolve)));
+        await runRuleOverInbox("u1", "acc-1", "r1");
+        await vi.waitFor(() => expect(messageFind).toHaveBeenCalledTimes(1));
+        await runRuleOverInbox("u1", "acc-1", "r1");
+        release([]);
+        await vi.waitFor(() => expect(ruleFind).toHaveBeenCalledTimes(3));
+        await new Promise((resolve) => setTimeout(resolve, 10));
+        expect(messageFind).toHaveBeenCalledTimes(1);
+
+        messageFind.mockResolvedValueOnce([]);
+        await runRuleOverInbox("u1", "acc-1", "r1");
+        await vi.waitFor(() => expect(messageFind).toHaveBeenCalledTimes(2));
     });
 
     it("stops at its bound", async () => {

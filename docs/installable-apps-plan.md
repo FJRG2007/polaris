@@ -194,6 +194,10 @@ false` only when it only adds (creating, sending, starting a run);
    what it starts at boot (its container upgrade and the camera watcher) and who
    it reaches through a lent camera or door. Its footage storage setting
    (`lib/footage-storage.ts`) is core; the zoom arithmetic moved on to `@polaris/ui/zoom`.
+   Its automation editor - the WHEN / IF / THEN form, the diagram and the graph
+   model - moved the same way, to `packages/ui/src/automation`, because the
+   dashboard's own Mail filters now use it too and core may not import
+   `@polaris-app/places`.
 2. **Move the app's code under its own workspace** (`apps/game-servers`,
    `apps/places`): services, routes, screens, jobs, tests - including the
    routes that still sit in the dashboard's tree (`app/(app)/apps/games`, the

@@ -11679,6 +11679,12 @@ model MailRule {
     actions    Json      @default("[]")
     // Whether a match here ends the walk.
     stop       Boolean   @default(false)
+    // The filter as an automation: a trigger, groups of conditions combined
+    // all/any, and ordered steps (`MailFilterDefinition` in @polaris/core). Null
+    // on a filter nobody has saved since filters became automations; it is read
+    // from the columns above until then, and those columns are still written on
+    // every save so an older Polaris reads the filter safely.
+    definition Json?
     position   Int       @default(0)
     // What it has done, so a rule that fires on everything is visible as one.
     matchCount Int       @default(0)

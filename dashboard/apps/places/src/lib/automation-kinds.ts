@@ -16,7 +16,7 @@
 
 import { z } from "zod";
 import * as kinds from "./device-kinds";
-import { isTimeZone } from "@polaris/core";
+import { automationNodeId, isTimeZone } from "@polaris/core";
 import type { DeviceAction, DeviceKind, DeviceView } from "./device-kinds";
 
 /** What about a device a trigger, a condition or a wait looks at. A lock has a
@@ -790,12 +790,8 @@ export function readsDevices(definition: AutomationDefinition): boolean {
 
 // --- building blocks ---------------------------------------------------------
 
-/** A short random id for a node, unique within one automation. Not a uuid: the
- *  editor may run on a plain-http address where `crypto.randomUUID` does not
- *  exist, and nothing outside one automation compares these. */
-export function nodeIdOf(): string {
-    return Math.random().toString(36).slice(2, 12).padEnd(6, "0");
-}
+/** A short random id for a node, unique within one automation. */
+export const nodeIdOf = automationNodeId;
 
 /** A trigger of a kind, with blanks where somebody has to choose. */
 export function blankTrigger(kind: TriggerKind): Trigger {
