@@ -617,18 +617,43 @@ function rowData(name: string, enabled: boolean, definition: core.MailFilterDefi
     };
 }
 
+/** How long a save waits on its run over the inbox before answering without
+ *  the count. Most inboxes are done well inside it; a big one goes on behind. */
+const APPLY_WAIT_MS = 4000;
+
+interface FilterInput {
+    readonly name: string;
+    readonly enabled: boolean;
+    readonly definition: core.MailFilterDefinition;
+    /** Sent by older screens and kept for them; whether a save runs over the
+     *  inbox is now the switch's (see `saveFilter`). */
+    readonly applyToExisting?: boolean;
+}
+
 export async function saveRule(
     userId: string,
     accountId: string,
     ruleId: string | null,
-    rule: {
-        readonly name: string;
-        readonly enabled: boolean;
-        readonly definition: core.MailFilterDefinition;
-        /** Whether it also runs over what is already in the inbox, once. */
-        readonly applyToExisting: boolean;
-    }
+    rule: FilterInput
 ): Promise<string> {
+    return (await saveFilter(userId, accountId, ruleId, rule)).id;
+}
+
+/**
+ * Save a filter, and apply one switched on to the mail already in the inbox.
+ *
+ * Saving a filter that is on is somebody saying "do this to my mail", and the
+ * mail already there is part of it - so the run is not a choice to make. Only
+ * this filter: running every one again would do again what the others did. Its
+ * forward steps are left out of that run (see `applyRuleToInbox`). `applied` is
+ * how many it caught, or null when it is off or the run is still going.
+ */
+export async function saveFilter(
+    userId: string,
+    accountId: string,
+    ruleId: string | null,
+    rule: FilterInput
+): Promise<{ id: string; applied: number | null }> {
     await ownedAccount(userId, accountId);
     await checkTargets(userId, accountId, rule.definition);
     const data = rowData(rule.name, rule.enabled, rule.definition);
@@ -668,26 +693,36 @@ export async function saveRule(
         metadata: { accountId, enabled: rule.enabled }
     });
 
-    // Running a new rule over what is already there is what somebody expects
-    // from "and do this to the ones I already have", and it is the reason the
-    // checkbox exists. Behind the response, because it can move thousands of
-    // messages and nobody should watch a spinner for it. Only this rule: running
-    // every rule again would do again what the others already did. Its forward
-    // steps are left out of that run (see `applyRuleToInbox`).
-    if (rule.applyToExisting) runOverInbox(accountId, id);
-    return id;
+    if (!rule.enabled) return { id, applied: null };
+    // Waited on only so long: it can move thousands of messages and nobody
+    // should watch a spinner for it, so a long one finishes behind the answer.
+    const run = runOverInbox(accountId, id);
+    if (!run) return { id, applied: null };
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const applied = await Promise.race([
+        run,
+        new Promise<null>((resolve) => {
+            timer = setTimeout(() => resolve(null), APPLY_WAIT_MS);
+        })
+    ]);
+    clearTimeout(timer);
+    return { id, applied };
 }
 
 /** The filters being run over an inbox right now, so a second click waits for
  *  the first run instead of doing everything again alongside it. */
 const inboxRuns = new Set<string>();
 
-/** Start a run of one filter over the inbox, behind the caller. */
-function runOverInbox(accountId: string, ruleId: string): void {
-    if (inboxRuns.has(ruleId)) return;
+/** Start a run of one filter over the inbox, behind the caller: how many it
+ *  caught once done (null if it failed), or null at once when one is going. */
+function runOverInbox(accountId: string, ruleId: string): Promise<number | null> | null {
+    if (inboxRuns.has(ruleId)) return null;
     inboxRuns.add(ruleId);
-    void applyRuleToInbox(accountId, ruleId)
-        .catch((caught) => console.error(caught))
+    return applyRuleToInbox(accountId, ruleId)
+        .catch((caught) => {
+            console.error(caught);
+            return null;
+        })
         .finally(() => inboxRuns.delete(ruleId));
 }
 
@@ -704,7 +739,7 @@ export async function runRuleOverInbox(
         select: { id: true }
     });
     if (!held) throw new MailRuleError("That rule is not on this mailbox.");
-    runOverInbox(accountId, ruleId);
+    void runOverInbox(accountId, ruleId);
 }
 
 /** Switch a filter on or off without opening it. */

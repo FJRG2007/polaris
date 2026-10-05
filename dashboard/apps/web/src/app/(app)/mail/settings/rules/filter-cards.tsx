@@ -9,43 +9,24 @@
  */
 
 import Link from "next/link";
+import type { ReactNode } from "react";
 import * as core from "@polaris/core";
 import * as words from "./filter-words";
 import * as flow from "@polaris/ui/automation";
 import type { MailLabelView } from "@/lib/mailbox/labels";
 import type { MailFolderView } from "@/lib/mailbox/views";
-import { Input, Select, SizeField, Switch } from "@polaris/ui";
+import { Input, Select, SizeField } from "@polaris/ui";
 import { swap, type Path } from "@polaris/ui/automation-graph";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 
-/** The trigger, which a filter cannot change: a message arriving in this
- *  mailbox, and whether the mail already there gets the same treatment once. */
-export function TriggerCard({
-    address,
-    applyToExisting,
-    disabled,
-    onApplyToExisting
-}: {
-    address: string;
-    applyToExisting: boolean;
-    disabled: boolean;
-    onApplyToExisting: (value: boolean) => void;
-}) {
+/** The trigger, which a filter cannot change: a message arriving in the
+ *  mailbox whose filters these are. Saving it switched on also applies it to
+ *  the mail already there, which the card says, since it is not a choice. */
+export function TriggerCard() {
     const t = useTranslations("mailSettings");
     return (
         <div className="flex min-w-0 flex-col gap-3 rounded-lg border border-border bg-card p-3">
-            <p className="min-w-0 break-words text-sm [overflow-wrap:anywhere]">
-                {t("rules.trigger.in", { address })}
-            </p>
-            <label className="flex items-center gap-2 text-xs text-muted-foreground">
-                <Switch
-                    checked={applyToExisting}
-                    disabled={disabled}
-                    onChange={onApplyToExisting}
-                    aria-label={t("rules.existingLabel")}
-                />
-                <span className="min-w-0">{t("rules.existing")}</span>
-            </label>
+            <p className="min-w-0 text-xs text-muted-foreground">{t("rules.trigger.onSave")}</p>
         </div>
     );
 }
@@ -57,7 +38,8 @@ export function GroupCard({
     disabled,
     attempted,
     onChange,
-    onRemove
+    onRemove,
+    handle
 }: {
     group: core.MailFilterGroup;
     path: Path;
@@ -65,6 +47,8 @@ export function GroupCard({
     attempted: boolean;
     onChange: (group: core.MailFilterGroup) => void;
     onRemove: () => void;
+    /** The drag handle, when the group sits in a list of groups. */
+    handle?: ReactNode;
 }) {
     const t = useTranslations("mailSettings");
     const setItem = (index: number, item: core.MailFilterCondition) =>
@@ -75,6 +59,7 @@ export function GroupCard({
     return (
         <div className="flex min-w-0 flex-col gap-2 rounded-lg border border-dashed border-border p-2">
             <div className="flex min-w-0 items-center gap-2">
+                {!disabled && handle}
                 {group.items.length > 1 ? (
                     <flow.MatchPicker
                         value={group.match}
@@ -98,28 +83,41 @@ export function GroupCard({
                     </button>
                 )}
             </div>
-            {group.items.map((condition, index) => (
-                <ConditionCard
-                    key={condition.id}
-                    condition={condition}
-                    path={[...path, "items", index]}
-                    disabled={disabled}
-                    onChange={(next) => setItem(index, next)}
-                    onRemove={() =>
-                        onChange({ ...group, items: group.items.filter((_, at) => at !== index) })
-                    }
-                    onUp={
-                        index > 0
-                            ? () => onChange({ ...group, items: swap(group.items, index, -1) })
-                            : undefined
-                    }
-                    onDown={
-                        index < group.items.length - 1
-                            ? () => onChange({ ...group, items: swap(group.items, index, 1) })
-                            : undefined
-                    }
-                />
-            ))}
+            <flow.SortableList
+                items={group.items}
+                label={t("rules.editor.conditionsList")}
+                handleLabel={t("rules.editor.reorder")}
+                disabled={disabled}
+                onMove={(from, to) =>
+                    onChange({ ...group, items: flow.moved(group.items, from, to) })
+                }
+            >
+                {(condition, index, conditionHandle) => (
+                    <ConditionCard
+                        condition={condition}
+                        path={[...path, "items", index]}
+                        disabled={disabled}
+                        handle={conditionHandle}
+                        onChange={(next) => setItem(index, next)}
+                        onRemove={() =>
+                            onChange({
+                                ...group,
+                                items: group.items.filter((_, at) => at !== index)
+                            })
+                        }
+                        onUp={
+                            index > 0
+                                ? () => onChange({ ...group, items: swap(group.items, index, -1) })
+                                : undefined
+                        }
+                        onDown={
+                            index < group.items.length - 1
+                                ? () => onChange({ ...group, items: swap(group.items, index, 1) })
+                                : undefined
+                        }
+                    />
+                )}
+            </flow.SortableList>
             {group.items.length === 0 && attempted && (
                 <p className="text-xs text-danger">{t("rules.editor.emptyGroup")}</p>
             )}
@@ -153,7 +151,8 @@ export function ConditionCard({
     onChange,
     onRemove,
     onUp,
-    onDown
+    onDown,
+    handle
 }: {
     condition: core.MailFilterCondition;
     path: Path;
@@ -162,6 +161,8 @@ export function ConditionCard({
     onRemove: () => void;
     onUp?: () => void;
     onDown?: () => void;
+    /** The drag handle, when the condition sits in its group's list. */
+    handle?: ReactNode;
 }) {
     const t = useTranslations("mailSettings");
     const operators = core.mailOperatorsFor(condition.kind);
@@ -185,6 +186,7 @@ export function ConditionCard({
     };
     return (
         <flow.NodeCard
+            handle={handle}
             kind={
                 <flow.KindPicker
                     value={condition.kind}
@@ -337,7 +339,8 @@ export function StepCard({
     onChange,
     onRemove,
     onUp,
-    onDown
+    onDown,
+    handle
 }: {
     step: core.MailFilterStep;
     number: number;
@@ -350,10 +353,13 @@ export function StepCard({
     onRemove: () => void;
     onUp?: () => void;
     onDown?: () => void;
+    /** The drag handle, when the step sits in the list of steps. */
+    handle?: ReactNode;
 }) {
     const t = useTranslations("mailSettings");
     return (
         <flow.NodeCard
+            handle={handle}
             number={number}
             kind={
                 <flow.KindPicker

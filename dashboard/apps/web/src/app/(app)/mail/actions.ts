@@ -812,9 +812,9 @@ export async function saveRuleAction(accountId: string, ruleId: string | null, i
         };
     }
     try {
-        const id = await rules.saveRule(userId, accountId, ruleId, parsed.data);
+        const { id, applied } = await rules.saveFilter(userId, accountId, ruleId, parsed.data);
         refresh();
-        return { id };
+        return { id, applied };
     } catch (caught) {
         return failure(caught, "errors.ruleSave");
     }

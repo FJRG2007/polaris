@@ -89,7 +89,6 @@ describe("filter messages like this", () => {
                 similar: SUBJECT
             })
         );
-        expect(screen.getByText("In me@example.com")).toBeTruthy();
         const values = screen.getAllByRole("textbox", {
             name: "What to look for"
         }) as HTMLInputElement[];

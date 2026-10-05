@@ -14,7 +14,15 @@ import { ToastProvider } from "@polaris/ui";
 import { MessagesWrapper } from "../../setup/i18n";
 import type { MailRuleView } from "@/lib/mailbox/rules";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import {
+    act,
+    cleanup,
+    createEvent,
+    fireEvent,
+    render,
+    screen,
+    within
+} from "@testing-library/react";
 
 vi.mock("next/navigation", () => ({
     useRouter: () => ({ refresh: () => undefined, push: () => undefined }),
@@ -187,23 +195,45 @@ describe("an existing filter", () => {
         ).toBeTruthy();
     });
 
-    it("runs over the mail already in the inbox when asked, with nothing else changed", async () => {
+    it("names no mailbox and asks nothing about the mail already here", () => {
         draw();
         fireEvent.click(screen.getByRole("button", { name: GITHUB.name }));
-        fireEvent.click(
-            screen.getByRole("switch", { name: "Also run it over the mail already here" })
-        );
+        expect(screen.queryByText(/me@example\.com/)).toBeNull();
+        expect(screen.queryByRole("switch", { name: /mail already/ })).toBeNull();
         expect(
-            screen.getByRole("button", { name: "Save the filter" }).getAttribute("aria-disabled")
-        ).toBeNull();
+            screen.getByText(
+                "Saving it while it is on also applies it once to the mail already in the inbox."
+            )
+        ).toBeTruthy();
+    });
+
+    it("says how many messages already in the inbox a filter saved on was applied to", async () => {
+        saveRuleAction.mockResolvedValueOnce({ id: "r1", applied: 3 });
+        drawWithToast();
+        fireEvent.click(screen.getByRole("button", { name: GITHUB.name }));
+        fireEvent.change(screen.getByRole("textbox", { name: "What to look for" }), {
+            target: { value: "Run failed:" }
+        });
         await act(async () => {
             fireEvent.click(screen.getByRole("button", { name: "Save the filter" }));
         });
-        expect(saveRuleAction).toHaveBeenCalledWith(
-            "acc-1",
-            "r1",
-            expect.objectContaining({ applyToExisting: true, definition: GITHUB.definition })
-        );
+        await wait();
+        expect(
+            screen.getByText("Filter saved and applied to 3 messages already in the inbox.")
+        ).toBeTruthy();
+    });
+
+    it("says only that it saved a filter saved off", async () => {
+        saveRuleAction.mockResolvedValueOnce({ id: "r1", applied: null });
+        drawWithToast();
+        fireEvent.click(screen.getByRole("button", { name: GITHUB.name }));
+        fireEvent.click(screen.getByRole("switch", { name: "Filter on" }));
+        await act(async () => {
+            fireEvent.click(screen.getByRole("button", { name: "Save the filter" }));
+        });
+        await wait();
+        expect(screen.queryByText(/already in the inbox/)).toBeNull();
+        expect(screen.getByText("Filter saved.")).toBeTruthy();
     });
 
     it("comes back to the editor, as it was typed, when the server refuses the save", async () => {
@@ -345,5 +375,123 @@ describe("the list", () => {
         expect(deleteRuleAction).toHaveBeenCalledWith("acc-1", "r1");
         expect(screen.queryByRole("button", { name: GITHUB.name })).toBeNull();
         expect(screen.getByRole("button", { name: SECOND.name })).toBeTruthy();
+    });
+});
+
+describe("putting a filter in a different order", () => {
+    /** Two groups, the first with two conditions, and two steps. */
+    const ORDERED: MailRuleView = {
+        ...GITHUB,
+        definition: {
+            triggers: [{ id: "arrival", kind: "arrival" }],
+            conditions: {
+                match: "any",
+                groups: [
+                    {
+                        id: "group1",
+                        match: "all",
+                        items: [
+                            { id: "cond1", kind: "subject", operator: "contains", value: "first" },
+                            { id: "cond2", kind: "from", operator: "contains", value: "second" }
+                        ]
+                    },
+                    {
+                        id: "group2",
+                        match: "all",
+                        items: [{ id: "cond3", kind: "to", operator: "contains", value: "third" }]
+                    }
+                ]
+            },
+            actions: [
+                { id: "step1", kind: "read" },
+                { id: "step2", kind: "trash" }
+            ]
+        } as core.MailFilterDefinition
+    };
+    const HANDLE = "Drag to reorder, or use the arrow keys";
+
+    async function saved(): Promise<core.MailFilterDefinition> {
+        await act(async () => {
+            fireEvent.click(screen.getByRole("button", { name: "Save the filter" }));
+        });
+        expect(saveRuleAction).toHaveBeenCalledTimes(1);
+        return (saveRuleAction.mock.calls[0]![2] as { definition: core.MailFilterDefinition })
+            .definition;
+    }
+
+    const data = { effectAllowed: "", dropEffect: "", setData: () => undefined };
+
+    /** Pick a row up by its handle and let it go below every row of `list`.
+     *  jsdom has no DragEvent, and the stand-in it makes drops the height. */
+    function dragFirstToEnd(list: HTMLElement) {
+        const row = list.querySelector<HTMLElement>(":scope > li")!;
+        fireEvent.pointerDown(within(row).getAllByRole("button", { name: HANDLE })[0]!);
+        fireEvent.dragStart(row, { dataTransfer: data });
+        for (const make of [createEvent.dragOver, createEvent.drop]) {
+            const event = make(list, { dataTransfer: data });
+            Object.defineProperty(event, "clientY", { value: 500 });
+            fireEvent(list, event);
+        }
+    }
+
+    const values = () =>
+        screen
+            .getAllByRole("textbox", { name: "What to look for" })
+            .map((input) => (input as HTMLInputElement).value);
+
+    it("moves a condition with the arrow keys on its handle, and keeps the order once saved and opened again", async () => {
+        draw([ORDERED]);
+        fireEvent.click(screen.getByRole("button", { name: ORDERED.name }));
+        expect(values()).toEqual(["first", "second", "third"]);
+        // The handles run groups first, then each group's conditions, then steps.
+        const condition = within(
+            screen.getAllByRole("list", { name: "Conditions" })[0]!
+        ).getAllByRole("button", {
+            name: HANDLE
+        })[0]!;
+        fireEvent.keyDown(condition, { key: "ArrowDown" });
+        expect(values()).toEqual(["second", "first", "third"]);
+
+        const definition = await saved();
+        expect(definition.conditions.groups[0]!.items.map((item) => item.id)).toEqual([
+            "cond2",
+            "cond1"
+        ]);
+
+        // Opened again from what was saved, it reads in the same order.
+        cleanup();
+        draw([{ ...ORDERED, definition }]);
+        fireEvent.click(screen.getByRole("button", { name: ORDERED.name }));
+        expect(values()).toEqual(["second", "first", "third"]);
+    });
+
+    it("moves a whole group with the arrow keys on its handle", async () => {
+        draw([ORDERED]);
+        fireEvent.click(screen.getByRole("button", { name: ORDERED.name }));
+        const groups = screen
+            .getByRole("list", { name: "Condition groups" })
+            .querySelectorAll<HTMLElement>(":scope > li");
+        // A group's own handle is the first in it; its conditions' come after.
+        fireEvent.keyDown(within(groups[1]!).getAllByRole("button", { name: HANDLE })[0]!, {
+            key: "ArrowUp"
+        });
+        expect(values()).toEqual(["third", "first", "second"]);
+        const definition = await saved();
+        expect(definition.conditions.groups.map((entry) => entry.id)).toEqual(["group2", "group1"]);
+    });
+
+    it("moves a step by dragging its handle", async () => {
+        draw([ORDERED]);
+        fireEvent.click(screen.getByRole("button", { name: ORDERED.name }));
+        dragFirstToEnd(screen.getByRole("list", { name: "Steps" }));
+        const definition = await saved();
+        expect(definition.actions.map((step) => step.id)).toEqual(["step2", "step1"]);
+    });
+
+    it("moving a condition does not pick up the group around it", () => {
+        draw([ORDERED]);
+        fireEvent.click(screen.getByRole("button", { name: ORDERED.name }));
+        dragFirstToEnd(screen.getAllByRole("list", { name: "Conditions" })[0]!);
+        expect(values()).toEqual(["second", "first", "third"]);
     });
 });

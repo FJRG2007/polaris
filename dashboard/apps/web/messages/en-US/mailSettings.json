@@ -353,8 +353,6 @@
         "labelLabel": "Which label",
         "forwardLabel": "Where to send it",
         "forwardHint": "A copy is sent from this mailbox, and replies to it go to whoever wrote the original. It will not send to an address you have here - that is a loop - and a message that has already been forwarded once is left alone.",
-        "existingLabel": "Also run it over the mail already here",
-        "existing": "Also run it over the mail already in the inbox",
         "saved": "Filter saved.",
         "save": "Save the filter",
         "likeName": "Messages like {subject}",
@@ -389,7 +387,8 @@
         },
         "trigger": {
             "arrival": "A message arrives",
-            "in": "In {address}"
+            "everyMessage": "Every message that arrives",
+            "onSave": "Saving it while it is on also applies it once to the mail already in the inbox."
         },
         "editor": {
             "back": "All filters",
@@ -414,6 +413,10 @@
             "addGroup": "Add another group",
             "addStep": "Add a step",
             "tooMany": "This filter holds as many as it can.",
+            "reorder": "Drag to reorder, or use the arrow keys",
+            "conditionsList": "Conditions",
+            "groupsList": "Condition groups",
+            "stepsList": "Steps",
             "up": "Move up",
             "down": "Move down",
             "removeStep": "Remove this step",
@@ -480,7 +483,8 @@
             "deleteBody": "Mail it already filed stays where it is.",
             "deleted": "Filter deleted.",
             "full": "This mailbox has as many filters as it can hold.",
-            "savedRunning": "Filter saved. Running it over the inbox.",
+            "savedApplied": "{count, plural, =0 {Filter saved. Nothing already in the inbox matched it.} one {Filter saved and applied to # message already in the inbox.} other {Filter saved and applied to # messages already in the inbox.}}",
+            "savedRunning": "Filter saved. Applying it to the mail already in the inbox.",
             "notForwarded": "Mail already here is not forwarded.",
             "unverified": "Not forwarding: {to} is not a verified address on your account.",
             "unreachable": "Polaris could not be reached. Try again."

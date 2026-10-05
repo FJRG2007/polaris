@@ -94,7 +94,6 @@ export function draftOf(rule: MailRuleView): FilterDraft {
 }
 
 export function FilterEditor({
-    address,
     initial,
     isNew,
     folders,
@@ -106,8 +105,6 @@ export function FilterEditor({
     onSave,
     onClose
 }: {
-    /** The mailbox it runs on. */
-    address: string;
     initial: FilterDraft;
     /** Nothing saved yet: Save is there to press from the first moment. */
     isNew: boolean;
@@ -239,7 +236,7 @@ export function FilterEditor({
                 kinds: ["arrival"],
                 kindText: () => t("rules.trigger.arrival"),
                 blank: () => ({ id: core.automationNodeId(), kind: "arrival" }),
-                describe: () => t("rules.trigger.in", { address }),
+                describe: () => t("rules.trigger.everyMessage"),
                 fixed: true
             },
             conditions: {
@@ -262,7 +259,7 @@ export function FilterEditor({
             },
             newId: core.automationNodeId
         }),
-        [t, address, lookup]
+        [t, lookup]
     );
 
     const blocked = issues.length > 0 || !dirty;
@@ -272,20 +269,12 @@ export function FilterEditor({
         onSave({ ...draft, name: core.normalizeMailName(draft.name) });
     };
 
-    const triggerCard = (
-        <TriggerCard
-            address={address}
-            applyToExisting={draft.applyToExisting}
-            disabled={false}
-            onApplyToExisting={(applyToExisting) =>
-                edit((current) => ({ ...current, applyToExisting }))
-            }
-        />
-    );
+    const triggerCard = <TriggerCard />;
 
-    const groupCard = (group: core.MailFilterGroup, index: number) => (
+    const groupCard = (group: core.MailFilterGroup, index: number, handle?: ReactNode) => (
         <GroupCard
             key={group.id}
+            handle={handle}
             group={group}
             path={["definition", "conditions", "groups", index]}
             disabled={false}
@@ -313,9 +302,10 @@ export function FilterEditor({
         />
     );
 
-    const stepCard = (step: core.MailFilterStep, index: number) => (
+    const stepCard = (step: core.MailFilterStep, index: number, handle?: ReactNode) => (
         <StepCard
             key={step.id}
+            handle={handle}
             step={step}
             number={index + 1}
             path={["definition", "actions", index]}
@@ -518,7 +508,22 @@ export function FilterEditor({
                             }
                         >
                             {groupsMatch}
-                            {definition.conditions.groups.map(groupCard)}
+                            <flow.SortableList
+                                items={definition.conditions.groups}
+                                label={t("rules.editor.groupsList")}
+                                handleLabel={t("rules.editor.reorder")}
+                                onMove={(from, to) =>
+                                    editDefinition((current) => ({
+                                        ...current,
+                                        conditions: {
+                                            ...current.conditions,
+                                            groups: flow.moved(current.conditions.groups, from, to)
+                                        }
+                                    }))
+                                }
+                            >
+                                {groupCard}
+                            </flow.SortableList>
                             {definition.conditions.groups.length <
                                 core.MAIL_FILTER_LIMITS.groups && (
                                 <flow.AddMenu
@@ -542,7 +547,19 @@ export function FilterEditor({
                             issue={stageIssue(["definition", "actions"])}
                             last
                         >
-                            {definition.actions.map(stepCard)}
+                            <flow.SortableList
+                                items={definition.actions}
+                                label={t("rules.editor.stepsList")}
+                                handleLabel={t("rules.editor.reorder")}
+                                onMove={(from, to) =>
+                                    editDefinition((current) => ({
+                                        ...current,
+                                        actions: flow.moved(current.actions, from, to)
+                                    }))
+                                }
+                            >
+                                {stepCard}
+                            </flow.SortableList>
                             {definition.actions.length < core.MAIL_FILTER_LIMITS.steps && (
                                 <flow.AddMenu
                                     label={t("rules.editor.addStep")}

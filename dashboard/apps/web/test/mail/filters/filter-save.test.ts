@@ -22,6 +22,7 @@ const THEIRS = "00000000-0000-4000-8000-000000000002";
 const FOLDER = "00000000-0000-4000-8000-0000000000f1";
 const OTHER_FOLDER = "00000000-0000-4000-8000-0000000000f2";
 
+const inboxLookup = vi.fn(async (..._args: unknown[]) => [] as { id: string }[]);
 const recordAudit = vi.fn(async (..._args: unknown[]) => undefined);
 const listUserEmails = vi.fn(async (..._args: unknown[]) => [
     { email: "me@personal.example", verified: true },
@@ -104,6 +105,8 @@ vi.mock("@polaris/db", () => {
             })
         },
         mailFolder: {
+            // No inbox here: a run over it reads that much and stops.
+            findMany: (...args: unknown[]) => inboxLookup(...args),
             count: vi.fn(
                 async ({ where }: { where: { id: { in: string[] }; accountId: string } }) =>
                     where.id.in.filter((id) => id === FOLDER && where.accountId === MINE).length
@@ -186,6 +189,7 @@ beforeEach(() => {
     rows.clear();
     created = 0;
     recordAudit.mockClear();
+    inboxLookup.mockClear();
 });
 
 describe("saving a filter", () => {
@@ -313,5 +317,24 @@ describe("the headers a mailbox's filters look at", () => {
         await rules.saveRule("u1", MINE, null, input(DEFINITION));
         await rules.saveRule("u1", MINE, null, input(DEFINITION));
         expect(await rules.filterHeaderNames(MINE)).toEqual(["x-github-reason"]);
+    });
+});
+
+describe("the mail already in the inbox", () => {
+    it("gets a filter saved switched on applied to it once, and says how many it caught", async () => {
+        const saved = await rules.saveFilter("u1", MINE, null, input(DEFINITION));
+        expect(saved.applied).toBe(0);
+        expect(inboxLookup).toHaveBeenCalledTimes(1);
+        expect(rows.has(saved.id)).toBe(true);
+    });
+
+    it("is left alone by a filter saved switched off, whatever an older screen asks", async () => {
+        const saved = await rules.saveFilter("u1", MINE, null, {
+            ...input(DEFINITION),
+            enabled: false,
+            applyToExisting: true
+        });
+        expect(saved.applied).toBeNull();
+        expect(inboxLookup).not.toHaveBeenCalled();
     });
 });

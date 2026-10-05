@@ -222,10 +222,18 @@ export function RulesView({
                 return;
             }
             landed(accountKey, temporary, answer);
+            // Saved switched on, it was applied to the inbox: say to how many,
+            // or that it is still going on a big one.
+            const applied =
+                typeof answer === "object" && answer !== null && "applied" in answer
+                    ? answer.applied
+                    : null;
             toast.show({
-                title: draft.applyToExisting
-                    ? `${t("rules.list.savedRunning")}${notForwarded(definition)}`
-                    : t("rules.saved")
+                title: !draft.enabled
+                    ? t("rules.saved")
+                    : typeof applied === "number"
+                      ? `${t("rules.list.savedApplied", { count: applied })}${notForwarded(definition)}`
+                      : `${t("rules.list.savedRunning")}${notForwarded(definition)}`
             });
             router.refresh();
         })();
@@ -336,7 +344,6 @@ export function RulesView({
                 {confirmDialog}
                 <FilterEditor
                     key={`${account.id}-${editing.id ?? "new"}-${editing.error}`}
-                    address={account.address}
                     initial={editing.draft}
                     isNew={editing.id === null || existing === undefined || editing.error !== ""}
                     folders={myFolders}

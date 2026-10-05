@@ -353,8 +353,6 @@
         "labelLabel": "Qué etiqueta",
         "forwardLabel": "Adónde enviarlo",
         "forwardHint": "Se envía una copia desde este buzón, y las respuestas van a quien escribió el original. No se envía a una dirección que tengas aquí, porque sería un bucle, y un mensaje que ya se reenvió una vez se deja como está.",
-        "existingLabel": "Ejecutarlo también sobre el correo que ya está aquí",
-        "existing": "Ejecutarlo también sobre el correo que ya está en Recibidos",
         "saved": "Filtro guardado.",
         "save": "Guardar el filtro",
         "likeName": "Mensajes como {subject}",
@@ -389,7 +387,8 @@
         },
         "trigger": {
             "arrival": "Llega un mensaje",
-            "in": "En {address}"
+            "everyMessage": "Cada mensaje que llega",
+            "onSave": "Al guardarlo activado, también se aplica una vez al correo que ya está en la bandeja de entrada."
         },
         "editor": {
             "back": "Filtros",
@@ -414,6 +413,10 @@
             "addGroup": "Añadir otro grupo",
             "addStep": "Añadir paso",
             "tooMany": "Este filtro ya tiene todos los que caben.",
+            "reorder": "Arrastra para reordenar o usa las flechas",
+            "conditionsList": "Condiciones",
+            "groupsList": "Grupos",
+            "stepsList": "Pasos",
             "up": "Subir",
             "down": "Bajar",
             "removeStep": "Quitar este paso",
@@ -480,7 +483,8 @@
             "deleteBody": "El correo que ya ha archivado se queda donde está.",
             "deleted": "Filtro eliminado.",
             "full": "Este buzón ya tiene todos los filtros que puede tener.",
-            "savedRunning": "Filtro guardado. Aplicándolo a la bandeja de entrada.",
+            "savedApplied": "{count, plural, =0 {Filtro guardado. Nada de lo que ya está en la bandeja de entrada coincide.} one {Filtro guardado y aplicado a # mensaje que ya estaba en la bandeja de entrada.} other {Filtro guardado y aplicado a # mensajes que ya estaban en la bandeja de entrada.}}",
+            "savedRunning": "Filtro guardado. Aplicándolo al correo que ya está en la bandeja de entrada.",
             "notForwarded": "El correo que ya está aquí no se reenvía.",
             "unverified": "No se reenvía: {to} no es una dirección verificada de tu cuenta.",
             "unreachable": "No se ha podido conectar con Polaris. Inténtalo de nuevo."

@@ -9,13 +9,18 @@
  * What a node holds is the editor's own business - a device and a state for
  * Places, a header and a pattern for Mail - so nothing here knows a kind. Every
  * word arrives as a prop, already in the reader's language.
+ *
+ * A list of cards can be put in another order by dragging a card's handle, or
+ * with the arrow keys on it (`SortableList`); the order is the definition's own
+ * list order, so it is what gets saved.
  */
 
 import { cn } from "../lib/cn";
 import { Button } from "../components/button";
 import { Select } from "../components/select";
 import type { FlowMatch, Path } from "./graph";
-import { ArrowDown, ArrowUp, Plus, X } from "lucide-react";
+import { moved, useListOrder } from "../lib/list-order";
+import { ArrowDown, ArrowUp, GripVertical, Plus, X } from "lucide-react";
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -72,6 +77,7 @@ export function Field({
 
 /** One card in the flow: its kind, its fields, and the buttons that move it. */
 export function NodeCard({
+    handle,
     number,
     kind,
     onRemove,
@@ -93,10 +99,13 @@ export function NodeCard({
     downLabel: string;
     disabled?: boolean;
     children?: ReactNode;
+    /** The drag handle a `SortableList` hands its row. */
+    handle?: ReactNode;
 }) {
     return (
         <div className="relative flex flex-col gap-3 rounded-lg border border-border bg-card p-3">
             <div className="flex items-center gap-2">
+                {!disabled && handle}
                 {number !== undefined && (
                     <span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-muted text-[0.6875rem] font-medium tabular-nums text-muted-foreground">
                         {number}
@@ -146,6 +155,85 @@ export function NodeCard({
         </div>
     );
 }
+
+/**
+ * Cards that can be put in another order: dragged by the handle each row is
+ * handed, or moved with the arrow keys on that handle. `onMove` is told where
+ * a card went, and the caller reorders its own list - `moved` does exactly that.
+ * Nests: a group's conditions can be a list inside the list of groups, and a
+ * card dragged in one never picks up the card around it.
+ */
+export function SortableList<T extends { readonly id: string }>({
+    items,
+    label,
+    handleLabel,
+    disabled,
+    onMove,
+    children
+}: {
+    items: readonly T[];
+    /** What the list is, for a screen reader. */
+    label: string;
+    handleLabel: string;
+    disabled?: boolean;
+    onMove: (from: number, to: number) => void;
+    /** One row, given the handle to put in its heading. */
+    children: (item: T, index: number, handle: ReactNode) => ReactNode;
+}) {
+    const order = useListOrder(
+        items.length,
+        onMove,
+        items.map((item) => item.id)
+    );
+    const sortable = !disabled && items.length > 1;
+    const line = (
+        <span
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-x-0 h-0.5 rounded-full bg-primary"
+        />
+    );
+    return (
+        <ul
+            aria-label={label}
+            className="flex min-w-0 flex-col gap-2"
+            {...(sortable ? order.listProps : {})}
+        >
+            {items.map((item, index) => (
+                <li
+                    key={item.id}
+                    className={cn("relative min-w-0", order.dragging === index && "opacity-40")}
+                    {...(sortable ? order.rowProps(index) : {})}
+                >
+                    {order.dragging !== null && order.dropAt === index && (
+                        <span className="absolute inset-x-0 -top-1.5">{line}</span>
+                    )}
+                    {children(
+                        item,
+                        index,
+                        sortable ? (
+                            <button
+                                type="button"
+                                aria-label={handleLabel}
+                                title={handleLabel}
+                                className="flex size-7 shrink-0 cursor-grab touch-none items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring active:cursor-grabbing"
+                                {...order.handleProps(index, items.length)}
+                            >
+                                <GripVertical className="size-3.5" />
+                            </button>
+                        ) : null
+                    )}
+                    {order.dragging !== null &&
+                        order.dropAt === items.length &&
+                        index === items.length - 1 && (
+                            <span className="absolute inset-x-0 -bottom-1.5">{line}</span>
+                        )}
+                </li>
+            ))}
+        </ul>
+    );
+}
+
+export { moved };
 
 /** One of WHEN, IF and THEN: a heading on the line, its cards, and the line
  *  carried down to the next. */
