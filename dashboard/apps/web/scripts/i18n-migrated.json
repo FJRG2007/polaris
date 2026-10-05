@@ -1063,6 +1063,7 @@
         "web/src/components/app-nav.tsx",
         "web/src/components/app-sidebar.tsx",
         "web/src/components/arrange-apps-dialog.tsx",
+        "web/src/components/consent-card.tsx",
         "web/src/components/device-cache-card.tsx",
         "web/src/components/display-preferences-form.tsx",
         "web/src/components/dns/dns-propagation-panel.tsx",

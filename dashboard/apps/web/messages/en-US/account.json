@@ -587,7 +587,9 @@
             "notACode": "That is not a code from the Polaris extension.",
             "nothingWaiting": "Nothing is waiting on that code. Ask the extension for a new one.",
             "cannotAnswer": "That request cannot be answered."
-        }
+        },
+        "title": "Connect {device} to Polaris",
+        "signedInAs": "Signed in as {name}"
     },
     "friends": {
         "page": {
@@ -1045,6 +1047,8 @@
             "nothingWaiting": "Nothing is waiting on that code. Run plr login again for a new one.",
             "cannotAnswer": "That request cannot be answered.",
             "noScopes": "Your account cannot use Deploy, which is all the command line does. Ask an administrator for access."
-        }
+        },
+        "title": "Sign in {device}",
+        "signedInAs": "Signed in as {name}"
     }
 }

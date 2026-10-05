@@ -13,17 +13,17 @@ import { getTranslations } from "@/lib/i18n/request";
 export const dynamic = "force-dynamic";
 
 export default async function CliPage() {
-    await requireUser();
+    const user = await requireUser();
     const t = await getTranslations("account");
     return (
-        <div className="mx-auto flex w-full max-w-2xl flex-col gap-4">
+        <div className="mx-auto flex w-full max-w-md flex-col gap-4">
             <div>
                 <h1 className="text-[1.0625rem] font-semibold tracking-tight">
                     {t("cli.page.title")}
                 </h1>
                 <p className="text-sm text-muted-foreground">{t("cli.page.intro")}</p>
             </div>
-            <CliApproveView />
+            <CliApproveView account={t("cli.signedInAs", { name: user.name || user.email })} />
         </div>
     );
 }

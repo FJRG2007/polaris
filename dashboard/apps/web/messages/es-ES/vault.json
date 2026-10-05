@@ -122,7 +122,9 @@
         "turnItAway": "Rechazar",
         "codeLabel": "El código que muestra la app",
         "looking": "Buscando",
-        "findIt": "Buscar"
+        "findIt": "Buscar",
+        "titleFor": "Dejar entrar a {device} en tu bóveda",
+        "signedInAs": "Sesión iniciada como {name}"
     },
     "clients": {
         "title": "Conectar una app",

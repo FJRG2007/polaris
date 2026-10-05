@@ -17,15 +17,19 @@ import { ExtensionConnectView } from "./extension-connect-view";
 export const dynamic = "force-dynamic";
 
 export default async function ExtensionPage() {
-    await requireUser();
+    const user = await requireUser();
     const t = await getTranslations("account");
     return (
-        <div className="mx-auto flex w-full max-w-2xl flex-col gap-4">
+        <div className="mx-auto flex w-full max-w-md flex-col gap-4">
             <div>
-                <h1 className="text-[1.0625rem] font-semibold tracking-tight">{t("extension.page.title")}</h1>
+                <h1 className="text-[1.0625rem] font-semibold tracking-tight">
+                    {t("extension.page.title")}
+                </h1>
                 <p className="text-sm text-muted-foreground">{t("extension.page.intro")}</p>
             </div>
-            <ExtensionConnectView />
+            <ExtensionConnectView
+                account={t("extension.signedInAs", { name: user.name || user.email })}
+            />
         </div>
     );
 }
