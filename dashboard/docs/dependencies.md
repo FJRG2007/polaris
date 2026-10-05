@@ -11,7 +11,10 @@ a known advisory is accepted instead of fixed.
   `scripts/audit-allowlist.json` accepts it. On a pull request that touches no
   manifest, on a push and in the publish workflow the same check only reports:
   an advisory published today against a package nobody changed is not that
-  change's fault.
+  change's fault. In that same non-gating case, `npm audit` or
+  `audit-gate.mjs` itself failing to produce a usable report is a warning, not
+  a failure - a broken check should not block a change it was never meant to
+  gate.
 - **Every Monday.** The maintenance workflow runs the same gate and the
   typecheck, and opens or updates one issue when either fails. Development-only
   and moderate findings are in its report and never open the issue on their own.

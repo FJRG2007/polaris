@@ -97,7 +97,10 @@ jobs:
       # else - a push, the publish workflow's call, a pull request that touches no
       # manifest - it is reported and does not fail: an advisory published today
       # against a package nobody changed is not that change's fault, and the
-      # weekly maintenance run opens the issue for it.
+      # weekly maintenance run opens the issue for it. In that same non-gating
+      # case, npm or audit-gate.mjs itself failing to produce a report (exit 2)
+      # is a warning, not a failure: a broken check should not block a change it
+      # was not meant to gate.
       - name: Audit production dependencies
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
