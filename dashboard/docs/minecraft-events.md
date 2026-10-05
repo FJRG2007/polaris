@@ -751,10 +751,10 @@ A new kind follows all of them. A change to an old kind must not undo one.
   every first rise: the first punch of each hot potato holder, the first
   find, the first hit and kill of every fighter. A count read for the first
   time of somebody on at the last look rises from 0 (`hits.rose`)
-  (`2f5400563`, `9b351dc35`, `4606a3bb8`).
+  (`a5bfc3c12`, `800b43f30`, `50c9aca43`).
 - **Neither does a `health` score until that player's health changes.** A
   capture the flag player nobody had hurt yet read as not on, and could not
-  take a flag; such a player is whole (`duel.healthOf`) (`9b351dc35`).
+  take a flag; such a player is whole (`duel.healthOf`) (`800b43f30`).
 - **The damage statistics are not hits.** They count tenths of a heart,
   rounded, so a quick second punch under Resistance IV counts nothing, and
   `damage_taken` rises for a fall as much as for a blow: a hider dropping off
@@ -762,52 +762,52 @@ A new kind follows all of them. A change to an old kind must not undo one.
   a SkyWars player who jumped off a tree handed the nearest striker an
   elimination. A hit is the events data pack's advancement (see "Hits" in
   the kind notes), and who hurt whom is the game's own memory of it,
-  `execute on attacker` (`2f5400563`, `4606a3bb8`).
+  `execute on attacker` (`a5bfc3c12`, `50c9aca43`).
 - **A tag the game sets for anybody is cleared before a game reads it.** The
   pack tags a hit in any arena, and only hot potato and hide and seek take
   the tags: one left from an earlier fight was read on their first look as a
-  pass or a find of their own. Both clear them at "Go!" (`fac62a154`).
+  pass or a find of their own. Both clear them at "Go!" (`9ef1d4813`).
 - **Credit goes to whoever hurt that player, not whoever struck last.** "The
   rival who struck last" was anybody's strike at anybody: with more than one
-  a side, eliminations went to the wrong rival (`9b351dc35`).
+  a side, eliminations went to the wrong rival (`800b43f30`).
 - **A mark the quick look leaves is taken in the same batch it is cleared,
   and wiped off anybody the tick moves.** Capture the flag read its marks and
   cleared them in separate trips and sent its lines - the send-back teleport
   among them - at the end of the tick. A quick look in between marked a
   player brought low by the other team's flag where they stood before the
   move, and on the next tick they took that flag from their own base, two
-  blocks from their own, and captured it at once (`9b351dc35`).
+  blocks from their own, and captured it at once (`800b43f30`).
 - **A dead player is still somewhere.** `@a` selects players on the death
   screen where they fell, so a player dead by a flag was marked as touching
   it after their death was counted; only somebody alive takes or captures
-  one (`9b351dc35`).
+  one (`800b43f30`).
 - **`tp` leaves its target on the ground.** The dropper's landing box
   reached the spot it sends landed racers back to, so each was sent back
   every tick - the server ignores a player's moves until it has their answer
   to a teleport - and held in mid-air until vanilla kicked them for floating
-  too long, on every run on a real server (`d69f3bef3`).
+  too long, on every run on a real server (`fac79a14a`).
 - **What the pack notes to the tick orders what one look sees.** Two
   racers reaching the dropper's water in one look were told their places by
   join order, and the last two of a TNT run falling in one look left no
-  winner; both go by the game tick the pack wrote (`d69f3bef3`, `2be087857`).
+  winner; both go by the game tick the pack wrote (`fac79a14a`, `5779a007a`).
 - **A rule a winner must keep is checked on the look that crowns them.**
   Creative was sampled every fifteen seconds and a bingo card every two:
   crafting in creative in between and switching back won the card
-  (`ee3e2349d`).
+  (`2bdb2b344`).
 - **A count measured from the last look can be wound back.** A treasure
   dropped on one look lowered the count a catch is measured from, and picked
   up again after a cast on a later one it was a new catch, over and over; the
-  measure is now the most a player has had (`6c6bebac9`).
+  measure is now the most a player has had (`72b98f85c`).
 - **A statistic for a kind of mob counts the world's own mobs too.** A horde
   or villager defense counted every zombie killed near the point at night,
-  summoned or not; the pack counts kills of `pe_wfight` only (`d1e523362`):
-  not `pe_mob`, which a jockey's mount carries too.
+  summoned or not; the pack counts kills of `pe_wfight` only (`88a8e34ee`,
+  `4a6f9bae5`): not `pe_mob`, which a jockey's mount carries too.
 - **Coming back is not starting over.** A boat racer who left and joined
   again lost every gate in the game while their clock kept running; they now
-  come back at their last gate with their passes (`abb4aa37e`).
+  come back at their last gate with their passes (`d50b36885`).
 - **A look that cannot read a value keeps the last one, never a default.**
   The villager's health fell back to full on a look it could not be read,
-  showing a dying villager healed (`08c4e1a52`).
+  showing a dying villager healed (`8b7f0626d`).
 
 ### Versions, loaders and plugins
 
@@ -824,9 +824,10 @@ A new kind follows all of them. A change to an old kind must not undo one.
     - 1.19.4: the heightmap. Before it, the ground marker lands a block or two
       off, so keep a margin from beds and never leave a marked chunk loaded
       (`40bcd010c`, `4f5b2ccc3`). And `execute on attacker`, who hurt a
-      player; before it, the nearest striker is the guess (`9b351dc35`).
+      player; before it, the nearest striker is the guess (`a5bfc3c12`,
+      `800b43f30`, `50c9aca43`).
     - 1.21: the data pack's `advancement` and `function` folders, singular;
-      before, plural. The pack ships both (`2f5400563`).
+      before, plural. The pack ships both (`a5bfc3c12`).
     - 1.20.5: item components. Before it, NBT `Count` (`b29835d20`).
     - 1.21.5: equipment, `drop_chances`, SNBT text names, and the new
       click-event spelling (`e3143f57b`, `e24b3e480`).
