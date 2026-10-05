@@ -25,6 +25,7 @@ import * as alerts from "../lib/alerts";
 import * as places from "../lib/places";
 import * as people from "../lib/people";
 import * as devices from "../lib/devices";
+import { operateDevice } from "../lib/device-operation";
 import * as cameras from "../lib/cameras";
 import * as schemas from "../lib/schemas";
 import { probeCamera } from "../lib/onvif";
@@ -46,13 +47,7 @@ import { LOCAL_MACHINE, needsSomewhereToRun, type Detector } from "../lib/detect
 import type { DeviceAction, DeviceEventView, DeviceView } from "../lib/device-kinds";
 import { DEVICE_ACTIONS, deviceCommandSchema } from "../lib/device-kinds";
 import { currentPlace, PLACE_COOKIE, PLACE_COOKIE_MAX_AGE } from "../lib/current-place";
-import {
-    countDeviceUse,
-    onlyReachable,
-    reachesDevice,
-    requireDeviceControl,
-    type PlacesReach
-} from "../lib/sharing";
+import { onlyReachable, reachesDevice, type PlacesReach } from "../lib/sharing";
 import {
     faceEndpoint,
     faceRecognitionSettings,
@@ -1211,43 +1206,16 @@ export async function operateDeviceAction(
     if (!known || (setting !== null && !setting.success)) {
         return { error: await say("refusals.deviceCannot") };
     }
-    const lent = await guard(() => requireDeviceControl(user, String(deviceId)));
-    if (lent.error) return { error: lent.error };
-
     const result = await guard(() =>
-        devices.actOnDevice(
+        operateDevice(
+            user,
             install.id,
             String(deviceId),
             action,
-            user.name,
             setting?.success ? setting.data : undefined
         )
     );
-    if (result.error) {
-        // Recorded refused as well as done. An attempt that was turned down is
-        // the half of this log that says somebody tried.
-        await recordAudit({
-            actorId: user.id,
-            action: `places.device.${action}.refused`,
-            targetType: "placeDevice",
-            targetId: String(deviceId)
-        });
-        return { error: result.error };
-    }
-    await countDeviceUse(lent.value ?? null);
-    await recordAudit({
-        actorId: user.id,
-        action: `places.device.${action}`,
-        targetType: "placeDevice",
-        targetId: String(deviceId),
-        // Which of the two rights was used, so the log tells a resident opening
-        // their own door apart from a visitor spending one of four.
-        metadata: {
-            name: result.value?.name,
-            lent: Boolean(lent.value),
-            ...(setting?.success ? { setting: setting.data } : {})
-        }
-    });
+    if (result.error) return { error: result.error };
     return { device: result.value };
 }
 

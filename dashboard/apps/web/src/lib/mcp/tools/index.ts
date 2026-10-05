@@ -5,6 +5,10 @@
  * capability handed to a model running against somebody's repository, so what is
  * on it should be a decision somebody made in a review, visible in one diff -
  * not something that appears because a file was imported.
+ *
+ * Core's tools only. An installable app's are its own, offered through the
+ * extension registry while it is installed (`lib/mcp/catalog.ts`): Calendar's
+ * among them, which is why there is no calendar file here.
  */
 
 import { z } from "zod";
@@ -16,7 +20,7 @@ import { DRIVE_TOOLS } from "./drive";
 import { DEPLOY_TOOLS } from "./deploy";
 import { SESSION_TOOLS } from "./sessions";
 import type { McpTool } from "../protocol";
-import { CALENDAR_TOOLS } from "./calendar";
+import { MAIL_TOOLS } from "./mail";
 
 const whoamiInput = z.object({});
 
@@ -65,5 +69,5 @@ export const MCP_TOOLS: readonly McpTool<never>[] = [
     ...NOTE_TOOLS,
     ...CHAT_TOOLS,
     ...DRIVE_TOOLS,
-    ...CALENDAR_TOOLS
+    ...MAIL_TOOLS
 ];

@@ -774,20 +774,26 @@ describe("changing what a connected app may do", () => {
         expect((await whoami(access))?.sort()).toEqual(["deploy.read", "tasks.read"]);
     });
 
-    it("never adds what the app did not ask for or the person does not hold", async () => {
+    it("adds what the app did not ask for only when it is offered and the person holds it", async () => {
         state.permissions = new Set(["tasks.read", "tasks.manage", "deploy.read"]);
         const { tokens } = await connect(["tasks.read"], "tasks.read");
         const [app] = await listConnectedApps(ADA.id);
 
-        // Not asked for: dropped, so nothing is left to grant but what it had.
+        // Not asked for, but offered and held: the person's to give. Not offered
+        // over MCP at all: dropped.
         const result = await changeAppScopesAction({
             id: app!.id,
             scopes: ["tasks.read", "deploy.read", "users.manage"]
         });
-        expect(result.scopes).toEqual(["tasks.read"]);
-        expect(await whoami(String(tokens.body.access_token))).toEqual(["tasks.read"]);
+        expect(result.scopes).toEqual(["deploy.read", "tasks.read"]);
+        expect((await whoami(String(tokens.body.access_token)))?.sort()).toEqual([
+            "deploy.read",
+            "tasks.read"
+        ]);
+        // What it asked for is still what it asked for.
+        expect((await listConnectedApps(ADA.id))[0]!.requestable).toEqual(["tasks.read"]);
 
-        // Asked for but not held: refused the same way.
+        // Asked for but not held: refused.
         state.permissions = new Set(["tasks.read"]);
         const second = await connect(["tasks.read"], "tasks.read tasks.manage");
         const apps = await listConnectedApps(ADA.id);
@@ -822,18 +828,23 @@ describe("changing what a connected app may do", () => {
         ).toBe("connectedApps.changeFailed");
     });
 
-    it("treats a grant from before requests were kept as narrow-only", async () => {
+    it("reads a grant from before requests were kept as asking for what it holds", async () => {
         const { tokens } = await connect(["tasks.read"], "tasks.read deploy.read");
         const grant = state.db.tables.oAuthGrant![0]!;
         grant.requestedScopes = null;
         const [app] = await listConnectedApps(ADA.id);
         expect(app!.requestable).toEqual(["tasks.read"]);
+        // Anything more is marked as not asked for on the page, and still the
+        // person's to give.
         const result = await changeAppScopesAction({
             id: app!.id,
             scopes: ["tasks.read", "deploy.read"]
         });
-        expect(result.scopes).toEqual(["tasks.read"]);
-        expect(await whoami(String(tokens.body.access_token))).toEqual(["tasks.read"]);
+        expect(result.scopes).toEqual(["deploy.read", "tasks.read"]);
+        expect((await whoami(String(tokens.body.access_token)))?.sort()).toEqual([
+            "deploy.read",
+            "tasks.read"
+        ]);
     });
 });
 
@@ -997,5 +1008,110 @@ describe("where a connected app may call from", () => {
         expect((await setAppIpPolicyAction({ id: app.id, policy: { mode: "origin" } })).error).toBe(
             "connectedApps.ip.noOrigin"
         );
+    });
+});
+
+describe("the finer scopes, and the grants made before them", () => {
+    async function scopesOf(accessToken: string) {
+        const answer = await mcpCall(accessToken, {
+            method: "tools/call",
+            params: { name: "polaris_whoami", arguments: {} }
+        });
+        return answer.body?.result.structuredContent.scopes as string[] | undefined;
+    }
+
+    it("offers mail's scopes, and no scope of an app that is not installed", async () => {
+        const response = await serverMetadata.GET(new Request(`${ORIGIN}/x`), {
+            params: Promise.resolve({})
+        });
+        const offered = ((await response.json()) as { scopes_supported: string[] })
+            .scopes_supported;
+        expect(offered).toEqual(expect.arrayContaining(["mail.read", "mail.send"]));
+        for (const absent of ["calendar.use", "calendar.read", "places.read", "gameservers.read"])
+            expect(offered).not.toContain(absent);
+        const challenge = (await mcpCall(null, { method: "tools/list" })).headers.get(
+            "www-authenticate"
+        );
+        expect(challenge).toContain("mail.send");
+        expect(challenge).not.toContain("places.");
+    });
+
+    it("holds a finer scope only while the person holds the permission it stands on", async () => {
+        state.permissions = new Set(["tasks.read", "mail.use"]);
+        const { tokens } = await connect(["tasks.read", "mail.read"], "tasks.read mail.read");
+        const access = String(tokens.body.access_token);
+        expect(tokens.body.scope).toBe("mail.read tasks.read");
+        expect(await scopesOf(access)).toEqual(["mail.read", "tasks.read"]);
+
+        state.permissions = new Set(["tasks.read"]);
+        expect(await scopesOf(access)).toEqual(["tasks.read"]);
+        const refused = await mcpCall(access, {
+            method: "tools/call",
+            params: { name: "mail_list", arguments: {} }
+        });
+        expect(refused.body?.result.isError).toBe(true);
+        expect(refused.body?.result.content[0].text).toContain("mail.read");
+    });
+
+    it("never grants a finer scope the person cannot hold, at consent", async () => {
+        state.permissions = new Set(["tasks.read"]);
+        const { tokens } = await connect(["tasks.read", "mail.send"], "tasks.read mail.send");
+        expect(tokens.body.scope).toBe("tasks.read");
+    });
+
+    it("lets a new scope be added to a grant made before it existed", async () => {
+        state.permissions = new Set(["tasks.read", "mail.use"]);
+        const { tokens } = await connect(["tasks.read"], "tasks.read");
+        const [app] = await listConnectedApps(ADA.id);
+        const result = await changeAppScopesAction({
+            id: app!.id,
+            scopes: ["tasks.read", "mail.read"]
+        });
+        expect(result.scopes).toEqual(["mail.read", "tasks.read"]);
+        expect(await scopesOf(String(tokens.body.access_token))).toEqual([
+            "mail.read",
+            "tasks.read"
+        ]);
+    });
+
+    it("keeps an old grant's stored scopes exactly, honouring the ones it knows", async () => {
+        state.permissions = new Set(["tasks.read", "calendar.use"]);
+        const { tokens } = await connect(["tasks.read"], "tasks.read");
+        // As a grant from before the split was stored: the old calendar scope,
+        // and one this Polaris has never heard of.
+        const stored = JSON.stringify(["tasks.read", "calendar.use", "bogus.scope"]);
+        state.db.tables.oAuthGrant![0]!.scopes = stored;
+        for (const row of state.db.tables.oAuthToken!) row.scopes = stored;
+
+        const [app] = await listConnectedApps(ADA.id);
+        expect(app!.scopes).toEqual(["calendar.use", "tasks.read"]);
+        expect(await scopesOf(String(tokens.body.access_token))).toEqual([
+            "calendar.use",
+            "tasks.read"
+        ]);
+        // Reading it changed nothing.
+        expect(state.db.tables.oAuthGrant![0]!.scopes).toBe(stored);
+    });
+
+    it("leaves alone, when permissions change, a scope the dialog did not show", async () => {
+        state.permissions = new Set(["tasks.read", "deploy.read", "home.read"]);
+        await connect(["tasks.read"], "tasks.read");
+        // Places' scope, held from when it was installed; it is not now.
+        state.db.tables.oAuthGrant![0]!.scopes = JSON.stringify(["tasks.read", "places.read"]);
+        const [app] = await listConnectedApps(ADA.id);
+        const result = await changeAppScopesAction({
+            id: app!.id,
+            scopes: ["tasks.read", "deploy.read"]
+        });
+        expect(result.scopes).toEqual(["deploy.read", "places.read", "tasks.read"]);
+    });
+
+    it("drops the old calendar scope when the person unticks it", async () => {
+        state.permissions = new Set(["tasks.read", "calendar.use"]);
+        await connect(["tasks.read"], "tasks.read");
+        state.db.tables.oAuthGrant![0]!.scopes = JSON.stringify(["tasks.read", "calendar.use"]);
+        const [app] = await listConnectedApps(ADA.id);
+        const result = await changeAppScopesAction({ id: app!.id, scopes: ["tasks.read"] });
+        expect(result.scopes).toEqual(["tasks.read"]);
     });
 });

@@ -179,17 +179,24 @@ export function scopeGroupKey(title: string): string {
     return `apiKeys.scopes.groups.${camel}`;
 }
 
-/** Scopes sorted into the areas above, in their order. What no area lists is
- *  returned as `rest`, for the caller's "Other". */
-export function groupScopes(scopes: readonly string[]): {
-    groups: { title: string; scopes: Permission[] }[];
+/** Scopes sorted into the areas above, each area in the order the scopes were
+ *  given. `placeOf` names the permission a scope is filed under, for a scope
+ *  that is not one itself. What no area lists is returned as `rest`, for the
+ *  caller's "Other". */
+export function groupScopes(
+    scopes: readonly string[],
+    placeOf: (scope: string) => string = (scope) => scope
+): {
+    groups: { title: string; scopes: string[] }[];
     rest: string[];
 } {
-    const held = new Set(scopes);
-    const groups = SCOPE_GROUPS.map((group) => ({
-        title: group.title,
-        scopes: group.scopes.filter((scope) => held.has(scope))
-    })).filter((group) => group.scopes.length > 0);
+    const groups = SCOPE_GROUPS.map((group) => {
+        const members = new Set<string>(group.scopes);
+        return {
+            title: group.title,
+            scopes: scopes.filter((scope) => members.has(placeOf(scope)))
+        };
+    }).filter((group) => group.scopes.length > 0);
     const listed = new Set<string>(groups.flatMap((group) => group.scopes));
     return { groups, rest: scopes.filter((scope) => !listed.has(scope)) };
 }

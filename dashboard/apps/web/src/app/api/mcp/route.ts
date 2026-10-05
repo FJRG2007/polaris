@@ -26,9 +26,9 @@
 
 import { z } from "zod";
 import { prisma } from "@polaris/db";
-import { MCP_TOOLS } from "@/lib/mcp/tools";
+import { mcpTools } from "@/lib/mcp/catalog";
 import { readCappedBody } from "@/lib/request-body";
-import type { Permission } from "@polaris/core";
+import type { McpScope } from "@/lib/mcp/scope-table";
 import { DEPLOY_TOOLS } from "@/lib/mcp/tools/deploy";
 import { authenticateApiKey } from "@/lib/api-key-auth";
 import { throttleDeployKey, tooManyCalls } from "@/lib/deploy/api/http";
@@ -43,6 +43,7 @@ import { mcpResource, wwwAuthenticate } from "@/lib/mcp/oauth/urls";
 import { ACCESS_TOKEN_PREFIX, touchGrant, verifyAccessToken } from "@/lib/mcp/oauth/grants";
 import { IP_REFUSED_DESCRIPTION, grantAllowsIp } from "@/lib/mcp/oauth/ip-guard";
 import {
+    type McpTool,
     MCP_PROTOCOL_VERSION,
     RPC_INVALID_REQUEST,
     RPC_PARSE_ERROR,
@@ -117,7 +118,7 @@ const envelopeSchema = z.union([
  * them in a loop, on somebody else's hardware, with nobody watching. A person who
  * wants that hands over an API key, which is a decision rather than a default.
  */
-const SESSION_SCOPES: Permission[] = ["tasks.read", "tasks.manage", "agents.read"];
+const SESSION_SCOPES: McpScope[] = ["tasks.read", "tasks.manage", "agents.read"];
 
 /** A connected app carries no address rules of its own; its person's still
  *  apply, through `evaluateAccountAccess`. */
@@ -206,7 +207,8 @@ async function callerFor(request: Request): Promise<McpCaller | typeof IP_REFUSE
  */
 async function overBudget(
     message: Record<string, unknown>,
-    caller: McpCaller
+    caller: McpCaller,
+    tools: readonly McpTool<never>[]
 ): Promise<JsonRpcResponse | null> {
     if (message.method !== "tools/call") return null;
     const id = message.id;
@@ -214,7 +216,7 @@ async function overBudget(
     // id is the handler's to refuse.
     if (typeof id !== "string" && typeof id !== "number" && id !== null) return null;
     const name = (message.params as { name?: unknown } | undefined)?.name;
-    const tool = MCP_TOOLS.find((candidate) => candidate.name === name);
+    const tool = tools.find((candidate) => candidate.name === name);
     if (!tool) return null;
 
     // Every tool, for every credential: a model in a loop is the ordinary way
@@ -258,11 +260,12 @@ const CHANGES_PER_MINUTE = 30;
 async function auditChange(
     message: Record<string, unknown>,
     reply: JsonRpcResponse | null,
-    caller: McpCaller
+    caller: McpCaller,
+    tools: readonly McpTool<never>[]
 ): Promise<void> {
     if (message.method !== "tools/call" || !reply || reply.error) return;
     const name = (message.params as { name?: unknown } | undefined)?.name;
-    const tool = MCP_TOOLS.find((candidate) => candidate.name === name);
+    const tool = tools.find((candidate) => candidate.name === name);
     if (!tool || tool.readOnly) return;
     if ((reply.result as { isError?: boolean } | undefined)?.isError) return;
     await recordAudit({
@@ -279,29 +282,31 @@ async function auditChange(
 }
 
 /** One message, answered after its budgets are spent, and audited if it
- *  changed something. */
+ *  changed something. `tools` is what is available for this request: core's,
+ *  and those of the apps installed right now. */
 async function answer(
     message: Record<string, unknown>,
-    caller: McpCaller
+    caller: McpCaller,
+    tools: readonly McpTool<never>[]
 ): Promise<JsonRpcResponse | null> {
-    const refused = await overBudget(message, caller);
+    const refused = await overBudget(message, caller, tools);
     if (refused) return refused;
-    const reply = await handleMcpMessage(message, MCP_TOOLS, caller, SERVER);
-    await auditChange(message, reply, caller);
+    const reply = await handleMcpMessage(message, tools, caller, SERVER);
+    await auditChange(message, reply, caller, tools);
     return reply;
 }
 
 /** What tells a client how to get a credential: a 401 that points at the
  *  resource metadata (RFC 9728 section 5.1), which is where an assistant
  *  starts the OAuth flow. Clients holding an API key never see it. */
-function unauthorized(request: Request, hadToken: boolean): Response {
+async function unauthorized(request: Request, hadToken: boolean): Promise<Response> {
     const origin = originOf(request);
     return Response.json(
         // i18n-ignore read by a machine, not shown to a person
         { error: "Unauthorized" },
         {
             status: 401,
-            headers: { "WWW-Authenticate": wwwAuthenticate(origin, mcpScopes(), hadToken) }
+            headers: { "WWW-Authenticate": wwwAuthenticate(origin, await mcpScopes(), hadToken) }
         }
     );
 }
@@ -347,6 +352,7 @@ export async function POST(request: Request): Promise<Response> {
     const payload = envelope.data;
 
     const headers = { "MCP-Protocol-Version": MCP_PROTOCOL_VERSION };
+    const tools = await mcpTools();
 
     // A batch is a JSON array. Every message in it is answered independently, and
     // the notifications among them contribute nothing to the reply - which is
@@ -354,14 +360,14 @@ export async function POST(request: Request): Promise<Response> {
     if (Array.isArray(payload)) {
         const answers: JsonRpcResponse[] = [];
         for (const message of payload) {
-            const reply = await answer(message, caller);
+            const reply = await answer(message, caller, tools);
             if (reply) answers.push(reply);
         }
         if (answers.length === 0) return new Response(null, { status: 202, headers });
         return Response.json(answers, { headers });
     }
 
-    const reply = await answer(payload, caller);
+    const reply = await answer(payload, caller, tools);
     if (!reply) return new Response(null, { status: 202, headers });
     return Response.json(reply, { headers });
 }

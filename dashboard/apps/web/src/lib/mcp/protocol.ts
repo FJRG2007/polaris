@@ -22,7 +22,7 @@
 
 import { z } from "zod";
 import { toJsonSchema } from "./json-schema";
-import type { Permission } from "@polaris/core";
+import type { McpScope } from "./scope-table";
 
 /** The revision of MCP this speaks. Sent back on initialize when the client asks
  *  for something else, which is the protocol's own way of saying "this is what I
@@ -43,7 +43,7 @@ export interface McpCaller {
     readonly isAdmin: boolean;
     /** What the presented key may do, already intersected with what its owner
      *  holds. A tool asks for one of these and gets it or does not run. */
-    readonly scopes: readonly Permission[];
+    readonly scopes: readonly McpScope[];
     /** The key that is calling, for the audit trail of anything a tool changes.
      *  Absent for a session's own token, which is not a key. */
     readonly keyId?: string | null;
@@ -95,9 +95,11 @@ export interface McpTool<Input = never> {
      *  defaults on it accepts less than it produces, and pinning both to one type
      *  would make every tool with an optional argument unassignable. */
     readonly input: z.ZodType<Input, z.ZodTypeDef, unknown>;
-    /** The scope a key must carry. Null for a tool that only needs a valid key,
-     *  which so far is nothing that reads or writes anybody's data. */
-    readonly scope: Permission | null;
+    /** The scope a key must carry, or a list of which any one will do (a tool
+     *  that still answers a scope it was split out of). Null for a tool that
+     *  only needs a valid key, which so far is nothing that reads or writes
+     *  anybody's data. */
+    readonly scope: McpScope | readonly McpScope[] | null;
     /** Whether calling it can change anything. Advertised to the client, which is
      *  what lets an agent be run in a mode that may look but not touch. */
     readonly readOnly: boolean;
@@ -113,6 +115,23 @@ export interface McpTool<Input = never> {
     /** What a client shows a person in place of the name. */
     readonly title?: string;
     run(input: Input, caller: McpCaller): Promise<McpToolResult>;
+}
+
+/** The scopes any one of which lets a caller use a tool; empty for none. */
+export function toolScopes(tool: Pick<McpTool<never>, "scope">): readonly McpScope[] {
+    if (tool.scope === null) return [];
+    return typeof tool.scope === "string" ? [tool.scope] : tool.scope;
+}
+
+/**
+ * A tool, typed by what its schema parses to, as the catalogue holds it.
+ *
+ * The catalogue is one list of tools whose inputs all differ, so each is
+ * stored with its input type erased; this is the one place that erasure
+ * happens, after the compiler has checked the tool against its own schema.
+ */
+export function defineMcpTool<Input>(tool: McpTool<Input>): McpTool<never> {
+    return tool as unknown as McpTool<never>;
 }
 
 /** A tool as MCP describes it on the wire. */
@@ -268,10 +287,11 @@ async function callTool(
 
     // Scope before shape. A caller who may not use the tool at all should not
     // learn its argument names by being told which of them they got wrong.
-    if (tool.scope && !caller.scopes.includes(tool.scope)) {
+    const needs = toolScopes(tool);
+    if (needs.length > 0 && !needs.some((scope) => caller.scopes.includes(scope))) {
         return toolFailure(
             id,
-            `This connection cannot ${tool.name}. It needs the ${tool.scope} scope.`
+            `This connection cannot ${tool.name}. It needs the ${needs[0]} scope.`
         );
     }
 

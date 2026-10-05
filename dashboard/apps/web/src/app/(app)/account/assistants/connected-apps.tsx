@@ -24,7 +24,7 @@ import { scopeLabelKey } from "@/lib/mcp/oauth/scope-labels";
 import type { ConnectedAppView } from "@/lib/mcp/oauth/grants";
 import { groupScopes, scopeGroupKey } from "@/lib/api-key-scopes";
 import { useTranslations } from "@/components/i18n/i18n-provider";
-import { expandPermissions, type Permission } from "@polaris/core";
+import { expandScopes, scopeRequires, isMcpScope, type McpScope } from "@/lib/mcp/scope-table";
 import { McpScopeChecklist } from "@/components/mcp-scope-checklist";
 import { IpRuleDialog } from "./ip-rule-dialog";
 import type { IpPolicy } from "@/lib/mcp/oauth/ip-policy";
@@ -50,8 +50,12 @@ import {
     cn
 } from "@polaris/ui";
 
-/** An app as the list draws it: what it holds, and what it could be given. */
-export type ConnectedAppRow = ConnectedAppView & { readonly offered: Permission[] };
+/** An app as the list draws it: what it holds, what it could be given, and
+ *  which of those it never asked for. */
+export type ConnectedAppRow = ConnectedAppView & {
+    readonly offered: McpScope[];
+    readonly unrequested: McpScope[];
+};
 
 /** More apps than this and the list gets a search box. */
 const SEARCH_FROM = 6;
@@ -110,8 +114,11 @@ export function ConnectedApps({ apps: initial }: { apps: ConnectedAppRow[] }) {
         router.refresh();
     }
 
-    async function save(app: ConnectedAppRow, scopes: Permission[]) {
+    async function save(app: ConnectedAppRow, picked: McpScope[]) {
         setEditing(null);
+        // What the dialog did not show is kept as it was, here as on the server.
+        const shown = new Set<string>(app.offered);
+        const scopes = [...picked, ...app.scopes.filter((scope) => !shown.has(scope))];
         if (sameSet(scopes, app.scopes)) return;
         setError(null);
         const before = apps;
@@ -378,7 +385,10 @@ function AppRow({
 function ScopeGroups({ id, scopes }: { id: string; scopes: readonly string[] }) {
     const t = useTranslations("mcp");
     const ta = useTranslations("account");
-    const { groups, rest } = groupScopes(scopes);
+    // A finer scope sits in the area of the permission it stands on.
+    const { groups, rest } = groupScopes(scopes, (scope) =>
+        isMcpScope(scope) ? scopeRequires(scope) : scope
+    );
     const areaName = (title: string) => {
         const key = scopeGroupKey(title);
         return ta.has(key) ? ta(key as NamespaceKey<"account">) : title;
@@ -416,20 +426,23 @@ function EditScopes({
 }: {
     app: ConnectedAppRow;
     onCancel: () => void;
-    onSave: (scopes: Permission[]) => void;
+    onSave: (scopes: McpScope[]) => void;
 }) {
     const t = useTranslations("mcp");
     const tc = useTranslations("common");
     const offered = app.offered;
-    const [selected, setSelected] = useState<Permission[]>(() =>
-        offered.filter((scope) => app.scopes.includes(scope))
+    const holding = useMemo(
+        () => offered.filter((scope) => app.scopes.includes(scope)),
+        [offered, app.scopes]
     );
+    const [selected, setSelected] = useState<McpScope[]>(holding);
     const effective = useMemo(
-        () => new Set(expandPermissions(selected).filter((scope) => offered.includes(scope))),
+        () => new Set(expandScopes(selected).filter((scope) => offered.includes(scope))),
         [selected, offered]
     );
+    const unrequested = useMemo(() => new Set(app.unrequested), [app.unrequested]);
     const name = app.name || t("consent.unnamed");
-    const unchanged = sameSet([...effective], app.scopes);
+    const unchanged = sameSet([...effective], holding);
     const empty = effective.size === 0;
 
     return (
@@ -445,6 +458,7 @@ function EditScopes({
                     offered={offered}
                     selected={selected}
                     effective={effective}
+                    unrequested={unrequested}
                     onToggle={(scope, checked) =>
                         setSelected((current) =>
                             checked

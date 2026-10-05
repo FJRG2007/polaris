@@ -14,7 +14,6 @@ import { gameOfServer, isModpackReference, routesByHostname } from "@polaris/cor
 import { z } from "zod";
 import { prisma } from "@polaris/db";
 import { revalidatePath } from "next/cache";
-import { runArkCommand } from "../../lib/ark/service";
 import { clearCrashLoop } from "../../lib/games-health";
 import { loaderReleasedBy } from "../../lib/minecraft/loader-pin";
 import {
@@ -24,7 +23,7 @@ import {
     type LoaderPinView
 } from "../../lib/minecraft/loader-pin-service";
 import { GAME_MODES } from "../../lib/minecraft/players";
-import { runFivemCommand } from "../../lib/fivem/service";
+import { runConsoleCommand } from "../../lib/games-operations";
 import { findGameIdentity } from "../../lib/game-identity";
 import { isAddressRule } from "../../lib/minecraft/access";
 import { ITEM_ID_PATTERN } from "../../lib/minecraft/items";
@@ -107,7 +106,6 @@ import {
 import {
     applyFirewallBans,
     getServerPlayers,
-    runConsoleLine,
     runServerCommand,
     setPlayerExperience,
     withServerContainer
@@ -2445,37 +2443,7 @@ export async function sendConsoleCommandAction(
             "games.console",
             parsed.data.installedAppId
         );
-        // Recorded before it runs, and recorded whatever it does.
-        //
-        // Every other thing this screen can do to a server leaves a line in the
-        // audit - who opped whom, who banned whom, who changed the world. The
-        // console is how you do all of those without going through any of them,
-        // and it was the one action that left nothing at all. A server where the
-        // deliberate route is written down and the general-purpose one is not is a
-        // server with no record of anything that mattered.
-        await recordAudit({
-            actorId: user.id,
-            action: "games.console",
-            targetType: "installedApp",
-            targetId: parsed.data.installedAppId,
-            metadata: { line: parsed.data.line }
-        });
-        // One console, a language per game underneath. Which one is decided here
-        // rather than by the screen: the panel that renders the console is the
-        // same one.
-        const game = gameOfServer(access.install.catalogId)?.id;
-        const typed = parsed.data.line.replace(/^\//, "");
-        const output =
-            game === "ark"
-                ? await runArkCommand(access.ownerId, parsed.data.installedAppId, typed)
-                : game === "fivem"
-                  ? await runFivemCommand(access.ownerId, parsed.data.installedAppId, typed)
-                  : await runConsoleLine(
-                        access.ownerId,
-                        parsed.data.installedAppId,
-                        parsed.data.line
-                    );
-        return { output: output.trim() };
+        return { output: await runConsoleCommand(user, access, parsed.data.line) };
     } catch (caught) {
         return {
             error:

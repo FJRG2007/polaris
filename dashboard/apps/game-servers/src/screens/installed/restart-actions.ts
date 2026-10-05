@@ -17,12 +17,8 @@ import { z } from "zod";
 import { gameWords, issueText, messageText } from "../game-words";
 import { revalidatePath } from "next/cache";
 import { MAX_RESTART_REASON, type PendingRestart } from "../../lib/games-restart";
-import {
-    cancelRestart,
-    readRestartRequest,
-    requestRestart,
-    runRestartNow
-} from "../../lib/games-restart-service";
+import { cancelRestart, readRestartRequest, requestRestart } from "../../lib/games-restart-service";
+import { restartServerNow } from "../../lib/games-operations";
 import { host } from "@polaris/app-host";
 
 const { recordAudit } = host.auditService;
@@ -58,7 +54,12 @@ export async function scheduleGameRestartAction(input: {
     reason?: string;
 }): Promise<{ pending?: PendingRestart; error?: string }> {
     const parsed = bookSchema.safeParse(input);
-    if (!parsed.success) return { error: (await issueText(parsed.error.issues[0]?.message)) ?? (await gameWords("games"))("errors.checkTheTimeAndTry") };
+    if (!parsed.success)
+        return {
+            error:
+                (await issueText(parsed.error.issues[0]?.message)) ??
+                (await gameWords("games"))("errors.checkTheTimeAndTry")
+        };
     try {
         const { user } = await requireGameServer("games.manage", parsed.data.installedAppId);
         const pending = await requestRestart(parsed.data.installedAppId, {
@@ -76,7 +77,12 @@ export async function scheduleGameRestartAction(input: {
         });
         return { pending };
     } catch (caught) {
-        return { error: caught instanceof Error ? await messageText(caught.message) : (await gameWords("games"))("errors.thatRestartCouldNotBe") };
+        return {
+            error:
+                caught instanceof Error
+                    ? await messageText(caught.message)
+                    : (await gameWords("games"))("errors.thatRestartCouldNotBe")
+        };
     }
 }
 
@@ -93,7 +99,12 @@ export async function cancelGameRestartAction(installedAppId: string): Promise<{
         });
         return {};
     } catch (caught) {
-        return { error: caught instanceof Error ? await messageText(caught.message) : (await gameWords("games"))("errors.thatRestartCouldNotBe2") };
+        return {
+            error:
+                caught instanceof Error
+                    ? await messageText(caught.message)
+                    : (await gameWords("games"))("errors.thatRestartCouldNotBe2")
+        };
     }
 }
 
@@ -107,16 +118,15 @@ export async function cancelGameRestartAction(installedAppId: string): Promise<{
 export async function restartGameNowAction(installedAppId: string): Promise<{ error?: string }> {
     try {
         const { user, access } = await requireGameServer("games.manage", installedAppId);
-        await runRestartNow(access.ownerId, installedAppId, user.id);
-        await recordAudit({
-            actorId: user.id,
-            action: "games.restart.now",
-            targetType: "installedApp",
-            targetId: installedAppId
-        });
+        await restartServerNow(user, access);
         revalidatePath(`/apps/installed/${installedAppId}`);
         return {};
     } catch (caught) {
-        return { error: caught instanceof Error ? await messageText(caught.message) : (await gameWords("games"))("errors.theServerCouldNotBe") };
+        return {
+            error:
+                caught instanceof Error
+                    ? await messageText(caught.message)
+                    : (await gameWords("games"))("errors.theServerCouldNotBe")
+        };
     }
 }

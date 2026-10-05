@@ -24,6 +24,7 @@ import { clientBrand } from "@/lib/mcp/oauth/client-brand";
 import { scopesAvailableTo } from "@polaris/auth";
 import { isLoopback } from "@/lib/mcp/oauth/urls";
 import { mcpScopes } from "@/lib/mcp/oauth/scopes";
+import { scopeRequires } from "@/lib/mcp/scope-table";
 import { getTranslations } from "@/lib/i18n/request";
 import { rateLimit } from "@/lib/rate-limit-service";
 import { Messages } from "@/components/i18n/messages";
@@ -91,7 +92,7 @@ export default async function AuthorizePage({ searchParams }: { searchParams: Se
     if (!throttle.ok) return <ConsentError reason="tooMany" />;
 
     const origin = await currentOrigin();
-    const check = await checkAuthorizationRequest(readParams(search), origin, mcpScopes());
+    const check = await checkAuthorizationRequest(readParams(search), origin, await mcpScopes());
     if (check.kind === "unsafe") return <ConsentError reason={check.reason} />;
     if (check.kind === "redirect") redirect(check.url);
 
@@ -117,8 +118,8 @@ export default async function AuthorizePage({ searchParams }: { searchParams: Se
                     loopback: isLoopback(redirectUrl)
                 }}
                 person={user.name || user.email}
-                offered={request.scopes.filter((scope) => held.has(scope))}
-                withheld={request.scopes.filter((scope) => !held.has(scope))}
+                offered={request.scopes.filter((scope) => held.has(scopeRequires(scope)))}
+                withheld={request.scopes.filter((scope) => !held.has(scopeRequires(scope)))}
             />
         </Messages>
     );

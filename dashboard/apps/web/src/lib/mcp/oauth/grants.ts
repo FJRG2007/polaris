@@ -30,7 +30,8 @@ import { readIpPolicy, type IpPolicy } from "./ip-policy";
 import { getUserPermissions } from "@polaris/auth";
 import type { OAuthClientRecord } from "./clients";
 import { generateToken, hashToken } from "@polaris/core/tokens";
-import { hasPermission, parseStringList, stringifyList, type Permission } from "@polaris/core";
+import { readScopes, scopeRequires, type McpScope } from "@/lib/mcp/scope-table";
+import { hasPermission, parseStringList, stringifyList } from "@polaris/core";
 
 export const ACCESS_TOKEN_PREFIX = "pmo_";
 const REFRESH_TOKEN_PREFIX = "pmr_";
@@ -116,8 +117,8 @@ export async function approve(input: {
     redirectUri: string;
     codeChallenge: string;
     resource: string;
-    scopes: readonly Permission[];
-    requested: readonly Permission[];
+    scopes: readonly McpScope[];
+    requested: readonly McpScope[];
     /** Where the person approved it from, for the "only from there" rule. */
     approvedIp?: string | null;
 }): Promise<{ code: string; grantId: string }> {
@@ -392,7 +393,7 @@ export interface VerifiedAccess {
     readonly grantId: string;
     readonly userId: string;
     readonly isAdmin: boolean;
-    readonly scopes: Permission[];
+    readonly scopes: McpScope[];
     /** What the connection's address rule reads, for the caller to apply. */
     readonly ipPolicy: string | null;
     readonly approvedIp: string | null;
@@ -438,15 +439,17 @@ export async function verifyAccessToken(
 
     // What this token was issued with, cut to the grant as it stands now (the
     // person may have connected the app again with fewer boxes ticked) and then
-    // to what the person holds right now.
+    // to what the person holds right now - for a finer scope, the permission it
+    // stands on. A stored scope this Polaris no longer knows is dropped here,
+    // never trusted.
     const approved = new Set(parseStringList(row.grant.scopes));
-    const requested = (parseStringList(row.scopes) as Permission[]).filter((scope) =>
+    const requested = readScopes(parseStringList(row.scopes)).filter((scope) =>
         approved.has(scope)
     );
     const granted = await getUserPermissions(row.grant.userId);
     const scopes = row.grant.user.isAdmin
         ? requested
-        : requested.filter((scope) => hasPermission(granted, scope));
+        : requested.filter((scope) => hasPermission(granted, scopeRequires(scope)));
     return {
         grantId: row.grant.id,
         userId: row.grant.userId,
@@ -484,10 +487,11 @@ export interface ConnectedAppView {
     readonly redirectHost: string | null;
     /** The known assistant it is, for its mark; null draws its initial. */
     readonly brand: ClientBrand | null;
-    readonly scopes: string[];
-    /** What the app asked for when it was approved: the most it can be given
-     *  later. A grant from before that was kept can only be narrowed. */
-    readonly requestable: string[];
+    readonly scopes: McpScope[];
+    /** What the app asked for when it was approved. The edit dialog marks what
+     *  it offers beyond this; a grant from before that was kept reads as what
+     *  it holds. */
+    readonly requestable: McpScope[];
     readonly createdAt: string;
     readonly lastUsedAt: string | null;
     readonly lastUsedIp: string | null;
@@ -541,8 +545,10 @@ function appView(row: {
         clientUri: row.client.clientUri,
         redirectHost,
         brand: clientBrand(row.client.name, redirects),
-        scopes: parseStringList(row.scopes),
-        requestable: parseStringList(row.requestedScopes ?? row.scopes),
+        // Only scopes this Polaris knows: one stored by a version that had a
+        // scope since removed is left in the row and out of the screen.
+        scopes: readScopes(parseStringList(row.scopes)),
+        requestable: readScopes(parseStringList(row.requestedScopes ?? row.scopes)),
         createdAt: row.createdAt.toISOString(),
         lastUsedAt: row.lastUsedAt?.toISOString() ?? null,
         lastUsedIp: row.lastUsedIp,
@@ -603,7 +609,7 @@ export async function revokeConnectedApp(userId: string, grantId: string): Promi
 export async function changeGrantScopes(
     userId: string,
     grantId: string,
-    scopes: readonly Permission[]
+    scopes: readonly McpScope[]
 ): Promise<{ before: string[] } | null> {
     const grant = await prisma.oAuthGrant.findFirst({
         where: { id: grantId, userId, revokedAt: null },
