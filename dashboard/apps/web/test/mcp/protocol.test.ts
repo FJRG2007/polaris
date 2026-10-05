@@ -11,6 +11,7 @@
 
 import { z } from "zod";
 import { describe, expect, it } from "vitest";
+import { InitializeResultSchema } from "@modelcontextprotocol/sdk/types.js";
 import {
     MCP_PROTOCOL_VERSION,
     RPC_INVALID_PARAMS,
@@ -92,6 +93,42 @@ describe("initialize", () => {
         expect(result.capabilities).toEqual({ tools: { listChanged: false } });
         expect(result.serverInfo).toEqual({ name: "polaris", version: "1" });
         expect(result.instructions).toBe("Do the thing.");
+    });
+
+    it("gives clients the title and icons to show it by, in the revisions that define them", async () => {
+        const icons = [
+            {
+                src: "https://polaris.example.test/icon.svg",
+                mimeType: "image/svg+xml",
+                sizes: ["any"]
+            }
+        ];
+        const server = { ...SERVER, title: "Polaris", icons };
+        const info = async (protocolVersion: string) => {
+            const answer = await handleMcpMessage(
+                { jsonrpc: "2.0", id: 1, method: "initialize", params: { protocolVersion } },
+                TOOLS,
+                caller,
+                server
+            );
+            const result = answer?.result as { serverInfo: unknown };
+            // Every answer is a valid InitializeResult by the SDK's own schema.
+            expect(InitializeResultSchema.safeParse(result).success, protocolVersion).toBe(true);
+            return result.serverInfo;
+        };
+        expect(await info("2025-11-25")).toEqual({
+            name: "polaris",
+            title: "Polaris",
+            version: "1",
+            icons
+        });
+        expect(await info("2025-06-18")).toEqual({
+            name: "polaris",
+            title: "Polaris",
+            version: "1"
+        });
+        expect(await info("2025-03-26")).toEqual({ name: "polaris", version: "1" });
+        expect(await info("2024-11-05")).toEqual({ name: "polaris", version: "1" });
     });
 });
 

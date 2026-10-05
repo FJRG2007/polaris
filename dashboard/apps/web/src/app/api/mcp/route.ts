@@ -38,6 +38,7 @@ import { recordAudit } from "@/lib/audit-service";
 import { rateLimit } from "@/lib/rate-limit-service";
 import { mcpScopes } from "@/lib/mcp/oauth/scopes";
 import { originOf } from "@/lib/mcp/oauth/origin";
+import { serverIcons } from "@/lib/mcp/server-icons";
 import { evaluateAccountAccess } from "@/lib/network-rules";
 import { mcpResource, wwwAuthenticate } from "@/lib/mcp/oauth/urls";
 import { ACCESS_TOKEN_PREFIX, touchGrant, verifyAccessToken } from "@/lib/mcp/oauth/grants";
@@ -67,6 +68,7 @@ export const dynamic = "force-dynamic";
  */
 const SERVER: McpServerInfo = {
     name: "polaris",
+    title: "Polaris", // i18n-ignore: the product name, not translated
     version: "1",
     instructions: [
         "Polaris is the control plane this work is being tracked in.",
@@ -287,11 +289,12 @@ async function auditChange(
 async function answer(
     message: Record<string, unknown>,
     caller: McpCaller,
-    tools: readonly McpTool<never>[]
+    tools: readonly McpTool<never>[],
+    server: McpServerInfo
 ): Promise<JsonRpcResponse | null> {
     const refused = await overBudget(message, caller, tools);
     if (refused) return refused;
-    const reply = await handleMcpMessage(message, tools, caller, SERVER);
+    const reply = await handleMcpMessage(message, tools, caller, server);
     await auditChange(message, reply, caller, tools);
     return reply;
 }
@@ -353,6 +356,8 @@ export async function POST(request: Request): Promise<Response> {
 
     const headers = { "MCP-Protocol-Version": MCP_PROTOCOL_VERSION };
     const tools = await mcpTools();
+    // The icons are on the origin the client used, which is the one it checks.
+    const server = { ...SERVER, icons: serverIcons(originOf(request)) };
 
     // A batch is a JSON array. Every message in it is answered independently, and
     // the notifications among them contribute nothing to the reply - which is
@@ -360,14 +365,14 @@ export async function POST(request: Request): Promise<Response> {
     if (Array.isArray(payload)) {
         const answers: JsonRpcResponse[] = [];
         for (const message of payload) {
-            const reply = await answer(message, caller, tools);
+            const reply = await answer(message, caller, tools, server);
             if (reply) answers.push(reply);
         }
         if (answers.length === 0) return new Response(null, { status: 202, headers });
         return Response.json(answers, { headers });
     }
 
-    const reply = await answer(payload, caller, tools);
+    const reply = await answer(payload, caller, tools, server);
     if (!reply) return new Response(null, { status: 202, headers });
     return Response.json(reply, { headers });
 }

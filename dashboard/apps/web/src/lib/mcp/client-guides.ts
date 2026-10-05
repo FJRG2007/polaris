@@ -1,12 +1,13 @@
 /**
  * The MCP clients Account > AI assistants has a guide for, and what each guide
- * shows: its numbered steps, the value beside a step that has one to copy, and
- * the install link where the client documents one.
+ * shows: its numbered steps, every value a step has the reader type or pick, each
+ * ready to copy, and the install link where the client documents one.
  *
  * Pure data over `client-setup`, so the screen, the docs and the tests read one
  * list. A client is here only when its own documentation says how to add a
  * custom remote server; the link to that page is on every guide. The words of
- * each step are in the `mcpConnect` catalog under `clients.<id>.<step>`.
+ * each step are in the `mcpConnect` catalog under `clients.<id>.<step>`, with the
+ * labels and values the reader has to find marked `<b>`.
  */
 
 import * as setup from "@/lib/mcp/client-setup";
@@ -22,13 +23,24 @@ export interface ServerUrls {
 /** A mark the repo draws inline, or a file it serves under /logos. */
 export type ClientLogo = { mark: "claude" | "openai" | "cursor" } | { src: string };
 
-export type CopyKind = "url" | "command" | "config";
+/** What a value is: names its copy button, and for the short ones that sit in
+ *  a client's form (`LABELLED_KINDS`), the field it goes in. */
+export type CopyKind = "name" | "url" | "auth" | "transport" | "command" | "config";
+
+/** The kinds shown with the name of the field they are typed or picked in. A
+ *  command or a configuration is the whole step and needs no label. */
+export const LABELLED_KINDS: ReadonlySet<CopyKind> = new Set(["name", "url", "auth", "transport"]);
+
+export interface CopyField {
+    kind: CopyKind;
+    value: (urls: ServerUrls) => string;
+}
 
 export interface GuideStep {
     /** The step's message, `clients.<id>.<key>`. */
     key: string;
-    /** What to copy at this step, if anything. */
-    copy?: { kind: CopyKind; value: (urls: ServerUrls) => string };
+    /** Every value typed or picked at this step, in the order the client asks. */
+    copy?: readonly CopyField[];
 }
 
 export interface ClientGuide {
@@ -48,7 +60,12 @@ export interface ClientGuide {
     aliases?: string[];
 }
 
-const url = { kind: "url", value: (urls: ServerUrls) => urls.http } as const;
+const url: CopyField = { kind: "url", value: (urls) => urls.http };
+const name: CopyField = { kind: "name", value: () => setup.DISPLAY_NAME };
+const oauth: CopyField = { kind: "auth", value: () => "OAuth" };
+const command = (value: CopyField["value"]): CopyField => ({ kind: "command", value });
+const config = (value: CopyField["value"]): CopyField => ({ kind: "config", value });
+const transport = (value: string): CopyField => ({ kind: "transport", value: () => value });
 
 export const CLIENT_GUIDES: readonly ClientGuide[] = [
     {
@@ -56,7 +73,7 @@ export const CLIENT_GUIDES: readonly ClientGuide[] = [
         name: "Claude",
         aliases: ["claude.ai", "claude desktop", "anthropic"],
         logo: { mark: "claude" },
-        steps: [{ key: "step1" }, { key: "step2", copy: url }, { key: "step3" }],
+        steps: [{ key: "step1" }, { key: "step2", copy: [name, url] }, { key: "step3" }],
         notes: ["teams"],
         open: { key: "open", href: setup.CLAUDE_CONNECTORS_URL },
         docs: setup.SETUP_GUIDES.claude
@@ -67,11 +84,8 @@ export const CLIENT_GUIDES: readonly ClientGuide[] = [
         aliases: ["anthropic", "cli"],
         logo: { mark: "claude" },
         steps: [
-            {
-                key: "step1",
-                copy: { kind: "command", value: (urls) => setup.claudeCodeCommand(urls.http) }
-            },
-            { key: "step2" }
+            { key: "step1", copy: [command((urls) => setup.claudeCodeCommand(urls.http))] },
+            { key: "step2", copy: [command(() => "/mcp")] }
         ],
         docs: setup.SETUP_GUIDES.claudeCode
     },
@@ -83,8 +97,8 @@ export const CLIENT_GUIDES: readonly ClientGuide[] = [
         steps: [
             { key: "step1" },
             { key: "step2" },
-            { key: "step3", copy: url },
-            { key: "step4" },
+            { key: "step3", copy: [name, url] },
+            { key: "step4", copy: [oauth] },
             { key: "step5" },
             { key: "step6" }
         ],
@@ -97,10 +111,7 @@ export const CLIENT_GUIDES: readonly ClientGuide[] = [
         logo: { mark: "cursor" },
         install: { key: "install", href: (urls) => setup.cursorInstallLink(urls.http) },
         steps: [
-            {
-                key: "step1",
-                copy: { kind: "config", value: (urls) => setup.cursorConfig(urls.http) }
-            },
+            { key: "step1", copy: [config((urls) => setup.cursorConfig(urls.http))] },
             { key: "step2" }
         ],
         docs: setup.SETUP_GUIDES.cursor
@@ -112,11 +123,9 @@ export const CLIENT_GUIDES: readonly ClientGuide[] = [
         logo: { src: "/logos/vscode.svg" },
         install: { key: "install", href: (urls) => setup.vscodeInstallLink(urls.http) },
         steps: [
-            {
-                key: "step1",
-                copy: { kind: "config", value: (urls) => setup.vscodeConfig(urls.http) }
-            },
-            { key: "step2" }
+            { key: "step1", copy: [command(() => setup.VSCODE_OPEN_CONFIG)] },
+            { key: "step2", copy: [config((urls) => setup.vscodeConfig(urls.http))] },
+            { key: "step3" }
         ],
         docs: setup.SETUP_GUIDES.vscode
     },
@@ -126,10 +135,7 @@ export const CLIENT_GUIDES: readonly ClientGuide[] = [
         aliases: ["github", "copilot cli"],
         logo: { src: "/logos/github-copilot.svg" },
         steps: [
-            {
-                key: "step1",
-                copy: { kind: "command", value: (urls) => setup.copilotCliCommand(urls.http) }
-            },
+            { key: "step1", copy: [command((urls) => setup.copilotCliCommand(urls.http))] },
             { key: "step2" }
         ],
         notes: ["vscode", "cloudAgent"],
@@ -140,19 +146,18 @@ export const CLIENT_GUIDES: readonly ClientGuide[] = [
         name: "Codex CLI",
         aliases: ["openai"],
         logo: { mark: "openai" },
-        steps: [
-            {
-                key: "step1",
-                copy: { kind: "command", value: (urls) => setup.codexCommands(urls.http) }
-            }
-        ]
+        steps: [{ key: "step1", copy: [command((urls) => setup.codexCommands(urls.http))] }]
     },
     {
         id: "devin",
         name: "Devin",
         aliases: ["cognition"],
         logo: { src: "/logos/devin.svg" },
-        steps: [{ key: "step1" }, { key: "step2", copy: url }, { key: "step3" }],
+        steps: [
+            { key: "step1" },
+            { key: "step2", copy: [name, transport("HTTP"), url] },
+            { key: "step3" }
+        ],
         docs: setup.SETUP_GUIDES.devin
     },
     {
@@ -160,7 +165,7 @@ export const CLIENT_GUIDES: readonly ClientGuide[] = [
         name: "Figma Make",
         aliases: ["figma"],
         logo: { src: "/logos/figma.svg" },
-        steps: [{ key: "step1" }, { key: "step2", copy: url }, { key: "step3" }],
+        steps: [{ key: "step1" }, { key: "step2", copy: [name, url] }, { key: "step3" }],
         notes: ["plans"],
         docs: setup.SETUP_GUIDES.figma
     },
@@ -169,7 +174,7 @@ export const CLIENT_GUIDES: readonly ClientGuide[] = [
         name: "Grok",
         aliases: ["xai"],
         logo: { src: "/logos/grok.svg" },
-        steps: [{ key: "step1" }, { key: "step2" }, { key: "step3", copy: url }],
+        steps: [{ key: "step1" }, { key: "step2" }, { key: "step3", copy: [url] }],
         notes: ["business"],
         open: { key: "open", href: setup.GROK_CONNECTORS_URL },
         docs: setup.SETUP_GUIDES.grok
@@ -179,7 +184,12 @@ export const CLIENT_GUIDES: readonly ClientGuide[] = [
         name: "Mistral Le Chat",
         aliases: ["mistral"],
         logo: { src: "/logos/mistral.svg" },
-        steps: [{ key: "step1" }, { key: "step2", copy: url }, { key: "step3" }],
+        steps: [
+            { key: "step1" },
+            // Le Chat takes an identifier here: no spaces or special characters.
+            { key: "step2", copy: [{ kind: "name", value: () => setup.SERVER_NAME }, url] },
+            { key: "step3" }
+        ],
         notes: ["admin"],
         docs: setup.SETUP_GUIDES.mistral
     },
@@ -187,7 +197,11 @@ export const CLIENT_GUIDES: readonly ClientGuide[] = [
         id: "zapier",
         name: "Zapier",
         logo: { src: "/logos/zapier.svg" },
-        steps: [{ key: "step1" }, { key: "step2", copy: url }, { key: "step3" }],
+        steps: [
+            { key: "step1" },
+            { key: "step2", copy: [url, transport("Streamable HTTP")] },
+            { key: "step3" }
+        ],
         docs: setup.SETUP_GUIDES.zapier
     },
     {
@@ -195,7 +209,7 @@ export const CLIENT_GUIDES: readonly ClientGuide[] = [
         name: "Make",
         aliases: ["integromat"],
         logo: { src: "/logos/make.svg" },
-        steps: [{ key: "step1" }, { key: "step2", copy: url }, { key: "step3" }],
+        steps: [{ key: "step1" }, { key: "step2", copy: [url] }, { key: "step3" }],
         docs: setup.SETUP_GUIDES.make
     },
     {
@@ -203,14 +217,8 @@ export const CLIENT_GUIDES: readonly ClientGuide[] = [
         name: "OpenCode",
         logo: { src: "/logos/opencode.svg" },
         steps: [
-            {
-                key: "step1",
-                copy: { kind: "config", value: (urls) => setup.opencodeConfig(urls.http) }
-            },
-            {
-                key: "step2",
-                copy: { kind: "command", value: () => setup.opencodeAuthCommand() }
-            }
+            { key: "step1", copy: [config((urls) => setup.opencodeConfig(urls.http))] },
+            { key: "step2", copy: [command(() => setup.opencodeAuthCommand())] }
         ],
         docs: setup.SETUP_GUIDES.opencode
     },
@@ -220,14 +228,8 @@ export const CLIENT_GUIDES: readonly ClientGuide[] = [
         aliases: ["kimi cli", "moonshot"],
         logo: { src: "/logos/kimi.svg" },
         steps: [
-            {
-                key: "step1",
-                copy: { kind: "command", value: (urls) => setup.kimiAddCommand(urls.http) }
-            },
-            {
-                key: "step2",
-                copy: { kind: "command", value: () => setup.kimiAuthCommand() }
-            }
+            { key: "step1", copy: [command((urls) => setup.kimiAddCommand(urls.http))] },
+            { key: "step2", copy: [command(() => setup.kimiAuthCommand())] }
         ],
         docs: setup.SETUP_GUIDES.kimi
     }

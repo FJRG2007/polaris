@@ -2,8 +2,8 @@
 
 /**
  * "Connect an MCP client": pick a client from its logo, then follow that
- * client's own steps with every value ready to copy, or the generic steps for
- * any client not listed.
+ * client's own steps with every value ready to copy in the step it is typed
+ * in, or the generic steps for any client not listed.
  *
  * The chosen client lives in the address (`#connect-<id>`), so a guide can be
  * linked to and survives a reload. Nothing here carries a credential: every
@@ -11,7 +11,7 @@
  */
 
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useRef, useState, type ReactNode } from "react";
 import { CopyButton } from "@/components/copy-button";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { ArrowLeft, ExternalLink, Search, Plug } from "lucide-react";
@@ -30,10 +30,11 @@ import {
     CLIENT_GUIDES,
     CONNECTION_TYPES,
     matchClients,
+    LABELLED_KINDS,
     type ClientGuide,
     type ClientLogo,
     type ConnectionType,
-    type CopyKind,
+    type CopyField,
     type ServerUrls
 } from "@/lib/mcp/client-guides";
 
@@ -130,11 +131,33 @@ function OfficialLink({ href }: { href: string }) {
     );
 }
 
+/** A value from a step, under the name of the client's field it goes in when
+ *  it has one. */
+function Field({ field, urls }: { field: CopyField; urls: ServerUrls }) {
+    const t = useTranslations("mcpConnect");
+    const copyable = <Copyable value={field.value(urls)} label={t(`copy.${field.kind}`)} />;
+    if (!LABELLED_KINDS.has(field.kind)) return copyable;
+    return (
+        <div className="flex min-w-0 flex-col gap-1">
+            <span className="text-xs text-muted-foreground">
+                {t(`fields.${field.kind}` as never)}
+            </span>
+            {copyable}
+        </div>
+    );
+}
+
 function ClientSteps({ guide, urls }: { guide: ClientGuide; urls: ServerUrls }) {
     const t = useTranslations("mcpConnect");
-    // The catalog test holds every key a guide names to both locales.
-    const say = (key: string) => t(`clients.${guide.id}.${key}` as never);
-    const copyLabel = (kind: CopyKind) => t(`copy.${kind}`);
+    // The catalog test holds every key a guide names to both locales. Steps
+    // mark the labels and values to look for in the client with <b>.
+    const say = (key: string) =>
+        t
+            .rich<ReactNode>(`clients.${guide.id}.${key}` as never, {
+                b: (chunks) => <strong className="font-semibold">{chunks}</strong>
+            })
+            .map((part, index) => <Fragment key={index}>{part}</Fragment>);
+    const label = (key: string) => t(`clients.${guide.id}.${key}` as never);
 
     return (
         <div className="flex flex-col gap-4">
@@ -142,13 +165,13 @@ function ClientSteps({ guide, urls }: { guide: ClientGuide; urls: ServerUrls }) 
                 <div className="flex flex-wrap gap-2">
                     {guide.install ? (
                         <Button asChild size="sm" className="w-fit">
-                            <a href={guide.install.href(urls)}>{say(guide.install.key)}</a>
+                            <a href={guide.install.href(urls)}>{label(guide.install.key)}</a>
                         </Button>
                     ) : null}
                     {guide.open ? (
                         <Button asChild variant="outline" size="sm" className="w-fit">
                             <a href={guide.open.href} target="_blank" rel="noreferrer noopener">
-                                {say(guide.open.key)}
+                                {label(guide.open.key)}
                                 <ExternalLink className="size-3.5" aria-hidden />
                             </a>
                         </Button>
@@ -158,12 +181,9 @@ function ClientSteps({ guide, urls }: { guide: ClientGuide; urls: ServerUrls }) 
             <Steps>
                 {guide.steps.map((step, index) => (
                     <Step key={step.key} number={index + 1} text={say(step.key)}>
-                        {step.copy ? (
-                            <Copyable
-                                value={step.copy.value(urls)}
-                                label={copyLabel(step.copy.kind)}
-                            />
-                        ) : null}
+                        {step.copy?.map((field) => (
+                            <Field key={field.kind} field={field} urls={urls} />
+                        ))}
                     </Step>
                 ))}
             </Steps>
@@ -284,11 +304,6 @@ export function ConnectGuides({ urls }: { urls: ServerUrls }) {
                 <p className="text-sm text-muted-foreground">{t("intro")}</p>
             </CardHeader>
             <CardBody className="flex flex-col gap-4 text-sm">
-                <div className="flex flex-col gap-1.5">
-                    <p className="font-medium">{t("serverUrl")}</p>
-                    <Copyable value={urls.http} label={t("copy.url")} />
-                </div>
-
                 {name ? (
                     <section
                         className="flex flex-col gap-4"

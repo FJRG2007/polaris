@@ -7,9 +7,10 @@ Drive and mail - and, when they are installed, your calendar, your places'
 devices and your game servers. Each assistant can do only what you approve when
 it connects, and never more than your own account.
 
-The quickest way in is **Account > AI assistants**, which shows your server URL
-and the setup for each client with copy buttons and install links. This page is
-the same information, plus how it works.
+The quickest way in is **Account > AI assistants**, which shows the setup for
+each client with every value - name, URL, authentication, transport - ready to
+copy under the field it goes in, plus install links. This page is the same
+information, plus how it works.
 
 ## Your server URL
 

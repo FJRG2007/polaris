@@ -1,17 +1,25 @@
 {
     "title": "Conectar un cliente MCP",
     "intro": "Cada cliente inicia sesión aquí y pide permiso antes de recibir nada.",
-    "serverUrl": "Dirección",
     "search": "Buscar clientes",
     "noMatch": "Ningún cliente coincide con \"{query}\". Usa los pasos para cualquier otro cliente.",
     "pick": "Elige tu cliente",
     "back": "Volver",
     "official": "Guía oficial",
     "guideFor": "Configurar {client}",
+    "fields": {
+        "name": "Nombre",
+        "url": "Dirección",
+        "auth": "Autenticación",
+        "transport": "Transporte"
+    },
     "copy": {
         "url": "dirección",
         "command": "comando",
-        "config": "configuración"
+        "config": "configuración",
+        "name": "nombre",
+        "auth": "autenticación",
+        "transport": "transporte"
     },
     "other": {
         "name": "Otro cliente",
@@ -37,81 +45,82 @@
     },
     "clients": {
         "claude": {
-            "step1": "Abre Personalizar > Conectores y elige Añadir conector personalizado.",
-            "step2": "Llámalo Polaris, pega esta URL y elige Añadir.",
-            "step3": "Elige Conectar e inicia sesión aquí.",
-            "teams": "En los planes Team y Enterprise, primero un propietario lo añade en Configuración de la organización > Conectores. También funciona en Claude Desktop.",
+            "step1": "Abre <b>Personalizar > Conectores</b> y elige <b>Añadir conector personalizado</b>.",
+            "step2": "Escribe este nombre y esta URL y elige <b>Añadir</b>.",
+            "step3": "Elige <b>Conectar</b> e inicia sesión aquí.",
+            "teams": "En los planes Team y Enterprise, primero un propietario lo añade en <b>Configuración de la organización > Conectores</b>. También funciona en Claude Desktop.",
             "open": "Abrir Conectores"
         },
         "claudeCode": {
             "step1": "Ejecuta esto en una terminal:",
-            "step2": "En Claude Code, ejecuta /mcp y elige polaris para iniciar sesión."
+            "step2": "En Claude Code, ejecuta esto y elige <b>polaris</b> para iniciar sesión:"
         },
         "chatgpt": {
-            "step1": "Abre Configuración > Seguridad e inicio de sesión y activa el modo desarrollador.",
-            "step2": "Abre Plugins, selecciona Añadir y luego Crear app MCP.",
-            "step3": "Llámala Polaris. En Conexión, deja URL del servidor y pega esta URL.",
-            "step4": "En Autenticación, elige OAuth. No hace falta ID ni secreto de cliente.",
-            "step5": "Marca Entiendo y quiero continuar y selecciona Crear.",
+            "step1": "Abre <b>Configuración > Seguridad e inicio de sesión</b> y activa el <b>modo desarrollador</b>.",
+            "step2": "Abre <b>Plugins</b>, selecciona <b>Añadir</b> y luego <b>Crear app MCP</b>.",
+            "step3": "Escribe este nombre. En <b>Conexión</b>, deja <b>URL del servidor</b> y pega la URL.",
+            "step4": "En <b>Autenticación</b>, elige <b>OAuth</b>. No hace falta ID ni secreto de cliente.",
+            "step5": "Marca <b>Entiendo y quiero continuar</b> y selecciona <b>Crear</b>.",
             "step6": "Inicia sesión aquí cuando ChatGPT te lo pida.",
-            "missing": "Si Añadir solo ofrece Crear plugin y Subir plugin, el modo desarrollador está desactivado. Esas dos opciones son para plugins empaquetados, no para una URL de servidor.",
+            "missing": "Si <b>Añadir</b> solo ofrece <b>Crear plugin</b> y <b>Subir plugin</b>, el modo desarrollador está desactivado. Esas dos opciones son para plugins empaquetados, no para una URL de servidor.",
             "plans": "Requiere un plan Plus, Pro, Business, Enterprise o Education, en la web. En un espacio de trabajo Business, Enterprise o Education, puede que un administrador tenga que permitir antes el modo desarrollador."
         },
         "cursor": {
             "install": "Añadir a Cursor",
-            "step1": "O añade esto a ~/.cursor/mcp.json:",
+            "step1": "O añade esto a <b>~/.cursor/mcp.json</b>:",
             "step2": "Inicia sesión aquí la primera vez que Cursor use Polaris."
         },
         "vscode": {
             "install": "Añadir a VS Code",
-            "step1": "O ejecuta MCP: Open User Configuration y añade esto:",
-            "step2": "Inicia sesión aquí la primera vez que VS Code use Polaris."
+            "step1": "O ejecuta esto desde la <b>paleta de comandos</b>:",
+            "step2": "Añade esto al archivo que se abre:",
+            "step3": "Inicia sesión aquí la primera vez que VS Code use Polaris."
         },
         "copilot": {
-            "step1": "Para Copilot CLI, ejecuta esto en una terminal:",
+            "step1": "Para <b>Copilot CLI</b>, ejecuta esto en una terminal:",
             "step2": "Inicia sesión aquí cuando Copilot te lo pida.",
-            "vscode": "Copilot en VS Code usa la configuración de Visual Studio Code.",
+            "vscode": "Copilot en VS Code usa la configuración de <b>Visual Studio Code</b>.",
             "cloudAgent": "El agente en la nube de Copilot no puede iniciar sesión en servidores, así que necesita una clave de API."
         },
         "codex": {
             "step1": "Ejecuta esto en una terminal para añadir Polaris e iniciar sesión:"
         },
         "devin": {
-            "step1": "Abre Customize > MCPs, elige Add MCP y luego Add custom MCP.",
-            "step2": "Llámalo Polaris, elige el transporte HTTP y pega esta URL. Después, Save.",
-            "step3": "Elige Connect e inicia sesión aquí."
+            "step1": "Abre <b>Customize > MCPs</b>, elige <b>Add MCP</b> y luego <b>Add custom MCP</b>.",
+            "step2": "Escribe este nombre, elige el transporte <b>HTTP</b> y pega la URL. Después, <b>Save</b>.",
+            "step3": "Elige <b>Connect</b> e inicia sesión aquí."
         },
         "figma": {
-            "step1": "En un chat de Figma Make, haz clic en Add context, pasa el cursor por Connectors y selecciona Manage.",
-            "step2": "En Created by you, haz clic en Create, llámalo Polaris y pega esta URL.",
-            "step3": "Haz clic en Create y luego en Connect, e inicia sesión aquí.",
+            "step1": "En un chat de Figma Make, haz clic en <b>Add context</b>, pasa el cursor por <b>Connectors</b> y selecciona <b>Manage</b>.",
+            "step2": "En <b>Created by you</b>, haz clic en <b>Create</b> y escribe este nombre y esta URL.",
+            "step3": "Haz clic en <b>Create</b> y luego en <b>Connect</b>, e inicia sesión aquí.",
             "plans": "Requiere un plan de pago de Figma. Un administrador puede desactivar los conectores personalizados."
         },
         "grok": {
-            "step1": "Abre grok.com/connectors.",
-            "step2": "Haz clic en New Connector y selecciona Custom.",
+            "step1": "Abre <b>grok.com/connectors</b>.",
+            "step2": "Haz clic en <b>New Connector</b> y selecciona <b>Custom</b>.",
             "step3": "Pega esta URL e inicia sesión aquí cuando Grok te lo pida.",
             "business": "En Grok Business y Enterprise, primero un administrador añade el conector.",
             "open": "Abrir Connectors"
         },
         "mistral": {
-            "step1": "Abre Connectors, haz clic en + Add Connector y cambia a Custom MCP Connector.",
-            "step2": "Llámalo polaris y pega esta URL.",
-            "step3": "Haz clic en Connect e inicia sesión aquí.",
+            "step1": "Abre <b>Connectors</b>, haz clic en <b>+ Add Connector</b> y cambia a <b>Custom MCP Connector</b>.",
+            "step2": "Escribe este nombre y esta URL.",
+            "step3": "Haz clic en <b>Connect</b> e inicia sesión aquí.",
             "admin": "Solo un administrador puede añadir un conector personalizado."
         },
         "zapier": {
-            "step1": "Abre Apps, haz clic en + Add connection y elige MCP Client.",
-            "step2": "Pega esta URL, pon Transport en Streamable HTTP y OAuth en Yes.",
-            "step3": "Haz clic en Yes, Continue to MCP Client e inicia sesión aquí."
+            "step1": "Abre <b>Apps</b>, haz clic en <b>+ Add connection</b> y elige <b>MCP Client</b>.",
+            "step2": "Pega esta URL, pon <b>Transport</b> en <b>Streamable HTTP</b> y <b>OAuth</b> en <b>Yes</b>.",
+            "step3": "Haz clic en <b>Yes, Continue to MCP Client</b> e inicia sesión aquí."
         },
         "make": {
-            "step1": "Añade un módulo MCP Client a un escenario y haz clic en Create a connection.",
-            "step2": "En MCP Server, elige + New MCP Server y pega esta URL.",
-            "step3": "Haz clic en Save e inicia sesión aquí si Make te lo pide."
+            "step1": "Añade un módulo <b>MCP Client</b> a un escenario y haz clic en <b>Create a connection</b>.",
+            "step2": "En <b>MCP Server</b>, elige <b>+ New MCP Server</b> y pega esta URL.",
+            "step3": "Haz clic en <b>Save</b> e inicia sesión aquí si Make te lo pide."
         },
         "opencode": {
-            "step1": "Añade esto a opencode.json:",
+            "step1": "Añade esto a <b>opencode.json</b>:",
             "step2": "Después inicia sesión:"
         },
         "kimi": {

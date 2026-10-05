@@ -28,7 +28,9 @@ export default function manifest(): MetadataRoute.Manifest {
         theme_color: "#0b0c0e",
         icons: [
             { src: "/icon.svg", sizes: "any", type: "image/svg+xml", purpose: "any" },
-            { src: "/polaris-mark-128.png", sizes: "128x128", type: "image/png", purpose: "any" }
+            { src: "/polaris-mark-128.png", sizes: "128x128", type: "image/png", purpose: "any" },
+            { src: "/polaris-mark-192.png", sizes: "192x192", type: "image/png", purpose: "any" },
+            { src: "/polaris-mark-512.png", sizes: "512x512", type: "image/png", purpose: "any" }
         ],
         // The same address the Mail settings register for mailto links, so an
         // installed Polaris is offered as the mail app too.

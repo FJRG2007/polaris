@@ -31,7 +31,7 @@ export const MARK_CORNER = 7;
 /** A four-point star - Polaris is the one that does not move. */
 export const MARK_STAR = "M16 3Q17.6 12.6 29 16Q17.6 19.4 16 29Q14.4 19.4 3 16Q14.4 12.6 16 3Z";
 
-const MARK_FOREGROUND = "#FFFFFF";
+export const MARK_FOREGROUND = "#FFFFFF";
 
 /** Red, matching the interface's danger. */
 const BADGE_BACKGROUND = "#E1474C";

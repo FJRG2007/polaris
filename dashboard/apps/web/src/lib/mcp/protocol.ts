@@ -21,6 +21,7 @@
  */
 
 import { z } from "zod";
+import type { Icon } from "@modelcontextprotocol/sdk/types.js";
 import { toJsonSchema } from "./json-schema";
 import type { McpScope } from "./scope-table";
 
@@ -219,9 +220,29 @@ export function toolFailure(id: JsonRpcId, message: string): JsonRpcResponse {
 
 export interface McpServerInfo {
     readonly name: string;
+    /** What a client shows people instead of `name` (MCP 2025-06-18 on). */
+    readonly title?: string;
     readonly version: string;
+    /** The mark a client draws beside the server (MCP 2025-11-25, SEP-973). */
+    readonly icons?: readonly Icon[];
     /** Shown by clients that offer the server's own instructions to the model. */
     readonly instructions: string;
+}
+
+/** Revisions compare as their dates do. */
+const TITLE_SINCE = "2025-06-18";
+const ICONS_SINCE = "2025-11-25";
+
+/** `serverInfo` in the revision the client agreed to: `title` and `icons` only
+ *  where that revision defines them, so a client on an older one is sent the
+ *  shape it was written against. */
+function serverInfoFor(server: McpServerInfo, version: string) {
+    return {
+        name: server.name,
+        ...(server.title && version >= TITLE_SINCE ? { title: server.title } : {}),
+        version: server.version,
+        ...(server.icons?.length && version >= ICONS_SINCE ? { icons: server.icons } : {})
+    };
 }
 
 /**
@@ -256,10 +277,11 @@ export async function handleMcpMessage(
     switch (method) {
         case "initialize": {
             const asked = typeof params?.protocolVersion === "string" ? params.protocolVersion : "";
+            const version = SPOKEN_VERSIONS.has(asked) ? asked : MCP_PROTOCOL_VERSION;
             return ok(id, {
-                protocolVersion: SPOKEN_VERSIONS.has(asked) ? asked : MCP_PROTOCOL_VERSION,
+                protocolVersion: version,
                 capabilities: { tools: { listChanged: false } },
-                serverInfo: { name: server.name, version: server.version },
+                serverInfo: serverInfoFor(server, version),
                 instructions: server.instructions
             });
         }

@@ -697,6 +697,21 @@ describe("consent and code exchange", () => {
 });
 
 describe("calling /api/mcp with the token", () => {
+    it("introduces itself with its title and its icons on the origin the client used", async () => {
+        const { tokens } = await connect();
+        const answer = await mcpCall(String(tokens.body.access_token), {
+            method: "initialize",
+            params: { protocolVersion: "2025-11-25" }
+        });
+        const info = answer.body?.result.serverInfo;
+        expect(info.title).toBe("Polaris");
+        expect(info.icons.map((icon: { src: string }) => icon.src)).toEqual([
+            `${ORIGIN}/icon.svg`,
+            `${ORIGIN}/polaris-mark-192.png`,
+            `${ORIGIN}/polaris-mark-512.png`
+        ]);
+    });
+
     it("acts as the person, with the approved scopes", async () => {
         const { tokens } = await connect();
         const answer = await mcpCall(String(tokens.body.access_token), {
