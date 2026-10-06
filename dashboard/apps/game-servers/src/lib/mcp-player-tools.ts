@@ -33,7 +33,15 @@ import { listGameServerPresence, withNamesOnly } from "./games-service";
 import { getServerRoster, runServerCommand } from "./minecraft/service";
 import { liftTimeout, timeoutPlayer } from "./minecraft/timeout-service";
 import { liftArkTimeout, timeoutArkPlayer } from "./ark/timeout-service";
-import { attempt, gameOf, onlyFor, refuse, serverFor, serverId, MODERATED_GAMES } from "./mcp-common";
+import {
+    attempt,
+    gameOf,
+    onlyFor,
+    refuse,
+    serverFor,
+    serverId,
+    MODERATED_GAMES
+} from "./mcp-common";
 
 type McpTool = AppHostTypes["McpTool"];
 
@@ -210,9 +218,7 @@ const moderateTool = () =>
                 if (input.action === "whitelist-add" || input.action === "whitelist-remove")
                     refuse("ARK has no whitelist; who may join is its join password.");
                 const verb = input.action === "pardon" ? "unban" : input.action;
-                await attempt(() =>
-                    moderateArkPlayer(access.ownerId, input.serverId, name, verb)
-                );
+                await attempt(() => moderateArkPlayer(access.ownerId, input.serverId, name, verb));
                 await recordAudit({
                     actorId: user.id,
                     action: moderationAction(game, verb),
@@ -239,7 +245,12 @@ const moderateTool = () =>
             const said = output.trim();
             return {
                 text: said || `Done: ${input.action} ${name} on ${access.install.name}.`,
-                structured: { serverId: input.serverId, player: name, action: input.action, output: said }
+                structured: {
+                    serverId: input.serverId,
+                    player: name,
+                    action: input.action,
+                    output: said
+                }
             };
         }
     });
@@ -253,11 +264,10 @@ const timeoutInput = z.object({
         .min(1)
         .max(MAX_TIMEOUT_MINUTES)
         .optional()
-        .describe(`How long they are kept out, up to ${MAX_TIMEOUT_MINUTES} (a week). Leave out with lift.`),
-    lift: z
-        .boolean()
-        .default(false)
-        .describe("True to end a timeout early and let them back in."),
+        .describe(
+            `How long they are kept out, up to ${MAX_TIMEOUT_MINUTES} (a week). Leave out with lift.`
+        ),
+    lift: z.boolean().default(false).describe("True to end a timeout early and let them back in."),
     reason: z.string().trim().max(200).optional().describe("Shown to the player.")
 });
 
@@ -301,7 +311,13 @@ const timeoutTool = () =>
             const minutes = input.minutes ?? refuse("Say how many minutes, or lift one.");
             const entry = await attempt(() =>
                 game === "ark"
-                    ? timeoutArkPlayer(access.ownerId, input.serverId, name, minutes, input.reason ?? "")
+                    ? timeoutArkPlayer(
+                          access.ownerId,
+                          input.serverId,
+                          name,
+                          minutes,
+                          input.reason ?? ""
+                      )
                     : timeoutPlayer(access.ownerId, input.serverId, name, minutes, input.reason)
             );
             await recordAudit({
@@ -366,7 +382,9 @@ const whitelistTool = () =>
 
 const accessInput = z.object({
     serverId,
-    action: z.enum(["grant", "revoke"]).describe("grant: let them in. revoke: take them off the list, and off the server."),
+    action: z
+        .enum(["grant", "revoke"])
+        .describe("grant: let them in. revoke: take them off the list, and off the server."),
     username: z.string().trim().min(1).max(16).describe("Their Minecraft account name."),
     address: z
         .string()
@@ -407,7 +425,11 @@ const accessTool = () =>
                 });
                 return {
                     text: `${input.username} is off ${access.install.name}'s list.`,
-                    structured: { serverId: input.serverId, username: input.username, action: "revoke" }
+                    structured: {
+                        serverId: input.serverId,
+                        username: input.username,
+                        action: "revoke"
+                    }
                 };
             }
             const address = input.address ?? refuse('Say where they connect from, or "any".');
@@ -427,7 +449,12 @@ const accessTool = () =>
             });
             return {
                 text: `${input.username} may join ${access.install.name} from ${address}.`,
-                structured: { serverId: input.serverId, username: input.username, address, action: "grant" }
+                structured: {
+                    serverId: input.serverId,
+                    username: input.username,
+                    address,
+                    action: "grant"
+                }
             };
         }
     });

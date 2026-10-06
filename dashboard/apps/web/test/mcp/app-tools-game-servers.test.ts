@@ -149,7 +149,13 @@ function standing(catalogId = "minecraft") {
     return {
         ownerId: "owner-1",
         isOwner: false,
-        install: { id: GAME, name: "Survival", catalogId, applicationId: "app-1", status: "running" }
+        install: {
+            id: GAME,
+            name: "Survival",
+            catalogId,
+            applicationId: "app-1",
+            status: "running"
+        }
     };
 }
 
@@ -173,13 +179,19 @@ beforeEach(() => {
     mocks.timeoutArkPlayer.mockResolvedValue({ player: STEAM, until: "2026-10-06T12:00:00.000Z" });
     mocks.listTemplates.mockResolvedValue([]);
     mocks.announceNow.mockResolvedValue({ sent: 3, kept: false });
-    mocks.requestRestart.mockImplementation(async (_id: string, input: { when: string; at: string | null; reason: string }) => ({
-        ...input,
-        requestedAt: "2026-10-06T10:00:00.000Z",
-        requestedBy: "user-1"
-    }));
+    mocks.requestRestart.mockImplementation(
+        async (_id: string, input: { when: string; at: string | null; reason: string }) => ({
+            ...input,
+            requestedAt: "2026-10-06T10:00:00.000Z",
+            requestedBy: "user-1"
+        })
+    );
     mocks.restoreWorldBackup.mockResolvedValue({ level: "world-restored" });
-    mocks.createWorldBackup.mockResolvedValue({ name: BACKUP, sizeBytes: 1024, createdAt: "2026-10-06T10:00:00.000Z" });
+    mocks.createWorldBackup.mockResolvedValue({
+        name: BACKUP,
+        sizeBytes: 1024,
+        createdAt: "2026-10-06T10:00:00.000Z"
+    });
 });
 
 describe("moderating players", () => {
@@ -287,17 +299,22 @@ describe("who may join", () => {
             address: "any"
         });
         audited("minecraft.access-grant");
-        await call(
-            "games_player_access",
-            { serverId: GAME, action: "revoke", username: "Steve" },
-            ["gameservers.manage"]
-        );
+        await call("games_player_access", { serverId: GAME, action: "revoke", username: "Steve" }, [
+            "gameservers.manage"
+        ]);
         expect(mocks.revokePlayerAccess).toHaveBeenCalledWith("owner-1", GAME, "Steve");
         audited("minecraft.access-revoke");
     });
 
     it("reads the list as the person may see it, and the roster only from a server that answers", async () => {
-        const view = { rules: [], refusals: [], links: [], bindAddresses: true, addressesAvailable: true, edition: "java" };
+        const view = {
+            rules: [],
+            refusals: [],
+            links: [],
+            bindAddresses: true,
+            addressesAvailable: true,
+            edition: "java"
+        };
         mocks.listPlayerAccess.mockResolvedValue(view);
         mocks.forViewer.mockResolvedValue(view);
         mocks.listGameServerPresence.mockResolvedValue([
@@ -313,7 +330,11 @@ describe("who may join", () => {
 describe("announcements", () => {
     it("send on the console standing, a template or words written here, and are recorded", async () => {
         mocks.listTemplates.mockResolvedValue([
-            { id: "tpl-1", name: "Restart soon", announcement: { target: "@a", title: "Restart", chat: "", hold: "timed" } }
+            {
+                id: "tpl-1",
+                name: "Restart soon",
+                announcement: { target: "@a", title: "Restart", chat: "", hold: "timed" }
+            }
         ]);
         const sent = await call("games_announce", { serverId: GAME, templateId: "tpl-1" }, [
             "gameservers.manage"
@@ -338,7 +359,11 @@ describe("announcements", () => {
 
     it("delete only a template the server keeps, and record nothing for one it does not", async () => {
         mocks.listTemplates.mockResolvedValue([
-            { id: "tpl-1", name: "Restart soon", announcement: { target: "@a", title: "Restart", chat: "", hold: "timed" } }
+            {
+                id: "tpl-1",
+                name: "Restart soon",
+                announcement: { target: "@a", title: "Restart", chat: "", hold: "timed" }
+            }
         ]);
         const missing = await call(
             "games_announcement_template_delete",
@@ -388,11 +413,19 @@ describe("restarts", () => {
         audited("games.restart.book");
 
         mocks.readRestartRequest.mockResolvedValue(null);
-        const nothing = await call("games_restart_cancel", { serverId: GAME }, ["gameservers.manage"]);
+        const nothing = await call("games_restart_cancel", { serverId: GAME }, [
+            "gameservers.manage"
+        ]);
         expect(nothing.structuredContent).toMatchObject({ cancelled: false });
         expect(mocks.cancelRestart).not.toHaveBeenCalled();
 
-        mocks.readRestartRequest.mockResolvedValue({ when: "empty", at: null, reason: "", requestedAt: "", requestedBy: "" });
+        mocks.readRestartRequest.mockResolvedValue({
+            when: "empty",
+            at: null,
+            reason: "",
+            requestedAt: "",
+            requestedBy: ""
+        });
         await call("games_restart_cancel", { serverId: GAME }, ["gameservers.manage"]);
         expect(mocks.cancelRestart).toHaveBeenCalledWith(GAME);
         audited("games.restart.cancel");
@@ -443,7 +476,13 @@ describe("players in polaris_search", () => {
             { id: GAME, name: "Survival", catalogName: "Minecraft", game: "minecraft" }
         ]);
         mocks.searchKnownPlayers.mockResolvedValue([
-            { installedAppId: GAME, name: "Steve", playerId: null, lastSeen: "2026-10-06T10:00:00.000Z", online: true }
+            {
+                installedAppId: GAME,
+                name: "Steve",
+                playerId: null,
+                lastSeen: "2026-10-06T10:00:00.000Z",
+                online: true
+            }
         ]);
         const providers = await gameServersExtension.mcpSearch!();
         const players = providers.find((provider) => provider.id === "game-servers.players")!;

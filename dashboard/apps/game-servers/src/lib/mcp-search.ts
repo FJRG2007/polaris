@@ -140,8 +140,14 @@ const playersProvider = () =>
                         { tool: "games_players", args: { serverId: server.id } },
                         ...(server.game && MODERATED_GAMES.includes(server.game)
                             ? [
-                                  { tool: "games_player_moderate", args: { serverId: server.id, player: who } },
-                                  { tool: "games_player_timeout", args: { serverId: server.id, player: who } }
+                                  {
+                                      tool: "games_player_moderate",
+                                      args: { serverId: server.id, player: who }
+                                  },
+                                  {
+                                      tool: "games_player_timeout",
+                                      args: { serverId: server.id, player: who }
+                                  }
                               ]
                             : [])
                     ]

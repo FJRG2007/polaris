@@ -626,10 +626,7 @@ export async function searchKnownPlayers(
     const matched = wanted
         ? await read({ ...within, name: { contains: wanted, mode: "insensitive" } }, limit)
         : [];
-    const rest =
-        matched.length < limit
-            ? await read(within, limit)
-            : [];
+    const rest = matched.length < limit ? await read(within, limit) : [];
     const seen = new Set<string>();
     const rows = [...matched, ...rest].filter((row) => {
         const key = `${row.installedAppId}\u0000${row.name.toLowerCase()}\u0000${row.playerId ?? ""}`;

@@ -30,7 +30,11 @@ import { attempt, onlyFor, refuse, serverFor, serverId } from "./mcp-common";
 import { announcementSchema, MAX_TEMPLATE_NAME } from "./minecraft/announcement-templates";
 import { cancelRestart, readRestartRequest, requestRestart } from "./games-restart-service";
 import { createWorldBackup, readWorldView, restoreWorldBackup } from "./minecraft/world-service";
-import { deleteTemplate, listTemplates, saveTemplate } from "./minecraft/announcement-template-service";
+import {
+    deleteTemplate,
+    listTemplates,
+    saveTemplate
+} from "./minecraft/announcement-template-service";
 
 type McpTool = AppHostTypes["McpTool"];
 
@@ -61,7 +65,10 @@ const templatesTool = () =>
             onlyFor(access, ["minecraft"], "Announcements");
             const templates = await attempt(() => listTemplates(input.serverId));
             if (templates.length === 0)
-                return { text: "No templates.", structured: { serverId: input.serverId, templates } };
+                return {
+                    text: "No templates.",
+                    structured: { serverId: input.serverId, templates }
+                };
             return {
                 text: templates
                     .map((template) => {
@@ -142,7 +149,12 @@ const saveTemplateInput = z.object({
         .uuid()
         .optional()
         .describe("A template to rewrite. Leave out to keep a new one."),
-    name: z.string().trim().min(1).max(MAX_TEMPLATE_NAME).describe("What it is called on the list."),
+    name: z
+        .string()
+        .trim()
+        .min(1)
+        .max(MAX_TEMPLATE_NAME)
+        .describe("What it is called on the list."),
     announcement
 });
 
@@ -163,7 +175,11 @@ const saveTemplateTool = () =>
             onlyFor(access, ["minecraft"], "Announcements");
             const id = input.id ?? randomUUID();
             await attempt(() =>
-                saveTemplate(input.serverId, { id, name: input.name, announcement: input.announcement })
+                saveTemplate(input.serverId, {
+                    id,
+                    name: input.name,
+                    announcement: input.announcement
+                })
             );
             await recordAudit({
                 actorId: user.id,
@@ -189,7 +205,12 @@ const deleteTemplateTool = () =>
             "Take an announcement template off a Minecraft server's list. It cannot be brought back.",
         input: z.object({
             serverId,
-            templateId: z.string().trim().min(1).max(64).describe("As games_announcement_templates listed it.")
+            templateId: z
+                .string()
+                .trim()
+                .min(1)
+                .max(64)
+                .describe("As games_announcement_templates listed it.")
         }),
         category: "games",
         scope: "gameservers.manage",
@@ -202,7 +223,11 @@ const deleteTemplateTool = () =>
             if (!templates.some((template) => template.id === input.templateId))
                 return {
                     text: `${access.install.name} keeps no template with that id.`,
-                    structured: { serverId: input.serverId, templateId: input.templateId, deleted: false }
+                    structured: {
+                        serverId: input.serverId,
+                        templateId: input.templateId,
+                        deleted: false
+                    }
                 };
             await attempt(() => deleteTemplate(input.serverId, input.templateId));
             await recordAudit({
@@ -214,7 +239,11 @@ const deleteTemplateTool = () =>
             });
             return {
                 text: `Deleted the template from ${access.install.name}.`,
-                structured: { serverId: input.serverId, templateId: input.templateId, deleted: true }
+                structured: {
+                    serverId: input.serverId,
+                    templateId: input.templateId,
+                    deleted: true
+                }
             };
         }
     });
@@ -327,11 +356,21 @@ const bookTool = () =>
                 action: "games.restart.book",
                 targetType: "installedApp",
                 targetId: input.serverId,
-                metadata: { when: pending.when, at: pending.at ?? "", reason: pending.reason, via: "mcp" }
+                metadata: {
+                    when: pending.when,
+                    at: pending.at ?? "",
+                    reason: pending.reason,
+                    via: "mcp"
+                }
             });
             return {
                 text: `${access.install.name} restarts ${pending.when === "empty" ? "when nobody is on" : `at ${pending.at}`}.`,
-                structured: { serverId: input.serverId, when: pending.when, at: pending.at, reason: pending.reason }
+                structured: {
+                    serverId: input.serverId,
+                    when: pending.when,
+                    at: pending.at,
+                    reason: pending.reason
+                }
             };
         }
     });
@@ -407,7 +446,10 @@ const worldsTool = () =>
                 `Worlds: ${view.worlds.length > 0 ? view.worlds.map((one) => one.level).join(", ") : "none read"}.`,
                 "Backups:",
                 ...(view.backups.length > 0
-                    ? view.backups.map((backup) => `  ${backup.name}  ${backup.createdAt}  ${backup.sizeBytes} bytes`)
+                    ? view.backups.map(
+                          (backup) =>
+                              `  ${backup.name}  ${backup.createdAt}  ${backup.sizeBytes} bytes`
+                      )
                     : ["  none"]),
                 `Taken: ${view.policy.every}${view.nextBackupAt ? `, next ${view.nextBackupAt}` : ""}.`
             ];

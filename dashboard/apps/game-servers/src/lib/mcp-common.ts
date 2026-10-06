@@ -75,4 +75,7 @@ export function onlyFor(
         refuse(`${what} is not something Polaris can do on ${access.install.name}'s game.`);
 }
 
-export const serverId = z.string().uuid().describe("The server's id, as games_servers returned it.");
+export const serverId = z
+    .string()
+    .uuid()
+    .describe("The server's id, as games_servers returned it.");

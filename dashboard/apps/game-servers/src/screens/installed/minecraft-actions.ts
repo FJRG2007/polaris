@@ -242,7 +242,11 @@ export async function moderatePlayerAction(
             "games.moderate",
             parsed.data.installedAppId
         );
-        const output = await moderatePlayer(access.ownerId, parsed.data.installedAppId, parsed.data);
+        const output = await moderatePlayer(
+            access.ownerId,
+            parsed.data.installedAppId,
+            parsed.data
+        );
         await recordAudit({
             actorId: user.id,
             action: `minecraft.${parsed.data.action}`,
