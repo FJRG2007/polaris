@@ -37,10 +37,10 @@ describe("a disk with no room left", () => {
             "Error: ENOSPC: no space left on device, write"
         ]) {
             expect(deployFailureReason(raw, STEP)).toContain("ran out of disk space");
-        // And where to undo it. Polaris frees this itself, so a message that
-        // stopped at "free some room" was sending somebody to a terminal for
-        // something a button does.
-        expect(deployFailureReason(raw, STEP)).toContain("Servers > Storage");
+            // And where to undo it. Polaris frees this itself, so a message that
+            // stopped at "free some room" was sending somebody to a terminal for
+            // something a button does.
+            expect(deployFailureReason(raw, STEP)).toContain("Servers > Storage");
         }
     });
 
@@ -90,9 +90,9 @@ describe("an image taken off the machine while it was coming down", () => {
 describe("the other ways a deploy gives up", () => {
     it("separates an image that is not there from one it may not have", () => {
         expect(deployFailureReason("manifest unknown", STEP)).toContain("does not exist");
-        expect(deployFailureReason("denied: requested access to the resource is denied", STEP)).toContain(
-            "refused the credentials"
-        );
+        expect(
+            deployFailureReason("denied: requested access to the resource is denied", STEP)
+        ).toContain("refused the credentials");
     });
 
     it("calls a registry it could not reach what it is", () => {

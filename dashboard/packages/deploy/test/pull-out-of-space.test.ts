@@ -29,7 +29,11 @@ const NO_ROOM = [
 function plan(): AppDeployPlan {
     return {
         ref: { name: "vision", project: "polaris-vision" },
-        build: { method: "image", name: "vision", imageRef: "ghcr.io/fjrg2007/polaris-vision:latest" },
+        build: {
+            method: "image",
+            name: "vision",
+            imageRef: "ghcr.io/fjrg2007/polaris-vision:latest"
+        },
         env: {},
         volumes: [],
         ports: [],

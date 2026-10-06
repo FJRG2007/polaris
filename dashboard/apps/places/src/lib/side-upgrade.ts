@@ -86,7 +86,9 @@ async function readLanded(): Promise<Landed> {
 /** The image a service of the catalog runs, split into what the registry is
  *  asked about. Null when it has none, or is pinned by digest and cannot move. */
 function imageOf(catalogId: string): { image: string; tag: string } | null {
-    const ref = catalogApps().find((app) => app.id === catalogId)?.template?.image?.trim();
+    const ref = catalogApps()
+        .find((app) => app.id === catalogId)
+        ?.template?.image?.trim();
     if (!ref || ref.includes("@")) return null;
     const slash = ref.lastIndexOf("/");
     const colon = ref.lastIndexOf(":");

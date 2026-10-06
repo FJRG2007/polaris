@@ -14,7 +14,12 @@ import { mountFailureReason } from "../mount-failure.js";
 import { RELEASE_IMAGE_GONE, pinRelease, rollbackImageOf } from "./release.js";
 import { tailIntoLog, waitUntilListening, waitUntilServing } from "./readiness.js";
 import { buildPorts, fetchPorts, holdImages, loadPrebuilt, shipRelease } from "./ship.js";
-import { deployFailureReason, isFetchCutShort, isOutOfSpace, isStaleImageLease } from "../deploy-failure.js";
+import {
+    deployFailureReason,
+    isFetchCutShort,
+    isOutOfSpace,
+    isStaleImageLease
+} from "../deploy-failure.js";
 import { FORWARDER_IMAGE, withPortForwarders } from "../private-names.js";
 import { appComposeSpec, dbComposeSpec, dbPlanImages, expandReplicas } from "../compose-spec.js";
 import type {
