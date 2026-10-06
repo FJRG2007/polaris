@@ -324,5 +324,18 @@ else
     bad "roll_service: an unresolvable image recreated the service (started:$svc_started)"
 fi
 
+# The dashboard this update just started redeploys its apps' workers at boot,
+# and an image being fetched has no container on it yet: to a prune from out
+# here it is unused, and the pull fails on a path that no longer exists. Every
+# prune on the machine goes through the dashboard's image-store lock instead.
+for script in "$update_sh" "$self_dir/../install.sh"; do
+    name=$(basename "$script")
+    if grep -v '^[[:space:]]*#' "$script" | grep -Eq 'docker[[:space:]]+(image|system|builder|buildx)[[:space:]]+prune'; then
+        bad "$name prunes images behind the dashboard's back"
+    else
+        ok "$name leaves pruning images to the dashboard, which holds it off a pull"
+    fi
+done
+
 printf '\n%d passed, %d failed\n' "$pass" "$fail"
 [ "$fail" -eq 0 ]

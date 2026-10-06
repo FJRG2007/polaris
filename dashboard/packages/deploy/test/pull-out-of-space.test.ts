@@ -16,18 +16,24 @@ import { describe, expect, it, vi } from "vitest";
 import { ComposeRuntime } from "../src/runtime/compose.js";
 import type { AppDeployPlan, RuntimeContext } from "../src/runtime/driver.js";
 
-/** What containerd says when the disk is full: a rename it could not finish. */
+/** What containerd says when the disk is full: a write that found no room. A
+ *  rename that finds nothing to move is a different failure - a download
+ *  removed under the pull - and is fetched again without pruning anything
+ *  (failure-reason.test.ts). */
 const NO_ROOM = [
-    'failed commit on ref "layer-sha256:3fc760c2b0d9": commit failed: rename',
-    "/var/lib/containerd/io.containerd.content.v1.content/ingest/2ca5059f/data",
-    "/var/lib/containerd/io.containerd.content.v1.content/blobs/sha256/3fc760c2b0d9:",
-    "no such file or directory"
+    'failed commit on ref "layer-sha256:3fc760c2b0d9": write',
+    "/var/lib/containerd/io.containerd.content.v1.content/ingest/2ca5059f/data:",
+    "no space left on device"
 ].join(" ");
 
 function plan(): AppDeployPlan {
     return {
         ref: { name: "vision", project: "polaris-vision" },
-        build: { method: "image", name: "vision", imageRef: "ghcr.io/fjrg2007/polaris-vision:latest" },
+        build: {
+            method: "image",
+            name: "vision",
+            imageRef: "ghcr.io/fjrg2007/polaris-vision:latest"
+        },
         env: {},
         volumes: [],
         ports: [],

@@ -21,8 +21,17 @@ let settings: Record<string, string> = {};
 /** What is installed, and whether each is meant to be up. */
 let installs: { applicationId: string; ownerId: string; catalogId: string }[] = [];
 let states: Record<string, string> = {};
+/** The release each one is on now, as the deploy records it once it is up. */
+let current: Record<string, string | null> = {};
+/** What `:latest` of each image points at in the registry, or an error. */
+let published: Record<string, string | Error> = {};
 
-const deployApplication = vi.fn(async () => undefined);
+const deployApplication = vi.fn(async (id: string) => `deployment-of-${id}`);
+const readTagDigest = vi.fn(async (image: string) => {
+    const said = published[image] ?? "sha256:one";
+    if (said instanceof Error) throw said;
+    return said;
+});
 /** Whether Places is installed. */
 let placesInstalled = true;
 
@@ -32,12 +41,14 @@ vi.mock("@polaris/db", () => ({
         installedApp: { findMany: vi.fn(async () => installs) },
         application: {
             findFirst: vi.fn(async ({ where }: { where: { id: string } }) => ({
-                desiredState: states[where.id] ?? "running"
+                desiredState: states[where.id] ?? "running",
+                currentDeploymentId: current[where.id] ?? null
             }))
         }
     }
 }));
 vi.mock("@/lib/deploy-service", () => ({ deployApplication }));
+vi.mock("@/lib/registry", () => ({ readTagDigest }));
 vi.mock("@/lib/apps/install-presence", () => ({
     isAppInstalled: async (catalogId: string) => catalogId === "home" && placesInstalled
 }));
@@ -60,9 +71,19 @@ beforeEach(() => {
         { applicationId: "relay-app", ownerId: "owner-1", catalogId: "camera-hub" },
         { applicationId: "vision-app", ownerId: "owner-1", catalogId: "vision-worker" }
     ];
+    current = {};
+    published = {};
     deployApplication.mockClear();
-    deployApplication.mockImplementation(async () => undefined);
+    deployApplication.mockImplementation(async (id: string) => `deployment-of-${id}`);
+    readTagDigest.mockClear();
 });
+
+/** Every deploy started so far came up, as the deploy itself records it. */
+function landed(): void {
+    for (const [id] of deployApplication.mock.calls) current[id] = `deployment-of-${id}`;
+}
+
+const VISION = "ghcr.io/fjrg2007/polaris-vision";
 
 describe("bringing them to this build", () => {
     it("redeploys each one, which is what pulls the new image", async () => {
@@ -123,6 +144,53 @@ describe("bringing them to this build", () => {
         installs = [];
         await upgradeHomeServices();
         expect(settings["home.services.build"]).toBe("abc123");
+    });
+});
+
+describe("a new build that did not change their images", () => {
+    // The report: every update failed the vision worker's deploy, on a release
+    // that had not touched it. CI only publishes these when their own sources
+    // change, so most builds of Polaris leave them exactly as they were.
+    it("leaves one alone whose image is what it came up on", async () => {
+        await upgradeHomeServices();
+        landed();
+        deployApplication.mockClear();
+        build = "def456";
+        await upgradeHomeServices();
+        expect(deployApplication).not.toHaveBeenCalled();
+        expect(settings["home.services.build"]).toBe("def456");
+    });
+
+    it("redeploys only the one whose image moved", async () => {
+        await upgradeHomeServices();
+        landed();
+        deployApplication.mockClear();
+        build = "def456";
+        published[VISION] = "sha256:two";
+        await upgradeHomeServices();
+        expect(deployApplication).toHaveBeenCalledTimes(1);
+        expect(deployApplication).toHaveBeenCalledWith("vision-app", "owner-1", null);
+    });
+
+    it("redeploys one whose last deploy never came up", async () => {
+        await upgradeHomeServices();
+        landed();
+        current["vision-app"] = "an-older-release";
+        deployApplication.mockClear();
+        build = "def456";
+        await upgradeHomeServices();
+        expect(deployApplication).toHaveBeenCalledTimes(1);
+        expect(deployApplication).toHaveBeenCalledWith("vision-app", "owner-1", null);
+    });
+
+    it("redeploys when the registry cannot say, rather than guess it is current", async () => {
+        await upgradeHomeServices();
+        landed();
+        deployApplication.mockClear();
+        build = "def456";
+        published[VISION] = new Error("the registry answered 503");
+        await upgradeHomeServices();
+        expect(deployApplication).toHaveBeenCalledWith("vision-app", "owner-1", null);
     });
 });
 

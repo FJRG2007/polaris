@@ -14,7 +14,12 @@ import { mountFailureReason } from "../mount-failure.js";
 import { RELEASE_IMAGE_GONE, pinRelease, rollbackImageOf } from "./release.js";
 import { tailIntoLog, waitUntilListening, waitUntilServing } from "./readiness.js";
 import { buildPorts, fetchPorts, holdImages, loadPrebuilt, shipRelease } from "./ship.js";
-import { deployFailureReason, isOutOfSpace, isStaleImageLease } from "../deploy-failure.js";
+import {
+    deployFailureReason,
+    isFetchCutShort,
+    isOutOfSpace,
+    isStaleImageLease
+} from "../deploy-failure.js";
 import { FORWARDER_IMAGE, withPortForwarders } from "../private-names.js";
 import { appComposeSpec, dbComposeSpec, dbPlanImages, expandReplicas } from "../compose-spec.js";
 import type {
@@ -204,6 +209,17 @@ async function pullWithRoom(image: string, ctx: RuntimeContext, sink: OutputSink
         return;
     } catch (error) {
         const said = reasonOf(error, "");
+        // Its download was removed part-way by a cleanup that ran over it. The
+        // image is fine; fetching it again is the whole fix, and only once.
+        if (isFetchCutShort(said)) {
+            ctx.log(
+                Buffer.from(
+                    "Part of that image was removed while it was coming down; fetching it again.\n"
+                )
+            );
+            await ctx.ports.pull(image, sink);
+            return;
+        }
         if (!isOutOfSpace(said) || !ctx.ports.reclaimSpace) throw error;
 
         const freed = await ctx.ports.reclaimSpace().catch(() => 0);
