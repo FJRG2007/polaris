@@ -337,6 +337,33 @@ describe("rules", () => {
         ).toBe(true);
     });
 
+    it("gives every pattern of a condition to one run", () => {
+        const runs: (string | readonly string[])[] = [];
+        const counting: mailbox.MailPatternTest = (pattern, text) => {
+            runs.push(pattern);
+            return (typeof pattern === "string" ? [pattern] : pattern).some((one) =>
+                new RegExp(one, "i").test(text)
+            );
+        };
+        expect(
+            mailbox.mailConditionHolds(
+                { field: "subject", operator: "matches", value: "^refund", alternatives: ["\\d{4}$"] },
+                message,
+                counting
+            )
+        ).toBe(true);
+        expect(runs).toEqual([["^refund", "\\d{4}$"]]);
+    });
+
+    it("reads whether there are attachments as one value", () => {
+        expect(
+            mailbox.mailConditionHolds(
+                { field: "attachment", operator: "is", value: "yes", alternatives: ["no"] },
+                { ...message, hasAttachments: false }
+            )
+        ).toBe(false);
+    });
+
     it("tells capitals apart only when asked to", () => {
         const cased = { field: "subject" as const, caseSensitive: true };
         expect(

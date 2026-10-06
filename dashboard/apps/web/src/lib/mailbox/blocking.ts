@@ -51,6 +51,7 @@ export function blockedBy(rule: MailRuleView): BlockedSender | null {
     const [action] = actions;
     if (!action) return null;
     if (condition.kind !== "from" || condition.operator !== "is") return null;
+    if (condition.alternatives?.length || condition.caseSensitive) return null;
     if (action.kind !== "trash" && action.kind !== "junk") return null;
     return {
         address: condition.value,

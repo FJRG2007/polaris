@@ -89,4 +89,28 @@ describe("a filter condition with several values", () => {
             }).success
         ).toBe(false);
     });
+
+    it("refuses more values, or capitals, on whether there are attachments", async () => {
+        const { mailFilterConditionSchema } = await import("./mailbox.js");
+        const attachment = { id: "cond01", kind: "attachment", operator: "is", value: "yes" };
+        expect(mailFilterConditionSchema.safeParse(attachment).success).toBe(true);
+        expect(mailFilterConditionSchema.safeParse({ ...attachment, alternatives: ["no"] }).success).toBe(
+            false
+        );
+        expect(mailFilterConditionSchema.safeParse({ ...attachment, caseSensitive: true }).success).toBe(
+            false
+        );
+    });
+
+    it("drops capitals from a subject's shape, which has none left", async () => {
+        const { mailFilterConditionSchema } = await import("./mailbox.js");
+        const parsed = mailFilterConditionSchema.parse({
+            id: "cond01",
+            kind: "subject",
+            operator: "similar",
+            value: "Run failed: CI - main",
+            caseSensitive: true
+        });
+        expect(parsed.caseSensitive).toBeUndefined();
+    });
 });

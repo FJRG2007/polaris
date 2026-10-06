@@ -169,10 +169,7 @@ export function ConditionCard({
     const operators = core.mailOperatorsFor(condition.kind);
     const shape = condition.operator === "similar" ? core.mailSubjectShape(condition.value) : "";
     // More values ("this or that") and capitals, for the comparisons over text.
-    const text =
-        condition.kind !== "size" &&
-        condition.kind !== "attachment" &&
-        core.mailTakesValues(condition.operator);
+    const text = core.mailTakesValues(condition.operator, condition.kind);
     const more = condition.alternatives ?? [];
     const negative = condition.operator === "not-contains" || condition.operator === "is-not";
     const setMore = (next: readonly string[]) =>
@@ -265,12 +262,16 @@ export function ConditionCard({
                                     value: operator,
                                     label: words.operatorText(operator, t)
                                 }))}
-                                onValueChange={(operator) =>
+                                onValueChange={(operator) => {
+                                    const next = operator as core.MailRuleOperator;
                                     onChange({
                                         ...condition,
-                                        operator: operator as core.MailRuleOperator
-                                    })
-                                }
+                                        operator: next,
+                                        caseSensitive: core.mailTellsCapitals(next, condition.kind)
+                                            ? condition.caseSensitive
+                                            : undefined
+                                    });
+                                }}
                             />
                         )}
                     </flow.Field>
@@ -383,7 +384,7 @@ export function ConditionCard({
                                     {negative ? t("rules.editor.addNor") : t("rules.editor.addOr")}
                                 </button>
                             ) : null}
-                            {condition.operator !== "similar" ? (
+                            {core.mailTellsCapitals(condition.operator, condition.kind) ? (
                                 <label className="flex items-center gap-2 text-xs text-muted-foreground">
                                     <Checkbox
                                         checked={condition.caseSensitive === true}

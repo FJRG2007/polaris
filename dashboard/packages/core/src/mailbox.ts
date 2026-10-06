@@ -940,10 +940,18 @@ export interface MailRuleCondition {
     readonly caseSensitive?: boolean;
 }
 
-/** The comparisons a condition can give more values to, and tell capitals
- *  apart in: the ones over text. */
-export function mailTakesValues(operator: MailRuleOperator): boolean {
+/** The comparisons a condition can give more values to: the ones over text.
+ *  Given the field, a size or the yes-or-no attachment field takes one value
+ *  whatever its comparison. */
+export function mailTakesValues(operator: MailRuleOperator, field?: MailRuleField): boolean {
+    if (field === "size" || field === "attachment") return false;
     return MAIL_TEXT_OPERATORS.includes(operator) || operator === "similar";
+}
+
+/** Whether capitals can count in a condition: text compared as written. A
+ *  subject's shape ("similar") has none left to tell apart. */
+export function mailTellsCapitals(operator: MailRuleOperator, field?: MailRuleField): boolean {
+    return mailTakesValues(operator, field) && operator !== "similar";
 }
 
 export type MailRuleAction =
@@ -1120,14 +1128,21 @@ export function mailPatternProblem(source: string): "invalid" | "unsafe" | null 
     return repeats > MAIL_FILTER_LIMITS.patternRepeats ? "unsafe" : null;
 }
 
-/** Runs a filter's pattern over a stretch of text, ignoring case unless the
- *  condition says otherwise. The server passes one that gives up after a time
- *  limit, so a pattern saved before the save-time check still runs there; the
- *  default has no limit and refuses what that check would. */
-export type MailPatternTest = (pattern: string, text: string, caseSensitive?: boolean) => boolean;
+/** Runs a filter's pattern, or any of a condition's patterns, over a stretch of
+ *  text, ignoring case unless the condition says otherwise. The server passes
+ *  one that gives up after a time limit for the whole condition, so a pattern
+ *  saved before the save-time check still runs there; the default has no limit
+ *  and refuses what that check would. */
+export type MailPatternTest = (
+    pattern: string | readonly string[],
+    text: string,
+    caseSensitive?: boolean
+) => boolean;
 
 const plainPatternTest: MailPatternTest = (pattern, text, caseSensitive) =>
-    !mailPatternProblem(pattern) && new RegExp(pattern, caseSensitive ? "" : "i").test(text);
+    (typeof pattern === "string" ? [pattern] : pattern).some(
+        (one) => !mailPatternProblem(one) && new RegExp(one, caseSensitive ? "" : "i").test(text)
+    );
 
 /**
  * Text as a filter compares it: one plain space wherever there was any run of
@@ -1160,9 +1175,13 @@ export function mailConditionHolds(
     message: MailRuleSubject,
     testPattern: MailPatternTest = plainPatternTest
 ): boolean {
-    const more = mailTakesValues(condition.operator) ? (condition.alternatives ?? []) : [];
+    const more = mailTakesValues(condition.operator, condition.field)
+        ? (condition.alternatives ?? [])
+        : [];
     if (more.length === 0) return oneValueHolds(condition, message, testPattern);
     const values = [condition.value, ...more];
+    // Every pattern in one run, so the server's time limit holds per condition.
+    if (condition.operator === "matches") return patternHolds(condition, values, message, testPattern);
     // "Does not contain this or that" means neither is there.
     const negative = condition.operator === "not-contains" || condition.operator === "is-not";
     return negative
@@ -1207,20 +1226,26 @@ function oneValueHolds(
         case "ends-with":
             return haystack.trimEnd().endsWith(needle);
         case "matches":
-            try {
-                return testPattern(
-                    condition.value,
-                    mailSpacing(fieldText(condition, message)).slice(
-                        0,
-                        MAIL_FILTER_LIMITS.patternText
-                    ),
-                    condition.caseSensitive === true
-                );
-            } catch {
-                return false;
-            }
+            return patternHolds(condition, [condition.value], message, testPattern);
         default:
             return false;
+    }
+}
+
+function patternHolds(
+    condition: MailRuleCondition,
+    patterns: readonly string[],
+    message: MailRuleSubject,
+    testPattern: MailPatternTest
+): boolean {
+    try {
+        return testPattern(
+            patterns.length === 1 ? patterns[0]! : patterns,
+            mailSpacing(fieldText(condition, message)).slice(0, MAIL_FILTER_LIMITS.patternText),
+            condition.caseSensitive === true
+        );
+    } catch {
+        return false;
     }
 }
 

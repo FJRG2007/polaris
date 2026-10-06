@@ -195,6 +195,16 @@ describe("a filter's pattern", () => {
         expect(timedPatternTest("^PR run", "PR run failed")).toBe(true);
     });
 
+    it("gives a condition's patterns one time limit between them", () => {
+        const started = Date.now();
+        const slow = "^(a+)+$";
+        expect(timedPatternTest(Array(20).fill(slow), `${"a".repeat(40)}!`)).toBe(false);
+        // One limit, not twenty of them back to back.
+        expect(Date.now() - started).toBeLessThan(250);
+        expect(timedPatternTest(["([", "^PR run"], "PR run failed")).toBe(true);
+        expect(timedPatternTest(["^pr run"], "PR run failed", true)).toBe(false);
+    });
+
     it("still runs on the server a pattern saved before the static check", () => {
         const older = filter(
             [{ match: "all", items: [condition("subject", "matches", ".*PR.*run.*CI.*main.*")] }],

@@ -23,6 +23,7 @@ import {
     mailPatternProblem,
     mailSubjectShape,
     mailTakesValues,
+    mailTellsCapitals,
     type MailRuleField,
     type MailRuleOperator
 } from "../mailbox.js";
@@ -579,7 +580,7 @@ function normalizeCondition<T extends ConditionLike>(condition: T): T {
     const more = (next.alternatives ?? []).map((value) => value.trim()).filter(Boolean);
     if (more.length > 0) next.alternatives = more;
     else delete next.alternatives;
-    if (next.caseSensitive !== true) delete next.caseSensitive;
+    if (next.caseSensitive !== true || next.operator === "similar") delete next.caseSensitive;
     if (next.operator === "similar") {
         next.value = mailSubjectShape(next.value);
         if (next.alternatives) next.alternatives = next.alternatives.map(mailSubjectShape);
@@ -599,9 +600,11 @@ function checkCondition(
 ): void {
     const issue = (path: string, message: string) =>
         context.addIssue({ code: "custom", path: [path], message });
-    if (!mailTakesValues(condition.operator)) {
-        if (condition.alternatives?.length) issue("alternatives", "That comparison takes one value");
-        if (condition.caseSensitive) issue("caseSensitive", "That comparison has no capitals to tell apart");
+    if (!mailTakesValues(condition.operator, condition.field) && condition.alternatives?.length) {
+        issue("alternatives", "That comparison takes one value");
+    }
+    if (!mailTellsCapitals(condition.operator, condition.field) && condition.caseSensitive) {
+        issue("caseSensitive", "That comparison has no capitals to tell apart");
     }
     if (condition.operator === "similar") {
         if (condition.field !== "subject") issue(fieldKey, "Only a subject can be similar");
