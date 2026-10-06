@@ -923,6 +923,13 @@
             "helmet": "Helmet",
             "hotbar": "Hotbar {number}",
             "slot": "Slot {number}"
+        },
+        "pointAtAStack": "Point at a stack to see what it is.",
+        "details": {
+            "stored": "Stores {list}",
+            "unbreakable": "Unbreakable",
+            "durability": "Durability: {left} / {max}",
+            "damage": "{damage} damage taken"
         }
     },
     "sidebar": {

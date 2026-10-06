@@ -24,6 +24,7 @@
 
 import { z } from "zod";
 import type { InventoryItem } from "./inventory";
+import { itemDetails, type Enchantment } from "./item-details";
 import {
     itemArgument,
     replaceSlot,
@@ -309,54 +310,19 @@ export function csvCell(value: string | number): string {
     return /[",\n\r]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
 }
 
-/** What a stack's data says in words: its name, its enchantments, its damage. */
+/** What a stack's data says in words: its name, its enchantments - the ones a
+ *  book stores as well - and its damage. Read by the same walk the inventory
+ *  screen uses, so the export and the screen describe a stack alike. */
 export function summarize(item: InventoryItem): string {
-    const snbt = item.data?.snbt;
-    if (!snbt) return "";
+    const details = itemDetails(item.data);
+    const short = (list: readonly Enchantment[]) =>
+        list.map((one) => `${one.id.split(":").pop()} ${one.level}`).join(", ");
     const parts: string[] = [];
-    const name = nameIn(snbt);
-    if (name) parts.push(`"${name}"`);
-    const enchantments = enchantmentsIn(snbt);
-    if (enchantments.length > 0) parts.push(enchantments.join(", "));
-    const damage = /(?:"minecraft:damage"|\bDamage)\s*:\s*(\d+)/.exec(snbt)?.[1];
-    if (damage && damage !== "0") parts.push(`damage ${damage}`);
+    if (details.name) parts.push(`"${details.name}"`);
+    if (details.enchantments.length > 0) parts.push(short(details.enchantments));
+    if (details.stored.length > 0) parts.push(`stores ${short(details.stored)}`);
+    if (details.damage !== null) parts.push(`damage ${details.damage}`);
     return parts.join("; ");
-}
-
-function nameIn(snbt: string): string | null {
-    const component = /"minecraft:custom_name"\s*:\s*(\{[^{}]*\}|'[^']*'|"(?:[^"\\]|\\.)*")/.exec(
-        snbt
-    )?.[1];
-    const legacy = /\bName\s*:\s*('[^']*'|"(?:[^"\\]|\\.)*")/.exec(snbt)?.[1];
-    const raw = component ?? legacy;
-    if (!raw) return null;
-    const text =
-        /text\s*:\s*"((?:[^"\\]|\\.)*)"|"text"\s*:\s*"((?:[^"\\]|\\.)*)"|\\"text\\"\s*:\s*\\"((?:[^"\\]|\\.)*?)\\"/.exec(
-            raw
-        );
-    const found = text?.[1] ?? text?.[2] ?? text?.[3];
-    if (found !== undefined) return found;
-    return raw.replace(/^['"]|['"]$/g, "").replace(/^"|"$/g, "") || null;
-}
-
-function enchantmentsIn(snbt: string): string[] {
-    const found: string[] = [];
-    // Components: {"minecraft:enchantments": {levels: {"minecraft:sharpness": 5}}}, or without `levels` from 1.21.5.
-    const component = /"minecraft:enchantments"\s*:\s*\{(?:levels\s*:\s*)?\{?([^{}]*)\}/.exec(
-        snbt
-    )?.[1];
-    if (component)
-        for (const match of component.matchAll(/"(?:minecraft:)?([a-z_]+)"\s*:\s*(\d+)/g))
-            found.push(`${match[1]} ${match[2]}`);
-    // Before: Enchantments: [{id: "minecraft:sharpness", lvl: 5s}].
-    for (const match of snbt.matchAll(
-        /\{\s*(?:id\s*:\s*"(?:minecraft:)?([a-z_]+)"\s*,\s*lvl\s*:\s*(\d+)s?|lvl\s*:\s*(\d+)s?\s*,\s*id\s*:\s*"(?:minecraft:)?([a-z_]+)")\s*\}/g
-    )) {
-        const id = match[1] ?? match[4];
-        const level = match[2] ?? match[3];
-        if (id && level) found.push(`${id} ${level}`);
-    }
-    return found;
 }
 
 /**
