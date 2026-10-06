@@ -73,8 +73,28 @@ async function contextFor(caller: McpCaller) {
     return { user, install };
 }
 
+/** Kinds whose state is a bolt: locked or not says nothing about whether the
+ *  door is open, which only a door sensor knows. */
+const BOLTS = new Set(["lock", "opener"]);
+
+/** How long ago something was read, in a few words. */
+export function readAgo(stateAt: string | null, now: number): string {
+    if (!stateAt) return "never read";
+    const seconds = Math.max(0, Math.round((now - Date.parse(stateAt)) / 1000));
+    if (seconds < 90) return `${seconds}s ago`;
+    const minutes = Math.round(seconds / 60);
+    if (minutes < 90) return `${minutes} min ago`;
+    const hours = Math.round(minutes / 60);
+    return hours < 48 ? `${hours} h ago` : `${Math.round(hours / 24)} days ago`;
+}
+
 /** A device as a model reads it: what it is, where, and what it is doing. */
-function deviceRow(device: DeviceView, placeNames: ReadonlyMap<string, string>) {
+function deviceRow(
+    device: DeviceView,
+    placeNames: ReadonlyMap<string, string>,
+    now: number = Date.now()
+) {
+    const bolt = BOLTS.has(device.kind);
     return {
         id: device.id,
         name: device.name,
@@ -83,6 +103,10 @@ function deviceRow(device: DeviceView, placeNames: ReadonlyMap<string, string>) 
         zone: device.zone,
         state: device.state,
         door: device.doorState === "none" ? null : device.doorState,
+        /** The bolt, for a lock: never whether the door is open. */
+        lock: bolt ? device.state : null,
+        /** The door's own sensor, for a lock: "none" when it has no sensor. */
+        doorSensor: bolt ? device.doorState : null,
         online: device.online,
         operable: device.controllable && device.online,
         actions: device.controllable ? actionsFor(device.kind) : [],
@@ -90,14 +114,102 @@ function deviceRow(device: DeviceView, placeNames: ReadonlyMap<string, string>) 
         reading: device.reading,
         climate: device.climate ?? null,
         air: device.air ?? null,
-        stateAt: device.stateAt
+        stateAt: device.stateAt,
+        ageSeconds: device.stateAt
+            ? Math.max(0, Math.round((now - Date.parse(device.stateAt)) / 1000))
+            : null
     };
 }
 
-function deviceLine(row: ReturnType<typeof deviceRow>): string {
+/** What a device is doing, said so that a lock's bolt and its door cannot be
+ *  read as one another. */
+function statusOf(row: ReturnType<typeof deviceRow>): string {
+    if (!row.online) return "offline";
+    if (row.lock === null) return `state: ${row.state}`;
+    const door =
+        row.doorSensor === "none" || row.doorSensor === null
+            ? "door sensor: none"
+            : `door: ${row.doorSensor}`;
+    return `lock: ${row.lock}, ${door}`;
+}
+
+function deviceLine(row: ReturnType<typeof deviceRow>, now: number = Date.now()): string {
     const where = [row.place, row.zone].filter(Boolean).join(" / ");
     const reading = row.reading ? ` ${row.reading.value}${row.reading.unit}` : "";
-    return `${row.id}  ${row.name} (${row.kind}${where ? `, ${where}` : ""}): ${row.online ? row.state : "offline"}${reading}`;
+    return `${row.id}  ${row.name} (${row.kind}${where ? `, ${where}` : ""}): ${statusOf(row)}${reading} (as of ${readAgo(row.stateAt, now)})`;
+}
+
+/** How long a read of the accounts is waited for before answering with what
+ *  was last read. */
+const FRESH_WAIT_MS = 4000;
+
+/** How long a command is waited for to be confirmed by a read of the device. */
+const CONFIRM_WAIT_MS = 8000;
+
+/**
+ * Read again, now, the accounts of devices whose last reading is older than
+ * their account's turn - or that are still moving - within `FRESH_WAIT_MS`.
+ * The same quiet read the background makes, shared with it; never a probe.
+ * Answers whether everything asked for was read; false is the reader's cue to
+ * say how old what it shows is.
+ */
+async function freshen(installedAppId: string, list: readonly DeviceView[]): Promise<boolean> {
+    // A device connected to nothing has no account to read again.
+    if (!list.some((device) => device.accountId)) return true;
+    try {
+        const [watch, accounts] = await Promise.all([
+            import("./device-watch"),
+            import("./device-accounts")
+        ]);
+        const connections = new Map(
+            (await accounts.listAccounts(installedAppId)).map((account) => [
+                account.id,
+                account.connection
+            ])
+        );
+        const now = Date.now();
+        const stale = new Set<string>();
+        for (const device of list) {
+            const connection = device.accountId ? connections.get(device.accountId) : undefined;
+            if (!device.accountId || !connection || !accounts.isConnectable(connection)) continue;
+            const at = device.stateAt ? Date.parse(device.stateAt) : 0;
+            if (
+                device.state === "moving" ||
+                now - at > watch.currentInterval(installedAppId, connection)
+            )
+                stale.add(device.accountId);
+        }
+        if (stale.size === 0) return true;
+        return (await watch.refreshAccounts(installedAppId, [...stale], FRESH_WAIT_MS)) === "read";
+    } catch (caught) {
+        console.error("places: devices could not be read again for an assistant:", caught);
+        return false;
+    }
+}
+
+/**
+ * The device as its account reports it after a command, or null when no read
+ * after the command found it settled within `CONFIRM_WAIT_MS`. The command
+ * itself already asked for the follow-up reads (`requestFollowUps`); this only
+ * waits for them.
+ */
+async function confirmed(
+    installedAppId: string,
+    device: DeviceView,
+    actedAt: number
+): Promise<DeviceView | null> {
+    if (!device.accountId) return null;
+    const watch = await import("./device-watch");
+    const deadline = actedAt + CONFIRM_WAIT_MS;
+    let after = actedAt;
+    while (Date.now() < deadline) {
+        const read = await watch.waitForRead(device.accountId, after, deadline - Date.now());
+        if (!read) return null;
+        after = Date.now();
+        const now = await devices.getDevice(installedAppId, device.id).catch(() => null);
+        if (now && now.state !== "moving") return now;
+    }
+    return null;
 }
 
 // ---------------------------------------------------------------------------
@@ -138,7 +250,7 @@ const devicesTool = () =>
         title: "Devices and their state",
         description:
             // i18n-ignore read by the calling model, not shown to a person
-            "The devices in this account's places - locks, lights, switches, air conditioners, sensors - with their last known state and the actions each accepts. Read-only.",
+            "The devices in this account's places - locks, lights, switches, air conditioners, sensors - with their state, how long ago it was read, and the actions each accepts. A lock's state is its bolt (locked or unlocked), never whether the door is open: only a door sensor says that, and \"door sensor: none\" means there is none. Reads an account again first when its devices are older than its usual turn. Read-only.",
         input: devicesInput,
         category: "home",
         scope: "places.read",
@@ -146,16 +258,22 @@ const devicesTool = () =>
         async run(input, caller) {
             const { user, install } = await contextFor(caller);
             const reach = await placesReach(user);
-            const [list, placeList] = await Promise.all([
+            const read = () =>
                 input.deviceId
                     ? attempt(async () => [await devices.getDevice(install.id, input.deviceId!)])
-                    : devices.listDevices(install.id),
-                places.listPlaces(install.id)
-            ]);
+                    : devices.listDevices(install.id);
+            const [first, placeList] = await Promise.all([read(), places.listPlaces(install.id)]);
+            let list = onlyReachable(first, reach.everything || reach.devices);
+            // Only for somebody who reaches the house, as the devices screen
+            // only reads the accounts for them: a visitor is told what is known.
+            let fresh = true;
+            if (reach.everything && list.length > 0) {
+                fresh = await freshen(install.id, list);
+                if (fresh) list = onlyReachable(await read(), true);
+            }
+            const now = Date.now();
             const names = new Map(placeList.map((place) => [place.id, place.name]));
-            const visible = onlyReachable(list, reach.everything || reach.devices).map((device) =>
-                deviceRow(device, names)
-            );
+            const visible = list.map((device) => deviceRow(device, names, now));
             if (input.deviceId && visible.length === 0)
                 refuse("That device is not shared with you");
             if (visible.length === 0) {
@@ -170,10 +288,16 @@ const devicesTool = () =>
                 { one: "device", other: "devices" },
                 DEVICE_LIMIT
             );
-            const lines = found.items.map(deviceLine).join("\n");
+            const lines = found.items.map((row) => deviceLine(row, now)).join("
+");
+            const stale = fresh
+                ? ""
+                : "
+(Could not read them again just now: each shows its last reading, as of the time given.)";
             return {
-                text: found.note ? `${found.note}\n${lines}` : lines,
-                structured: { devices: found.items, matched: found.matched }
+                text: `${found.note ? `${found.note}
+` : ""}${lines}${stale}`,
+                structured: { devices: found.items, matched: found.matched, fresh }
             };
         }
     });
@@ -203,7 +327,7 @@ const controlTool = () =>
         title: "Operate a device",
         description:
             // i18n-ignore read by the calling model, not shown to a person
-            "Lock or unlock a door, switch something on or off, or set an air conditioner or purifier. Acts in the real world at once: confirm with the person before opening a door.",
+            "Lock or unlock a door, switch something on or off, or set an air conditioner or purifier. Acts in the real world at once: confirm with the person before opening a door. Answers with the state the device reports a few seconds later, or says the command was sent and not yet confirmed.",
         input: controlInput,
         category: "home",
         scope: "places.control",
@@ -231,12 +355,20 @@ const controlTool = () =>
                     );
                 setting = parsed.data;
             }
+            const actedAt = Date.now();
             const device = await attempt(() =>
                 operateDevice(user, install.id, input.deviceId, input.action, setting)
             );
+            // What the device reports once it has done it, when its account says
+            // so within a few seconds; otherwise the command was sent and that is
+            // all that is known.
+            const settled = await confirmed(install.id, device, actedAt).catch(() => null);
+            const row = deviceRow(settled ?? device, new Map());
             return {
-                text: `${device.name}: ${device.state}.`,
-                structured: { device: deviceRow(device, new Map()) }
+                text: settled
+                    ? `${device.name}: ${statusOf(row)} - confirmed by the device.`
+                    : `${device.name}: sent, not yet confirmed (last known ${statusOf(row)}).`,
+                structured: { device: row, confirmed: settled !== null }
             };
         }
     });

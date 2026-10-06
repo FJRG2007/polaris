@@ -160,7 +160,8 @@ function toView(row: DeviceRow): kinds.DeviceView {
         stateAt: row.stateAt?.toISOString() ?? null,
         climate: climateOf(row),
         air: airOf(row),
-        appliance: applianceOf(row)
+        appliance: applianceOf(row),
+        accountId: row.accountId
     };
 }
 
@@ -364,7 +365,26 @@ export async function actOnDevice(
     await tellAutomations(installedAppId, [row]);
     const acted = toView(row);
     live.announceDevices(installedAppId, [acted]);
+    await followUp(installedAppId, device.accountId, device.id);
     return acted;
+}
+
+/**
+ * Read the account again shortly, so what the device got to is known within
+ * seconds rather than at the next turn of the timer - whoever pressed: the
+ * panel, an automation, an assistant. Never a reason for a press to fail: the
+ * door moved whether or not the follow-up could be planned.
+ */
+async function followUp(
+    installedAppId: string,
+    accountId: string,
+    deviceId: string
+): Promise<void> {
+    try {
+        (await import("./device-watch")).requestFollowUps(installedAppId, accountId, deviceId);
+    } catch (error) {
+        console.error("places: a device could not be read again after a command:", error);
+    }
 }
 
 /**
