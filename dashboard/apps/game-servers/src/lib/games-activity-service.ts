@@ -587,3 +587,69 @@ async function pruneActivity(now: Date): Promise<void> {
         .deleteMany({ where: { joinedAt: { lt: new Date(now.getTime() - SESSION_RETENTION_MS) } } })
         .catch(() => undefined);
 }
+
+/** One player somebody has watched on a server, for the assistant's search. */
+export interface KnownPlayer {
+    readonly installedAppId: string;
+    /** As the server spells it. */
+    readonly name: string;
+    /** The game's own id where it has one (an ARK survivor's SteamID64). */
+    readonly playerId: string | null;
+    /** When they were last on, or on now (`leftAt` null). */
+    readonly lastSeen: string;
+    readonly online: boolean;
+}
+
+/**
+ * The players these servers have seen, most recently seen first: those whose
+ * name holds `query` first, then the rest, so the ranking that comes after has
+ * candidates whose name is spelt differently. Bounded by `limit` in the
+ * database - a server that has had ten thousand visitors is not read whole for
+ * a search.
+ */
+export async function searchKnownPlayers(
+    installedAppIds: readonly string[],
+    query: string,
+    limit: number
+): Promise<KnownPlayer[]> {
+    if (installedAppIds.length === 0 || limit <= 0) return [];
+    const within = { installedAppId: { in: [...installedAppIds] } };
+    const read = (where: Prisma.GamePlayerSessionWhereInput, take: number) =>
+        prisma.gamePlayerSession.groupBy({
+            by: ["installedAppId", "name", "playerId"],
+            where,
+            _max: { joinedAt: true },
+            orderBy: { _max: { joinedAt: "desc" } },
+            take
+        });
+    const wanted = query.trim();
+    const matched = wanted
+        ? await read({ ...within, name: { contains: wanted, mode: "insensitive" } }, limit)
+        : [];
+    const rest = matched.length < limit ? await read(within, limit) : [];
+    const seen = new Set<string>();
+    const rows = [...matched, ...rest].filter((row) => {
+        const key = `${row.installedAppId}\u0000${row.name.toLowerCase()}\u0000${row.playerId ?? ""}`;
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+    });
+    const picked = rows.slice(0, limit);
+    const open = picked.length
+        ? await prisma.gamePlayerSession.findMany({
+              where: {
+                  leftAt: null,
+                  OR: picked.map((row) => ({ installedAppId: row.installedAppId, name: row.name }))
+              },
+              select: { installedAppId: true, name: true }
+          })
+        : [];
+    const on = new Set(open.map((row) => `${row.installedAppId}\u0000${row.name}`));
+    return picked.map((row) => ({
+        installedAppId: row.installedAppId,
+        name: row.name,
+        playerId: row.playerId,
+        lastSeen: (row._max.joinedAt ?? new Date(0)).toISOString(),
+        online: on.has(`${row.installedAppId}\u0000${row.name}`)
+    }));
+}

@@ -22,7 +22,7 @@ import { isModId, MAX_MODS } from "../../lib/ark/mods";
 import { warmModImages } from "../../lib/mod-image-cache";
 import { findGameIdentity } from "../../lib/game-identity";
 import { recentlyGivenItems } from "../../lib/recent-items";
-import { liftSanctions, recordSanction } from "../../lib/sanctions-service";
+import { ARK_MODERATION_VERBS, moderateArkPlayer } from "../../lib/ark/player-moderation";
 import { MAX_TIMEOUT_MINUTES } from "../../lib/player-timeout";
 import { GAME_LOG, isJoinPassword, isSteamId } from "../../lib/ark/access";
 import { giveArkItems, requireArkPlayerId } from "../../lib/ark/item-service";
@@ -351,7 +351,7 @@ export async function revealArkPasswordsAction(
 const moderateSchema = z.object({
     installedAppId: z.string().trim().min(1),
     steamId: z.string().trim().refine(isSteamId, schemaWords("games", "errors.thatIsNotASteam")),
-    verb: z.enum(["kick", "ban", "unban"])
+    verb: z.enum(ARK_MODERATION_VERBS)
 });
 
 export async function moderateArkPlayerAction(
@@ -371,20 +371,12 @@ export async function moderateArkPlayerAction(
             "games.moderate",
             parsed.data.installedAppId
         );
-        const run = {
-            kick: ark.kickArkPlayer,
-            ban: ark.banArkPlayer,
-            unban: ark.unbanArkPlayer
-        }[parsed.data.verb];
-        await run(access.ownerId, parsed.data.installedAppId, parsed.data.steamId);
-        if (parsed.data.verb === "unban")
-            await liftSanctions(parsed.data.installedAppId, parsed.data.steamId);
-        else
-            await recordSanction({
-                installedAppId: parsed.data.installedAppId,
-                player: parsed.data.steamId,
-                kind: parsed.data.verb
-            });
+        await moderateArkPlayer(
+            access.ownerId,
+            parsed.data.installedAppId,
+            parsed.data.steamId,
+            parsed.data.verb
+        );
         await recordAudit({
             actorId: user.id,
             action: `games.ark.${parsed.data.verb}`,

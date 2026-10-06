@@ -191,6 +191,7 @@ describe("every tool against the table", () => {
         ]);
         expect([...scopes(APP_TOOLS.games)].sort()).toEqual([
             "gameservers.manage",
+            "gameservers.moderate",
             "gameservers.read"
         ]);
         const mail = MCP_TOOLS.filter((tool) => tool.name.startsWith("mail_"));

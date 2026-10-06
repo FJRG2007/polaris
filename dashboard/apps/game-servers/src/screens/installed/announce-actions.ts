@@ -12,9 +12,7 @@ import { z } from "zod";
 import { gameWords, issueText, messageText } from "../game-words";
 import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
-import { sendAnnouncement } from "../../lib/minecraft/service";
-import { needsRepeating } from "../../lib/minecraft/announcement";
-import { pinAnnouncement } from "../../lib/minecraft/live-display-service";
+import { announceNow } from "../../lib/minecraft/live-display-service";
 import {
     announcementSchema,
     MAX_TEMPLATE_NAME,
@@ -51,24 +49,12 @@ export async function sendAnnouncementAction(
             "games.console",
             parsed.data.installedAppId
         );
-        const sentAt = Date.now();
-        const sent = await sendAnnouncement(
+        const { sent, kept } = await announceNow(
             access.ownerId,
             parsed.data.installedAppId,
             parsed.data.announcement,
             user.id
         );
-        // The game keeps an action bar up for about three seconds and has no
-        // "until": anything meant to stay longer is sent again from here on.
-        const kept = needsRepeating(parsed.data.announcement);
-        if (kept) {
-            await pinAnnouncement(
-                access.ownerId,
-                parsed.data.installedAppId,
-                parsed.data.announcement,
-                sentAt
-            );
-        }
         await recordAudit({
             actorId: user.id,
             action: "games.announce",

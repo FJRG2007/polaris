@@ -160,6 +160,14 @@ export const MCP_ONLY_SCOPES = {
         sensitive: true
     },
     "gameservers.read": { requires: "games.read", category: "games" },
+    // Kicking, banning and timing out are done to people, and a role can hold
+    // them without managing the server: the moderators' own grant.
+    "gameservers.moderate": {
+        requires: "games.moderate",
+        category: "games",
+        implies: ["gameservers.read"],
+        sensitive: true
+    },
     "gameservers.manage": {
         requires: "games.manage",
         category: "games",

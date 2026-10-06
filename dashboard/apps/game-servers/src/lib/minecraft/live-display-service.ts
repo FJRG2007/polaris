@@ -26,6 +26,7 @@ import {
     shownPlayers,
     onlineRoster,
     openServerContainer,
+    sendAnnouncement,
     withServerContainer,
     type ServerContainer
 } from "./service";
@@ -36,6 +37,7 @@ import {
     announcementCommands,
     clearAnnouncementCommands,
     hasText,
+    needsRepeating,
     type Announcement,
     type SendContext
 } from "./announcement";
@@ -592,4 +594,26 @@ export async function sweepLiveDisplays(): Promise<{ running: number }> {
         }
     }
     return { running: loops.size };
+}
+
+/**
+ * Put an announcement on the players' screens now, and keep it up when it is
+ * meant to stay longer than the game holds it.
+ *
+ * The game keeps an action bar up for about three seconds and has no "until":
+ * anything meant to stay longer is sent again from here on. Shared by the
+ * announce dialog and the assistant's tool, so one cannot send a held title the
+ * other would have let drop.
+ */
+export async function announceNow(
+    ownerId: string,
+    installedAppId: string,
+    announcement: Announcement,
+    actorId: string | null
+): Promise<{ sent: number; kept: boolean }> {
+    const sentAt = Date.now();
+    const sent = await sendAnnouncement(ownerId, installedAppId, announcement, actorId);
+    const kept = needsRepeating(announcement);
+    if (kept) await pinAnnouncement(ownerId, installedAppId, announcement, sentAt);
+    return { sent, kept };
 }
