@@ -5294,10 +5294,7 @@ async function deliverPending(
     const held = stored.heldNames(state);
     const owed = stored
         .livePending(state.pending, Date.now())
-        .filter(
-            (one) =>
-                seen.has(one.player.toLowerCase()) && !held.has(one.player.toLowerCase())
-        );
+        .filter((one) => seen.has(one.player.toLowerCase()) && !held.has(one.player.toLowerCase()));
     if (owed.length === 0) return;
     /** What is still owed after this, by pending id: null when all of it arrived. */
     const left = new Map<
