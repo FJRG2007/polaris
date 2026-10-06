@@ -163,6 +163,8 @@ export function VariablesEditor({
     // The row the pointer is over, for F2: an editor's rename key works on what
     // is under the hand as much as on what was clicked.
     const hovered = useRef<EnvVarView | null>(null);
+    const listRef = useRef<HTMLUListElement>(null);
+    const editHovered = useRef<(row: EnvVarView) => Promise<void>>(async () => {});
     const copyTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
     const nextId = () => `new-${++counter.current}`;
 
@@ -199,17 +201,20 @@ export function VariablesEditor({
         if (!canWrite) return;
         function onKey(event: KeyboardEvent): void {
             if (event.key !== "F2" || event.defaultPrevented || !hovered.current) return;
-            const typing = document.activeElement;
-            if (typing instanceof HTMLInputElement || typing instanceof HTMLTextAreaElement)
+            const target = event.target;
+            if (target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement)
+                return;
+            if (
+                target !== document.body &&
+                !(target instanceof Node && listRef.current?.contains(target))
+            )
                 return;
             event.preventDefault();
-            void startEditing(hovered.current);
+            void editHovered.current(hovered.current);
         }
         window.addEventListener("keydown", onKey);
         return () => window.removeEventListener("keydown", onKey);
-        // startEditing reads the latest state through its setters.
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [canWrite, revealed, known]);
+    }, [canWrite]);
 
     const list = rows ?? NO_ROWS;
     const compared = useMemo(() => ({ ...known, ...revealed }), [known, revealed]);
@@ -306,6 +311,7 @@ export function VariablesEditor({
         setRevealed((current) => ({ ...current, [row.id]: value }));
         setEditing((current) => new Set(current).add(row.id));
     }
+    editHovered.current = startEditing;
 
     /** Leave a row's box: Enter keeps what was typed, Escape puts it back. */
     function stopEditing(id: string, keep: boolean): void {
@@ -491,7 +497,7 @@ export function VariablesEditor({
                     {canWrite ? t("variables.emptyWritable") : t("variables.empty")}
                 </p>
             ) : (
-                <ul className="flex flex-col">
+                <ul ref={listRef} className="flex flex-col">
                     {draft.added.map((item) => (
                         <li
                             key={item.tempId}
