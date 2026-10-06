@@ -166,6 +166,32 @@ describe("the scoreboard", () => {
 });
 
 describe("reading what the server says", () => {
+    it("asks for answers a few dozen lines to a trip, and alone only what a trip lost", async () => {
+        const lines = Array.from({ length: 60 }, (_, at) => `tp P${at} 0 64 0`);
+        const trips: number[] = [];
+        const alone: string[] = [];
+        const answers = await commands.answersOf(
+            {
+                say: async ([line]) => {
+                    alone.push(line!);
+                    return `alone ${line}`;
+                },
+                sayEach: async (argvs) => {
+                    trips.push(argvs.length);
+                    if (trips.length === 2) throw new Error("timed out");
+                    return argvs.map(([line]) => `trip ${line}`);
+                }
+            },
+            lines
+        );
+        expect(trips).toEqual([25, 25, 10]);
+        expect(alone).toEqual(lines.slice(25, 50));
+        expect(answers).toHaveLength(60);
+        expect(answers[0]).toBe("trip tp P0 0 64 0");
+        expect(answers[30]).toBe("alone tp P30 0 64 0");
+        expect(answers[59]).toBe("trip tp P59 0 64 0");
+    });
+
     it("reads scores, and ignores somebody who has none", () => {
         const output =
             "Ana has 12 [pe_score]Ben has 3 [pe_score]\nCan't get value of pe_score for Cai; none is set";
@@ -2667,6 +2693,11 @@ describe("the kit is marked, and only it is taken back", () => {
             'nbt={Item:{components:{"minecraft:custom_data":{polaris_event:1b}}}}'
         );
         expect(arena.killMarkedDrops(box, "tag")).toContain("nbt={Item:{tag:{polaris_event:1b}}}");
+        // What a broken block let fall: never the kit, never anything thrown.
+        expect(arena.killBrokenDrops(box, "components")).toBe(
+            'execute in minecraft:overworld as @e[type=minecraft:item,x=0,y=100,z=0,dx=16,dy=7,dz=22,nbt=!{Item:{components:{"minecraft:custom_data":{polaris_event:1b}}}}] unless data entity @s Thrower run kill @s'
+        );
+        expect(arena.killBrokenDrops(box, "tag")).toContain("nbt=!{Item:{tag:{polaris_event:1b}}}");
     });
 
     it("reads each player's game mode and id", () => {

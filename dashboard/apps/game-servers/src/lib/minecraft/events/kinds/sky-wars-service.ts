@@ -107,10 +107,10 @@ async function goLines(ctx: KindContext): Promise<string[]> {
                 warMessages.goSubtitle(ctx.language)
             )
         );
-    // Islands broken by hand: survival, but only when nothing broken drops
-    // (`sw.TILE_DROPS`), so nothing unmarked is carried home.
-    if (sw.TILE_DROPS.some((rule) => run.gamerules[rule] !== undefined))
-        for (const one of run.entrants) out.push(`gamemode survival ${one.name}`);
+    // Islands broken by hand: survival, but only with a marker to tell the
+    // kit from what a broken block lets fall (`sw.quickLines`), so nothing
+    // unmarked is carried home.
+    if (run.marker) for (const one of run.entrants) out.push(`gamemode survival ${one.name}`);
     // The cages down last, everybody already on their own spot.
     out.push(...sw.cagesDown(layoutOf(run), atOf(run)));
     return out;
@@ -323,7 +323,7 @@ export const skyWars: ArenaGame = {
     ],
     goLines,
     tick,
-    quickLines: (run) => sw.quickLines(layoutOf(run), atOf(run), run.arena!.box),
+    quickLines: (run) => sw.quickLines(layoutOf(run), atOf(run), run.arena!.box, run.marker),
     results: (run) =>
         sw.scoresOf(
             sw.stateOf(run.game),

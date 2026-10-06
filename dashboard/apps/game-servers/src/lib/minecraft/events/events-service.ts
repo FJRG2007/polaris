@@ -33,7 +33,6 @@ import * as trivia from "./trivia-bank";
 import * as chunks from "./kinds/chunks";
 import { host } from "@polaris/app-host";
 import * as duel from "./kinds/team-duel";
-import * as sw from "./kinds/sky-wars";
 import * as boost from "./kinds/xp-boost";
 import { parseProperties } from "../parse";
 import { readSchedule } from "../schedule";
@@ -1589,20 +1588,6 @@ async function begin(
         // with keepInventory, and put back with it.
         if (preset.kind === "team-duel" || preset.kind === "capture-the-flag") {
             for (const rule of duel.NATURAL_REGENERATION) {
-                const value =
-                    loop.run.gamerules[rule] ??
-                    commands.readRuleValue(await server.say([commands.readRule(rule)]));
-                if (value === null) continue;
-                before[rule] = value;
-                lines.push(commands.setRule(rule, "false"));
-                break;
-            }
-        }
-        // SkyWars is played in survival, the islands broken by hand; nothing
-        // broken drops, so nothing unmarked reaches an inventory - written
-        // down and put back like the rest.
-        if (preset.kind === "sky-wars") {
-            for (const rule of sw.TILE_DROPS) {
                 const value =
                     loop.run.gamerules[rule] ??
                     commands.readRuleValue(await server.say([commands.readRule(rule)]));

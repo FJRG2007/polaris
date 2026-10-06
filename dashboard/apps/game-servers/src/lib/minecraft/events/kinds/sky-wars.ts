@@ -31,7 +31,7 @@
  */
 
 import { z } from "zod";
-import { marked } from "./arena";
+import { killBrokenDrops, marked } from "./arena";
 import type { Spot } from "./arena";
 import type { Fill } from "./arena-game";
 import type { Box, Marker } from "../state";
@@ -1061,10 +1061,6 @@ export const GONE_TAG = "pe_sw_gone";
 /** How long after a blow its striker is still credited with somebody going out. */
 export const CREDIT_MS = 10_000;
 
-/** Whether a broken block drops, by its name before 1.21.11 and after. Held
- *  off while SkyWars runs: the islands are broken by hand, in survival. */
-export const TILE_DROPS = ["doTileDrops", "block_drops"] as const;
-
 /** The counts the game keeps: damage taken, and bows drawn. */
 export const TAKEN = "pe_swt";
 export const BOWS = "pe_swb";
@@ -1101,10 +1097,16 @@ export const TEARDOWN = [
  * Between ticks, nothing read: whoever is down to `OUT_HEALTH` shielded until
  * the tick puts them out; whoever crossed the play area's edge - under the
  * islands, past a side, over the top - taken up to the gallery at once and
- * marked for the tick, before they could place anything outside the box; and
- * an arrow stuck in a block gone before anybody picks it up as their own.
+ * marked for the tick, before they could place anything outside the box; an
+ * arrow stuck in a block gone before anybody picks it up as their own; and,
+ * with a marker, what a broken block let fall (`arena.killBrokenDrops`).
  */
-export function quickLines(layout: Layout, at: Placed, box: Box): string[] {
+export function quickLines(
+    layout: Layout,
+    at: Placed,
+    box: Box,
+    marker: Marker | null = null
+): string[] {
     const play = playArea(layout, at);
     const who = `tag=pe_arena,tag=!${OUT_TAG}`;
     const far = 64;
@@ -1133,7 +1135,8 @@ export function quickLines(layout: Layout, at: Placed, box: Box): string[] {
             (one) => `execute in minecraft:overworld run tag @a[${who},${one}] add ${GONE_TAG}`
         ),
         `execute in minecraft:overworld run tp @a[${who},tag=${GONE_TAG}] ${seat.x + 0.5} ${seat.y} ${seat.z + 0.5}`,
-        `execute in minecraft:overworld run kill @e[type=minecraft:arrow,${box2},nbt={inGround:1b}]`
+        `execute in minecraft:overworld run kill @e[type=minecraft:arrow,${box2},nbt={inGround:1b}]`,
+        ...(marker ? [killBrokenDrops(box, marker)] : [])
     ];
 }
 

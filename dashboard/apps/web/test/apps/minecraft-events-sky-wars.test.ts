@@ -309,6 +309,12 @@ describe("SkyWars' rules", () => {
         expect(lines.at(-1)).toContain("nbt={inGround:1b}");
     });
 
+    it("sweeps what a broken block let fall in the box, only with a marker to spare the kit", () => {
+        const lines = sw.quickLines(layout, at, box, "components");
+        expect(lines.at(-1)).toBe(arena.killBrokenDrops(box, "components"));
+        expect(lines).toHaveLength(sw.quickLines(layout, at, box).length + 1);
+    });
+
     it("credits a hit to the nearest who struck, or else the nearest who drew a bow", () => {
         const victim = { x: 0, y: 100, z: 0 };
         expect(sw.hitBy(victim, [{ name: "Ana", x: 2, y: 100, z: 0 }], [])).toBe("Ana");

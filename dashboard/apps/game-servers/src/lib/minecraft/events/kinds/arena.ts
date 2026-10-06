@@ -240,13 +240,25 @@ export function clearMarked(name: string, id: string, marker: Marker): string {
         : `clear ${name} ${id}{${MARK}}`;
 }
 
+/** How a marked item reads in an item entity's `Item`. */
+function markedItem(marker: Marker): string {
+    return marker === "components"
+        ? `{components:{"minecraft:custom_data":{${MARK}}}}`
+        : `{tag:{${MARK}}}`;
+}
+
 /** Kit lying about in the box, dropped or thrown: gone, and only it. */
 export function killMarkedDrops(box: Box, marker: Marker): string {
-    const item =
-        marker === "components"
-            ? `{components:{"minecraft:custom_data":{${MARK}}}}`
-            : `{tag:{${MARK}}}`;
-    return `${IN_OVERWORLD} kill @e[type=minecraft:item,${within(box)},nbt={Item:${item}}]`;
+    return `${IN_OVERWORLD} kill @e[type=minecraft:item,${within(box)},nbt={Item:${markedItem(marker)}}]`;
+}
+
+/**
+ * What a block broken in the box let fall: gone before anybody can pick it up,
+ * so nothing unmarked leaves with them. Never the kit, and never what somebody
+ * threw (it has a `Thrower`), so nobody's own things are touched.
+ */
+export function killBrokenDrops(box: Box, marker: Marker): string {
+    return `execute in minecraft:overworld as @e[type=minecraft:item,${within(box)},nbt=!{Item:${markedItem(marker)}}] unless data entity @s Thrower run kill @s`;
 }
 
 /**

@@ -1099,11 +1099,14 @@ One entry per bug: what a player saw, why, and the rule that keeps it gone.
   (`boat-race.boatLines`); never turn a boat with a `tp` afterwards.
 - **SkyWars islands cannot be broken.** `arena.enter` puts every entrant in
   adventure mode, whatever the kind, and SkyWars never changed it. A kind
-  whose blocks must break switches its entrants to survival at Go, and holds
-  `doTileDrops` / `block_drops` off for the run so nothing unmarked reaches an
-  inventory; anyone put out goes back to adventure. Survival is only given
-  when the rule could be held. Not yet seen on a live server: whether a chest
-  broken with drops off still spills its (marked) contents.
+  whose blocks must break switches its entrants to survival at Go, and the
+  quick look kills every unmarked, unthrown item in the box
+  (`arena.killBrokenDrops`) so nothing unmarked reaches an inventory; anyone
+  put out goes back to adventure. Never hold `doTileDrops` / `block_drops`
+  off for it: that rule is server-wide, and whatever anybody outside the
+  event broke meanwhile would be lost for good. Survival is only given with a
+  marker to tell the kit apart. Not yet seen on a live server: whether a
+  sweep every 400 ms always beats a dropped block's half-second pickup delay.
 - **Capture the flag calls a player "out" nobody touched.** Health is read
   from a `health` objective, which has no score for a player until their
   health changes, and no score reads as whole. A player who walked in hurt

@@ -144,8 +144,6 @@ interface World {
     /** Health not said is no score at all, as the game has it until a
      *  player's health first changes after the count was made. */
     hpUnset: boolean;
-    /** A server that answers neither name of the block-drops rule. */
-    tileDropsUnknown: boolean;
     /** Called with every line as the game takes it, before it answers. */
     onLine: ((line: string) => void) | null;
     dealt: Record<string, number>;
@@ -1178,11 +1176,6 @@ function answer(sent: string): string {
             ? `Gamerule ${line.slice(9)} is currently set to: true`
             : "Unknown or incomplete command, see below for error";
     }
-    if (line === "gamerule doTileDrops" || line === "gamerule block_drops") {
-        return !world.tileDropsUnknown && world.renamedRules === (line === "gamerule block_drops")
-            ? `Gamerule ${line.slice(9)} is currently set to: true`
-            : "Unknown or incomplete command, see below for error";
-    }
     if (line === "gamerule keepInventory") {
         return world.keepInventory === "unknown"
             ? "Unknown or incomplete command, see below for error"
@@ -2043,7 +2036,6 @@ beforeEach(() => {
     world.tags = {};
     world.attackers = {};
     world.hpUnset = false;
-    world.tileDropsUnknown = false;
     world.onLine = null;
     world.links = {};
     world.locales = {};
@@ -11329,15 +11321,20 @@ describe("SkyWars", () => {
         // nothing hides an island from its player.
         for (const line of sw.cagesDown(layout, at)) expect(world.sent).toContain(line);
         expect(world.sent).toContain("gamerule keepInventory true");
-        // Islands broken by hand: survival from "Go!", and nothing broken drops.
-        expect(world.sent).toContain("gamerule doTileDrops false");
+        // Islands broken by hand: survival from "Go!", and what breaks swept
+        // from the box, never a rule that holds drops off for the whole server.
         for (const name of names) {
             const survival = world.sent.indexOf(`gamemode survival ${name}`);
             expect(survival).toBeGreaterThan(world.sent.indexOf(`gamemode adventure ${name}`));
-            expect(survival).toBeGreaterThan(world.sent.indexOf("gamerule doTileDrops false"));
         }
+        expect(world.sent.some((line) => /^gamerule (doTileDrops|block_drops)/.test(line))).toBe(
+            false
+        );
         await play(500);
         expect(world.sent.some((line) => line.endsWith(" add pe_sw_gone"))).toBe(true);
+        expect(
+            world.sent.some((line) => line.endsWith("unless data entity @s Thrower run kill @s"))
+        ).toBe(true);
 
         // Cy falls under the islands: out, up to the gallery, the kit taken.
         const play0 = sw.playArea(layout, at);
@@ -11392,29 +11389,8 @@ describe("SkyWars", () => {
             true
         );
         expect(world.sent).toContain("scoreboard objectives remove pe_swb");
-        expect(world.sent).toContain("gamerule doTileDrops true");
         expect(done.arenaLeftovers).toEqual([]);
         onlyOurBlocks();
-    });
-
-    it("holds block drops off by the rule's new name, and stays in adventure on a server that has neither", async () => {
-        world.online = [...names];
-        world.renamedRules = true;
-        setUp([warOf()]);
-        await joinAndStart("war", names);
-        expect(world.sent).toContain("gamerule block_drops false");
-        expect(world.sent).toContain("gamemode survival Ana");
-        await events.cancelEvent("owner", SERVER);
-        await play(2_100);
-        expect(world.sent).toContain("gamerule block_drops true");
-
-        world.sent = [];
-        world.renamedRules = false;
-        world.tileDropsUnknown = true;
-        setUp([warOf()]);
-        await joinAndStart("war", names);
-        expect(state().run!.readyAt).not.toBeNull();
-        expect(world.sent.some((line) => line.startsWith("gamemode survival"))).toBe(false);
     });
 
     it("credits whoever the game says hurt a player, never a striker beside one hurt by a fall", async () => {
