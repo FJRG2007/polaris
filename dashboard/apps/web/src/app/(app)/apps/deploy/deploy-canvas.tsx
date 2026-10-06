@@ -859,7 +859,7 @@ export function DeployCanvas({
                     <div
                         ref={containerRef}
                         data-board-frame
-                        className="absolute inset-0 cursor-grab overflow-auto overscroll-contain data-[panning]:cursor-grabbing"
+                        className={`absolute inset-0 cursor-grab overflow-auto overscroll-contain data-[panning]:cursor-grabbing${hasNodes ? " touch-none" : ""}`}
                         style={DOT_BG}
                     >
                         {/* Sized to the board at the current zoom, so the frame

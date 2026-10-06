@@ -45,6 +45,20 @@ const WHEEL_RATE = 0.002;
 /** How far a press may wander and still be a click rather than a drag. */
 const CLICK_SLOP = 4;
 
+/**
+ * The click a drag ends in, if the browser sends one, is not a click on what it
+ * ended over. Only the click of this same release: a drag that sends none (a
+ * touch, or a release outside the window) leaves nothing behind to eat the next.
+ */
+export function swallowNextClick(): void {
+    const swallow = (click: MouseEvent) => {
+        click.stopPropagation();
+        click.preventDefault();
+    };
+    window.addEventListener("click", swallow, { capture: true, once: true });
+    setTimeout(() => window.removeEventListener("click", swallow, { capture: true }), 0);
+}
+
 /** The factor one wheel event zooms by. Lines and pages are turned into the
  *  pixels a wheel in pixel mode would have sent, so every mouse zooms alike. */
 export function wheelFactor(event: { readonly deltaY: number; readonly deltaMode: number }): number {
@@ -189,12 +203,7 @@ export function useBoardGestures(
             // A drag that moved the board ends over something; it was not a click
             // on that something.
             if (travelled > CLICK_SLOP) {
-                const swallow = (click: MouseEvent) => {
-                    click.stopPropagation();
-                    click.preventDefault();
-                };
-                window.addEventListener("click", swallow, { capture: true, once: true });
-                setTimeout(() => window.removeEventListener("click", swallow, { capture: true }), 0);
+                swallowNextClick();
             }
         }
 

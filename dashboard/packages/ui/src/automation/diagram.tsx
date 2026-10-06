@@ -23,6 +23,7 @@ import { Button } from "../components/button";
 import { Maximize, ZoomIn, ZoomOut } from "lucide-react";
 import {
     fitBoard,
+    swallowNextClick,
     useBoardGestures,
     zoomViewAt,
     type BoardBounds,
@@ -244,14 +245,7 @@ export function Diagram({
             if (moved) {
                 onDrop(node.id, last);
                 // The press that dragged is not also a click on the node.
-                window.addEventListener(
-                    "click",
-                    (click) => {
-                        click.stopPropagation();
-                        click.preventDefault();
-                    },
-                    { capture: true, once: true }
-                );
+                swallowNextClick();
             }
         };
         window.addEventListener("pointermove", move);
@@ -367,7 +361,10 @@ export function Diagram({
                     );
                 })}
             </div>
-            <div className="absolute bottom-2 left-2 flex items-center rounded-md border border-border bg-elevated">
+            <div
+                className="absolute bottom-2 left-2 flex items-center rounded-md border border-border bg-elevated"
+                onClick={(event) => event.stopPropagation()}
+            >
                 {(
                     [
                         [labels.zoomIn, <ZoomIn key="in" className="size-4" />, () => zoomCentre(STEP)],

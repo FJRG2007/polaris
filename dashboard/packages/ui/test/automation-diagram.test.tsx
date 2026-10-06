@@ -145,9 +145,10 @@ beforeEach(() => {
     }));
 });
 
-afterEach(() => {
+afterEach(async () => {
     cleanup();
     vi.unstubAllGlobals();
+    await new Promise((resolve) => setTimeout(resolve, 0));
 });
 
 describe("the diagram", () => {
@@ -190,6 +191,27 @@ describe("the diagram", () => {
         expect(order).toEqual(["step02", "step01"]);
         fireEvent.keyDown(node("step01"), { key: "Delete" });
         expect(order).toEqual(["step02"]);
+    });
+
+    it("keeps the selection when a zoom control is pressed", () => {
+        render(<Editor />);
+        fireEvent.click(node("step01"));
+        expect(node("step01").getAttribute("aria-pressed")).toBe("true");
+        fireEvent.click(screen.getByRole("button", { name: "Zoom in" }));
+        expect(node("step01").getAttribute("aria-pressed")).toBe("true");
+    });
+
+    it("lets the next click through after a drag that sent none", async () => {
+        render(<Editor />);
+        const step = node("step01");
+        act(() => {
+            step.dispatchEvent(new PointerEvent("pointerdown", { button: 0, clientX: 10, clientY: 10, bubbles: true }));
+            window.dispatchEvent(new PointerEvent("pointermove", { clientX: 10, clientY: 400 }));
+            window.dispatchEvent(new PointerEvent("pointerup", { clientX: 10, clientY: 400 }));
+        });
+        await painted();
+        fireEvent.click(node("step02"));
+        expect(node("step02").getAttribute("aria-pressed")).toBe("true");
     });
 
     it("leaves a fixed trigger where it is", () => {
