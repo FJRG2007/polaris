@@ -18,11 +18,11 @@
         "test": "vitest run --passWithNoTests"
     },
     "dependencies": {
-        "@embedpdf/pdfium": "2.15.0",
+        "@embedpdf/pdfium": "2.15.1",
         "@polaris/docx": "*",
         "@polaris/font-metrics": "*",
         "@polaris/pptx": "*",
         "bidi-js": "1.1.0",
-        "jszip": "3.10.1"
+        "jszip": "3.10.2"
     }
 }
