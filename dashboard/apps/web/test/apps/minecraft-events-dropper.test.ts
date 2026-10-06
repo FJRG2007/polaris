@@ -219,6 +219,75 @@ describe("a dropper's shaft", () => {
         expect(dropper.fallTick({ y: 5, velocity: 0 })).toEqual({ y: 5, velocity: -0.01 * 0.98 });
     });
 
+    it("is never in the air longer than the server lets a player be", () => {
+        // The server's own limit before "Flying is not enabled on this server":
+        // 80 ticks, times how much lighter than 0.08 the player's gravity is
+        // (`ServerGamePacketListenerImpl.getMaximumFlyingTicks`).
+        const limit = (gravity: number) => Math.ceil(80 * Math.max(0.08 / gravity, 1));
+        // What happened before: let go from the top at y 224 under Slow Falling
+        // alone, both racers were kicked at y 204.0404329834322 - exactly where
+        // that fall is on its 81st tick, the first one over the limit.
+        let fall: dropper.Fall = { y: 224, velocity: 0 };
+        for (let tick = 0; tick <= limit(0.08); tick += 1) fall = dropper.fallTick(fall);
+        expect(fall.y).toBeCloseTo(204.0404329834322, 4);
+        // The lighter gravity is Slow Falling's own, so the fall is unchanged...
+        expect(stage.LIGHT_GRAVITY).toBe(dropper.PHYSICS.gravity);
+        expect(0.08 * (1 + Number(stage.lightFallLines("Ana")[0]!.split(" ").at(-2)))).toBeCloseTo(
+            stage.LIGHT_GRAVITY,
+            12
+        );
+        // ...and the deepest shaft, fallen from the lid to the water without
+        // touching a floor, takes well under the limit it gives.
+        let longest = 0;
+        for (const difficulty of DIFFICULTIES)
+            for (let seed = 0; seed < 200; seed += 1) {
+                const shaft = dropper.shaft(
+                    { levels: 20, difficulty },
+                    `deep-${seed}`,
+                    { x: 0, z: 0 },
+                    60
+                );
+                let falling: dropper.Fall = { y: shaft.top + 1, velocity: 0 };
+                let ticks = 0;
+                while (falling.y > shaft.water) {
+                    falling = dropper.fallTick(falling);
+                    ticks += 1;
+                }
+                longest = Math.max(longest, ticks);
+            }
+        expect(longest).toBeGreaterThan(limit(0.08));
+        expect(longest).toBeLessThan(limit(stage.LIGHT_GRAVITY) - 60);
+    });
+
+    it("lends a racer the lighter fall by name, under both names of the attribute, and takes it back", () => {
+        expect(stage.lightFallLines("Ana")).toEqual([
+            "attribute Ana minecraft:gravity modifier add polaris:event_light_fall -0.875 add_multiplied_base",
+            "attribute Ana minecraft:generic.gravity modifier add polaris:event_light_fall -0.875 add_multiplied_base"
+        ]);
+        expect(stage.normalFallLines("Ana")).toEqual([
+            "attribute Ana minecraft:gravity modifier remove polaris:event_light_fall",
+            "attribute Ana minecraft:generic.gravity modifier remove polaris:event_light_fall"
+        ]);
+        // Every way home takes it off.
+        const saved: stage.Saved = {
+            name: "Ana",
+            dimension: "minecraft:overworld",
+            x: 0,
+            y: 64,
+            z: 0,
+            yaw: 0,
+            pitch: 0,
+            mode: "survival"
+        };
+        const after = stage.afterReturnLines(saved, "components", "&7Back");
+        for (const line of stage.normalFallLines("Ana")) expect(after).toContain(line);
+        for (const line of [
+            ...stage.lightFallLines("Maximilian_1234"),
+            ...stage.normalFallLines("Maximilian_1234")
+        ])
+            expect(commandBytes(line)).toBeLessThanOrEqual(COMMAND_BYTES_MAX);
+    });
+
     it("is built of boxes that never share a block, inside its volume, the water held in", () => {
         const wrong: string[] = [];
         const check = (ok: boolean, what: string) => {

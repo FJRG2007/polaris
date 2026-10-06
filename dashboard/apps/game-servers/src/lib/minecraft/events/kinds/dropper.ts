@@ -42,6 +42,14 @@
  * is: the fall is a steady half a block a tick, there is time to steer, and no
  * fall can hurt anybody.
  *
+ * That pace makes a fall long: twenty blocks take four seconds, and four
+ * seconds in the air is what the server allows before it disconnects a player
+ * for flying - every racer let go from the top was kicked at the same height,
+ * twenty blocks down. So from "Go!" each racer's own gravity is brought down to
+ * Slow Falling's (`stage.lightFallLines`), which leaves the fall as it is and
+ * gives them thirty-two seconds; the deepest shaft is under twenty-seven (the
+ * tests).
+ *
  * Pure: the plan, the boxes and the lines are functions of what they are given.
  */
 
