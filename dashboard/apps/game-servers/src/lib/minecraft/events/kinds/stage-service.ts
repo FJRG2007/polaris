@@ -609,6 +609,9 @@ async function admit(
             // dropper's racer, nowhere yet.
             ...(layout.kind === "parkour" ? parkour.racerScores(one.name, racer.checkpoint) : []),
             ...(layout.kind === "dropper" ? dropper.racerScores(one.name, layout.shaft) : []),
+            // A late racer is let go from the top straight away: a fall that
+            // may last longer than the server lets anybody be in the air.
+            ...(layout.kind === "dropper" && !holding(loop) ? stage.lightFallLines(one.name) : []),
             ...(layout.kind === "tnt-run" ? tntRun.racerLines(one.name) : []),
             ...(layout.kind === "boat-race"
                 ? boatRace.racerScores(one.name, resumed, layout.track.gates.length)
@@ -721,7 +724,11 @@ async function returnOne(
     // Sent home already, by an end that stopped before it gave everything back:
     // not moved again, only given what they are still owed.
     const say = (line: string) => server.say([line]);
-    if (await commands.alreadyBack(say, saved.name, stage.IN_ARENA)) return giveBack();
+    if (await commands.alreadyBack(say, saved.name, stage.IN_ARENA)) {
+        // Their own gravity too, should that end have stopped before it.
+        await server.sayAll(stage.normalFallLines(saved.name));
+        return giveBack();
+    }
     // The event's items off, then home, then - there - their own game mode.
     await server.sayAll(stage.clearMarked(saved.name, items));
     if (!stage.returned(await server.say([stage.returnLine(saved)]))) return false;
@@ -907,6 +914,9 @@ async function holdTick(
             lines.push(
                 stage.moveLine(racer.name, spawn),
                 ...dropper.racerScores(racer.name, layout.shaft),
+                // Falls of more than four seconds without being kicked for
+                // flying (`stage.lightFallLines`); taken off on the way home.
+                ...stage.lightFallLines(racer.name),
                 `title ${racer.name} times 5 40 10`,
                 `title ${racer.name} subtitle ${commands.text(dropperMessages.goSubtitle(language))}`,
                 `title ${racer.name} title ${commands.text(messages.goTitle(language))}`,
@@ -1280,6 +1290,8 @@ async function dropperTick(
                     ? now
                     : Math.max(racer.since, Math.min(now, now - Math.max(0, gameNow - tick) * 50));
             next = { ...next, best: levels, finishedAt: when };
+            // In the water: their own gravity back, so a jump is a jump.
+            lines.push(...stage.normalFallLines(racer.name));
             const place = state(loop).racers.filter((one) => one.finishedAt !== null).length + 1;
             lines.push(
                 commands.say(

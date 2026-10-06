@@ -489,14 +489,51 @@ export function returned(output: string): boolean {
 }
 
 /**
+ * A long fall under Slow Falling without being kicked for flying. The server
+ * counts every tick a player spends in the air, and past a limit disconnects
+ * them with "Flying is not enabled on this server" - 80 ticks, four seconds,
+ * scaled up by how much lighter than the usual 0.08 the player's own gravity
+ * is (`ServerGamePacketListenerImpl.getMaximumFlyingTicks`: 80 x 0.08 /
+ * gravity). Slow Falling slows the fall but leaves that gravity alone, so a
+ * fall under it of more than four seconds - twenty blocks - was a kick.
+ *
+ * This modifier brings the gravity itself down to Slow Falling's 0.01: the fall
+ * is exactly the same (Slow Falling already takes the lesser of the two), and
+ * the limit becomes 640 ticks, thirty-two seconds. Only where Slow Falling is on
+ * and nothing is jumped from: going up, the lighter gravity applies too.
+ *
+ * Both names of the attribute, because 1.21.2 renamed it (`generic.gravity` to
+ * `gravity`); the one a release does not know, and the whole command before
+ * 1.21, only answers with an error. Taken off by every return
+ * (`afterReturnLines`), so it never outlives the event, whatever ended it.
+ */
+export const LIGHT_FALL = "polaris:event_light_fall";
+const GRAVITY = ["minecraft:gravity", "minecraft:generic.gravity"];
+/** The gravity a lighter fall comes down to: Slow Falling's. */
+export const LIGHT_GRAVITY = 0.01;
+
+export function lightFallLines(name: string): string[] {
+    return GRAVITY.map(
+        (attribute) =>
+            `attribute ${name} ${attribute} modifier add ${LIGHT_FALL} ${LIGHT_GRAVITY / 0.08 - 1} add_multiplied_base`
+    );
+}
+
+export function normalFallLines(name: string): string[] {
+    return GRAVITY.map((attribute) => `attribute ${name} ${attribute} modifier remove ${LIGHT_FALL}`);
+}
+
+/**
  * Everything else about being back: the event's own items taken (and nothing
- * else), the game mode they had, the tag off, and a few seconds more of
- * protection - somebody who joined mid-air lands safely where they left.
+ * else), the game mode they had, their own gravity (`lightFallLines`), the tag
+ * off, and a few seconds more of protection - somebody who joined mid-air lands
+ * safely where they left.
  */
 export function afterReturnLines(saved: Saved, items: Flavour["items"], note: string): string[] {
     return [
         ...clearMarked(saved.name, items),
         `gamemode ${saved.mode} ${saved.name}`,
+        ...normalFallLines(saved.name),
         `tag ${saved.name} remove ${IN_ARENA}`,
         protect(saved.name),
         `tellraw ${saved.name} ${text(note)}`

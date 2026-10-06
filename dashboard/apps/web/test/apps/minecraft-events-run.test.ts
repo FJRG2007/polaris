@@ -6724,6 +6724,13 @@ describe("a dropper", () => {
             world.sent.indexOf("scoreboard players set #on polaris_drop 1")
         );
         expect(state().run!.readyAt).not.toBeNull();
+        // Each racer's gravity down to Slow Falling's from Go, never on the lid
+        // before it: a fall longer than four seconds is not taken for flying.
+        for (const name of ["Ana", "Ben"])
+            for (const line of stageKit.lightFallLines(name)) {
+                expect(world.sent).toContain(line);
+                expect(world.sent.indexOf(line)).toBeGreaterThan(one);
+            }
 
         // The pack sends Ben back up: the quick look tells him, once.
         scores("pe_back").Ben = 1;
@@ -6753,6 +6760,9 @@ describe("a dropper", () => {
             )
         ).toBe(true);
         expect(state().run!.stage!.racers.find((one) => one.name === "Ben")!.best).toBe(3);
+        // In the water: Ana's own gravity back straight away.
+        for (const line of stageKit.normalFallLines("Ana")) expect(world.sent).toContain(line);
+        const beforeLeaving = world.sent.length;
         chat(["Ben", "leave"]);
         await play(4_100);
 
@@ -6761,6 +6771,9 @@ describe("a dropper", () => {
         expect(after.history[0]?.note).toBe("Everybody finished or dropped out");
         expect(after.history[0]?.podium?.[0]).toMatchObject({ place: 1, name: "Ana" });
         expect(after.history[0]?.podium?.[1]).toEqual({ place: 2, name: "Ben", score: 3 });
+        // And Ben's, on the way home.
+        for (const line of stageKit.normalFallLines("Ben"))
+            expect(world.sent.slice(beforeLeaving)).toContain(line);
         for (const line of dropperKind.stopLines(shaft.boxes)) expect(world.sent).toContain(line);
         for (const line of dropperKind.SCORES_REMOVED) expect(world.sent).toContain(line);
         expect(world.inside.size).toBe(0);
