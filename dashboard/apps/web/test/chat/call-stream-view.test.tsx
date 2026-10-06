@@ -188,8 +188,8 @@ describe("a stream in a direct message", () => {
                 place="direct"
                 call={call()}
                 expanded
-                onExpand={() => undefined}
-                onLeave={() => undefined}
+                onExpand={vi.fn()}
+                onLeave={vi.fn()}
             />,
             { wrapper: MessagesWrapper }
         );
