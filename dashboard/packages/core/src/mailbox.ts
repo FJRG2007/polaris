@@ -642,7 +642,14 @@ export function dedupeAddresses(entries: readonly MailAddress[]): readonly MailA
  * called `Gesendete Objekte` has to work the same as one whose is not.
  */
 export type MailFolderRole =
-    "inbox" | "sent" | "drafts" | "trash" | "junk" | "archive" | "all" | "none";
+    | "inbox"
+    | "sent"
+    | "drafts"
+    | "trash"
+    | "junk"
+    | "archive"
+    | "all"
+    | "none";
 
 /**
  * The roles a person may point a folder at.
@@ -1181,7 +1188,8 @@ export function mailConditionHolds(
     if (more.length === 0) return oneValueHolds(condition, message, testPattern);
     const values = [condition.value, ...more];
     // Every pattern in one run, so the server's time limit holds per condition.
-    if (condition.operator === "matches") return patternHolds(condition, values, message, testPattern);
+    if (condition.operator === "matches")
+        return patternHolds(condition, values, message, testPattern);
     // "Does not contain this or that" means neither is there.
     const negative = condition.operator === "not-contains" || condition.operator === "is-not";
     return negative

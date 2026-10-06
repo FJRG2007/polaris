@@ -331,7 +331,9 @@ export function ConditionCard({
                                     {more.map((value, at) => (
                                         <div key={at} className="flex min-w-0 items-center gap-2">
                                             <span className="w-6 shrink-0 text-xs text-muted-foreground">
-                                                {negative ? t("rules.editor.nor") : t("rules.editor.or")}
+                                                {negative
+                                                    ? t("rules.editor.nor")
+                                                    : t("rules.editor.or")}
                                             </span>
                                             <Input
                                                 value={value}
@@ -344,7 +346,9 @@ export function ConditionCard({
                                                 onChange={(event) =>
                                                     setMore(
                                                         more.map((entry, index) =>
-                                                            index === at ? event.target.value : entry
+                                                            index === at
+                                                                ? event.target.value
+                                                                : entry
                                                         )
                                                     )
                                                 }
@@ -360,7 +364,9 @@ export function ConditionCard({
                                                     })}
                                                     className="inline-flex size-7 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
                                                     onClick={() =>
-                                                        setMore(more.filter((_, index) => index !== at))
+                                                        setMore(
+                                                            more.filter((_, index) => index !== at)
+                                                        )
                                                     }
                                                 >
                                                     <X className="size-3.5" />

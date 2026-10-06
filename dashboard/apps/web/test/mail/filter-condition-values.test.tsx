@@ -62,15 +62,22 @@ describe("a condition with more than one value", () => {
     it("is said as this or that", () => {
         const t = (key: string, values?: Record<string, unknown>) =>
             translate("en-US", `mailSettings.${key}`, values as never);
-        expect(
-            describeCondition({ ...SUBJECT, alternatives: ["Run cancelled"] }, t as never)
-        ).toBe('the subject contains "PR run failed:" or "Run cancelled"');
+        expect(describeCondition({ ...SUBJECT, alternatives: ["Run cancelled"] }, t as never)).toBe(
+            'the subject contains "PR run failed:" or "Run cancelled"'
+        );
         expect(
             describeCondition(
-                { ...SUBJECT, operator: "not-contains", alternatives: ["Run cancelled"], caseSensitive: true },
+                {
+                    ...SUBJECT,
+                    operator: "not-contains",
+                    alternatives: ["Run cancelled"],
+                    caseSensitive: true
+                },
                 t as never
             )
-        ).toBe('the subject does not contain "PR run failed:" nor "Run cancelled" (capitals count)');
+        ).toBe(
+            'the subject does not contain "PR run failed:" nor "Run cancelled" (capitals count)'
+        );
     });
 });
 
@@ -84,9 +91,12 @@ describe("capitals", () => {
     });
 
     it("are not offered where nothing is text", () => {
-        render(<Card start={{ id: "cond01", kind: "size", operator: "greater-than", value: "100" }} />, {
-            wrapper: MessagesWrapper
-        });
+        render(
+            <Card start={{ id: "cond01", kind: "size", operator: "greater-than", value: "100" }} />,
+            {
+                wrapper: MessagesWrapper
+            }
+        );
         expect(screen.queryByRole("checkbox", { name: "Match capitals exactly" })).toBeNull();
         expect(screen.queryByRole("button", { name: /Or another value/ })).toBeNull();
     });

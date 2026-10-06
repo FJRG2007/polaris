@@ -325,13 +325,23 @@ describe("rules", () => {
         );
         expect(
             mailbox.mailConditionHolds(
-                { field: "subject", operator: "not-contains", value: "receipt", alternatives: ["refund"] },
+                {
+                    field: "subject",
+                    operator: "not-contains",
+                    value: "receipt",
+                    alternatives: ["refund"]
+                },
                 message
             )
         ).toBe(true);
         expect(
             mailbox.mailConditionHolds(
-                { field: "subject", operator: "matches", value: "^refund", alternatives: ["\\d{4}$"] },
+                {
+                    field: "subject",
+                    operator: "matches",
+                    value: "^refund",
+                    alternatives: ["\\d{4}$"]
+                },
                 message
             )
         ).toBe(true);
@@ -347,7 +357,12 @@ describe("rules", () => {
         };
         expect(
             mailbox.mailConditionHolds(
-                { field: "subject", operator: "matches", value: "^refund", alternatives: ["\\d{4}$"] },
+                {
+                    field: "subject",
+                    operator: "matches",
+                    value: "^refund",
+                    alternatives: ["\\d{4}$"]
+                },
                 message,
                 counting
             )
@@ -367,16 +382,25 @@ describe("rules", () => {
     it("tells capitals apart only when asked to", () => {
         const cased = { field: "subject" as const, caseSensitive: true };
         expect(
-            mailbox.mailConditionHolds({ ...cased, operator: "contains", value: "invoice" }, message)
+            mailbox.mailConditionHolds(
+                { ...cased, operator: "contains", value: "invoice" },
+                message
+            )
         ).toBe(false);
         expect(
-            mailbox.mailConditionHolds({ ...cased, operator: "contains", value: "Invoice" }, message)
+            mailbox.mailConditionHolds(
+                { ...cased, operator: "contains", value: "Invoice" },
+                message
+            )
         ).toBe(true);
         expect(
             mailbox.mailConditionHolds({ ...cased, operator: "is", value: "Invoice 4021" }, message)
         ).toBe(true);
         expect(
-            mailbox.mailConditionHolds({ ...cased, operator: "matches", value: "^invoice" }, message)
+            mailbox.mailConditionHolds(
+                { ...cased, operator: "matches", value: "^invoice" },
+                message
+            )
         ).toBe(false);
         expect(
             mailbox.mailConditionHolds(

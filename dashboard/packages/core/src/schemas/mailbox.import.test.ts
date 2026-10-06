@@ -94,12 +94,12 @@ describe("a filter condition with several values", () => {
         const { mailFilterConditionSchema } = await import("./mailbox.js");
         const attachment = { id: "cond01", kind: "attachment", operator: "is", value: "yes" };
         expect(mailFilterConditionSchema.safeParse(attachment).success).toBe(true);
-        expect(mailFilterConditionSchema.safeParse({ ...attachment, alternatives: ["no"] }).success).toBe(
-            false
-        );
-        expect(mailFilterConditionSchema.safeParse({ ...attachment, caseSensitive: true }).success).toBe(
-            false
-        );
+        expect(
+            mailFilterConditionSchema.safeParse({ ...attachment, alternatives: ["no"] }).success
+        ).toBe(false);
+        expect(
+            mailFilterConditionSchema.safeParse({ ...attachment, caseSensitive: true }).success
+        ).toBe(false);
     });
 
     it("drops capitals from a subject's shape, which has none left", async () => {

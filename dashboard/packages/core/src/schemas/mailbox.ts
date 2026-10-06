@@ -635,7 +635,10 @@ function checkCondition(
             const also = mailPatternProblem(extra);
             if (also === "invalid") issue("alternatives", "One of those patterns is not valid");
             if (also === "unsafe")
-                issue("alternatives", "One of those patterns could take too long to check. Make it simpler");
+                issue(
+                    "alternatives",
+                    "One of those patterns could take too long to check. Make it simpler"
+                );
         }
     }
 }
