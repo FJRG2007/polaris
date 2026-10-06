@@ -105,7 +105,14 @@ export async function joinRefusal(
 ): Promise<string | null> {
     // Imported when asked: the rules live beside the code that reaches the
     // server, which this route never needs.
-    const { noteRefusal, playerAccessRules } = await import("./player-access");
+    const { noteRefusal, playerAccessRules, syncLinkedAddresses } = await import(
+        "./player-access"
+    );
+    // A linked player may connect from where their Polaris account is signed in
+    // now, not where it was at the last sweep: somebody turned away who opens
+    // Polaris on that connection gets in on the next try, not two minutes later.
+    // A sync that fails leaves the rules as they were.
+    await syncLinkedAddresses(server.installedAppId).catch(() => undefined);
     const [rules, install] = await Promise.all([
         playerAccessRules(server.installedAppId),
         prisma.installedApp.findUnique({
