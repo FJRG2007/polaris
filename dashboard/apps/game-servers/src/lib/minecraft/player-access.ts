@@ -81,11 +81,15 @@ export const HIDDEN_SIGN_IN_ADDRESS = gameMessage("games", "lib.hiddenSignIn");
 /**
  * Whether the person asking may see where other accounts sign in from. An
  * administrator always may; anybody else only while the instance shares it. A
- * caller that cannot be identified is shown nothing.
+ * caller that cannot be identified is shown nothing. `viewer` is for a caller
+ * with no browser session behind it - an assistant acting for somebody - and
+ * is the person it acts for.
  */
-export async function viewerSeesSignInAddresses(): Promise<boolean> {
+export async function viewerSeesSignInAddresses(viewer?: {
+    readonly isAdmin: boolean;
+}): Promise<boolean> {
     try {
-        const user = await requireUser();
+        const user = viewer ?? (await requireUser());
         if (user.isAdmin) return true;
     } catch {
         return false;
@@ -99,8 +103,11 @@ export async function viewerSeesSignInAddresses(): Promise<boolean> {
  * replaced with a label when the instance keeps them from the people running
  * servers. Enforcement never goes through here - it reads the rows themselves.
  */
-export async function forViewer(view: PlayerAccessView): Promise<PlayerAccessView> {
-    if (await viewerSeesSignInAddresses()) return view;
+export async function forViewer(
+    view: PlayerAccessView,
+    viewer?: { readonly isAdmin: boolean }
+): Promise<PlayerAccessView> {
+    if (await viewerSeesSignInAddresses(viewer)) return view;
     return {
         ...view,
         rules: view.rules.map((rule) =>

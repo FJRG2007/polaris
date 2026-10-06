@@ -23,6 +23,7 @@ import {
     type LoaderPinView
 } from "../../lib/minecraft/loader-pin-service";
 import { GAME_MODES } from "../../lib/minecraft/players";
+import { MODERATION_VERBS, moderatePlayer } from "../../lib/minecraft/player-moderation";
 import { runConsoleCommand } from "../../lib/games-operations";
 import { findGameIdentity } from "../../lib/game-identity";
 import { isAddressRule } from "../../lib/minecraft/access";
@@ -58,7 +59,6 @@ import { readMinecraftStats } from "../../lib/minecraft/stats-service";
 import { guardForSave, PROJECTS_KEY, SOFTWARE_KEY } from "../../lib/minecraft/join-guard";
 import { setGameHostname, setGameRouted } from "../../lib/minecraft/address";
 import { liftTimeout, timeoutPlayer } from "../../lib/minecraft/timeout-service";
-import { liftSanctions, recordSanction } from "../../lib/sanctions-service";
 import { EXPERIENCE_UNITS, MAX_EXPERIENCE } from "../../lib/minecraft/experience";
 import { MAX_BACKUP_BYTES, MAX_KEEP_LAST } from "../../lib/minecraft/backup-policy";
 import { readPlayerRecord, type PlayerRecord } from "../../lib/games-activity-service";
@@ -145,16 +145,7 @@ const playerNameSchema = z
 
 const moderationSchema = z.object({
     installedAppId: z.string().uuid(),
-    action: z.enum([
-        "op",
-        "deop",
-        "kick",
-        "ban",
-        "pardon",
-        "kill",
-        "whitelist-add",
-        "whitelist-remove"
-    ]),
+    action: z.enum(MODERATION_VERBS),
     player: playerNameSchema,
     /** Shown to the player being kicked or banned. */
     reason: z.string().trim().max(200).optional()
@@ -181,29 +172,6 @@ const settingsSchema = z.object({
         .array(z.object({ key: z.string().trim().min(1).max(128), value: z.string().max(4096) }))
         .max(64)
 });
-
-/** The command each moderation action sends, as argv. */
-function moderationArgv(input: MinecraftModeration): string[] {
-    const reason = input.reason && input.reason.length > 0 ? [input.reason] : [];
-    switch (input.action) {
-        case "op":
-            return ["op", input.player];
-        case "deop":
-            return ["deop", input.player];
-        case "kick":
-            return ["kick", input.player, ...reason];
-        case "ban":
-            return ["ban", input.player, ...reason];
-        case "pardon":
-            return ["pardon", input.player];
-        case "kill":
-            return ["kill", input.player];
-        case "whitelist-add":
-            return ["whitelist", "add", input.player];
-        case "whitelist-remove":
-            return ["whitelist", "remove", input.player];
-    }
-}
 
 /**
  * Put one or several players into a game mode.
@@ -259,26 +227,6 @@ export async function setGamemodeAction(input: {
     }
 }
 
-/**
- * Carry one moderation out, by whichever route this server will actually honour.
- *
- * How each verb has to reach an unauthenticated server is decided in
- * `player-access`, not here, and this opens the server once and hands it over.
- * Three paths carry these verbs out - this one, the queue that applies a decision
- * the server was not up to hear, and the timeout service - and a verb treated
- * differently on one of them is the original defect reappearing on whichever path
- * nobody was looking at.
- *
- * One connection rather than two: the command and the file that has to be settled
- * behind it used to open the container separately, which on a server registered
- * across an SSH link is two handshakes for one button.
- */
-async function moderationOutcome(ownerId: string, input: MinecraftModeration): Promise<string> {
-    return withServerContainer(ownerId, input.installedAppId, (server) =>
-        playerAccess.applyOnContainer(server, input.action, input.player, moderationArgv(input))
-    );
-}
-
 export async function moderatePlayerAction(
     input: MinecraftModeration
 ): Promise<{ output?: string; error?: string }> {
@@ -294,11 +242,7 @@ export async function moderatePlayerAction(
             "games.moderate",
             parsed.data.installedAppId
         );
-        const output = await moderationOutcome(access.ownerId, parsed.data);
-        const { installedAppId, action, player, reason } = parsed.data;
-        if (action === "kick" || action === "ban")
-            await recordSanction({ installedAppId, player, kind: action, reason });
-        else if (action === "pardon") await liftSanctions(installedAppId, player);
+        const output = await moderatePlayer(access.ownerId, parsed.data.installedAppId, parsed.data);
         await recordAudit({
             actorId: user.id,
             action: `minecraft.${parsed.data.action}`,

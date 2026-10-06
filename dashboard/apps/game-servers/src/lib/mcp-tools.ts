@@ -10,9 +10,11 @@
  * server somebody was only invited to watch is one their assistant can only
  * watch.
  *
- * Two scopes: seeing servers and who is on them (`gameservers.read`), and
- * starting, stopping, restarting and the console (`gameservers.manage`). The
- * console also needs the console grant on that server, as on its page.
+ * Three scopes: seeing servers and who is on them (`gameservers.read`);
+ * kicking, banning and timing players out (`gameservers.moderate`); and
+ * starting, stopping, restarting, the console, worlds and who may join
+ * (`gameservers.manage`). The console also needs the console grant on that
+ * server, as on its page.
  *
  * A Minecraft server's events are the Events screen's own buttons: the kinds
  * the catalog has, the events a server set up with what is on and how recent
@@ -21,8 +23,12 @@
  * that server, as every one of the screen's actions does, and starts an event
  * through the same service call, so its preconditions refuse exactly as there.
  *
- * Deliberately not offered: creating, deleting or reconfiguring a server,
- * setting events up, and moderating players. Each is a page of its own.
+ * Players (`mcp-player-tools.ts`) and announcements, restarts and worlds
+ * (`mcp-server-tools.ts`) are offered from their own modules, on the same
+ * standing.
+ *
+ * Deliberately not offered: creating, deleting or reconfiguring a server, and
+ * setting events up. Each is a page of its own.
  *
  * Server-only.
  */
@@ -34,58 +40,13 @@ import { statusOf } from "../screens/list";
 import { MAX_CONSOLE_LINE } from "./console-queue";
 import type { AppHostTypes } from "@polaris/app-host";
 import { gameCatalogs } from "../../messages";
-import { gameMessageIn, readGameMessage } from "./game-message";
+import { playerTools } from "./mcp-player-tools";
+import { serverTools } from "./mcp-server-tools";
+import { actorFor, attempt, serverFor, serverId } from "./mcp-common";
 import { restartServerNow, runConsoleCommand, setServerRunning } from "./games-operations";
 import { listGameServerFacts, listGameServerPresence, withNamesOnly } from "./games-service";
 
 type McpTool = AppHostTypes["McpTool"];
-type McpCaller = AppHostTypes["McpCaller"];
-
-/** A refusal the model reads as written. A class from the host, so it is
- *  only reached for once a call is running. */
-function refuse(message: string): never {
-    throw new host.mcp.McpRefusal(message);
-}
-
-/**
- * Run the app's own work. What it throws for the person to read carries one
- * of the app's message keys, and reaches the model in the person's language;
- * anything else is the inside of a container and goes to the log.
- */
-async function attempt<T>(run: () => Promise<T>): Promise<T> {
-    try {
-        return await run();
-    } catch (caught) {
-        if (caught instanceof Error && readGameMessage(caught.message))
-            refuse(gameMessageIn(await host.i18nRequest.getLocale(), caught.message));
-        throw caught;
-    }
-}
-
-async function actorFor(caller: McpCaller) {
-    const user = await host.mcp.actingUser(caller.userId);
-    if (!user) refuse("This account cannot use Game servers.");
-    return user;
-}
-
-/** The caller's standing on one server, or the refusal a page would give. */
-async function serverFor(
-    caller: McpCaller,
-    serverId: string,
-    permission: "games.read" | "games.manage" | "games.console"
-) {
-    const user = await actorFor(caller);
-    const access = await host.appsInstallAccess.gameServerAccess(user, serverId, permission);
-    if (!access)
-        refuse(
-            permission === "games.read"
-                ? "There is no game server with that id that this account can see."
-                : "This account cannot do that on that game server."
-        );
-    return { user, access };
-}
-
-const serverId = z.string().uuid().describe("The server's id, as games_servers returned it.");
 
 // ---------------------------------------------------------------------------
 // Reading
@@ -539,7 +500,9 @@ export function gameMcpTools(): readonly McpTool[] {
         eventKindsTool,
         eventsTool,
         eventStartTool,
-        eventCancelTool
+        eventCancelTool,
+        ...playerTools,
+        ...serverTools
     ].map((tool) => tool());
     return built;
 }
