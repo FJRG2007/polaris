@@ -116,6 +116,23 @@ export function modFileFor(software: string, version: string): string | null {
     );
 }
 
+/**
+ * The Polaris mod a server on this software and release always carries, whatever
+ * its login and anti-cheat switches say: the events run their heavy work through
+ * it (`events/in-server.ts`), and its login and anti-xray stay idle unless
+ * switched on. Only mod-loader builds - a plugin server keeps its own switches.
+ * Null where Polaris has no mod build.
+ */
+export function componentFileFor(software: string, version: string): string | null {
+    return loaderForType(software) === "neoforge" ? modFileFor(software, version) : null;
+}
+
+/** Whether this list already names exactly that file, whichever address it was
+ *  written with. */
+export function carriesFile(mods: string, file: string): boolean {
+    return modEntries(mods).some((entry) => (entry.split(/[?#]/)[0] ?? "").endsWith(`/${file}`));
+}
+
 /** Whether any build loads on this software, whatever the release - the question
  *  of whether a screen should ask about Polaris login at all. */
 export function hasBuildFor(software: string): boolean {
@@ -207,9 +224,20 @@ export function envWrites(
 /** What turning it off writes. The token stays: it is worthless without the
  *  switch, and keeping it means turning it back on changes nothing a running
  *  server holds. */
-export function disableEnv(current: ReadonlyMap<string, string>): Map<string, string> {
+export function disableEnv(
+    current: ReadonlyMap<string, string>,
+    keepComponent = true
+): Map<string, string> {
+    const mods = current.get(MODS_KEY) ?? "";
+    // The mod stays where it is the server's Polaris component; only the login
+    // is switched off, and the mod then leaves players alone.
+    const component = componentFileFor(current.get("TYPE") ?? "", current.get("VERSION") ?? "");
+    const kept =
+        keepComponent && component !== null && carriesFile(mods, component)
+            ? mods
+            : withoutMod(mods);
     return new Map([
-        [MODS_KEY, withoutMod(current.get(MODS_KEY) ?? "")],
+        [MODS_KEY, kept],
         [LOGIN_KEY, "off"]
     ]);
 }
@@ -243,7 +271,9 @@ export function modMovedTo(
         const base = at > 0 ? listed.slice(0, at) : "";
         if (base) return new Map([[MODS_KEY, withMod(mods, modUrl(base, file))]]);
     }
-    return disableEnv(env);
+    // A build for the old release ends the new one's boot: it comes off, and the
+    // component sweep puts on the one that loads there, if any.
+    return disableEnv(env, false);
 }
 
 /** How long a running server may go without checking in before the panel says so.

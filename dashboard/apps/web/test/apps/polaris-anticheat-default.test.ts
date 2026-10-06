@@ -72,7 +72,7 @@ vi.mock("@polaris/app-host", () => ({
     }
 }));
 
-const { adoptAnticheatDefaults } = await import(
+const { adoptAnticheatDefaults, adoptPolarisComponent } = await import(
     "@polaris-app/game-servers/src/lib/minecraft/polaris-anticheat-service"
 );
 
@@ -150,5 +150,42 @@ describe("switching it on for the servers made before", () => {
         expect(await adoptAnticheatDefaults()).toEqual({ adopted: 1 });
         quiet.mockRestore();
         expect(fake.written.has("app-2")).toBe(true);
+    });
+});
+
+describe("the Polaris mod on every server it has a build for", () => {
+    const JAR = "https://polaris.example/api/minecraft/mod/polaris-neoforge-1.21.4.jar";
+
+    it("adds it whatever the switches say, keeping the rest of the list", async () => {
+        server("1", {
+            TYPE: "NEOFORGE",
+            VERSION: "1.21.4",
+            MODS: "https://example.org/other.jar",
+            POLARIS_ANTICHEAT: "off",
+            POLARIS_ANTIXRAY: "off"
+        });
+        expect(await adoptPolarisComponent()).toEqual({ adopted: 1 });
+        expect(fake.written.get("app-1")).toEqual([
+            { key: "MODS", value: `https://example.org/other.jar,${JAR}`, isSecret: false }
+        ]);
+    });
+
+    it("leaves a server that has it, one with no build, and a plugin server", async () => {
+        server("1", { TYPE: "NEOFORGE", VERSION: "1.21.4", MODS: JAR.replace("polaris.example", "old.example") });
+        server("2", { TYPE: "NEOFORGE", VERSION: "1.21.1" });
+        server("3", { TYPE: "PAPER", VERSION: "1.21.4" });
+        server("4", { TYPE: "VANILLA", VERSION: "1.21.4" });
+        expect(await adoptPolarisComponent()).toEqual({ adopted: 0 });
+        expect(fake.written.size).toBe(0);
+    });
+
+    it("writes nothing without a public address or a jar to serve", async () => {
+        server("1", { TYPE: "NEOFORGE", VERSION: "1.21.4" });
+        fake.publicUrl = null;
+        expect(await adoptPolarisComponent()).toEqual({ adopted: 0 });
+        fake.publicUrl = "https://polaris.example";
+        fake.bundled = false;
+        expect(await adoptPolarisComponent()).toEqual({ adopted: 0 });
+        expect(fake.written.size).toBe(0);
     });
 });

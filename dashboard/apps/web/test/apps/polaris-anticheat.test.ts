@@ -223,12 +223,13 @@ describe("on a NeoForge server, through the Polaris mod", () => {
         expect(anticheat.anticheatActive(neo())).toBe(false);
         const off = anticheat.anticheatDisableEnv(examplesmp);
         // The login still needs the mod; it is only told to stop hiding ore.
-        expect(off.get("MODS")).toBe(MOD);
+        // The mod is the server's Polaris component: it stays on the list.
+        expect(off.has("MODS")).toBe(false);
         expect(off.get("POLARIS_ANTIXRAY")).toBe("off");
         expect(anticheat.anticheatActive(new Map([...examplesmp, ...off]))).toBe(false);
     });
 
-    it("puts the mod on the list when turned on, and takes it off again without the login", () => {
+    it("puts the mod on the list when turned on, and keeps it there when turned off", () => {
         const on = anticheat.anticheatEnableEnv(neo([["POLARIS_ANTIXRAY", "off"]]), {
             baseUrl: BASE,
             installedAppId: SERVER,
@@ -240,7 +241,8 @@ describe("on a NeoForge server, through the Polaris mod", () => {
         const env = new Map([...neo(), ...on]);
         expect(anticheat.anticheatActive(env)).toBe(true);
         expect(anticheat.anticheatOn(env)).toBe(true);
-        expect(anticheat.anticheatDisableEnv(env).get("MODS")).toBe("");
+        expect(anticheat.anticheatDisableEnv(env).has("MODS")).toBe(false);
+        expect(anticheat.anticheatDisableEnv(env).get("POLARIS_ANTIXRAY")).toBe("off");
     });
 
     const guarded = () =>
