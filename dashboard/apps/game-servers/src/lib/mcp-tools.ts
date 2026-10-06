@@ -10,11 +10,11 @@
  * server somebody was only invited to watch is one their assistant can only
  * watch.
  *
- * Three scopes: seeing servers and who is on them (`gameservers.read`);
- * kicking, banning and timing players out (`gameservers.moderate`); and
- * starting, stopping, restarting, the console, worlds and who may join
- * (`gameservers.manage`). The console also needs the console grant on that
- * server, as on its page.
+ * Three scopes: seeing servers, who is on them and what a Minecraft player is
+ * carrying (`gameservers.read`); kicking, banning and timing players out
+ * (`gameservers.moderate`); and starting, stopping, restarting, the console,
+ * worlds and who may join (`gameservers.manage`). The console also needs the
+ * console grant on that server, as on its page.
  *
  * A Minecraft server's events are the Events screen's own buttons: the kinds
  * the catalog has, the events a server set up with what is on and how recent
@@ -36,7 +36,9 @@
 import { z } from "zod";
 import * as catalog from "./minecraft/events/catalog";
 import { host } from "@polaris/app-host";
+import { gameOfServer } from "@polaris/core";
 import { statusOf } from "../screens/list";
+import { slotLabel } from "./minecraft/inventory";
 import { MAX_CONSOLE_LINE } from "./console-queue";
 import type { AppHostTypes } from "@polaris/app-host";
 import { gameCatalogs } from "../../messages";
@@ -129,6 +131,88 @@ const statusTool = () =>
                 text: `${structured.name}: ${status}${structured.address ? ` at ${structured.address}` : ""}. ${playing}${structured.players.length > 0 ? `: ${structured.players.join(", ")}` : ""}.`,
                 structured
             };
+        }
+    });
+
+/** The bag reader, loaded when the tool runs: it reaches the server's container
+ *  and the database, which listing the tools has no need of. */
+const inventoryService = () => import("./minecraft/inventory-service");
+
+const inventoryInput = z.object({
+    serverId,
+    player: z
+        .string()
+        .trim()
+        .regex(/^[A-Za-z0-9_]{1,16}$/, "A Minecraft account name")
+        .describe("The player's Minecraft name, as games_server_status lists them.")
+});
+
+/** What an offline player, an old server or a silent one is said as. */
+const INVENTORY_REFUSALS = {
+    offline: "That player is not on the server, and Polaris has not kept a copy of what they carry yet.",
+    unsupported: "This server's version has no command to read what a player carries.",
+    unanswered: "The server did not answer with an inventory"
+} as const;
+
+const inventoryTool = () =>
+    host.mcp.defineTool({
+        name: "games_player_inventory",
+        // i18n-ignore shown by the calling client, which has no locale to ask for
+        title: "A Minecraft player's inventory",
+        description:
+            // i18n-ignore read by the calling model, not shown to a person
+            "What one player is carrying on a Minecraft Java server - hotbar, bag, armour and offhand, each stack with its slot, item, count and its components (enchantments, damage, name). Live while they are on; when they are not, the last copy Polaris kept, with when it was taken. The same reading as the player's page. Read-only.",
+        input: inventoryInput,
+        category: "games",
+        scope: "gameservers.read",
+        readOnly: true,
+        async run(input, caller) {
+            const { access } = await serverFor(caller, input.serverId, "games.read");
+            if (gameOfServer(access.install.catalogId)?.id !== "minecraft")
+                refuse("Only a Minecraft server has inventories to read.");
+            const { readPlayerInventory } = await inventoryService();
+            const read = await attempt(() =>
+                readPlayerInventory(access.ownerId, access.install.id, input.player)
+            );
+            if ("refusal" in read) {
+                const refusal = read.refusal;
+                refuse(
+                    refusal.reason === "unanswered" && refusal.said
+                        ? `${INVENTORY_REFUSALS.unanswered}: ${refusal.said}`
+                        : INVENTORY_REFUSALS[refusal.reason]
+                );
+            }
+            const { inventory } = read;
+            const items = inventory.items.map((item) => ({
+                slot: item.slot,
+                where: slotLabel(item.slot),
+                id: item.id,
+                count: item.count,
+                components: item.data?.snbt ?? null
+            }));
+            const structured = {
+                serverId: input.serverId,
+                player: input.player,
+                live: inventory.live,
+                takenAt: inventory.takenAt,
+                items,
+                unreadable: inventory.unreadable ?? 0
+            };
+            const heading = inventory.live
+                ? `${input.player} is carrying, live:`
+                : `${input.player} is not on; the last copy Polaris kept, taken ${inventory.takenAt}:`;
+            const lines =
+                items.length > 0
+                    ? items.map(
+                          (item) =>
+                              `  ${item.where}: ${item.id} x${item.count}${item.components ? ` ${item.components}` : ""}`
+                      )
+                    : ["  nothing"];
+            const missing =
+                structured.unreadable > 0
+                    ? [`${structured.unreadable} more stack(s) could not be read whole.`]
+                    : [];
+            return { text: [heading, ...lines, ...missing].join("\n"), structured };
         }
     });
 
@@ -495,6 +579,7 @@ export function gameMcpTools(): readonly McpTool[] {
     built ??= [
         serversTool,
         statusTool,
+        inventoryTool,
         powerTool,
         consoleTool,
         eventKindsTool,

@@ -207,7 +207,8 @@ describe("every tool against the table", () => {
             "places_devices",
             "places_routines",
             "games_servers",
-            "games_server_status"
+            "games_server_status",
+            "games_player_inventory"
         ])
             expect(readOnly).toContain(name);
         for (const name of [

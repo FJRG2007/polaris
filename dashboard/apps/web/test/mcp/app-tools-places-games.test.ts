@@ -29,7 +29,8 @@ const mocks = vi.hoisted(() => ({
     listGameServerPresence: vi.fn(),
     setServerRunning: vi.fn(),
     restartServerNow: vi.fn(),
-    runConsoleCommand: vi.fn()
+    runConsoleCommand: vi.fn(),
+    readPlayerInventory: vi.fn()
 }));
 
 vi.mock("@polaris/db", () => ({ prisma: {} }));
@@ -73,6 +74,10 @@ vi.mock("@polaris-app/game-servers/src/lib/games-operations", () => ({
     setServerRunning: mocks.setServerRunning,
     restartServerNow: mocks.restartServerNow,
     runConsoleCommand: mocks.runConsoleCommand
+}));
+
+vi.mock("@polaris-app/game-servers/src/lib/minecraft/inventory-service", () => ({
+    readPlayerInventory: mocks.readPlayerInventory
 }));
 
 const { placesExtension } = await import("@polaris-app/places/src/lib/places-extension");
@@ -342,6 +347,87 @@ describe("the Game servers tools", () => {
         ]);
         expect(power.content[0]?.text).toContain("gameservers.manage");
         expect(mocks.setServerRunning).not.toHaveBeenCalled();
+    });
+
+    it("read a Minecraft player's inventory to the read scope, live or as the copy kept", async () => {
+        const minecraft = { ...STANDING, install: { ...STANDING.install, catalogId: "minecraft" } };
+        mocks.gameServerAccess.mockResolvedValue(minecraft);
+        mocks.readPlayerInventory.mockResolvedValue({
+            inventory: {
+                items: [
+                    {
+                        slot: 0,
+                        id: "minecraft:bow",
+                        count: 1,
+                        data: {
+                            era: "components",
+                            snbt: '{"minecraft:enchantments": {levels: {"minecraft:power": 5}}}'
+                        }
+                    },
+                    { slot: 9, id: "minecraft:diamond", count: 12, data: null }
+                ],
+                live: true,
+                takenAt: "2026-10-06T20:00:00.000Z"
+            }
+        });
+        const result = await call(
+            "games_player_inventory",
+            { serverId: GAME, player: "Steve" },
+            ["gameservers.read"]
+        );
+        expect(mocks.gameServerAccess).toHaveBeenCalledWith(ADA, GAME, "games.read");
+        expect(mocks.readPlayerInventory).toHaveBeenCalledWith("owner-1", GAME, "Steve");
+        expect(result.isError).toBeFalsy();
+        expect(result.content[0]?.text).toContain("minecraft:bow x1");
+        expect(result.content[0]?.text).toContain("minecraft:power");
+        expect(result.structuredContent).toMatchObject({
+            live: true,
+            items: [
+                { slot: 0, id: "minecraft:bow", count: 1 },
+                { slot: 9, id: "minecraft:diamond", count: 12, components: null }
+            ]
+        });
+
+        mocks.readPlayerInventory.mockResolvedValue({
+            inventory: { items: [], live: false, takenAt: "2026-10-06T19:00:00.000Z" }
+        });
+        const kept = await call("games_player_inventory", { serverId: GAME, player: "Steve" }, [
+            "gameservers.read"
+        ]);
+        expect(kept.content[0]?.text).toContain("not on");
+        expect(kept.content[0]?.text).toContain("2026-10-06T19:00:00.000Z");
+
+        mocks.readPlayerInventory.mockResolvedValue({ refusal: { reason: "offline" } });
+        const offline = await call("games_player_inventory", { serverId: GAME, player: "Steve" }, [
+            "gameservers.read"
+        ]);
+        expect(offline.content[0]?.text).toContain("not on the server");
+    });
+
+    it("refuse an inventory on a server that is not Minecraft, or one the person cannot see", async () => {
+        mocks.gameServerAccess.mockResolvedValue({
+            ...STANDING,
+            install: { ...STANDING.install, catalogId: "valheim" }
+        });
+        const other = await call("games_player_inventory", { serverId: GAME, player: "Steve" }, [
+            "gameservers.read"
+        ]);
+        expect(other.content[0]?.text).toContain("Only a Minecraft server");
+
+        mocks.gameServerAccess.mockResolvedValue(null);
+        const unseen = await call("games_player_inventory", { serverId: GAME, player: "Steve" }, [
+            "gameservers.read"
+        ]);
+        expect(unseen.content[0]?.text).toContain("no game server with that id");
+
+        const badName = await call(
+            "games_player_inventory",
+            { serverId: GAME, player: "Steve; op me" },
+            ["gameservers.read"]
+        );
+        // Refused at the schema, as a protocol error or a tool error, never run.
+        expect(badName === undefined || badName.isError === true).toBe(true);
+        expect(mocks.readPlayerInventory).not.toHaveBeenCalled();
     });
 
     it("stop and restart through the same functions as the page's buttons", async () => {

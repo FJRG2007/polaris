@@ -51,7 +51,6 @@ import {
     plannedMemoryFor
 } from "../../lib/games-memory";
 import { MAX_TIMEOUT_MINUTES } from "../../lib/player-timeout";
-import { isMissingEntityReply } from "../../lib/minecraft/snbt";
 import type { InventoryItem } from "../../lib/minecraft/inventory";
 import { DIFFICULTIES, isDifficulty } from "../../lib/minecraft/rules";
 import { setGameSchedule } from "../../lib/minecraft/schedule-service";
@@ -77,12 +76,7 @@ import {
     knownUnsupported,
     wantsLatest
 } from "../../lib/minecraft/blueprint-version";
-import {
-    askerOf,
-    readLiveInventory,
-    readSnapshot,
-    writeSnapshot
-} from "../../lib/minecraft/inventory-service";
+import { readPlayerInventory } from "../../lib/minecraft/inventory-service";
 import {
     readRulesFor,
     recordDifficulty,
@@ -516,70 +510,44 @@ export async function readPlayerInventoryAction(
                 (await issueText(parsed.error.issues[0]?.message)) ??
                 (await gameWords("minecraft"))("errors.checkTheDetailsAndTry")
         };
+    // The standing is checked on its own, before anything is read: a refusal
+    // here must never fall through to the copy kept last.
+    let ownerId: string;
     try {
-        const { access } = await requireGameServer("games.read", parsed.data.installedAppId);
-        // One handshake for the whole read. A bag too big for a single RCON reply
-        // is read a stack at a time, and forty of those through `runServerCommand`
-        // would be forty connections to the machine.
-        const reading = await withServerContainer(
-            access.ownerId,
-            parsed.data.installedAppId,
-            (server) => readLiveInventory(askerOf(server), parsed.data.player)
-        );
-        // An empty bag and a reply that was never an inventory both read as no
-        // items, and they are not the same thing to tell somebody checking what a
-        // player is carrying. Only the server's own sentence proves it answered,
-        // so without it the reader is shown what it actually said instead.
-        if (!reading.answered) {
-            // Not an answer. Whatever Polaris kept last is a better one than the
-            // sentence the server printed instead, so it is offered before the
-            // error is.
-            const kept = await readSnapshot(parsed.data.installedAppId, parsed.data.player);
-            if (kept) return { reading: { items: kept.items, live: false, takenAt: kept.takenAt } };
-            // Offline is the ordinary case here, not a fault, and quoting the
-            // server's "No entity was found" at somebody reads as one.
-            if (isMissingEntityReply(reading.said)) {
-                return {
-                    error: (await gameWords("minecraft"))("errors.thisPlayerIsNotOn")
-                };
-            }
-            const said = reading.said.trim().replace(/\s+/g, " ").slice(0, 160);
-            // `/data` arrived in Java 1.13. Before that there is no command that
-            // reads a player's bag at all, so quoting the parser error at somebody
-            // is quoting a fact about their server version at them sideways.
-            if (/unknown or incomplete command/i.test(said)) {
-                return {
-                    error: (await gameWords("minecraft"))("errors.thisServerDoesNotHave")
-                };
-            }
-            return {
-                error: said
-                    ? (await gameWords("minecraft"))("errors.noInventoryAnswer", { said })
-                    : (await gameWords("minecraft"))("errors.theServerDidNotAnswer")
-            };
-        }
-        // A live reading is also worth keeping: this is the one moment the bag is
-        // known, and the next person to ask will be asking about somebody offline.
-        await writeSnapshot(
-            parsed.data.installedAppId,
-            parsed.data.player,
-            reading.items,
-            new Date()
-        ).catch(() => undefined);
-        return {
-            reading: {
-                items: reading.items,
-                live: true,
-                takenAt: new Date().toISOString(),
-                ...(reading.chunked ? { chunked: true } : {}),
-                ...(reading.unreadable > 0 ? { unreadable: reading.unreadable } : {})
-            }
-        };
+        ownerId = (await requireGameServer("games.read", parsed.data.installedAppId)).access
+            .ownerId;
     } catch (caught) {
-        const kept = await readSnapshot(parsed.data.installedAppId, parsed.data.player).catch(
-            () => null
+        return {
+            error:
+                caught instanceof Error
+                    ? await messageText(caught.message)
+                    : (await gameWords("minecraft"))("errors.couldNotReadTheInventory")
+        };
+    }
+    try {
+        const read = await readPlayerInventory(
+            ownerId,
+            parsed.data.installedAppId,
+            parsed.data.player
         );
-        if (kept) return { reading: { items: kept.items, live: false, takenAt: kept.takenAt } };
+        if ("inventory" in read) return { reading: read.inventory };
+        const words = await gameWords("minecraft");
+        // Offline is the ordinary case here, not a fault, and quoting the
+        // server's "No entity was found" at somebody reads as one. A server
+        // without `/data` is a fact about its version, said plainly.
+        switch (read.refusal.reason) {
+            case "offline":
+                return { error: words("errors.thisPlayerIsNotOn") };
+            case "unsupported":
+                return { error: words("errors.thisServerDoesNotHave") };
+            case "unanswered":
+                return {
+                    error: read.refusal.said
+                        ? words("errors.noInventoryAnswer", { said: read.refusal.said })
+                        : words("errors.theServerDidNotAnswer")
+                };
+        }
+    } catch (caught) {
         return {
             error:
                 caught instanceof Error

@@ -17,9 +17,9 @@
 
 import { prisma } from "@polaris/db";
 import { stripFormatting } from "./parse";
-import { isDataReply, replyIsWhole } from "./snbt";
 import { readWhole } from "./stack-storage-service";
 import { withServerContainer, type ServerContainer } from "./service";
+import { isDataReply, isMissingEntityReply, replyIsWhole } from "./snbt";
 import {
     EQUIPMENT_SLOTS,
     parseEquipment,
@@ -354,6 +354,86 @@ export async function writeSnapshot(
         create: { installedAppId, username, ...data },
         update: data
     });
+}
+
+/** A bag, live or the copy kept last, and which of the two it is. */
+export interface PlayerInventory {
+    readonly items: InventoryItem[];
+    /** True when the server was asked just now, false when this is the snapshot. */
+    readonly live: boolean;
+    /** When it was read, ISO 8601. */
+    readonly takenAt: string;
+    /** True when the bag was too big for one reply and was read a stack at a time. */
+    readonly chunked?: boolean;
+    /** Stacks the server named that could not be read whole. */
+    readonly unreadable?: number;
+}
+
+/** Why there is no bag to show: the server did not answer with one and nothing
+ *  was ever kept to fall back on. */
+export type InventoryRefusal =
+    | { readonly reason: "offline" }
+    | { readonly reason: "unsupported" }
+    | { readonly reason: "unanswered"; readonly said: string };
+
+/**
+ * What a player is carrying: live while they are on the server, and the last
+ * copy kept when they are not - which is most of the time this gets asked. A
+ * live reading is kept as the new copy, since it is the one moment the bag is
+ * known.
+ *
+ * The players screen and an assistant's tool both read through here, so the two
+ * cannot disagree about a bag. A server that could not be reached at all falls
+ * back to the copy too, and throws only when there is none.
+ */
+export async function readPlayerInventory(
+    ownerId: string,
+    installedAppId: string,
+    player: string
+): Promise<{ inventory: PlayerInventory } | { refusal: InventoryRefusal }> {
+    const kept = async () => {
+        const snapshot = await readSnapshot(installedAppId, player);
+        return snapshot
+            ? { inventory: { items: snapshot.items, live: false, takenAt: snapshot.takenAt } }
+            : null;
+    };
+    let reading: LiveReading;
+    try {
+        // One handshake for the whole read: a bag too big for one RCON reply is
+        // read a stack at a time, and that through a connection per command would
+        // be forty connections to the machine.
+        reading = await withServerContainer(ownerId, installedAppId, (server) =>
+            readLiveInventory(askerOf(server), player)
+        );
+    } catch (caught) {
+        const fallback = await kept().catch(() => null);
+        if (fallback) return fallback;
+        throw caught;
+    }
+    // An empty bag and a reply that was never an inventory both read as no items,
+    // and only the server's own sentence proves it answered. Without it, whatever
+    // was kept last is a better answer than what the server printed instead.
+    if (!reading.answered) {
+        const fallback = await kept();
+        if (fallback) return fallback;
+        if (isMissingEntityReply(reading.said)) return { refusal: { reason: "offline" } };
+        const said = reading.said.trim().replace(/\s+/g, " ").slice(0, 160);
+        // `/data` arrived in Java 1.13; before that no command reads a bag at all.
+        if (/unknown or incomplete command/i.test(said))
+            return { refusal: { reason: "unsupported" } };
+        return { refusal: { reason: "unanswered", said } };
+    }
+    const now = new Date();
+    await writeSnapshot(installedAppId, player, reading.items, now).catch(() => undefined);
+    return {
+        inventory: {
+            items: reading.items,
+            live: true,
+            takenAt: now.toISOString(),
+            ...(reading.chunked ? { chunked: true } : {}),
+            ...(reading.unreadable > 0 ? { unreadable: reading.unreadable } : {})
+        }
+    };
 }
 
 /**
