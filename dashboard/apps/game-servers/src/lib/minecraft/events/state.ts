@@ -468,6 +468,28 @@ export function eventWins(state: EventState): { name: string; value: number }[] 
     return Object.values(winsSoFar(state)).map((one) => ({ name: one.name, value: one.count }));
 }
 
+/**
+ * Who, in lower case, an event still holds: their own things put away, or a
+ * trip back still owed - in the run on now, or in an arena or a stage one left
+ * behind. Nothing is handed to them until it lets them go: a prize given while
+ * their own things are away lands in an empty slot - the slot one of their own
+ * stacks goes back into, which then falls at their feet - and never joins the
+ * stack of the same item they get back.
+ */
+export function heldNames(
+    state: Pick<EventState, "run" | "arenaLeftovers" | "stageLeftovers">
+): Set<string> {
+    const entrants = [
+        ...(state.run?.entrants ?? []),
+        ...(state.run?.sentOut ?? []),
+        ...state.arenaLeftovers.flatMap((one) => one.entrants)
+    ];
+    return new Set([
+        ...entrants.filter((one) => one.away).map((one) => one.name.toLowerCase()),
+        ...state.stageLeftovers.flatMap((one) => one.saved.map((saved) => saved.name.toLowerCase()))
+    ]);
+}
+
 /** Prizes still owed, minus the ones too old to keep waiting for. */
 export function livePending(pending: readonly PendingReward[], now: number): PendingReward[] {
     return pending.filter((one) => now - one.createdAt < PENDING_KEPT_MS).slice(-PENDING_MAX);

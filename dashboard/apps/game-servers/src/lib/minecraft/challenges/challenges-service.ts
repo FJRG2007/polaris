@@ -48,7 +48,7 @@ import { parseProperties } from "../parse";
 import type * as plan from "../events/plan";
 import * as settingsModule from "./settings";
 import * as replies from "../events/replies";
-import { readEventState } from "../events/state";
+import { heldNames, readEventState } from "../events/state";
 import * as speechService from "../speech-service";
 import * as eventMessages from "../events/messages";
 import { editionOf, type ServerContainer } from "../service";
@@ -593,6 +593,10 @@ interface Sweep {
     readonly home: catalog.Language;
     readonly languageOf: (name: string) => catalog.Language;
     readonly eventOn: boolean;
+    /** Whom an event still holds, lowercased (`heldNames`): paid only once it
+     *  lets them go, so a reward never takes the slot their own stack goes
+     *  back into. */
+    readonly heldByEvent: ReadonlySet<string>;
     /** Who the anti-xray caught, and when, by lowercased name. */
     readonly caught: Map<string, number[]>;
 }
@@ -685,6 +689,7 @@ async function contextFor(
         links,
         seen: new Map(),
         eventOn: readEventState(row.config).run !== null,
+        heldByEvent: heldNames(readEventState(row.config)),
         caught: caughtBy(row.config),
         home,
         languageOf: (name) => audience.of.get(name.toLowerCase()) ?? home,
@@ -1832,6 +1837,9 @@ async function carry(
 ): Promise<void> {
     if (!commands.PLAYER_NAME.test(name)) return;
     const language = sweep.languageOf(name);
+    // Not on, or their own things still away in an event: kept for later, and
+    // handed over once everything of theirs is back.
+    const payable = online && !sweep.heldByEvent.has(name.toLowerCase());
     const said: string[] = [];
     const owed: { items: { id: string; count: number }[]; levels: number } = {
         items: [],
@@ -1842,7 +1850,7 @@ async function carry(
         if (effect.kind === "title" && online)
             said.push(...commands.completion(name, effect.title, effect.subtitle));
         if (effect.kind !== "pay") continue;
-        if (!online) {
+        if (!payable) {
             owed.items.push(...effect.payout.items);
             owed.levels += effect.payout.levels;
             continue;
@@ -1869,7 +1877,7 @@ async function carry(
     }
     if (said.length > 0) await sweep.server.sayAll(said);
     if (owed.items.length === 0 && owed.levels === 0) return;
-    if (online) await sweep.server.sayAll([commands.tell(name, messages.rewardWaiting(language))]);
+    if (payable) await sweep.server.sayAll([commands.tell(name, messages.rewardWaiting(language))]);
     await owe(sweep.installedAppId, name, owed, language);
 }
 

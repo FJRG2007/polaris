@@ -4219,10 +4219,17 @@ async function finish(
                     .readWhere(await server.say([commands.WHERE]))
                     .map((one) => one.name.toLowerCase())
             );
+            // Not given back yet - still in the air, not on: the prize waits
+            // with the others (`deliverPending`) until everything of theirs is.
+            const held = stored.heldNames({
+                run: null,
+                arenaLeftovers: arenaLeftover ? [arenaLeftover] : [],
+                stageLeftovers: stageLeftover ? [stageLeftover] : []
+            });
             for (const { name, reward } of owed) {
                 if (!catalog.PLAYER_NAME.test(name)) continue;
                 let left: catalog.Reward | null = reward;
-                if (online.has(name.toLowerCase())) {
+                if (online.has(name.toLowerCase()) && !held.has(name.toLowerCase())) {
                     const handed = await give(server, name, reward);
                     left = handed.left;
                     delivered.push(handed.delivered);
@@ -5277,9 +5284,15 @@ async function deliverPending(
 ): Promise<void> {
     const row = await readRow(installedAppId);
     if (!row) return;
+    const state = stored.readEventState(row.config);
+    // Somebody an event still holds gets it once everything of theirs is back.
+    const held = stored.heldNames(state);
     const owed = stored
-        .livePending(stored.readEventState(row.config).pending, Date.now())
-        .filter((one) => seen.has(one.player.toLowerCase()));
+        .livePending(state.pending, Date.now())
+        .filter(
+            (one) =>
+                seen.has(one.player.toLowerCase()) && !held.has(one.player.toLowerCase())
+        );
     if (owed.length === 0) return;
     /** What is still owed after this, by pending id: null when all of it arrived. */
     const left = new Map<string, catalog.Reward | null>();
