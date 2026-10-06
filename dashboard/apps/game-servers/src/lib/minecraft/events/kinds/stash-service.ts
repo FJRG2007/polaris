@@ -73,6 +73,29 @@ async function experienceOf(
     return levels === null || points === null ? null : { levels, points };
 }
 
+/** Their health and hunger now, and the absorption over the health; null when
+ *  they are not on to ask. Asked in one trip where the server can. */
+async function vitalsOf(
+    server: ServerContainer,
+    name: string
+): Promise<{ vitals: stash.Vitals; absorption: number } | null> {
+    const lines = stash.readVitals(name);
+    const replies: (string | null)[] = server.sayEach
+        ? await server.sayEach(lines.map((line) => [line])).catch(() => lines.map(() => null))
+        : lines.map(() => null);
+    const numbers: (number | null)[] = [];
+    for (const [index, line] of lines.entries()) {
+        const reply = replies[index] ?? (await server.say([line]));
+        numbers.push(stash.readEntityNumber(stripFormatting(reply)));
+    }
+    const [health, food, saturation, exhaustion, absorption] = numbers;
+    if (health == null || food == null || saturation == null || exhaustion == null) return null;
+    return {
+        vitals: { health, food, saturation, exhaustion: Math.min(exhaustion, 4) },
+        absorption: absorption ?? 0
+    };
+}
+
 /** Why somebody was kept out of an event rather than let in carrying their own
  *  things (`events.refusedWhy.*`). */
 export type StashRefusal =
@@ -154,7 +177,10 @@ export async function stashIn(
     if (untakeable.length > 0) return refuse("untakeable", untakeable);
     const experience = existing ? null : await experienceOf(server, name);
     const hasExperience = experience !== null && (experience.levels > 0 || experience.points > 0);
-    if (theirs.length === 0 && !hasExperience) return { stash: existing, refused: null };
+    // Their health and hunger as they come in: whatever the event does to
+    // them, they leave with these.
+    const vitals = existing ? null : ((await vitalsOf(server, name))?.vitals ?? null);
+    if (theirs.length === 0 && !hasExperience && !vitals) return { stash: existing, refused: null };
 
     // The database copy: every stack written down whole, under the slot it is
     // to go back to.
@@ -183,6 +209,14 @@ export async function stashIn(
                         inventory: reading.said,
                         items: JSON.stringify(copies),
                         experience: hasExperience ? JSON.stringify(experience) : null,
+                        ...(vitals
+                            ? {
+                                  health: vitals.health,
+                                  foodLevel: vitals.food,
+                                  foodSaturation: vitals.saturation,
+                                  foodExhaustion: vitals.exhaustion
+                              }
+                            : {}),
                         barrels: "[]",
                         casing: "[]",
                         status: "stashed"
@@ -201,6 +235,7 @@ export async function stashIn(
                 data: digest(item)
             })),
             experience: existing ? existing.experience : hasExperience ? experience : null,
+            vitals: existing ? existing.vitals : vitals,
             state,
             record
         };
@@ -325,6 +360,7 @@ async function copyOf(record: string | null): Promise<
     | {
           items: InventoryItem[];
           experience: stash.Experience | null;
+          vitals: stash.Vitals | null;
           owed: ReadonlySet<number> | null;
           writing: ReadonlySet<number>;
       }
@@ -335,13 +371,26 @@ async function copyOf(record: string | null): Promise<
     let row: {
         items: string;
         experience: string | null;
+        health: number | null;
+        foodLevel: number | null;
+        foodSaturation: number | null;
+        foodExhaustion: number | null;
         missing: string | null;
         writing: string | null;
     } | null;
     try {
         row = await prisma.eventInventoryStash.findUnique({
             where: { id: record },
-            select: { items: true, experience: true, missing: true, writing: true }
+            select: {
+                items: true,
+                experience: true,
+                health: true,
+                foodLevel: true,
+                foodSaturation: true,
+                foodExhaustion: true,
+                missing: true,
+                writing: true
+            }
         });
     } catch {
         return "unread";
@@ -350,6 +399,19 @@ async function copyOf(record: string | null): Promise<
     return {
         items: parse<InventoryItem[]>(row.items, []),
         experience: parse<stash.Experience | null>(row.experience, null),
+        // A row written before these were kept has none: nothing to put back.
+        vitals:
+            row.health != null &&
+            row.foodLevel != null &&
+            row.foodSaturation != null &&
+            row.foodExhaustion != null
+                ? {
+                      health: row.health,
+                      food: row.foodLevel,
+                      saturation: row.foodSaturation,
+                      exhaustion: row.foodExhaustion
+                  }
+                : null,
         owed: row.missing ? new Set(parse<number[]>(row.missing, [])) : null,
         writing: new Set(parse<number[]>(row.writing, []))
     };
@@ -391,7 +453,8 @@ export async function giveBack(
     server: ServerContainer,
     name: string,
     kept: stash.Stash,
-    save: (left: stash.Stash | null) => Promise<void>
+    save: (left: stash.Stash | null) => Promise<void>,
+    wait: (ms: number) => Promise<unknown> = pause
 ): Promise<GiveBack> {
     const current = await readLiveInventory(askerOf(server), name);
     if (!current.answered) return "offline";
@@ -400,7 +463,7 @@ export async function giveBack(
     // No copy: it is deleted only once everything was given back, and this is a
     // give-back that stopped just after.
     if (copy === null) {
-        if (kept.kept.length > 0 || kept.experience)
+        if (kept.kept.length > 0 || kept.experience || kept.vitals)
             console.warn("polaris: a kept bag had no database copy", server.installedAppId, name);
         await removeBarrels(server, kept);
         await save(null);
@@ -550,6 +613,33 @@ export async function giveBack(
         return "offline";
     }
 
+    // Their health and hunger as they came in - whatever the event did to them,
+    // a death in it included. Put back once, as close as the game lets it be,
+    // and never again: a give-back tried later from the panel must not undo
+    // what they have lived through since. Gone before they could be asked:
+    // kept for when they are next on.
+    const vitals = kept.vitals ?? copy.vitals;
+    if (vitals) {
+        const back = await vitalsBack(server, name, vitals, wait);
+        if (back === "unasked" && !(await readLiveInventory(askerOf(server), name)).answered) {
+            await save({ ...kept, kept: owed, experience, vitals });
+            return "offline";
+        }
+        if (back !== "given")
+            console.warn(
+                "polaris: health and hunger not put back exactly",
+                server.installedAppId,
+                name
+            );
+        if (kept.record)
+            await prisma.eventInventoryStash.update({
+                where: { id: kept.record },
+                data: { health: null, foodLevel: null, foodSaturation: null, foodExhaustion: null }
+            });
+        kept = { ...kept, vitals: null };
+        await save({ ...kept, kept: owed, experience });
+    }
+
     if (owed.length > 0 || experience) {
         await fail(
             server,
@@ -565,6 +655,56 @@ export async function giveBack(
     await removeBarrels(server, kept);
     await save(null);
     return "done";
+}
+
+/** How many times food and health are each stepped towards what is wanted. */
+const VITAL_STEPS = 6;
+
+/**
+ * Put `name`'s health and hunger back to `wanted` (`stash` has how): the food
+ * first, with their health full so the game's own healing takes nothing from
+ * it, then the health - healed to full and the exact rest taken off, past
+ * whatever armor, enchantment or Resistance they have on. Answers "given",
+ * "near" when the game would not come closer (a peaceful world refills food on
+ * its own), or "unasked" when they could not be asked.
+ */
+async function vitalsBack(
+    server: ServerContainer,
+    name: string,
+    wanted: stash.Vitals,
+    wait: (ms: number) => Promise<unknown>
+): Promise<"given" | "near" | "unasked"> {
+    let now = await vitalsOf(server, name);
+    if (!now) return "unasked";
+    if (stash.sameVitals(now.vitals, wanted) && now.absorption === 0) return "given";
+    await server.sayAll([stash.healLine(name)]);
+    for (let step = 0; step < VITAL_STEPS; step += 1) {
+        const next = stash.foodStep(now.vitals, wanted);
+        if (!next) break;
+        if (next.kind === "feed") await server.sayAll([stash.feedLine(name, next.points)]);
+        else {
+            const hunger = stash.hungerFor(next.exhaustion);
+            if (!hunger) break;
+            await server.sayAll(stash.hungerLines(name, hunger));
+            // Past its last tick, then cleared: a server running slow must not
+            // go on draining after this has read it.
+            await wait(hunger.seconds * 1000 + 500);
+            await server.sayAll([stash.endHunger(name)]);
+        }
+        now = await vitalsOf(server, name);
+        if (!now) return "unasked";
+    }
+    for (let step = 0; step < VITAL_STEPS; step += 1) {
+        const { health } = now.vitals;
+        if (Math.abs(health - wanted.health) <= 0.01 && now.absorption === 0) break;
+        // Below what they came with - starving on the way down, a hit since:
+        // full again first, and the rest taken off from there.
+        if (health < wanted.health - 0.01) await server.sayAll([stash.healLine(name)]);
+        else await server.sayAll([stash.hurtLine(name, health + now.absorption - wanted.health)]);
+        now = await vitalsOf(server, name);
+        if (!now) return "unasked";
+    }
+    return stash.sameVitals(now.vitals, wanted) ? "given" : "near";
 }
 
 /**
@@ -806,6 +946,8 @@ function stashOfRow(row: NonNullable<Awaited<ReturnType<typeof failedRow>>>): st
             };
         }),
         experience: parse<stash.Experience | null>(row.experience, null),
+        // Put back with the give-back that failed, never by a retry later.
+        vitals: null,
         state: "failed",
         record: row.id
     };
