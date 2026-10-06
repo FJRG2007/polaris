@@ -139,7 +139,7 @@ export interface ArenaGame {
     /** Said with the results. */
     resultLines(run: stored.EventRun, language: speech.Speech): string[];
     /** Its teams and counts removed, with the rest of the event's own. */
-    endLines?(): string[];
+    endLines?(run: stored.EventRun): string[];
     /** What is left lying in its box once everybody is out: arrows, say. */
     closeLines?(box: stored.Box): string[];
 }

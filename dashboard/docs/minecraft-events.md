@@ -1082,3 +1082,50 @@ A new kind follows all of them. A change to an old kind must not undo one.
   Done disabled until a saved event is changed also held it disabled for
   one just added, where nothing has to change first - its defaults are a
   choice too (`EventEditor`'s `isNew`) (`1715ffef0`).
+
+### Pitfalls
+
+One entry per bug: what a player saw, why, and the rule that keeps it gone.
+
+- **Players arrive and leave an arena one by one, seconds apart.** Each
+  entrant's stash and teleport went in its own RCON trip, so a SkyWars of
+  three took three seconds to bring in and eleven to send home (seen in a
+  live server's log). Stash everybody first, then send every entry line in one
+  `sayAll`; send every teleport home in one `sayEach` trip and hand items back
+  afterwards (`arena-service.closeArena`, `stage-service.returnAll`).
+- **A boat race's boats spawn sideways to the track.** A turn sent after a
+  boat is summoned is dropped by the client controlling it, so the boat keeps
+  its spawn yaw of 0. Put `Rotation` in the summon itself
+  (`boat-race.boatLines`); never turn a boat with a `tp` afterwards.
+- **SkyWars islands cannot be broken.** `arena.enter` puts every entrant in
+  adventure mode, whatever the kind, and SkyWars never changed it. A kind
+  whose blocks must break switches its entrants to survival at Go, and the
+  quick look kills every unmarked, unthrown item in the box
+  (`arena.killBrokenDrops`) so nothing unmarked reaches an inventory; anyone
+  put out goes back to adventure. Never hold `doTileDrops` / `block_drops`
+  off for it: that rule is server-wide, and whatever anybody outside the
+  event broke meanwhile would be lost for good. Survival is only given with a
+  marker to tell the kit apart. Not yet seen on a live server: whether a
+  sweep every 400 ms always beats a dropped block's half-second pickup delay.
+- **Capture the flag calls a player "out" nobody touched.** Health is read
+  from a `health` objective, which has no score for a player until their
+  health changes, and no score reads as whole. A player who walked in hurt
+  got a true low score at their first scratch or heart back, and the next
+  look took them out. Everybody inside is healed whole at Go
+  (`arena.HEAL_INSIDE`), before anything is counted. Likely, not proven: the
+  log shows no deaths and no healing at entry, and the first send-back two
+  seconds after the low-health shield first matched.
+- **Bingo reads 0/9 while players hold card items.** By design only what a
+  player picks up, crafts or smelts after the start counts (the game's own
+  statistics), so a stack carried in or taken out of a chest marks nothing -
+  and nobody was told. The one live run was called off after a minute, with
+  the game's own per-cell sums at 0 for both players on every look: nothing
+  on the card had come in, so detection itself did not fail. The start now
+  says what counts (`bingo-messages.countsFromNow`). Whether those players
+  expected carried items to count is an inference.
+- **Hide and seek is won by a minimap radar.** Each entrant is sent Xaero's
+  Minimap fair-play code at Go, again when they come back on the server, and
+  the reset code at the end (`hs.RADAR_OFF`, `hs.RADAR_RESET`). Its limit:
+  only Xaero's maps read it - any other minimap still shows players - and an
+  entrant off the server at the end is not sent the reset. Not yet tried with
+  a live client.

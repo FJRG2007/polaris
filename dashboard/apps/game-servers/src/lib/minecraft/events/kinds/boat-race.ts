@@ -778,21 +778,63 @@ function boatEntity(way: "oak_boat" | "boat"): string {
 
 /**
  * A new boat for the one player `selector` finds, put in it - or, before
- * `ride`, a marked boat in their hands. Summoned where they stand, turned the
- * way they face, and unbreakable. One player at a time: two summoned together
- * on one spot could both be ridden into the same boat, which seats two.
+ * `ride`, a marked boat in their hands. Summoned where they stand, already
+ * facing `yaw` - the way the track runs from their spot - and unbreakable.
+ *
+ * The facing is in the summon itself, never a turn after it: the game of the
+ * player in a boat steers it, and drops whatever turn the server sends while
+ * the boat is on its way to them, so a boat summoned facing south and turned
+ * a moment later stayed facing south - its racer sat across the track.
+ *
+ * One player at a time: two summoned together on one spot could both be
+ * ridden into the same boat, which seats two. `facing` narrows the summon to
+ * the players looking within a range (`y_rotation`), for a selector that may
+ * find a player on any of several spots.
  */
-export function boatLines(selector: string, way: BoatWay): string[] {
+export function boatLines(
+    selector: string,
+    way: BoatWay,
+    yaw: number,
+    facing: string | null = null
+): string[] {
     if (!rides(way)) return [`give ${selector} ${markedBoat(way)} 1`];
     const type = boatEntity(way);
     const kind = way === "boat" ? `,Type:"oak"` : "";
-    const data = `{Tags:["${BOAT_TAG}","${NEW_TAG}"],Invulnerable:1b${kind}}`;
+    const data = `{Tags:["${BOAT_TAG}","${NEW_TAG}"],Invulnerable:1b,Rotation:[${yaw.toFixed(1)}f,0.0f]${kind}}`;
+    const who = !facing
+        ? selector
+        : selector.endsWith("]")
+          ? `${selector.slice(0, -1)},y_rotation=${facing}]`
+          : `${selector}[y_rotation=${facing}]`;
     return [
-        `execute as ${selector} at @s run summon ${type} ~ ~ ~ ${data}`,
-        `execute as ${selector} at @s rotated as @s run tp @e[type=${type},tag=${NEW_TAG},limit=1,sort=nearest] ~ ~ ~ ~ 0`,
+        `execute as ${who} at @s run summon ${type} ~ ~ ~ ${data}`,
         `execute as ${selector} at @s run ride @s mount @e[type=${type},tag=${NEW_TAG},limit=1,sort=nearest]`,
         `tag @e[type=${type},tag=${NEW_TAG}] remove ${NEW_TAG}`
     ];
+}
+
+/** A yaw as the game keeps it: from -180 up to 180. */
+function wrapped(yaw: number): number {
+    return ((((yaw + 180) % 360) + 360) % 360) - 180;
+}
+
+/**
+ * Each of `yaws` with the arc of facings nearer to it than to any other, as a
+ * `y_rotation` range - together the whole circle, so whichever way a player
+ * looks, one of them is theirs - or a lone yaw with no range at all. A player
+ * exactly on the edge of two gets a boat from both; the one nobody sits in is
+ * taken away on the next look, like any boat left empty.
+ */
+export function facingArcs(yaws: readonly number[]): { yaw: number; range: string | null }[] {
+    const sorted = [...new Set(yaws.map((yaw) => wrapped(Math.round(yaw))))].sort((a, b) => a - b);
+    if (sorted.length <= 1) return sorted.map((yaw) => ({ yaw, range: null }));
+    return sorted.map((yaw, index) => {
+        const before = sorted[(index - 1 + sorted.length) % sorted.length]!;
+        const after = sorted[(index + 1) % sorted.length]!;
+        const low = wrapped(yaw - ((yaw - before + 360) % 360 || 360) / 2);
+        const high = wrapped(yaw + ((after - yaw + 360) % 360 || 360) / 2);
+        return { yaw, range: `${low}..${high}` };
+    });
 }
 
 /** Every boat the race left on its track - summoned or put down - and any boat
@@ -1027,10 +1069,20 @@ export function quickLines(
     lines.push(`scoreboard players set @a[tag=${RESET_TAG}] ${CUT_SCORE} 0`);
     // A boat each, one racer at a time; anybody past the few a look has room
     // for is still out of a boat on the next, and has theirs then.
+    // Each summoned facing the spot it was put back on: whoever is mounted was
+    // turned that way by the teleport above, in this same look, so the way
+    // they face says which spot's boat is theirs.
+    const arcs = facingArcs(back.map((spot) => spot.yaw));
+    const mounted = `@a[tag=${MOUNT_TAG}]`;
     for (let one = 0; one < MOUNTS_PER_LOOK; one += 1)
         lines.push(
             `tag @a[tag=${RESET_TAG},limit=1] add ${MOUNT_TAG}`,
-            ...boatLines(`@a[tag=${MOUNT_TAG}]`, way),
+            ...(rides(way)
+                ? [
+                      ...arcs.map(({ yaw, range }) => boatLines(mounted, way, yaw, range)[0]!),
+                      ...boatLines(mounted, way, 0).slice(1)
+                  ]
+                : boatLines(mounted, way, 0)),
             `tag @a[tag=${MOUNT_TAG}] remove ${RESET_TAG}`,
             `tag @a remove ${MOUNT_TAG}`
         );

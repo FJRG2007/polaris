@@ -240,13 +240,25 @@ export function clearMarked(name: string, id: string, marker: Marker): string {
         : `clear ${name} ${id}{${MARK}}`;
 }
 
+/** How a marked item reads in an item entity's `Item`. */
+function markedItem(marker: Marker): string {
+    return marker === "components"
+        ? `{components:{"minecraft:custom_data":{${MARK}}}}`
+        : `{tag:{${MARK}}}`;
+}
+
 /** Kit lying about in the box, dropped or thrown: gone, and only it. */
 export function killMarkedDrops(box: Box, marker: Marker): string {
-    const item =
-        marker === "components"
-            ? `{components:{"minecraft:custom_data":{${MARK}}}}`
-            : `{tag:{${MARK}}}`;
-    return `${IN_OVERWORLD} kill @e[type=minecraft:item,${within(box)},nbt={Item:${item}}]`;
+    return `${IN_OVERWORLD} kill @e[type=minecraft:item,${within(box)},nbt={Item:${markedItem(marker)}}]`;
+}
+
+/**
+ * What a block broken in the box let fall: gone before anybody can pick it up,
+ * so nothing unmarked leaves with them. Never the kit, and never what somebody
+ * threw (it has a `Thrower`), so nobody's own things are touched.
+ */
+export function killBrokenDrops(box: Box, marker: Marker): string {
+    return `execute in minecraft:overworld as @e[type=minecraft:item,${within(box)},nbt=!{Item:${markedItem(marker)}}] unless data entity @s Thrower run kill @s`;
 }
 
 /**
@@ -382,6 +394,16 @@ export function floatDown(name: string): string {
 export function feed(name: string): string {
     return `effect give ${name} minecraft:saturation 3 0 true`;
 }
+
+/**
+ * Everybody inside healed whole, at "Go!". A fight reads health from a
+ * `health` count (`team-duel.healthOf`), which the game fills in only once a
+ * player's health changes, and takes a player with no score yet as whole. A
+ * player who came in already hurt had none - until the first scratch, or the
+ * first heart back, wrote their true, low health and the next look called
+ * them out of a fight nobody had touched them in.
+ */
+export const HEAL_INSIDE = `effect give @a[tag=${IN_ARENA}] minecraft:instant_health 1 3 true`;
 
 /** Beyond harm for a moment past each look: where nobody is meant to fight,
  *  nobody can be hurt, or die and drop what they carry. */

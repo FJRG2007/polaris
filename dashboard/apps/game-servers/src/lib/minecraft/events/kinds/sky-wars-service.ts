@@ -107,6 +107,10 @@ async function goLines(ctx: KindContext): Promise<string[]> {
                 warMessages.goSubtitle(ctx.language)
             )
         );
+    // Islands broken by hand: survival, but only with a marker to tell the
+    // kit from what a broken block lets fall (`sw.quickLines`), so nothing
+    // unmarked is carried home.
+    if (run.marker) for (const one of run.entrants) out.push(`gamemode survival ${one.name}`);
     // The cages down last, everybody already on their own spot.
     out.push(...sw.cagesDown(layoutOf(run), atOf(run)));
     return out;
@@ -219,6 +223,7 @@ async function tick(ctx: KindContext, lines: string[]): Promise<string | null> {
             lines.push(
                 ...(marker ? sw.LOOT_IDS.map((id) => arena.clearMarked(name, id, marker)) : []),
                 `effect give ${name} minecraft:instant_health 1 3 true`,
+                `gamemode adventure ${name}`,
                 arena.moveTo(name, sw.gallerySpot(layout, at, state.out.length - 1)),
                 ...arena.titleTo(
                     name,
@@ -253,7 +258,13 @@ async function tick(ctx: KindContext, lines: string[]): Promise<string | null> {
                 where.z >= gallery.z1 &&
                 where.z < gallery.z2 + 1 &&
                 where.y >= gallery.y1;
-            if (!seated) lines.push(arena.moveTo(one.name, sw.gallerySpot(layout, at, index)));
+            // Nothing broken from the gallery: back in adventure, whoever was
+            // out while off the server included.
+            if (!seated)
+                lines.push(
+                    `gamemode adventure ${one.name}`,
+                    arena.moveTo(one.name, sw.gallerySpot(layout, at, index))
+                );
             lines.push(
                 arena.protect(one.name),
                 arena.feed(one.name),
@@ -312,7 +323,7 @@ export const skyWars: ArenaGame = {
     ],
     goLines,
     tick,
-    quickLines: (run) => sw.quickLines(layoutOf(run), atOf(run), run.arena!.box),
+    quickLines: (run) => sw.quickLines(layoutOf(run), atOf(run), run.arena!.box, run.marker),
     results: (run) =>
         sw.scoresOf(
             sw.stateOf(run.game),

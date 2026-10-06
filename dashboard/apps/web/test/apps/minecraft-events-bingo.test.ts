@@ -169,6 +169,93 @@ describe("what a bingo rush sends", () => {
             );
     });
 
+    it("marks an item crafted or picked up since the start and still held, never one carried in", () => {
+        // A player's statistics and inventory, as the game keeps them.
+        type Player = { scores: Record<string, number>; held: Record<string, number> };
+        const furnace = card.indexOf("furnace") >= 0 ? "furnace" : card[0]!;
+        const at = (id: string) => card.indexOf(id);
+        const players: Record<string, Player> = {
+            // Came in with one, never touched another: the game counted nothing.
+            Ana: { scores: {}, held: { [furnace]: 1 } },
+            // Made four and holds them.
+            Ben: { scores: { [`pe_bgc${at(card[1]!)}`]: 4 }, held: { [card[1]!]: 4 } },
+            // Picked two up, dropped both: holds none.
+            Cy: {
+                scores: { [`pe_bgp${at(card[2]!)}`]: 2, [`pe_bgd${at(card[2]!)}`]: 2 },
+                held: {}
+            },
+            // Picked one up and holds it.
+            Dee: { scores: { [`pe_bgp${at(card[3]!)}`]: 1 }, held: { [card[3]!]: 1 } }
+        };
+        const has = (one: Player, filter: string) =>
+            filter.split(",").every((part) => {
+                const [objective, range] = part.split("=") as [string, string];
+                const score = one.scores[objective];
+                return range.endsWith("..")
+                    ? score !== undefined && score >= Number(range.slice(0, -2))
+                    : score === Number(range);
+            });
+        // Each line as 1.21.4 runs it: a score read that fails, or a clear
+        // that finds nothing, stores 0.
+        const run = (line: string) => {
+            const head =
+                /^execute as @a(?:\[scores=\{([^}]*)\}\])?(?: unless score @s (\w+) matches 1)? (?:store result score @s (\w+) )?run (.*)$/.exec(
+                    line
+                );
+            if (!head) {
+                const set = /^scoreboard players set @a (\w+) 0$/.exec(line);
+                expect(set, line).not.toBeNull();
+                for (const one of Object.values(players)) one.scores[set![1]!] = 0;
+                return;
+            }
+            const [, filter, unlessMarked, store, command] = head;
+            for (const one of Object.values(players)) {
+                if (filter && !has(one, filter)) continue;
+                if (unlessMarked && one.scores[unlessMarked] === 1) continue;
+                let result = 0;
+                const get = /^scoreboard players get @s (\w+)$/.exec(command!);
+                const clear = /^clear @s minecraft:(\S+) 0$/.exec(command!);
+                const operation = /^scoreboard players operation @s (\w+) ([-+])= @s (\w+)$/.exec(
+                    command!
+                );
+                const set = /^scoreboard players set @s (\w+) 1$/.exec(command!);
+                const add = /^scoreboard players add @s (\w+) (\d+)$/.exec(command!);
+                if (get) result = one.scores[get[1]!] ?? 0;
+                else if (clear) result = one.held[clear[1]!] ?? 0;
+                else if (operation) {
+                    const [, to, sign, from] = operation as unknown as [
+                        string,
+                        string,
+                        string,
+                        string
+                    ];
+                    one.scores[to] =
+                        (one.scores[to] ?? 0) + (sign === "+" ? 1 : -1) * (one.scores[from] ?? 0);
+                } else if (set) one.scores[set[1]!] = 1;
+                else if (add) one.scores[add[1]!] = (one.scores[add[1]!] ?? 0) + Number(add[2]);
+                else throw new Error(`not modelled: ${line}`);
+                if (store) one.scores[store] = result;
+            }
+        };
+        bingo.bingoTick(card).forEach(run);
+        const mask = (name: string) => players[name]!.scores[bingo.MASK] ?? 0;
+        expect(mask("Ana")).toBe(0);
+        expect(mask("Ben")).toBe(1 << 1);
+        expect(mask("Cy")).toBe(0);
+        expect(mask("Dee")).toBe(1 << 3);
+        // A mark stays: Ben drops what he made, and the next look keeps it.
+        players.Ben!.held = {};
+        bingo.bingoTick(card).forEach(run);
+        expect(mask("Ben")).toBe(1 << 1);
+    });
+
+    it("tells everybody at the start that only what comes in from now counts", () => {
+        expect(say.countsFromNow("en")).toContain("not what you already carry");
+        expect(say.countsFromNow("es").length).toBeGreaterThanOrEqual(
+            say.countsFromNow("en").length
+        );
+    });
+
     it("shows the card with each item named by the game, ticked where it is marked", () => {
         const rows = bingo.cardLines("Ana", card, 0b000010001);
         expect(rows).toHaveLength(3);

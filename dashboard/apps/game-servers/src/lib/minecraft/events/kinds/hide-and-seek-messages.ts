@@ -76,6 +76,13 @@ export function bar(left: number, clock: string, language: Language): string {
         : `&aStill hidden: ${left} &7- &f${clock}`;
 }
 
+/** Told to each player at "Go!", with the code that turns minimap radars off. */
+export function radarOff(language: Language): string {
+    return language === "es"
+        ? `${INFO}Los radares del minimapa están apagados en esta partida.`
+        : `${INFO}Minimap radars are switched off for this round.`;
+}
+
 /** Said with the results. */
 export function summary(found: number, hiders: number, language: Language): string {
     return language === "es"

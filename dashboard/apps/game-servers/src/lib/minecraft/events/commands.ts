@@ -513,6 +513,35 @@ export async function alreadyBack(
     return readTest(await say(`execute if entity @a[name=${name}]`)) === "passed";
 }
 
+/** Lines to one `answersOf` trip, so a full server stays inside a trip's time limit. */
+const ANSWERS_PER_TRIP = 25;
+
+/**
+ * Each line's answer, the lines sent a few dozen to a trip where the server can
+ * take several (`sayEach`): a teleport for each of twenty players then lands on
+ * the same moment instead of one round trip after another. An answer that did
+ * not come back whole - or a trip that failed outright - is asked again on its
+ * own, so only send lines that are safe to run twice (a teleport to a fixed spot).
+ */
+export async function answersOf(
+    server: {
+        say(argv: readonly string[]): Promise<string>;
+        sayEach?(commands: readonly (readonly string[])[]): Promise<(string | null)[]>;
+    },
+    lines: readonly string[]
+): Promise<string[]> {
+    const answers: string[] = [];
+    for (let start = 0; start < lines.length; start += ANSWERS_PER_TRIP) {
+        const trip = lines.slice(start, start + ANSWERS_PER_TRIP);
+        const replies = server.sayEach
+            ? await server.sayEach(trip.map((line) => [line])).catch(() => [])
+            : [];
+        for (const [at, line] of trip.entries())
+            answers.push(replies[at] ?? (await server.say([line])));
+    }
+    return answers;
+}
+
 // ------------------------------------------------------------------ what the server understands
 
 /**

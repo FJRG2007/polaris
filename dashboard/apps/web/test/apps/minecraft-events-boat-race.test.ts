@@ -277,18 +277,41 @@ describe("the boat race's data pack", () => {
 
 describe("boats", () => {
     it("are summoned and ridden from 1.19.4, by the entity of each version, one racer at a time", () => {
-        expect(boatRace.boatLines("Ana", "oak_boat")).toEqual([
-            'execute as Ana at @s run summon minecraft:oak_boat ~ ~ ~ {Tags:["polaris_boat","polaris_boat_new"],Invulnerable:1b}',
-            "execute as Ana at @s rotated as @s run tp @e[type=minecraft:oak_boat,tag=polaris_boat_new,limit=1,sort=nearest] ~ ~ ~ ~ 0",
+        // Facing the track from the summon on - a turn sent after it is lost
+        // on the racer's own game, which left them sitting across the track.
+        expect(boatRace.boatLines("Ana", "oak_boat", -90)).toEqual([
+            'execute as Ana at @s run summon minecraft:oak_boat ~ ~ ~ {Tags:["polaris_boat","polaris_boat_new"],Invulnerable:1b,Rotation:[-90.0f,0.0f]}',
             "execute as Ana at @s run ride @s mount @e[type=minecraft:oak_boat,tag=polaris_boat_new,limit=1,sort=nearest]",
             "tag @e[type=minecraft:oak_boat,tag=polaris_boat_new] remove polaris_boat_new"
         ]);
-        expect(boatRace.boatLines("Ana", "boat")[0]).toBe(
-            'execute as Ana at @s run summon minecraft:boat ~ ~ ~ {Tags:["polaris_boat","polaris_boat_new"],Invulnerable:1b,Type:"oak"}'
+        expect(boatRace.boatLines("Ana", "oak_boat", 0).some((line) => line.includes(" tp "))).toBe(
+            false
+        );
+        expect(boatRace.boatLines("Ana", "boat", 180)[0]).toBe(
+            'execute as Ana at @s run summon minecraft:boat ~ ~ ~ {Tags:["polaris_boat","polaris_boat_new"],Invulnerable:1b,Rotation:[180.0f,0.0f],Type:"oak"}'
+        );
+        // Only for whoever looks within a range, when asked.
+        expect(boatRace.boatLines("@a[tag=pe_mount]", "oak_boat", 90, "45..135")[0]).toBe(
+            'execute as @a[tag=pe_mount,y_rotation=45..135] at @s run summon minecraft:oak_boat ~ ~ ~ {Tags:["polaris_boat","polaris_boat_new"],Invulnerable:1b,Rotation:[90.0f,0.0f]}'
         );
         // Before `ride`: a marked boat to put down.
-        expect(boatRace.boatLines("Ana", "item")).toEqual([
+        expect(boatRace.boatLines("Ana", "item", 0)).toEqual([
             "give Ana minecraft:oak_boat{polaris_event:1b} 1"
+        ]);
+    });
+
+    it("splits the circle of facings between the spots' own, so every way a player looks is one spot's", () => {
+        expect(boatRace.facingArcs([90, 90])).toEqual([{ yaw: 90, range: null }]);
+        expect(boatRace.facingArcs([0, 90, 180, -90])).toEqual([
+            { yaw: -180, range: "135..-135" },
+            { yaw: -90, range: "-135..-45" },
+            { yaw: 0, range: "-45..45" },
+            { yaw: 90, range: "45..135" }
+        ]);
+        // Two facings: half the circle each, round either side.
+        expect(boatRace.facingArcs([0, 90])).toEqual([
+            { yaw: 0, range: "-135..45" },
+            { yaw: 90, range: "45..-135" }
         ]);
     });
 
@@ -331,6 +354,15 @@ describe("boats", () => {
         );
         for (const line of lines.filter((one) => one.includes("run ride @s mount")))
             expect(line).toContain("execute as @a[tag=pe_mount]");
+        // Each boat summoned facing the spot its racer was put back on: one
+        // summon per facing the spots have, narrowed to the players turned
+        // that way by the teleport.
+        const arcs = boatRace.facingArcs([start, ...track.respawns].map((spot) => spot.yaw));
+        for (const { yaw, range } of arcs)
+            expect(lines).toContain(
+                boatRace.boatLines("@a[tag=pe_mount]", "oak_boat", yaw, range)[0]!
+            );
+        expect(lines.some((line) => line.includes("rotated as @s run tp"))).toBe(false);
         expect(lines.at(-1)).toBe("tag @a remove pe_reset");
         // Before 1.19.4: nobody is put back for being out of a boat, only handed one.
         const old = boatRace.quickLines(track, "item", told);
@@ -424,7 +456,7 @@ describe("what a boat race says", () => {
         for (const way of ["oak_boat", "boat", "item", "item_components"] as const)
             for (const line of [
                 ...boatRace.quickLines(track, way, told),
-                ...boatRace.boatLines("Maximilian_1234", way)
+                ...boatRace.boatLines("Maximilian_1234", way, -180)
             ])
                 expect(commandBytes(line)).toBeLessThanOrEqual(COMMAND_BYTES_MAX);
         for (const line of [
