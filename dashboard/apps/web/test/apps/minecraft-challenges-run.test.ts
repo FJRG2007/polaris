@@ -416,6 +416,53 @@ describe("challenges on a server", () => {
         expect(ledger.points).toBe(10);
     });
 
+    it("keeps a reward for somebody whose own things an event still holds", async () => {
+        knownPool();
+        await step(1);
+        await step(16, ["Alba"]);
+        // Sent home from an arena, still falling: everything of hers is away.
+        config = {
+            ...config,
+            eventState: {
+                arenaLeftovers: [
+                    {
+                        id: "old",
+                        kind: "team-duel",
+                        arena: null,
+                        marker: "components",
+                        kit: [],
+                        entrants: [
+                            {
+                                name: "Alba",
+                                uuid: null,
+                                dimension: "minecraft:overworld",
+                                x: 1,
+                                y: 64,
+                                z: 1,
+                                yaw: 0,
+                                pitch: 0,
+                                gamemode: "survival",
+                                side: 0
+                            }
+                        ],
+                        createdAt: Date.now()
+                    }
+                ]
+            }
+        };
+        fake.add("Alba", PUMPKIN, 3);
+        await step(16, ["Alba"]);
+        expect(record("Alba").daily!.instances[0]!.doneAt).not.toBeNull();
+        // Not handed over now, where it would take the slot one of her own
+        // stacks goes back into: it waits in the queue with the events' prizes.
+        expect(fake.heard).not.toContain("xp add Alba 1 levels");
+        expect(
+            readEventState(config).pending.some(
+                (one) => one.player === "Alba" && one.reward.levels === 1
+            )
+        ).toBe(true);
+    });
+
     it("credits nothing that rose while the player stood still", async () => {
         knownPool();
         await step(1);

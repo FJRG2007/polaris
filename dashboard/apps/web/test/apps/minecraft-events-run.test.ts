@@ -2552,6 +2552,70 @@ describe("the minute sweep", () => {
         expect(state().pending).toEqual([]);
     });
 
+    it("keeps a waiting prize from somebody an arena has not let go of yet", async () => {
+        setUp([newPreset("fishing", "fish")], {
+            random: { ...catalog.settingsSchema.parse({}).random }
+        });
+        const away = {
+            name: "Ana",
+            uuid: null,
+            dimension: "minecraft:overworld",
+            x: 1,
+            y: 64,
+            z: 1,
+            yaw: 0,
+            pitch: 0,
+            gamemode: "survival",
+            side: 0,
+            // Her own things, put away while she played.
+            stash: {
+                barrels: [],
+                casing: [],
+                kept: [],
+                experience: null,
+                state: "stashed",
+                record: null
+            }
+        };
+        config[catalog.EVENT_STATE_KEY] = {
+            pending: [
+                {
+                    id: "p1",
+                    player: "Ana",
+                    reward: { items: [{ id: "minecraft:emerald", count: 2 }], levels: 0 },
+                    event: "Fishing contest",
+                    createdAt: Date.now()
+                }
+            ],
+            arenaLeftovers: [
+                {
+                    id: "old",
+                    kind: "team-duel",
+                    arena: null,
+                    marker: "components",
+                    kit: [],
+                    entrants: [away],
+                    createdAt: Date.now()
+                }
+            ]
+        };
+        // Still falling: not given back this sweep, so not paid either.
+        world.aloft = ["Ana"];
+        const sweeping = events.sweepEvents();
+        await play(30_000);
+        await sweeping;
+        expect(state().arenaLeftovers).toHaveLength(1);
+        expect(world.sent).not.toContain("give Ana minecraft:emerald 2");
+        expect(state().pending.map((one) => one.player)).toEqual(["Ana"]);
+        // Down and let go of: paid.
+        world.aloft = [];
+        await events.sweepEvents();
+        await events.sweepEvents();
+        expect(state().arenaLeftovers).toEqual([]);
+        expect(world.sent).toContain("give Ana minecraft:emerald 2");
+        expect(state().pending).toEqual([]);
+    });
+
     it("gives a prize once to a player whose name reads like an error", async () => {
         world.online = ["ErrorBoy", "Unknown_1"];
         setUp([newPreset("fishing", "fish")], {
@@ -3206,6 +3270,46 @@ describe("a world boss fight", () => {
         expect(
             world.sent.some((line) => line.startsWith("tellraw Ana ") && line.includes("trophy"))
         ).toBe(true);
+    });
+
+    it("keeps the trophy for a winner not taken back yet, and hands it over once they are", async () => {
+        world.bag = { Ana: {}, Ben: {} };
+        world.room = { Ana: 640, Ben: 640 };
+        setUp([groundBoss("boss", 10, { arena: true })]);
+        await start();
+        await play(12_100);
+        world.lift = ["Ana"];
+        await play(2_100);
+        world.lift = [];
+        expect(state().run?.stage?.saved.map((one) => one.name)).toEqual(["Ana"]);
+        world.scores = { Ana: 180 };
+        world.bossAlive = false;
+        // Gone the moment it falls: still owed her trip back out of its arena.
+        world.online = ["Ben"];
+        await play(6_100);
+        expect(state().run).toBeNull();
+        expect(
+            state().stageLeftovers.flatMap((one) => one.saved.map((saved) => saved.name))
+        ).toEqual(["Ana"]);
+        const trophy = (line: string) => line.startsWith("give Ana minecraft:nether_star[");
+        expect(world.sent.some(trophy)).toBe(false);
+        const owed = state().pending.find((one) => one.player === "Ana");
+        expect(owed?.trophy).toMatchObject({ kind: "wither-skeleton", difficulty: "normal" });
+
+        // Back on: taken home first, then handed the trophy.
+        world.online = ["Ana", "Ben"];
+        await events.sweepEvents();
+        await events.sweepEvents();
+        expect(state().stageLeftovers).toEqual([]);
+        const sent = world.sent;
+        const given = sent.findIndex(trophy);
+        expect(given).toBeGreaterThan(sent.indexOf("tag Ana remove pe_in"));
+        expect(sent.filter(trophy)).toHaveLength(1);
+        expect(state().pending).toEqual([]);
+        const ana = state().history[0]!.delivered.flatMap((one) =>
+            one.name === "Ana" ? one.items : []
+        );
+        expect(ana).toContainEqual({ id: "minecraft:nether_star", count: 1, dropped: 0 });
     });
 
     it("stands in a closed arena in the sky, takes players up through the beam and puts them back", async () => {
@@ -7721,6 +7825,45 @@ describe("players' own things through an arena", () => {
         expect(await stashService.failedStashes(SERVER)).toMatchObject([
             { player: "Ana", note: "experience" }
         ]);
+    });
+
+    it("holds a prize for somebody not given back yet, and gives it after their own things", async () => {
+        world.online = ["Ana", "Ben"];
+        world.inv = { Ana: stuffed(), Ben: new Map() };
+        const ana = copyOf(world.inv.Ana!);
+        setUp([duelOf()]);
+        await joinAndStart("duel");
+        // Ana wins the duel.
+        world.at = { Ana: [300, 102, -8], Ben: [300, 102, 8] };
+        await play(6_100);
+        world.dealt = { Ana: 60 };
+        world.hp = { Ben: 4 };
+        world.attackers = { Ben: "Ana" };
+        await play(2_100);
+        world.hp = {};
+        // Still falling when the end is handed out: nothing of hers is back.
+        world.aloft = ["Ana"];
+        await play(3 * 60_000 + 30_000);
+        expect(state().run).toBeNull();
+        expect(world.inv.Ana!.size).toBe(0);
+        // So no prize either: given now, it would land in the empty slot one
+        // of her own stacks goes back into, and push that one onto the ground.
+        expect(world.sent).not.toContain("give Ana minecraft:diamond 5");
+        expect(state().pending.map((one) => one.player)).toEqual(["Ana"]);
+
+        world.aloft = [];
+        await events.sweepEvents();
+        expect(world.inv.Ana).toEqual(ana);
+        expect(state().arenaLeftovers).toEqual([]);
+        expect(state().pending).toEqual([]);
+        // Her own things first, then the prize - which the game piles onto a
+        // stack of the same item she already has rather than a slot of its own.
+        const gave = world.sent.indexOf("give Ana minecraft:diamond 5");
+        const lastBack = world.sent.findLastIndex((line) =>
+            line.startsWith("item replace entity Ana hotbar.0 with minecraft:diamond_sword[")
+        );
+        expect(lastBack).toBeGreaterThan(-1);
+        expect(gave).toBeGreaterThan(lastBack);
     });
 
     it("gives nothing back to somebody still falling, and gives it once they are down", async () => {

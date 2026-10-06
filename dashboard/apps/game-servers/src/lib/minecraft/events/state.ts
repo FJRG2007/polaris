@@ -17,7 +17,7 @@ import {
     type EventPreset
 } from "./catalog";
 import { stashSchema } from "./kinds/stash";
-import { bossStateSchema } from "./kinds/boss";
+import { bossStateSchema, trophySchema } from "./kinds/boss";
 import { villagerSchema } from "./kinds/village-defense";
 import { bingoSchema } from "./kinds/bingo";
 import { fishSchema } from "./kinds/boss-fishing";
@@ -345,7 +345,9 @@ const pendingSchema = z.object({
     reward: rewardSchema,
     /** The event it is for, which is what the player is told when it arrives. */
     event: z.string(),
-    createdAt: z.number()
+    createdAt: z.number(),
+    /** A world boss's trophy owed besides the reward, rebuilt when it is handed over. */
+    trophy: trophySchema.nullable().default(null)
 });
 
 export type PendingReward = z.infer<typeof pendingSchema>;
@@ -466,6 +468,42 @@ function winsSoFar(state: EventState): Wins {
 /** How many events each player has won on this server, most first. */
 export function eventWins(state: EventState): { name: string; value: number }[] {
     return Object.values(winsSoFar(state)).map((one) => ({ name: one.name, value: one.count }));
+}
+
+/**
+ * Who, in lower case, is still owed a trip back from an earlier stage or arena
+ * - logged out inside it - and so is not taken anywhere else until they are
+ * back where they started.
+ */
+export function owedNames(
+    state: Pick<EventState, "arenaLeftovers" | "stageLeftovers">
+): Set<string> {
+    return new Set([
+        ...state.arenaLeftovers
+            .flatMap((one) => one.entrants)
+            .filter((one) => one.away)
+            .map((one) => one.name.toLowerCase()),
+        ...state.stageLeftovers.flatMap((one) => one.saved.map((saved) => saved.name.toLowerCase()))
+    ]);
+}
+
+/**
+ * Who, in lower case, an event still holds: their own things put away, or a
+ * trip back still owed - in the run on now, or in an arena or a stage one left
+ * behind. Nothing is handed to them until it lets them go: a prize given while
+ * their own things are away lands in an empty slot - the slot one of their own
+ * stacks goes back into, which then falls at their feet - and never joins the
+ * stack of the same item they get back.
+ */
+export function heldNames(
+    state: Pick<EventState, "run" | "arenaLeftovers" | "stageLeftovers">
+): Set<string> {
+    const entrants = [...(state.run?.entrants ?? []), ...(state.run?.sentOut ?? [])];
+    return new Set([
+        ...owedNames(state),
+        ...entrants.filter((one) => one.away).map((one) => one.name.toLowerCase()),
+        ...(state.run?.stage?.saved ?? []).map((saved) => saved.name.toLowerCase())
+    ]);
 }
 
 /** Prizes still owed, minus the ones too old to keep waiting for. */

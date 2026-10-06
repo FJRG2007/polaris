@@ -1164,6 +1164,15 @@ export function takeBackLine(name: string, id: string, count: number): string {
  */
 export const TROPHY_ITEM = "minecraft:nether_star";
 
+/** A trophy still owed: what it is rebuilt from when it is handed over. */
+export const trophySchema = z.object({
+    kind: z.enum(catalog.BOSS_KINDS),
+    difficulty: z.enum(catalog.BOSS_DIFFICULTIES),
+    winner: z.enum(catalog.BOSS_WINNERS).default("damage")
+});
+
+export type Trophy = z.infer<typeof trophySchema>;
+
 /** How a version writes an item's name. */
 export type NameSpelling = "text" | "json" | "tag";
 

@@ -1139,15 +1139,6 @@ export function leftoverOf(
     };
 }
 
-/** Who is still owed a trip back, in lower case. */
-export function owedNames(leftovers: readonly stored.ArenaLeftover[]): Set<string> {
-    return new Set(
-        leftovers.flatMap((one) =>
-            one.entrants.filter((entrant) => entrant.away).map((entrant) => lower(entrant.name))
-        )
-    );
-}
-
 function releases(left: stored.ArenaLeftover): string[] {
     const areas = new Map<string, stored.Box>();
     for (const box of [left.site, left.arena?.box]) if (box) areas.set(arena.region(box), box);

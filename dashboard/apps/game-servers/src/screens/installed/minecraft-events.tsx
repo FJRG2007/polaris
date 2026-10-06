@@ -22,7 +22,7 @@ import * as catalog from "../../lib/minecraft/events/catalog";
 import { incompatibleText, kindLabel, kindSummary, kindUnit } from "./event-kinds";
 import { figureLanguage, formatCount, formatDuration } from "../../lib/figures";
 import { type GameText, useGameText, useSchemaText } from "../game-text";
-import type { EventHistoryEntry } from "../../lib/minecraft/events/state";
+import type { EventHistoryEntry, PendingReward } from "../../lib/minecraft/events/state";
 import type { EventsView } from "../../lib/minecraft/events/events-service";
 import type { SearchSummary } from "../../lib/minecraft/events/place-search";
 import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
@@ -237,6 +237,13 @@ function rewardText(t: GameText<"minecraft">, reward: catalog.Reward, joiner = "
 }
 
 const givesSomething = (reward: catalog.Reward) => reward.items.length > 0 || reward.levels > 0;
+
+/** A prize still owed, with the world boss's trophy when that waits too. */
+function pendingText(t: GameText<"minecraft">, one: PendingReward): string {
+    if (!one.trophy) return rewardText(t, one.reward);
+    const trophy = t("events.prizes.trophy");
+    return givesSomething(one.reward) ? `${rewardText(t, one.reward)}, ${trophy}` : trophy;
+}
 
 /** The podium places that pay a prize of their own. A place with none is paid the
  *  taking-part prize, so it is not listed apart: "everybody else" covers it. */
@@ -1908,9 +1915,9 @@ export function MinecraftEvents({
                                     <span className="font-medium">{one.player}</span>
                                     <span
                                         className="min-w-0 flex-1 truncate text-muted-foreground"
-                                        title={rewardText(t, one.reward)}
+                                        title={pendingText(t, one)}
                                     >
-                                        {one.event} - {rewardText(t, one.reward)}
+                                        {one.event} - {pendingText(t, one)}
                                     </span>
                                     <ui.Button
                                         variant="ghost"

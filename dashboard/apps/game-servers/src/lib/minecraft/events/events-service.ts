@@ -46,6 +46,7 @@ import * as rareCatch from "./kinds/rare-catch";
 import * as meteors from "./kinds/meteor-shower";
 import * as speechService from "../speech-service";
 import * as bossService from "./kinds/boss-service";
+import type { NameSpelling } from "./kinds/boss";
 import type { GameKey } from "../../../../messages";
 import * as stageService from "./kinds/stage-service";
 import * as snowballPackService from "./kinds/snowball-pack-service";
@@ -2375,21 +2376,9 @@ function kindContext(
         tickSeconds: tickMsOf(loop.run.preset.kind) / 1000,
         owed: async () => {
             const row = await readRow(installedAppId);
-            return row ? owedNames(stored.readEventState(row.config)) : new Set<string>();
+            return row ? stored.owedNames(stored.readEventState(row.config)) : new Set<string>();
         }
     };
-}
-
-/**
- * Who, in lower case, is still owed a trip back from an earlier stage or arena
- * - logged out inside it - and so is not taken anywhere else until they are
- * back where they started.
- */
-function owedNames(state: stored.EventState): Set<string> {
-    return new Set([
-        ...arenaService.owedNames(state.arenaLeftovers),
-        ...state.stageLeftovers.flatMap((one) => one.saved.map((saved) => saved.name.toLowerCase()))
-    ]);
 }
 
 /**
@@ -3972,7 +3961,7 @@ function stageTools(
         chat: () => newChat(server, loop),
         owed: async () => {
             const row = await readRow(installedAppId);
-            return row ? owedNames(stored.readEventState(row.config)) : new Set<string>();
+            return row ? stored.owedNames(stored.readEventState(row.config)) : new Set<string>();
         },
         flavour: async () => loop.flavour ?? (loop.flavour = await stageFlavour(server)),
         itemsWork: (items) => {
@@ -4219,10 +4208,17 @@ async function finish(
                     .readWhere(await server.say([commands.WHERE]))
                     .map((one) => one.name.toLowerCase())
             );
+            // Not given back yet - still in the air, not on: the prize waits
+            // with the others (`deliverPending`) until everything of theirs is.
+            const held = stored.heldNames({
+                run: null,
+                arenaLeftovers: arenaLeftover ? [arenaLeftover] : [],
+                stageLeftovers: stageLeftover ? [stageLeftover] : []
+            });
             for (const { name, reward } of owed) {
                 if (!catalog.PLAYER_NAME.test(name)) continue;
                 let left: catalog.Reward | null = reward;
-                if (online.has(name.toLowerCase())) {
+                if (online.has(name.toLowerCase()) && !held.has(name.toLowerCase())) {
                     const handed = await give(server, name, reward);
                     left = handed.left;
                     delivered.push(handed.delivered);
@@ -4241,24 +4237,34 @@ async function finish(
                     });
             }
             // The boss's trophy, besides whatever the podium paid: to the most
-            // damage, or to the final blow (`bossService.trophyWinner`).
+            // damage, or to the final blow (`bossService.trophyWinner`). Held or
+            // not on, it waits with their prize (`deliverPending`), rebuilt then.
             const trophyTo =
                 preset.kind === "world-boss" ? bossService.trophyWinner(run, placed) : null;
-            if (trophyTo && online.has(trophyTo.toLowerCase())) {
+            const owedTrophy = trophyTo ? bossService.trophyOf(run) : null;
+            const trophyName = trophyTo?.toLowerCase() ?? "";
+            if (trophyTo && owedTrophy && (!online.has(trophyName) || held.has(trophyName))) {
+                const at = pending.findIndex((one) => one.player.toLowerCase() === trophyName);
+                if (at >= 0) pending[at] = { ...pending[at]!, trophy: owedTrophy };
+                else
+                    pending.push({
+                        id: `${run.id}-${trophyTo}`,
+                        player: trophyTo,
+                        reward: { items: [], levels: 0 },
+                        event: preset.name,
+                        createdAt: Date.now(),
+                        trophy: owedTrophy
+                    });
+            } else if (trophyTo && owedTrophy) {
                 const trophy = await bossService.awardTrophy(
                     server,
-                    run,
+                    owedTrophy,
                     loop.home,
-                    (await serverAtLeast(server, [1, 21, 5]))
-                        ? "text"
-                        : (await serverAtLeast(server, [1, 20, 5]))
-                          ? "json"
-                          : "tag",
+                    await nameSpelling(server),
                     trophyTo
                 );
                 if (trophy) {
-                    const winner = trophyTo.toLowerCase();
-                    const at = delivered.findIndex((one) => one.name.toLowerCase() === winner);
+                    const at = delivered.findIndex((one) => one.name.toLowerCase() === trophyName);
                     const item = { id: trophy.id, count: trophy.count, dropped: trophy.dropped };
                     if (at >= 0)
                         delivered[at] = {
@@ -4864,6 +4870,12 @@ async function versionOf(server: ServerContainer): Promise<string | null> {
  * be. Past what a probe can tell, the answer is no: every caller's older choice
  * is the one that works, or fails harmlessly, on a newer server too.
  */
+/** How this server's version writes an item's name. */
+async function nameSpelling(server: ServerContainer): Promise<NameSpelling> {
+    if (await serverAtLeast(server, [1, 21, 5])) return "text";
+    return (await serverAtLeast(server, [1, 20, 5])) ? "json" : "tag";
+}
+
 async function serverAtLeast(server: ServerContainer, wanted: readonly number[]): Promise<boolean> {
     const version = await versionOf(server);
     if (version !== null) return atLeast(version, wanted);
@@ -5277,12 +5289,18 @@ async function deliverPending(
 ): Promise<void> {
     const row = await readRow(installedAppId);
     if (!row) return;
+    const state = stored.readEventState(row.config);
+    // Somebody an event still holds gets it once everything of theirs is back.
+    const held = stored.heldNames(state);
     const owed = stored
-        .livePending(stored.readEventState(row.config).pending, Date.now())
-        .filter((one) => seen.has(one.player.toLowerCase()));
+        .livePending(state.pending, Date.now())
+        .filter((one) => seen.has(one.player.toLowerCase()) && !held.has(one.player.toLowerCase()));
     if (owed.length === 0) return;
     /** What is still owed after this, by pending id: null when all of it arrived. */
-    const left = new Map<string, catalog.Reward | null>();
+    const left = new Map<
+        string,
+        { reward: catalog.Reward; trophy: stored.PendingReward["trophy"] } | null
+    >();
     /** What reached whom, for the history of the run it was won in. */
     const arrived: { runId: string; prize: stored.DeliveredPrize }[] = [];
     // Each told in their own language.
@@ -5294,23 +5312,39 @@ async function deliverPending(
         await speechService.hear(installedAppId, server, home);
         for (const one of owed) {
             if (!catalog.PLAYER_NAME.test(one.player)) continue;
-            const handed = await give(server, one.player, one.reward);
-            const rest = handed.left;
-            arrived.push({
-                runId: one.id.slice(0, -(one.player.length + 1)),
-                prize: handed.delivered
-            });
-            if (!rest) {
-                left.set(one.id, null);
+            const gives = one.reward.items.length > 0 || one.reward.levels > 0;
+            const handed = gives ? await give(server, one.player, one.reward) : null;
+            const rest = handed?.left ?? null;
+            const prize = handed?.delivered ?? { name: one.player, items: [], levels: 0 };
+            // The trophy after the prize, as at the end of the fight.
+            let trophy = one.trophy;
+            if (trophy) {
+                const item = await bossService.awardTrophy(
+                    server,
+                    trophy,
+                    home,
+                    await nameSpelling(server),
+                    one.player
+                );
+                if (item) {
+                    trophy = null;
+                    prize.items.push({ id: item.id, count: item.count, dropped: item.dropped });
+                }
+            }
+            if (prize.items.length > 0 || prize.levels > 0)
+                arrived.push({ runId: one.id.slice(0, -(one.player.length + 1)), prize });
+            if (gives && !rest)
                 await server.say([
                     `tellraw ${one.player} ${commands.text(messages.rewardGiven(one.event, language))}`
                 ]);
-            } else if (
-                rest.items.length !== one.reward.items.length ||
-                rest.levels !== one.reward.levels
-            ) {
-                left.set(one.id, rest);
-            }
+            if (!rest && !trophy) left.set(one.id, null);
+            else if (
+                trophy !== one.trophy ||
+                (rest &&
+                    (rest.items.length !== one.reward.items.length ||
+                        rest.levels !== one.reward.levels))
+            )
+                left.set(one.id, { reward: rest ?? { items: [], levels: 0 }, trophy });
         }
     });
     if (left.size === 0 && arrived.length === 0) return;
@@ -5319,7 +5353,7 @@ async function deliverPending(
         pending: current.pending.flatMap((one) => {
             if (!left.has(one.id)) return [one];
             const rest = left.get(one.id);
-            return rest ? [{ ...one, reward: rest }] : [];
+            return rest ? [{ ...one, reward: rest.reward, trophy: rest.trophy }] : [];
         }),
         // Written into the run it was won in, when that is still in the history.
         history: current.history.map((entry) => {
