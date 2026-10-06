@@ -512,7 +512,8 @@
         "whitelistOn": "Whitelist enforced",
         "whitelistOff": "Whitelist off",
         "allBanned": "Every blocked address was already banned here",
-        "bannedCount": "Banned {count, plural, one {# address} other {# addresses}}"
+        "bannedCount": "Banned {count, plural, one {# address} other {# addresses}}",
+        "notSignedInThere": "{player}'s Polaris account is not signed in from this address. Opening Polaris on that connection lets them in, or allow it here for good."
     },
     "xray": {
         "everythingRecordedAgainstThemIs": "Everything recorded against them is forgotten, as if it never happened.",
