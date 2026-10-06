@@ -37,7 +37,10 @@ describe("a system line", () => {
             </PersonPressContext.Provider>
         );
         fireEvent.click(screen.getByRole("button", { name: "Elepd" }));
-        expect(press).toHaveBeenCalledWith({ id: "u-elepd", name: "Elepd" }, expect.any(HTMLElement));
+        expect(press).toHaveBeenCalledWith(
+            { id: "u-elepd", name: "Elepd" },
+            expect.any(HTMLElement)
+        );
         expect(container.textContent).toBe("You added Elepd");
     });
 

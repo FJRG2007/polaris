@@ -125,7 +125,10 @@ export function PersonCardProvider({
 }
 
 /** Their role here, in words, or null when they have none. */
-function roleWords(role: ChatRole | null | undefined, channel: ChatChannelView | undefined): string | null {
+function roleWords(
+    role: ChatRole | null | undefined,
+    channel: ChatChannelView | undefined
+): string | null {
     if (!role) return null;
     if (!channel?.spaceId) return role === "owner" ? "Group owner" : null;
     return role === "owner" ? "Space owner" : "Space admin";
@@ -311,7 +314,8 @@ function PersonCard({
                 // A press on what opened it is the toggle closing it, not a
                 // press somewhere else - see `PersonCardProvider`.
                 onInteractOutside={(event) => {
-                    if (event.target instanceof Node && anchor.contains(event.target)) event.preventDefault();
+                    if (event.target instanceof Node && anchor.contains(event.target))
+                        event.preventDefault();
                 }}
             >
                 <DialogTitle className="sr-only">{profile?.name || person.name}</DialogTitle>
