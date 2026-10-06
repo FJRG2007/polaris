@@ -642,14 +642,7 @@ export function dedupeAddresses(entries: readonly MailAddress[]): readonly MailA
  * called `Gesendete Objekte` has to work the same as one whose is not.
  */
 export type MailFolderRole =
-    | "inbox"
-    | "sent"
-    | "drafts"
-    | "trash"
-    | "junk"
-    | "archive"
-    | "all"
-    | "none";
+    "inbox" | "sent" | "drafts" | "trash" | "junk" | "archive" | "all" | "none";
 
 /**
  * The roles a person may point a folder at.
@@ -1892,7 +1885,12 @@ export function proxyRemoteContent(
 function attributeUrl(raw: string): string {
     return raw.replace(
         /&(?:#(\d{1,7})|#x([0-9a-f]{1,6})|(amp|quot|apos|lt|gt));/gi,
-        (match, decimal: string | undefined, hex: string | undefined, named: string | undefined) => {
+        (
+            match,
+            decimal: string | undefined,
+            hex: string | undefined,
+            named: string | undefined
+        ) => {
             if (named) return NAMED_IN_URLS[named.toLowerCase()] ?? match;
             const point = decimal ? Number.parseInt(decimal, 10) : Number.parseInt(hex ?? "", 16);
             return Number.isInteger(point) && point > 0 && point <= 0x10ffff
