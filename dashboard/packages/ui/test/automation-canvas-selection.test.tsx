@@ -106,7 +106,7 @@ class Observer {
 }
 
 function node(id: string): HTMLElement {
-    const found = document.querySelector<HTMLElement>(`.react-flow__node[data-id="${id}"]`);
+    const found = document.querySelector<HTMLElement>(`[data-flow-node][data-id="${id}"]`);
     if (!found) throw new Error(`no node ${id} drawn`);
     return found;
 }

@@ -301,7 +301,7 @@
         "viewInDrive": "Ver en Drive",
         "editMount": "Montaje",
         "hint": "Arrastra los nodos para colocarlos. Arrastra desde el tirador derecho de un nodo hasta otro servicio para enlazarlos. Haz clic derecho en el tablero para añadir un servicio, o en un servicio para ver más.",
-        "hintZoom": "Mantén Ctrl (Cmd en un Mac) y desplaza para hacer zoom.",
+        "hintZoom": "Desplaza para hacer zoom y arrastra el tablero para moverte.",
         "removeService": "Esto elimina el servicio, su contenedor, sus dominios y sus variables.",
         "deleteServiceTitle": "Borrar servicio",
         "zoomControls": "Zoom",

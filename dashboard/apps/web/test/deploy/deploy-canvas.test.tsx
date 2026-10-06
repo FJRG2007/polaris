@@ -12,7 +12,7 @@
 import type { ReactNode } from "react";
 import { MessagesWrapper } from "../setup/i18n";
 import userEvent from "@testing-library/user-event";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import type { ProjectSummary } from "@/app/(app)/apps/deploy/deploy-view";
 
@@ -216,15 +216,58 @@ describe("the project canvas", () => {
         expect(saveLayoutAction).not.toHaveBeenCalled();
     });
 
-    it("tells how to zoom with a wheel only where there is a pointer to hold Ctrl with", () => {
-        mount(<DeployCanvas environment={environment()} canManage />);
-        const zoom = screen.getByText(/Hold Ctrl \(Cmd on a Mac\) and scroll to zoom/);
-        // Hidden on a touch screen, which pinches instead: shown only for a fine pointer.
-        expect(zoom.className).toContain("hidden");
-        expect(zoom.className).toContain("[@media(pointer:fine)]:inline");
-        expect(screen.getByText(/Drag nodes to arrange them/).textContent).not.toMatch(
-            /Hold Ctrl.*Hold Ctrl/
+    it("zooms on the wheel towards the pointer, as the automation diagrams do", () => {
+        const { container } = mount(<DeployCanvas environment={environment()} canManage />);
+        const reset = screen.getByRole("button", { name: "Reset to 100%" });
+        const frame = container.querySelector<HTMLElement>("[data-board-frame]")!;
+        fireEvent(
+            frame,
+            new WheelEvent("wheel", {
+                deltaY: -200,
+                clientX: 10,
+                clientY: 10,
+                bubbles: true,
+                cancelable: true
+            })
         );
+        expect(reset.textContent).not.toBe("100%");
+        expect(Number.parseInt(reset.textContent ?? "", 10)).toBeGreaterThan(100);
+    });
+
+    it("moves around when the board itself is dragged, and not when a card is", () => {
+        const { container } = mount(<DeployCanvas environment={environment()} canManage />);
+        const frame = container.querySelector<HTMLElement>("[data-board-frame]")!;
+        frame.scrollLeft = 200;
+        frame.scrollTop = 200;
+        const drag = (target: Element, from: [number, number], to: [number, number]) => {
+            target.dispatchEvent(
+                new PointerEvent("pointerdown", {
+                    button: 0,
+                    clientX: from[0],
+                    clientY: from[1],
+                    bubbles: true
+                })
+            );
+            window.dispatchEvent(
+                new PointerEvent("pointermove", { clientX: to[0], clientY: to[1], bubbles: true })
+            );
+            window.dispatchEvent(
+                new PointerEvent("pointerup", { clientX: to[0], clientY: to[1], bubbles: true })
+            );
+        };
+        drag(frame, [300, 300], [260, 240]);
+        expect(frame.scrollLeft).toBe(240);
+        expect(frame.scrollTop).toBe(260);
+
+        drag(screen.getByRole("button", { name: "Open api (Online)" }), [300, 300], [200, 200]);
+        expect(frame.scrollLeft).toBe(240);
+        expect(frame.scrollTop).toBe(260);
+    });
+
+    it("says how to get around it once, without asking for a modifier key", () => {
+        mount(<DeployCanvas environment={environment()} canManage />);
+        expect(screen.queryByText(/Hold Ctrl/)).toBeNull();
+        expect(screen.getByText(/Scroll to zoom/).textContent).toMatch(/drag the board/i);
     });
 
     it("offers to add the first service from an empty board", () => {

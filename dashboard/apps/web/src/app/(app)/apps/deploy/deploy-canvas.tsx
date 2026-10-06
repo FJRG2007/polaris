@@ -7,8 +7,10 @@
  * organizational for now - a visual map of how services relate - not yet wired to
  * private networking. Full service controls live in the List view.
  *
- * The board zooms (the corner controls, or Ctrl/Cmd + wheel towards the pointer)
- * and pointing at a service lights up the lines that join it, so the shape of a
+ * The board zooms (the corner controls, the wheel towards the pointer, or a
+ * pinch), moves when the board itself is dragged (`useBoardGestures`, the same
+ * hand the automation diagrams answer), and pointing at a service lights up
+ * the lines that join it, so the shape of a
  * project with many services can still be read. The arithmetic for both lives
  * in canvas-geometry.ts.
  */
@@ -71,7 +73,8 @@ import {
     ContextMenuSub,
     ContextMenuSubContent,
     ContextMenuSubTrigger,
-    ContextMenuTrigger
+    ContextMenuTrigger,
+    useBoardGestures
 } from "@polaris/ui";
 
 const NODE_W = 280;
@@ -459,26 +462,27 @@ export function DeployCanvas({
         setZoom(view.zoom);
     }
 
-    // Ctrl/Cmd + wheel zooms towards the pointer, as every map and design tool
-    // does; a plain wheel still scrolls the board. A trackpad pinch arrives as a
-    // wheel with ctrlKey set, so it zooms too. Registered by hand because React's
-    // wheel listener is passive and could not stop the page zooming instead.
+    // The wheel zooms towards the pointer and dragging the board moves it, as on
+    // the automation diagrams. The board is a scrolling box, so a move is a
+    // scroll; a press on a card, a handle or a control is theirs, not the board's.
     const hasNodes = nodes.length > 0;
-    useEffect(() => {
-        const container = containerRef.current;
-        if (!container) return;
-        function onWheel(event: WheelEvent) {
-            if (!event.ctrlKey && !event.metaKey) return;
-            event.preventDefault();
-            const rect = container!.getBoundingClientRect();
-            zoomTo(zoomRef.current * Math.exp(-event.deltaY * 0.002), {
-                x: event.clientX - rect.left,
-                y: event.clientY - rect.top
-            });
-        }
-        container.addEventListener("wheel", onWheel, { passive: false });
-        return () => container.removeEventListener("wheel", onWheel);
-    }, [hasNodes, zoomTo]);
+    useBoardGestures(
+        containerRef,
+        {
+            onZoom: (factor, anchor) => zoomTo(zoomRef.current * factor, anchor),
+            onPan: (dx, dy) => {
+                const container = containerRef.current;
+                if (!container) return;
+                container.scrollLeft -= dx;
+                container.scrollTop -= dy;
+            },
+            grabs: (target) =>
+                !target.closest(
+                    "[role='button'], button, a, input, textarea, select, [role='menuitem']"
+                )
+        },
+        hasNodes
+    );
 
     /**
      * Open the board on the services rather than on the corner it starts in.
@@ -854,7 +858,8 @@ export function DeployCanvas({
                 <div className="relative h-[calc(100dvh-11rem)] min-h-[460px] overflow-hidden rounded-lg border border-border/60">
                     <div
                         ref={containerRef}
-                        className="absolute inset-0 overflow-auto overscroll-contain"
+                        data-board-frame
+                        className={`absolute inset-0 cursor-grab overflow-auto overscroll-contain data-[panning]:cursor-grabbing${hasNodes ? " touch-none" : ""}`}
                         style={DOT_BG}
                     >
                         {/* Sized to the board at the current zoom, so the frame
