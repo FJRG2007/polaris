@@ -219,11 +219,53 @@ describe("reading now", () => {
             () => new Promise((resolve) => setTimeout(() => resolve({ failed: [] }), 10_000))
         );
         const asked = watch.refreshAccounts(INSTALL, ["nuki"], 4000);
+        const before = Date.now() - 1;
         await advance(4000);
         expect(await asked).toBe("timeout");
-        const waited = watch.waitForRead("nuki", Date.now(), 10_000);
+        const waited = watch.waitForRead("nuki", before, 10_000);
         await advance(6000);
         expect(await waited).toBe(true);
+    });
+
+    it("never takes a read started before a command for one made after it", async () => {
+        let finish: (value: unknown) => void = () => undefined;
+        mocks.syncDevices.mockImplementationOnce(
+            () => new Promise((resolve) => (finish = () => resolve({ failed: [] })))
+        );
+        const early = watch.readAccounts(INSTALL, ["garage"]);
+        await advance(1000);
+        const actedAt = Date.now();
+        let settled = false;
+        const waited = watch.waitForRead("garage", actedAt, 10_000).then((read) => {
+            settled = true;
+            return read;
+        });
+        await advance(500);
+        finish(undefined);
+        expect(await early).toEqual([]);
+        await advance(0);
+        expect(settled).toBe(false);
+        const late = watch.readAccounts(INSTALL, ["garage"], new Map([["garage", actedAt]]));
+        await advance(0);
+        expect(mocks.syncDevices).toHaveBeenCalledTimes(2);
+        expect(await late).toEqual([]);
+        expect(await waited).toBe(true);
+    });
+
+    it("starts a follow-up's own read instead of joining one from before the command", async () => {
+        let finish: (value: unknown) => void = () => undefined;
+        mocks.syncDevices.mockImplementationOnce(
+            () => new Promise((resolve) => (finish = () => resolve({ failed: [] })))
+        );
+        const early = watch.readAccounts(INSTALL, ["garage"]);
+        await advance(500);
+        const since = Date.now();
+        const late = watch.readAccounts(INSTALL, ["garage"], new Map([["garage", since]]));
+        await advance(0);
+        expect(mocks.syncDevices).toHaveBeenCalledTimes(2);
+        expect(await late).toEqual([]);
+        finish(undefined);
+        expect(await early).toEqual([]);
     });
 
     it("says when an account refused", async () => {

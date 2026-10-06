@@ -23,8 +23,10 @@
  */
 
 import { z } from "zod";
+import * as core from "@polaris/core";
+import type { DataConnectionView } from "@/lib/data/connections";
 import { reachesDatabase } from "../oauth/database-reach";
-import { defineMcpSearch } from "../search";
+import { defineMcpSearch, preferMatches } from "../search";
 import { McpRefusal, defineMcpTool, type McpCaller, type McpTool } from "../protocol";
 
 /**
@@ -444,6 +446,12 @@ const executeTool: McpTool<z.infer<typeof executeInput>> = {
     }
 };
 
+const DATABASE_FIELDS: readonly core.SearchField<DataConnectionView>[] = [
+    { text: (entry) => entry.name, weight: 1 },
+    { text: (entry) => entry.engine, weight: 0.4 },
+    { text: (entry) => (entry.origin === "managed" ? entry.where : null), weight: 0.4 }
+];
+
 /**
  * What `polaris_search` finds here: every database this connection may open,
  * with the same reach and the same silence about addresses as databases_list.
@@ -453,23 +461,23 @@ export const DATABASE_SEARCH = defineMcpSearch({
     app: "databases",
     category: "databases",
     scope: "databases.read",
-    async search(_query, caller, limit) {
+    async search(query, caller, limit) {
         const userId = await actorFor(caller);
         const { connections } = await services();
-        return (await connections.listOpenable(userId))
-            .filter((entry) => reachesDatabase(caller.databaseIds, entry.id))
-            .slice(0, limit)
-            .map((entry) => ({
-                id: entry.id,
-                name: entry.name,
-                kind: "database",
-                where: entry.origin === "managed" ? entry.where : null,
-                keywords: [entry.engine],
-                next: [
-                    { tool: "databases_schema", args: { databaseId: entry.id } },
-                    { tool: "databases_query", args: { databaseId: entry.id } }
-                ]
-            }));
+        const rows = (await connections.listOpenable(userId)).filter((entry) =>
+            reachesDatabase(caller.databaseIds, entry.id)
+        );
+        return preferMatches(rows, query, DATABASE_FIELDS, limit).map((entry) => ({
+            id: entry.id,
+            name: entry.name,
+            kind: "database",
+            where: entry.origin === "managed" ? entry.where : null,
+            keywords: [entry.engine],
+            next: [
+                { tool: "databases_schema", args: { databaseId: entry.id } },
+                { tool: "databases_query", args: { databaseId: entry.id } }
+            ]
+        }));
     }
 });
 

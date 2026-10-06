@@ -4,8 +4,8 @@
  * Offered through the `mcpSearch` hook, beside the tools in `mcp-tools.ts`, and
  * held to the same rules: `placesReach` and `onlyReachable` decide what the
  * person sees, so somebody lent one door finds that door, its place and its
- * room, and nothing else of the house. Cameras are found by name and place so
- * a model can say which one is meant; nothing of what they see is offered.
+ * room, and nothing else of the house. Cameras are found by name and place,
+ * and point at the picture tool, which holds its own scope.
  * Routines are found only by somebody who manages the house, as on the
  * routines screen.
  *
@@ -81,7 +81,7 @@ const thingsProvider = () =>
                     kind: "camera",
                     where: whereOf(placeName.get(camera.placeId), camera.zone),
                     keywords: ["camera"],
-                    next: []
+                    next: [{ tool: "places_camera_snapshot", args: { cameraId: camera.id } }]
                 });
             }
 

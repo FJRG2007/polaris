@@ -54,7 +54,7 @@ const eventsProvider = () =>
         id: "game-servers.minecraft-events",
         app: "game-servers",
         category: "games",
-        scope: "gameservers.manage",
+        scope: "gameservers.read",
         async search(_query, caller, limit) {
             const user = await host.mcp.actingUser(caller.userId);
             if (!user) return [];
@@ -84,7 +84,13 @@ const eventsProvider = () =>
                                 "minecraft",
                                 preset.enabled ? "on" : "off"
                             ],
-                            next: [{ tool: "games_server_status", args: { serverId: server.id } }]
+                            next: [
+                                {
+                                    tool: "games_event_start",
+                                    args: { serverId: server.id, eventId: preset.id }
+                                },
+                                { tool: "games_events", args: { serverId: server.id } }
+                            ]
                         })
                     );
                 })

@@ -670,10 +670,11 @@ function EditScopes({
     );
     const [reach, setReach] = useState<DatabaseReach>(initialReach);
     const showDatabases = holdsDatabases(effective);
+    const chosenReach = sameDatabaseReach(reach, initialReach) ? app.databaseIds : reach;
     const name = app.name || t("consent.unnamed");
     const unchanged =
         sameSet([...effective], holding) &&
-        (!showDatabases || sameDatabaseReach(reach, app.databaseIds));
+        (!showDatabases || sameDatabaseReach(chosenReach, app.databaseIds));
     const empty = effective.size === 0;
 
     return (
@@ -708,7 +709,7 @@ function EditScopes({
                     </Button>
                     <Button
                         disabled={unchanged || empty}
-                        onClick={() => onSave([...effective], reach)}
+                        onClick={() => onSave([...effective], chosenReach)}
                     >
                         {t("connectedApps.save")}
                     </Button>

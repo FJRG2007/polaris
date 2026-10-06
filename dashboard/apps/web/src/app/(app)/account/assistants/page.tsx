@@ -40,9 +40,11 @@ async function ConnectedAppsSection({ userId, isAdmin }: { userId: string; isAdm
         const unrequested = offered.filter((scope) => !requestable.has(scope));
         return { ...app, offered, unrequested };
     });
-    // The databases an app may be pointed at, read only when some app holds a
-    // database permission: the list reaches the connection store.
-    const databases = rows.some((app) => app.scopes.some((scope) => scope.startsWith("databases.")))
+    // The databases an app may be pointed at, read only when some app could be
+    // given a database permission: the list reaches the connection store.
+    const databases = rows.some((app) =>
+        app.offered.some((scope) => scope.startsWith("databases."))
+    )
         ? await databaseOptions(userId)
         : [];
     // The rules a connected assistant is held to are the ones an administrator

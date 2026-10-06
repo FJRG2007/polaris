@@ -136,9 +136,9 @@ export function dueAccounts(
 // ---------------------------------------------------------------------------
 
 interface Shared {
-    /** Reads in flight, by account. */
-    readonly inflight: Map<string, Promise<boolean>>;
-    /** When each account last finished a read that worked. */
+    /** Reads in flight, by account, with when each started. */
+    readonly inflight: Map<string, { startedAt: number; read: Promise<boolean> }>;
+    /** When each account's last read that worked was started. */
     readonly readAt: Map<string, number>;
     /** Waiting for an account's next read. */
     readonly waiters: Set<{ accountId: string; after: number; done: (read: boolean) => void }>;
@@ -155,21 +155,25 @@ function shared(): Shared {
 /**
  * Read these accounts now, through the one sync path (`syncDevices`, quietly -
  * never a probe). An account already being read is not read twice: the caller
- * waits for the read in flight. Answers the accounts that failed.
+ * waits for the read in flight, unless it started no later than the time
+ * `after` holds for that account. Answers the accounts that failed.
  */
 export async function readAccounts(
     installedAppId: string,
-    accountIds: readonly string[]
+    accountIds: readonly string[],
+    after: ReadonlyMap<string, number> = new Map()
 ): Promise<string[]> {
     const { inflight, readAt, waiters } = shared();
     const waiting = new Map<string, Promise<boolean>>();
     const fresh: string[] = [];
     for (const id of new Set(accountIds)) {
         const running = inflight.get(id);
-        if (running) waiting.set(id, running);
+        if (running && running.startedAt > (after.get(id) ?? -Infinity))
+            waiting.set(id, running.read);
         else fresh.push(id);
     }
     if (fresh.length > 0) {
+        const startedAt = Date.now();
         // Loaded when needed: `devices` publishes through `device-live`, and
         // reaches this module itself after a command.
         const read = import("./devices").then((devices) =>
@@ -180,14 +184,14 @@ export async function readAccounts(
                 (outcome) => !outcome.failed.includes(id),
                 () => false
             );
-            inflight.set(id, one);
+            const entry = { startedAt, read: one };
+            inflight.set(id, entry);
             void one.then((worked) => {
-                inflight.delete(id);
+                if (inflight.get(id) === entry) inflight.delete(id);
                 if (!worked) return;
-                const at = Date.now();
-                readAt.set(id, at);
+                if (startedAt > (readAt.get(id) ?? 0)) readAt.set(id, startedAt);
                 for (const waiter of [...waiters]) {
-                    if (waiter.accountId === id && at > waiter.after) waiter.done(true);
+                    if (waiter.accountId === id && startedAt > waiter.after) waiter.done(true);
                 }
             });
             waiting.set(id, one);
@@ -199,8 +203,8 @@ export async function readAccounts(
 }
 
 /**
- * Resolve once an account has been read successfully after `after` (epoch
- * ms), or with false when `timeoutMs` passes first.
+ * Resolve once a read of an account started after `after` (epoch ms) has
+ * worked, or with false when `timeoutMs` passes first.
  */
 export function waitForRead(accountId: string, after: number, timeoutMs: number): Promise<boolean> {
     const { readAt, waiters } = shared();
@@ -256,6 +260,8 @@ export async function refreshAccounts(
 interface FollowUp {
     /** When to read the account again, soonest first. */
     times: number[];
+    /** When the last command was sent: a read started before it is not one. */
+    since: number;
     /** The devices commanded, read after each pass to see whether they have
      *  stopped moving. */
     devices: Set<string>;
@@ -354,7 +360,10 @@ async function tick(installedAppId: string, watch: Watch): Promise<void> {
         const options = { watched: watch.viewers > 0, followUps: nextFollowUps(watch) };
         const plan = dueAccounts(list, watch.failures, Date.now(), options);
         if (plan.due.length > 0) {
-            const failed = new Set(await readAccounts(installedAppId, plan.due));
+            const since = new Map(
+                [...watch.followUps].map(([id, followUp]) => [id, followUp.since])
+            );
+            const failed = new Set(await readAccounts(installedAppId, plan.due, since));
             for (const id of plan.due) {
                 if (failed.has(id)) {
                     const count = (watch.failures.get(id)?.count ?? 0) + 1;
@@ -448,7 +457,11 @@ export function requestFollowUps(
     const current = watch.followUps.get(accountId);
     const devices = new Set(current?.devices ?? []);
     devices.add(deviceId);
-    watch.followUps.set(accountId, { times: FOLLOW_UP_MS.map((ms) => now + ms), devices });
+    watch.followUps.set(accountId, {
+        times: FOLLOW_UP_MS.map((ms) => now + ms),
+        since: now,
+        devices
+    });
     schedule(installedAppId, watch, FOLLOW_UP_MS[0]!);
 }
 
