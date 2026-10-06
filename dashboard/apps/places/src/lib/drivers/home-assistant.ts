@@ -239,6 +239,13 @@ export const homeAssistantDriver: DeviceDriver = {
         ];
     },
 
+    /** Every entity change, as Home Assistant pushes it over its WebSocket. An
+     *  air unit's sensors are entities of their own and are caught by the
+     *  next turn instead. */
+    async listen(credentials, changed, signal) {
+        await ha.listenHomeAssistant(homeOf(credentials), (entityId) => changed([entityId]), signal);
+    },
+
     async act(credentials, device, action, command) {
         const domain = domainOf(device.externalId);
         if (domain === "climate") {

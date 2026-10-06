@@ -15,7 +15,14 @@ const mocks = vi.hoisted(() => ({
     listAccounts: vi.fn(),
     installsWithAccounts: vi.fn(),
     syncDevices: vi.fn(),
-    getDevice: vi.fn()
+    getDevice: vi.fn(),
+    keepListening: vi.fn(),
+    stopListening: vi.fn()
+}));
+
+vi.mock("@polaris-app/places/src/lib/device-push", () => ({
+    keepListening: mocks.keepListening,
+    stopListening: mocks.stopListening
 }));
 
 vi.mock("@polaris-app/places/src/lib/device-accounts", () => ({
@@ -135,6 +142,38 @@ describe("the background coordinator", () => {
         expect(mocks.syncDevices).toHaveBeenCalledTimes(2);
         await advance(watch.CLOUD_POLL_MS);
         expect(mocks.syncDevices).toHaveBeenCalledTimes(3);
+    });
+});
+
+describe("the makes that push", () => {
+    it("are listened to from the first pass, and let go when nothing keeps the install read", async () => {
+        watch.startDeviceCoordinator();
+        await advance(0);
+        expect(mocks.keepListening).toHaveBeenCalledWith(
+            INSTALL,
+            [expect.objectContaining({ id: "nuki", connection: "nuki-web" })],
+            expect.any(Function)
+        );
+        // What a change on a channel does: read that account through the one path.
+        const read = mocks.keepListening.mock.calls[0]![2] as (id: string) => Promise<unknown>;
+        mocks.syncDevices.mockClear();
+        await read("nuki");
+        expect(mocks.syncDevices).toHaveBeenCalledWith(INSTALL, { probe: false, only: ["nuki"] });
+        watch.stopDeviceCoordinator();
+        expect(mocks.stopListening).toHaveBeenCalledWith(INSTALL);
+    });
+
+    it("never stop the timer when listening fails", async () => {
+        mocks.keepListening.mockImplementation(() => {
+            throw new Error("no driver");
+        });
+        try {
+            watch.startDeviceCoordinator();
+            await advance(0);
+            expect(mocks.syncDevices).toHaveBeenCalledTimes(1);
+        } finally {
+            mocks.keepListening.mockReset();
+        }
     });
 });
 

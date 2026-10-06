@@ -104,7 +104,7 @@ export function normalizeFingerprint(value: string): string {
     return value.replace(/[^0-9a-f]/gi, "").toUpperCase();
 }
 
-function refusal(error: NodeJS.ErrnoException): DriverError {
+export function refusal(error: NodeJS.ErrnoException): DriverError {
     if (error instanceof DriverError) return error;
     const code = error.code ?? "";
     if (code === "ENOTFOUND" || code === "EAI_AGAIN") {
@@ -138,7 +138,7 @@ function refusal(error: NodeJS.ErrnoException): DriverError {
  * request exists: a socket handed to `createConnection` is already trusted, and
  * the headers carrying a key go to nothing else.
  */
-function secureSocket(
+export function secureSocket(
     host: string,
     port: number,
     trust: LanTrust,

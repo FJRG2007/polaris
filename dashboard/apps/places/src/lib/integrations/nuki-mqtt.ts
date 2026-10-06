@@ -24,7 +24,7 @@
  * out loud on the screen that asks for the address rather than hidden here.
  */
 
-import { publish, readRetained, type BrokerAddress } from "./mqtt-broker";
+import { publish, readRetained, watchTopics, type BrokerAddress } from "./mqtt-broker";
 
 export { BrokerError as NukiMqttError } from "./mqtt-broker";
 
@@ -66,6 +66,24 @@ export async function readBroker(broker: NukiBroker): Promise<BrokerContents> {
         devices.set(id, device);
     }
     return devices;
+}
+
+/** Hand `changed` the id of every device that publishes anything from now on,
+ *  until the broker closes or `signal` aborts. */
+export async function watchBroker(
+    broker: NukiBroker,
+    changed: (deviceId: string) => void,
+    signal: AbortSignal
+): Promise<void> {
+    await watchTopics(
+        broker,
+        [`${broker.prefix}/+/#`],
+        (topic) => {
+            const id = topic.split("/")[1];
+            if (id) changed(id);
+        },
+        signal
+    );
 }
 
 /**

@@ -240,6 +240,20 @@ export interface DeviceDriver {
          *  always the device's own kind's. */
         command?: DeviceCommand
     ): Promise<void>;
+    /**
+     * Hear the devices change as it happens, where the make pushes it: a hub's
+     * event stream, a broker's subscription. Calls `changed` with the external
+     * ids that changed, or none when it cannot tell which, and resolves when
+     * the channel closes or `signal` aborts; rejects, with a `DriverError`,
+     * only when it could not be opened. Never a read of its own: what changed
+     * is read through `list`, the one path every reading takes
+     * (`device-push.ts`). Present only where the make has such a channel.
+     */
+    listen?(
+        credentials: Credentials,
+        changed: (externalIds: readonly string[]) => void,
+        signal: AbortSignal
+    ): Promise<void>;
     /** Present on a connection made by pairing rather than by typing. */
     readonly pair?: DevicePairing;
     /**

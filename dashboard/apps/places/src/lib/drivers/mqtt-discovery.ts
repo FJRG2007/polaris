@@ -396,6 +396,35 @@ export const mqttDiscoveryDriver: DeviceDriver = {
     },
 
     /**
+     * The state and availability topics of everything announced, from now on,
+     * by the device each belongs to - and a description changing, which can be
+     * anything, as a change nobody can name.
+     */
+    async listen(credentials, changed, signal) {
+        const address = brokerOf(credentials);
+        const { found } = await readAll(address);
+        const owners = new Map<string, string[]>();
+        for (const entry of found) {
+            for (const topic of [
+                pick(entry.config, "state_topic", "stat_t"),
+                pick(entry.config, "availability_topic", "avty_t")
+            ]) {
+                if (!topic) continue;
+                owners.set(topic, [...(owners.get(topic) ?? []), entry.id]);
+            }
+        }
+        const descriptions = [`${address.prefix}/+/+/config`, `${address.prefix}/+/+/+/config`];
+        await speaking(() =>
+            broker.watchTopics(
+                address,
+                [...descriptions, ...owners.keys()],
+                (topic) => changed(owners.get(topic) ?? []),
+                signal
+            )
+        );
+    },
+
+    /**
      * Say the thing on the topic the device itself named.
      *
      * Retained deliberately not: a command that stayed on the broker would be

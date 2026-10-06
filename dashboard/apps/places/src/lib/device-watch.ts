@@ -29,12 +29,17 @@
  * an account any other path just read (an automation, the button, a press) is
  * not read again until it is due.
  *
+ * Where a make pushes its changes - Home Assistant, a DIRIGERA hub, a broker -
+ * a channel is held open beside the timer (`device-push.ts`), and a change on
+ * it reads the account at once instead of at its next turn.
+ *
  * None of this wakes a device: it is the same quiet read the timer made. The
  * button that does wake them is still the person's to press.
  *
  * Server-only.
  */
 
+import * as push from "./device-push";
 import * as accounts from "./device-accounts";
 import { deviceConnection } from "./device-connections";
 
@@ -337,6 +342,13 @@ async function tick(installedAppId: string, watch: Watch): Promise<void> {
     let nextInMs = CLOUD_POLL_MS;
     try {
         const list = await accounts.listAccounts(installedAppId);
+        // The makes that push are heard between passes too (`device-push`). A
+        // channel that cannot be kept never costs the timer its pass.
+        try {
+            push.keepListening(installedAppId, list, (id) => readAccounts(installedAppId, [id]));
+        } catch (error) {
+            console.error("places: the devices could not be listened to:", error);
+        }
         const known = new Set(list.map((account) => account.id));
         for (const id of watch.followUps.keys()) if (!known.has(id)) watch.followUps.delete(id);
         const options = { watched: watch.viewers > 0, followUps: nextFollowUps(watch) };
@@ -391,11 +403,12 @@ function schedule(installedAppId: string, watch: Watch, delayMs: number): void {
     watch.timer.unref?.();
 }
 
-function idle(watch: Watch): void {
+function idle(installedAppId: string, watch: Watch): void {
     if (active(watch)) return;
     if (watch.timer) clearTimeout(watch.timer);
     watch.timer = null;
     watch.failures.clear();
+    push.stopListening(installedAppId);
 }
 
 /**
@@ -415,7 +428,7 @@ export function watchDevices(installedAppId: string): () => void {
         if (released) return;
         released = true;
         watch.viewers -= 1;
-        idle(watch);
+        idle(installedAppId, watch);
     };
 }
 
@@ -458,7 +471,7 @@ export async function discoverInstalls(): Promise<string[]> {
     for (const [installedAppId, watch] of watches()) {
         if (installs.has(installedAppId)) continue;
         watch.background = false;
-        idle(watch);
+        idle(installedAppId, watch);
     }
     for (const installedAppId of installs) {
         const watch = watchFor(installedAppId);
@@ -490,9 +503,9 @@ export function stopDeviceCoordinator(): void {
     const state = coordinator();
     if (state.timer) clearInterval(state.timer);
     state.timer = null;
-    for (const watch of watches().values()) {
+    for (const [installedAppId, watch] of watches()) {
         watch.background = false;
-        idle(watch);
+        idle(installedAppId, watch);
     }
 }
 

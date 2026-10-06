@@ -73,6 +73,22 @@ vi.mock("@polaris-app/places/src/lib/integrations/lan-http", async (original) =>
     };
 });
 
+/** The event stream: what it was opened with, and the messages it carries. */
+const stream = vi.hoisted(() => ({
+    opened: [] as { url: string; headers?: Record<string, string>; trust?: unknown }[],
+    messages: [] as string[]
+}));
+
+vi.mock("@polaris-app/places/src/lib/integrations/lan-socket", () => ({
+    openLanSocket: async (options: (typeof stream.opened)[number]) => {
+        stream.opened.push(options);
+        return {};
+    },
+    eachMessage: async (_ws: unknown, onMessage: (text: string) => void) => {
+        for (const message of stream.messages) onMessage(message);
+    }
+}));
+
 const ikea = await import("@polaris-app/places/src/lib/integrations/dirigera-api");
 const { dirigeraHubDriver } = await import("@polaris-app/places/src/lib/drivers/dirigera-hub");
 
@@ -240,5 +256,29 @@ describe("what a hub has", () => {
         await expect(dirigeraHubDriver.list({ host: "10.0.1.25" })).rejects.toMatchObject({
             kind: "unauthorized"
         });
+    });
+});
+
+describe("the hub's event stream", () => {
+    it("is opened with the token over the pinned certificate, and names each device that changed", async () => {
+        stream.opened = [];
+        stream.messages = [
+            JSON.stringify({ type: "deviceStateChanged", data: { id: "lamp-1", attributes: { isOn: true } } }),
+            JSON.stringify({ type: "sceneUpdated", data: { id: "scene-1" } }),
+            "not json",
+            JSON.stringify({ type: "deviceAdded", data: {} })
+        ];
+        const changed: (readonly string[])[] = [];
+        await dirigeraHubDriver.listen!(
+            { host: "10.0.1.25", token: "hub-token", fingerprint: PIN },
+            (ids) => changed.push(ids),
+            new AbortController().signal
+        );
+        expect(stream.opened[0]).toMatchObject({
+            url: "wss://10.0.1.25:8443/v1",
+            headers: { authorization: "Bearer hub-token" },
+            trust: { pin: PIN }
+        });
+        expect(changed).toEqual([["lamp-1", "lamp-1#temperature", "lamp-1#humidity"], []]);
     });
 });

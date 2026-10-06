@@ -15,7 +15,9 @@ import { X509Certificate } from "node:crypto";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createServer as createHttpServer } from "node:http";
 import { createServer as createHttpsServer } from "node:https";
+import { WebSocketServer } from "ws";
 import * as lan from "@polaris-app/places/src/lib/integrations/lan-http";
+import * as lanSocket from "@polaris-app/places/src/lib/integrations/lan-socket";
 import * as address from "@polaris-app/places/src/lib/integrations/lan-address";
 
 // The servers below listen on the loopback address, which a device connection
@@ -303,5 +305,76 @@ describe("an address no device is at", () => {
         ]) {
             expect(actual.forbiddenAddress(allowed), allowed).toBe(false);
         }
+    });
+});
+
+describe("a channel that stays open", () => {
+    async function tlsHub() {
+        const server = createHttpsServer({ cert: DEVICE_CERT, key: DEVICE_KEY });
+        const sockets = new WebSocketServer({ server });
+        const upgrades: (string | undefined)[] = [];
+        sockets.on("connection", (socket, request) => {
+            upgrades.push(request.headers.authorization);
+            socket.send(JSON.stringify({ type: "deviceStateChanged", data: { id: "lamp-1" } }));
+        });
+        server.listen(0, "127.0.0.1");
+        await once(server, "listening");
+        stop = () => {
+            sockets.close();
+            server.close();
+        };
+        return { port: (server.address() as AddressInfo).port, upgrades };
+    }
+
+    it("opens over the pinned certificate and reads what the hub says first", async () => {
+        const hub = await tlsHub();
+        const ws = await lanSocket.openLanSocket({
+            url: `wss://127.0.0.1:${hub.port}/v1`,
+            headers: { authorization: "Bearer hub-token" },
+            trust: { pin: DEVICE_PIN }
+        });
+        const said: string[] = [];
+        const controller = new AbortController();
+        const reading = lanSocket.eachMessage(ws, (text) => said.push(text), controller.signal);
+        await vi.waitFor(() => expect(said).toHaveLength(1));
+        controller.abort();
+        await reading;
+        expect(hub.upgrades).toEqual(["Bearer hub-token"]);
+        expect(JSON.parse(said[0]!)).toMatchObject({ data: { id: "lamp-1" } });
+    });
+
+    it("refuses another certificate before the token is sent", async () => {
+        const hub = await tlsHub();
+        const other = new X509Certificate(OTHER_CERT).fingerprint256;
+        await expect(
+            lanSocket.openLanSocket({
+                url: `wss://127.0.0.1:${hub.port}/v1`,
+                headers: { authorization: "Bearer hub-token" },
+                trust: { pin: other }
+            })
+        ).rejects.toMatchObject({ kind: "unauthorized" });
+        expect(hub.upgrades).toEqual([]);
+    });
+
+    it("will not speak wss with no rule for trusting it, nor dial an address no device is at", async () => {
+        await expect(
+            lanSocket.openLanSocket({ url: "wss://127.0.0.1:1/v1" })
+        ).rejects.toMatchObject({ kind: "refused" });
+        await expect(
+            lanSocket.openLanSocket({ url: "ws://169.254.169.254/" })
+        ).rejects.toMatchObject({ message: FORBIDDEN });
+    });
+
+    it("says which sign-in was refused when the upgrade is answered with 401", async () => {
+        const origin = await plainDevice((_request, response) => {
+            response.statusCode = 401;
+            response.end();
+        });
+        await expect(
+            lanSocket.openLanSocket({
+                url: origin.replace("http", "ws"),
+                signInRefused: "The hub no longer accepts Polaris."
+            })
+        ).rejects.toMatchObject({ kind: "unauthorized", message: "The hub no longer accepts Polaris." });
     });
 });

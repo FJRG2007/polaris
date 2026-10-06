@@ -1,5 +1,5 @@
 /**
- * Reading and writing an MQTT broker, without holding a subscription open.
+ * Reading and writing an MQTT broker, and listening to one.
  *
  * Everything a device publishes about itself is retained: the broker keeps the
  * last message on each topic and hands the set to any client that subscribes. So
@@ -7,10 +7,11 @@
  * has exactly what a permanent subscriber would have had, without a long-lived
  * socket inside a web server that is not built to hold one.
  *
- * What that costs is the stream. Nobody is listening between reads, so an event
- * that is published and not retained - a button press, a lock's own record of who
- * opened it - is not seen. Every state is, which is what a screen showing what
- * things are doing actually needs.
+ * What that costs is the stream: nobody is listening between reads. So the one
+ * long-lived subscription is `watchTopics`, held by the background reads
+ * (`device-push.ts`) once per account, and only ever as a signal that something
+ * changed - what it changed to is read again the usual way, so a message that
+ * is published and not retained is a reason to read, never a state of its own.
  *
  * Shared by every make reached this way: Nuki's own MQTT support and the
  * discovery convention that Zigbee2MQTT, Tasmota, ESPHome and the rest publish
@@ -190,6 +191,46 @@ export async function publish(
                     resolve();
                 }
             );
+        });
+    } finally {
+        client.end(true);
+    }
+}
+
+/**
+ * Listen to these filters until the broker closes the connection or `signal`
+ * aborts, handing every message published from now on to `onMessage`. What the
+ * broker was holding (retained, handed over on subscribing) is skipped: that is
+ * what a read already has. Rejects only when it could not connect or
+ * subscribe.
+ */
+export async function watchTopics(
+    broker: BrokerAddress,
+    filters: readonly string[],
+    onMessage: (topic: string) => void,
+    signal: AbortSignal
+): Promise<void> {
+    const client = await connect(broker);
+    try {
+        await new Promise<void>((resolve, reject) => {
+            const close = () => {
+                signal.removeEventListener("abort", close);
+                resolve();
+            };
+            if (signal.aborted) {
+                close();
+                return;
+            }
+            signal.addEventListener("abort", close);
+            client.on("message", (topic: string, _payload: Buffer, packet: { retain?: boolean }) => {
+                if (!packet.retain) onMessage(topic);
+            });
+            client.once("close", close);
+            client.subscribe([...filters], { qos: 0 }, (error) => {
+                if (!error) return;
+                signal.removeEventListener("abort", close);
+                reject(new BrokerError("The broker would not let Polaris read that.", "refused"));
+            });
         });
     } finally {
         client.end(true);

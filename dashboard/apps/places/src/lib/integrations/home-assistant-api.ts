@@ -199,3 +199,89 @@ export async function callService(
         throw new DriverError("Home Assistant refused the request.", "refused");
     }
 }
+
+const socketMessage = z.object({
+    type: z.string(),
+    id: z.number().optional(),
+    success: z.boolean().optional(),
+    event: z
+        .object({
+            event_type: z.string(),
+            data: z.object({
+                entity_id: z.string(),
+                old_state: z.object({ state: z.string() }).passthrough().nullable().optional(),
+                new_state: z.object({ state: z.string() }).passthrough().nullable().optional()
+            })
+        })
+        .optional()
+});
+
+/** Domains whose attributes are only details: a change that leaves their state
+ *  as it was (a sensor's `last_reset`, a friendly name) is not news. Every other
+ *  domain keeps what Polaris shows in its attributes - a climate's setpoint, a
+ *  purifier's speed - so any change to it is. */
+const STATE_ONLY_DOMAINS = new Set(["sensor", "binary_sensor"]);
+
+/**
+ * Hear every entity change as Home Assistant makes it, over its WebSocket API
+ * (developers.home-assistant.io/docs/api/websocket): sign in with the token,
+ * subscribe to `state_changed`, and hand each changed entity id to `changed`.
+ * Resolves when the socket closes or `signal` aborts; rejects when it could
+ * not be opened or the token is refused.
+ */
+export async function listenHomeAssistant(
+    home: HomeAssistant,
+    changed: (entityId: string) => void,
+    signal: AbortSignal
+): Promise<void> {
+    const { openLanSocket, eachMessage } = await import("./lan-socket");
+    const ws = await openLanSocket({
+        url: `${home.origin.replace(/^http/, "ws")}/api/websocket`,
+        trust: "system",
+        signInRefused: tokenRefused().message
+    });
+    let signedIn = false;
+    let refused: DriverError | null = null;
+    await eachMessage(
+        ws,
+        (text) => {
+            let parsed: unknown;
+            try {
+                parsed = JSON.parse(text) as unknown;
+            } catch {
+                return;
+            }
+            const message = socketMessage.safeParse(parsed);
+            if (!message.success) return;
+            const said = message.data;
+            if (said.type === "auth_required") {
+                ws.send(JSON.stringify({ type: "auth", access_token: home.token }));
+            } else if (said.type === "auth_ok") {
+                signedIn = true;
+                ws.send(
+                    JSON.stringify({ id: 1, type: "subscribe_events", event_type: "state_changed" })
+                );
+            } else if (said.type === "auth_invalid") {
+                refused = tokenRefused();
+                ws.close();
+            } else if (said.type === "result" && said.id === 1 && said.success === false) {
+                refused = new DriverError(
+                    "Home Assistant would not send its changes to Polaris.",
+                    "refused"
+                );
+                ws.close();
+            } else if (said.type === "event" && said.event?.event_type === "state_changed") {
+                const { entity_id: entityId, old_state: before, new_state: after } =
+                    said.event.data;
+                const detail =
+                    STATE_ONLY_DOMAINS.has(entityId.split(".")[0] ?? "") &&
+                    before?.state === after?.state;
+                if (!detail) changed(entityId);
+            }
+        },
+        signal
+    );
+    if (refused) throw refused;
+    if (!signedIn && !signal.aborted)
+        throw new DriverError("Home Assistant closed the connection.", "unreachable");
+}
