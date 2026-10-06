@@ -42,3 +42,4 @@ a regression. Entries are sorted open/regressed first, then by severity.
 | VULN-0034 | Messaging bridge starts with an empty token and compares it in non-constant time | Low | Fixed | dashboard/services/messaging-bridge/src/server.ts:36 | CWE-306 | 2026-09-28 |
 | VULN-0035 | Inbox ingest key compared in non-constant time | Low | Fixed | dashboard/apps/web/src/app/api/inbox/ingest/route.ts | CWE-208 | 2026-09-28 |
 | VULN-0005 | Drive lock unlock cookie never expires and survives a password change | Low | Fixed | dashboard/apps/web/src/lib/access-lock-service.ts:125 | CWE-613 | 2026-09-28 |
+| VULN-0036 | A player's kept inventory returned to a caller with no access to the server | Low | Fixed | dashboard/apps/game-servers/src/screens/installed/minecraft-actions.ts | CWE-863 | 2026-10-06 |
