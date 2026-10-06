@@ -86,8 +86,15 @@ vi.mock("@polaris/db", () => ({
     prisma: {
         linkPreview: {
             findUnique: async () => rows.existing,
-            updateMany: async (args: { where: unknown; data: { fetchedAt: Date } }) => {
+            updateMany: async (args: {
+                where: { fetchedAt?: { lt: Date } };
+                data: { fetchedAt: Date };
+            }) => {
                 rows.updates.push(args);
+                const before = args.where.fetchedAt?.lt;
+                const at = rows.existing?.fetchedAt;
+                if (before && at && at >= before) return { count: 0 };
+                if (rows.existing) rows.existing = { ...rows.existing, ...args.data };
                 return { count: 1 };
             },
             findMany: async () => [],
@@ -589,6 +596,29 @@ describe("a card's picture that expired", () => {
         });
         expect(await previewImage("p1")).toBeNull();
         expect(fetched).not.toContain("https://example.com/post");
+    });
+
+    it("is looked up once when several requests for it arrive together", async () => {
+        dns.set("p16-sign.tiktokcdn-eu.com", ["23.0.0.12"]);
+        rows.existing = {
+            ok: true,
+            url: "https://example.com/post",
+            target: null,
+            fetchedAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000),
+            imageUrl: "https://p16-sign.tiktokcdn-eu.com/old.image?x-expires=1"
+        };
+        responses.set("https://p16-sign.tiktokcdn-eu.com/old.image?x-expires=1", {
+            status: 403,
+            headers: { "content-type": "text/plain" },
+            body: "expired"
+        });
+        responses.set("https://example.com/post", {
+            status: 200,
+            headers: { "content-type": "text/html; charset=utf-8" },
+            body: '<html><head><title>A post</title><meta property="og:image" content="https://p16-sign.tiktokcdn-eu.com/new.image?x-expires=9"></head></html>'
+        });
+        await Promise.all([previewImage("p1"), previewImage("p1"), previewImage("p1")]);
+        expect(fetched.filter((address) => address === "https://example.com/post")).toHaveLength(1);
     });
 });
 

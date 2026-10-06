@@ -227,8 +227,7 @@ export async function previewImage(
     const first = await fetchPicture(row.imageUrl);
     if (first) return first;
 
-    const lookedAt = row.fetchedAt?.getTime() ?? 0;
-    if (row.url && Date.now() - lookedAt >= RETRY_MS) {
+    if (row.url && (await claimLook(previewId))) {
         await unfurl(row.url, { force: true }).catch(() => undefined);
         const again = await prisma.linkPreview.findUnique({
             where: { id: previewId },
@@ -255,6 +254,20 @@ async function fetchPicture(
             ? await readCapped(response, MAX_IMAGE_BYTES)
             : null;
     return bytes ? { bytes, contentType } : null;
+}
+
+/** Take this hour's look at a card, or learn that another request already has:
+ *  the condition is part of the write, so of several picture requests arriving
+ *  together only one reads the page again. */
+async function claimLook(previewId: string): Promise<boolean> {
+    const now = Date.now();
+    const claimed = await prisma.linkPreview
+        .updateMany({
+            where: { id: previewId, fetchedAt: { lt: new Date(now - RETRY_MS) } },
+            data: { fetchedAt: new Date(now) }
+        })
+        .catch(() => ({ count: 0 }));
+    return claimed.count === 1;
 }
 
 /**
