@@ -431,7 +431,7 @@ async function raise(
         );
         throw new CalledOff(`Only ${brought} could be brought in; it needs ${needed}`);
     }
-    arrival.open(loop.run.id, now);
+    arrival.open(loop.run.id, Date.now());
     await tools.persist();
 }
 
@@ -682,7 +682,7 @@ async function stashAll(
     inside: boolean
 ): Promise<boolean[]> {
     const shared = pace.coalescing(server);
-    const results = await Promise.all(
+    const settled = await Promise.allSettled(
         names.map(async (name) => {
             const saved = state(loop).saved.find((one) => same(one.name, name));
             if (!saved) return "out" as const;
@@ -703,9 +703,12 @@ async function stashAll(
             );
         })
     );
+    const failed = settled.find((outcome) => outcome.status === "rejected");
+    if (failed) throw failed.reason;
     const inOrOut: boolean[] = [];
     for (const [index, name] of names.entries()) {
-        const result = results[index];
+        const outcome = settled[index]!;
+        const result = outcome.status === "fulfilled" ? outcome.value : null;
         if (result === "out") inOrOut.push(false);
         else if (!result?.refused) inOrOut.push(true);
         else inOrOut.push(await keptOut(loop, server, tools, name, result.refused));

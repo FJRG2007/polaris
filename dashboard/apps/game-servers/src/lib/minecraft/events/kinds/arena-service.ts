@@ -504,7 +504,7 @@ async function bringIn(ctx: KindContext): Promise<void> {
     )
         throw new TooFew(ONE_SIDED);
     // The clock, the kit and "Go!" wait for everybody to be in.
-    arrival.open(ctx.run.id, ctx.now);
+    arrival.open(ctx.run.id, Date.now());
 }
 
 /** Where each entrant starts, by name in lower case: a duel's side, a build
@@ -671,11 +671,14 @@ function goLines(run: stored.EventRun, language: speech.Speech, offhand: boolean
 async function stashAll(ctx: KindContext, inside: boolean): Promise<void> {
     const entrants = [...ctx.run.entrants];
     const shared = pace.coalescing(ctx.server);
-    const results = await Promise.all(
+    const settled = await Promise.allSettled(
         entrants.map((one) => stashFor(ctx, one, inside, shared))
     );
+    const failed = settled.find((outcome) => outcome.status === "rejected");
+    if (failed) throw failed.reason;
     for (const [at, one] of entrants.entries()) {
-        const result = results[at];
+        const outcome = settled[at]!;
+        const result = outcome.status === "fulfilled" ? outcome.value : null;
         if (result?.refused) await keptOut(ctx, one, inside, result.refused);
     }
 }
