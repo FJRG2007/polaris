@@ -14,6 +14,7 @@ const deleteEnvVar = vi.fn();
 const envVarScope = vi.fn();
 const listEnvVars = vi.fn();
 const revealEnvVar = vi.fn();
+const promoteEnvVar = vi.fn();
 const recordDeployAudit = vi.fn();
 
 vi.mock("next/cache", () => ({ revalidatePath: () => undefined }));
@@ -29,6 +30,7 @@ vi.mock("@/lib/env-var-service", () => ({
     deleteEnvVar,
     envVarScope,
     listEnvVars,
+    promoteEnvVar,
     revealEnvVar
 }));
 
@@ -151,7 +153,7 @@ describe("revealEnvScopeAction", () => {
 
 describe("promoteEnvVarAction", () => {
     beforeEach(() => {
-        for (const mock of [requireEnvScopeAccess, listEnvVars, revealEnvVar, setEnvVar, envVarScope, recordDeployAudit])
+        for (const mock of [requireEnvScopeAccess, listEnvVars, revealEnvVar, promoteEnvVar, setEnvVar, envVarScope, recordDeployAudit])
             mock.mockReset();
         requireEnvScopeAccess.mockResolvedValue({ ownerId: "owner-1", orgId: null, environmentId: "env-1" });
         envVarScope.mockResolvedValue({ scope: "application", scopeId: "app-1", key: "STRIPE_KEY" });
@@ -161,39 +163,37 @@ describe("promoteEnvVarAction", () => {
                 : [{ id: "s1", key: "OTHER", isSecret: false, value: "x" }]
         );
         revealEnvVar.mockResolvedValue("sk_live_123");
+        promoteEnvVar.mockResolvedValue(true);
     });
 
     it("moves the value to the environment's shared variables and points the service at it", async () => {
         expect(await promoteEnvVarAction({ id: "v1" })).toEqual({ key: "STRIPE_KEY" });
         expect(requireEnvScopeAccess).toHaveBeenCalledWith("application", "app-1", "user-1", "variables.write");
         expect(requireEnvScopeAccess).toHaveBeenCalledWith("environment", "env-1", "user-1", "variables.write");
-        expect(setEnvVar).toHaveBeenNthCalledWith(1, "environment", "env-1", "owner-1", {
+        expect(promoteEnvVar).toHaveBeenCalledWith({
+            serviceId: "app-1",
+            serviceOwnerId: "owner-1",
+            environmentId: "env-1",
+            environmentOwnerId: "owner-1",
             key: "STRIPE_KEY",
             value: "sk_live_123",
             isSecret: true
         });
-        expect(setEnvVar).toHaveBeenNthCalledWith(2, "application", "app-1", "owner-1", {
-            key: "STRIPE_KEY",
-            value: "${{shared.STRIPE_KEY}}",
-            isSecret: false
-        });
+        expect(setEnvVar).not.toHaveBeenCalled();
+        expect(recordDeployAudit).toHaveBeenCalledTimes(2);
     });
 
-    it("refuses when the environment already shares a variable by that name, and changes nothing", async () => {
-        listEnvVars.mockImplementation(async (scope: string) =>
-            scope === "application"
-                ? [{ id: "v1", key: "STRIPE_KEY", isSecret: true, value: null }]
-                : [{ id: "s1", key: "STRIPE_KEY", isSecret: true, value: null }]
-        );
+    it("refuses when the environment already shares a variable by that name, and records nothing", async () => {
+        promoteEnvVar.mockResolvedValue(false);
         const result = await promoteEnvVarAction({ id: "v1" });
         expect(result.error).toContain("STRIPE_KEY");
-        expect(setEnvVar).not.toHaveBeenCalled();
+        expect(recordDeployAudit).not.toHaveBeenCalled();
     });
 
     it("only promotes a service's own variable", async () => {
         envVarScope.mockResolvedValue({ scope: "environment", scopeId: "env-1", key: "STRIPE_KEY" });
         expect((await promoteEnvVarAction({ id: "v1" })).error).toBeTruthy();
-        expect(setEnvVar).not.toHaveBeenCalled();
+        expect(promoteEnvVar).not.toHaveBeenCalled();
     });
 
     it("does not promote one that already points at a shared variable", async () => {
@@ -204,6 +204,6 @@ describe("promoteEnvVarAction", () => {
         );
         revealEnvVar.mockResolvedValue("${{shared.STRIPE_KEY}}");
         expect((await promoteEnvVarAction({ id: "v1" })).error).toBeTruthy();
-        expect(setEnvVar).not.toHaveBeenCalled();
+        expect(promoteEnvVar).not.toHaveBeenCalled();
     });
 });

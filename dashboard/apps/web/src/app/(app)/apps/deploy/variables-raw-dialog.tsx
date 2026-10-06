@@ -1,7 +1,8 @@
 "use client";
 
 /**
- * The raw editor: a scope's variables as they are, every value in the clear,
+ * The raw editor: a scope's variables as the editor has them, pending changes
+ * included, every value in the clear,
  * as a `.env` or as JSON - to read, to copy whole, and, for somebody who may
  * edit them, to change in place, the way Railway's raw editor works.
  *
@@ -15,9 +16,10 @@
 import { Loader2, Upload } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { revealEnvScopeAction } from "./variable-actions";
-import type { VariableRow } from "@/lib/deploy/variable-changes";
+import type { VariableDraft, VariableRow } from "@/lib/deploy/variable-changes";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import {
+    draftEntries,
     parseRaw,
     renderRaw,
     type RawEntry,
@@ -41,6 +43,7 @@ export function VariablesRawDialog({
     scope,
     scopeId,
     rows,
+    draft,
     canWrite,
     onClose,
     onUpdate
@@ -48,6 +51,8 @@ export function VariablesRawDialog({
     scope: "application" | "environment";
     scopeId: string;
     rows: readonly VariableRow[];
+    /** The changes staged so far, written into the text so Update keeps them. */
+    draft: VariableDraft;
     canWrite: boolean;
     onClose: () => void;
     /** The whole new set, with every stored value as it was shown, for the
@@ -63,7 +68,7 @@ export function VariablesRawDialog({
     const [format, setFormat] = useState<RawFormat>("env");
     const [text, setText] = useState("");
     const [error, setError] = useState<string | null>(null);
-    const [newAreSecrets, setNewAreSecrets] = useState(false);
+    const [newAreSecrets, setNewAreSecrets] = useState(true);
     const [copied, setCopied] = useState(false);
     const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -74,7 +79,7 @@ export function VariablesRawDialog({
                 if (!live) return;
                 if (result.values) {
                     setValues(result.values);
-                    setText(renderRaw(rows, result.values, "env"));
+                    setText(renderRaw(draftEntries(rows, draft, result.values), "env"));
                 } else setError(result.error ?? t("variables.raw.loadFailed"));
             })
             .catch(() => live && setError(t("variables.raw.loadFailed")));
@@ -82,7 +87,7 @@ export function VariablesRawDialog({
             live = false;
             if (timer.current) clearTimeout(timer.current);
         };
-        // The rows on screen when it opened are the set it shows.
+        // The rows and changes on screen when it opened are the set it shows.
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [scope, scopeId]);
 
@@ -101,13 +106,7 @@ export function VariablesRawDialog({
             return;
         }
         setError(null);
-        const asRows = read.entries.map((entry) => ({
-            id: entry.key,
-            key: entry.key,
-            isSecret: false,
-            value: entry.value
-        }));
-        setText(renderRaw(asRows, {}, next));
+        setText(renderRaw(read.entries, next));
         setFormat(next);
     }
 

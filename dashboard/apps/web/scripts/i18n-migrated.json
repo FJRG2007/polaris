@@ -573,6 +573,7 @@
         "web/src/app/(app)/apps/deploy/upload-source.tsx",
         "web/src/app/(app)/apps/deploy/variable-actions.ts",
         "web/src/app/(app)/apps/deploy/variables-editor.tsx",
+        "web/src/app/(app)/apps/deploy/variables-raw-dialog.tsx",
         "web/src/app/(app)/apps/deploy/volume-detail.tsx",
         "web/src/app/(app)/apps/deploy/volume-form.tsx",
         "web/src/app/(app)/apps/deploy/volumes-panel.tsx",

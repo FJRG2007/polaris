@@ -298,6 +298,26 @@ export function VariablesEditor({
                 setError(result.error);
                 return;
             }
+            setDraft((current) => {
+                const edits = { ...current.edits };
+                delete edits[row.id];
+                return {
+                    ...current,
+                    edits,
+                    removed: current.removed.filter((id) => id !== row.id)
+                };
+            });
+            setEditing((current) => {
+                const next = new Set(current);
+                next.delete(row.id);
+                return next;
+            });
+            for (const forget of [setRevealed, setKnown])
+                forget((current) => {
+                    const next = { ...current };
+                    delete next[row.id];
+                    return next;
+                });
             setNotice("pending");
             load();
         });
@@ -769,6 +789,7 @@ export function VariablesEditor({
                     scope={scope}
                     scopeId={scopeId}
                     rows={list}
+                    draft={draft}
                     canWrite={canWrite}
                     onClose={() => setRawOpen(false)}
                     onUpdate={stageRaw}

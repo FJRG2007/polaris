@@ -25,6 +25,7 @@ import {
     deleteEnvVar,
     envVarScope,
     listEnvVars,
+    promoteEnvVar,
     revealEnvVar,
     setEnvVar,
     setEnvVarSecrecy,
@@ -208,8 +209,9 @@ const SHARED_REFERENCE = /^\$\{\{\s*shared\.[A-Za-z_][A-Za-z0-9_]*\s*\}\}$/;
  * Promote a service's variable to a shared one, as Railway's menu does: the
  * value moves to the environment's shared variables, keeping whether it is a
  * secret, and the service's variable becomes `${{shared.KEY}}`, so it reads
- * the same value and every other service can too. Refused, before anything is
- * written, when the environment already shares a variable by that name.
+ * the same value and every other service can too. Both are written in one
+ * transaction, and nothing is when the environment already shares a variable
+ * by that name.
  */
 export async function promoteEnvVarAction(input: unknown): Promise<{ key?: string; error?: string }> {
     const user = await requirePermission("deploy.manage");
@@ -227,25 +229,21 @@ export async function promoteEnvVarAction(input: unknown): Promise<{ key?: strin
         if (!row) return { error: await reply("variables.gone") };
         const value = (await revealEnvVar(row.id, service.ownerId)) ?? "";
         if (SHARED_REFERENCE.test(value.trim())) return { error: await reply("variables.notPromotable") };
-        const taken = (await listEnvVars("environment", service.environmentId, shared.ownerId)).some(
-            (one) => one.key === row.key
-        );
-        if (taken) return { error: await reply("variables.alreadyShared", { key: row.key }) };
-
-        await setEnvVar("environment", service.environmentId, shared.ownerId, {
+        const promoted = await promoteEnvVar({
+            serviceId: located.scopeId,
+            serviceOwnerId: service.ownerId,
+            environmentId: service.environmentId,
+            environmentOwnerId: shared.ownerId,
             key: row.key,
             value,
             isSecret: row.isSecret
         });
+        if (!promoted) return { error: await reply("variables.alreadyShared", { key: row.key }) };
+
         await audit(user.id, shared.orgId, "environment", service.environmentId, "deploy.variable.set", {
             key: row.key,
             secret: row.isSecret,
             promotedFrom: located.scopeId
-        });
-        await setEnvVar("application", located.scopeId, service.ownerId, {
-            key: row.key,
-            value: `\${{shared.${row.key}}}`,
-            isSecret: false
         });
         await audit(user.id, service.orgId, "application", located.scopeId, "deploy.variable.set", {
             key: row.key,
