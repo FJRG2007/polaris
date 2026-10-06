@@ -1043,3 +1043,39 @@ describe("a saved event that no longer reads whole", () => {
         expect(catalog.repairPreset(fine)?.reset).toEqual([]);
     });
 });
+
+describe("who an event still holds", () => {
+    const saved = (name: string) => ({
+        name,
+        dimension: "minecraft:overworld",
+        x: 0,
+        y: 64,
+        z: 0,
+        yaw: 0,
+        pitch: 0,
+        mode: "survival" as const,
+        stash: null
+    });
+
+    it("counts a player inside the stage of the run on now", () => {
+        const run = { entrants: [], sentOut: [], stage: { saved: [saved("Ana")] } };
+        const held = stored.heldNames({
+            run: run as unknown as stored.EventRun,
+            arenaLeftovers: [],
+            stageLeftovers: []
+        });
+        expect([...held]).toEqual(["ana"]);
+    });
+
+    it("owes a trip back only for what an earlier event left behind", () => {
+        const state = {
+            run: { entrants: [], sentOut: [], stage: { saved: [saved("Ana")] } },
+            arenaLeftovers: [],
+            stageLeftovers: [
+                { runId: "old", area: null, boxes: [], saved: [saved("Ben")], keepForced: null }
+            ]
+        } as unknown as stored.EventState;
+        expect([...stored.owedNames(state)]).toEqual(["ben"]);
+        expect([...stored.heldNames(state)].sort()).toEqual(["ana", "ben"]);
+    });
+});

@@ -2375,21 +2375,9 @@ function kindContext(
         tickSeconds: tickMsOf(loop.run.preset.kind) / 1000,
         owed: async () => {
             const row = await readRow(installedAppId);
-            return row ? owedNames(stored.readEventState(row.config)) : new Set<string>();
+            return row ? stored.owedNames(stored.readEventState(row.config)) : new Set<string>();
         }
     };
-}
-
-/**
- * Who, in lower case, is still owed a trip back from an earlier stage or arena
- * - logged out inside it - and so is not taken anywhere else until they are
- * back where they started.
- */
-function owedNames(state: stored.EventState): Set<string> {
-    return new Set([
-        ...arenaService.owedNames(state.arenaLeftovers),
-        ...state.stageLeftovers.flatMap((one) => one.saved.map((saved) => saved.name.toLowerCase()))
-    ]);
 }
 
 /**
@@ -3972,7 +3960,7 @@ function stageTools(
         chat: () => newChat(server, loop),
         owed: async () => {
             const row = await readRow(installedAppId);
-            return row ? owedNames(stored.readEventState(row.config)) : new Set<string>();
+            return row ? stored.owedNames(stored.readEventState(row.config)) : new Set<string>();
         },
         flavour: async () => loop.flavour ?? (loop.flavour = await stageFlavour(server)),
         itemsWork: (items) => {
