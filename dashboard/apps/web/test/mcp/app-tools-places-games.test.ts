@@ -154,7 +154,7 @@ describe("the Places tools", () => {
             id: DEVICE,
             place: "Flat",
             state: "locked",
-            actions: ["lock", "unlock", "unlatch"]
+            actions: ["lock", "unlock", "open"]
         });
         const control = await call(
             "places_device_control",
@@ -208,6 +208,35 @@ describe("the Places tools", () => {
             INSTALL.id,
             DEVICE,
             "unlock",
+            undefined
+        );
+    });
+
+    it("open a door with the screen's own word, which is not unlocking it", async () => {
+        // The report: asked to open the door, the assistant unlocked it - twice -
+        // because the button that says Open was offered as "unlatch".
+        const opened = await call("places_device_control", { deviceId: DEVICE, action: "open" }, [
+            "places.control"
+        ]);
+        expect(opened.isError).toBeUndefined();
+        expect(mocks.operateDevice).toHaveBeenLastCalledWith(
+            ADA,
+            INSTALL.id,
+            DEVICE,
+            "unlatch",
+            undefined
+        );
+        const tool = TOOLS.find((one) => one.name === "places_device_control")!;
+        expect(tool.description).toMatch(/open/i);
+        // A client that learned the old word still reaches the same button.
+        await call("places_device_control", { deviceId: DEVICE, action: "unlatch" }, [
+            "places.control"
+        ]);
+        expect(mocks.operateDevice).toHaveBeenLastCalledWith(
+            ADA,
+            INSTALL.id,
+            DEVICE,
+            "unlatch",
             undefined
         );
     });

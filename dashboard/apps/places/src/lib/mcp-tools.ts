@@ -42,6 +42,7 @@ import {
     actionsFor,
     deviceCommandSchema,
     needsCommand,
+    type DeviceAction,
     type DeviceView
 } from "./device-kinds";
 
@@ -109,7 +110,7 @@ function deviceRow(
         doorSensor: bolt ? device.doorState : null,
         online: device.online,
         operable: device.controllable && device.online,
-        actions: device.controllable ? actionsFor(device.kind) : [],
+        actions: device.controllable ? actionsFor(device.kind).map(spokenAction) : [],
         battery: device.batteryPercent,
         reading: device.reading,
         climate: device.climate ?? null,
@@ -299,11 +300,61 @@ const devicesTool = () =>
         }
     });
 
+/**
+ * Every device action as a model is offered it: the word on the device panel's
+ * button, and what it does in the world.
+ *
+ * Inside Places the panel's Open button is `unlatch`, a word nobody says.
+ * Offered under it, a model asked to open a door unlocked it instead - twice -
+ * which leaves the door shut. So the name here is the button's, and the hint
+ * says what tells it from its neighbours. A `Record` over every action, so one
+ * added to Places without a name and a hint here does not compile. The
+ * internal name is still accepted, for a client that learned it.
+ */
+const ACTION_WORDS: Readonly<Record<DeviceAction, { name: string; hint: string }>> = {
+    lock: { name: "lock", hint: "locks a door" },
+    unlock: { name: "unlock", hint: "only unlocks a door; it stays shut" },
+    unlatch: {
+        name: "open",
+        hint: 'unlocks AND pulls the latch so the door opens - what "open the door" means'
+    },
+    "turn-on": { name: "turn-on", hint: "switches it on" },
+    "turn-off": { name: "turn-off", hint: "switches it off" },
+    "set-mode": { name: "set-mode", hint: "with mode" },
+    "set-temperature": { name: "set-temperature", hint: "with target" },
+    "set-fan": { name: "set-fan", hint: "with fan" },
+    "set-option": { name: "set-option", hint: "with option and on" },
+    "set-humidity": { name: "set-humidity", hint: "with target" },
+    stop: { name: "stop", hint: "stops a moving device" }
+};
+
+const BY_WORD = new Map<string, DeviceAction>(
+    DEVICE_ACTIONS.flatMap((action) => [
+        [ACTION_WORDS[action].name, action],
+        [action, action]
+    ])
+);
+
+const SPOKEN_ACTIONS = [...BY_WORD.keys()] as [string, ...string[]];
+
+function spokenAction(action: DeviceAction): string {
+    return ACTION_WORDS[action].name;
+}
+
+function deviceAction(word: string): DeviceAction {
+    return BY_WORD.get(word)!;
+}
+
 const controlInput = z.object({
     deviceId: z.string().uuid().describe("The device, as places_devices returned it."),
     action: z
-        .enum(DEVICE_ACTIONS)
-        .describe("What to do. places_devices lists the actions each device accepts."),
+        .enum(SPOKEN_ACTIONS)
+        .transform(deviceAction)
+        .describe(
+            `What to do; places_devices lists the actions each device accepts. ${DEVICE_ACTIONS.map(
+                (action) => `${ACTION_WORDS[action].name}: ${ACTION_WORDS[action].hint}`
+            ).join("; ")}.`
+        ),
     mode: z.string().trim().max(40).optional().describe("For set-mode: the mode."),
     fan: z.string().trim().max(40).optional().describe("For set-fan: the fan speed."),
     target: z
@@ -324,7 +375,7 @@ const controlTool = () =>
         title: "Operate a device",
         description:
             // i18n-ignore read by the calling model, not shown to a person
-            "Lock or unlock a door, switch something on or off, or set an air conditioner or purifier. Acts in the real world at once: confirm with the person before opening a door. Answers with the state the device reports a few seconds later, or says the command was sent and not yet confirmed.",
+            "Open, unlock or lock a door, switch something on or off, or set an air conditioner or purifier. To open a door use action open, not unlock: unlock leaves it shut. Acts in the real world at once: confirm with the person before opening or unlocking a door. Answers with the state the device reports a few seconds later, or says the command was sent and not yet confirmed.",
         input: controlInput,
         category: "home",
         scope: "places.control",
