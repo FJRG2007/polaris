@@ -253,7 +253,8 @@
             "refusals": {
                 "unreadable": "No se pudo leer esa URL.",
                 "scheme": "Usa una URL que empiece por postgres://, mysql://, mariadb://, mongodb:// o redis://.",
-                "srv": "Una dirección mongodb+srv:// es un registro SRV, no un servidor. Usa la mongodb:// que también da tu proveedor."
+                "srv": "Una dirección mongodb+srv:// es un registro SRV, no un servidor. Usa la mongodb:// que también da tu proveedor.",
+                "multihost": "Esta URL lista varios servidores. Usa la dirección de uno, el primario si lo hay."
             }
         },
         "noServersManual": "Aún no hay servidores en Polaris: inicia sesión SSH aquí."

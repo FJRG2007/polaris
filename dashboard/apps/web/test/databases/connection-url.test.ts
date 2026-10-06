@@ -86,6 +86,20 @@ describe("a connection URL", () => {
             ok: false,
             refusal: "srv"
         });
+        expect(
+            parseConnectionUrl(
+                "mongodb://u:p@h1:27017,h2:27017,h3:27017/app?replicaSet=rs0&authSource=admin"
+            )
+        ).toEqual({ ok: false, refusal: "multihost" });
+        expect(parseConnectionUrl("mongodb://h1,h2/app")).toEqual({
+            ok: false,
+            refusal: "multihost"
+        });
+        expect(parseConnectionUrl("postgresql://h1:5432,h2:5432/d")).toEqual({
+            ok: false,
+            refusal: "multihost"
+        });
+        expect(read("postgres://u:a%2Cb@h/d?options=x,y").password).toBe("a,b");
         expect(parseConnectionUrl("postgres://u:%E0%A4%A@h/d")).toEqual({
             ok: false,
             refusal: "unreadable"

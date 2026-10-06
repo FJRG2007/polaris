@@ -34,9 +34,10 @@ export interface ImportedConnection {
     readonly softened: boolean;
 }
 
-/** Why a URL could not be read: not a URL of a scheme this form knows, or a
- *  MongoDB SRV record, which names no host to connect to. */
-export type ConnectionUrlRefusal = "unreadable" | "scheme" | "srv";
+/** Why a URL could not be read: not a URL of a scheme this form knows, a
+ *  MongoDB SRV record, which names no host to connect to, or a list of hosts
+ *  (a replica set, libpq's failover list) where the form takes one. */
+export type ConnectionUrlRefusal = "unreadable" | "scheme" | "srv" | "multihost";
 
 const SCHEMES: Readonly<Record<string, DbEngine>> = {
     postgres: "postgres",
@@ -64,6 +65,17 @@ const MYSQL_MODES: Readonly<Record<string, TlsMode>> = {
     verify_ca: "verify-ca",
     verify_identity: "verify-full"
 };
+
+const AUTHORITY = /^([a-z][a-z0-9+.-]*):\/\/([^/?#]*)/i;
+
+/** Whether a URL of a known scheme lists more than one host, which the WHATWG
+ *  parser either rejects as a bad port or reads as one host named `h1,h2`. */
+function listsHosts(raw: string): boolean {
+    const match = AUTHORITY.exec(raw);
+    if (!match || !SCHEMES[match[1]!.toLowerCase()]) return false;
+    const authority = match[2]!;
+    return authority.slice(authority.lastIndexOf("@") + 1).includes(",");
+}
 
 function decoded(value: string): string | null {
     try {
@@ -101,9 +113,11 @@ function encryption(
 export function parseConnectionUrl(
     raw: string
 ): { ok: true; connection: ImportedConnection } | { ok: false; refusal: ConnectionUrlRefusal } {
+    const trimmed = raw.trim();
+    if (listsHosts(trimmed)) return { ok: false, refusal: "multihost" };
     let url: URL;
     try {
-        url = new URL(raw.trim());
+        url = new URL(trimmed);
     } catch {
         return { ok: false, refusal: "unreadable" };
     }
