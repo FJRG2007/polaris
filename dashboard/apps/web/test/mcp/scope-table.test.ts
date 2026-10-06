@@ -73,6 +73,12 @@ describe("the scope table", () => {
             "calendar.manage"
         ]);
         expect(table.expandScopes(["tasks.manage"])).toEqual(["tasks.read", "tasks.manage"]);
+        expect(table.expandScopes(["databases.write"])).toEqual([
+            "databases.read",
+            "databases.write"
+        ]);
+        expect(table.scopeRequires("databases.write")).toBe("deploy.read");
+        expect(table.scopeRequires("places.cameras")).toBe("home.read");
     });
 
     it("ignores, rather than trusts, a stored scope it does not know", () => {
@@ -84,6 +90,9 @@ describe("the scope table", () => {
     it("waits for the person to tick what reaches outside Polaris", () => {
         expect(table.isSensitiveScope("mail.send")).toBe(true);
         expect(table.isSensitiveScope("places.control")).toBe(true);
+        expect(table.isSensitiveScope("places.cameras")).toBe(true);
+        expect(table.isSensitiveScope("databases.read")).toBe(true);
+        expect(table.isSensitiveScope("databases.write")).toBe(true);
         expect(table.isSensitiveScope("mail.read")).toBe(false);
         expect(table.isSensitiveScope("tasks.manage")).toBe(false);
     });
@@ -175,6 +184,7 @@ describe("every tool against the table", () => {
             "calendar.use"
         ]);
         expect([...scopes(APP_TOOLS.home)].sort()).toEqual([
+            "places.cameras",
             "places.control",
             "places.read",
             "places.routines"

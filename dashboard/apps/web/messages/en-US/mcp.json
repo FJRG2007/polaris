@@ -63,6 +63,8 @@
         "chat_meetings": "Create meeting links",
         "deploy_read": "See apps, deployments and logs",
         "deploy_manage": "Deploy, restart and change apps",
+        "databases_read": "See your databases and read their data",
+        "databases_write": "Change data in your databases",
         "games_read": "See game servers",
         "games_moderate": "Moderate players",
         "games_console": "Use game server consoles",
@@ -77,6 +79,7 @@
         "places_read": "See the devices in your places",
         "places_control": "Operate devices: switch, lock, set",
         "places_routines": "See and run routines",
+        "places_cameras": "See a still picture from your cameras",
         "tools_use": "Use the tools",
         "tools_manage": "Manage short links",
         "tasks_read": "Read spaces, lists and tasks",
@@ -181,6 +184,18 @@
             "askAdmin": "Only an administrator can let a connection past these rules.",
             "rules": "See your access rules",
             "allow": "Allow {app}"
+        },
+        "databases": {
+            "title": "Databases it may reach",
+            "hint": "Applies to its database tools from its next call.",
+            "all": "Every database you can open",
+            "chosen": "Only the ones I choose",
+            "search": "Search databases",
+            "noneToChoose": "You have no databases to choose from.",
+            "noneChosen": "None chosen: its database tools are refused.",
+            "failed": "Which databases it may reach could not be changed. Reload and try again.",
+            "summaryAll": "Databases: every one you can open",
+            "summaryChosen": "{count, plural, =0 {Databases: none} one {Databases: # chosen} other {Databases: # chosen}}"
         }
     },
     "categories": {

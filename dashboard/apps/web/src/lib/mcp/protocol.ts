@@ -58,6 +58,10 @@ export interface McpCaller {
     /** The agent session whose own token is calling. Set only when neither
      *  `keyId` nor `grantId` is, so each session spends its own budget. */
     readonly sessionId?: string | null;
+    /** For a connected app: the database connections its person let the
+     *  database tools reach. Null or absent is every one the person can open,
+     *  which is what a key and a session's own token reach. */
+    readonly databaseIds?: readonly string[] | null;
 }
 
 /** What a tool gives back. Text because that is what a model reads; `structured`
@@ -66,6 +70,16 @@ export interface McpCaller {
 export interface McpToolResult {
     readonly text: string;
     readonly structured?: unknown;
+    /** Pictures that go with the text - a camera's frame - sent as MCP image
+     *  content after it. Every revision this speaks defines image content, and a
+     *  client that draws no pictures still has the sentence. */
+    readonly images?: readonly McpImage[];
+}
+
+/** One picture in a tool's answer: the bytes as base64, and what they are. */
+export interface McpImage {
+    readonly data: string;
+    readonly mimeType: string;
 }
 
 /**
@@ -344,7 +358,14 @@ async function callTool(
     try {
         const result = await tool.run(args.data as never, caller);
         return ok(id, {
-            content: [{ type: "text", text: result.text }],
+            content: [
+                { type: "text", text: result.text },
+                ...(result.images ?? []).map((image) => ({
+                    type: "image",
+                    data: image.data,
+                    mimeType: image.mimeType
+                }))
+            ],
             ...(result.structured === undefined ? {} : { structuredContent: result.structured })
         });
     } catch (error) {

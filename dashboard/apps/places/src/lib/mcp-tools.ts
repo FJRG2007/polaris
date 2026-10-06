@@ -10,11 +10,15 @@
  * routine only the house's managers may start, is out of an assistant's reach
  * exactly as it is out of theirs.
  *
- * Three scopes, by risk: seeing devices (`places.read`), operating them
- * (`places.control`), and listing and running routines (`places.routines`,
- * which needs what the routines screen needs: managing the house).
+ * Four scopes, by risk: seeing devices (`places.read`), operating them
+ * (`places.control`), listing and running routines (`places.routines`, which
+ * needs what the routines screen needs: managing the house), and a still from a
+ * camera (`places.cameras`, its own grant because a camera's picture is the
+ * inside of somebody's home). A camera is watched through the snapshot route's
+ * own check (`requireCameraView`) and its own relay call (`cameraStill`).
  *
- * Deliberately not offered: cameras, footage and the people Places knows.
+ * Deliberately not offered: live video, recorded footage, and the people
+ * Places knows.
  *
  * Server-only.
  */
@@ -29,7 +33,7 @@ import { HomeError } from "./home-error";
 import * as automations from "./automations";
 import { operateDevice } from "./device-operation";
 import type { AppHostTypes } from "@polaris/app-host";
-import { onlyReachable, placesReach } from "./sharing";
+import { onlyReachable, placesReach, requireCameraView } from "./sharing";
 import { matchForModel, type SearchField } from "@polaris/core";
 import {
     DEVICE_ACTIONS,
@@ -325,12 +329,130 @@ const runTool = () =>
         }
     });
 
+// ---------------------------------------------------------------------------
+// Cameras
+// ---------------------------------------------------------------------------
+
+/** The width asked of the relay unless the model asks for another. Enough to
+ *  tell who is at a door; a fraction of what a camera's own frame weighs. */
+const SNAPSHOT_WIDTH = 640;
+
+/** The width asked for when the first picture came back over the cap. */
+const SNAPSHOT_SMALLEST = 320;
+
+/** The most one picture may weigh. It goes into a model's context as base64,
+ *  where every kilobyte is read. */
+const SNAPSHOT_MAX_BYTES = 1024 * 1024;
+
+/** How long the relay is given, both streams together, before the call gives
+ *  up. A sleeping camera takes a moment; a model should not wait on one for
+ *  ever. */
+const SNAPSHOT_TIMEOUT_MS = 12_000;
+
+const snapshotInput = z.object({
+    cameraId: z
+        .string()
+        .uuid()
+        .optional()
+        .describe(
+            "The camera, as this tool listed it. Absent lists the cameras this account can watch, with no picture."
+        ),
+    width: z
+        .number()
+        .int()
+        .min(SNAPSHOT_SMALLEST)
+        .max(1280)
+        .default(SNAPSHOT_WIDTH)
+        .describe("How wide the picture is, in pixels. Smaller is cheaper to read.")
+});
+
+const snapshotTool = () =>
+    host.mcp.defineTool({
+        name: "places_camera_snapshot",
+        // i18n-ignore shown by the calling client, which has no locale to ask for
+        title: "Camera picture",
+        description:
+            // i18n-ignore read by the calling model, not shown to a person
+            "A still picture from one camera in this account's places, as it is right now. Without cameraId, lists the cameras this account can watch. No video and no recordings. Read-only.",
+        input: snapshotInput,
+        scope: "places.cameras",
+        category: "home",
+        readOnly: true,
+        async run(input, caller) {
+            const { user, install } = await contextFor(caller);
+            const cameras = await import("./cameras");
+            if (!input.cameraId) {
+                const reach = await placesReach(user);
+                const [list, placeList] = await Promise.all([
+                    cameras.listCameras(install.id),
+                    places.listPlaces(install.id)
+                ]);
+                const names = new Map(placeList.map((place) => [place.id, place.name]));
+                // Named, placed and whether it answers - never its address or
+                // the login it is reached with.
+                const rows = onlyReachable(list, reach.everything || reach.cameras).map(
+                    (camera) => ({
+                        id: camera.id,
+                        name: camera.name,
+                        place: names.get(camera.placeId) ?? null,
+                        zone: camera.zone,
+                        enabled: camera.enabled,
+                        online: camera.enabled && camera.offlineSince === null,
+                        lastSeenAt: camera.lastSeenAt
+                    })
+                );
+                if (rows.length === 0) return { text: "No cameras.", structured: { cameras: [] } };
+                return {
+                    text: rows
+                        .map(
+                            (row) =>
+                                `${row.id}  ${row.name} (${[row.place, row.zone].filter(Boolean).join(" / ")}): ${row.enabled ? (row.online ? "online" : "offline") : "switched off"}`
+                        )
+                        .join("\n"),
+                    structured: { cameras: rows }
+                };
+            }
+
+            const cameraId = input.cameraId;
+            // The snapshot route's own question, asked before the relay is.
+            await attempt(() => requireCameraView(user, cameraId));
+            const camera = await cameras.getCamera(install.id, cameraId);
+            if (!camera) refuse("That camera is not shared with you");
+            const { cameraStill, CameraOfflineError } = await import("./live");
+            const still = async (width: number) => {
+                try {
+                    return await cameraStill(install.id, cameraId, {
+                        width,
+                        signal: AbortSignal.timeout(SNAPSHOT_TIMEOUT_MS)
+                    });
+                } catch (caught) {
+                    // Asleep, starting or switched off: the tile's own sentence.
+                    if (caught instanceof CameraOfflineError) refuse(caught.message);
+                    if (caught instanceof Error && caught.name === "TimeoutError")
+                        refuse("The camera did not send a picture in time.");
+                    throw caught;
+                }
+            };
+            let image = await still(input.width);
+            if (image.length > SNAPSHOT_MAX_BYTES && input.width > SNAPSHOT_SMALLEST)
+                image = await still(SNAPSHOT_SMALLEST);
+            if (image.length > SNAPSHOT_MAX_BYTES)
+                refuse("The camera's picture is too large to send, even at its smallest size.");
+            const takenAt = new Date().toISOString();
+            return {
+                text: `${camera.name}, ${takenAt}.`,
+                images: [{ data: image.toString("base64"), mimeType: "image/jpeg" }],
+                structured: { cameraId, name: camera.name, takenAt, bytes: image.length }
+            };
+        }
+    });
+
 /** Built when the app is first asked for its tools, not when this module
  *  loads: `defineTool` is the host's, and a module of this app can be loaded
  *  before the dashboard has provided it (test/home/cold-start). */
 let built: readonly McpTool[] | undefined;
 
 export function placesMcpTools(): readonly McpTool[] {
-    built ??= [devicesTool, controlTool, routinesTool, runTool].map((tool) => tool());
+    built ??= [devicesTool, controlTool, routinesTool, runTool, snapshotTool].map((tool) => tool());
     return built;
 }

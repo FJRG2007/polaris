@@ -145,6 +145,20 @@ export const MCP_ONLY_SCOPES = {
         implies: ["places.read"],
         sensitive: true
     },
+    // A camera's picture is the inside of somebody's home, and it is what the
+    // device scopes deliberately leave out: its own grant, on what lets a
+    // person watch the cameras on the screen.
+    "places.cameras": { requires: "home.read", category: "home", sensitive: true },
+    // The Databases app's own gate is `deploy.read`; the connection's read-only
+    // switch is what stops a write there. Reading rows and changing them are two
+    // decisions here, and both reach a database outside Polaris.
+    "databases.read": { requires: "deploy.read", category: "databases", sensitive: true },
+    "databases.write": {
+        requires: "deploy.read",
+        category: "databases",
+        implies: ["databases.read"],
+        sensitive: true
+    },
     "gameservers.read": { requires: "games.read", category: "games" },
     "gameservers.manage": {
         requires: "games.manage",
