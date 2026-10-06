@@ -726,13 +726,7 @@ async function keptOut(
 ): Promise<boolean> {
     loop.run = {
         ...loop.run,
-        keptOut: await stashService.keepOut(
-            server,
-            loop.run.keptOut,
-            name,
-            refused,
-            loop.language
-        )
+        keptOut: await stashService.keepOut(server, loop.run.keptOut, name, refused, loop.language)
     };
     // Back where they were - or, never moved, left there - with whatever was
     // taken given back; never counted as racing.

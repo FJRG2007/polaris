@@ -1199,11 +1199,11 @@ One entry per bug: what a player saw, why, and the rule that keeps it gone.
     - Arenas are built where they always were, near the players, and every
       command is one each supported server accepts: nothing needs the Polaris
       mod or a data pack.
-  Faster still needs code inside the server, and a restart to load it: a
-  Polaris mod command, or a data-pack function walking a storage list with a
-  macro (1.20.2+), would run a whole batch - every stash, every entry, every
-  give-back, an inventory swap in memory - in one server tick and one trip.
-  Not done: it would not reach a server without the mod or the pack.
+      Faster still needs code inside the server, and a restart to load it: a
+      Polaris mod command, or a data-pack function walking a storage list with a
+      macro (1.20.2+), would run a whole batch - every stash, every entry, every
+      give-back, an inventory swap in memory - in one server tick and one trip.
+      Not done: it would not reach a server without the mod or the pack.
 - **King of the ring scored nobody once it got busy.** Only a player alone in
   the ring scored (`matches 1`), so with many in it nobody was ever ranked.
   Everybody in it scores now, and the one alone in it three times as much

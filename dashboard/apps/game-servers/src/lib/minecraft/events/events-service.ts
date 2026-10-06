@@ -4475,7 +4475,10 @@ async function finish(
             owedLines = await arenaService
                 .owedAtEnd(server, run, Date.now() + stored.PENDING_KEPT_MS)
                 .catch((error: unknown) => {
-                    console.warn("polaris: reading who missed an event's end failed", String(error));
+                    console.warn(
+                        "polaris: reading who missed an event's end failed",
+                        String(error)
+                    );
                     return [];
                 });
     } catch (error) {
@@ -5183,7 +5186,8 @@ async function sweepOne(
         return false;
     }
     if (pending.length > 0 && seen.size > 0) await deliverPending(ownerId, installedAppId, seen);
-    if (owedLines.length > 0 && seen.size > 0) await deliverOwedLines(ownerId, installedAppId, seen);
+    if (owedLines.length > 0 && seen.size > 0)
+        await deliverOwedLines(ownerId, installedAppId, seen);
     const active = plan.activePlayers(seen, settings.settings.afkMinutes, now).length;
     const activeFor = (preset: catalog.EventPreset) =>
         plan.playersFor(preset, seen, settings.settings.afkMinutes, now).length;

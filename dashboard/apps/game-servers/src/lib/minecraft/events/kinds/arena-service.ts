@@ -1172,9 +1172,7 @@ export async function owedAtEnd(
     );
     return run.entrants
         .filter((one) => !online.has(lower(one.name)))
-        .flatMap((one) =>
-            owe(run, one.name).map((owed) => ({ player: one.name, ...owed, until }))
-        );
+        .flatMap((one) => owe(run, one.name).map((owed) => ({ player: one.name, ...owed, until })));
 }
 
 /** Whether a kind sends lines between ticks (`quickLines`). */

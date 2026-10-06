@@ -110,10 +110,13 @@ describe("the ring played with fists only", () => {
             const scores = new Map<string, number>();
             const names = Array.from({ length: inRing }, (_, index) => `P${index}`);
             for (const line of hill.scoreLines({ x: 0, y: 64, z: 0 }, 4, seconds)) {
-                const add = / as @a\[[^\]]+\] run scoreboard players add @s pe_score (\d+)$/.exec(line);
+                const add = / as @a\[[^\]]+\] run scoreboard players add @s pe_score (\d+)$/.exec(
+                    line
+                );
                 if (!add) continue;
                 if (line.includes("matches 1 ") && inRing !== 1) continue;
-                for (const name of names) scores.set(name, (scores.get(name) ?? 0) + Number(add[1]));
+                for (const name of names)
+                    scores.set(name, (scores.get(name) ?? 0) + Number(add[1]));
             }
             return { lines: hill.scoreLines({ x: 0, y: 64, z: 0 }, 4, seconds).length, scores };
         };
@@ -137,7 +140,9 @@ describe("the ring played with fists only", () => {
             }
         }
         // The smallest ring: everybody in its middle.
-        expect(hill.startSpots(place, 2, 3).every((spot) => spot.x === 100 && spot.z === -20)).toBe(true);
+        expect(hill.startSpots(place, 2, 3).every((spot) => spot.x === 100 && spot.z === -20)).toBe(
+            true
+        );
     });
 
     it("neither shrinks nor moves before the grace after Go, or after a round's pause", () => {
