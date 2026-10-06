@@ -19,14 +19,23 @@
  * database's own address is then what the SSH server sees - usually
  * `127.0.0.1` - which is said on the field rather than left to be worked out.
  *
- * Encryption is the four modes every client names the same way (libpq's
- * `sslmode`), and a mode that checks nothing is only ever the reader's choice,
- * said as what it is when picked. Typing a host that is not a tunnel and looks
- * public (`looksPublic`) defaults the mode to `verify-full`, since that is the
- * one a reader would want and the one easy to not think to pick; a private or
- * tunnelled host defaults to off. A self-signed server is trusted the way the
- * SSH key below it is: its certificate is read when the connection is saved and
- * checked every time after.
+ * Laid out the way Beekeeper Studio's form is: a connection URL can be pasted
+ * and imported into the fields (`parseConnectionUrl`), the SSH tunnel sits
+ * right under the address it changes, and encryption is one "Enable SSL"
+ * switch whose options appear only when it is on.
+ *
+ * Encryption is libpq's `sslmode`: off, or one of three modes, each said in
+ * plain words beside it, and a mode that checks nothing is only ever the
+ * reader's choice. Typing a host that is not a tunnel and looks public
+ * (`looksPublic`) turns SSL on at `verify-full`, since that is the one a reader
+ * would want and the one easy to not think to pick; a private or tunnelled host
+ * leaves it off. A self-signed server is trusted the way the SSH key is: its
+ * certificate is read when the connection is saved and checked every time
+ * after.
+ *
+ * With no server registered in Polaris, the tunnel opens straight on an SSH
+ * login typed here, with its password or key in view, rather than on an empty
+ * server picker.
  *
  * Read-only is a tick, off unless somebody makes the choice: the browser refuses
  * writes when it is on, and defaulting it on made every new connection a
@@ -45,12 +54,22 @@ import * as actions from "./actions";
 import * as core from "@polaris/core";
 import { dataText } from "@/lib/data/words";
 import { runAction } from "@/lib/run-action";
+import { parseConnectionUrl } from "@/lib/data/connection-url";
 import * as schema from "@/lib/data/connection-schema";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { DbEngineSelect } from "@/components/db-engine-select";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { DataConnectionView, ManagedOption } from "@/lib/data/connections";
-import { Loader2, Plug, Database, Upload, KeyRound, ShieldAlert, Activity } from "lucide-react";
+import {
+    Loader2,
+    Plug,
+    Database,
+    Upload,
+    KeyRound,
+    ShieldAlert,
+    Activity,
+    Link2
+} from "lucide-react";
 import {
     Button,
     Dialog,
@@ -131,6 +150,16 @@ export function ConnectionDialog({
     // one: a public name starts on full verification, anything else off.
     const [tlsMode, setTlsMode] = useState<schema.TlsMode>(savedTls?.mode ?? "disable");
     const [tlsPicked, setTlsPicked] = useState(connection !== null);
+    // The mode SSL had when it was switched off, so switching it back on
+    // returns to it rather than to a default.
+    const lastTlsMode = useRef<schema.TlsMode | null>(null);
+    // The port follows the engine until somebody types one or a URL names one.
+    const portTyped = useRef(false);
+    const [url, setUrl] = useState("");
+    const [urlNote, setUrlNote] = useState<
+        { kind: "filled"; softened: boolean } | { kind: "refused"; text: string } | null
+    >(null);
+    const urlId = useId();
     const [tlsTrust, setTlsTrust] = useState<schema.TlsTrust>(savedTls?.trust ?? "system");
     const [caCert, setCaCert] = useState("");
     const [clientAuth, setClientAuth] = useState(Boolean(savedTls?.clientCertificate));
@@ -167,13 +196,19 @@ export function ConnectionDialog({
     useEffect(() => {
         void actions.engineOptionsAction().then((result) => setEngines(result.engines));
         void actions.listManagedAction().then((result) => setManaged(result.databases ?? []));
-        void actions.listTunnelServersAction().then((result) => setServers(result.servers));
+        void actions.listTunnelServersAction().then((result) => {
+            setServers(result.servers);
+            // Nothing to pick from: the login typed here is the only way in.
+            if (result.servers.length === 0 && saved?.mode !== "server") setTunnelKind("manual");
+        });
+        // Once, on opening: what the saved tunnel was is fixed for this form.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     // The port follows the engine until somebody types one, so picking MySQL
     // does not leave 5432 in a field nobody looked at.
     useEffect(() => {
-        if (connection) return;
+        if (connection || portTyped.current) return;
         const chosen = engines.find((entry) => entry.id === engine);
         if (chosen) setPort(String(chosen.port));
     }, [engine, engines, connection]);
@@ -387,6 +422,45 @@ export function ConnectionDialog({
         );
     };
 
+    /** Fill the fields from a pasted URL. The URL itself is not kept: it
+     *  carries the password, which then lives only in its own field. */
+    const importUrl = () => {
+        const read = parseConnectionUrl(url);
+        if (!read.ok) {
+            setUrlNote({ kind: "refused", text: t(`dialog.url.refusals.${read.refusal}`) });
+            return;
+        }
+        const found = read.connection;
+        portTyped.current = found.port !== null;
+        setEngine(found.engine);
+        const enginePort = engines.find((entry) => entry.id === found.engine)?.port;
+        setPort(String(found.port ?? enginePort ?? ""));
+        setHost(found.host);
+        setDatabase(found.database);
+        setUsername(found.username);
+        if (found.password) setPassword(found.password);
+        if (found.tlsMode) {
+            setTlsPicked(true);
+            setTlsMode(found.tlsMode);
+        }
+        if (!name.trim()) setName(found.database || found.host);
+        setUrl("");
+        setUrlNote({ kind: "filled", softened: found.softened });
+    };
+
+    const toggleSsl = (on: boolean) => {
+        setTlsPicked(true);
+        if (!on) {
+            if (tlsMode !== "disable") lastTlsMode.current = tlsMode;
+            setTlsMode("disable");
+            return;
+        }
+        setTlsMode(
+            lastTlsMode.current ??
+                (schema.looksPublic(host) && !tunnelled ? "verify-full" : "require")
+        );
+    };
+
     const serverOptions = servers.map((server) => ({
         value: server.id,
         label: `${server.name} - ${server.address}`
@@ -459,6 +533,49 @@ export function ConnectionDialog({
                         )
                     ) : (
                         <>
+                            <div className="flex flex-col gap-1 text-xs text-muted-foreground">
+                                <label htmlFor={urlId}>{t("dialog.url.label")}</label>
+                                <div className="flex gap-2">
+                                    <Input
+                                        id={urlId}
+                                        value={url}
+                                        autoComplete="off"
+                                        spellCheck={false}
+                                        // i18n-ignore: an example connection URL
+                                        placeholder="postgres://user:password@host:5432/database"
+                                        aria-invalid={urlNote?.kind === "refused" ? true : undefined}
+                                        onChange={(event) => {
+                                            setUrl(event.target.value);
+                                            if (urlNote?.kind === "refused") setUrlNote(null);
+                                        }}
+                                        onKeyDown={(event) => {
+                                            if (event.key === "Enter" && url.trim()) {
+                                                event.preventDefault();
+                                                importUrl();
+                                            }
+                                        }}
+                                        className="min-w-0 flex-1 font-mono text-xs"
+                                    />
+                                    <Button
+                                        variant="outline"
+                                        disabled={!url.trim()}
+                                        onClick={importUrl}
+                                    >
+                                        <Link2 className="size-4" />
+                                        {t("dialog.url.import")}
+                                    </Button>
+                                </div>
+                                {urlNote?.kind === "refused" ? (
+                                    <span className="text-danger">{urlNote.text}</span>
+                                ) : urlNote?.kind === "filled" ? (
+                                    <span role="status" className="text-success-ink">
+                                        {t("dialog.url.filled")}
+                                        {urlNote.softened && ` ${t("dialog.url.softened")}`}
+                                    </span>
+                                ) : (
+                                    <span>{t("dialog.url.hint")}</span>
+                                )}
+                            </div>
                             <div className="flex gap-3">
                                 <Field label={t("dialog.engine")} className="min-w-0 flex-1">
                                     <DbEngineSelect
@@ -475,7 +592,10 @@ export function ConnectionDialog({
                                     <Input
                                         inputMode="numeric"
                                         value={port}
-                                        onChange={(event) => setPort(event.target.value)}
+                                        onChange={(event) => {
+                                            portTyped.current = true;
+                                            setPort(event.target.value);
+                                        }}
                                     />
                                 </Field>
                             </div>
@@ -531,122 +651,6 @@ export function ConnectionDialog({
                                 />
                             </Field>
 
-                            <Field
-                                label={t("dialog.tls")}
-                                hint={t(`dialog.tlsModes.${tlsMode}.hint`)}
-                            >
-                                <Select
-                                    value={tlsMode}
-                                    onValueChange={(next) => {
-                                        setTlsPicked(true);
-                                        setTlsMode(next as schema.TlsMode);
-                                    }}
-                                    aria-label={t("dialog.tls")}
-                                    options={(
-                                        ["disable", "require", "verify-ca", "verify-full"] as const
-                                    ).map((mode) => ({
-                                        value: mode,
-                                        label: t(`dialog.tlsModes.${mode}.label`)
-                                    }))}
-                                />
-                            </Field>
-                            {tlsMode === "require" && (
-                                <p className="flex items-start gap-2 text-xs text-warning">
-                                    <ShieldAlert className="mt-0.5 size-3.5 shrink-0" />
-                                    {savedTls?.legacy
-                                        ? t("dialog.tlsLegacy")
-                                        : t("dialog.tlsUnverified")}
-                                </p>
-                            )}
-                            {verifying && (
-                                <div className="flex flex-col gap-3 rounded-lg border border-border bg-surface p-3">
-                                    <Field label={t("dialog.tlsTrust")}>
-                                        <Select
-                                            value={tlsTrust}
-                                            onValueChange={(next) =>
-                                                setTlsTrust(next as schema.TlsTrust)
-                                            }
-                                            aria-label={t("dialog.tlsTrust")}
-                                            options={(["system", "upload", "server"] as const).map(
-                                                (trust) => ({
-                                                    value: trust,
-                                                    label: t(`dialog.tlsTrusts.${trust}`)
-                                                })
-                                            )}
-                                        />
-                                    </Field>
-                                    {tlsTrust === "upload" && (
-                                        <FileField
-                                            label={t("dialog.caCert")}
-                                            accept=".pem,.crt,.cer,.ca-bundle"
-                                            maxBytes={schema.MAX_CERT_BYTES}
-                                            value={caCert}
-                                            onChange={setCaCert}
-                                            saved={
-                                                savedTls?.trust === "upload" && savedTls.authority
-                                                    ? savedTls.authority.subject
-                                                    : null
-                                            }
-                                            error={shown("tlsCaCert", caCert)}
-                                        />
-                                    )}
-                                    {tlsTrust === "server" && (
-                                        <>
-                                            <p className="text-xs text-muted-foreground">
-                                                {t("dialog.tlsServerNote")}
-                                            </p>
-                                            {connection &&
-                                                savedTls?.trust === "server" &&
-                                                savedTls.authority &&
-                                                sameDestination && (
-                                                    <CertificateCheck
-                                                        connectionId={connection.id}
-                                                        trusted={savedTls.authority}
-                                                    />
-                                                )}
-                                        </>
-                                    )}
-                                </div>
-                            )}
-                            {tlsMode !== "disable" && (
-                                <>
-                                    <Toggle
-                                        label={t("dialog.clientCert")}
-                                        hint={t("dialog.clientCertHint")}
-                                        checked={clientAuth}
-                                        onChange={setClientAuth}
-                                    />
-                                    {clientAuth && (
-                                        <div className="flex flex-col gap-3 rounded-lg border border-border bg-surface p-3">
-                                            <FileField
-                                                label={t("dialog.clientCertFile")}
-                                                accept=".pem,.crt,.cer"
-                                                maxBytes={schema.MAX_CERT_BYTES}
-                                                value={clientCert}
-                                                onChange={setClientCert}
-                                                saved={
-                                                    keepsSecrets
-                                                        ? (savedTls?.clientCertificate?.subject ??
-                                                          null)
-                                                        : null
-                                                }
-                                                error={shown("tlsClientCert", clientCert)}
-                                            />
-                                            <FileField
-                                                label={t("dialog.clientKeyFile")}
-                                                accept=".pem,.key"
-                                                maxBytes={schema.MAX_KEY_BYTES}
-                                                value={clientKey}
-                                                onChange={setClientKey}
-                                                saved={null}
-                                                secret
-                                                error={shown("tlsClientKey", clientKey)}
-                                            />
-                                        </div>
-                                    )}
-                                </>
-                            )}
-
                             <Toggle
                                 label={t("dialog.ssh")}
                                 hint={t("dialog.sshHint")}
@@ -655,18 +659,24 @@ export function ConnectionDialog({
                             />
                             {tunnelled && (
                                 <div className="flex flex-col gap-4 rounded-lg border border-border bg-surface p-3">
-                                    <SegmentedControl
-                                        className="self-start"
-                                        aria-label={t("dialog.whichLogin")}
-                                        value={tunnelKind}
-                                        onValueChange={(next) =>
-                                            setTunnelKind(next as "server" | "manual")
-                                        }
-                                        options={[
-                                            { value: "server", label: t("dialog.serverLogin") },
-                                            { value: "manual", label: t("dialog.otherLogin") }
-                                        ]}
-                                    />
+                                    {servers.length > 0 || saved?.mode === "server" ? (
+                                        <SegmentedControl
+                                            className="self-start"
+                                            aria-label={t("dialog.whichLogin")}
+                                            value={tunnelKind}
+                                            onValueChange={(next) =>
+                                                setTunnelKind(next as "server" | "manual")
+                                            }
+                                            options={[
+                                                { value: "server", label: t("dialog.serverLogin") },
+                                                { value: "manual", label: t("dialog.otherLogin") }
+                                            ]}
+                                        />
+                                    ) : (
+                                        <p className="text-xs text-muted-foreground">
+                                            {t("dialog.noServersManual")}
+                                        </p>
+                                    )}
                                     {tunnelKind === "server" ? (
                                         servers.length === 0 ? (
                                             <p className="text-sm text-muted-foreground">
@@ -737,6 +747,9 @@ export function ConnectionDialog({
                                                     }
                                                 />
                                             </Field>
+                                            <span className="-mb-2 text-xs text-muted-foreground">
+                                                {t("dialog.sshAuth")}
+                                            </span>
                                             <SegmentedControl
                                                 className="self-start"
                                                 aria-label={t("dialog.sshAuth")}
@@ -885,6 +898,119 @@ export function ConnectionDialog({
                                     </p>
                                 </div>
                             )}
+
+                            <Toggle
+                                label={t("dialog.ssl")}
+                                hint={t("dialog.sslHint")}
+                                checked={tlsMode !== "disable"}
+                                onChange={toggleSsl}
+                            />
+                            {tlsMode !== "disable" && (
+                                <SslModes
+                                    value={tlsMode}
+                                    onChange={(next) => {
+                                        setTlsPicked(true);
+                                        setTlsMode(next);
+                                    }}
+                                />
+                            )}
+                            {tlsMode === "require" && (
+                                <p className="flex items-start gap-2 text-xs text-warning">
+                                    <ShieldAlert className="mt-0.5 size-3.5 shrink-0" />
+                                    {savedTls?.legacy
+                                        ? t("dialog.tlsLegacy")
+                                        : t("dialog.tlsUnverified")}
+                                </p>
+                            )}
+                            {verifying && (
+                                <div className="flex flex-col gap-3 rounded-lg border border-border bg-surface p-3">
+                                    <Field label={t("dialog.tlsTrust")}>
+                                        <Select
+                                            value={tlsTrust}
+                                            onValueChange={(next) =>
+                                                setTlsTrust(next as schema.TlsTrust)
+                                            }
+                                            aria-label={t("dialog.tlsTrust")}
+                                            options={(["system", "upload", "server"] as const).map(
+                                                (trust) => ({
+                                                    value: trust,
+                                                    label: t(`dialog.tlsTrusts.${trust}`)
+                                                })
+                                            )}
+                                        />
+                                    </Field>
+                                    {tlsTrust === "upload" && (
+                                        <FileField
+                                            label={t("dialog.caCert")}
+                                            accept=".pem,.crt,.cer,.ca-bundle"
+                                            maxBytes={schema.MAX_CERT_BYTES}
+                                            value={caCert}
+                                            onChange={setCaCert}
+                                            saved={
+                                                savedTls?.trust === "upload" && savedTls.authority
+                                                    ? savedTls.authority.subject
+                                                    : null
+                                            }
+                                            error={shown("tlsCaCert", caCert)}
+                                        />
+                                    )}
+                                    {tlsTrust === "server" && (
+                                        <>
+                                            <p className="text-xs text-muted-foreground">
+                                                {t("dialog.tlsServerNote")}
+                                            </p>
+                                            {connection &&
+                                                savedTls?.trust === "server" &&
+                                                savedTls.authority &&
+                                                sameDestination && (
+                                                    <CertificateCheck
+                                                        connectionId={connection.id}
+                                                        trusted={savedTls.authority}
+                                                    />
+                                                )}
+                                        </>
+                                    )}
+                                </div>
+                            )}
+                            {tlsMode !== "disable" && (
+                                <>
+                                    <Toggle
+                                        label={t("dialog.clientCert")}
+                                        hint={t("dialog.clientCertHint")}
+                                        checked={clientAuth}
+                                        onChange={setClientAuth}
+                                    />
+                                    {clientAuth && (
+                                        <div className="flex flex-col gap-3 rounded-lg border border-border bg-surface p-3">
+                                            <FileField
+                                                label={t("dialog.clientCertFile")}
+                                                accept=".pem,.crt,.cer"
+                                                maxBytes={schema.MAX_CERT_BYTES}
+                                                value={clientCert}
+                                                onChange={setClientCert}
+                                                saved={
+                                                    keepsSecrets
+                                                        ? (savedTls?.clientCertificate?.subject ??
+                                                          null)
+                                                        : null
+                                                }
+                                                error={shown("tlsClientCert", clientCert)}
+                                            />
+                                            <FileField
+                                                label={t("dialog.clientKeyFile")}
+                                                accept=".pem,.key"
+                                                maxBytes={schema.MAX_KEY_BYTES}
+                                                value={clientKey}
+                                                onChange={setClientKey}
+                                                saved={null}
+                                                secret
+                                                error={shown("tlsClientKey", clientKey)}
+                                            />
+                                        </div>
+                                    )}
+                                </>
+                            )}
+
                         </>
                     )}
 
@@ -1240,6 +1366,56 @@ function CertificateCheck({
                     </Button>
                 </div>
             )}
+        </div>
+    );
+}
+
+/** The three ways SSL can be strict, each with what it means said beside it. */
+function SslModes({
+    value,
+    onChange
+}: {
+    value: schema.TlsMode;
+    onChange: (next: schema.TlsMode) => void;
+}) {
+    const t = useTranslations("databases");
+    const group = useId();
+    return (
+        <div
+            role="radiogroup"
+            aria-label={t("dialog.sslStrict")}
+            className="flex flex-col gap-2"
+        >
+            {(["require", "verify-ca", "verify-full"] as const).map((mode) => (
+                <label
+                    key={mode}
+                    className={cn(
+                        "flex cursor-pointer items-start gap-2.5 rounded-lg border px-3 py-2 transition-colors",
+                        value === mode
+                            ? "border-primary bg-primary/5"
+                            : "border-border hover:bg-muted"
+                    )}
+                >
+                    <input
+                        type="radio"
+                        name={group}
+                        value={mode}
+                        checked={value === mode}
+                        onChange={() => onChange(mode)}
+                        aria-labelledby={`${group}-${mode}`}
+                        aria-describedby={`${group}-${mode}-hint`}
+                        className="mt-0.5 shrink-0 accent-primary"
+                    />
+                    <span className="flex min-w-0 flex-col gap-0.5">
+                        <span id={`${group}-${mode}`} className="text-sm font-medium text-foreground">
+                            {t(`dialog.sslModes.${mode}.label`)}
+                        </span>
+                        <span id={`${group}-${mode}-hint`} className="text-xs text-muted-foreground">
+                            {t(`dialog.sslModes.${mode}.hint`)}
+                        </span>
+                    </span>
+                </label>
+            ))}
         </div>
     );
 }

@@ -162,7 +162,6 @@
         "user": "User",
         "password": "Password",
         "keepSaved": "Leave empty to keep the saved one.",
-        "tls": "Encryption",
         "ssh": "Reach it over SSH",
         "sshHint": "For a database that is not published on the network: Polaris signs in to a server that can see it and forwards the port.",
         "whichLogin": "Which SSH login",
@@ -174,7 +173,7 @@
         "tunnelServer": "Server to tunnel through",
         "sshHost": "SSH host",
         "sshUser": "SSH user",
-        "sshAuth": "How to sign in over SSH",
+        "sshAuth": "Sign in with",
         "privateKey": "Private key",
         "sshPassword": "SSH password",
         "sshPasswordHint": "Needed to sign in to the SSH server.",
@@ -194,24 +193,6 @@
         "passwordAgain": "The address changed, so enter the password again.",
         "passwordAgainTls": "The encryption is weaker now, so enter the password again.",
         "savedSecret": "Saved",
-        "tlsModes": {
-            "disable": {
-                "label": "Off",
-                "hint": "Plain connection. Only for a private network or an SSH tunnel."
-            },
-            "require": {
-                "label": "On, not verified",
-                "hint": "Encrypted, but any server can answer in its place."
-            },
-            "verify-ca": {
-                "label": "Verify certificate",
-                "hint": "The certificate must be signed by an authority you trust."
-            },
-            "verify-full": {
-                "label": "Verify certificate and name",
-                "hint": "Signed by a trusted authority, and issued for this host."
-            }
-        },
         "tlsUnverified": "Nothing checks who answers, so someone on the network can read and change what is sent. Use a verify mode if you can.",
         "tlsLegacy": "Saved when encryption did not check the certificate. Pick a verify mode to close that gap.",
         "tlsTrust": "Check against",
@@ -245,7 +226,37 @@
         "certDifferent": "The server now presents a different certificate:",
         "trustCert": "Trust new certificate",
         "test": "Test",
-        "testOk": "Connected: {version}"
+        "testOk": "Connected: {version}",
+        "ssl": "Enable SSL",
+        "sslHint": "Encrypts what travels between Polaris and the database.",
+        "sslStrict": "How strict",
+        "sslModes": {
+            "require": {
+                "label": "Encrypt only",
+                "hint": "Nobody can read it on the way, but Polaris does not check who answers. For a server with its own certificate on a network you trust."
+            },
+            "verify-ca": {
+                "label": "Check the certificate",
+                "hint": "The certificate must be signed by an authority you trust. The name is not checked, so it suits a server reached by IP."
+            },
+            "verify-full": {
+                "label": "Check the certificate and the name",
+                "hint": "The safest: signed by an authority you trust and issued for this exact address."
+            }
+        },
+        "url": {
+            "label": "Connection URL",
+            "import": "Import",
+            "hint": "Paste one to fill in the fields below. The URL itself is not kept.",
+            "filled": "Filled in from the URL. Check the fields and save.",
+            "softened": "It allowed an unencrypted fallback, so SSL is on without checking the certificate.",
+            "refusals": {
+                "unreadable": "That URL could not be read.",
+                "scheme": "Use a URL that starts with postgres://, mysql://, mariadb://, mongodb:// or redis://.",
+                "srv": "A mongodb+srv:// address is an SRV record, not a server. Use the plain mongodb:// one your provider also gives."
+            }
+        },
+        "noServersManual": "No servers in Polaris yet, so sign in to the SSH server here."
     },
     "notes": {
         "polaris": "Read-only. Polaris itself runs on this one.",

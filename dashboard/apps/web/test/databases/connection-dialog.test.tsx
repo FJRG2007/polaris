@@ -14,9 +14,11 @@ import { MessagesWrapper } from "../setup/i18n";
 import userEvent from "@testing-library/user-event";
 import { readPrivateKey, SshKeyError } from "@/lib/data/ssh-key";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 
 const saved: unknown[] = [];
+const NODE_0 = { id: "22222222-2222-4222-8222-222222222222", name: "node-0", address: "10.0.0.2" };
+let tunnelServers: (typeof NODE_0)[] = [NODE_0];
 
 vi.mock("@/app/(app)/apps/databases/actions", () => ({
     // The real key reader, so this exercises the same parsing and passphrase
@@ -37,11 +39,7 @@ vi.mock("@/app/(app)/apps/databases/actions", () => ({
         ]
     }),
     listManagedAction: async () => ({ databases: [] }),
-    listTunnelServersAction: async () => ({
-        servers: [
-            { id: "22222222-2222-4222-8222-222222222222", name: "node-0", address: "10.0.0.2" }
-        ]
-    }),
+    listTunnelServersAction: async () => ({ servers: tunnelServers }),
     saveConnectionAction: async (input: unknown) => {
         saved.push(input);
         return { id: "new" };
@@ -63,6 +61,7 @@ beforeAll(() => {
 afterEach(() => {
     cleanup();
     saved.length = 0;
+    tunnelServers = [NODE_0];
 });
 
 function open() {
@@ -217,17 +216,87 @@ describe("the connection form", () => {
         });
     });
 
-    it("turns encryption on verify-full for a public host, and off for a private one", async () => {
+    it("turns SSL on, verifying the certificate and name, for a public host, and off for a private one", async () => {
         open();
         const host = screen.getByLabelText("Host");
-        const tls = () => screen.getByRole("combobox", { name: "Encryption" });
+        const ssl = () => screen.getByRole("switch", { name: "Enable SSL" });
 
         await userEvent.type(host, "db.example.com");
-        expect(tls().textContent).toContain("Verify certificate and name");
+        expect(ssl().getAttribute("aria-checked")).toBe("true");
+        expect(
+            (screen.getByRole("radio", { name: /Check the certificate and the name/ }) as HTMLInputElement)
+                .checked
+        ).toBe(true);
 
         await userEvent.clear(host);
         await userEvent.type(host, "10.0.0.4");
-        expect(tls().textContent).toContain("Off");
+        expect(ssl().getAttribute("aria-checked")).toBe("false");
+        expect(screen.queryByRole("radio", { name: /Check the certificate and the name/ })).toBeNull();
+    });
+
+    it("shows the SSL options only once SSL is on, each mode said in plain words", async () => {
+        open();
+        await userEvent.type(screen.getByLabelText("Host"), "10.0.0.4");
+        expect(screen.queryByRole("radiogroup", { name: "How strict" })).toBeNull();
+
+        await userEvent.click(screen.getByRole("switch", { name: "Enable SSL" }));
+        const modes = screen.getByRole("radiogroup", { name: "How strict" });
+        expect(within(modes).getAllByRole("radio")).toHaveLength(3);
+        expect(modes.textContent).toContain("does not check who answers");
+        expect(modes.textContent).toContain("signed by an authority you trust");
+        expect(modes.textContent).toContain("issued for this exact address");
+
+        await userEvent.click(within(modes).getByRole("radio", { name: /Encrypt only/ }));
+        expect(screen.getByText(/someone on the network can read/)).toBeTruthy();
+        await userEvent.click(within(modes).getByRole("radio", { name: /Check the certificate$/ }));
+        expect(screen.getByRole("combobox", { name: "Check against" })).toBeTruthy();
+    });
+
+    it("fills the form from a pasted connection URL, and keeps nothing of the URL", async () => {
+        open();
+        const url = screen.getByLabelText("Connection URL");
+        await userEvent.type(url, "postgres://app_user:s3cret@db.example.com:6543/shop?sslmode=require");
+        await userEvent.click(screen.getByRole("button", { name: "Import" }));
+
+        expect((screen.getByLabelText("Host") as HTMLInputElement).value).toBe("db.example.com");
+        expect((screen.getByLabelText("Port") as HTMLInputElement).value).toBe("6543");
+        expect((screen.getByLabelText("Database") as HTMLInputElement).value).toBe("shop");
+        expect((screen.getByLabelText("User") as HTMLInputElement).value).toBe("app_user");
+        expect(screen.getByRole("switch", { name: "Enable SSL" }).getAttribute("aria-checked")).toBe("true");
+        expect((screen.getByRole("radio", { name: /Encrypt only/ }) as HTMLInputElement).checked).toBe(true);
+        expect((url as HTMLInputElement).value).toBe("");
+        expect(screen.getByRole("status").textContent).toContain("Filled in from the URL");
+
+        await userEvent.type(screen.getByLabelText("Name"), "Shop");
+        await userEvent.click(screen.getByRole("button", { name: /Add it/ }));
+        expect(saved[0]).toMatchObject({ password: "s3cret", tlsMode: "require", port: 6543 });
+    });
+
+    it("says why a URL cannot be imported instead of filling half the form", async () => {
+        open();
+        await userEvent.type(screen.getByLabelText("Connection URL"), "mongodb+srv://u:p@cluster0.example.net/app");
+        await userEvent.click(screen.getByRole("button", { name: "Import" }));
+        expect(screen.getByText(/SRV/)).toBeTruthy();
+        expect((screen.getByLabelText("Host") as HTMLInputElement).value).toBe("");
+    });
+
+    it("opens another login straight away when Polaris has no servers, with the password in view", async () => {
+        tunnelServers = [];
+        open();
+        await userEvent.click(screen.getByRole("switch", { name: "Reach it over SSH" }));
+        expect(await screen.findByPlaceholderText("ssh.example.com")).toBeTruthy();
+        expect(screen.queryByRole("radio", { name: "A server in Polaris" })).toBeNull();
+        expect(screen.getByText(/No servers in Polaris yet/)).toBeTruthy();
+        expect(screen.getByText("SSH password")).toBeTruthy();
+        // The way in is a choice with a visible name, not an unlabeled toggle.
+        expect(screen.getByRole("radiogroup", { name: "Sign in with" })).toBeTruthy();
+    });
+
+    it("puts the SSH tunnel before the encryption, where it is seen", () => {
+        open();
+        const ssh = screen.getByRole("switch", { name: "Reach it over SSH" });
+        const ssl = screen.getByRole("switch", { name: "Enable SSL" });
+        expect(ssh.compareDocumentPosition(ssl) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     });
 
     it("imports a private key by drag-and-drop, reads it for real, and never echoes the passphrase back", async () => {
