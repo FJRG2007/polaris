@@ -224,14 +224,19 @@ describe("the connection form", () => {
         await userEvent.type(host, "db.example.com");
         expect(ssl().getAttribute("aria-checked")).toBe("true");
         expect(
-            (screen.getByRole("radio", { name: /Check the certificate and the name/ }) as HTMLInputElement)
-                .checked
+            (
+                screen.getByRole("radio", {
+                    name: /Check the certificate and the name/
+                }) as HTMLInputElement
+            ).checked
         ).toBe(true);
 
         await userEvent.clear(host);
         await userEvent.type(host, "10.0.0.4");
         expect(ssl().getAttribute("aria-checked")).toBe("false");
-        expect(screen.queryByRole("radio", { name: /Check the certificate and the name/ })).toBeNull();
+        expect(
+            screen.queryByRole("radio", { name: /Check the certificate and the name/ })
+        ).toBeNull();
     });
 
     it("shows the SSL options only once SSL is on, each mode said in plain words", async () => {
@@ -255,15 +260,22 @@ describe("the connection form", () => {
     it("fills the form from a pasted connection URL, and keeps nothing of the URL", async () => {
         open();
         const url = screen.getByLabelText("Connection URL");
-        await userEvent.type(url, "postgres://app_user:s3cret@db.example.com:6543/shop?sslmode=require");
+        await userEvent.type(
+            url,
+            "postgres://app_user:s3cret@db.example.com:6543/shop?sslmode=require"
+        );
         await userEvent.click(screen.getByRole("button", { name: "Import" }));
 
         expect((screen.getByLabelText("Host") as HTMLInputElement).value).toBe("db.example.com");
         expect((screen.getByLabelText("Port") as HTMLInputElement).value).toBe("6543");
         expect((screen.getByLabelText("Database") as HTMLInputElement).value).toBe("shop");
         expect((screen.getByLabelText("User") as HTMLInputElement).value).toBe("app_user");
-        expect(screen.getByRole("switch", { name: "Enable SSL" }).getAttribute("aria-checked")).toBe("true");
-        expect((screen.getByRole("radio", { name: /Encrypt only/ }) as HTMLInputElement).checked).toBe(true);
+        expect(
+            screen.getByRole("switch", { name: "Enable SSL" }).getAttribute("aria-checked")
+        ).toBe("true");
+        expect(
+            (screen.getByRole("radio", { name: /Encrypt only/ }) as HTMLInputElement).checked
+        ).toBe(true);
         expect((url as HTMLInputElement).value).toBe("");
         expect(screen.getByRole("status").textContent).toContain("Filled in from the URL");
 
@@ -274,7 +286,10 @@ describe("the connection form", () => {
 
     it("says why a URL cannot be imported instead of filling half the form", async () => {
         open();
-        await userEvent.type(screen.getByLabelText("Connection URL"), "mongodb+srv://u:p@cluster0.example.net/app");
+        await userEvent.type(
+            screen.getByLabelText("Connection URL"),
+            "mongodb+srv://u:p@cluster0.example.net/app"
+        );
         await userEvent.click(screen.getByRole("button", { name: "Import" }));
         expect(screen.getByText(/SRV/)).toBeTruthy();
         expect((screen.getByLabelText("Host") as HTMLInputElement).value).toBe("");

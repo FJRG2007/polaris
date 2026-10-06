@@ -543,7 +543,9 @@ export function ConnectionDialog({
                                         spellCheck={false}
                                         // i18n-ignore: an example connection URL
                                         placeholder="postgres://user:password@host:5432/database"
-                                        aria-invalid={urlNote?.kind === "refused" ? true : undefined}
+                                        aria-invalid={
+                                            urlNote?.kind === "refused" ? true : undefined
+                                        }
                                         onChange={(event) => {
                                             setUrl(event.target.value);
                                             if (urlNote?.kind === "refused") setUrlNote(null);
@@ -1010,7 +1012,6 @@ export function ConnectionDialog({
                                     )}
                                 </>
                             )}
-
                         </>
                     )}
 
@@ -1381,11 +1382,7 @@ function SslModes({
     const t = useTranslations("databases");
     const group = useId();
     return (
-        <div
-            role="radiogroup"
-            aria-label={t("dialog.sslStrict")}
-            className="flex flex-col gap-2"
-        >
+        <div role="radiogroup" aria-label={t("dialog.sslStrict")} className="flex flex-col gap-2">
             {(["require", "verify-ca", "verify-full"] as const).map((mode) => (
                 <label
                     key={mode}
@@ -1407,10 +1404,16 @@ function SslModes({
                         className="mt-0.5 shrink-0 accent-primary"
                     />
                     <span className="flex min-w-0 flex-col gap-0.5">
-                        <span id={`${group}-${mode}`} className="text-sm font-medium text-foreground">
+                        <span
+                            id={`${group}-${mode}`}
+                            className="text-sm font-medium text-foreground"
+                        >
                             {t(`dialog.sslModes.${mode}.label`)}
                         </span>
-                        <span id={`${group}-${mode}-hint`} className="text-xs text-muted-foreground">
+                        <span
+                            id={`${group}-${mode}-hint`}
+                            className="text-xs text-muted-foreground"
+                        >
                             {t(`dialog.sslModes.${mode}.hint`)}
                         </span>
                     </span>
