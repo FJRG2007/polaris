@@ -3901,6 +3901,12 @@ model EventInventoryStash {
     items          String
     // Stringified {levels, points}: the experience taken, until it is given back.
     experience     String?
+    // Health and hunger as they came in, until put back. Null on a row written
+    // before these were kept, and once they are given back.
+    health         Float?
+    foodLevel      Int?
+    foodSaturation Float?
+    foodExhaustion Float?
     // Stringified [{x,y,z}]: a stash kept in barrels before they were in the
     // database only - the two barrels, and the barrier round them. "[]" since.
     barrels        String

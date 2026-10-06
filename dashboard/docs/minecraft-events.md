@@ -11,7 +11,8 @@ own play).
 - **Nothing built is broken, and no item is lost.** Arenas, stages and anything
   an event places go only into air, and only what the event placed is removed.
   A player's own things are stashed in the database before they enter an arena
-  and given back after; `keepInventory` is on for any event a player can die in.
+  and given back after, with the health and hunger they came in with;
+  `keepInventory` is on for any event a player can die in.
 - **Everything it changes is written down before it is changed** (game rules,
   the time of day) on the run, so whatever ends the event - its end, a call-off,
   a Polaris restart - puts back exactly that.
@@ -1129,3 +1130,30 @@ One entry per bug: what a player saw, why, and the rule that keeps it gone.
   only Xaero's maps read it - any other minimap still shows players - and an
   entrant off the server at the end is not sent the reset. Not yet tried with
   a live client.
+- **Dropper racers kicked with "Flying is not enabled" partway down.** Vanilla
+  allows 80 ticks airborne before it calls it flying, and Slow Falling does not
+  lengthen that. Racers fall with a lighter `gravity` attribute for the run
+  (Slow Falling's 0.01), which raises the limit without changing the fall, and
+  get their own back when they finish or leave (#419).
+- **A player's own item lost at the end of an event.** The prize was given
+  before their things were back: it filled the empty slot their item was owed,
+  and their item was dropped at their feet. Prizes and the world boss's trophy
+  wait until the player is released, after the give-back (#420).
+- **A player left an event with less health or food than they came with.**
+  The stash kept items and experience only, and vanilla refuses `data modify`
+  on a player. Health, food level, saturation and exhaustion are read on the
+  way in and put back with the give-back - after a death in the event too, and
+  on the next join for somebody who logged off (`stash.foodStep`). Health:
+  Instant Health to full, then `damage <player> <n> minecraft:generic_kill`
+  for the exact rest - it passes armor, Protection and Resistance, and
+  absorption is taken off with it. Food: Saturation adds `n` food and `2n`
+  saturation at once, Hunger drains 0.005 x (amplifier + 1) exhaustion a tick.
+  Precision: health to 0.01, food level exact, saturation from what it was to
+  under a point over (Hunger takes it a whole point at a time), exhaustion
+  within about 0.1 - except that nothing lowers exhaustion, so when no drain
+  was needed it stays where the event left it, under one saturation point.
+  Draining takes game time - up to about 10 s per player - so it runs in the
+  background once their things are back (`restoreVitals`, one at a time per
+  player): a stage tick or an arena end never waits on it. Somebody who logs
+  off mid-drain keeps what it reached. Restored once and never by a retry from
+  the panel. A peaceful world refills food on its own; not exact there.

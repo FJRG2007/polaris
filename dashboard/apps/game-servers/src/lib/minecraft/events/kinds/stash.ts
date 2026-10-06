@@ -69,6 +69,16 @@ const experienceSchema = z.object({
 
 export type Experience = z.infer<typeof experienceSchema>;
 
+/** Health and hunger as the game keeps them on a player. */
+const vitalsSchema = z.object({
+    health: z.number().min(0),
+    food: z.number().int().min(0).max(20),
+    saturation: z.number().min(0),
+    exhaustion: z.number().min(0)
+});
+
+export type Vitals = z.infer<typeof vitalsSchema>;
+
 export const stashSchema = z.object({
     /** A stash kept in barrels, before this: the two barrels, in order. */
     barrels: z.array(pointSchema).max(2).default([]),
@@ -78,6 +88,8 @@ export const stashSchema = z.object({
     kept: z.array(keptSchema).default([]),
     /** The experience taken, until it is given back. */
     experience: experienceSchema.nullable().default(null),
+    /** Their health and hunger on the way in, until they are given back. */
+    vitals: vitalsSchema.nullable().default(null),
     /** `taking` from the moment the copy was written until the slots are seen
      *  emptied - a stack still in its slot then was never taken; `stashed` after;
      *  `failed` for a give-back that could not finish. */
@@ -238,6 +250,138 @@ export function addExperience(name: string, experience: Experience): string[] {
         `xp add ${name} ${experience.levels} levels`,
         `xp add ${name} ${experience.points} points`
     ];
+}
+
+// ------------------------------------------------------------------ vitals
+//
+// Vanilla refuses `data modify` on a player, so health and hunger are put back
+// with what the game itself does to them: Instant Health at amplifier 10 heals to full,
+// `damage ... minecraft:generic_kill` takes off the exact rest (it passes
+// armor, Protection and Resistance, and scales with nothing without an
+// attacker), Saturation adds `n` food and `2n` saturation at once, and Hunger
+// adds 0.005 * (amplifier + 1) exhaustion a tick - every 4 of it costs one
+// saturation point, or one food point once saturation is gone.
+
+/** The player's numbers each read on its own, in `Vitals` order, then absorption. */
+export function readVitals(name: string): string[] {
+    return [
+        `data get entity ${name} Health`,
+        `data get entity ${name} foodLevel`,
+        `data get entity ${name} foodSaturationLevel`,
+        `data get entity ${name} foodExhaustionLevel`,
+        `data get entity ${name} AbsorptionAmount`
+    ];
+}
+
+/** `Ana has the following entity data: 17.5f`. Null when it is not that answer. */
+export function readEntityNumber(output: string): number | null {
+    const match =
+        /has the following entity data: (-?\d+(?:\.\d+)?(?:E-?\d+)?)[bsLfdBSFD]?\s*$/.exec(
+            output.trim()
+        );
+    return match ? Number(match[1]) : null;
+}
+
+/** Hunger's most exhaustion in a second: amplifier 255, 20 ticks. */
+const HUNGER_PER_SECOND = 0.1 * 256;
+
+/** Hunger for as few whole seconds as add `exhaustion`, as close as a tenth a
+ *  second allows. Null for nothing worth adding. */
+export function hungerFor(exhaustion: number): { seconds: number; amplifier: number } | null {
+    if (exhaustion < 0.05) return null;
+    const seconds = Math.ceil(exhaustion / HUNGER_PER_SECOND);
+    const amplifier = Math.min(255, Math.max(0, Math.round(exhaustion / (0.1 * seconds)) - 1));
+    return { seconds, amplifier };
+}
+
+export function hungerLines(
+    name: string,
+    hunger: { seconds: number; amplifier: number }
+): string[] {
+    return [
+        endHunger(name),
+        `effect give ${name} minecraft:hunger ${hunger.seconds} ${hunger.amplifier} true`
+    ];
+}
+
+/** Hunger stopped, whatever is left of it. */
+export function endHunger(name: string): string {
+    return `effect clear ${name} minecraft:hunger`;
+}
+
+/** Saturation given once: `points` food and twice as much saturation, each
+ *  held to the game's 20 and to the food level. */
+export function feedLine(name: string, points: number): string {
+    return `effect give ${name} minecraft:saturation 1 ${points - 1} true`;
+}
+
+/** Healed to full: Instant Health heals 4 << amplifier - 4096 at X. */
+export function healLine(name: string): string {
+    return `effect give ${name} minecraft:instant_health 1 10 true`;
+}
+
+/** Exactly `amount` off their health, absorption first. */
+export function hurtLine(name: string, amount: number): string {
+    return `damage ${name} ${Number(amount.toFixed(4))} minecraft:generic_kill`;
+}
+
+/**
+ * The next step from `now` towards `wanted` food, saturation and exhaustion:
+ * Saturation can only add, and only food and saturation together; Hunger can
+ * only take away, saturation first. So a level that must come down, or a
+ * saturation Saturation cannot reach on top of what is there, is first drained
+ * to `wanted.food - ceil(saturation / 2)` with nothing left, then fed back up
+ * to the food level, and the saturation left over drained a point at a time
+ * with the exhaustion wanted on top.
+ */
+export function foodStep(
+    now: Pick<Vitals, "food" | "saturation" | "exhaustion">,
+    wanted: Pick<Vitals, "food" | "saturation" | "exhaustion">
+): { kind: "drain"; exhaustion: number } | { kind: "feed"; points: number } | null {
+    const reachable = Math.min(now.saturation + 2 * (wanted.food - now.food), wanted.food);
+    if (now.food > wanted.food || reachable < wanted.saturation - 0.01) {
+        const floor = Math.max(wanted.food - Math.ceil(wanted.saturation / 2 - 0.0001), 0);
+        const points = Math.ceil(now.saturation - 0.0001) + Math.max(now.food - floor, 0);
+        if (points > 0) return drain(points, now.exhaustion, wanted.exhaustion);
+    }
+    if (now.food < wanted.food) return { kind: "feed", points: wanted.food - now.food };
+    const over = Math.max(Math.floor(now.saturation - wanted.saturation + 0.0001), 0);
+    return drain(over, now.exhaustion, wanted.exhaustion);
+}
+
+/**
+ * Hunger for `points` points with `wanted` exhaustion left over. A point goes
+ * only past 4, not at it, so what is left is kept a tenth off either edge -
+ * twice Hunger's error over one second. More than a second's worth is only
+ * as exact as a twentieth a second, so it stops halfway into the last point
+ * and leaves that one, and the exact rest, to a step of its own.
+ */
+function drain(
+    points: number,
+    exhaustion: number,
+    wanted: number
+): { kind: "drain"; exhaustion: number } | null {
+    const rest = points > 0 ? Math.min(Math.max(wanted, 0.1), 3.9) : wanted;
+    const whole = 4 * points + rest - exhaustion;
+    if (whole > HUNGER_PER_SECOND)
+        return { kind: "drain", exhaustion: 4 * points - exhaustion - 2 };
+    return whole >= 0.05 ? { kind: "drain", exhaustion: whole } : null;
+}
+
+/**
+ * Whether `now` is `wanted` as closely as the game lets it be put: health to
+ * a hundredth, the food level exactly, saturation from what it was to under a
+ * point over (Hunger takes it a whole point at a time), and exhaustion - which
+ * nothing lowers - to a tenth or two under, and anything over.
+ */
+export function sameVitals(now: Vitals, wanted: Vitals): boolean {
+    return (
+        Math.abs(now.health - wanted.health) <= 0.01 &&
+        now.food === wanted.food &&
+        now.saturation >= wanted.saturation - 0.01 &&
+        now.saturation < wanted.saturation + 1 &&
+        now.exhaustion >= wanted.exhaustion - 0.25
+    );
 }
 
 // ------------------------------------------------------------------ out

@@ -131,6 +131,32 @@ describe("keeping a player's things", () => {
         ]);
     });
 
+    it("reads health and hunger as the game prints them, and puts them back through what it allows", () => {
+        expect(stash.readEntityNumber("Ana has the following entity data: 17.5f")).toBe(17.5);
+        expect(stash.readEntityNumber("Ana has the following entity data: 14")).toBe(14);
+        expect(stash.readEntityNumber("No entity was found")).toBeNull();
+        expect(stash.hurtLine("Ana", 6.5)).toBe("damage Ana 6.5 minecraft:generic_kill");
+        expect(stash.feedLine("Ana", 3)).toBe("effect give Ana minecraft:saturation 1 2 true");
+        // Hunger's top rate is 25.6 exhaustion a second: more takes longer.
+        expect(stash.hungerFor(2)).toEqual({ seconds: 1, amplifier: 19 });
+        expect(stash.hungerFor(60)).toEqual({ seconds: 3, amplifier: 199 });
+        expect(stash.hungerFor(0.01)).toBeNull();
+        // Food that must come down is drained to below what Saturation then
+        // brings back up to it with saturation enough.
+        expect(
+            stash.foodStep(
+                { food: 20, saturation: 3, exhaustion: 0 },
+                { food: 18, saturation: 3, exhaustion: 0 }
+            )
+        ).toEqual({ kind: "drain", exhaustion: 4 * (3 + 4) - 2 });
+        expect(
+            stash.foodStep(
+                { food: 16, saturation: 0, exhaustion: 0.1 },
+                { food: 18, saturation: 3, exhaustion: 0 }
+            )
+        ).toEqual({ kind: "feed", points: 2 });
+    });
+
     it("drops a stack whole, in the syntax its own data was read in", () => {
         const record = "00000000-0000-7000-8000-000000000123";
         const tag = stash.dropTag(record, 103);
