@@ -923,6 +923,13 @@
             "helmet": "Casco",
             "hotbar": "Barra {number}",
             "slot": "Casilla {number}"
+        },
+        "pointAtAStack": "Señala un objeto para ver qué es.",
+        "details": {
+            "stored": "Guarda {list}",
+            "unbreakable": "Irrompible",
+            "durability": "Durabilidad {left} / {max}",
+            "damage": "{damage} de desgaste"
         }
     },
     "sidebar": {
