@@ -16,6 +16,7 @@
  */
 
 import type { ItemData } from "./inventory";
+import { itemLabel } from "./items";
 import { readInt, splitTopLevel, topLevelColon, unquote } from "./snbt";
 
 export interface Enchantment {
@@ -156,17 +157,6 @@ export function itemDetails(data: ItemData | null): ItemDetails {
     };
 }
 
-/** Whether the stack has anything worth a second line under its name. */
-export function hasDetails(details: ItemDetails): boolean {
-    return (
-        details.name !== null ||
-        details.enchantments.length > 0 ||
-        details.stored.length > 0 ||
-        details.damage !== null ||
-        details.unbreakable
-    );
-}
-
 const ROMAN: readonly [number, string][] = [
     [1000, "M"],
     [900, "CM"],
@@ -199,13 +189,7 @@ export function levelText(level: number): string {
 }
 
 /** "minecraft:fire_protection" as "Fire Protection", the way items are named. */
-export function enchantmentLabel(id: string): string {
-    return (id.split(":").pop() ?? id)
-        .split("_")
-        .filter((word) => word.length > 0)
-        .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-        .join(" ");
-}
+export const enchantmentLabel = itemLabel;
 
 /** One enchantment as the game writes it: "Sharpness V". */
 export function enchantmentText(enchantment: Enchantment): string {

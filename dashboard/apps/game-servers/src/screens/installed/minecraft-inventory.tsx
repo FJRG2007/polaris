@@ -32,7 +32,6 @@ import { itemLabel } from "../../lib/minecraft/items";
 import { isMovable } from "../../lib/minecraft/item-argument";
 import {
     enchantmentText,
-    hasDetails,
     itemDetails,
     type ItemDetails
 } from "../../lib/minecraft/item-details";
@@ -405,9 +404,7 @@ function StackDetails({ item, where }: { item: InventoryItem; where: string }) {
     const name = itemLabel(item.id);
     const heading = `${details.name ?? name}${item.count > 1 ? ` x${item.count}` : ""}`;
     return (
-        <div
-            aria-live="polite"
-            className="flex min-w-0 items-start gap-2 rounded-md border border-border bg-surface/40 px-3 py-2"
+        <div className="flex min-w-0 items-start gap-2 rounded-md border border-border bg-surface/40 px-3 py-2"
         >
             <ItemIcon id={item.id} className="size-8 shrink-0" />
             <div className="flex min-w-0 flex-col gap-0.5 text-xs">
@@ -417,12 +414,11 @@ function StackDetails({ item, where }: { item: InventoryItem; where: string }) {
                 <span className="truncate text-muted-foreground">
                     {details.name ? `${name} - ${where}` : where}
                 </span>
-                {hasDetails(details) &&
-                    describe(t, details).map((line) => (
-                        <span key={line} className="break-words text-primary">
-                            {line}
-                        </span>
-                    ))}
+                {describe(t, details).map((line) => (
+                    <span key={line} className="break-words text-primary">
+                        {line}
+                    </span>
+                ))}
             </div>
         </div>
     );
