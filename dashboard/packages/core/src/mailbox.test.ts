@@ -435,6 +435,23 @@ describe("privacy", () => {
         return { html: out, urls };
     }
 
+    it("hands over the address a browser would fetch, with its entities read", () => {
+        // The report: a map image whose address was written into the message as
+        // `?lat=36.7&amp;lon=-4.4&amp;presetId=email` showed in every other mail
+        // client and never here. The proxy asked for `&amp;lon=...` verbatim and
+        // the server answered 400 with a page, which is not a picture.
+        const { urls } = proxied(
+            '<img src="https://maps.ex/view?lat=36.7&amp;lon=-4.4&#38;preset=email&#x26;z=3">' +
+                '<td background="https://a.ex/bg.png?a=1&amp;b=2"></td>' +
+                "<div style=\"background-image:url('https://a.ex/c.png?x=1&amp;y=2')\"></div>"
+        );
+        expect(urls).toEqual([
+            "https://maps.ex/view?lat=36.7&lon=-4.4&preset=email&z=3",
+            "https://a.ex/bg.png?a=1&b=2",
+            "https://a.ex/c.png?x=1&y=2"
+        ]);
+    });
+
     it("gives an address the sender used twice its own number each time", () => {
         const { html, urls } = proxied(
             '<img src="https://a.ex/logo.png"><img src="https://b.ex/pixel.gif"><img src="https://a.ex/logo.png">'

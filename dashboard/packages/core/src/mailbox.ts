@@ -1846,7 +1846,7 @@ export function proxyRemoteContent(
     toProxy: (index: number, url: string) => string
 ): string {
     let index = -1;
-    const next = (url: string) => toProxy((index += 1), url.trim());
+    const next = (url: string) => toProxy((index += 1), attributeUrl(url.trim()));
     return (
         html
             // Quoted or bare. A mail server hands over what the sender's client
@@ -1882,6 +1882,33 @@ export function proxyRemoteContent(
             )
     );
 }
+
+/**
+ * An address as a browser reads it out of the markup: `&amp;` and the numeric
+ * entities are the characters they stand for. Markup writes a query string's
+ * `&` as `&amp;`, as it must; fetched verbatim, `?lat=1&amp;lon=2` is a
+ * different address that a server answers with an error page.
+ */
+function attributeUrl(raw: string): string {
+    return raw.replace(
+        /&(?:#(\d{1,7})|#x([0-9a-f]{1,6})|(amp|quot|apos|lt|gt));/gi,
+        (match, decimal: string | undefined, hex: string | undefined, named: string | undefined) => {
+            if (named) return NAMED_IN_URLS[named.toLowerCase()] ?? match;
+            const point = decimal ? Number.parseInt(decimal, 10) : Number.parseInt(hex ?? "", 16);
+            return Number.isInteger(point) && point > 0 && point <= 0x10ffff
+                ? String.fromCodePoint(point)
+                : match;
+        }
+    );
+}
+
+const NAMED_IN_URLS: Readonly<Record<string, string>> = {
+    amp: "&",
+    quot: '"',
+    apos: "'",
+    lt: "<",
+    gt: ">"
+};
 
 /** The first address in a srcset worth fetching. A list can hold a `cid:` or a
  *  data URI, and neither is something to proxy. */
