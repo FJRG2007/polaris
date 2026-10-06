@@ -198,6 +198,12 @@ const deleteTemplateTool = () =>
         async run(input, caller) {
             const { user, access } = await serverFor(caller, input.serverId, "games.console");
             onlyFor(access, ["minecraft"], "Announcements");
+            const templates = await attempt(() => listTemplates(input.serverId));
+            if (!templates.some((template) => template.id === input.templateId))
+                return {
+                    text: `${access.install.name} keeps no template with that id.`,
+                    structured: { serverId: input.serverId, templateId: input.templateId, deleted: false }
+                };
             await attempt(() => deleteTemplate(input.serverId, input.templateId));
             await recordAudit({
                 actorId: user.id,
@@ -208,7 +214,7 @@ const deleteTemplateTool = () =>
             });
             return {
                 text: `Deleted the template from ${access.install.name}.`,
-                structured: { serverId: input.serverId, templateId: input.templateId }
+                structured: { serverId: input.serverId, templateId: input.templateId, deleted: true }
             };
         }
     });

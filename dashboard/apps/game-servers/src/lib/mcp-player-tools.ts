@@ -33,7 +33,7 @@ import { listGameServerPresence, withNamesOnly } from "./games-service";
 import { getServerRoster, runServerCommand } from "./minecraft/service";
 import { liftTimeout, timeoutPlayer } from "./minecraft/timeout-service";
 import { liftArkTimeout, timeoutArkPlayer } from "./ark/timeout-service";
-import { attempt, gameOf, onlyFor, refuse, serverFor, serverId } from "./mcp-common";
+import { attempt, gameOf, onlyFor, refuse, serverFor, serverId, MODERATED_GAMES } from "./mcp-common";
 
 type McpTool = AppHostTypes["McpTool"];
 
@@ -202,7 +202,7 @@ const moderateTool = () =>
         destructive: true,
         async run(input, caller) {
             const { user, access } = await serverFor(caller, input.serverId, "games.moderate");
-            onlyFor(access, ["minecraft", "ark"], "Moderating players");
+            onlyFor(access, MODERATED_GAMES, "Moderating players");
             const game = gameOf(access);
             const name = playerOn(game, input.player);
             let output = "";
@@ -276,7 +276,7 @@ const timeoutTool = () =>
         destructive: true,
         async run(input, caller) {
             const { user, access } = await serverFor(caller, input.serverId, "games.moderate");
-            onlyFor(access, ["minecraft", "ark"], "Timing players out");
+            onlyFor(access, MODERATED_GAMES, "Timing players out");
             const game = gameOf(access);
             const name = playerOn(game, input.player);
             const who = game === "ark" ? { steamId: name } : { player: name };

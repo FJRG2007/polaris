@@ -56,6 +56,9 @@ export async function serverFor(caller: McpCaller, serverId: string, permission:
     return { user, access };
 }
 
+/** The games whose players the moderation and timeout tools reach. */
+export const MODERATED_GAMES: readonly string[] = ["minecraft", "ark"];
+
 /** The game a server runs, by its catalog id. */
 export function gameOf(access: { readonly install: { readonly catalogId: string } }) {
     return gameOfServer(access.install.catalogId)?.id ?? null;

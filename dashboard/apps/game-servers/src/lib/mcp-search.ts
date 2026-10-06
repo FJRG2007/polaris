@@ -14,6 +14,7 @@
 
 import { host } from "@polaris/app-host";
 import type { AppHostTypes } from "@polaris/app-host";
+import { MODERATED_GAMES } from "./mcp-common";
 import { listGameServerFacts } from "./games-service";
 import { searchKnownPlayers } from "./games-activity-service";
 import { KIND_NAMES } from "./minecraft/events/catalog";
@@ -137,8 +138,12 @@ const playersProvider = () =>
                     ],
                     next: [
                         { tool: "games_players", args: { serverId: server.id } },
-                        { tool: "games_player_moderate", args: { serverId: server.id, player: who } },
-                        { tool: "games_player_timeout", args: { serverId: server.id, player: who } }
+                        ...(server.game && MODERATED_GAMES.includes(server.game)
+                            ? [
+                                  { tool: "games_player_moderate", args: { serverId: server.id, player: who } },
+                                  { tool: "games_player_timeout", args: { serverId: server.id, player: who } }
+                              ]
+                            : [])
                     ]
                 };
             });

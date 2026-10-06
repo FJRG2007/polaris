@@ -336,6 +336,30 @@ describe("announcements", () => {
         expect(both.isError).toBe(true);
     });
 
+    it("delete only a template the server keeps, and record nothing for one it does not", async () => {
+        mocks.listTemplates.mockResolvedValue([
+            { id: "tpl-1", name: "Restart soon", announcement: { target: "@a", title: "Restart", chat: "", hold: "timed" } }
+        ]);
+        const missing = await call(
+            "games_announcement_template_delete",
+            { serverId: GAME, templateId: "tpl-404" },
+            ["gameservers.manage"]
+        );
+        expect(missing.isError).toBeFalsy();
+        expect(missing.structuredContent).toMatchObject({ deleted: false });
+        expect(mocks.deleteTemplate).not.toHaveBeenCalled();
+        expect(mocks.recordAudit).not.toHaveBeenCalled();
+
+        const deleted = await call(
+            "games_announcement_template_delete",
+            { serverId: GAME, templateId: "tpl-1" },
+            ["gameservers.manage"]
+        );
+        expect(deleted.structuredContent).toMatchObject({ deleted: true });
+        expect(mocks.deleteTemplate).toHaveBeenCalledWith(GAME, "tpl-1");
+        audited("games.announce.template-delete");
+    });
+
     it("are Minecraft's only", async () => {
         mocks.gameServerAccess.mockResolvedValue(standing("ark"));
         const refused = await call(
@@ -433,5 +457,25 @@ describe("players in polaris_search", () => {
             "games_player_timeout"
         ]);
         expect(hits[0]!.next[1]!.args).toEqual({ serverId: GAME, player: "Steve" });
+    });
+
+    it("point a game the moderation tools do not reach only at the player list", async () => {
+        mocks.reachableInstallIds.mockResolvedValue([GAME]);
+        mocks.listGameServerFacts.mockResolvedValue([
+            { id: GAME, name: "City", catalogName: "FiveM", game: "fivem" }
+        ]);
+        mocks.searchKnownPlayers.mockResolvedValue([
+            {
+                installedAppId: GAME,
+                name: "Niko",
+                playerId: "license:0000000000000000000000000000000000000000",
+                lastSeen: "2026-10-06T10:00:00.000Z",
+                online: false
+            }
+        ]);
+        const providers = await gameServersExtension.mcpSearch!();
+        const players = providers.find((provider) => provider.id === "game-servers.players")!;
+        const hits = await players.search("niko", { userId: "user-1" } as never, 10);
+        expect(hits[0]!.next.map((step) => step.tool)).toEqual(["games_players"]);
     });
 });
