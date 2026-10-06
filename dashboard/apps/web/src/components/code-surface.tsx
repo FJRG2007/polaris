@@ -35,7 +35,8 @@ export function CodeSurface({
     ariaLabel,
     className,
     matches = [],
-    currentMatch = 0
+    currentMatch = 0,
+    readOnly = false
 }: {
     code: string;
     /** A highlight.js token, or null to leave the text unpainted. */
@@ -48,6 +49,8 @@ export function CodeSurface({
     matches?: readonly Match[];
     /** Which of them somebody is on. It is scrolled to as it changes. */
     currentMatch?: number;
+    /** Keep the text box, for selecting and the keyboard, but refuse typing. */
+    readOnly?: boolean;
 }) {
     const highlight = useHighlighter(language);
     const painted = language && highlight ? highlight(code, language) : null;
@@ -101,6 +104,7 @@ export function CodeSurface({
                             value={code}
                             onChange={(event) => onChange(event.target.value)}
                             wrap="off"
+                            readOnly={readOnly}
                             spellCheck={false}
                             aria-label={ariaLabel}
                             className={cn(

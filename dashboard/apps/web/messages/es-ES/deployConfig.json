@@ -176,8 +176,12 @@
             "unreadable": "Eso no es JSON válido.",
             "notObject": "Escribe un objeto JSON de nombres a valores.",
             "notText": "{key} debe ser texto, entre comillas.",
-            "badKey": "{key} no es un nombre válido: letras, dígitos y guiones bajos, sin empezar por dígito."
-        }
+            "badKey": "{key} no es un nombre válido: letras, dígitos y guiones bajos, sin empezar por dígito.",
+            "find": "Buscar en las variables",
+            "findCtrl": "Buscar en las variables (Ctrl+F)",
+            "download": "Descargar"
+        },
+        "editHint": "Doble clic o F2 para editar"
     },
     "cron": {
         "presets": {

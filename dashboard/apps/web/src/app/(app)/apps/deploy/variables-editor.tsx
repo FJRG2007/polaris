@@ -160,6 +160,11 @@ export function VariablesEditor({
     const [notice, setNotice] = useState<"pending" | "redeploying" | null>(null);
     const [pending, startTransition] = useTransition();
     const counter = useRef(0);
+    // The row the pointer is over, for F2: an editor's rename key works on what
+    // is under the hand as much as on what was clicked.
+    const hovered = useRef<EnvVarView | null>(null);
+    const listRef = useRef<HTMLUListElement>(null);
+    const editHovered = useRef<(row: EnvVarView) => Promise<void>>(async () => {});
     const copyTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
     const nextId = () => `new-${++counter.current}`;
 
@@ -191,6 +196,24 @@ export function VariablesEditor({
         },
         []
     );
+
+    useEffect(() => {
+        if (!canWrite) return;
+        function onKey(event: KeyboardEvent): void {
+            if (event.key !== "F2" || event.defaultPrevented || !hovered.current) return;
+            const target = event.target;
+            if (target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement) return;
+            if (
+                target !== document.body &&
+                !(target instanceof Node && listRef.current?.contains(target))
+            )
+                return;
+            event.preventDefault();
+            void editHovered.current(hovered.current);
+        }
+        window.addEventListener("keydown", onKey);
+        return () => window.removeEventListener("keydown", onKey);
+    }, [canWrite]);
 
     const list = rows ?? NO_ROWS;
     const compared = useMemo(() => ({ ...known, ...revealed }), [known, revealed]);
@@ -281,10 +304,31 @@ export function VariablesEditor({
 
     /** Edit a row in place: a secret is read first, so it is edited as it is. */
     async function startEditing(row: EnvVarView): Promise<void> {
+        if (!canWrite || draft.removed.includes(row.id)) return;
         const value = await valueOf(row);
         if (value === null) return;
         setRevealed((current) => ({ ...current, [row.id]: value }));
         setEditing((current) => new Set(current).add(row.id));
+    }
+    editHovered.current = startEditing;
+
+    /** Leave a row's box: Enter keeps what was typed, Escape puts it back. */
+    function stopEditing(id: string, keep: boolean): void {
+        if (!keep)
+            setDraft((current) => {
+                const held = current.edits[id];
+                if (!held || held.value === undefined) return current;
+                const edits = { ...current.edits };
+                const { value: _dropped, ...rest } = held;
+                if (Object.keys(rest).length > 0) edits[id] = rest;
+                else delete edits[id];
+                return { ...current, edits };
+            });
+        setEditing((current) => {
+            const next = new Set(current);
+            next.delete(id);
+            return next;
+        });
     }
 
     function promote(row: EnvVarView): void {
@@ -452,7 +496,7 @@ export function VariablesEditor({
                     {canWrite ? t("variables.emptyWritable") : t("variables.empty")}
                 </p>
             ) : (
-                <ul className="flex flex-col">
+                <ul ref={listRef} className="flex flex-col">
                     {draft.added.map((item) => (
                         <li
                             key={item.tempId}
@@ -543,7 +587,19 @@ export function VariablesEditor({
                         return (
                             <li
                                 key={row.id}
-                                className="group flex flex-col gap-2 border-b border-border py-2.5 sm:flex-row sm:items-center sm:gap-3"
+                                tabIndex={canWrite && !removed ? -1 : undefined}
+                                onMouseEnter={() => {
+                                    hovered.current = row;
+                                }}
+                                onMouseLeave={() => {
+                                    if (hovered.current?.id === row.id) hovered.current = null;
+                                }}
+                                onKeyDown={(event) => {
+                                    if (event.key !== "F2" || !canWrite || removed) return;
+                                    event.preventDefault();
+                                    void startEditing(row);
+                                }}
+                                className="group flex flex-col gap-2 border-b border-border py-2.5 outline-none focus-visible:bg-card-hover sm:flex-row sm:items-center sm:gap-3"
                             >
                                 <div className="flex min-w-0 flex-col gap-1 sm:w-56 sm:shrink-0">
                                     <span className="flex min-w-0 items-center gap-1.5">
@@ -594,6 +650,16 @@ export function VariablesEditor({
                                             onChange={(event) =>
                                                 edit(row.id, { value: event.target.value })
                                             }
+                                            onKeyDown={(event) => {
+                                                if (event.key === "Enter") {
+                                                    event.preventDefault();
+                                                    stopEditing(row.id, true);
+                                                } else if (event.key === "Escape") {
+                                                    event.preventDefault();
+                                                    stopEditing(row.id, false);
+                                                }
+                                            }}
+                                            onDoubleClick={() => void startEditing(row)}
                                             placeholder={t("variables.valuePlaceholder")}
                                             aria-label={t("variables.valueOf", { name: row.key })}
                                             className="h-8 font-mono text-xs"
@@ -601,8 +667,18 @@ export function VariablesEditor({
                                         />
                                     ) : (
                                         <span
-                                            className="block truncate font-mono text-xs text-muted-foreground"
-                                            title={shown}
+                                            className={cn(
+                                                "block truncate font-mono text-xs text-muted-foreground",
+                                                canWrite && !removed && "cursor-text"
+                                            )}
+                                            onDoubleClick={() => void startEditing(row)}
+                                            title={
+                                                canWrite && !removed
+                                                    ? [shown, t("variables.editHint")]
+                                                          .filter(Boolean)
+                                                          .join("\n\n")
+                                                    : shown
+                                            }
                                         >
                                             {shown !== undefined ? (
                                                 shown || (
