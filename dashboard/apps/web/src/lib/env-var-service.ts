@@ -140,6 +140,30 @@ export async function revealEnvVar(id: string, ownerId: string): Promise<string 
 
 const VALID_KEY = /^[A-Za-z_][A-Za-z0-9_]*$/;
 
+/** The columns a value is stored in: sealed when secret, as text when not. */
+function storedValue(
+    value: string,
+    isSecret: boolean
+): {
+    isSecret: boolean;
+    value: string | null;
+    encryptedValue: Buffer | null;
+    valueNonce: Buffer | null;
+    valueKeyId: string | null;
+} {
+    if (!isSecret) {
+        return { isSecret: false, value, encryptedValue: null, valueNonce: null, valueKeyId: null };
+    }
+    const blob = encryptSecret(value, loadEnv().POLARIS_MASTER_KEY);
+    return {
+        isSecret: true,
+        value: null,
+        encryptedValue: blob.ciphertext,
+        valueNonce: blob.nonce,
+        valueKeyId: blob.keyId
+    };
+}
+
 /** Create or replace a variable by key. A secret value is encrypted at rest. */
 export async function setEnvVar(
     scope: EnvScope,
@@ -160,31 +184,7 @@ export async function setEnvVar(
         select: { id: true }
     });
 
-    let data: {
-        isSecret: boolean;
-        value: string | null;
-        encryptedValue: Buffer | null;
-        valueNonce: Buffer | null;
-        valueKeyId: string | null;
-    };
-    if (input.isSecret) {
-        const blob = encryptSecret(input.value, loadEnv().POLARIS_MASTER_KEY);
-        data = {
-            isSecret: true,
-            value: null,
-            encryptedValue: blob.ciphertext,
-            valueNonce: blob.nonce,
-            valueKeyId: blob.keyId
-        };
-    } else {
-        data = {
-            isSecret: false,
-            value: input.value,
-            encryptedValue: null,
-            valueNonce: null,
-            valueKeyId: null
-        };
-    }
+    const data = storedValue(input.value, input.isSecret);
 
     if (existing) {
         await prisma.envVar.update({ where: { id: existing.id }, data });
@@ -192,6 +192,53 @@ export async function setEnvVar(
         await prisma.envVar.create({ data: { scopeType: scope, scopeId, key, ...data } });
     }
     return { created: !existing };
+}
+
+/**
+ * Move a service's variable to its environment's shared variables and point
+ * the service's at it, in one transaction: either both are written or neither.
+ * False when the environment already shares a variable by that name, including
+ * one created by somebody else in the same moment.
+ */
+export async function promoteEnvVar(input: {
+    serviceId: string;
+    serviceOwnerId: string;
+    environmentId: string;
+    environmentOwnerId: string;
+    key: string;
+    value: string;
+    isSecret: boolean;
+}): Promise<boolean> {
+    await assertOwnsScope("application", input.serviceId, input.serviceOwnerId);
+    await assertOwnsScope("environment", input.environmentId, input.environmentOwnerId);
+    const shared = storedValue(input.value, input.isSecret);
+    const reference = storedValue(`\${{shared.${input.key}}}`, false);
+    try {
+        return await prisma.$transaction(async (tx) => {
+            const taken = await tx.envVar.findFirst({
+                where: { scopeType: "environment", scopeId: input.environmentId, key: input.key },
+                select: { id: true }
+            });
+            if (taken) return false;
+            await tx.envVar.create({
+                data: {
+                    scopeType: "environment",
+                    scopeId: input.environmentId,
+                    key: input.key,
+                    ...shared
+                }
+            });
+            const moved = await tx.envVar.updateMany({
+                where: { scopeType: "application", scopeId: input.serviceId, key: input.key },
+                data: reference
+            });
+            if (moved.count === 0) throw new Error("That variable no longer exists");
+            return true;
+        });
+    } catch (caught) {
+        if ((caught as { code?: string }).code === "P2002") return false;
+        throw caught;
+    }
 }
 
 /** Moved to a pure module so the browser can stage a paste; kept here for callers. */

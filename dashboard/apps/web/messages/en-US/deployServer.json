@@ -44,7 +44,11 @@
         "saveFailed": "Could not save the variables",
         "nothingToRedeploy": "Nothing to redeploy",
         "redeployFailed": "Could not start the redeploy",
-        "setTwice": "{key} is set twice"
+        "setTwice": "{key} is set twice",
+        "alreadyShared": "{key} is already a shared variable in this environment",
+        "notPromotable": "Only a service variable with a value of its own can be shared",
+        "promoteFailed": "Could not share the variable",
+        "revealAllFailed": "Could not show the values"
     },
     "notes": {
         "invalid": "That note cannot be posted",
