@@ -3273,6 +3273,46 @@ describe("a world boss fight", () => {
         ).toBe(true);
     });
 
+    it("keeps the trophy for a winner not taken back yet, and hands it over once they are", async () => {
+        world.bag = { Ana: {}, Ben: {} };
+        world.room = { Ana: 640, Ben: 640 };
+        setUp([groundBoss("boss", 10, { arena: true })]);
+        await start();
+        await play(12_100);
+        world.lift = ["Ana"];
+        await play(2_100);
+        world.lift = [];
+        expect(state().run?.stage?.saved.map((one) => one.name)).toEqual(["Ana"]);
+        world.scores = { Ana: 180 };
+        world.bossAlive = false;
+        // Gone the moment it falls: still owed her trip back out of its arena.
+        world.online = ["Ben"];
+        await play(6_100);
+        expect(state().run).toBeNull();
+        expect(
+            state().stageLeftovers.flatMap((one) => one.saved.map((saved) => saved.name))
+        ).toEqual(["Ana"]);
+        const trophy = (line: string) => line.startsWith("give Ana minecraft:nether_star[");
+        expect(world.sent.some(trophy)).toBe(false);
+        const owed = state().pending.find((one) => one.player === "Ana");
+        expect(owed?.trophy).toMatchObject({ kind: "wither-skeleton", difficulty: "normal" });
+
+        // Back on: taken home first, then handed the trophy.
+        world.online = ["Ana", "Ben"];
+        await events.sweepEvents();
+        await events.sweepEvents();
+        expect(state().stageLeftovers).toEqual([]);
+        const sent = world.sent;
+        const given = sent.findIndex(trophy);
+        expect(given).toBeGreaterThan(sent.indexOf("tag Ana remove pe_in"));
+        expect(sent.filter(trophy)).toHaveLength(1);
+        expect(state().pending).toEqual([]);
+        const ana = state().history[0]!.delivered.flatMap((one) =>
+            one.name === "Ana" ? one.items : []
+        );
+        expect(ana).toContainEqual({ id: "minecraft:nether_star", count: 1, dropped: 0 });
+    });
+
     it("stands in a closed arena in the sky, takes players up through the beam and puts them back", async () => {
         const preset = groundBoss("boss", 10, { arena: true });
         setUp([preset]);

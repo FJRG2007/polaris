@@ -17,7 +17,7 @@ import {
     type EventPreset
 } from "./catalog";
 import { stashSchema } from "./kinds/stash";
-import { bossStateSchema } from "./kinds/boss";
+import { bossStateSchema, trophySchema } from "./kinds/boss";
 import { villagerSchema } from "./kinds/village-defense";
 import { bingoSchema } from "./kinds/bingo";
 import { fishSchema } from "./kinds/boss-fishing";
@@ -345,7 +345,9 @@ const pendingSchema = z.object({
     reward: rewardSchema,
     /** The event it is for, which is what the player is told when it arrives. */
     event: z.string(),
-    createdAt: z.number()
+    createdAt: z.number(),
+    /** A world boss's trophy owed besides the reward, rebuilt when it is handed over. */
+    trophy: trophySchema.nullable().default(null)
 });
 
 export type PendingReward = z.infer<typeof pendingSchema>;

@@ -967,6 +967,16 @@ export function rankingLine(
     return entries.length > 0 ? say.damageRanking(entries, language) : null;
 }
 
+/** The trophy a fight pays, as it is rebuilt to be handed over; null with no boss drawn. */
+export function trophyOf(run: stored.EventRun): boss.Trophy | null {
+    if (!run.boss) return null;
+    return {
+        kind: run.boss.kind,
+        difficulty: run.boss.difficulty,
+        winner: optionsOf(run).winner ?? "damage"
+    };
+}
+
 /**
  * The trophy handed to its winner (`trophyWinner`): counted on them before and
  * after, like every prize, so what fell at their feet is known. Answers what
@@ -974,16 +984,16 @@ export function rankingLine(
  */
 export async function awardTrophy(
     server: ServerContainer,
-    run: stored.EventRun,
+    trophy: boss.Trophy,
     home: catalog.Language,
     spelling: boss.NameSpelling,
     to: string
 ): Promise<delivery.DeliveredItem | null> {
-    if (!run.boss || !boss.isPlayer(to)) return null;
-    const winner = optionsOf(run).winner;
+    if (!boss.isPlayer(to)) return null;
+    const winner = trophy.winner;
     const args = boss.trophyArguments(
-        written.trophyName(run.boss.kind, home),
-        written.trophyLore(run.boss.difficulty, winner, home),
+        written.trophyName(trophy.kind, home),
+        written.trophyLore(trophy.difficulty, winner, home),
         spelling
     );
     const before = delivery.readCount(await server.say([delivery.countLine(to, boss.TROPHY_ITEM)]));
