@@ -1033,7 +1033,15 @@ function CopySection({ overview, manage, ask }: { overview: Overview; manage: bo
         null
     );
     const [connections, setConnections] = useState<
-        { id: string; name: string; where: string; viaSsh: boolean; sshName: string | null }[] | null
+        | {
+              id: string;
+              name: string;
+              where: string;
+              viaSsh: boolean;
+              usable: boolean;
+              sshName: string | null;
+          }[]
+        | null
     >(null);
     const [sourceId, setSourceId] = useState("");
     const [connectionId, setConnectionId] = useState("");
@@ -1110,6 +1118,7 @@ function CopySection({ overview, manage, ask }: { overview: Overview; manage: bo
                             placeholder={t("database.copy.pickSaved")}
                             options={(connections ?? []).map((entry) => ({
                                 value: entry.id,
+                                disabled: !entry.usable,
                                 label: entry.viaSsh
                                     ? t("database.copy.savedViaSsh", {
                                           name: entry.name,
@@ -1123,6 +1132,11 @@ function CopySection({ overview, manage, ask }: { overview: Overview; manage: bo
                                 ? t("database.copy.throughSsh")
                                 : t("database.copy.readInside")}
                         </p>
+                        {connections?.some((entry) => !entry.usable) ? (
+                            <p className="text-xs text-muted-foreground">
+                                {t("database.copy.sshNeedsLocal")}
+                            </p>
+                        ) : null}
                     </>
                 )
             ) : from === "managed" ? (

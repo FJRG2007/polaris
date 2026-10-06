@@ -161,7 +161,8 @@
             "noSaved": "No hay conexiones de {engine} en Bases de datos.",
             "openDatabases": "Ir a Bases de datos",
             "savedViaSsh": "{name} (por SSH a través de {server})",
-            "throughSsh": "Polaris abre el túnel SSH y se lo da solo al contenedor de esta base, así que no hay que publicar nada."
+            "throughSsh": "Polaris abre el túnel SSH y se lo da solo al contenedor de esta base, así que no hay que publicar nada.",
+            "sshNeedsLocal": "Las conexiones por SSH solo se pueden copiar en una base de datos de la máquina donde corre Polaris."
         },
         "running": "En curso",
         "failed": "Fallida",

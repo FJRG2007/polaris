@@ -39,8 +39,14 @@ vi.mock("@polaris/db", () => ({
         protectedResource: { findFirst: async () => null }
     }
 }));
-vi.mock("@/lib/data/connections", () => ({ addressOf: mocks.addressOf }));
-vi.mock("@/lib/data/tunnel", () => ({ openTunnel: mocks.openTunnel }));
+vi.mock("@/lib/data/connections", () => ({
+    addressOf: mocks.addressOf,
+    DataConnectionError: class DataConnectionError extends Error {}
+}));
+vi.mock("@/lib/data/tunnel", () => ({
+    openTunnel: mocks.openTunnel,
+    TunnelError: class TunnelError extends Error {}
+}));
 vi.mock("@/lib/database-ops/restore", () => ({ restoreDumpInto: mocks.restoreDumpInto }));
 vi.mock("@/lib/backups/sources/databases", () => ({
     dumpInContainer: vi.fn(),
@@ -79,6 +85,8 @@ vi.mock("@/lib/database-ops/ops", async () => {
 });
 
 const { copyInto } = await import("@/lib/database-ops/copy");
+const { DataConnectionError } = await import("@/lib/data/connections");
+const { TunnelError } = await import("@/lib/data/tunnel");
 
 const TUNNEL = { target: { host: "bastion.example.test", port: 22 }, jump: null, label: "bastion" };
 const CONNECTION = "44444444-4444-4444-8444-444444444444";
@@ -164,6 +172,23 @@ describe("a copy from a saved connection behind SSH", () => {
         expect(mocks.openTunnel).not.toHaveBeenCalled();
     });
 
+    it("says a tunnel refusal as itself and hides anything else", async () => {
+        vi.spyOn(console, "error").mockImplementation(() => undefined);
+        mocks.addressOf.mockResolvedValue(address(TUNNEL));
+        mocks.openTunnel.mockRejectedValueOnce(new TunnelError("bastion refused the login."));
+        await copyInto("db-into", "owner-1", "user-1", { fromConnectionId: CONNECTION });
+        await settled();
+        expect(String(mocks.fail.mock.calls[0]?.[0])).toMatch(/bastion refused the login/);
+
+        mocks.fail.mockClear();
+        mocks.openTunnel.mockRejectedValueOnce(new Error("listen EADDRNOTAVAIL 172.18.0.4:0"));
+        await copyInto("db-into", "owner-1", "user-1", { fromConnectionId: CONNECTION });
+        await settled();
+        const said = String(mocks.fail.mock.calls[0]?.[0]);
+        expect(said).toMatch(/SSH tunnel to Shop \(prod\) did not open/);
+        expect(said).not.toContain("EADDRNOTAVAIL");
+    });
+
     it("says so when the destination shares no network with Polaris", async () => {
         mocks.addressOf.mockResolvedValue(address(TUNNEL));
         mocks.inspect.mockResolvedValue({ NetworkSettings: { Networks: {} } });
@@ -182,6 +207,36 @@ describe("a copy from a saved connection reached directly", () => {
         expect(mocks.openTunnel).not.toHaveBeenCalled();
         const dump = mocks.runIn.mock.calls.find(([, argv]) => argv.join(" ").includes("pg_dump"));
         expect(dump?.[1]).toContain("db.example.test");
+    });
+
+    it.each([
+        ["verify-ca", null],
+        ["verify-full", null],
+        ["require", "-----BEGIN CERTIFICATE-----"]
+    ])("is refused, before anything starts, when it checks certificates (%s)", async (mode, clientCert) => {
+        mocks.addressOf.mockResolvedValue({
+            ...address(null),
+            host: "db.example.test",
+            tls: { mode, ca: null, clientCert, clientKey: null, name: "db.example.test" }
+        });
+        await expect(
+            copyInto("db-into", "owner-1", "user-1", { fromConnectionId: CONNECTION })
+        ).rejects.toThrow(/certificate/);
+        expect(mocks.started).not.toHaveBeenCalled();
+        expect(mocks.runIn).not.toHaveBeenCalled();
+    });
+
+    it("hides an unexpected failure reading the connection", async () => {
+        vi.spyOn(console, "error").mockImplementation(() => undefined);
+        mocks.addressOf.mockRejectedValueOnce(new Error("PrismaClientKnownRequestError: column x"));
+        await expect(
+            copyInto("db-into", "owner-1", "user-1", { fromConnectionId: CONNECTION })
+        ).rejects.toThrow("That connection could not be opened.");
+
+        mocks.addressOf.mockRejectedValueOnce(new DataConnectionError("The SSH login is incomplete."));
+        await expect(
+            copyInto("db-into", "owner-1", "user-1", { fromConnectionId: CONNECTION })
+        ).rejects.toThrow("The SSH login is incomplete.");
     });
 
     it("is refused for somebody else's connection", async () => {

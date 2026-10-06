@@ -134,9 +134,10 @@ export async function copySources(databaseId: string, ownerId: string) {
 export async function copyConnections(databaseId: string, ownerId: string, userId: string) {
     const row = await prisma.managedDatabase.findFirst({
         where: { id: databaseId, environment: { project: { ownerId } } },
-        select: { engine: true }
+        select: { engine: true, target: { select: { kind: true } } }
     });
     if (!row) throw new DatabaseOperationError("That database is not there any more.");
+    const local = row.target.kind === "local";
     const engines = row.engine === "mysql" || row.engine === "mariadb" ? ["mysql", "mariadb"] : [row.engine];
     const rows = await prisma.dataConnection.findMany({
         where: { ownerId: userId, managedDatabaseId: null, engine: { in: engines } },
@@ -157,6 +158,7 @@ export async function copyConnections(databaseId: string, ownerId: string, userI
         name: connection.name,
         where: `${connection.host ?? ""}${connection.port ? `:${connection.port}` : ""}`,
         viaSsh: Boolean(connection.sshMode),
+        usable: local || !connection.sshMode,
         sshName: connection.sshServer?.name ?? connection.sshHost ?? null
     }));
 }

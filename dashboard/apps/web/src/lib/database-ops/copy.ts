@@ -22,8 +22,8 @@
 
 import { networkInterfaces } from "node:os";
 import { prisma } from "@polaris/db";
-import { addressOf } from "@/lib/data/connections";
-import { openTunnel, type DataTunnel } from "@/lib/data/tunnel";
+import { addressOf, DataConnectionError } from "@/lib/data/connections";
+import { openTunnel, TunnelError, type DataTunnel } from "@/lib/data/tunnel";
 import type { DataAddress } from "@/lib/data/driver";
 import { containerNetworks, sharedNetwork } from "./relay";
 import { restoreDumpInto } from "./restore";
@@ -225,14 +225,16 @@ async function savedSource(
     try {
         address = await addressOf(actorId, connectionId);
     } catch (error) {
-        throw new DatabaseOperationError(
-            error instanceof Error ? error.message : "That connection could not be opened."
-        );
+        throw readableRefusal(error, DataConnectionError, "That connection could not be opened.");
     }
     if (family(address.engine) !== family(into.engine))
         throw new DatabaseOperationError(`${row.name} runs a different engine from ${into.name}.`);
     if (address.engine !== "redis" && !address.database)
         throw new DatabaseOperationError(`${row.name} names no database to copy. Set one on the connection in Databases.`);
+    if (address.tls.mode === "verify-ca" || address.tls.mode === "verify-full" || address.tls.clientCert)
+        throw new DatabaseOperationError(
+            `${row.name} checks the database's certificate or signs in with one, which a copy cannot do yet, so nothing was sent to it.`
+        );
     if (address.tunnel && into.target.kind !== "local")
         throw new DatabaseOperationError(
             `${row.name} is reached through SSH, which only a database on the machine Polaris runs on can be copied into. ${into.name} runs on another server.`
@@ -285,9 +287,7 @@ async function copyFromSaved(
         bindHost: relay.bindHost,
         allowFrom: relay.containerIp
     }).catch((error: unknown) => {
-        throw new DatabaseOperationError(
-            error instanceof Error ? error.message : `The SSH tunnel to ${saved.name} did not open.`
-        );
+        throw readableRefusal(error, TunnelError, `The SSH tunnel to ${saved.name} did not open.`);
     });
     try {
         await copyFromExternal(
@@ -299,4 +299,16 @@ async function copyFromSaved(
     } finally {
         tunnel.close();
     }
+}
+
+/** A refusal written for the reader, said as itself; anything else is logged
+ *  and replaced, because it can name internals and addresses. */
+function readableRefusal(
+    error: unknown,
+    readable: abstract new (...args: never[]) => Error,
+    fallback: string
+): DatabaseOperationError {
+    if (error instanceof readable) return new DatabaseOperationError(error.message);
+    console.error("database: a saved connection could not be copied from:", error);
+    return new DatabaseOperationError(fallback);
 }
