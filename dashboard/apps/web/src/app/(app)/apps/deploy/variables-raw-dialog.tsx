@@ -171,7 +171,9 @@ export function VariablesRawDialog({
                                                 .text()
                                                 .then((more) =>
                                                     setText((now) =>
-                                                        now.trim() ? `${now.trimEnd()}\n${more}` : more
+                                                        now.trim()
+                                                            ? `${now.trimEnd()}\n${more}`
+                                                            : more
                                                     )
                                                 );
                                     }}

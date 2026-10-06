@@ -91,17 +91,23 @@ describe("a variable's row", () => {
         expect(within(row).queryByRole("switch")).toBeNull();
         expect(row.textContent).not.toContain(SECRETS.v1);
 
-        await userEvent.click(within(row).getByRole("button", { name: "Show the value of DATABASE_URL" }));
+        await userEvent.click(
+            within(row).getByRole("button", { name: "Show the value of DATABASE_URL" })
+        );
         expect(await within(row).findByText(SECRETS.v1)).toBeTruthy();
 
-        await userEvent.click(within(row).getByRole("button", { name: "Copy the value of DATABASE_URL" }));
+        await userEvent.click(
+            within(row).getByRole("button", { name: "Copy the value of DATABASE_URL" })
+        );
         await waitFor(() => expect(mocks.writeText).toHaveBeenCalledWith(SECRETS.v1));
     });
 
     it("copies a secret nobody revealed by reading it first", async () => {
         open();
         const row = (await screen.findByText("GOOGLE_CLIENT_ID")).closest("li")!;
-        await userEvent.click(within(row).getByRole("button", { name: "Copy the value of GOOGLE_CLIENT_ID" }));
+        await userEvent.click(
+            within(row).getByRole("button", { name: "Copy the value of GOOGLE_CLIENT_ID" })
+        );
         await waitFor(() => expect(mocks.writeText).toHaveBeenCalledWith(SECRETS.v3));
         expect(mocks.revealEnvVarAction).toHaveBeenCalledWith("v3");
     });
@@ -109,7 +115,9 @@ describe("a variable's row", () => {
     it("lets somebody who cannot edit still see and copy a value", async () => {
         open({ canWrite: false });
         const row = (await screen.findByText("DATABASE_URL")).closest("li")!;
-        await userEvent.click(within(row).getByRole("button", { name: "Show the value of DATABASE_URL" }));
+        await userEvent.click(
+            within(row).getByRole("button", { name: "Show the value of DATABASE_URL" })
+        );
         expect(await within(row).findByText(SECRETS.v1)).toBeTruthy();
         expect(within(row).queryByRole("button", { name: "Actions for DATABASE_URL" })).toBeNull();
     });
@@ -128,8 +136,12 @@ describe("a variable's row", () => {
     it("shares a service's variable with every service, through the server", async () => {
         open();
         const row = (await screen.findByText("DATABASE_URL")).closest("li")!;
-        await userEvent.click(within(row).getByRole("button", { name: "Actions for DATABASE_URL" }));
-        await userEvent.click(await screen.findByRole("menuitem", { name: "Share with every service" }));
+        await userEvent.click(
+            within(row).getByRole("button", { name: "Actions for DATABASE_URL" })
+        );
+        await userEvent.click(
+            await screen.findByRole("menuitem", { name: "Share with every service" })
+        );
         await waitFor(() => expect(mocks.promoteEnvVarAction).toHaveBeenCalledWith({ id: "v1" }));
         expect(mocks.listEnvVarsAction).toHaveBeenCalledTimes(2);
     });
@@ -144,7 +156,10 @@ describe("the list", () => {
         expect(screen.getByText("GOOGLE_CLIENT_ID")).toBeTruthy();
 
         await userEvent.clear(screen.getByRole("searchbox", { name: "Search variables" }));
-        await userEvent.type(screen.getByRole("searchbox", { name: "Search variables" }), "nothing-like-it");
+        await userEvent.type(
+            screen.getByRole("searchbox", { name: "Search variables" }),
+            "nothing-like-it"
+        );
         expect(screen.getByText("No variable matches that.")).toBeTruthy();
     });
 
@@ -163,12 +178,16 @@ describe("the raw editor", () => {
         open();
         await screen.findByText("DATABASE_URL");
         await userEvent.click(screen.getByRole("button", { name: /Raw editor/ }));
-        const text = (await screen.findByRole("textbox", { name: "Variables as text" })) as HTMLTextAreaElement;
+        const text = (await screen.findByRole("textbox", {
+            name: "Variables as text"
+        })) as HTMLTextAreaElement;
         await waitFor(() => expect(text.value).toContain(`DATABASE_URL="${SECRETS.v1}"`));
         expect(text.value).toContain('NODE_ENV="production"');
 
         await userEvent.click(screen.getByRole("radio", { name: "JSON" }));
-        await waitFor(() => expect(JSON.parse(text.value)).toMatchObject({ GOOGLE_CLIENT_ID: SECRETS.v3 }));
+        await waitFor(() =>
+            expect(JSON.parse(text.value)).toMatchObject({ GOOGLE_CLIENT_ID: SECRETS.v3 })
+        );
 
         await userEvent.click(screen.getByRole("button", { name: "Copy all" }));
         await waitFor(() => expect(mocks.writeText).toHaveBeenCalledWith(text.value));
@@ -178,7 +197,9 @@ describe("the raw editor", () => {
         open();
         await screen.findByText("DATABASE_URL");
         await userEvent.click(screen.getByRole("button", { name: /Raw editor/ }));
-        const text = (await screen.findByRole("textbox", { name: "Variables as text" })) as HTMLTextAreaElement;
+        const text = (await screen.findByRole("textbox", {
+            name: "Variables as text"
+        })) as HTMLTextAreaElement;
         await waitFor(() => expect(text.value).toContain("NODE_ENV"));
         await userEvent.clear(text);
         await userEvent.type(text, `DATABASE_URL="${SECRETS.v1}"{enter}NODE_ENV="development"`);
@@ -204,7 +225,9 @@ describe("the raw editor", () => {
         open({ canWrite: false });
         await screen.findByText("DATABASE_URL");
         await userEvent.click(screen.getByRole("button", { name: /Raw editor/ }));
-        const text = (await screen.findByRole("textbox", { name: "Variables as text" })) as HTMLTextAreaElement;
+        const text = (await screen.findByRole("textbox", {
+            name: "Variables as text"
+        })) as HTMLTextAreaElement;
         expect(text.readOnly).toBe(true);
         expect(screen.queryByRole("button", { name: "Update variables" })).toBeNull();
         expect(screen.getByRole("button", { name: "Copy all" })).toBeTruthy();

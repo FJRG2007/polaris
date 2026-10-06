@@ -71,7 +71,12 @@ export async function saveEnvVarChangesAction(
     const parsed = variableChangesSchema.safeParse(input);
     if (!parsed.success) {
         const twice = SET_TWICE.exec(parsed.error.issues[0]?.message ?? "");
-        if (twice?.[1]) return { error: (await getTranslations("deployServer"))("variables.setTwice", { key: twice[1] }) };
+        if (twice?.[1])
+            return {
+                error: (await getTranslations("deployServer"))("variables.setTwice", {
+                    key: twice[1]
+                })
+            };
         return { error: await firstIssue(parsed.error, "variables.check") };
     }
     const { scope, scopeId, set, secrecy, remove, redeploy } = parsed.data;
@@ -93,9 +98,16 @@ export async function saveEnvVarChangesAction(
 
         for (const id of remove) {
             await deleteEnvVar(id, access.ownerId);
-            await audit(user.id, access.orgId, scope, scopeId, "deploy.variable.remove", { key: keys.get(id) });
+            await audit(user.id, access.orgId, scope, scopeId, "deploy.variable.remove", {
+                key: keys.get(id)
+            });
             if (scope === "application") {
-                await activity.record({ subjectType: "app", subjectId: scopeId, userId: user.id, action: "variable-removed" });
+                await activity.record({
+                    subjectType: "app",
+                    subjectId: scopeId,
+                    userId: user.id,
+                    action: "variable-removed"
+                });
             }
         }
         for (const item of secrecy) {
@@ -131,11 +143,16 @@ export async function saveEnvVarChangesAction(
             }
         }
 
-        if (redeploy) void redeployForEnvScope(scope, scopeId, access.ownerId, user.id).catch(() => undefined);
+        if (redeploy)
+            void redeployForEnvScope(scope, scopeId, access.ownerId, user.id).catch(
+                () => undefined
+            );
         revalidatePath(DEPLOY_PATH);
         return { saved: set.length + secrecy.length + remove.length, redeployed: redeploy };
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : await reply("variables.saveFailed") };
+        return {
+            error: caught instanceof Error ? caught.message : await reply("variables.saveFailed")
+        };
     }
 }
 
@@ -145,12 +162,25 @@ export async function redeployEnvScopeAction(input: unknown): Promise<{ error?: 
     const parsed = scopeSchema.safeParse(input);
     if (!parsed.success) return { error: await reply("variables.nothingToRedeploy") };
     try {
-        const access = await requireEnvScopeAccess(parsed.data.scope, parsed.data.scopeId, user.id, "deploy.run");
-        void redeployForEnvScope(parsed.data.scope, parsed.data.scopeId, access.ownerId, user.id).catch(() => undefined);
+        const access = await requireEnvScopeAccess(
+            parsed.data.scope,
+            parsed.data.scopeId,
+            user.id,
+            "deploy.run"
+        );
+        void redeployForEnvScope(
+            parsed.data.scope,
+            parsed.data.scopeId,
+            access.ownerId,
+            user.id
+        ).catch(() => undefined);
         revalidatePath(DEPLOY_PATH);
         return {};
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : await reply("variables.redeployFailed") };
+        return {
+            error:
+                caught instanceof Error ? caught.message : await reply("variables.redeployFailed")
+        };
     }
 }
 
@@ -160,7 +190,12 @@ export async function variableLinksAction(input: unknown): Promise<Record<string
     const parsed = scopeSchema.safeParse(input);
     if (!parsed.success) return {};
     try {
-        await requireEnvScopeAccess(parsed.data.scope, parsed.data.scopeId, user.id, "variables.read");
+        await requireEnvScopeAccess(
+            parsed.data.scope,
+            parsed.data.scopeId,
+            user.id,
+            "variables.read"
+        );
         return await variableLinks(parsed.data.scope, parsed.data.scopeId);
     } catch {
         return {};
@@ -193,11 +228,16 @@ export async function revealEnvScopeAction(
             secrets.push(row.key);
         }
         if (secrets.length > 0) {
-            await audit(user.id, access.orgId, scope, scopeId, "deploy.variable.reveal", { keys: secrets });
+            await audit(user.id, access.orgId, scope, scopeId, "deploy.variable.reveal", {
+                keys: secrets
+            });
         }
         return { values };
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : await reply("variables.revealAllFailed") };
+        return {
+            error:
+                caught instanceof Error ? caught.message : await reply("variables.revealAllFailed")
+        };
     }
 }
 
@@ -213,22 +253,36 @@ const SHARED_REFERENCE = /^\$\{\{\s*shared\.[A-Za-z_][A-Za-z0-9_]*\s*\}\}$/;
  * transaction, and nothing is when the environment already shares a variable
  * by that name.
  */
-export async function promoteEnvVarAction(input: unknown): Promise<{ key?: string; error?: string }> {
+export async function promoteEnvVarAction(
+    input: unknown
+): Promise<{ key?: string; error?: string }> {
     const user = await requirePermission("deploy.manage");
     const parsed = z.object({ id: z.string().trim().min(1).max(100) }).safeParse(input);
     if (!parsed.success) return { error: await reply("variables.gone") };
     try {
         const located = await envVarScope(parsed.data.id);
         if (!located) return { error: await reply("variables.gone") };
-        if (located.scope !== "application") return { error: await reply("variables.notPromotable") };
-        const service = await requireEnvScopeAccess("application", located.scopeId, user.id, "variables.write");
-        const shared = await requireEnvScopeAccess("environment", service.environmentId, user.id, "variables.write");
+        if (located.scope !== "application")
+            return { error: await reply("variables.notPromotable") };
+        const service = await requireEnvScopeAccess(
+            "application",
+            located.scopeId,
+            user.id,
+            "variables.write"
+        );
+        const shared = await requireEnvScopeAccess(
+            "environment",
+            service.environmentId,
+            user.id,
+            "variables.write"
+        );
         const row = (await listEnvVars("application", located.scopeId, service.ownerId)).find(
             (one) => one.id === parsed.data.id
         );
         if (!row) return { error: await reply("variables.gone") };
         const value = (await revealEnvVar(row.id, service.ownerId)) ?? "";
-        if (SHARED_REFERENCE.test(value.trim())) return { error: await reply("variables.notPromotable") };
+        if (SHARED_REFERENCE.test(value.trim()))
+            return { error: await reply("variables.notPromotable") };
         const promoted = await promoteEnvVar({
             serviceId: located.scopeId,
             serviceOwnerId: service.ownerId,
@@ -240,11 +294,18 @@ export async function promoteEnvVarAction(input: unknown): Promise<{ key?: strin
         });
         if (!promoted) return { error: await reply("variables.alreadyShared", { key: row.key }) };
 
-        await audit(user.id, shared.orgId, "environment", service.environmentId, "deploy.variable.set", {
-            key: row.key,
-            secret: row.isSecret,
-            promotedFrom: located.scopeId
-        });
+        await audit(
+            user.id,
+            shared.orgId,
+            "environment",
+            service.environmentId,
+            "deploy.variable.set",
+            {
+                key: row.key,
+                secret: row.isSecret,
+                promotedFrom: located.scopeId
+            }
+        );
         await audit(user.id, service.orgId, "application", located.scopeId, "deploy.variable.set", {
             key: row.key,
             secret: false,
@@ -253,6 +314,8 @@ export async function promoteEnvVarAction(input: unknown): Promise<{ key?: strin
         revalidatePath(DEPLOY_PATH);
         return { key: row.key };
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : await reply("variables.promoteFailed") };
+        return {
+            error: caught instanceof Error ? caught.message : await reply("variables.promoteFailed")
+        };
     }
 }

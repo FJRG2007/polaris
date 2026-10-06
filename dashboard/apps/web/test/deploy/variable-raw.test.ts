@@ -74,7 +74,11 @@ describe("reading it back", () => {
         expect(parseRaw('{"A": 1}', "json")).toEqual({ ok: false, error: "notText", key: "A" });
         expect(parseRaw("[1, 2]", "json")).toEqual({ ok: false, error: "notObject" });
         expect(parseRaw("{oops", "json")).toEqual({ ok: false, error: "unreadable" });
-        expect(parseRaw('{"1BAD": "x"}', "json")).toEqual({ ok: false, error: "badKey", key: "1BAD" });
+        expect(parseRaw('{"1BAD": "x"}', "json")).toEqual({
+            ok: false,
+            error: "badKey",
+            key: "1BAD"
+        });
     });
 
     it("lets the last of a key written twice win, as a shell would", () => {

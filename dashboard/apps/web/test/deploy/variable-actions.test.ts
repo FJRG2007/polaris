@@ -34,27 +34,61 @@ vi.mock("@/lib/env-var-service", () => ({
     revealEnvVar
 }));
 
-const { saveEnvVarChangesAction, redeployEnvScopeAction, revealEnvScopeAction, promoteEnvVarAction } =
-    await import("@/app/(app)/apps/deploy/variable-actions");
+const {
+    saveEnvVarChangesAction,
+    redeployEnvScopeAction,
+    revealEnvScopeAction,
+    promoteEnvVarAction
+} = await import("@/app/(app)/apps/deploy/variable-actions");
 
-const BASE = { scope: "application", scopeId: "app-1", set: [], secrecy: [], remove: [], redeploy: false };
+const BASE = {
+    scope: "application",
+    scopeId: "app-1",
+    set: [],
+    secrecy: [],
+    remove: [],
+    redeploy: false
+};
 
 describe("saveEnvVarChangesAction", () => {
     beforeEach(() => {
-        for (const mock of [requireEnvScopeAccess, redeployForEnvScope, setEnvVar, setEnvVarSecrecy, deleteEnvVar, envVarScope]) {
+        for (const mock of [
+            requireEnvScopeAccess,
+            redeployForEnvScope,
+            setEnvVar,
+            setEnvVarSecrecy,
+            deleteEnvVar,
+            envVarScope
+        ]) {
             mock.mockReset();
         }
         requireEnvScopeAccess.mockResolvedValue({ ownerId: "owner-1", orgId: null });
         redeployForEnvScope.mockResolvedValue(undefined);
-        envVarScope.mockImplementation(async (id: string) => ({ scope: "application", scopeId: "app-1", key: `KEY_${id}` }));
+        envVarScope.mockImplementation(async (id: string) => ({
+            scope: "application",
+            scopeId: "app-1",
+            key: `KEY_${id}`
+        }));
     });
 
     it("saves without redeploying when a redeploy was not asked for", async () => {
-        const result = await saveEnvVarChangesAction({ ...BASE, set: [{ key: "PORT", value: "8080", isSecret: false }] });
+        const result = await saveEnvVarChangesAction({
+            ...BASE,
+            set: [{ key: "PORT", value: "8080", isSecret: false }]
+        });
         expect(result).toEqual({ saved: 1, redeployed: false });
-        expect(setEnvVar).toHaveBeenCalledWith("application", "app-1", "owner-1", { key: "PORT", value: "8080", isSecret: false });
+        expect(setEnvVar).toHaveBeenCalledWith("application", "app-1", "owner-1", {
+            key: "PORT",
+            value: "8080",
+            isSecret: false
+        });
         expect(redeployForEnvScope).not.toHaveBeenCalled();
-        expect(requireEnvScopeAccess).toHaveBeenCalledWith("application", "app-1", "user-1", "variables.write");
+        expect(requireEnvScopeAccess).toHaveBeenCalledWith(
+            "application",
+            "app-1",
+            "user-1",
+            "variables.write"
+        );
     });
 
     it("redeploys once for the whole batch when asked, after checking the right to deploy", async () => {
@@ -68,7 +102,12 @@ describe("saveEnvVarChangesAction", () => {
             redeploy: true
         });
         expect(result).toEqual({ saved: 3, redeployed: true });
-        expect(requireEnvScopeAccess).toHaveBeenCalledWith("application", "app-1", "user-1", "deploy.run");
+        expect(requireEnvScopeAccess).toHaveBeenCalledWith(
+            "application",
+            "app-1",
+            "user-1",
+            "deploy.run"
+        );
         expect(redeployForEnvScope).toHaveBeenCalledTimes(1);
     });
 
@@ -105,7 +144,10 @@ describe("saveEnvVarChangesAction", () => {
     });
 
     it("refuses a malformed batch", async () => {
-        const result = await saveEnvVarChangesAction({ ...BASE, set: [{ key: "9LIVES", value: "", isSecret: false }] });
+        const result = await saveEnvVarChangesAction({
+            ...BASE,
+            set: [{ key: "9LIVES", value: "", isSecret: false }]
+        });
         expect(result.error).toContain("Letters, digits and underscores");
         expect(requireEnvScopeAccess).not.toHaveBeenCalled();
     });
@@ -115,16 +157,33 @@ describe("redeployEnvScopeAction", () => {
     it("asks for the right to deploy", async () => {
         requireEnvScopeAccess.mockReset().mockResolvedValue({ ownerId: "owner-1", orgId: null });
         redeployForEnvScope.mockReset().mockResolvedValue(undefined);
-        expect(await redeployEnvScopeAction({ scope: "environment", scopeId: "env-1" })).toEqual({});
-        expect(requireEnvScopeAccess).toHaveBeenCalledWith("environment", "env-1", "user-1", "deploy.run");
-        expect(redeployForEnvScope).toHaveBeenCalledWith("environment", "env-1", "owner-1", "user-1");
+        expect(await redeployEnvScopeAction({ scope: "environment", scopeId: "env-1" })).toEqual(
+            {}
+        );
+        expect(requireEnvScopeAccess).toHaveBeenCalledWith(
+            "environment",
+            "env-1",
+            "user-1",
+            "deploy.run"
+        );
+        expect(redeployForEnvScope).toHaveBeenCalledWith(
+            "environment",
+            "env-1",
+            "owner-1",
+            "user-1"
+        );
     });
 });
 
 describe("revealEnvScopeAction", () => {
     beforeEach(() => {
-        for (const mock of [requireEnvScopeAccess, listEnvVars, revealEnvVar, recordDeployAudit]) mock.mockReset();
-        requireEnvScopeAccess.mockResolvedValue({ ownerId: "owner-1", orgId: null, environmentId: "env-1" });
+        for (const mock of [requireEnvScopeAccess, listEnvVars, revealEnvVar, recordDeployAudit])
+            mock.mockReset();
+        requireEnvScopeAccess.mockResolvedValue({
+            ownerId: "owner-1",
+            orgId: null,
+            environmentId: "env-1"
+        });
         listEnvVars.mockResolvedValue([
             { id: "v1", key: "DATABASE_URL", isSecret: true, value: null },
             { id: "v2", key: "NODE_ENV", isSecret: false, value: "production" }
@@ -135,10 +194,18 @@ describe("revealEnvScopeAction", () => {
     it("hands every value over to somebody who may read them, and writes down which secrets were seen", async () => {
         const result = await revealEnvScopeAction({ scope: "application", scopeId: "app-1" });
         expect(result).toEqual({ values: { v1: "postgres://u:p@db/app", v2: "production" } });
-        expect(requireEnvScopeAccess).toHaveBeenCalledWith("application", "app-1", "user-1", "variables.read");
+        expect(requireEnvScopeAccess).toHaveBeenCalledWith(
+            "application",
+            "app-1",
+            "user-1",
+            "variables.read"
+        );
         expect(revealEnvVar).toHaveBeenCalledTimes(1);
         expect(recordDeployAudit).toHaveBeenCalledWith(
-            expect.objectContaining({ action: "deploy.variable.reveal", metadata: { keys: ["DATABASE_URL"] } })
+            expect.objectContaining({
+                action: "deploy.variable.reveal",
+                metadata: { keys: ["DATABASE_URL"] }
+            })
         );
     });
 
@@ -153,10 +220,26 @@ describe("revealEnvScopeAction", () => {
 
 describe("promoteEnvVarAction", () => {
     beforeEach(() => {
-        for (const mock of [requireEnvScopeAccess, listEnvVars, revealEnvVar, promoteEnvVar, setEnvVar, envVarScope, recordDeployAudit])
+        for (const mock of [
+            requireEnvScopeAccess,
+            listEnvVars,
+            revealEnvVar,
+            promoteEnvVar,
+            setEnvVar,
+            envVarScope,
+            recordDeployAudit
+        ])
             mock.mockReset();
-        requireEnvScopeAccess.mockResolvedValue({ ownerId: "owner-1", orgId: null, environmentId: "env-1" });
-        envVarScope.mockResolvedValue({ scope: "application", scopeId: "app-1", key: "STRIPE_KEY" });
+        requireEnvScopeAccess.mockResolvedValue({
+            ownerId: "owner-1",
+            orgId: null,
+            environmentId: "env-1"
+        });
+        envVarScope.mockResolvedValue({
+            scope: "application",
+            scopeId: "app-1",
+            key: "STRIPE_KEY"
+        });
         listEnvVars.mockImplementation(async (scope: string) =>
             scope === "application"
                 ? [{ id: "v1", key: "STRIPE_KEY", isSecret: true, value: null }]
@@ -168,8 +251,18 @@ describe("promoteEnvVarAction", () => {
 
     it("moves the value to the environment's shared variables and points the service at it", async () => {
         expect(await promoteEnvVarAction({ id: "v1" })).toEqual({ key: "STRIPE_KEY" });
-        expect(requireEnvScopeAccess).toHaveBeenCalledWith("application", "app-1", "user-1", "variables.write");
-        expect(requireEnvScopeAccess).toHaveBeenCalledWith("environment", "env-1", "user-1", "variables.write");
+        expect(requireEnvScopeAccess).toHaveBeenCalledWith(
+            "application",
+            "app-1",
+            "user-1",
+            "variables.write"
+        );
+        expect(requireEnvScopeAccess).toHaveBeenCalledWith(
+            "environment",
+            "env-1",
+            "user-1",
+            "variables.write"
+        );
         expect(promoteEnvVar).toHaveBeenCalledWith({
             serviceId: "app-1",
             serviceOwnerId: "owner-1",
@@ -191,7 +284,11 @@ describe("promoteEnvVarAction", () => {
     });
 
     it("only promotes a service's own variable", async () => {
-        envVarScope.mockResolvedValue({ scope: "environment", scopeId: "env-1", key: "STRIPE_KEY" });
+        envVarScope.mockResolvedValue({
+            scope: "environment",
+            scopeId: "env-1",
+            key: "STRIPE_KEY"
+        });
         expect((await promoteEnvVarAction({ id: "v1" })).error).toBeTruthy();
         expect(promoteEnvVar).not.toHaveBeenCalled();
     });
@@ -199,7 +296,14 @@ describe("promoteEnvVarAction", () => {
     it("does not promote one that already points at a shared variable", async () => {
         listEnvVars.mockImplementation(async (scope: string) =>
             scope === "application"
-                ? [{ id: "v1", key: "STRIPE_KEY", isSecret: false, value: "${{shared.STRIPE_KEY}}" }]
+                ? [
+                      {
+                          id: "v1",
+                          key: "STRIPE_KEY",
+                          isSecret: false,
+                          value: "${{shared.STRIPE_KEY}}"
+                      }
+                  ]
                 : []
         );
         revealEnvVar.mockResolvedValue("${{shared.STRIPE_KEY}}");
