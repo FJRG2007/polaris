@@ -17,7 +17,13 @@ import { listenForward } from "../src/forward.js";
 /** An SSH client whose forwarded channels answer every write with an echo. */
 function echoClient() {
     const forwardOut = vi.fn(
-        (_sh: string, _sp: number, _dh: string, _dp: number, done: (error: Error | undefined, channel: unknown) => void) => {
+        (
+            _sh: string,
+            _sp: number,
+            _dh: string,
+            _dp: number,
+            done: (error: Error | undefined, channel: unknown) => void
+        ) => {
             const channel = new PassThrough() as PassThrough & { close: () => void };
             channel.close = () => channel.destroy();
             done(undefined, channel);

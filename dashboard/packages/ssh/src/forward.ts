@@ -62,7 +62,10 @@ export async function listenForward(
     const host = options.bindHost ?? "127.0.0.1";
 
     server.on("connection", (socket: Socket) => {
-        if (options.allowFrom && plainAddress(socket.remoteAddress) !== plainAddress(options.allowFrom)) {
+        if (
+            options.allowFrom &&
+            plainAddress(socket.remoteAddress) !== plainAddress(options.allowFrom)
+        ) {
             socket.destroy();
             return;
         }

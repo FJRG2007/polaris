@@ -119,7 +119,11 @@ beforeEach(() => {
     mocks.inspect.mockResolvedValue({
         NetworkSettings: { Networks: { polaris: { IPAddress: "172.18.0.9", IPPrefixLen: 16 } } }
     });
-    mocks.openTunnel.mockResolvedValue({ host: "172.18.0.4", port: 40123, close: mocks.closeTunnel });
+    mocks.openTunnel.mockResolvedValue({
+        host: "172.18.0.4",
+        port: 40123,
+        close: mocks.closeTunnel
+    });
     mocks.runIn.mockResolvedValue({ code: 0, output: "" });
 });
 
@@ -134,7 +138,9 @@ describe("a copy from a saved connection behind SSH", () => {
         await settled();
 
         expect(mocks.findConnection).toHaveBeenCalledWith(
-            expect.objectContaining({ where: { id: CONNECTION, ownerId: "user-1", managedDatabaseId: null } })
+            expect.objectContaining({
+                where: { id: CONNECTION, ownerId: "user-1", managedDatabaseId: null }
+            })
         );
         expect(mocks.addressOf).toHaveBeenCalledWith("user-1", CONNECTION);
         expect(mocks.openTunnel).toHaveBeenCalledWith(TUNNEL, "127.0.0.1", 5432, undefined, {
@@ -154,7 +160,9 @@ describe("a copy from a saved connection behind SSH", () => {
     it("closes the tunnel when the dump fails", async () => {
         mocks.addressOf.mockResolvedValue(address(TUNNEL));
         mocks.runIn.mockImplementation(async (_container: string, argv: string[]) =>
-            argv.join(" ").includes("pg_dump") ? { code: 1, output: "connection refused" } : { code: 0, output: "0" }
+            argv.join(" ").includes("pg_dump")
+                ? { code: 1, output: "connection refused" }
+                : { code: 0, output: "0" }
         );
         await copyInto("db-into", "owner-1", "user-1", { fromConnectionId: CONNECTION });
         await settled();
@@ -213,18 +221,21 @@ describe("a copy from a saved connection reached directly", () => {
         ["verify-ca", null],
         ["verify-full", null],
         ["require", "-----BEGIN CERTIFICATE-----"]
-    ])("is refused, before anything starts, when it checks certificates (%s)", async (mode, clientCert) => {
-        mocks.addressOf.mockResolvedValue({
-            ...address(null),
-            host: "db.example.test",
-            tls: { mode, ca: null, clientCert, clientKey: null, name: "db.example.test" }
-        });
-        await expect(
-            copyInto("db-into", "owner-1", "user-1", { fromConnectionId: CONNECTION })
-        ).rejects.toThrow(/certificate/);
-        expect(mocks.started).not.toHaveBeenCalled();
-        expect(mocks.runIn).not.toHaveBeenCalled();
-    });
+    ])(
+        "is refused, before anything starts, when it checks certificates (%s)",
+        async (mode, clientCert) => {
+            mocks.addressOf.mockResolvedValue({
+                ...address(null),
+                host: "db.example.test",
+                tls: { mode, ca: null, clientCert, clientKey: null, name: "db.example.test" }
+            });
+            await expect(
+                copyInto("db-into", "owner-1", "user-1", { fromConnectionId: CONNECTION })
+            ).rejects.toThrow(/certificate/);
+            expect(mocks.started).not.toHaveBeenCalled();
+            expect(mocks.runIn).not.toHaveBeenCalled();
+        }
+    );
 
     it("hides an unexpected failure reading the connection", async () => {
         vi.spyOn(console, "error").mockImplementation(() => undefined);
@@ -233,7 +244,9 @@ describe("a copy from a saved connection reached directly", () => {
             copyInto("db-into", "owner-1", "user-1", { fromConnectionId: CONNECTION })
         ).rejects.toThrow("That connection could not be opened.");
 
-        mocks.addressOf.mockRejectedValueOnce(new DataConnectionError("The SSH login is incomplete."));
+        mocks.addressOf.mockRejectedValueOnce(
+            new DataConnectionError("The SSH login is incomplete.")
+        );
         await expect(
             copyInto("db-into", "owner-1", "user-1", { fromConnectionId: CONNECTION })
         ).rejects.toThrow("The SSH login is incomplete.");

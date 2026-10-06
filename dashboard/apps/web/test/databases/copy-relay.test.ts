@@ -42,9 +42,7 @@ describe("the network a copy's tunnel is served on", () => {
     });
 
     it("never offers loopback, and reads nothing from an inspection it does not understand", () => {
-        expect(
-            sharedNetwork(DASHBOARD, [{ ip: "127.0.0.5", prefix: 8 }])
-        ).toBeNull();
+        expect(sharedNetwork(DASHBOARD, [{ ip: "127.0.0.5", prefix: 8 }])).toBeNull();
         expect(containerNetworks({ NetworkSettings: "nope" })).toEqual([]);
         expect(containerNetworks(null)).toEqual([]);
     });

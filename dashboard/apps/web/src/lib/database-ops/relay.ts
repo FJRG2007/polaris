@@ -87,7 +87,7 @@ function prefixOf(netmask: string): number | null {
     const mask = toNumber(netmask);
     if (mask === null) return null;
     const bits = mask.toString(2).padStart(32, "0");
-    return /^1*0*$/.test(bits) ? bits.indexOf("0") === -1 ? 32 : bits.indexOf("0") : null;
+    return /^1*0*$/.test(bits) ? (bits.indexOf("0") === -1 ? 32 : bits.indexOf("0")) : null;
 }
 
 /**
@@ -108,7 +108,7 @@ export function sharedNetwork(
             const mine = toNumber(face.address);
             const prefix = prefixOf(face.netmask);
             if (mine === null || prefix !== network.prefix || mine === theirs) continue;
-            if (((mine & mask) >>> 0) === ((theirs & mask) >>> 0))
+            if ((mine & mask) >>> 0 === (theirs & mask) >>> 0)
                 return { bindHost: face.address, containerIp: network.ip };
         }
     }
