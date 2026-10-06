@@ -682,7 +682,9 @@ export function FlowCanvas<D extends graphs.FlowDefinition>({
                         )}
                         onSelect={setSelectedId}
                         onDrop={drop}
-                        onNudge={(id, by) => onChange((current) => graphs.shiftNode(current, id, by))}
+                        onNudge={(id, by) =>
+                            onChange((current) => graphs.shiftNode(current, id, by))
+                        }
                         onDelete={(id) => {
                             onChange((current) => graphs.removeNode(current, id));
                             setSelectedId(null);

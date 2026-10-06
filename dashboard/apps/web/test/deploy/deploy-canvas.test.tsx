@@ -222,7 +222,13 @@ describe("the project canvas", () => {
         const frame = container.querySelector<HTMLElement>("[data-board-frame]")!;
         fireEvent(
             frame,
-            new WheelEvent("wheel", { deltaY: -200, clientX: 10, clientY: 10, bubbles: true, cancelable: true })
+            new WheelEvent("wheel", {
+                deltaY: -200,
+                clientX: 10,
+                clientY: 10,
+                bubbles: true,
+                cancelable: true
+            })
         );
         expect(reset.textContent).not.toBe("100%");
         expect(Number.parseInt(reset.textContent ?? "", 10)).toBeGreaterThan(100);
@@ -235,7 +241,12 @@ describe("the project canvas", () => {
         frame.scrollTop = 200;
         const drag = (target: Element, from: [number, number], to: [number, number]) => {
             target.dispatchEvent(
-                new PointerEvent("pointerdown", { button: 0, clientX: from[0], clientY: from[1], bubbles: true })
+                new PointerEvent("pointerdown", {
+                    button: 0,
+                    clientX: from[0],
+                    clientY: from[1],
+                    bubbles: true
+                })
             );
             window.dispatchEvent(
                 new PointerEvent("pointermove", { clientX: to[0], clientY: to[1], bubbles: true })

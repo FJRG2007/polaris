@@ -176,7 +176,9 @@ export function Diagram({
     const fit = useCallback(() => {
         const element = frame.current;
         const bounds = boundsOf(
-            nodes.filter((node) => !node.parentId).map((node) => ({ ...node.position, width: node.width, height: node.height }))
+            nodes
+                .filter((node) => !node.parentId)
+                .map((node) => ({ ...node.position, width: node.width, height: node.height }))
         );
         if (!element || !bounds) return;
         const rect = element.getBoundingClientRect();
@@ -194,14 +196,20 @@ export function Diagram({
 
     useBoardGestures(frame, {
         onZoom: (factor, at) => setView((current) => zoomViewAt(current, factor, at, LIMITS)),
-        onPan: (dx, dy) => setView((current) => ({ ...current, x: current.x + dx, y: current.y + dy })),
+        onPan: (dx, dy) =>
+            setView((current) => ({ ...current, x: current.x + dx, y: current.y + dy })),
         grabs: (target) => !target.closest("[data-flow-node], button")
     });
 
     const zoomCentre = (factor: number) => {
         const rect = frame.current?.getBoundingClientRect();
         setView((current) =>
-            zoomViewAt(current, factor, { x: (rect?.width ?? 0) / 2, y: (rect?.height ?? 0) / 2 }, LIMITS)
+            zoomViewAt(
+                current,
+                factor,
+                { x: (rect?.width ?? 0) / 2, y: (rect?.height ?? 0) / 2 },
+                LIMITS
+            )
         );
     };
 
@@ -257,19 +265,29 @@ export function Diagram({
         if (event.key === "Enter" || event.key === " ") {
             event.preventDefault();
             onSelect(node.id);
-        } else if ((event.key === "ArrowUp" || event.key === "ArrowDown") && !readOnly && node.draggable) {
+        } else if (
+            (event.key === "ArrowUp" || event.key === "ArrowDown") &&
+            !readOnly &&
+            node.draggable
+        ) {
             event.preventDefault();
             onSelect(node.id);
             onNudge(node.id, event.key === "ArrowUp" ? -1 : 1);
             setSaid(labels.moved);
-        } else if ((event.key === "Delete" || event.key === "Backspace") && !readOnly && node.deletable) {
+        } else if (
+            (event.key === "Delete" || event.key === "Backspace") &&
+            !readOnly &&
+            node.deletable
+        ) {
             event.preventDefault();
             onDelete(node.id);
         }
     }
 
     // Groups first, so the conditions inside them are drawn on top.
-    const ordered = [...nodes].sort((a, b) => Number(b.role === "group") - Number(a.role === "group"));
+    const ordered = [...nodes].sort(
+        (a, b) => Number(b.role === "group") - Number(a.role === "group")
+    );
 
     return (
         <div
@@ -294,7 +312,12 @@ export function Diagram({
                 className="absolute left-0 top-0 origin-top-left"
                 style={{ transform: `translate(${view.x}px, ${view.y}px) scale(${view.zoom})` }}
             >
-                <svg aria-hidden="true" className="pointer-events-none absolute left-0 top-0 overflow-visible" width={1} height={1}>
+                <svg
+                    aria-hidden="true"
+                    className="pointer-events-none absolute left-0 top-0 overflow-visible"
+                    width={1}
+                    height={1}
+                >
                     {edges.map((edge) => {
                         const source = byId.get(edge.source);
                         const target = byId.get(edge.target);
@@ -304,7 +327,12 @@ export function Diagram({
                         return (
                             <path
                                 key={edge.id}
-                                d={edgePath(anchor(boxOf(source), fromSide), fromSide, anchor(boxOf(target), toSide), toSide)}
+                                d={edgePath(
+                                    anchor(boxOf(source), fromSide),
+                                    fromSide,
+                                    anchor(boxOf(target), toSide),
+                                    toSide
+                                )}
                                 fill="none"
                                 stroke="hsl(var(--border-strong))"
                                 strokeWidth={1.5}
@@ -332,7 +360,12 @@ export function Diagram({
                                 held?.id === node.id && "z-10 cursor-grabbing",
                                 !readOnly && node.draggable && held?.id !== node.id && "cursor-grab"
                             )}
-                            style={{ left: box.x, top: box.y, width: box.width, height: box.height }}
+                            style={{
+                                left: box.x,
+                                top: box.y,
+                                width: box.width,
+                                height: box.height
+                            }}
                             onPointerDown={(event) => press(event, node)}
                             onClick={(event) => {
                                 event.stopPropagation();
@@ -342,7 +375,10 @@ export function Diagram({
                         >
                             {face(node, selected)}
                             {Object.values(SIDES[node.role]).map((side) => {
-                                const at = anchor({ x: 0, y: 0, width: box.width, height: box.height }, side);
+                                const at = anchor(
+                                    { x: 0, y: 0, width: box.width, height: box.height },
+                                    side
+                                );
                                 return (
                                     <span
                                         key={side}
@@ -367,8 +403,16 @@ export function Diagram({
             >
                 {(
                     [
-                        [labels.zoomIn, <ZoomIn key="in" className="size-4" />, () => zoomCentre(STEP)],
-                        [labels.zoomOut, <ZoomOut key="out" className="size-4" />, () => zoomCentre(1 / STEP)],
+                        [
+                            labels.zoomIn,
+                            <ZoomIn key="in" className="size-4" />,
+                            () => zoomCentre(STEP)
+                        ],
+                        [
+                            labels.zoomOut,
+                            <ZoomOut key="out" className="size-4" />,
+                            () => zoomCentre(1 / STEP)
+                        ],
                         [labels.fit, <Maximize key="fit" className="size-4" />, fit]
                     ] as const
                 ).map(([label, icon, run]) => (

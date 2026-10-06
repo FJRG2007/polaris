@@ -61,8 +61,16 @@ export function swallowNextClick(): void {
 
 /** The factor one wheel event zooms by. Lines and pages are turned into the
  *  pixels a wheel in pixel mode would have sent, so every mouse zooms alike. */
-export function wheelFactor(event: { readonly deltaY: number; readonly deltaMode: number }): number {
-    const pixels = event.deltaMode === 1 ? event.deltaY * 16 : event.deltaMode === 2 ? event.deltaY * 400 : event.deltaY;
+export function wheelFactor(event: {
+    readonly deltaY: number;
+    readonly deltaMode: number;
+}): number {
+    const pixels =
+        event.deltaMode === 1
+            ? event.deltaY * 16
+            : event.deltaMode === 2
+              ? event.deltaY * 400
+              : event.deltaY;
     // Bounded, so one violent flick does not leap from one end to the other.
     const delta = Math.max(-200, Math.min(200, pixels));
     return Math.exp(-delta * WHEEL_RATE);
@@ -83,7 +91,11 @@ export function zoomViewAt(
     anchor: BoardPoint,
     limits: { readonly min: number; readonly max: number }
 ): BoardView {
-    const zoom = clamp(view.zoom * (Number.isFinite(factor) && factor > 0 ? factor : 1), limits.min, limits.max);
+    const zoom = clamp(
+        view.zoom * (Number.isFinite(factor) && factor > 0 ? factor : 1),
+        limits.min,
+        limits.max
+    );
     const applied = zoom / view.zoom;
     return {
         zoom,

@@ -16,7 +16,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { FlowCanvas, type FlowCanvasLabels, type FlowVocabulary } from "../src/automation/canvas";
 
-
 const LABELS: FlowCanvasLabels = {
     when: "When",
     if: "If",
@@ -162,12 +161,22 @@ describe("the diagram", () => {
         render(<Editor />);
         const frame = layer().parentElement!;
         const before = layer().style.transform;
-        fireEvent(frame, new WheelEvent("wheel", { deltaY: -200, bubbles: true, cancelable: true }));
+        fireEvent(
+            frame,
+            new WheelEvent("wheel", { deltaY: -200, bubbles: true, cancelable: true })
+        );
         expect(layer().style.transform).not.toBe(before);
 
         const zoomed = layer().style.transform;
         act(() => {
-            frame.dispatchEvent(new PointerEvent("pointerdown", { button: 0, clientX: 100, clientY: 100, bubbles: true }));
+            frame.dispatchEvent(
+                new PointerEvent("pointerdown", {
+                    button: 0,
+                    clientX: 100,
+                    clientY: 100,
+                    bubbles: true
+                })
+            );
             window.dispatchEvent(new PointerEvent("pointermove", { clientX: 140, clientY: 130 }));
             window.dispatchEvent(new PointerEvent("pointerup", { clientX: 140, clientY: 130 }));
         });
@@ -178,7 +187,14 @@ describe("the diagram", () => {
         render(<Editor />);
         const step = node("step01");
         act(() => {
-            step.dispatchEvent(new PointerEvent("pointerdown", { button: 0, clientX: 10, clientY: 10, bubbles: true }));
+            step.dispatchEvent(
+                new PointerEvent("pointerdown", {
+                    button: 0,
+                    clientX: 10,
+                    clientY: 10,
+                    bubbles: true
+                })
+            );
             window.dispatchEvent(new PointerEvent("pointermove", { clientX: 10, clientY: 400 }));
             window.dispatchEvent(new PointerEvent("pointerup", { clientX: 10, clientY: 400 }));
         });
@@ -205,7 +221,14 @@ describe("the diagram", () => {
         render(<Editor />);
         const step = node("step01");
         act(() => {
-            step.dispatchEvent(new PointerEvent("pointerdown", { button: 0, clientX: 10, clientY: 10, bubbles: true }));
+            step.dispatchEvent(
+                new PointerEvent("pointerdown", {
+                    button: 0,
+                    clientX: 10,
+                    clientY: 10,
+                    bubbles: true
+                })
+            );
             window.dispatchEvent(new PointerEvent("pointermove", { clientX: 10, clientY: 400 }));
             window.dispatchEvent(new PointerEvent("pointerup", { clientX: 10, clientY: 400 }));
         });
