@@ -2022,6 +2022,7 @@ function VariablesTab({ app }: { app: ProjectApp }) {
                         ? t("variables.redeployService")
                         : t("variables.redeployEnvironment")
                 }
+                onConfigureShared={() => setScope("environment")}
             />
         </div>
     );

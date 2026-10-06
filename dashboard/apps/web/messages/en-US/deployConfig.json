@@ -143,7 +143,41 @@
         "discard": "Discard",
         "save": "Save",
         "saveRedeployTitle": "Save, then redeploy {target}",
-        "saveRedeploy": "Save and redeploy"
+        "saveRedeploy": "Save and redeploy",
+        "search": "Search variables",
+        "noMatch": "No variable matches that.",
+        "showValueOf": "Show the value of {name}",
+        "hideValueOf": "Hide the value of {name}",
+        "copyValueOf": "Copy the value of {name}",
+        "copy": "Copy",
+        "actionsFor": "Actions for {name}",
+        "actions": "Actions",
+        "edit": "Edit",
+        "makeSecret": "Make it a secret",
+        "makePlain": "Make it not secret",
+        "promote": "Share with every service",
+        "promoteFailed": "Could not share the variable",
+        "sync": {
+            "title": "Keep variables in sync across services",
+            "body": "Create a shared variable for the environment, or share one of this service's from its menu.",
+            "configure": "Configure shared variables"
+        },
+        "raw": {
+            "title": "Raw editor",
+            "intro": "Every variable as it is. Edit it here and update to review the changes; a line you delete is a variable removed.",
+            "introReadOnly": "Every variable as it is, to read or copy.",
+            "format": "Format",
+            "text": "Variables as text",
+            "copyAll": "Copy all",
+            "copied": "Copied",
+            "close": "Close",
+            "update": "Update variables",
+            "loadFailed": "Could not show the values.",
+            "unreadable": "That is not valid JSON.",
+            "notObject": "Write one JSON object of names to values.",
+            "notText": "{key} has to be text, in quotes.",
+            "badKey": "{key} is not a variable name: letters, digits and underscores, not starting with a digit."
+        }
     },
     "cron": {
         "presets": {

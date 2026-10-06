@@ -143,7 +143,41 @@
         "discard": "Descartar",
         "save": "Guardar",
         "saveRedeployTitle": "Guardar y volver a desplegar {target}",
-        "saveRedeploy": "Guardar y redesplegar"
+        "saveRedeploy": "Guardar y redesplegar",
+        "search": "Buscar variables",
+        "noMatch": "Ninguna variable coincide.",
+        "showValueOf": "Mostrar el valor de {name}",
+        "hideValueOf": "Ocultar el valor de {name}",
+        "copyValueOf": "Copiar el valor de {name}",
+        "copy": "Copiar",
+        "actionsFor": "Acciones de {name}",
+        "actions": "Acciones",
+        "edit": "Editar",
+        "makeSecret": "Hacerla secreta",
+        "makePlain": "Que no sea secreta",
+        "promote": "Compartir con todos",
+        "promoteFailed": "No se pudo compartir la variable",
+        "sync": {
+            "title": "Variables iguales en todos los servicios",
+            "body": "Crea una variable compartida del entorno, o comparte una de este servicio desde su menú.",
+            "configure": "Variables compartidas"
+        },
+        "raw": {
+            "title": "Editor raw",
+            "intro": "Todas las variables tal cual. Edítalas aquí y actualiza para revisar; una línea borrada es una variable eliminada.",
+            "introReadOnly": "Todas las variables tal cual, para leer o copiar.",
+            "format": "Formato",
+            "text": "Variables como texto",
+            "copyAll": "Copiar todo",
+            "copied": "Copiado",
+            "close": "Cerrar",
+            "update": "Actualizar",
+            "loadFailed": "No se pudieron mostrar los valores.",
+            "unreadable": "Eso no es JSON válido.",
+            "notObject": "Escribe un objeto JSON de nombres a valores.",
+            "notText": "{key} debe ser texto, entre comillas.",
+            "badKey": "{key} no es un nombre válido: letras, dígitos y guiones bajos, sin empezar por dígito."
+        }
     },
     "cron": {
         "presets": {

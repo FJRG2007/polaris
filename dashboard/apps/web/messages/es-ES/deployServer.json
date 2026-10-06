@@ -44,7 +44,11 @@
         "saveFailed": "No se guardaron las variables",
         "nothingToRedeploy": "Nada que redesplegar",
         "redeployFailed": "No se pudo volver a desplegar",
-        "setTwice": "{key} está definida dos veces"
+        "setTwice": "{key} está definida dos veces",
+        "alreadyShared": "{key} ya es una variable compartida aquí",
+        "notPromotable": "Solo se comparte una variable con valor propio",
+        "promoteFailed": "No se pudo compartir la variable",
+        "revealAllFailed": "No se mostraron los valores"
     },
     "notes": {
         "invalid": "No se puede publicar esa nota",
