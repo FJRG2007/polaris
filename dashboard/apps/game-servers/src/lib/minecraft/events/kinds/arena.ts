@@ -383,6 +383,16 @@ export function feed(name: string): string {
     return `effect give ${name} minecraft:saturation 3 0 true`;
 }
 
+/**
+ * Everybody inside healed whole, at "Go!". A fight reads health from a
+ * `health` count (`team-duel.healthOf`), which the game fills in only once a
+ * player's health changes, and takes a player with no score yet as whole. A
+ * player who came in already hurt had none - until the first scratch, or the
+ * first heart back, wrote their true, low health and the next look called
+ * them out of a fight nobody had touched them in.
+ */
+export const HEAL_INSIDE = `effect give @a[tag=${IN_ARENA}] minecraft:instant_health 1 3 true`;
+
 /** Beyond harm for a moment past each look: where nobody is meant to fight,
  *  nobody can be hurt, or die and drop what they carry. */
 export function protect(name: string): string {

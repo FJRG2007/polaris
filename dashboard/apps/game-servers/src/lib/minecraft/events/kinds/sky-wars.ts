@@ -1061,6 +1061,10 @@ export const GONE_TAG = "pe_sw_gone";
 /** How long after a blow its striker is still credited with somebody going out. */
 export const CREDIT_MS = 10_000;
 
+/** Whether a broken block drops, by its name before 1.21.11 and after. Held
+ *  off while SkyWars runs: the islands are broken by hand, in survival. */
+export const TILE_DROPS = ["doTileDrops", "block_drops"] as const;
+
 /** The counts the game keeps: damage taken, and bows drawn. */
 export const TAKEN = "pe_swt";
 export const BOWS = "pe_swb";

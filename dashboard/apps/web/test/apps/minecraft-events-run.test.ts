@@ -144,6 +144,8 @@ interface World {
     /** Health not said is no score at all, as the game has it until a
      *  player's health first changes after the count was made. */
     hpUnset: boolean;
+    /** A server that answers neither name of the block-drops rule. */
+    tileDropsUnknown: boolean;
     /** Called with every line as the game takes it, before it answers. */
     onLine: ((line: string) => void) | null;
     dealt: Record<string, number>;
@@ -1099,6 +1101,11 @@ function answer(sent: string): string {
             )
             .join("\n");
     }
+    if (line === "effect give @a[tag=pe_arena] minecraft:instant_health 1 3 true") {
+        // Healed whole: the health count, where there is one, reads full again.
+        for (const name of tagged("pe_arena")) if (name in world.hp) world.hp[name] = 20;
+        return "Applied effect Instant Health";
+    }
     const duelled =
         /^execute as @a run scoreboard players get @s (pe_hp|pe_dealt|pe_died|pe_pk)$/.exec(line);
     if (duelled) {
@@ -1168,6 +1175,11 @@ function answer(sent: string): string {
         line === "gamerule natural_health_regeneration"
     ) {
         return world.renamedRules === (line === "gamerule natural_health_regeneration")
+            ? `Gamerule ${line.slice(9)} is currently set to: true`
+            : "Unknown or incomplete command, see below for error";
+    }
+    if (line === "gamerule doTileDrops" || line === "gamerule block_drops") {
+        return !world.tileDropsUnknown && world.renamedRules === (line === "gamerule block_drops")
             ? `Gamerule ${line.slice(9)} is currently set to: true`
             : "Unknown or incomplete command, see below for error";
     }
@@ -2031,6 +2043,7 @@ beforeEach(() => {
     world.tags = {};
     world.attackers = {};
     world.hpUnset = false;
+    world.tileDropsUnknown = false;
     world.onLine = null;
     world.links = {};
     world.locales = {};
@@ -5456,6 +5469,25 @@ async function startArena(presetId: string): Promise<void> {
     });
 }
 
+/**
+ * Everybody brought in at once: what each of `names` carried put away before
+ * anybody is moved, then every one of them moved with nothing read in between -
+ * not one player after another, between one stash and the next.
+ */
+function broughtInTogether(names: readonly string[]): void {
+    const firstAt = (pattern: RegExp) => world.sent.findIndex((line) => pattern.test(line));
+    const moved = names.map((name) => firstAt(new RegExp(`run tp ${name} `)));
+    for (const at of moved) expect(at).toBeGreaterThanOrEqual(0);
+    const first = Math.min(...moved);
+    const last = Math.max(...moved);
+    for (const name of names) {
+        const emptied = firstAt(new RegExp(`^item replace entity ${name} \\S+ with minecraft:air`));
+        expect(emptied).toBeGreaterThanOrEqual(0);
+        expect(emptied).toBeLessThan(first);
+    }
+    expect(world.sent.slice(first, last).some((line) => line.startsWith("data get "))).toBe(false);
+}
+
 /** Every block put up, and every block taken down, as `box -> block`. */
 function builtAndRemoved(): { built: string[]; removed: string[] } {
     const box = (line: string) => /fill (.+?) (minecraft:\S+)(?: replace (\S+)| keep)$/.exec(line);
@@ -5883,6 +5915,7 @@ describe("a parkour race", () => {
         expect(run.stage?.built).toBe(true);
         expect(world.inv.Ana!.size).toBe(0);
         expect(world.inv.Ben!.size).toBe(0);
+        broughtInTogether(["Ana", "Ben"]);
         const kept = run.stage!.saved.find((one) => one.name === "Ana")!.stash!;
         // Kept in the database, nothing built for it.
         expect(kept.barrels).toEqual([]);
@@ -5917,6 +5950,19 @@ describe("a parkour race", () => {
             );
             expect(world.sent).toContain(`tag ${one.name} remove pe_in`);
         }
+        // Everybody sent back together: nothing asked, waited on or given back
+        // between one player's trip home and the next.
+        const trips = saved.map((one) =>
+            world.sent.indexOf(
+                `execute in ${one.dimension} run tp ${one.name} ${one.x.toFixed(3)} ${one.y.toFixed(3)} ${one.z.toFixed(3)} ${one.yaw.toFixed(1)} ${one.pitch.toFixed(1)}`
+            )
+        );
+        expect(saved.length).toBeGreaterThan(1);
+        expect(
+            world.sent
+                .slice(Math.min(...trips), Math.max(...trips))
+                .every((line) => / run tp /.test(line))
+        ).toBe(true);
         expect(
             world.sent.some((line) => /run forceload remove -?\d+ -?\d+ -?\d+ -?\d+$/.test(line))
         ).toBe(true);
@@ -7088,12 +7134,16 @@ describe("an ice boat race", () => {
         expect(world.sent).toContain(
             `execute in minecraft:overworld run tp Ana ${grid[0]!.x.toFixed(3)} ${grid[0]!.y.toFixed(3)} ${grid[0]!.z.toFixed(3)} ${grid[0]!.yaw.toFixed(1)} 0.0`
         );
+        // Each boat summoned already facing the way its racer's spot faces
+        // down the track.
         for (const line of [
-            ...boatKind.boatLines("Ana", "oak_boat"),
-            ...boatKind.boatLines("Ben", "oak_boat")
+            ...boatKind.boatLines("Ana", "oak_boat", grid[0]!.yaw),
+            ...boatKind.boatLines("Ben", "oak_boat", grid[1]!.yaw)
         ])
             expect(world.sent).toContain(line);
-        expect(world.sent.indexOf(boatKind.boatLines("Ana", "oak_boat")[0]!)).toBeLessThan(armed);
+        expect(
+            world.sent.indexOf(boatKind.boatLines("Ana", "oak_boat", grid[0]!.yaw)[0]!)
+        ).toBeLessThan(armed);
         expect(state().run!.readyAt).not.toBeNull();
         // The quick look puts back whoever fell, cut a corner or left their boat.
         world.sent = [];
@@ -8193,6 +8243,7 @@ describe("a king of the hill", () => {
         // Nothing in their hands - no weapon, no armor - and no kit either.
         expect(world.inv.Ana!.size).toBe(0);
         expect(world.inv.Ben!.size).toBe(0);
+        broughtInTogether(["Ana", "Ben"]);
         expect(world.sent.some((line) => /^give (Ana|Ben) /.test(line))).toBe(false);
         // Round the circle, in adventure mode.
         expect(world.sent).toContain("gamemode adventure Ana");
@@ -10594,6 +10645,41 @@ describe("capture the flag", () => {
         expect(flag.stateOf(state().run!.game).flags[1].carrier).toBe("Ana");
     });
 
+    it("heals everybody inside at Go, so a player who came in hurt is not called out untouched", async () => {
+        const flag = await ctf();
+        // Ana walked in hurt, her health count already low from before.
+        world.hpUnset = true;
+        world.hp = { Ana: 4 };
+        setUp([ctfOf(3)]);
+        await joinAndStart("ctf");
+        const heal = world.sent.indexOf(
+            "effect give @a[tag=pe_arena] minecraft:instant_health 1 3 true"
+        );
+        expect(heal).toBeGreaterThan(-1);
+        // Before anything is counted or handed out.
+        const kit = world.sent.findIndex((line) =>
+            line.startsWith("give Ana minecraft:stone_sword")
+        );
+        expect(kit).toBeGreaterThan(heal);
+        await play(2_100);
+        await play(2_100);
+        expect(saidToAll("Ana is out")).toBe(false);
+        expect(flag.stateOf(state().run!.game).kills).toEqual({});
+    });
+
+    it("does not call out a player who drops out of a single read while alive and online", async () => {
+        const flag = await ctf();
+        setUp([ctfOf(3)]);
+        await joinAndStart("ctf");
+        await play(2_100);
+        world.online = ["Ben"];
+        await play(2_100);
+        world.online = ["Ana", "Ben"];
+        await play(2_100);
+        expect(saidToAll("Ana is out")).toBe(false);
+        expect(flag.stateOf(state().run!.game).kills).toEqual({});
+    });
+
     it("credits a player brought low to the rival the game says hurt them, not whoever struck last", async () => {
         const flag = await ctf();
         const four = ["Ana", "Ben", "Cy", "Dee"];
@@ -11000,6 +11086,46 @@ describe("hide and seek", () => {
         world.attackers[victim] = by;
     };
 
+    it("turns minimap radars off for each player at Go, again on a rejoin, and back on at the end", async () => {
+        const hs = await kind();
+        world.online = [...names, "Dee"];
+        setUp([hideOf(60)]);
+        await joinAndStart("hide", names);
+        const told = (name: string, code: string) =>
+            world.sent.filter(
+                (line) => line.startsWith(`tellraw ${name} `) && visible(line).includes(code)
+            );
+        for (const name of names) {
+            const [line] = told(name, hs.RADAR_OFF);
+            expect(line).toBeDefined();
+            // Sent as escapes, so nothing on the way mistakes the section sign.
+            expect(line).toContain("\\u00a7f\\u00a7a\\u00a7i");
+            expect(visible(line!)).toContain("Minimap radars are switched off");
+        }
+        expect(told("Dee", hs.RADAR_OFF)).toEqual([]);
+        expect(
+            world.sent.some(
+                (line) => line.startsWith("tellraw @a") && visible(line).includes(hs.RADAR_OFF)
+            )
+        ).toBe(false);
+
+        // Ben drops off and comes back: told again, the others not.
+        await play(2_100);
+        world.online = ["Ana", "Cy", "Dee"];
+        await play(2_100);
+        world.sent = [];
+        world.online = [...names, "Dee"];
+        await play(2_100);
+        expect(told("Ben", hs.RADAR_OFF)).toHaveLength(1);
+        expect(told("Ana", hs.RADAR_OFF)).toEqual([]);
+
+        // Over: every entrant's minimap given back, nobody else's.
+        await events.cancelEvent("owner", SERVER);
+        await play(2_100);
+        for (const name of names) expect(told(name, hs.RADAR_RESET)).toHaveLength(1);
+        expect(told("Dee", hs.RADAR_RESET)).toEqual([]);
+    });
+
     it("lets the seeker out after the hiding time, finds hiders with a hit and ends when all are found", async () => {
         const hs = await kind();
         world.online = [...names];
@@ -11203,6 +11329,13 @@ describe("SkyWars", () => {
         // nothing hides an island from its player.
         for (const line of sw.cagesDown(layout, at)) expect(world.sent).toContain(line);
         expect(world.sent).toContain("gamerule keepInventory true");
+        // Islands broken by hand: survival from "Go!", and nothing broken drops.
+        expect(world.sent).toContain("gamerule doTileDrops false");
+        for (const name of names) {
+            const survival = world.sent.indexOf(`gamemode survival ${name}`);
+            expect(survival).toBeGreaterThan(world.sent.indexOf(`gamemode adventure ${name}`));
+            expect(survival).toBeGreaterThan(world.sent.indexOf("gamerule doTileDrops false"));
+        }
         await play(500);
         expect(world.sent.some((line) => line.endsWith(" add pe_sw_gone"))).toBe(true);
 
@@ -11217,6 +11350,10 @@ describe("SkyWars", () => {
             "clear Cy minecraft:iron_sword[minecraft:custom_data={polaris_event:1b}]"
         );
         expect(world.at.Cy![1]).toBe(sw.galleryFloor(layout, at).y1 + 1);
+        // Nothing broken from the gallery.
+        expect(world.sent.lastIndexOf("gamemode adventure Cy")).toBeGreaterThan(
+            world.sent.indexOf("gamemode survival Cy")
+        );
         expect(saidToAll("Cy fell into the void")).toBe(true);
 
         // Ana strikes Ben beside her, and Ben is brought low: Ana's elimination.
@@ -11255,8 +11392,29 @@ describe("SkyWars", () => {
             true
         );
         expect(world.sent).toContain("scoreboard objectives remove pe_swb");
+        expect(world.sent).toContain("gamerule doTileDrops true");
         expect(done.arenaLeftovers).toEqual([]);
         onlyOurBlocks();
+    });
+
+    it("holds block drops off by the rule's new name, and stays in adventure on a server that has neither", async () => {
+        world.online = [...names];
+        world.renamedRules = true;
+        setUp([warOf()]);
+        await joinAndStart("war", names);
+        expect(world.sent).toContain("gamerule block_drops false");
+        expect(world.sent).toContain("gamemode survival Ana");
+        await events.cancelEvent("owner", SERVER);
+        await play(2_100);
+        expect(world.sent).toContain("gamerule block_drops true");
+
+        world.sent = [];
+        world.renamedRules = false;
+        world.tileDropsUnknown = true;
+        setUp([warOf()]);
+        await joinAndStart("war", names);
+        expect(state().run!.readyAt).not.toBeNull();
+        expect(world.sent.some((line) => line.startsWith("gamemode survival"))).toBe(false);
     });
 
     it("credits whoever the game says hurt a player, never a striker beside one hurt by a fall", async () => {

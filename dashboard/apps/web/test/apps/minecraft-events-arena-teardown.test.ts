@@ -78,4 +78,81 @@ describe("an arena taken down", () => {
         } as unknown as ServerContainer;
         expect(await closeArena(refusing, left)).toMatchObject({ id: "run-1", entrants: [] });
     });
+
+    it("sends everybody home in the same trip, before anybody is waited on or given anything", async () => {
+        const entrant = (name: string, x: number) => ({
+            name,
+            uuid: null,
+            dimension: "minecraft:overworld",
+            x,
+            y: 64,
+            z: 0,
+            yaw: 0,
+            pitch: 0,
+            gamemode: "survival" as const,
+            side: 0,
+            away: true,
+            tagged: false,
+            stash: null
+        });
+        const entrants = [entrant("Ana", 1), entrant("Ben", 2), entrant("Cleo", 3)];
+        const log: { how: "say" | "sayAll" | "sayEach"; lines: string[] }[] = [];
+        const server = {
+            say: async (lines: readonly string[]) => {
+                log.push({ how: "say", lines: [...lines] });
+                return lines[0]!.includes(" tp ") ? "Teleported" : "Successfully filled";
+            },
+            sayAll: async (lines: readonly string[]) => {
+                log.push({ how: "sayAll", lines: [...lines] });
+            },
+            sayEach: async (commands: readonly (readonly string[])[]) => {
+                const lines = commands.map((one) => one.join(" "));
+                log.push({ how: "sayEach", lines });
+                return lines.map((line) =>
+                    line.includes(" tp ") ? `Teleported ${line}` : "Successfully filled"
+                );
+            }
+        } as unknown as ServerContainer;
+        await closeArena(server, { ...left, arena: null, entrants });
+        const homes = entrants.map((one) => arena.sendHome(one));
+        const trips = log.filter((one) => one.lines.some((line) => homes.includes(line)));
+        // One trip, everybody's teleport in it, nothing else.
+        expect(trips).toEqual([{ how: "sayEach", lines: homes }]);
+        const sent = log.flatMap((one) => one.lines);
+        const home = sent.indexOf(homes[0]!);
+        // Everybody's fall protection and kit first; game mode and tag after.
+        for (const one of entrants) {
+            for (const line of arena.homeward(one, null, []))
+                expect(sent.indexOf(line)).toBeLessThan(home);
+            expect(sent.indexOf(arena.homeMode(one))).toBeGreaterThan(home);
+            expect(sent.indexOf(arena.leftArena(one.name))).toBeGreaterThan(home);
+        }
+    });
+
+    it("keeps whoever the teleport did not reach owed the trip, and sends the rest", async () => {
+        const one = {
+            name: "Gone",
+            uuid: null,
+            dimension: "minecraft:overworld",
+            x: 0,
+            y: 64,
+            z: 0,
+            yaw: 0,
+            pitch: 0,
+            gamemode: "survival" as const,
+            side: 0,
+            away: true,
+            tagged: false,
+            stash: null
+        };
+        const server = {
+            say: async () => "No player was found",
+            sayAll: async () => undefined,
+            sayEach: async (commands: readonly (readonly string[])[]) =>
+                commands.map(() => "No player was found")
+        } as unknown as ServerContainer;
+        expect(await closeArena(server, { ...left, arena: null, entrants: [one] })).toMatchObject({
+            entrants: [one]
+        });
+    });
 });

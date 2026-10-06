@@ -25,6 +25,14 @@ export function cardHeader(line: boolean, language: Language): string {
         : `${WARN}Today's card - ${goal}:`;
 }
 
+/** Under the card at the start: what counts. Without it, a player holding a
+ *  card item they brought in reads 0 marked and takes the card as broken. */
+export function countsFromNow(language: Language): string {
+    return language === "es"
+        ? `${INFO}Solo cuenta lo que recojas, fabriques o fundas desde ahora, no lo que ya llevas ni lo que saques de un cofre.`
+        : `${INFO}Only what you pick up, craft or smelt from now on counts - not what you already carry or take out of a chest.`;
+}
+
 /** Over a player's own card, sent to them when they mark something. */
 export function yourCard(language: Language): string {
     return language === "es" ? `${INFO}Tu cartón:` : `${INFO}Your card:`;

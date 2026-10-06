@@ -33,6 +33,7 @@ import * as trivia from "./trivia-bank";
 import * as chunks from "./kinds/chunks";
 import { host } from "@polaris/app-host";
 import * as duel from "./kinds/team-duel";
+import * as sw from "./kinds/sky-wars";
 import * as boost from "./kinds/xp-boost";
 import { parseProperties } from "../parse";
 import { readSchedule } from "../schedule";
@@ -159,7 +160,19 @@ function eventServer(server: ServerContainer, installedAppId: string): ServerCon
             const roster = replies.rosterNames(await one(replies.ROSTER).catch(() => ""));
             return replies.canonicalReplies(whole, roster).text;
         },
-        sayAll: async (lines) => server.sayAll(await named(speech.localizeAll(lines, audience())))
+        sayAll: async (lines) => server.sayAll(await named(speech.localizeAll(lines, audience()))),
+        // Commands with answers, several to a trip - a teleport for everybody
+        // at once - named for the game the way `say` names them. Never words
+        // for anybody to read: a line split by language would shift every
+        // answer after it.
+        ...(server.sayEach
+            ? {
+                  sayEach: async (argvs: readonly (readonly string[])[]) =>
+                      server.sayEach!(
+                          (await named(argvs.map((argv) => argv.join(" ")))).map((line) => [line])
+                      )
+              }
+            : {})
     };
 }
 
@@ -1585,6 +1598,20 @@ async function begin(
                 break;
             }
         }
+        // SkyWars is played in survival, the islands broken by hand; nothing
+        // broken drops, so nothing unmarked reaches an inventory - written
+        // down and put back like the rest.
+        if (preset.kind === "sky-wars") {
+            for (const rule of sw.TILE_DROPS) {
+                const value =
+                    loop.run.gamerules[rule] ??
+                    commands.readRuleValue(await server.say([commands.readRule(rule)]));
+                if (value === null) continue;
+                before[rule] = value;
+                lines.push(commands.setRule(rule, "false"));
+                break;
+            }
+        }
         loop.run = { ...loop.run, gamerules: { ...before, ...loop.run.gamerules } };
         await persist(installedAppId, loop);
     }
@@ -2817,7 +2844,8 @@ async function bingoBegin(
             messages.tag(loop.language) +
                 bingoSay.cardHeader(options.goal === "line", loop.language)
         ),
-        ...bingo.cardLines("@a", card)
+        ...bingo.cardLines("@a", card),
+        commands.say(messages.tag(loop.language) + bingoSay.countsFromNow(loop.language))
     ];
 }
 
@@ -4534,7 +4562,7 @@ export function cleanupOf(run: stored.EventRun): string[] {
             break;
     }
     // An arena kind's own teams and counts (`ArenaGame.endLines`).
-    after.push(...arenaService.endLines(run.preset));
+    after.push(...arenaService.endLines(run));
     // Operators' chat is given back last, so the tidying up does not fill it either.
     const feedback: string[] = commands.FEEDBACK_RULES.filter((rule) => rule in run.gamerules);
     const rules = Object.fromEntries(

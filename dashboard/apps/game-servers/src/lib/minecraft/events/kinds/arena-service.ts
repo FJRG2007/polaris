@@ -452,13 +452,14 @@ async function bringIn(ctx: KindContext): Promise<void> {
             arena.protect(one.name)
         ];
     };
-    // One at a time: what they carry put away, and straight in - nobody left
-    // standing about empty-handed at home, free to put their armor back on,
-    // while everybody else's is put away.
-    for (const one of [...ctx.run.entrants]) {
-        if (!(await stashOne(ctx, one))) continue;
-        await ctx.server.sayAll(linesIn(one));
-    }
+    // What everybody carries put away first, then everybody in at once, in one
+    // batch: brought in one at a time, between one player's stash and the
+    // next, a big server watched its players arrive a few at a time. Whatever
+    // somebody picks up while the others are put away is caught by the last
+    // look below, as anything picked up on the way in always was.
+    for (const one of [...ctx.run.entrants]) await stashOne(ctx, one);
+    // Those kept out are no longer entrants: everybody left goes in.
+    await ctx.server.sayAll(ctx.run.entrants.flatMap(linesIn));
     // And once in, a last look: whatever turned up on them on the way is put
     // away with the rest; anybody it cannot be taken from is sent back out.
     for (const one of [...ctx.run.entrants]) await stashOne(ctx, one, true);
@@ -552,6 +553,8 @@ async function arrivalTick(ctx: KindContext, lines: string[]): Promise<void> {
             ? (run.preset.options as catalog.EventOptions<"build-battle">).voteSeconds
             : 0);
     const started = { readyAt: now, startsAt: now, endsAt: now + seconds * 1000 };
+    // Everybody whole before anything is counted (`arena.HEAL_INSIDE`).
+    await ctx.server.sayAll([arena.HEAL_INSIDE]);
     if (hillside) {
         // Written down first: nothing is handed out on the hill.
         ctx.run = { ...ctx.run, ...started };
@@ -1087,8 +1090,8 @@ export function tiebreak(run: stored.EventRun): Record<string, number> | undefin
 }
 
 /** A kind's own teams and counts, removed with the rest of the event's. */
-export function endLines(preset: catalog.EventPreset): string[] {
-    return gameOf(preset.kind)?.endLines?.() ?? [];
+export function endLines(run: stored.EventRun): string[] {
+    return gameOf(run.preset.kind)?.endLines?.(run) ?? [];
 }
 
 /** Whether a kind sends lines between ticks (`quickLines`). */
@@ -1162,60 +1165,85 @@ export async function closeArena(
     arrival.forget(left.id);
     let rules = left.gamerules;
     const remaining: stored.Entrant[] = [];
-    let index = 0;
+    // Who has been seen to: home and given back, or written into `remaining`.
+    // Anybody else is still owed everything, should this stop half way.
+    const handled = new Set<number>();
     try {
         const box = left.arena?.box ?? null;
         if (box && left.marker) await server.sayAll([arena.killMarkedDrops(box, left.marker)]);
         const closing = box ? (gameOf(left.kind)?.closeLines?.(box) ?? []) : [];
         if (closing.length > 0) await server.sayAll(closing);
-        for (; index < left.entrants.length; index += 1) {
-            let one = left.entrants[index]!;
-            if (!one.away || !arena.commandable(one)) continue;
-            // Their own things back only once they are home and down: nothing
-            // is given back to a player who could still fall with it.
-            const giveBack = async (): Promise<boolean> => {
-                const down = await stashService.settle(server, one.name, (name) =>
-                    stage.fallProof(name, 5)
-                );
-                if (!one.stash) return true;
-                if (!down) return false;
-                const how = await stashService.giveBack(
-                    server,
-                    one.name,
-                    one.stash,
-                    async (kept) => {
-                        one = { ...one, stash: kept };
-                    }
-                );
-                return how === "done" || how === "failed";
-            };
-            // Sent home already, by an end that stopped before it gave everything
-            // back: not moved again, only given what they are still owed.
-            const say = (line: string) => server.say([line]);
-            if (one.tagged && (await commands.alreadyBack(say, one.name, arena.IN_ARENA))) {
-                await server.sayAll(stage.fallProof(one.name));
-                if (!(await giveBack())) remaining.push(one);
-                continue;
-            }
-            // The kit off, unable to fall to their death, then home - with their
-            // own game mode only there.
-            await server.sayAll(arena.homeward(one, left.marker, left.kit));
-            if (!arena.wentHome(await server.say([arena.sendHome(one)]))) {
+        const owed: { at: number; one: stored.Entrant }[] = [];
+        for (const [at, one] of left.entrants.entries()) {
+            if (one.away && arena.commandable(one)) owed.push({ at, one });
+            else handled.add(at);
+        }
+        // Sent home already, by an end that stopped before it gave everything
+        // back: not moved again, only given what they are still owed.
+        const say = (line: string) => server.say([line]);
+        const back = new Set<number>();
+        for (const { at, one } of owed)
+            if (one.tagged && (await commands.alreadyBack(say, one.name, arena.IN_ARENA)))
+                back.add(at);
+        const going = owed.filter(({ at }) => !back.has(at));
+        // The kit off and unable to fall to their death, then everybody home
+        // at once - one trip, never one player after another - with their own
+        // game mode only there.
+        const homeward = [
+            ...owed
+                .filter(({ at }) => back.has(at))
+                .flatMap(({ one }) => stage.fallProof(one.name)),
+            ...going.flatMap(({ one }) => arena.homeward(one, left.marker, left.kit))
+        ];
+        if (homeward.length > 0) await server.sayAll(homeward);
+        const answers = await commands.answersOf(
+            server,
+            going.map(({ one }) => arena.sendHome(one))
+        );
+        const home = new Set<number>();
+        for (const [index, { at, one }] of going.entries()) {
+            if (arena.wentHome(answers[index]!)) home.add(at);
+            else {
                 remaining.push(one);
-                continue;
+                handled.add(at);
             }
-            await server.sayAll([arena.homeMode(one), arena.leftArena(one.name)]);
+        }
+        const there = going.filter(({ at }) => home.has(at));
+        const settled = there.flatMap(({ one }) => {
             const thrown = box ? arena.sendThrown(box, one) : null;
-            if (thrown) await server.say([thrown]);
-            if (!(await giveBack())) {
-                remaining.push(one);
-                continue;
+            return [arena.homeMode(one), arena.leftArena(one.name), ...(thrown ? [thrown] : [])];
+        });
+        if (settled.length > 0) await server.sayAll(settled);
+        // Their own things back only once they are home and down: nothing is
+        // given back to a player who could still fall with it. Everybody is
+        // home by now, so each one's wait overlaps everybody else's.
+        for (const { at, one: entrant } of owed) {
+            if (!back.has(at) && !home.has(at)) continue;
+            let one = entrant;
+            const down = await stashService.settle(server, one.name, (name) =>
+                stage.fallProof(name, 5)
+            );
+            let given = true;
+            if (one.stash) {
+                if (!down) given = false;
+                else {
+                    const how = await stashService.giveBack(
+                        server,
+                        one.name,
+                        one.stash,
+                        async (kept) => {
+                            one = { ...one, stash: kept };
+                        }
+                    );
+                    given = how === "done" || how === "failed";
+                }
             }
-            if (language) {
+            if (!given) remaining.push(one);
+            else if (language && home.has(at))
                 await server.say([
                     arena.tellTo(one.name, messages.tag(language) + messages.takenBack(language))
                 ]);
-            }
+            handled.add(at);
         }
         // The rules it held - keepInventory among them - put back only once
         // everybody who could be sent home is home and down.
@@ -1275,7 +1303,7 @@ export async function closeArena(
         console.warn("polaris: taking an arena down failed", left.id, String(error));
         return {
             ...left,
-            entrants: [...remaining, ...left.entrants.slice(index)],
+            entrants: [...remaining, ...left.entrants.filter((_, at) => !handled.has(at))],
             gamerules: rules
         };
     }

@@ -50,6 +50,9 @@ function layoutOf(runId: string): hs.Layout {
 interface Memory {
     dealt: hits.Tally;
     taken: hits.Tally;
+    /** Who was on the server at the last look: whoever was not is told the
+     *  radar code again, since a minimap forgets it on a fresh join. */
+    seen: Set<string>;
 }
 
 const memories = new Map<string, Memory>();
@@ -58,7 +61,7 @@ function memoryOf(runId: string): Memory {
     let memory = memories.get(runId);
     if (!memory) {
         if (memories.size >= 16) memories.delete(memories.keys().next().value!);
-        memory = { dealt: hits.tally(), taken: hits.tally() };
+        memory = { dealt: hits.tally(), taken: hits.tally(), seen: new Set() };
         memories.set(runId, memory);
     }
     return memory;
@@ -115,6 +118,27 @@ function spotOf(
     );
 }
 
+/**
+ * A line to one player carrying one of Xaero's Minimap codes (`hs.RADAR_OFF`,
+ * `hs.RADAR_RESET`), after the sentence in their language when there is one.
+ */
+function radarLine(name: string, code: string, sentence?: (language: speech.Language) => string) {
+    const each = Object.fromEntries(
+        speech.LANGUAGES.map((language) => {
+            const parts: unknown[] = [""];
+            if (sentence) parts.push(JSON.parse(commands.text(sentence(language))) as unknown);
+            parts.push({ text: code });
+            return [language, commands.asciiJson(JSON.stringify(parts))];
+        })
+    ) as Record<speech.Language, string>;
+    return `tellraw ${name} ${speech.perLanguage(each)}`;
+}
+
+/** Every minimap radar off for one player, and why. */
+function radarOff(name: string): string {
+    return radarLine(name, hs.RADAR_OFF, said.radarOff);
+}
+
 async function goLines(ctx: KindContext): Promise<string[]> {
     const run = ctx.run;
     const language = ctx.language;
@@ -123,10 +147,13 @@ async function goLines(ctx: KindContext): Promise<string[]> {
     const mirror = await mirrorOf(ctx);
     // No hit from before "Go!" - or from another arena's fight - read as a find.
     const out: string[] = [...hits.TAGS_OFF];
+    const memory = memoryOf(run.id);
     for (const one of run.entrants) {
         const seeking = seekers.includes(lower(one.name));
+        memory.seen.add(lower(one.name));
         out.push(
             arena.moveTo(one.name, spotOf(run, one, mirror)),
+            radarOff(one.name),
             ...hs.joinSide(one.name, seeking),
             ...(seeking
                 ? [
@@ -163,6 +190,11 @@ async function tick(ctx: KindContext, lines: string[]): Promise<string | null> {
     // the damage counts say - nothing on the first look after a restart.
     const taken = await hitsService.take(ctx);
     const on = new Set(here.keys());
+    // Back on the server: the radar code again, for a minimap that forgot it.
+    for (const one of run.entrants)
+        if (on.has(lower(one.name)) && !memory.seen.has(lower(one.name)))
+            lines.push(radarOff(one.name));
+    memory.seen = on;
     const struck =
         taken?.struck ??
         hits.roseFor(memory.dealt, commands.readScores(await say(hs.READ_DEALT)), on);
@@ -316,5 +348,9 @@ export const hideAndSeek: ArenaGame = {
         const hiders = run.entrants.filter((one) => !seekers.has(lower(one.name))).length;
         return [commands.say(seekMessages.summary(state.finds.length, hiders, language))];
     },
-    endLines: () => [...hs.TEARDOWN]
+    // Every entrant's minimap given back what the server allows.
+    endLines: (run) => [
+        ...hs.TEARDOWN,
+        ...run.entrants.map((one) => radarLine(one.name, hs.RADAR_RESET))
+    ]
 };

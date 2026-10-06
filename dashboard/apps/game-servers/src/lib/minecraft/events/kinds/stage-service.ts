@@ -547,9 +547,10 @@ async function admit(
     await tools.persist();
     if (current.saved.length + fresh.length < needed) return fresh.length;
     // Nor until what they carry is put away too (`stash`): they come in
-    // empty-handed. One at a time, and straight in - nobody left standing about
-    // empty-handed at home, free to put their armor back on, while everybody
-    // else's is put away.
+    // empty-handed. Everybody's put away first, then everybody in at once, in
+    // one batch: brought in one at a time, between one player's stash and the
+    // next, a big server watched its players arrive a few at a time. Whatever
+    // somebody picks up meanwhile is caught by the last look below.
     const stashing = await tools.canStash();
     const places =
         layout.kind === "spleef" || layout.kind === "tnt-run"
@@ -576,9 +577,13 @@ async function admit(
         layout.kind === "boat-race" && !holding(loop)
             ? (loop.boatWay ??= await tools.boatWay())
             : null;
+    const ready: { index: number; one: stage.Saved }[] = [];
+    for (const [index, one] of fresh.entries())
+        if (!stashing || (await stashSaved(loop, server, tools, one.name, false)))
+            ready.push({ index, one });
     const brought: string[] = [];
-    for (const [index, one] of fresh.entries()) {
-        if (stashing && !(await stashSaved(loop, server, tools, one.name, false))) continue;
+    const going: string[] = [];
+    for (const { index, one } of ready) {
         const racer = state(loop).racers.find((each) => same(each.name, one.name))!;
         // Back in a boat race already on, after leaving it: from the last gate
         // they passed, with every pass they made - not from nothing, on a clock
@@ -591,7 +596,7 @@ async function admit(
                 : resumed > 0 && layout.kind === "boat-race"
                   ? boatRace.resumeSpot(layout.track, resumed)
                   : places[index]!;
-        await server.sayAll([
+        going.push(
             ...stage.admitLines(one.name, spot),
             `title ${one.name} times 5 50 15`,
             `title ${one.name} subtitle ${commands.text(readySubtitle(loop, layout))}`,
@@ -616,10 +621,11 @@ async function admit(
             ...(layout.kind === "boat-race"
                 ? boatRace.racerScores(one.name, resumed, layout.track.gates.length)
                 : []),
-            ...(way ? boatRace.boatLines(one.name, way) : [])
-        ]);
+            ...(way ? boatRace.boatLines(one.name, way, spot.yaw) : [])
+        );
         brought.push(one.name);
     }
+    if (going.length > 0) await server.sayAll(going);
     // And once in, a last look: whatever turned up on them on the way is put
     // away with the rest; anybody it cannot be taken from is sent back out.
     if (!stashing) return brought.length;
@@ -708,38 +714,71 @@ async function returnOne(
     language: speech.Speech,
     keep: (kept: stash.Stash | null) => Promise<void>
 ): Promise<boolean> {
-    // Their own things back only once they are home and down: nothing is given
-    // back to a player who could still fall with it.
-    const giveBack = async (): Promise<boolean> => {
-        const down = await stashService.settle(server, saved.name, (name) =>
-            stage.fallProof(name, 5)
-        );
-        if (!saved.stash) return true;
-        if (!down) return false;
-        const how = await stashService.giveBack(server, saved.name, saved.stash, keep);
-        return how === "done" || how === "failed";
-    };
+    const still = await returnAll(server, [saved], items, language, (_, kept) => keep(kept));
+    return still.length === 0;
+}
+
+/**
+ * Everybody in `saved` sent back where they were, all in the same moment - one
+ * trip for every teleport, never one player after another - and then each
+ * given back their own things. Answers who is still owed something, with
+ * whatever of theirs is still kept.
+ */
+async function returnAll(
+    server: ServerContainer,
+    saved: readonly stage.Saved[],
+    items: stage.Flavour["items"],
+    language: speech.Speech,
+    keep: (name: string, kept: stash.Stash | null) => Promise<void> = async () => undefined
+): Promise<stage.Saved[]> {
+    if (saved.length === 0) return [];
     // Nothing from here on can make them fall to their death.
-    await server.sayAll(stage.fallProof(saved.name));
+    await server.sayAll(saved.flatMap((one) => stage.fallProof(one.name)));
     // Sent home already, by an end that stopped before it gave everything back:
     // not moved again, only given what they are still owed.
     const say = (line: string) => server.say([line]);
-    if (await commands.alreadyBack(say, saved.name, stage.IN_ARENA)) {
-        // Their own gravity too, should that end have stopped before it.
-        await server.sayAll(stage.normalFallLines(saved.name));
-        return giveBack();
+    const back = new Set<stage.Saved>();
+    for (const one of saved)
+        if (await commands.alreadyBack(say, one.name, stage.IN_ARENA)) back.add(one);
+    // Their own gravity too, should that end have stopped before it.
+    if (back.size > 0)
+        await server.sayAll([...back].flatMap((one) => stage.normalFallLines(one.name)));
+    const going = saved.filter((one) => !back.has(one));
+    // The event's items off, then home - everybody at once - then, there,
+    // their own game mode.
+    if (going.length > 0)
+        await server.sayAll(going.flatMap((one) => stage.clearMarked(one.name, items)));
+    const answers = await commands.answersOf(server, going.map(stage.returnLine));
+    const still: stage.Saved[] = [];
+    const home = going.filter((one, index) => {
+        if (stage.returned(answers[index]!)) return true;
+        still.push(one);
+        return false;
+    });
+    const note = messages.tag(language) + messages.backWhereYouWere(language);
+    if (home.length > 0)
+        await server.sayAll(home.flatMap((one) => stage.afterReturnLines(one, items, note)));
+    // Their own things back only once they are home and down: nothing is given
+    // back to a player who could still fall with it. Everybody is home by now,
+    // so each one's wait overlaps everybody else's.
+    for (const one of saved) {
+        if (!back.has(one) && !home.includes(one)) continue;
+        let current = one;
+        const down = await stashService.settle(server, one.name, (name) =>
+            stage.fallProof(name, 5)
+        );
+        if (!current.stash) continue;
+        if (!down) {
+            still.push(current);
+            continue;
+        }
+        const how = await stashService.giveBack(server, one.name, current.stash, async (kept) => {
+            current = { ...current, stash: kept };
+            await keep(one.name, kept);
+        });
+        if (how !== "done" && how !== "failed") still.push(current);
     }
-    // The event's items off, then home, then - there - their own game mode.
-    await server.sayAll(stage.clearMarked(saved.name, items));
-    if (!stage.returned(await server.say([stage.returnLine(saved)]))) return false;
-    await server.sayAll(
-        stage.afterReturnLines(
-            saved,
-            items,
-            messages.tag(language) + messages.backWhereYouWere(language)
-        )
-    );
-    return giveBack();
+    return still;
 }
 
 /** Gone from the arena by their own doing: another world, or far off. */
@@ -892,7 +931,7 @@ async function holdTick(
             go.push(
                 stage.moveLine(racer.name, places[index]!),
                 ...boatRace.racerScores(racer.name),
-                ...boatRace.boatLines(racer.name, way),
+                ...boatRace.boatLines(racer.name, way, places[index]!.yaw),
                 `title ${racer.name} times 5 40 10`,
                 `title ${racer.name} subtitle ${commands.text(boatMessages.goSubtitle(layout.track.laps, language))}`,
                 `title ${racer.name} title ${commands.text(messages.goTitle(language))}`,
@@ -1662,17 +1701,12 @@ export async function settle(
                 .readWhere(await server.say([commands.WHERE]))
                 .map((one) => one.name.toLowerCase())
         );
-        const still: stage.Saved[] = [];
-        for (const one of saved) {
-            let current = one;
-            const back =
-                online.has(one.name.toLowerCase()) &&
-                (await returnOne(server, one, flavour.items, language, async (kept) => {
-                    current = { ...current, stash: kept };
-                }));
-            if (!back) still.push(current);
-        }
-        saved = still;
+        const here = saved.filter((one) => online.has(one.name.toLowerCase()));
+        const owed = await returnAll(server, here, flavour.items, language);
+        // Kept in the order they were, offline or not.
+        saved = saved.flatMap((one) =>
+            !here.includes(one) ? [one] : owed.filter((each) => each.name === one.name)
+        );
     }
     let boxes = leftover.boxes;
     let area = leftover.area;
