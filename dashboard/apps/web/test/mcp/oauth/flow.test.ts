@@ -721,6 +721,12 @@ describe("calling /api/mcp with the token", () => {
             `${ORIGIN}/polaris-mark-192.png`,
             `${ORIGIN}/polaris-mark-512.png`
         ]);
+        // One server for every app: a model that does not know where a thing
+        // lives is sent to the search before it guesses at a tool.
+        const instructions = String(answer.body?.result.instructions);
+        expect(instructions).toContain("one MCP server");
+        expect(instructions).toContain("polaris_search first");
+        expect(instructions).toContain("polaris_tools");
     });
 
     it("acts as the person, with the approved scopes", async () => {

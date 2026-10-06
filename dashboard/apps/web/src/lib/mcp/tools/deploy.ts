@@ -25,6 +25,7 @@ import { publicFailure } from "@/lib/deploy/api/refusal";
 import { isMcpOnlyScope } from "../scope-table";
 import type { Permission } from "@polaris/core";
 import { McpRefusal, type McpCaller, type McpTool } from "../protocol";
+import { defineMcpSearch } from "../search";
 import {
     addDomainSchema,
     putVariableSchema,
@@ -78,6 +79,7 @@ const projectsTool: McpTool<z.infer<typeof projectsInput>> = {
         // i18n-ignore read by the calling model, not shown to a person
         "Every Deploy project this key can reach, with each environment's services and what they are doing. Start here to find the name of a service.",
     input: projectsInput,
+    category: "development",
     scope: "deploy.read",
     readOnly: true,
     async run(_input, caller) {
@@ -107,6 +109,7 @@ const serviceTool: McpTool<z.infer<typeof serviceInput>> = {
         // i18n-ignore read by the calling model, not shown to a person
         "One service: where its code or image comes from, whether it is running, and the hostnames it answers on.",
     input: serviceInput,
+    category: "development",
     scope: "deploy.read",
     readOnly: true,
     async run(input, caller) {
@@ -135,6 +138,7 @@ const startTool: McpTool<z.infer<typeof serviceInput>> = {
         // i18n-ignore read by the calling model, not shown to a person
         "Deploy a service from its configured source. Returns at once with the deployment id; read its progress with deploy_deployment. Does not change how the service is built.",
     input: serviceInput,
+    category: "development",
     scope: "deploy.manage",
     readOnly: false,
     async run(input, caller) {
@@ -155,6 +159,7 @@ const deploymentsTool: McpTool<z.infer<typeof serviceInput>> = {
     // i18n-ignore read by the calling model, not shown to a person
     description: "A service's recent deployments, newest first, with status and commit.",
     input: serviceInput,
+    category: "development",
     scope: "deploy.read",
     readOnly: true,
     async run(input, caller) {
@@ -196,6 +201,7 @@ const deploymentTool: McpTool<z.infer<typeof deploymentInput>> = {
         // i18n-ignore read by the calling model, not shown to a person
         "A deployment's status and the end of its build log - what to read when a deploy failed, or to see whether it has finished.",
     input: deploymentInput,
+    category: "development",
     scope: "deploy.read",
     readOnly: true,
     async run(input, caller) {
@@ -226,6 +232,7 @@ const logsTool: McpTool<z.infer<typeof logsInput>> = {
         // i18n-ignore read by the calling model, not shown to a person
         "What a service's running container has printed recently. For a failed build use deploy_deployment instead - this is the app's own output.",
     input: logsInput,
+    category: "development",
     scope: "deploy.read",
     readOnly: true,
     async run(input, caller) {
@@ -264,6 +271,7 @@ const variablesTool: McpTool<z.infer<typeof serviceInput>> = {
         // i18n-ignore read by the calling model, not shown to a person
         "A service's environment variables by name, with whether each is secret and when it changed. No value is ever shown. Same as env_list.",
     input: serviceInput,
+    category: "development",
     scope: "deploy.read",
     readOnly: true,
     run: (input, caller) => variableNames(caller, input.service)
@@ -277,6 +285,7 @@ const envListTool: McpTool<z.infer<typeof serviceInput>> = {
         // i18n-ignore read by the calling model, not shown to a person
         "A service's environment variable names, with whether each is secret and when it changed. Values are never returned, so do not ask for them.",
     input: serviceInput,
+    category: "development",
     scope: "deploy.read",
     readOnly: true,
     run: (input, caller) => variableNames(caller, input.service)
@@ -294,6 +303,7 @@ const envSetTool: McpTool<z.infer<typeof envSetInput>> = {
         // i18n-ignore read by the calling model, not shown to a person
         "Create or replace one environment variable on a service (secret by default). Write-only: the value is stored and never returned. The running service keeps its old value until it is redeployed: pass redeploy to do that now.",
     input: envSetInput,
+    category: "development",
     scope: "deploy.manage",
     readOnly: false,
     async run(input, caller) {
@@ -332,6 +342,7 @@ const envDeleteTool: McpTool<z.infer<typeof envDeleteInput>> = {
         // i18n-ignore read by the calling model, not shown to a person
         "Remove one environment variable from a service by name. The running service keeps it until it is redeployed: pass redeploy to do that now.",
     input: envDeleteInput,
+    category: "development",
     scope: "deploy.manage",
     readOnly: false,
     async run(input, caller) {
@@ -362,6 +373,7 @@ const setVariableTool: McpTool<z.infer<typeof setVariableInput>> = {
         // i18n-ignore read by the calling model, not shown to a person
         "Set one environment variable on a service (secret by default). The running service keeps its old value until it is redeployed: pass redeploy to do that now, or deploy once after setting several.",
     input: setVariableInput,
+    category: "development",
     scope: "deploy.manage",
     readOnly: false,
     // Not idempotent: with redeploy set, every call starts another deployment.
@@ -394,6 +406,7 @@ const domainsTool: McpTool<z.infer<typeof serviceInput>> = {
     // i18n-ignore read by the calling model, not shown to a person
     description: "The hostnames a service answers on, with whether each is enabled and reachable.",
     input: serviceInput,
+    category: "development",
     scope: "deploy.read",
     readOnly: true,
     async run(input, caller) {
@@ -423,6 +436,7 @@ const addDomainTool: McpTool<z.infer<typeof addDomainInput>> = {
         // i18n-ignore read by the calling model, not shown to a person
         "Attach a hostname to a service, or its free subdomain when no hostname is given. Does not buy or register a domain.",
     input: addDomainInput,
+    category: "development",
     scope: "deploy.manage",
     readOnly: false,
     destructive: false,
@@ -446,6 +460,7 @@ const restartTool: McpTool<z.infer<typeof serviceInput>> = {
         // i18n-ignore read by the calling model, not shown to a person
         "Restart a service's running container from its current configuration. Does not rebuild it.",
     input: serviceInput,
+    category: "development",
     scope: "deploy.manage",
     readOnly: false,
     async run(input, caller) {
@@ -468,6 +483,7 @@ const rollbackTool: McpTool<z.infer<typeof rollbackInput>> = {
         // i18n-ignore read by the calling model, not shown to a person
         "Make an earlier deployment of a service its running release again, from its kept image - nothing is rebuilt. Only releases deploy_deployments marks as able to roll back qualify.",
     input: rollbackInput,
+    category: "development",
     scope: "deploy.manage",
     readOnly: false,
     async run(input, caller) {
@@ -480,6 +496,40 @@ const rollbackTool: McpTool<z.infer<typeof rollbackInput>> = {
         };
     }
 };
+
+/** Every Deploy service this caller reaches, by name, for `polaris_search`.
+ *  A project token reaches its project only, as `deploy_projects` does. */
+export const DEPLOY_SEARCH = defineMcpSearch({
+    id: "deploy.services",
+    app: "deploy",
+    category: "development",
+    scope: "deploy.read",
+    async search(_query, caller, limit) {
+        const projects = await surface.listProjects(deployCaller(caller));
+        return projects
+            .flatMap((project) =>
+                project.environments.flatMap((environment) =>
+                    environment.services.map((service) => {
+                        const ref = `${project.slug}/${environment.slug}/${service.slug}`;
+                        return {
+                            id: service.id,
+                            name: service.name,
+                            kind: "deploy service",
+                            where: `${project.name} / ${environment.name}`,
+                            keywords: [ref, service.status],
+                            next: [
+                                { tool: "deploy_service", args: { service: ref } },
+                                { tool: "deploy_deployments", args: { service: ref } },
+                                { tool: "deploy_start", args: { service: ref } },
+                                { tool: "deploy_restart", args: { service: ref } }
+                            ]
+                        };
+                    })
+                )
+            )
+            .slice(0, limit);
+    }
+});
 
 export const DEPLOY_TOOLS: readonly McpTool<never>[] = [
     projectsTool,

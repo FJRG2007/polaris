@@ -78,6 +78,7 @@ export * from "./paths.js";
 export * from "./scope.js";
 export * from "./faces.js";
 export * from "./search-text.js";
+export * from "./entity-match.js";
 export * from "./labels.js";
 export * from "./text-safety.js";
 export * from "./spoiler-text.js";

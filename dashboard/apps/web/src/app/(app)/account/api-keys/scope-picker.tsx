@@ -153,48 +153,76 @@ export function ScopePicker({
                     // closed row would be a search that answers nothing.
                     const expanded = needle.length > 0 || open.has(group.title);
                     const chosen = group.scopes.filter((scope) => effective.has(scope)).length;
+                    // The section's box acts on what can be ticked by hand: a
+                    // scope another one pulled in goes when that one goes.
+                    const bulk = group.scopes.filter(
+                        (scope) => includedBy(scope, selected) === null
+                    );
+                    const allHeld = bulk.every((scope) => effective.has(scope));
 
                     return (
                         <div key={group.title} className="border-b border-border last:border-b-0">
-                            <button
-                                type="button"
-                                aria-expanded={expanded}
-                                onClick={() =>
-                                    setOpen((current) => {
-                                        const next = new Set(current);
-                                        if (next.has(group.title)) next.delete(group.title);
-                                        else next.add(group.title);
-                                        return next;
-                                    })
-                                }
-                                className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition-colors hover:bg-muted/40"
-                            >
-                                <ChevronRight
-                                    className={cn(
-                                        "size-4 shrink-0 text-muted-foreground transition-transform duration-fast",
-                                        expanded && "rotate-90"
-                                    )}
+                            <div className="flex min-w-0 items-center gap-2 pl-3">
+                                <Checkbox
+                                    checked={allHeld}
+                                    indeterminate={!allHeld && chosen > 0}
+                                    aria-label={t("apiKeys.scopes.allInGroup", {
+                                        group: group.title
+                                    })}
+                                    title={t("apiKeys.scopes.allInGroup", { group: group.title })}
+                                    onChange={() =>
+                                        onChange(
+                                            allHeld
+                                                ? selected.filter((entry) => !bulk.includes(entry))
+                                                : [
+                                                      ...selected,
+                                                      ...bulk.filter(
+                                                          (scope) => !selected.includes(scope)
+                                                      )
+                                                  ]
+                                        )
+                                    }
                                 />
-                                <span
-                                    className="min-w-0 flex-1 truncate font-medium"
-                                    title={group.title}
+                                <button
+                                    type="button"
+                                    aria-expanded={expanded}
+                                    onClick={() =>
+                                        setOpen((current) => {
+                                            const next = new Set(current);
+                                            if (next.has(group.title)) next.delete(group.title);
+                                            else next.add(group.title);
+                                            return next;
+                                        })
+                                    }
+                                    className="flex min-w-0 flex-1 items-center gap-2 py-2 pr-3 text-left text-sm transition-colors hover:bg-muted/40"
                                 >
-                                    {group.title}
-                                </span>
-                                <span
-                                    className={cn(
-                                        "shrink-0 text-xs",
-                                        chosen > 0 ? "text-primary" : "text-muted-foreground"
-                                    )}
-                                >
-                                    {chosen > 0
-                                        ? t("apiKeys.scopes.ofGroup", {
-                                              count: chosen,
-                                              total: group.scopes.length
-                                          })
-                                        : t("apiKeys.scopes.none")}
-                                </span>
-                            </button>
+                                    <ChevronRight
+                                        className={cn(
+                                            "size-4 shrink-0 text-muted-foreground transition-transform duration-fast",
+                                            expanded && "rotate-90"
+                                        )}
+                                    />
+                                    <span
+                                        className="min-w-0 flex-1 truncate font-medium"
+                                        title={group.title}
+                                    >
+                                        {group.title}
+                                    </span>
+                                    <span
+                                        className={cn(
+                                            "shrink-0 text-xs",
+                                            chosen > 0 ? "text-primary" : "text-muted-foreground"
+                                        )}
+                                    >
+                                        {chosen > 0
+                                            ? t("apiKeys.scopes.ofGroup", {
+                                                  count: chosen,
+                                                  total: group.scopes.length
+                                              })
+                                            : t("apiKeys.scopes.none")}
+                                    </span>
+                                </button>
+                            </div>
 
                             {expanded && (
                                 <div className="flex flex-col gap-2 px-3 pb-3 pl-9">

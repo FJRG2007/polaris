@@ -33,6 +33,7 @@ const listSessionsTool: McpTool<z.infer<typeof listInput>> = {
         // i18n-ignore read by the calling model, not shown to a person
         "The coding-agent sessions this key can reach, and what each is doing. A session marked as needing somebody is blocked on a question.",
     input: listInput,
+    category: "development",
     scope: "agents.read",
     readOnly: true,
     async run(input, caller) {
@@ -69,6 +70,7 @@ const getSessionTool: McpTool<z.infer<typeof getInput>> = {
         // i18n-ignore read by the calling model, not shown to a person
         "What one session has been asked, what it has done, and whether it is waiting on anybody.",
     input: getInput,
+    category: "development",
     scope: "agents.read",
     readOnly: true,
     async run(input, caller) {
@@ -112,6 +114,7 @@ const promptSessionTool: McpTool<z.infer<typeof promptInput>> = {
         // i18n-ignore read by the calling model, not shown to a person
         "Send a running session the next thing, or the answer to what it asked. It goes into the agent's own prompt, so write it as you would say it.",
     input: promptInput,
+    category: "development",
     scope: "agents.manage",
     readOnly: false,
     destructive: false,
@@ -146,6 +149,7 @@ const startSessionTool: McpTool<z.infer<typeof startInput>> = {
         // i18n-ignore read by the calling model, not shown to a person
         "Put a coding agent on a piece of work in its own branch. Use this to hand off something separable from what you are doing - not to split the work you were asked to do yourself.",
     input: startInput,
+    category: "development",
     scope: "agents.manage",
     readOnly: false,
     destructive: false,

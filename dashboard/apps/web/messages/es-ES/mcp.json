@@ -27,7 +27,12 @@
             "tooMany": "Demasiados intentos de conexión. Espera unos minutos y vuelve a empezar desde la app.",
             "failed": "Polaris no ha podido terminar de conectar la app. Vuelve a empezar desde la app."
         },
-        "home": "Ir a Polaris"
+        "home": "Ir a Polaris",
+        "sensitive": "Sensible",
+        "sensitiveHint": "Actúa fuera de Polaris o sobre dispositivos reales",
+        "groupCount": "{count} de {total}",
+        "groupAll": "Permitir todo en {category}",
+        "groupShow": "Mostrar {category}"
     },
     "scopes": {
         "drive_read": "Ver archivos y descargarlos",
@@ -177,5 +182,18 @@
             "rules": "Ver tus reglas de acceso",
             "allow": "Permitir {app}"
         }
+    },
+    "categories": {
+        "polaris": "Polaris",
+        "home": "Casa y cámaras",
+        "mail": "Correo",
+        "calendar": "Calendario",
+        "chat": "Chat y bandeja",
+        "productivity": "Productividad",
+        "files": "Archivos y enlaces",
+        "development": "Desarrollo y despliegue",
+        "databases": "BBDD",
+        "games": "Juegos",
+        "account": "Cuenta y administración"
     }
 }

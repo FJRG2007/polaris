@@ -183,6 +183,34 @@ describe("the notes tools", () => {
             ?.result as ToolResult;
         expect(result.isError).toBe(true);
         expect(mocks.listNotes).not.toHaveBeenCalled();
+        // Named with the ones it can, so the model can pick rather than stop.
+        expect(result.content[0]?.text).toContain("private, Team");
+    });
+
+    it("find a notebook whatever the accents", async () => {
+        mocks.listShelves.mockResolvedValue([
+            { space: null, folders: [] },
+            { space: { id: SPACE_ID, name: "Reuniones de Equipo", role: "member" }, folders: [] }
+        ]);
+        mocks.listNotes.mockResolvedValue([]);
+        const result = (await call("notes_list", { notebook: "reuniónes de equipo" }))
+            ?.result as ToolResult;
+        expect(result.isError).toBeUndefined();
+        expect(mocks.listNotes).toHaveBeenCalledWith({ userId: "user-1", spaceId: SPACE_ID });
+    });
+
+    it("find a note by a word in another language, and list them all when nothing matches", async () => {
+        mocks.listNotes.mockImplementation(async (shelf: { spaceId: string | null }) =>
+            shelf.spaceId ? [] : Array.from({ length: 4 }, (_, index) => note(index))
+        );
+        const found = (await call("notes_list", { query: "reunion" }))?.result as ToolResult;
+        expect(found.structuredContent.notes[0].title).toMatch(/^Meeting/);
+        expect(found.structuredContent.matched).toBe(true);
+
+        const none = (await call("notes_list", { query: "zebra" }))?.result as ToolResult;
+        expect(none.structuredContent.notes).toHaveLength(4);
+        expect(none.structuredContent.matched).toBe(false);
+        expect(none.content[0]?.text).toContain('No match for "zebra"; these are all 4 notes.');
     });
 
     it("cut a very long note rather than hand it over whole", async () => {

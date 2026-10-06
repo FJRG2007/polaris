@@ -514,6 +514,21 @@ export async function runRandomNow(input: {
     return { run, skipped };
 }
 
+/** The events a server has set up, by name and kind, without anything live -
+ *  what a search finds them by. Empty for a server that is not Minecraft. */
+export async function eventPresets(
+    installedAppId: string
+): Promise<{ id: string; name: string; kind: catalog.EventKind; enabled: boolean }[]> {
+    const row = await readRow(installedAppId);
+    if (!row) return [];
+    return settingsOf(row.config).presets.map((preset) => ({
+        id: preset.id,
+        name: preset.name,
+        kind: preset.kind,
+        enabled: preset.enabled
+    }));
+}
+
 export async function eventsView(installedAppId: string): Promise<EventsView> {
     const row = await readRow(installedAppId);
     if (!row) throw new Error(refused("noServer"));

@@ -73,6 +73,9 @@ order out of the manifests and builds everything a wave at a time, in parallel
 within each wave, so building one by one is never necessary. Progress and what's in
 flight is tracked in [`../../dashboard/ROADMAP.md`](../../dashboard/ROADMAP.md).
 
+Adding an MCP tool, a `polaris_search` provider or a scope category:
+[`mcp.md`](mcp.md).
+
 ## Rust (plugins + host daemon)
 
 ```sh

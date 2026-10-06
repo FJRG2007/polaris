@@ -19,6 +19,7 @@
 
 import * as mime from "@/lib/mime";
 import { McpRefusal, defineMcpTool } from "@/lib/mcp/protocol";
+import { defineMcpSearch } from "@/lib/mcp/search";
 import { portKey } from "@/lib/apps/port-key";
 import * as appsCatalog from "@/lib/apps/catalog";
 import * as hostAddress from "@/lib/host-address";
@@ -45,6 +46,7 @@ import type {
 import type { InstallConfig } from "@/lib/apps/install-config";
 import type { McpScope } from "@/lib/mcp/scope-table";
 import type { McpCaller, McpTool, McpToolResult } from "@/lib/mcp/protocol";
+import type { McpSearchHit, McpSearchProvider } from "@/lib/mcp/search";
 import type { LinkableConversations } from "@/lib/chat/game-links";
 import type { InstallSeed, InstalledAppSetting } from "@/lib/apps/install-service";
 import type { InstallAccessEntry, InstallAccessView } from "@/lib/apps/install-sharing";
@@ -374,11 +376,14 @@ export const serverHost = {
     // What an app needs to offer tools over MCP (the `mcpTools` hook): a
     // tool typed against its own schema, the refusal a model is shown as
     // written, and the person a call acts for, shaped like a session so the
-    // app's own access rules decide. See docs/installable-apps-plan.md.
+    // app's own access rules decide. And `defineSearch`, for the providers
+    // its `mcpSearch` hook offers `polaris_search` (lib/mcp/search.ts).
+    // See docs/installable-apps-plan.md.
     mcp: {
         McpRefusal,
         actingUser: later(load.mcpActingUser, "actingUser"),
-        defineTool: defineMcpTool
+        defineTool: defineMcpTool,
+        defineSearch: defineMcpSearch
     },
     metricsShared: {
         resolveRange: metricsShared.resolveRange
@@ -479,6 +484,8 @@ declare module "@polaris/app-host" {
         McpScope: McpScope;
         McpTool: McpTool<never>;
         McpToolResult: McpToolResult;
+        McpSearchHit: McpSearchHit;
+        McpSearchProvider: McpSearchProvider;
         RelayedChannelMessage: RelayedChannelMessage;
         SealedSecret: SealedSecret;
         SessionUser: SessionUser;

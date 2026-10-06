@@ -191,4 +191,22 @@ describe("the chat tools", () => {
         expect(unread.structuredContent.conversations).toHaveLength(10);
         expect(unread.structuredContent.nextOffset).toBeNull();
     });
+
+    it("find a conversation loosely, and list them all when nothing matches", async () => {
+        mocks.listChannels.mockResolvedValue([
+            channel(0, 0),
+            { ...channel(1, 0), name: "Diseño web" },
+            channel(2, 0)
+        ]);
+        const found = (await call("chat_conversations", { query: "diseno" }))?.result as ToolResult;
+        expect(found.structuredContent.conversations[0].name).toBe("Diseño web");
+        expect(found.structuredContent.matched).toBe(true);
+
+        const none = (await call("chat_conversations", { query: "zebra" }))?.result as ToolResult;
+        expect(none.structuredContent.conversations).toHaveLength(3);
+        expect(none.structuredContent.matched).toBe(false);
+        expect(none.content[0]?.text).toContain(
+            'No match for "zebra"; these are all 3 conversations.'
+        );
+    });
 });

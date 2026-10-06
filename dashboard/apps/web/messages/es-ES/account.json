@@ -312,6 +312,7 @@
             "includedWith": "Incluido con {scope}",
             "remove": "Quitar {scope}",
             "ofGroup": "{count} de {total}",
+            "allInGroup": "Permitir todo en {group}",
             "none": "Ninguno",
             "noMatch": "Ningún permiso coincide.",
             "clear": "Borrar",

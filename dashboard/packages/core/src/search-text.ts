@@ -268,7 +268,7 @@ function allowedEdits(word: string): number {
  * or two neighbours swapped, each counting one - or `limit + 1` once it is
  * plainly more than `limit`.
  */
-function editDistance(typed: string, word: string, limit: number): number {
+export function editDistance(typed: string, word: string, limit: number): number {
     if (Math.abs(typed.length - word.length) > limit) return limit + 1;
     let before: number[] = [];
     let previous = Array.from({ length: word.length + 1 }, (_, at) => at);

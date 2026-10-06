@@ -23,7 +23,7 @@
 import { z } from "zod";
 import type { Icon } from "@modelcontextprotocol/sdk/types.js";
 import { toJsonSchema } from "./json-schema";
-import type { McpScope } from "./scope-table";
+import { scopeCategory, type McpCategory, type McpScope } from "./scope-table";
 
 /** The revision of MCP this speaks. Sent back on initialize when the client asks
  *  for something else, which is the protocol's own way of saying "this is what I
@@ -101,6 +101,12 @@ export interface McpTool<Input = never> {
      *  only needs a valid key, which so far is nothing that reads or writes
      *  anybody's data. */
     readonly scope: McpScope | readonly McpScope[] | null;
+    /** The heading `polaris_tools` lists it under, the same one its scope is
+     *  grouped under on the consent screen (`MCP_CATEGORIES`). Optional so an
+     *  app built before it existed still loads; left out, it is read from the
+     *  tool's scope (`toolCategory`). Every tool here sets it; a test holds
+     *  them to that. */
+    readonly category?: McpCategory;
     /** Whether calling it can change anything. Advertised to the client, which is
      *  what lets an agent be run in a mode that may look but not touch. */
     readonly readOnly: boolean;
@@ -122,6 +128,13 @@ export interface McpTool<Input = never> {
 export function toolScopes(tool: Pick<McpTool<never>, "scope">): readonly McpScope[] {
     if (tool.scope === null) return [];
     return typeof tool.scope === "string" ? [tool.scope] : tool.scope;
+}
+
+/** The heading a tool is listed under: its own, else its first scope's. */
+export function toolCategory(tool: Pick<McpTool<never>, "scope" | "category">): McpCategory {
+    if (tool.category) return tool.category;
+    const [first] = toolScopes(tool);
+    return first ? scopeCategory(first) : "polaris";
 }
 
 /**

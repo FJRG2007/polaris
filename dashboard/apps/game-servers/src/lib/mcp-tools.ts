@@ -91,6 +91,7 @@ const serversTool = () =>
             // i18n-ignore read by the calling model, not shown to a person
             "The game servers this account runs or was invited to: which game, whether each is meant to be up, and where players connect. games_server_status reads one live, with who is playing.",
         input: z.object({}),
+        category: "games",
         scope: "gameservers.read",
         readOnly: true,
         async run(_input, caller) {
@@ -128,6 +129,7 @@ const statusTool = () =>
             // i18n-ignore read by the calling model, not shown to a person
             "One game server as it is right now: online, starting, stopped or down, and the players on it. Asks the server itself, so it takes a moment.",
         input: statusInput,
+        category: "games",
         scope: "gameservers.read",
         readOnly: true,
         async run(input, caller) {
@@ -180,6 +182,7 @@ const powerTool = () =>
             // i18n-ignore read by the calling model, not shown to a person
             "Start, stop or restart a game server this account manages. Stopping or restarting disconnects everybody playing: check games_server_status and confirm with the person first.",
         input: powerInput,
+        category: "games",
         scope: "gameservers.manage",
         readOnly: false,
         destructive: true,
@@ -219,6 +222,7 @@ const consoleTool = () =>
             // i18n-ignore read by the calling model, not shown to a person
             "Run one command on a game server's console and read what it answered. The console can do anything the server can, op included: run only what the person asked for.",
         input: consoleInput,
+        category: "games",
         scope: "gameservers.manage",
         readOnly: false,
         destructive: true,

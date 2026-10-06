@@ -56,7 +56,9 @@ describe("the consent card", () => {
         expect(html).toContain("claude.ai");
         expect(html).toContain("Read spaces, lists and tasks");
         expect(html).toContain("Create and change tasks");
-        expect((html.match(/type="checkbox"/g) ?? []).length).toBe(2);
+        // One box per scope, and one for their section.
+        expect((html.match(/type="checkbox"/g) ?? []).length).toBe(3);
+        expect(html).toContain("Allow everything in Productivity");
         expect(html).toContain("your account cannot: Manage users");
         expect(html).not.toContain("runs on this computer");
     });
@@ -74,9 +76,12 @@ describe("the consent card", () => {
         expect(html).toContain("Read and search your mail");
         expect(html).toContain("Send mail as you");
         expect(html).toContain("Operate devices: switch, lock, set");
-        // One box of three is ticked: reading.
-        expect((html.match(/type="checkbox"/g) ?? []).length).toBe(3);
-        expect((html.match(/checked=""/g) ?? []).length).toBe(1);
+        // Three scope boxes and two section boxes. Of the scopes only reading is
+        // ticked; the mail section reads as whole because sending, being
+        // sensitive, is never the section's to tick.
+        expect((html.match(/type="checkbox"/g) ?? []).length).toBe(5);
+        expect((html.match(/checked=""/g) ?? []).length).toBe(2);
+        expect((html.match(/>Sensitive</g) ?? []).length).toBe(2);
     });
 
     it("warns about an app on this computer, and falls back for an unnamed one", () => {
@@ -267,7 +272,10 @@ describe("the boxes an app's permissions are changed with", () => {
             )
         );
         expect((html.match(/Not asked for by this app/g) ?? []).length).toBe(2);
+        // Only the tasks section's box: past two sections, one starts folded
+        // unless it holds something the app never asked for.
         expect((html.match(/checked=""/g) ?? []).length).toBe(1);
+        expect(html).not.toContain("Read spaces, lists and tasks");
         expect(html).toContain("Create, change and delete events");
         // Drawing the boxes changes nothing: only a click does.
         expect(toggle).not.toHaveBeenCalled();

@@ -30,8 +30,11 @@ import * as automations from "./automations";
 import { operateDevice } from "./device-operation";
 import type { AppHostTypes } from "@polaris/app-host";
 import { onlyReachable, placesReach } from "./sharing";
+import { matchForModel, type SearchField } from "@polaris/core";
 import {
     DEVICE_ACTIONS,
+    DEVICE_KIND_LABELS,
+    deviceKind,
     actionsFor,
     deviceCommandSchema,
     needsCommand,
@@ -108,8 +111,21 @@ const devicesInput = z.object({
         .trim()
         .max(100)
         .default("")
-        .describe("Only devices whose name, kind, zone or place contains this.")
+        .describe(
+            'Words for the device: its name, what it is or where ("door", "luz del salon"), in any language. The best matches come first; when nothing matches, every device is listed.'
+        )
 });
+
+/** Where a device search reads: the name first, then what it is, then where. */
+const DEVICE_FIELDS: readonly SearchField<ReturnType<typeof deviceRow>>[] = [
+    { text: (row) => row.name, weight: 1 },
+    { text: (row) => [row.kind, DEVICE_KIND_LABELS[deviceKind(row.kind)]], weight: 0.9 },
+    { text: (row) => row.zone, weight: 0.7 },
+    { text: (row) => row.place, weight: 0.6 }
+];
+
+/** The most rows one answer carries. */
+const DEVICE_LIMIT = 100;
 
 const devicesTool = () =>
     host.mcp.defineTool({
@@ -120,6 +136,7 @@ const devicesTool = () =>
             // i18n-ignore read by the calling model, not shown to a person
             "The devices in this account's places - locks, lights, switches, air conditioners, sensors - with their last known state and the actions each accepts. Read-only.",
         input: devicesInput,
+        category: "home",
         scope: "places.read",
         readOnly: true,
         async run(input, caller) {
@@ -132,21 +149,28 @@ const devicesTool = () =>
                 places.listPlaces(install.id)
             ]);
             const names = new Map(placeList.map((place) => [place.id, place.name]));
-            const wanted = input.query.toLowerCase();
-            const rows = onlyReachable(list, reach.everything || reach.devices)
-                .map((device) => deviceRow(device, names))
-                .filter(
-                    (row) =>
-                        !wanted ||
-                        [row.name, row.kind, row.zone, row.place ?? ""].some((value) =>
-                            value.toLowerCase().includes(wanted)
-                        )
-                );
-            if (input.deviceId && rows.length === 0) refuse("That device is not shared with you");
-            if (rows.length === 0) {
+            const visible = onlyReachable(list, reach.everything || reach.devices).map((device) =>
+                deviceRow(device, names)
+            );
+            if (input.deviceId && visible.length === 0)
+                refuse("That device is not shared with you");
+            if (visible.length === 0) {
                 return { text: "No devices.", structured: { devices: [] } };
             }
-            return { text: rows.map(deviceLine).join("\n"), structured: { devices: rows } };
+            // Never "No devices." for a query: a model told that gives up on a
+            // door it was asked to open. The closest, or all, said as such.
+            const found = matchForModel(
+                visible,
+                input.query,
+                DEVICE_FIELDS,
+                { one: "device", other: "devices" },
+                DEVICE_LIMIT
+            );
+            const lines = found.items.map(deviceLine).join("\n");
+            return {
+                text: found.note ? `${found.note}\n${lines}` : lines,
+                structured: { devices: found.items, matched: found.matched }
+            };
         }
     });
 
@@ -177,6 +201,7 @@ const controlTool = () =>
             // i18n-ignore read by the calling model, not shown to a person
             "Lock or unlock a door, switch something on or off, or set an air conditioner or purifier. Acts in the real world at once: confirm with the person before opening a door.",
         input: controlInput,
+        category: "home",
         scope: "places.control",
         readOnly: false,
         async run(input, caller) {
@@ -233,6 +258,7 @@ const routinesTool = () =>
             // i18n-ignore read by the calling model, not shown to a person
             "The routines (automations) set up in this account's places, whether each is switched on, and how its last run went. Read-only; places_routine_run starts one.",
         input: z.object({}),
+        category: "home",
         scope: "places.routines",
         readOnly: true,
         async run(_input, caller) {
@@ -277,6 +303,7 @@ const runTool = () =>
             // i18n-ignore read by the calling model, not shown to a person
             "Start a routine now, as its Run button does. Its steps act on real devices; its own conditions still apply, and a switched-off routine does not run.",
         input: runInput,
+        category: "home",
         scope: "places.routines",
         readOnly: false,
         destructive: false,

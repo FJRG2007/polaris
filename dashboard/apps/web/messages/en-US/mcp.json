@@ -27,7 +27,12 @@
             "tooMany": "Too many connection attempts. Wait a few minutes and start again from the app.",
             "failed": "Polaris could not finish connecting the app. Start again from the app."
         },
-        "home": "Go to Polaris"
+        "home": "Go to Polaris",
+        "sensitive": "Sensitive",
+        "sensitiveHint": "Acts outside Polaris or on real devices",
+        "groupCount": "{count} of {total}",
+        "groupAll": "Allow everything in {category}",
+        "groupShow": "Show {category}"
     },
     "scopes": {
         "drive_read": "See files and download them",
@@ -177,5 +182,18 @@
             "rules": "See your access rules",
             "allow": "Allow {app}"
         }
+    },
+    "categories": {
+        "polaris": "Polaris",
+        "home": "Home and cameras",
+        "mail": "Mail",
+        "calendar": "Calendar",
+        "chat": "Chat and inbox",
+        "productivity": "Productivity",
+        "files": "Files and sharing",
+        "development": "Development and deploy",
+        "databases": "Databases",
+        "games": "Game servers",
+        "account": "Account and administration"
     }
 }

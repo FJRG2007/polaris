@@ -21,6 +21,7 @@
 
 import { z } from "zod";
 import * as core from "@polaris/core";
+import { defineMcpSearch } from "../search";
 import { McpRefusal, type McpTool, defineMcpTool } from "../protocol";
 
 /** Loaded when a tool runs: the mail modules reach IMAP and SMTP clients that
@@ -67,6 +68,12 @@ const BODY_LIMIT = 50_000;
 
 const accountId = z.string().uuid().describe("The mailbox's id, as mail_mailboxes returned it.");
 
+/** A search with its accents taken off and nothing else changed: the
+ *  operators, the case and an address's punctuation stay as typed. */
+function withoutAccents(query: string): string {
+    return query.normalize("NFD").replace(/\p{M}+/gu, "");
+}
+
 function addressLine(addresses: readonly core.MailAddress[]): string {
     return addresses
         .map((entry) => (entry.name ? `${entry.name} <${entry.address}>` : entry.address))
@@ -87,6 +94,7 @@ const mailboxesTool = defineMcpTool({
     input: z.object({}),
     // Either is enough: a mailbox to send from has to be named as much as one
     // to read.
+    category: "mail",
     scope: ["mail.read", "mail.send"],
     readOnly: true,
     async run(_input, caller) {
@@ -128,7 +136,7 @@ const listInput = z.object({
         .max(300)
         .default("")
         .describe(
-            "Search words, as the Mail search box takes them (from:, subject:, has:attachment). Empty lists the folder."
+            "Search words, as the Mail search box takes them (from:, subject:, has:attachment). Empty lists the folder; when nothing matches, the newest conversations in it are listed, said as such."
         ),
     unreadOnly: z.boolean().default(false).describe("Only conversations with unread mail."),
     cursor: z
@@ -147,6 +155,7 @@ const listTool = defineMcpTool({
         // i18n-ignore read by the calling model, not shown to a person
         "Conversations in one folder of this account's mail, newest first, optionally searched. Returns subjects, senders and a snippet; read a message with mail_read and its messageId.",
     input: listInput,
+    category: "mail",
     scope: "mail.read",
     readOnly: true,
     async run(input, caller) {
@@ -155,19 +164,35 @@ const listTool = defineMcpTool({
         // checked first; so is this.
         if (input.accountId)
             await attempt(() => access.ownedAccount(caller.userId, input.accountId!));
-        const page = await views.listThreads(
-            caller.userId,
-            {
-                ...views.EMPTY_QUERY,
-                accountId: input.accountId ?? null,
-                role: input.folder,
-                query: input.query,
-                unreadOnly: input.unreadOnly,
-                cursor: input.cursor,
-                limit: input.limit
-            },
-            shelf.EVERY_SHELF
-        );
+        const read = (query: string) =>
+            views.listThreads(
+                caller.userId,
+                {
+                    ...views.EMPTY_QUERY,
+                    accountId: input.accountId ?? null,
+                    role: input.folder,
+                    query,
+                    unreadOnly: input.unreadOnly,
+                    cursor: input.cursor,
+                    limit: input.limit
+                },
+                shelf.EVERY_SHELF
+            );
+        // The search runs in the database, where it stays: a mailbox is too
+        // large to rank here. What changes is what an empty first page means.
+        // A model told "Nothing matches." stops, so a query with accents is
+        // tried once without them, and then the folder's newest conversations
+        // are listed, said to be that.
+        let page = await read(input.query);
+        let matched = true;
+        if (page.threads.length === 0 && input.query && !input.cursor) {
+            const plain = withoutAccents(input.query);
+            if (plain !== input.query) page = await read(plain);
+            if (page.threads.length === 0) {
+                page = await read("");
+                matched = false;
+            }
+        }
         const items = page.threads.map((thread) => ({
             messageId: thread.leadMessageId,
             accountId: thread.accountId,
@@ -178,15 +203,20 @@ const listTool = defineMcpTool({
             messages: thread.messageCount,
             at: thread.lastMessageAt
         }));
-        const nextCursor = page.cursor || null;
+        // A cursor pages the search it came from; the unsearched folder shown in
+        // place of one is a single page, so it carries none.
+        const nextCursor = (matched && page.cursor) || null;
         if (items.length === 0) {
             return {
                 text: input.query ? "Nothing matches." : "Nothing here.",
-                structured: { items, nextCursor }
+                structured: { items, nextCursor, matched }
             };
         }
         return {
             text:
+                (matched
+                    ? ""
+                    : `Nothing in ${input.folder} matches "${input.query}"; these are the newest conversations there.\n`) +
                 items
                     .map(
                         (item) =>
@@ -194,7 +224,7 @@ const listTool = defineMcpTool({
                     )
                     .join("\n") +
                 (nextCursor ? `\n(more: call again with cursor ${nextCursor})` : ""),
-            structured: { items, nextCursor }
+            structured: { items, nextCursor, matched }
         };
     }
 });
@@ -211,6 +241,7 @@ const readTool = defineMcpTool({
         // i18n-ignore read by the calling model, not shown to a person
         "One message of this account's mail: who sent it, to whom, when, and its text. Reading it here does not mark it read.",
     input: readInput,
+    category: "mail",
     scope: "mail.read",
     readOnly: true,
     async run(input, caller) {
@@ -280,6 +311,7 @@ const sendTool = defineMcpTool({
         // i18n-ignore read by the calling model, not shown to a person
         "Send an email from one of this account's mailboxes, in its name. It goes after the account's undo delay and can be taken back from the Outbox until then. Confirm the recipients and the text with the person before sending.",
     input: sendInput,
+    category: "mail",
     scope: "mail.send",
     readOnly: false,
     destructive: false,
@@ -326,6 +358,52 @@ const sendTool = defineMcpTool({
             text: `Queued. It goes at ${queued.sendAt.toISOString()} unless it is taken back from the Outbox.`,
             structured: { draftId: queued.draftId, sendAt: queued.sendAt.toISOString() }
         };
+    }
+});
+
+/** How many conversations a search hands in. A mailbox is searched in the
+ *  database and never listed whole. */
+const SEARCHED_MAIL = 10;
+
+/**
+ * The inbox conversations matching the query's words, for `polaris_search`.
+ * Mail's own search takes every word, so a sentence that names nothing in a
+ * message ("abre la factura") is narrowed to the words that can name one, and
+ * when those together find nothing, the longest of them is tried alone.
+ */
+export const MAIL_SEARCH = defineMcpSearch({
+    id: "mail.conversations",
+    app: "mail",
+    category: "mail",
+    scope: "mail.read",
+    async search(query, caller, limit) {
+        const terms = core.queryTerms(query);
+        if (terms.length === 0) return [];
+        const { shelf, views } = await services();
+        const read = (words: string) =>
+            views.listThreads(
+                caller.userId,
+                {
+                    ...views.EMPTY_QUERY,
+                    role: "inbox",
+                    query: words,
+                    limit: Math.min(limit, SEARCHED_MAIL)
+                },
+                shelf.EVERY_SHELF
+            );
+        let page = await read(terms.join(" "));
+        if (page.threads.length === 0 && terms.length > 1) {
+            const longest = [...terms].sort((left, right) => right.length - left.length)[0]!;
+            page = await read(longest);
+        }
+        return page.threads.map((thread) => ({
+            id: thread.leadMessageId,
+            name: thread.subject || "(no subject)",
+            kind: "mail",
+            where: addressLine(thread.participants),
+            keywords: [thread.snippet],
+            next: [{ tool: "mail_read", args: { messageId: thread.leadMessageId } }]
+        }));
     }
 });
 

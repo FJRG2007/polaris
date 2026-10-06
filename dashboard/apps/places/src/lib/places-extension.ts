@@ -126,5 +126,9 @@ export const placesExtension: AppExtension = {
     // What a connected assistant may do in the house: see the devices, and -
     // on the scopes that say so - operate them and run its routines, by the
     // same rules as the screens.
-    mcpTools: async () => (await import("./mcp-tools")).placesMcpTools()
+    mcpTools: async () => (await import("./mcp-tools")).placesMcpTools(),
+
+    // How `polaris_search` finds its devices, cameras, places, rooms and
+    // routines, by the same rules.
+    mcpSearch: async () => (await import("./mcp-search")).placesMcpSearch()
 };

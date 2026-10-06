@@ -66,15 +66,21 @@ export const dynamic = "force-dynamic";
  * What the client is told it has connected to, and how to behave once it has.
  *
  * The instructions are read by the model, not by the client's author, so they say
- * the two things a model gets wrong here: that this Polaris is the source of
- * truth about the work rather than a place to file a report afterwards, and that
- * a status is moved by name.
+ * the things a model gets wrong here: that every app is behind this one server,
+ * so a thing it cannot place is searched for rather than guessed at; that this
+ * Polaris is the source of truth about the work rather than a place to file a
+ * report afterwards; and that a status is moved by name.
  */
 const SERVER: McpServerInfo = {
     name: "polaris",
     title: "Polaris", // i18n-ignore: the product name, not translated
     version: "1",
     instructions: [
+        "Polaris is one MCP server for every app installed in it - home and cameras, mail,",
+        "calendar, chat, tasks, notes, files, deploys, databases, game servers - so do not look",
+        "for another server. If you do not know where something is or which tool handles it,",
+        "call polaris_search first: it searches every app at once, in any language, and answers",
+        "with ids and the tools to call next. polaris_tools lists the tools by category.",
         "Polaris is the control plane this work is being tracked in.",
         "If you were given a task, read it with tasks_get before starting, move it on with",
         "tasks_update as you go, and say what you found in tasks_comment when you finish -",

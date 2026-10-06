@@ -139,6 +139,64 @@ describe("the mail tools", () => {
         expect(result.content[0]?.text).toContain("cursor next-1");
     });
 
+    it("never answer a search with nothing while the folder has mail", async () => {
+        const lunch = {
+            leadMessageId: MESSAGE,
+            accountId: ACCOUNT,
+            subject: "Canción",
+            participants: [{ name: "Ada", address: "ada@example.test" }],
+            snippet: "Tomorrow?",
+            unreadCount: 0,
+            messageCount: 1,
+            lastMessageAt: "2026-10-05T09:00:00.000Z"
+        };
+        // The search itself runs in the database; only the folder unsearched
+        // has anything in it here.
+        mocks.listThreads.mockImplementation(async (_user: string, query: { query: string }) =>
+            query.query ? { threads: [], cursor: "" } : { threads: [lunch], cursor: "" }
+        );
+        const result = await call("mail_list", { query: "zebra", limit: 5 }, ["mail.read"]);
+        expect(mocks.listThreads).toHaveBeenLastCalledWith(
+            "user-1",
+            expect.objectContaining({ query: "", limit: 5, cursor: "" }),
+            "*"
+        );
+        expect(result.structuredContent).toMatchObject({
+            matched: false,
+            items: [{ messageId: MESSAGE }]
+        });
+        expect(result.content[0]?.text).toContain(
+            'Nothing in inbox matches "zebra"; these are the newest conversations there.'
+        );
+    });
+
+    it("retry a search without its accents before giving up on it", async () => {
+        mocks.listThreads.mockImplementation(async (_user: string, query: { query: string }) =>
+            query.query === "Cancion"
+                ? {
+                      threads: [
+                          {
+                              leadMessageId: MESSAGE,
+                              accountId: ACCOUNT,
+                              subject: "Cancion",
+                              participants: [],
+                              snippet: "",
+                              unreadCount: 0,
+                              messageCount: 1,
+                              lastMessageAt: "2026-10-05T09:00:00.000Z"
+                          }
+                      ],
+                      cursor: ""
+                  }
+                : { threads: [], cursor: "" }
+        );
+        const result = await call("mail_list", { query: "Canción" }, ["mail.read"]);
+        expect(result.structuredContent).toMatchObject({
+            matched: true,
+            items: [{ subject: "Cancion" }]
+        });
+    });
+
     it("read a message's text, falling back to its markup's words", async () => {
         mocks.openMessage.mockResolvedValue({
             envelope: {

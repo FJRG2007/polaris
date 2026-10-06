@@ -16,7 +16,8 @@
  * Server-only.
  */
 
-import { MCP_TOOLS } from "./tools";
+import { MCP_SEARCH_PROVIDERS, MCP_TOOLS } from "./tools";
+import type { McpSearchProvider } from "./search";
 import { toolScopes, type McpTool } from "./protocol";
 import { isLegacyScope, isMcpScope, orderScopes, type McpScope } from "./scope-table";
 
@@ -46,6 +47,34 @@ export async function mcpTools(): Promise<McpTool<never>[]> {
         tools.push(tool);
     }
     return tools;
+}
+
+/**
+ * Every search provider `polaris_search` asks: core's, then the installed
+ * apps'. Held to the rules a tool is - a unique id and a scope from the table
+ * - and one that breaks either is left out and logged.
+ */
+export async function mcpSearchProviders(): Promise<McpSearchProvider[]> {
+    const { appMcpSearchProviders } = await import("@/lib/app-extensions/registry");
+    const providers: McpSearchProvider[] = [...MCP_SEARCH_PROVIDERS];
+    const taken = new Set(providers.map((provider) => provider.id));
+    for (const { app, provider } of await appMcpSearchProviders()) {
+        const scopes = toolScopes(provider);
+        const problem = taken.has(provider.id)
+            ? "an id another provider already has"
+            : scopes.length === 0 || !scopes.every(isMcpScope)
+              ? "no scope from the table"
+              : null;
+        if (problem) {
+            console.error(
+                `polaris: ${app}'s search provider ${provider.id} has ${problem}; left out.`
+            );
+            continue;
+        }
+        taken.add(provider.id);
+        providers.push(provider);
+    }
+    return providers;
 }
 
 /**

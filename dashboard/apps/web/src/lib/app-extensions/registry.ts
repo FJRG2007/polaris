@@ -18,6 +18,7 @@ import type {
     AppExtension,
     AppJob,
     AppMcpTool,
+    AppMcpSearchProvider,
     AppSlot,
     AppWidgetDefinition,
     ChatCommandSpec,
@@ -35,6 +36,7 @@ export type {
     AppExtension,
     AppJob,
     AppMcpTool,
+    AppMcpSearchProvider,
     AppSlot,
     ChatCommandSpec,
     ChatGameLink,
@@ -335,6 +337,28 @@ export async function appMcpTools(): Promise<{ app: string; tool: AppMcpTool }[]
                 return tools.map((tool) => ({ app: extension.id, tool }));
             } catch (caught) {
                 console.error(`polaris: ${extension.id} could not list its MCP tools:`, caught);
+                return [];
+            }
+        })
+    );
+    return lists.flat();
+}
+
+/**
+ * The search providers the installed apps offer `polaris_search`, each with
+ * the app it came from. Asked on every call, as the tools are; one app
+ * failing to say leaves its providers out and never anybody else's.
+ */
+export async function appMcpSearchProviders(): Promise<
+    { app: string; provider: AppMcpSearchProvider }[]
+> {
+    const lists = await Promise.all(
+        (await installedWith("mcpSearch")).map(async (extension) => {
+            try {
+                const providers = (await extension.mcpSearch?.()) ?? [];
+                return providers.map((provider) => ({ app: extension.id, provider }));
+            } catch (caught) {
+                console.error(`polaris: ${extension.id} could not list its search:`, caught);
                 return [];
             }
         })

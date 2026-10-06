@@ -17,6 +17,7 @@ import { z } from "zod";
 import * as core from "@polaris/core";
 import type { NoteActor } from "@/lib/notes/access";
 import { moreLine, pageFields, pageOf } from "./paging";
+import { defineMcpSearch, preferMatches } from "../search";
 import { McpRefusal, type McpCaller, type McpTool } from "../protocol";
 
 /**
@@ -69,7 +70,9 @@ const listInput = z.object({
         .trim()
         .max(200)
         .default("")
-        .describe("Match against the title and the opening line. Empty lists everything."),
+        .describe(
+            "Words for the note's title or opening line, in any language. The best matches come first; empty, or nothing matching, lists every note."
+        ),
     notebook: z
         .string()
         .trim()
@@ -81,6 +84,50 @@ const listInput = z.object({
     ...pageFields
 });
 
+/** A note as the list hands it on. */
+interface NoteRow {
+    readonly id: string;
+    readonly title: string;
+    readonly excerpt: string;
+    readonly notebook: string;
+}
+
+/** Where a note search reads: the title, then the opening line, then the
+ *  notebook it is in. */
+const NOTE_FIELDS: readonly core.SearchField<NoteRow>[] = [
+    { text: (note) => note.title, weight: 1 },
+    { text: (note) => note.excerpt, weight: 0.6 },
+    { text: (note) => note.notebook, weight: 0.4 }
+];
+
+/** The notes on these shelves, as the list and the search both hand them on. */
+async function notesOn(
+    caller: McpCaller,
+    shelves: readonly { readonly space: { readonly id: string; readonly name: string } | null }[]
+) {
+    const { notes } = await services();
+    const listed = await Promise.all(
+        shelves.map(async (shelf) =>
+            (
+                await notes.listNotes({
+                    userId: caller.userId,
+                    spaceId: shelf.space?.id ?? null
+                })
+            ).map((note) => ({
+                id: note.id,
+                title: note.title,
+                excerpt: note.excerpt,
+                notebook: shelf.space?.name ?? "private",
+                notebookId: shelf.space?.id ?? null,
+                parentId: note.parentId,
+                pinned: note.pinned,
+                updatedAt: note.updatedAt
+            }))
+        )
+    );
+    return listed.flat();
+}
+
 const listNotesTool: McpTool<z.infer<typeof listInput>> = {
     name: "notes_list",
     // i18n-ignore shown by the calling client, which has no locale to ask for
@@ -89,64 +136,48 @@ const listNotesTool: McpTool<z.infer<typeof listInput>> = {
         // i18n-ignore read by the calling model, not shown to a person
         "Find notes this account can open, in its own private notebook and the shared ones. Returns titles and opening lines, not the text; use notes_get for that.",
     input: listInput,
+    category: "productivity",
     scope: "notes.use",
     readOnly: true,
     async run(input, caller) {
-        const { access, notes, shelves: shelfService } = await services();
+        const { access, shelves: shelfService } = await services();
         const actor = actorFor(caller);
         const shelves = await shelfService.listShelves(actor, await access.visibleSpaceIds(actor));
-        const wanted = input.notebook.toLowerCase();
+        // Accents and case do not count: "reuniones" is the notebook "Reuniónes".
+        const wanted = core.normalizeSearchText(input.notebook);
         const chosen = wanted
             ? shelves.filter((shelf) =>
                   shelf.space
                       ? shelf.space.id === input.notebook ||
-                        shelf.space.name.toLowerCase() === wanted
+                        core.normalizeSearchText(shelf.space.name) === wanted
                       : wanted === "private"
               )
             : shelves;
         if (wanted && chosen.length === 0) {
+            // Named with the ones it can open, so a model picks one rather than
+            // stopping at the refusal.
+            const names = shelves.map((shelf) => shelf.space?.name ?? "private");
             throw new McpRefusal(
-                `No notebook called "${input.notebook}" that this account can open.`
+                `No notebook called "${input.notebook}" that this account can open. It can open: ${names.join(", ")}.`
             );
         }
 
-        const listed = await Promise.all(
-            chosen.map(async (shelf) =>
-                (
-                    await notes.listNotes({
-                        userId: caller.userId,
-                        spaceId: shelf.space?.id ?? null
-                    })
-                ).map((note) => ({
-                    id: note.id,
-                    title: note.title,
-                    excerpt: note.excerpt,
-                    notebook: shelf.space?.name ?? "private",
-                    notebookId: shelf.space?.id ?? null,
-                    parentId: note.parentId,
-                    pinned: note.pinned,
-                    updatedAt: note.updatedAt
-                }))
-            )
-        );
-        const needle = input.query.toLowerCase();
-        const matched = listed
-            .flat()
-            .filter(
-                (note) =>
-                    !needle ||
-                    note.title.toLowerCase().includes(needle) ||
-                    note.excerpt.toLowerCase().includes(needle)
-            );
-        const page = pageOf(matched, input.offset, input.limit);
+        const listed = await notesOn(caller, chosen);
+        const found = core.matchForModel(listed, input.query, NOTE_FIELDS, {
+            one: "note",
+            other: "notes"
+        });
+        const page = pageOf(found.items, input.offset, input.limit);
         if (page.items.length === 0)
             return { text: "No notes matched.", structured: { notes: [], nextOffset: null } };
         return {
             text:
+                (found.note ? `${found.note}\n` : "") +
                 page.items
                     .map((note) => `${note.id}  ${note.title}  [${note.notebook}]`)
-                    .join("\n") + moreLine(page),
-            structured: { notes: page.items, nextOffset: page.nextOffset }
+                    .join("\n") +
+                moreLine(page),
+            structured: { notes: page.items, nextOffset: page.nextOffset, matched: found.matched }
         };
     }
 };
@@ -160,6 +191,7 @@ const getNoteTool: McpTool<z.infer<typeof getInput>> = {
     // i18n-ignore read by the calling model, not shown to a person
     description: "Read one note in full: its title and its text, in Markdown.",
     input: getInput,
+    category: "productivity",
     scope: "notes.use",
     readOnly: true,
     async run(input, caller) {
@@ -216,6 +248,7 @@ const createNoteTool: McpTool<z.infer<typeof createInput>> = {
         // i18n-ignore read by the calling model, not shown to a person
         "Write a new note, in your private notebook unless a shared one is named. Returns its id.",
     input: createInput,
+    category: "productivity",
     scope: "notes.use",
     readOnly: false,
     destructive: false,
@@ -264,6 +297,7 @@ const updateNoteTool: McpTool<z.infer<typeof updateInput>> = {
         // i18n-ignore read by the calling model, not shown to a person
         "Change a note's title, text or pin. Only the fields you send are written, and a new body replaces the old one whole.",
     input: updateInput,
+    category: "productivity",
     scope: "notes.use",
     readOnly: false,
     idempotent: true,
@@ -282,6 +316,31 @@ const updateNoteTool: McpTool<z.infer<typeof updateInput>> = {
         return { text: "Updated.", structured: { id: input.noteId } };
     }
 };
+
+/** Every note this account can open, for `polaris_search`. */
+export const NOTE_SEARCH = defineMcpSearch({
+    id: "notes.notes",
+    app: "notes",
+    category: "productivity",
+    scope: "notes.use",
+    async search(query, caller, limit) {
+        const { access, shelves: shelfService } = await services();
+        const actor = actorFor(caller);
+        const shelves = await shelfService.listShelves(actor, await access.visibleSpaceIds(actor));
+        const rows = await notesOn(caller, shelves);
+        return preferMatches(rows, query, NOTE_FIELDS, limit).map((note) => ({
+            id: note.id,
+            name: note.title,
+            kind: "note",
+            where: note.notebook,
+            keywords: [note.excerpt],
+            next: [
+                { tool: "notes_get", args: { noteId: note.id } },
+                { tool: "notes_update", args: { noteId: note.id } }
+            ]
+        }));
+    }
+});
 
 export const NOTE_TOOLS = [
     listNotesTool,

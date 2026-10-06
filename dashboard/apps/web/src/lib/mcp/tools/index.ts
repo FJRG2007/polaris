@@ -12,15 +12,17 @@
  */
 
 import { z } from "zod";
-import { CHAT_TOOLS } from "./chat";
+import { CHAT_SEARCH, CHAT_TOOLS } from "./chat";
 import { prisma } from "@polaris/db";
-import { NOTE_TOOLS } from "./notes";
-import { TASK_TOOLS } from "./tasks";
-import { DRIVE_TOOLS } from "./drive";
-import { DEPLOY_TOOLS } from "./deploy";
+import { NOTE_SEARCH, NOTE_TOOLS } from "./notes";
+import { TASK_SEARCH, TASK_TOOLS } from "./tasks";
+import { DRIVE_SEARCH, DRIVE_TOOLS } from "./drive";
+import { DEPLOY_SEARCH, DEPLOY_TOOLS } from "./deploy";
 import { SESSION_TOOLS } from "./sessions";
 import type { McpTool } from "../protocol";
-import { MAIL_TOOLS } from "./mail";
+import { MAIL_SEARCH, MAIL_TOOLS } from "./mail";
+import { DISCOVERY_TOOLS } from "./discovery";
+import type { McpSearchProvider } from "../search";
 
 const whoamiInput = z.object({});
 
@@ -39,6 +41,7 @@ const whoami: McpTool<z.infer<typeof whoamiInput>> = {
     // i18n-ignore read by the calling model, not shown to a person
     description: "Who this key acts as on this Polaris, and what it is allowed to do.",
     input: whoamiInput,
+    category: "polaris",
     scope: null,
     readOnly: true,
     async run(_input, caller) {
@@ -63,6 +66,7 @@ const whoami: McpTool<z.infer<typeof whoamiInput>> = {
 
 export const MCP_TOOLS: readonly McpTool<never>[] = [
     whoami as unknown as McpTool<never>,
+    ...DISCOVERY_TOOLS,
     ...TASK_TOOLS,
     ...SESSION_TOOLS,
     ...DEPLOY_TOOLS,
@@ -70,4 +74,18 @@ export const MCP_TOOLS: readonly McpTool<never>[] = [
     ...CHAT_TOOLS,
     ...DRIVE_TOOLS,
     ...MAIL_TOOLS
+];
+
+/**
+ * What `polaris_search` asks of core's apps, one provider per kind of thing
+ * (`lib/mcp/search.ts`). The same kind of reviewed list as the tools; an
+ * installable app's providers come from its own `mcpSearch` hook.
+ */
+export const MCP_SEARCH_PROVIDERS: readonly McpSearchProvider[] = [
+    TASK_SEARCH,
+    NOTE_SEARCH,
+    CHAT_SEARCH,
+    DRIVE_SEARCH,
+    MAIL_SEARCH,
+    DEPLOY_SEARCH
 ];
