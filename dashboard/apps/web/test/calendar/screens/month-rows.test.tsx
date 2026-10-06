@@ -142,6 +142,7 @@ function props(patch: Partial<GridViewProps>): GridViewProps {
         onItemFocus: () => undefined,
         onChange: () => undefined,
         onTaskDrop: () => undefined,
+        onTaskToggle: () => undefined,
         onOpenDay: () => undefined,
         ...patch
     };

@@ -411,18 +411,20 @@ const DEFAULT_STATUS_COLOR = "#64748b";
  * Tick a task off, or back, from the calendar - as its round mark does in
  * Tasks: to the first done status of its space, or back to the first not
  * started one. Through the Tasks service, so history, automations and
- * watchers see it as a change made on the task.
+ * watchers see it as a change made on the task. A space with no status to
+ * move it to answers with the reason, in the reader's words.
  */
 export async function setTaskDone(
     actor: { id: string; isAdmin: boolean },
     taskId: string,
     done: boolean
-): Promise<void> {
+): Promise<{ refused?: string }> {
     const access = await import("@/lib/tasks/access");
+    const { readerWords } = await import("@/lib/i18n/reader-words");
     const tasks = await import("@/lib/tasks/task-service");
     await access.requireTask(actor, taskId, "member");
     const task = await prisma.task.findUnique({ where: { id: taskId }, select: { spaceId: true } });
-    if (!task) return;
+    if (!task) return { refused: (await readerWords("tasks"))("refusals.taskGone") };
     const statuses = await prisma.taskStatus.findMany({
         where: { spaceId: task.spaceId },
         select: { id: true, type: true },
@@ -431,8 +433,14 @@ export async function setTaskDone(
     const target = statuses.find((status) =>
         done ? status.type === "done" : status.type === "open"
     );
-    if (!target) return;
+    if (!target)
+        return {
+            refused: (await readerWords("tasks"))(
+                done ? "refusals.noDoneStatus" : "refusals.noOpenStatus"
+            )
+        };
     await tasks.updateTask(actor.id, { taskId, statusId: target.id });
+    return {};
 }
 
 /**

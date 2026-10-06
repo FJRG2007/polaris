@@ -24,6 +24,8 @@ import {
 } from "./access";
 
 /** The widest window answered: a year view with the weeks around it. */
+export const MAX_WINDOW_DAYS = 400;
+
 /** A calendar task's status as the kind Tasks reasons about: what tells a
  *  ring, a filling ring, a tick and a cross apart. */
 export function todoStatusType(status: engine.TodoStatus): core.TaskStatusType {
@@ -32,8 +34,6 @@ export function todoStatusType(status: engine.TodoStatus): core.TaskStatusType {
     if (status === "IN-PROCESS") return "active";
     return "open";
 }
-
-export const MAX_WINDOW_DAYS = 400;
 
 /** Objects read for one window at most. A calendar that holds more inside one
  *  year view than this is drawn partially and says so. */

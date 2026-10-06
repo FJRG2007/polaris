@@ -160,11 +160,12 @@ export async function setTaskDoneAction(input: unknown): Promise<Outcome<object>
     return outcome(async () => {
         const user = await requireCalendarUser();
         if (parsed.data.source === "tasks") {
-            await host.calendarHost.setTaskDone(
+            const answer = await host.calendarHost.setTaskDone(
                 { id: user.id, isAdmin: user.isAdmin },
                 parsed.data.id,
                 parsed.data.done
             );
+            if (answer.refused) throw new CalendarRefusal(answer.refused);
             return {};
         }
         const { row } = await writableObject(user, parsed.data.id);

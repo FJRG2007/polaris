@@ -539,6 +539,8 @@ export default function GridView(props: GridViewProps) {
                 eventClick={(arg: EventClickArg) => {
                     arg.jsEvent.preventDefault();
                     if (!(arg.event.extendedProps as { item?: GridItem }).item) return;
+                    const target = arg.jsEvent.target;
+                    if (target instanceof Element && target.closest("[data-task-mark]")) return;
                     propsRef.current.onItemClick(
                         itemOf(arg.event),
                         arg.event.id,

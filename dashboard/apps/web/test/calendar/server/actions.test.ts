@@ -293,6 +293,12 @@ describe("calendar actions", () => {
             await tasks.setTaskDoneAction({ source: "tasks", id: MISSING, done: true, zone: ZONE })
         ).toEqual({ ok: true });
         expect(fake.doneSet).toEqual([{ taskId: MISSING, done: true }]);
+
+        fake.doneRefusal = "This task's space has no done status";
+        expect(
+            await tasks.setTaskDoneAction({ source: "tasks", id: MISSING, done: true, zone: ZONE })
+        ).toEqual({ ok: false, error: "This task's space has no done status" });
+        expect(fake.doneSet).toHaveLength(1);
     });
 
     it("saves a calendar task and schedules a Tasks-app task", async () => {

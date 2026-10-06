@@ -38,12 +38,15 @@ export function TaskMark({
     onToggle?: (task: TaskItemView) => void;
 }) {
     const t = useCalendarT();
-    const icon = <StatusIcon color={task.statusColor ?? color} type={task.statusType} size={size} />;
+    const icon = (
+        <StatusIcon color={task.statusColor ?? color} type={task.statusType} size={size} />
+    );
     if (!onToggle || !task.editable) return icon;
     const label = task.done ? t("todo.markNotDone") : t("todo.markDone");
     return (
         <button
             type="button"
+            data-task-mark=""
             aria-label={label}
             title={label}
             // Its own press: not the grid's click that opens the card, and not
@@ -105,7 +108,12 @@ export function TaskCard({
     const status = task.statusName || t(`todo.statusType.${task.statusType}`);
     const where = fromCalendar ? calendar?.name : task.listName;
     return (
-        <AnchoredPanel open onOpenChange={(open) => !open && onClose()} anchor={anchor} title={task.title}>
+        <AnchoredPanel
+            open
+            onOpenChange={(open) => !open && onClose()}
+            anchor={anchor}
+            title={task.title}
+        >
             <div className="flex flex-col gap-3 pr-1">
                 <div className="flex items-start gap-2">
                     <span className="mt-0.5">

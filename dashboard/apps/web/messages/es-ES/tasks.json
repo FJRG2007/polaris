@@ -368,6 +368,8 @@
         "folderTooDeepMove": "Las carpetas pueden anidarse hasta {limit} niveles, y así se pasaría",
         "folderTooDeep": "Las carpetas pueden anidarse hasta {limit} niveles",
         "noStatusCalled": "El espacio de esta tarea no tiene ningún estado llamado \"{name}\"",
+        "noDoneStatus": "El espacio de esta tarea no tiene ningún estado de completado",
+        "noOpenStatus": "El espacio de esta tarea no tiene ningún estado sin empezar",
         "ruleNotInSpace": "Esa regla no está en este espacio",
         "sprintNotInSpace": "Ese sprint no está en este espacio"
     },

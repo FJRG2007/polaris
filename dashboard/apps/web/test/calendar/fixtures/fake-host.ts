@@ -92,6 +92,8 @@ function blankState() {
         scheduled: [] as { taskId: string; due: unknown }[],
         /** Tasks-app tasks ticked or unticked from the calendar. */
         doneSet: [] as { taskId: string; done: boolean }[],
+        /** Why ticking a Tasks-app task is turned down, when it is. */
+        doneRefusal: null as string | null,
         /** Lists a task can be created in; null when Tasks is not theirs. */
         taskLists: [] as { id: string; name: string; spaceName: string }[] | null,
         createdTasks: [] as {
@@ -293,7 +295,9 @@ export const host = {
                 ...task
             })),
         setTaskDone: async (_actor: unknown, taskId: string, done: boolean) => {
+            if (fake.doneRefusal) return { refused: fake.doneRefusal };
             fake.doneSet.push({ taskId, done });
+            return {};
         },
         scheduleTask: async (_actor: unknown, taskId: string, due: unknown) => {
             fake.scheduled.push({ taskId, due });
