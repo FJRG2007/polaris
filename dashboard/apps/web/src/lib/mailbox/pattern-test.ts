@@ -18,12 +18,14 @@ import type * as core from "@polaris/core";
  *  short enough that a mailbox's worth of them cannot hold up a sync. */
 const PATTERN_MS = 25;
 
-const context = vm.createContext({ pattern: "", text: "", found: false });
-const run = new vm.Script("found = new RegExp(pattern, 'i').test(text);");
+const context = vm.createContext({ pattern: "", text: "", flags: "i", found: false });
+const run = new vm.Script("found = new RegExp(pattern, flags).test(text);");
 
-export const timedPatternTest: core.MailPatternTest = (pattern, text) => {
+export const timedPatternTest: core.MailPatternTest = (pattern, text, caseSensitive) => {
     context.pattern = pattern;
     context.text = text;
+    // Capitals are ignored unless the condition says they count.
+    context.flags = caseSensitive ? "" : "i";
     context.found = false;
     try {
         run.runInContext(context, { timeout: PATTERN_MS });

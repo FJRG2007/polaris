@@ -22,6 +22,7 @@ import {
     mailOperatorsFor,
     mailPatternProblem,
     mailSubjectShape,
+    mailTakesValues,
     type MailRuleField,
     type MailRuleOperator
 } from "../mailbox.js";
@@ -564,6 +565,8 @@ type ConditionLike = {
     operator: MailRuleOperator;
     value: string;
     header?: string;
+    alternatives?: string[];
+    caseSensitive?: boolean;
 };
 
 /** "Similar" is about a subject's shape, and the example it was written from is
@@ -571,7 +574,16 @@ type ConditionLike = {
  *  is stored by its lowercased name, and yes-or-no lowercased. */
 function normalizeCondition<T extends ConditionLike>(condition: T): T {
     const next = { ...condition };
-    if (next.operator === "similar") next.value = mailSubjectShape(next.value);
+    // A value left blank is no value; a condition with none beyond its first is
+    // stored as it always was.
+    const more = (next.alternatives ?? []).map((value) => value.trim()).filter(Boolean);
+    if (more.length > 0) next.alternatives = more;
+    else delete next.alternatives;
+    if (next.caseSensitive !== true) delete next.caseSensitive;
+    if (next.operator === "similar") {
+        next.value = mailSubjectShape(next.value);
+        if (next.alternatives) next.alternatives = next.alternatives.map(mailSubjectShape);
+    }
     if (next.field === "attachment") next.value = next.value.toLowerCase();
     if (next.field === "header") next.header = (next.header ?? "").trim().toLowerCase();
     else delete next.header;
@@ -587,6 +599,10 @@ function checkCondition(
 ): void {
     const issue = (path: string, message: string) =>
         context.addIssue({ code: "custom", path: [path], message });
+    if (!mailTakesValues(condition.operator)) {
+        if (condition.alternatives?.length) issue("alternatives", "That comparison takes one value");
+        if (condition.caseSensitive) issue("caseSensitive", "That comparison has no capitals to tell apart");
+    }
     if (condition.operator === "similar") {
         if (condition.field !== "subject") issue(fieldKey, "Only a subject can be similar");
         else if (!condition.value) issue("value", "That subject has no fixed words to match on");
@@ -612,6 +628,12 @@ function checkCondition(
         if (problem === "invalid") issue("value", "That pattern is not valid");
         if (problem === "unsafe")
             issue("value", "That pattern could take too long to check. Make it simpler");
+        for (const extra of condition.alternatives ?? []) {
+            const also = mailPatternProblem(extra);
+            if (also === "invalid") issue("alternatives", "One of those patterns is not valid");
+            if (also === "unsafe")
+                issue("alternatives", "One of those patterns could take too long to check. Make it simpler");
+        }
     }
 }
 
@@ -621,6 +643,13 @@ const conditionValue = z
     .min(1, "Say what to look for")
     .max(MAIL_FILTER_LIMITS.value, "That is longer than a condition can be");
 
+/** The values a condition gives beside its first. Each as long as a value may
+ *  be; blank ones are dropped when the condition is read. */
+const conditionAlternatives = z
+    .array(z.string().max(MAIL_FILTER_LIMITS.value, "That is longer than a condition can be"))
+    .max(MAIL_FILTER_LIMITS.alternatives, "That is more values than one condition can hold")
+    .optional();
+
 /** One condition the way filters were written before they were automations.
  *  Still accepted from anything that writes them that way. */
 export const mailRuleConditionSchema = z
@@ -628,7 +657,9 @@ export const mailRuleConditionSchema = z
         field: mailRuleField,
         operator: mailRuleOperator,
         value: conditionValue,
-        header: z.string().trim().max(76).optional()
+        header: z.string().trim().max(76).optional(),
+        alternatives: conditionAlternatives,
+        caseSensitive: z.boolean().optional()
     })
     .transform(normalizeCondition)
     .superRefine((condition, context) => checkCondition(condition, context, "field"));
@@ -702,7 +733,9 @@ export const mailFilterConditionSchema = z
         kind: mailRuleField,
         operator: mailRuleOperator,
         value: conditionValue,
-        header: z.string().trim().max(76).optional()
+        header: z.string().trim().max(76).optional(),
+        alternatives: conditionAlternatives,
+        caseSensitive: z.boolean().optional()
     })
     .transform((condition) => {
         const { field: _field, ...node } = normalizeCondition({

@@ -49,3 +49,44 @@ describe("where the next slice starts", () => {
         }
     });
 });
+
+describe("a filter condition with several values", () => {
+    it("keeps the values that say something, and the switch for capitals", async () => {
+        const { mailFilterConditionSchema } = await import("./mailbox.js");
+        const parsed = mailFilterConditionSchema.parse({
+            id: "cond01",
+            kind: "subject",
+            operator: "contains",
+            value: "PR run failed:",
+            alternatives: ["  Run cancelled ", "", "   "],
+            caseSensitive: true
+        });
+        expect(parsed).toMatchObject({
+            value: "PR run failed:",
+            alternatives: ["Run cancelled"],
+            caseSensitive: true
+        });
+    });
+
+    it("refuses more values, or capitals, where the comparison has none", async () => {
+        const { mailFilterConditionSchema } = await import("./mailbox.js");
+        expect(
+            mailFilterConditionSchema.safeParse({
+                id: "cond01",
+                kind: "size",
+                operator: "greater-than",
+                value: "100",
+                alternatives: ["200"]
+            }).success
+        ).toBe(false);
+        expect(
+            mailFilterConditionSchema.safeParse({
+                id: "cond01",
+                kind: "subject",
+                operator: "matches",
+                value: "ok",
+                alternatives: ["(["]
+            }).success
+        ).toBe(false);
+    });
+});

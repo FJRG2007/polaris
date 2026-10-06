@@ -147,11 +147,16 @@ export function describeCondition(condition: core.MailFilterCondition, t: Transl
         condition.kind === "header"
             ? t("rules.said.header", { header: condition.header || "?" })
             : t(`rules.fields.${condition.kind}`);
-    return t("rules.condition", {
+    const negative = condition.operator === "not-contains" || condition.operator === "is-not";
+    // "this" or "that": the template quotes the first and the last, the joins
+    // quote the ones between.
+    const join = `" ${negative ? t("rules.editor.nor") : t("rules.editor.or")} "`;
+    const said = t("rules.condition", {
         field,
         operator: operatorText(condition.operator, t),
-        value: condition.value
+        value: [condition.value, ...(condition.alternatives ?? [])].join(join)
     });
+    return condition.caseSensitive ? `${said}${t("rules.said.caseSensitive")}` : said;
 }
 
 /** One step as a phrase: "move it to Accounts". */

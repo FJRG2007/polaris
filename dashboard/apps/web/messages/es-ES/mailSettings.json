@@ -300,7 +300,7 @@
             "isNot": "no es",
             "startsWith": "empieza por",
             "endsWith": "termina en",
-            "matches": "coincide con el patrón",
+            "matches": "coincide con la expresión regular",
             "greaterThan": "es mayor que",
             "lessThan": "es menor que",
             "similar": "es parecido a"
@@ -328,7 +328,8 @@
             "header": "la cabecera {header}",
             "largerThan": "ocupa más de {size}",
             "smallerThan": "ocupa menos de {size}",
-            "stop": "y parar los filtros de debajo"
+            "stop": "y parar los filtros de debajo",
+            "caseSensitive": " (con mayúsculas)"
         },
         "sentence": "Si {conditions}, {actions}.",
         "actions": {
@@ -427,7 +428,7 @@
             "noAttachments": "No tiene",
             "size": "Tamaño",
             "patternPlaceholder": "^PR run failed:",
-            "patternHint": "Una expresión regular, sin distinguir mayúsculas, que se comprueba sobre los primeros {count} caracteres.",
+            "patternHint": "Una expresión regular, que se comprueba sobre los primeros {count} caracteres.",
             "chooseFolder": "Elige una carpeta",
             "chooseLabel": "Elige una etiqueta",
             "chooseAddress": "Elige una dirección",
@@ -436,7 +437,16 @@
             "noVerified": "Verifica una dirección en tu cuenta para reenviar a ella.",
             "verifyAddress": "Gestionar tus direcciones",
             "stopHint": "Los filtros de debajo no se ejecutan con un mensaje que este haya cumplido.",
-            "nothingToSave": "Aún no ha cambiado nada."
+            "nothingToSave": "Aún no ha cambiado nada.",
+            "or": "o",
+            "nor": "ni",
+            "orAny": "O alguno de estos",
+            "norAny": "Ni ninguno de estos",
+            "addOr": "O con otro valor",
+            "addNor": "Ni otro valor",
+            "valueNumber": "Valor {number}",
+            "removeValue": "Quitar valor {number}",
+            "caseSensitive": "Distinguir mayúsculas"
         },
         "canvas": {
             "layout": "Vista",

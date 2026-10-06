@@ -315,6 +315,50 @@ describe("rules", () => {
         ).toBe(true);
     });
 
+    it("holds when any of a condition's values does, and a negative one when none does", () => {
+        // The report: "the subject contains this or that" had no way to be said
+        // short of a group of its own, which nobody found.
+        const either = { field: "subject" as const, value: "receipt", alternatives: ["invoice"] };
+        expect(mailbox.mailConditionHolds({ ...either, operator: "contains" }, message)).toBe(true);
+        expect(mailbox.mailConditionHolds({ ...either, operator: "not-contains" }, message)).toBe(
+            false
+        );
+        expect(
+            mailbox.mailConditionHolds(
+                { field: "subject", operator: "not-contains", value: "receipt", alternatives: ["refund"] },
+                message
+            )
+        ).toBe(true);
+        expect(
+            mailbox.mailConditionHolds(
+                { field: "subject", operator: "matches", value: "^refund", alternatives: ["\\d{4}$"] },
+                message
+            )
+        ).toBe(true);
+    });
+
+    it("tells capitals apart only when asked to", () => {
+        const cased = { field: "subject" as const, caseSensitive: true };
+        expect(
+            mailbox.mailConditionHolds({ ...cased, operator: "contains", value: "invoice" }, message)
+        ).toBe(false);
+        expect(
+            mailbox.mailConditionHolds({ ...cased, operator: "contains", value: "Invoice" }, message)
+        ).toBe(true);
+        expect(
+            mailbox.mailConditionHolds({ ...cased, operator: "is", value: "Invoice 4021" }, message)
+        ).toBe(true);
+        expect(
+            mailbox.mailConditionHolds({ ...cased, operator: "matches", value: "^invoice" }, message)
+        ).toBe(false);
+        expect(
+            mailbox.mailConditionHolds(
+                { field: "subject", operator: "matches", value: "^invoice" },
+                message
+            )
+        ).toBe(true);
+    });
+
     it("treats a broken pattern as no match rather than throwing", () => {
         // A rule that never fires is a bad rule; a rule that throws stops every
         // other rule filing anything.

@@ -932,6 +932,18 @@ export interface MailRuleCondition {
     readonly operator: MailRuleOperator;
     readonly value: string;
     readonly header?: string;
+    /** More values beside `value`: "contains this or that". A positive
+     *  comparison holds when any of them does; a negative one ("does not
+     *  contain") when none of them is there. */
+    readonly alternatives?: readonly string[];
+    /** Capitals count. Off by default: "Invoice" and "invoice" are the same. */
+    readonly caseSensitive?: boolean;
+}
+
+/** The comparisons a condition can give more values to, and tell capitals
+ *  apart in: the ones over text. */
+export function mailTakesValues(operator: MailRuleOperator): boolean {
+    return MAIL_TEXT_OPERATORS.includes(operator) || operator === "similar";
 }
 
 export type MailRuleAction =
@@ -983,7 +995,9 @@ export const MAIL_FILTER_LIMITS = {
     /** A pattern is run over this many characters of what it looks at. */
     patternText: 10_000,
     /** At most this many `*`, `+` or `{n,}` in one pattern. */
-    patternRepeats: 3
+    patternRepeats: 3,
+    /** Values one condition may give beside its first. */
+    alternatives: 9
 } as const;
 
 function joinAddresses(list: readonly MailAddress[]): string {
@@ -1106,13 +1120,14 @@ export function mailPatternProblem(source: string): "invalid" | "unsafe" | null 
     return repeats > MAIL_FILTER_LIMITS.patternRepeats ? "unsafe" : null;
 }
 
-/** Runs a filter's pattern over a stretch of text. The server passes one that
- *  gives up after a time limit, so a pattern saved before the save-time check
- *  still runs there; the default has no limit and refuses what that check would. */
-export type MailPatternTest = (pattern: string, text: string) => boolean;
+/** Runs a filter's pattern over a stretch of text, ignoring case unless the
+ *  condition says otherwise. The server passes one that gives up after a time
+ *  limit, so a pattern saved before the save-time check still runs there; the
+ *  default has no limit and refuses what that check would. */
+export type MailPatternTest = (pattern: string, text: string, caseSensitive?: boolean) => boolean;
 
-const plainPatternTest: MailPatternTest = (pattern, text) =>
-    !mailPatternProblem(pattern) && new RegExp(pattern, "i").test(text);
+const plainPatternTest: MailPatternTest = (pattern, text, caseSensitive) =>
+    !mailPatternProblem(pattern) && new RegExp(pattern, caseSensitive ? "" : "i").test(text);
 
 /**
  * Text as a filter compares it: one plain space wherever there was any run of
@@ -1145,6 +1160,21 @@ export function mailConditionHolds(
     message: MailRuleSubject,
     testPattern: MailPatternTest = plainPatternTest
 ): boolean {
+    const more = mailTakesValues(condition.operator) ? (condition.alternatives ?? []) : [];
+    if (more.length === 0) return oneValueHolds(condition, message, testPattern);
+    const values = [condition.value, ...more];
+    // "Does not contain this or that" means neither is there.
+    const negative = condition.operator === "not-contains" || condition.operator === "is-not";
+    return negative
+        ? values.every((value) => oneValueHolds({ ...condition, value }, message, testPattern))
+        : values.some((value) => oneValueHolds({ ...condition, value }, message, testPattern));
+}
+
+function oneValueHolds(
+    condition: MailRuleCondition,
+    message: MailRuleSubject,
+    testPattern: MailPatternTest
+): boolean {
     if (condition.operator === "similar") {
         // Stored as a shape already (see the schema), and shaped again here so a
         // rule written by hand through the API with an example subject works too.
@@ -1157,8 +1187,12 @@ export function mailConditionHolds(
         if (!Number.isFinite(left) || !Number.isFinite(right)) return false;
         return condition.operator === "greater-than" ? left > right : left < right;
     }
-    const haystack = mailComparable(fieldText(condition, message));
-    const needle = mailComparable(condition.value);
+    // Capitals are folded away unless the condition says they count.
+    const comparable = condition.caseSensitive
+        ? (text: string) => mailSpacing(text).trim()
+        : mailComparable;
+    const haystack = comparable(fieldText(condition, message));
+    const needle = comparable(condition.value);
     switch (condition.operator) {
         case "contains":
             return haystack.includes(needle);
@@ -1179,7 +1213,8 @@ export function mailConditionHolds(
                     mailSpacing(fieldText(condition, message)).slice(
                         0,
                         MAIL_FILTER_LIMITS.patternText
-                    )
+                    ),
+                    condition.caseSensitive === true
                 );
             } catch {
                 return false;
@@ -1272,6 +1307,9 @@ export interface MailFilterCondition {
     readonly operator: MailRuleOperator;
     readonly value: string;
     readonly header?: string;
+    /** See `MailRuleCondition`. */
+    readonly alternatives?: readonly string[];
+    readonly caseSensitive?: boolean;
 }
 
 export interface MailFilterGroup {
@@ -1315,7 +1353,9 @@ export function mailConditionOf(condition: MailFilterCondition): MailRuleConditi
         field: condition.kind,
         operator: condition.operator,
         value: condition.value,
-        ...(condition.header !== undefined ? { header: condition.header } : {})
+        ...(condition.header !== undefined ? { header: condition.header } : {}),
+        ...(condition.alternatives?.length ? { alternatives: condition.alternatives } : {}),
+        ...(condition.caseSensitive ? { caseSensitive: true } : {})
     };
 }
 
