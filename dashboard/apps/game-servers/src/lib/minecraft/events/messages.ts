@@ -194,7 +194,7 @@ export interface RulesVariant {
     readonly finalBlow?: boolean;
     /** A horde defense won by damage dealt rather than kills. */
     readonly byDamage?: boolean;
-    /** A king of the ring with fists only: time alone in it, in rounds. */
+    /** A king of the ring with fists only: time in it - alone, triple - in rounds. */
     readonly ring?: boolean;
     /** The ring's rounds, and whether it shrinks and moves over each. */
     readonly rounds?: number;
@@ -224,8 +224,8 @@ export function rules(kind: EventKind, language: Language, variant: RulesVariant
     }
     if (kind === "king-of-the-hill" && variant.ring) {
         const hold = es
-            ? "Aguanta en el ring a solas: si hay dos dentro, nadie suma."
-            : "Hold the ring alone: two in it and neither scores.";
+            ? "Aguanta en el ring: dentro sumas, y a solas, el triple."
+            : "Hold the ring: in it you score, and alone, triple.";
         const end =
             (variant.rounds ?? 1) > 1
                 ? es

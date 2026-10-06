@@ -223,6 +223,11 @@ export function entrySpotsFor(run: stored.EventRun): arena.Spot[] {
     return hill.entrySpots(run.place!, optionsOf(run).radius, run.joined.length);
 }
 
+/** Where each starts: inside the whole ring, round its middle (`hill.startSpots`). */
+export function startSpotsFor(run: stored.EventRun): arena.Spot[] {
+    return hill.startSpots(run.place!, optionsOf(run).radius, run.joined.length);
+}
+
 /** What bringing one of them in says and does, once where they were is kept. */
 export function enterLines(
     run: stored.EventRun,
@@ -231,7 +236,7 @@ export function enterLines(
     overGround: boolean,
     language: speech.Speech
 ): string[] {
-    const spot = entrySpotsFor(run)[index % Math.max(1, run.joined.length)]!;
+    const spot = startSpotsFor(run)[index % Math.max(1, run.joined.length)]!;
     return [
         ...hill.enterLines(name, spot, overGround),
         ...arena.titleTo(
@@ -271,7 +276,7 @@ export async function holdLines(
         hill.catchLine(place, radius),
         ...arena.keepThrown(hill.bounds(place, radius))
     ];
-    const spots = entrySpotsFor(run);
+    const spots = startSpotsFor(run);
     const overGround = await ctx.atLeast([1, 19, 4]);
     const here = new Map(where.map((one) => [one.name.toLowerCase(), one]));
     for (const one of run.entrants) {
@@ -292,7 +297,7 @@ export async function holdLines(
  */
 export async function goLines(ctx: KindContext): Promise<string[]> {
     const run = ctx.run;
-    const spots = entrySpotsFor(run);
+    const spots = startSpotsFor(run);
     const overGround = await ctx.atLeast([1, 19, 4]);
     return [
         ...run.entrants.flatMap((one) =>
@@ -330,9 +335,9 @@ export function ringNow(run: stored.EventRun, now: number): hill.Ring {
  * One tick of the king of the ring played with fists only: nobody can be hurt,
  * whoever was knocked right off is brought back to the edge, and the ring
  * shrunk, moved and drawn where it is now (`hill.ringAt`). Time in it counts
- * only for whoever is in it alone - double at the end of a round - and the one
- * ahead glows and wears the crown. Between rounds everybody goes back to their
- * spot and nothing counts.
+ * for everybody in it, three times over for whoever is in it alone - double at
+ * the end of a round - and the one ahead glows and wears the crown. Between
+ * rounds everybody goes back to their spot and nothing counts.
  */
 export async function fightTick(ctx: KindContext, seconds: number, lines: string[]): Promise<void> {
     const run = ctx.run;
@@ -343,7 +348,9 @@ export async function fightTick(ctx: KindContext, seconds: number, lines: string
     const center = hill.ringCenter(platform, ring);
     // As it was built: whole, in the middle, nobody ahead.
     const was = run.ring ?? { round: 1, dx: 0, dz: 0, radius, sprint: false, leader: null };
+    // Knocked off: back at the edge. A new round: inside the whole ring.
     const spots = entrySpotsFor(run);
+    const starts = startSpotsFor(run);
     const room = hill.bounds(platform, radius);
     const overGround = await ctx.atLeast([1, 19, 4]);
     lines.push(
@@ -366,7 +373,7 @@ export async function fightTick(ctx: KindContext, seconds: number, lines: string
         lines.push(
             ...run.entrants.flatMap((one, index) =>
                 hill
-                    .enterLines(one.name, spots[index % spots.length]!, overGround)
+                    .enterLines(one.name, starts[index % starts.length]!, overGround)
                     .filter((line) => line.includes(" tp "))
             ),
             ...arena.titleTo(
