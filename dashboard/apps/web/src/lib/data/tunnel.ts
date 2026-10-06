@@ -26,6 +26,7 @@ import {
     hostKeyAccepted,
     listenForward,
     openSshClient,
+    type ForwardOptions,
     type SshConnectOptions
 } from "@polaris/ssh";
 
@@ -183,7 +184,8 @@ function forwardRefusal(error: unknown, server: string, host: string, port: numb
 }
 
 export interface OpenTunnel {
-    readonly host: "127.0.0.1";
+    /** Loopback, unless the caller opened it somewhere else (`listen`). */
+    readonly host: string;
     readonly port: number;
     close(): void;
 }
@@ -196,7 +198,10 @@ export async function openTunnel(
     tunnel: DataTunnel,
     remoteHost: string,
     remotePort: number,
-    deps: TunnelDeps = REAL
+    deps: TunnelDeps = REAL,
+    /** Somewhere other than loopback, for one caller only - a dump run inside a
+     *  database's own container, on the network the two share. */
+    listen: ForwardOptions = {}
 ): Promise<OpenTunnel> {
     let clients: Client[];
     try {
@@ -218,7 +223,7 @@ export async function openTunnel(
                 throw forwardRefusal(error, tunnel.label, remoteHost, remotePort);
             });
         channel.close();
-        const forward = await listenForward(clients[0]!, remoteHost, remotePort);
+        const forward = await listenForward(clients[0]!, remoteHost, remotePort, undefined, listen);
         return {
             host: forward.host,
             port: forward.port,

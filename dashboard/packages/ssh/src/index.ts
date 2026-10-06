@@ -22,7 +22,7 @@ export {
     type ExecOptions,
     type ShellOptions
 } from "./exec.js";
-export { listenForward, type LocalForward } from "./forward.js";
+export { listenForward, type ForwardOptions, type LocalForward } from "./forward.js";
 export { LeasePool, SshPool, type Lease, type SshLease } from "./pool.js";
 export { generateSshKeyPair, publicKeyBlob, type SshKeyPair } from "./keygen.js";
 /** What these hand back. Re-exported so holding one is not a reason to depend

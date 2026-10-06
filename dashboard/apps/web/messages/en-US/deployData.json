@@ -155,7 +155,14 @@
             "confirmBody": "Everything in {name} is replaced with a copy of {source}. Follow it under Activity.",
             "thatDatabase": "that database",
             "thatAddress": "the database at that address",
-            "copy": "Copy"
+            "copy": "Copy",
+            "saved": "A saved connection",
+            "pickSaved": "Pick a connection",
+            "noSaved": "No {engine} connection saved in Databases.",
+            "openDatabases": "Add one in Databases",
+            "savedViaSsh": "{name} (through SSH via {server})",
+            "throughSsh": "Polaris opens the SSH tunnel and hands it to this database's container only, so nothing has to be published.",
+            "sshNeedsLocal": "Connections through SSH can only be copied into a database on the machine Polaris runs on."
         },
         "running": "Running",
         "failed": "Failed",

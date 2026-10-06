@@ -1028,11 +1028,23 @@ function PitrSection({ overview, manage, ask }: { overview: Overview; manage: bo
 
 function CopySection({ overview, manage, ask }: { overview: Overview; manage: boolean; ask: Ask }) {
     const t = useTranslations("deployData");
-    const [from, setFrom] = useState<"managed" | "url">("managed");
+    const [from, setFrom] = useState<"managed" | "saved" | "url">("managed");
     const [sources, setSources] = useState<{ id: string; name: string; where: string }[] | null>(
         null
     );
+    const [connections, setConnections] = useState<
+        | {
+              id: string;
+              name: string;
+              where: string;
+              viaSsh: boolean;
+              usable: boolean;
+              sshName: string | null;
+          }[]
+        | null
+    >(null);
     const [sourceId, setSourceId] = useState("");
+    const [connectionId, setConnectionId] = useState("");
     const [url, setUrl] = useState("");
     const [error, setError] = useState<string | null>(null);
 
@@ -1041,8 +1053,10 @@ function CopySection({ overview, manage, ask }: { overview: Overview; manage: bo
         let active = true;
         void actions.copySourcesAction(overview.id).then((result) => {
             if (!active) return;
-            if (result.sources) setSources(result.sources);
-            else setError(result.error ?? t("database.copy.sourcesUnreadable"));
+            if (result.sources) {
+                setSources(result.sources);
+                setConnections(result.connections ?? []);
+            } else setError(result.error ?? t("database.copy.sourcesUnreadable"));
         });
         return () => {
             active = false;
@@ -1054,11 +1068,14 @@ function CopySection({ overview, manage, ask }: { overview: Overview; manage: bo
             <p className="text-sm text-muted-foreground">{t("database.copy.needsPermission")}</p>
         );
 
-    const parsed = core.databaseCopySchema.safeParse(
+    const request =
         from === "managed"
             ? { databaseId: overview.id, fromDatabaseId: sourceId || undefined }
-            : { databaseId: overview.id, fromUrl: url.trim() || undefined }
-    );
+            : from === "saved"
+              ? { databaseId: overview.id, fromConnectionId: connectionId || undefined }
+              : { databaseId: overview.id, fromUrl: url.trim() || undefined };
+    const parsed = core.databaseCopySchema.safeParse(request);
+    const connection = connections?.find((entry) => entry.id === connectionId);
     const readable =
         from === "url" && url.trim()
             ? core.parseExternalSource(url.trim(), overview.engine) !== null
@@ -1077,10 +1094,52 @@ function CopySection({ overview, manage, ask }: { overview: Overview; manage: bo
                 onValueChange={setFrom}
                 options={[
                     { value: "managed", label: t("database.copy.managed") },
+                    { value: "saved", label: t("database.copy.saved") },
                     { value: "url", label: t("database.copy.url") }
                 ]}
             />
-            {from === "managed" ? (
+            {from === "saved" ? (
+                connections === null && !error ? (
+                    <Skeleton className="h-9 w-full" />
+                ) : connections && connections.length === 0 ? (
+                    <p className="text-xs text-muted-foreground">
+                        {t("database.copy.noSaved", {
+                            engine: core.dbEngineLabel(overview.engine)
+                        })}{" "}
+                        <a href="/apps/databases" className="text-primary hover:underline">
+                            {t("database.copy.openDatabases")}
+                        </a>
+                    </p>
+                ) : (
+                    <>
+                        <Select
+                            value={connectionId}
+                            onValueChange={setConnectionId}
+                            placeholder={t("database.copy.pickSaved")}
+                            options={(connections ?? []).map((entry) => ({
+                                value: entry.id,
+                                disabled: !entry.usable,
+                                label: entry.viaSsh
+                                    ? t("database.copy.savedViaSsh", {
+                                          name: entry.name,
+                                          server: entry.sshName ?? entry.where
+                                      })
+                                    : `${entry.name} (${entry.where})`
+                            }))}
+                        />
+                        <p className="text-xs text-muted-foreground">
+                            {connection?.viaSsh
+                                ? t("database.copy.throughSsh")
+                                : t("database.copy.readInside")}
+                        </p>
+                        {connections?.some((entry) => !entry.usable) ? (
+                            <p className="text-xs text-muted-foreground">
+                                {t("database.copy.sshNeedsLocal")}
+                            </p>
+                        ) : null}
+                    </>
+                )
+            ) : from === "managed" ? (
                 sources === null && !error ? (
                     <Skeleton className="h-9 w-full" />
                 ) : sources && sources.length === 0 ? (
@@ -1149,16 +1208,13 @@ function CopySection({ overview, manage, ask }: { overview: Overview; manage: bo
                                 source:
                                     from === "managed"
                                         ? (sourceName ?? t("database.copy.thatDatabase"))
-                                        : t("database.copy.thatAddress")
+                                        : from === "saved"
+                                          ? (connection?.name ?? t("database.copy.thatDatabase"))
+                                          : t("database.copy.thatAddress")
                             }),
                             label: t("database.copy.copy"),
                             danger: true,
-                            run: () =>
-                                actions.copyIntoDatabaseAction(
-                                    from === "managed"
-                                        ? { databaseId: overview.id, fromDatabaseId: sourceId }
-                                        : { databaseId: overview.id, fromUrl: url.trim() }
-                                )
+                            run: () => actions.copyIntoDatabaseAction(request)
                         })
                     }
                 >
