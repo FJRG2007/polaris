@@ -162,7 +162,6 @@
         "user": "Usuario",
         "password": "Contraseña",
         "keepSaved": "Déjalo vacío para conservar la guardada.",
-        "tls": "Cifrado",
         "ssh": "Acceder por SSH",
         "sshHint": "Para una base de datos que no está publicada en la red: Polaris inicia sesión en un servidor que la ve y redirige el puerto.",
         "whichLogin": "Qué acceso SSH",
@@ -174,7 +173,7 @@
         "tunnelServer": "Servidor del túnel",
         "sshHost": "Host SSH",
         "sshUser": "Usuario SSH",
-        "sshAuth": "Cómo iniciar sesión por SSH",
+        "sshAuth": "Entrar con",
         "privateKey": "Clave privada",
         "sshPassword": "Contraseña SSH",
         "sshPasswordHint": "Necesaria para iniciar sesión en el servidor SSH.",
@@ -194,24 +193,6 @@
         "passwordAgain": "La dirección cambió; vuelve a escribir la contraseña.",
         "passwordAgainTls": "El cifrado es ahora más débil; vuelve a escribir la contraseña.",
         "savedSecret": "Guardada",
-        "tlsModes": {
-            "disable": {
-                "label": "No",
-                "hint": "Conexión sin cifrar. Solo en una red privada o por túnel SSH."
-            },
-            "require": {
-                "label": "Sí, sin verificar",
-                "hint": "Cifrada, pero cualquier servidor puede responder en su lugar."
-            },
-            "verify-ca": {
-                "label": "Verificar certificado",
-                "hint": "El certificado debe firmarlo una autoridad de confianza."
-            },
-            "verify-full": {
-                "label": "Verificar cert. y nombre",
-                "hint": "Firmado por una autoridad de confianza y emitido para este host."
-            }
-        },
         "tlsUnverified": "Nada comprueba quién responde, así que alguien en la red puede leer y cambiar lo que se envía. Usa un modo que verifique si puedes.",
         "tlsLegacy": "Se guardó cuando el cifrado no comprobaba el certificado. Elige un modo que verifique para cerrar ese hueco.",
         "tlsTrust": "Validar con",
@@ -245,7 +226,38 @@
         "certDifferent": "El servidor presenta ahora otro certificado:",
         "trustCert": "Aceptar certificado",
         "test": "Probar",
-        "testOk": "Conectado: {version}"
+        "testOk": "Conectado: {version}",
+        "ssl": "Activar SSL",
+        "sslHint": "Cifra lo que viaja entre Polaris y la base de datos.",
+        "sslStrict": "Rigor",
+        "sslModes": {
+            "require": {
+                "label": "Solo cifrar",
+                "hint": "Nadie puede leerlo por el camino, pero Polaris no comprueba quién responde. Para un servidor con certificado propio en una red fiable."
+            },
+            "verify-ca": {
+                "label": "Comprobar el certificado",
+                "hint": "El certificado debe firmarlo una autoridad de confianza. El nombre no se comprueba: vale para un servidor por IP."
+            },
+            "verify-full": {
+                "label": "Comprobar certificado y nombre",
+                "hint": "Lo más seguro: firmado por una autoridad de confianza y emitido para esta dirección."
+            }
+        },
+        "url": {
+            "label": "URL de conexión",
+            "import": "Importar",
+            "hint": "Pega una para rellenar los campos. La URL no se guarda.",
+            "filled": "Rellenado desde la URL. Revisa los campos y guarda.",
+            "softened": "Permitía caer a sin cifrar, así que SSL va sin comprobar el certificado.",
+            "refusals": {
+                "unreadable": "No se pudo leer esa URL.",
+                "scheme": "Usa una URL que empiece por postgres://, mysql://, mariadb://, mongodb:// o redis://.",
+                "srv": "Una dirección mongodb+srv:// es un registro SRV, no un servidor. Usa la mongodb:// que también da tu proveedor.",
+                "multihost": "Esta URL lista varios servidores. Usa la dirección de uno, el primario si lo hay."
+            }
+        },
+        "noServersManual": "Aún no hay servidores en Polaris: inicia sesión SSH aquí."
     },
     "notes": {
         "polaris": "Solo lectura. El propio Polaris corre sobre esta.",
