@@ -86,8 +86,15 @@ vi.mock("@polaris/db", () => ({
     prisma: {
         linkPreview: {
             findUnique: async () => rows.existing,
-            updateMany: async (args: { where: unknown; data: { fetchedAt: Date } }) => {
+            updateMany: async (args: {
+                where: { fetchedAt?: { lt: Date } };
+                data: { fetchedAt: Date };
+            }) => {
                 rows.updates.push(args);
+                const before = args.where.fetchedAt?.lt;
+                const at = rows.existing?.fetchedAt;
+                if (before && at && at >= before) return { count: 0 };
+                if (rows.existing) rows.existing = { ...rows.existing, ...args.data };
                 return { count: 1 };
             },
             findMany: async () => [],
@@ -99,6 +106,8 @@ vi.mock("@polaris/db", () => ({
                 create: Omit<Stored, "url">;
             }) => {
                 stored.push({ url: where.url, ...create });
+                // The row read back afterwards is the one just written.
+                if (rows.existing) rows.existing = { ...rows.existing, ...create, url: where.url };
                 return create;
             }
         }
@@ -534,6 +543,82 @@ describe("a card's picture", () => {
         expect(Date.now() - update.data.fetchedAt.getTime()).toBeGreaterThan(
             7 * 24 * 60 * 60 * 1000
         );
+    });
+});
+
+describe("a card's picture that expired", () => {
+    it("is fetched afresh in the same request: the page read again, its new picture handed back", async () => {
+        // The report: of several TikToks in a chat only the newest showed its
+        // picture. The others' covers - signed, good for two days - had
+        // expired; the card was marked to be read again, but the picture had
+        // already failed on screen at an address that never changes.
+        dns.set("p16-sign.tiktokcdn-eu.com", ["23.0.0.12"]);
+        rows.existing = {
+            ok: true,
+            url: "https://example.com/post",
+            target: null,
+            fetchedAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000),
+            imageUrl: "https://p16-sign.tiktokcdn-eu.com/old.image?x-expires=1"
+        };
+        responses.set("https://p16-sign.tiktokcdn-eu.com/old.image?x-expires=1", {
+            status: 403,
+            headers: { "content-type": "text/plain" },
+            body: "expired"
+        });
+        responses.set("https://example.com/post", {
+            status: 200,
+            headers: { "content-type": "text/html; charset=utf-8" },
+            body: '<html><head><title>A post</title><meta property="og:image" content="https://p16-sign.tiktokcdn-eu.com/new.image?x-expires=9"></head></html>'
+        });
+        responses.set("https://p16-sign.tiktokcdn-eu.com/new.image?x-expires=9", {
+            status: 200,
+            headers: { "content-type": "image/jpeg" },
+            body: "jpeg"
+        });
+        const image = await previewImage("p1");
+        expect(image?.contentType).toBe("image/jpeg");
+        expect(fetched).toContain("https://example.com/post");
+    });
+
+    it("is not looked up again more than once an hour", async () => {
+        dns.set("p16-sign.tiktokcdn-eu.com", ["23.0.0.12"]);
+        rows.existing = {
+            ok: true,
+            url: "https://example.com/post",
+            target: null,
+            fetchedAt: new Date(Date.now() - 10 * 60 * 1000),
+            imageUrl: "https://p16-sign.tiktokcdn-eu.com/old.image?x-expires=1"
+        };
+        responses.set("https://p16-sign.tiktokcdn-eu.com/old.image?x-expires=1", {
+            status: 403,
+            headers: { "content-type": "text/plain" },
+            body: "expired"
+        });
+        expect(await previewImage("p1")).toBeNull();
+        expect(fetched).not.toContain("https://example.com/post");
+    });
+
+    it("is looked up once when several requests for it arrive together", async () => {
+        dns.set("p16-sign.tiktokcdn-eu.com", ["23.0.0.12"]);
+        rows.existing = {
+            ok: true,
+            url: "https://example.com/post",
+            target: null,
+            fetchedAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000),
+            imageUrl: "https://p16-sign.tiktokcdn-eu.com/old.image?x-expires=1"
+        };
+        responses.set("https://p16-sign.tiktokcdn-eu.com/old.image?x-expires=1", {
+            status: 403,
+            headers: { "content-type": "text/plain" },
+            body: "expired"
+        });
+        responses.set("https://example.com/post", {
+            status: 200,
+            headers: { "content-type": "text/html; charset=utf-8" },
+            body: '<html><head><title>A post</title><meta property="og:image" content="https://p16-sign.tiktokcdn-eu.com/new.image?x-expires=9"></head></html>'
+        });
+        await Promise.all([previewImage("p1"), previewImage("p1"), previewImage("p1")]);
+        expect(fetched.filter((address) => address === "https://example.com/post")).toHaveLength(1);
     });
 });
 

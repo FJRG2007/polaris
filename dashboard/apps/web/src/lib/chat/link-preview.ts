@@ -148,7 +148,12 @@ export async function knownPreviews(urls: readonly string[]): Promise<Map<string
  * Every failure is recorded rather than thrown, so a dead link is asked about
  * once an hour instead of on every render.
  */
-export async function unfurl(address: string): Promise<void> {
+export async function unfurl(
+    address: string,
+    /** Look now, however recently it was looked at - for a card whose picture
+     *  has stopped answering. The caller bounds how often. */
+    options: { force?: boolean } = {}
+): Promise<void> {
     const url = safeUrl(address);
     if (!url) return;
 
@@ -157,7 +162,7 @@ export async function unfurl(address: string): Promise<void> {
         select: { ok: true, url: true, target: true, fetchedAt: true }
     });
     const age = existing ? Date.now() - existing.fetchedAt.getTime() : Infinity;
-    if (existing && age < trustedFor(existing)) return;
+    if (existing && !options.force && age < trustedFor(existing)) return;
 
     // A share link is followed first, and everything after is about where it
     // led: the site's own description of a TikTok is only to be had for the
@@ -199,33 +204,70 @@ export async function unfurl(address: string): Promise<void> {
 }
 
 /** The picture for one preview, fetched back through Polaris. Null when there is
- *  none, or when it has stopped being reachable. */
+ *  none, or when it has stopped being reachable.
+ *
+ *  A picture that stopped answering is most often a signed address that
+ *  expired - TikTok's covers, two days after they were handed out. The page is
+ *  then read again in the same request, at most once an hour per card, and its
+ *  freshly signed picture is the answer: the picture fails on screen once, at
+ *  an address that never changes, so a refresh left for the next visit is a
+ *  card with no picture on this one. */
 export async function previewImage(
     previewId: string
 ): Promise<{ bytes: Uint8Array; contentType: string } | null> {
     const row = await prisma.linkPreview.findUnique({
         where: { id: previewId },
-        select: { imageUrl: true }
+        select: { imageUrl: true, url: true, fetchedAt: true }
     });
     // Addressed by the row rather than by a URL in the request. A route that
     // took the address would be an open fetch proxy, which is the thing this
     // whole module exists not to be.
     if (!row?.imageUrl) return null;
 
-    const url = safeUrl(row.imageUrl);
-    if (!url) return null;
+    const first = await fetchPicture(row.imageUrl);
+    if (first) return first;
 
+    if (row.url && (await claimLook(previewId))) {
+        await unfurl(row.url, { force: true }).catch(() => undefined);
+        const again = await prisma.linkPreview.findUnique({
+            where: { id: previewId },
+            select: { imageUrl: true }
+        });
+        if (again?.imageUrl && again.imageUrl !== row.imageUrl) {
+            const fresh = await fetchPicture(again.imageUrl);
+            if (fresh) return fresh;
+        }
+    }
+    await lookAgainSoon(previewId);
+    return null;
+}
+
+async function fetchPicture(
+    address: string
+): Promise<{ bytes: Uint8Array; contentType: string } | null> {
+    const url = safeUrl(address);
+    if (!url) return null;
     const response = await follow(url, "image/*");
     const contentType = (response?.headers.get("content-type") ?? "").split(";")[0]!.trim();
     const bytes =
         response?.ok && contentType.startsWith("image/")
             ? await readCapped(response, MAX_IMAGE_BYTES)
             : null;
-    if (!bytes) {
-        await lookAgainSoon(previewId);
-        return null;
-    }
-    return { bytes, contentType };
+    return bytes ? { bytes, contentType } : null;
+}
+
+/** Take this hour's look at a card, or learn that another request already has:
+ *  the condition is part of the write, so of several picture requests arriving
+ *  together only one reads the page again. */
+async function claimLook(previewId: string): Promise<boolean> {
+    const now = Date.now();
+    const claimed = await prisma.linkPreview
+        .updateMany({
+            where: { id: previewId, fetchedAt: { lt: new Date(now - RETRY_MS) } },
+            data: { fetchedAt: new Date(now) }
+        })
+        .catch(() => ({ count: 0 }));
+    return claimed.count === 1;
 }
 
 /**
