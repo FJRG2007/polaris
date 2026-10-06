@@ -76,9 +76,7 @@ export function googleApisOff(raws: readonly (string | null | undefined)[]): num
  *  whichever learned first - the Calendar's sync or the Integrations probe. */
 async function apisOff(): Promise<number> {
     const raws = await Promise.all(
-        core.GOOGLE_APIS.map((api) =>
-            getSetting(core.googleApiStateKey(api.id)).catch(() => null)
-        )
+        core.GOOGLE_APIS.map((api) => getSetting(core.googleApiStateKey(api.id)).catch(() => null))
     );
     return googleApisOff(raws);
 }

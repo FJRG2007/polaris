@@ -464,13 +464,7 @@ function SetupNote({
 }) {
     const t = useCalendarT();
     if (!setup) return <StatusNote tone="warning">{t("accounts.setup.member")}</StatusNote>;
-    return (
-        <AdminApiNote
-            words={t("accounts.setup.admin")}
-            syncing={syncing}
-            onRetry={onRetry}
-        />
-    );
+    return <AdminApiNote words={t("accounts.setup.admin")} syncing={syncing} onRetry={onRetry} />;
 }
 
 /**
@@ -537,7 +531,9 @@ function TasksNote({
     if (!link?.grantsTasks || !tasksApiOff) return null;
     if (!tasksApiOff.enableUrl)
         return <StatusNote tone="neutral">{t("accounts.tasks.apiMember")}</StatusNote>;
-    return <AdminApiNote words={t("accounts.tasks.apiAdmin")} syncing={syncing} onRetry={onRetry} />;
+    return (
+        <AdminApiNote words={t("accounts.tasks.apiAdmin")} syncing={syncing} onRetry={onRetry} />
+    );
 }
 
 function SourceRow({

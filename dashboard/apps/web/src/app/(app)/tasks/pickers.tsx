@@ -102,12 +102,18 @@ export function AssigneePicker({
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start" className="w-56 pt-2">
                 {people.length > 0 && (
-                    <MenuSearch value={query} onChange={setQuery} placeholder={t("pickers.findSomeone")} />
+                    <MenuSearch
+                        value={query}
+                        onChange={setQuery}
+                        placeholder={t("pickers.findSomeone")}
+                    />
                 )}
                 <div className="max-h-64 overflow-y-auto overscroll-contain">
                     {matches.length === 0 && (
                         <p className="px-2 py-3 text-center text-xs text-muted-foreground">
-                            {people.length === 0 ? t("pickers.nobodyYet") : t("pickers.nobodyMatches")}
+                            {people.length === 0
+                                ? t("pickers.nobodyYet")
+                                : t("pickers.nobodyMatches")}
                         </p>
                     )}
                     {matches.map((person) => (
@@ -257,7 +263,11 @@ export function StatusPicker({
                 )}
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start" className="w-56 pt-2">
-                <MenuSearch value={query} onChange={setQuery} placeholder={t("pickers.findStatus")} />
+                <MenuSearch
+                    value={query}
+                    onChange={setQuery}
+                    placeholder={t("pickers.findStatus")}
+                />
                 <div className="max-h-64 overflow-y-auto overscroll-contain">
                     {matches.length === 0 && (
                         <p className="px-2 py-3 text-center text-xs text-muted-foreground">
@@ -607,7 +617,9 @@ export function TagPicker({
                             <span className="flex-1 truncate">
                                 {t("pickers.createTag", { name: query.trim() })}
                             </span>
-                            <span className="text-[0.625rem] text-muted-foreground">{t("pickers.enterKey")}</span>
+                            <span className="text-[0.625rem] text-muted-foreground">
+                                {t("pickers.enterKey")}
+                            </span>
                         </DropdownMenuItem>
                     )}
                 </div>
@@ -775,7 +787,9 @@ export function DurationField({
                 aria-invalid={invalid}
                 className="h-8 w-28 text-xs"
             />
-            {invalid && <p className="mt-1 text-[0.6875rem] text-danger">{t("pickers.durationHint")}</p>}
+            {invalid && (
+                <p className="mt-1 text-[0.6875rem] text-danger">{t("pickers.durationHint")}</p>
+            )}
         </div>
     );
 }
@@ -839,7 +853,9 @@ export function BlockedMarker({
     // Nothing written down and no date means the block is an unfinished task,
     // which the panel lists and a row has no room for.
     const label =
-        reasons.length > 0 ? t("pickers.blockedReasons", { reasons: reasons.join(" - ") }) : t("pickers.blockedByWork");
+        reasons.length > 0
+            ? t("pickers.blockedReasons", { reasons: reasons.join(" - ") })
+            : t("pickers.blockedByWork");
 
     return (
         <span className="inline-flex shrink-0" title={label} aria-label={label} role="img">

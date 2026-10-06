@@ -67,18 +67,28 @@ function card(task: TaskItemView, handlers: Partial<Record<string, () => void>> 
 describe("a task's mark", () => {
     it("is Tasks' round mark, and ticks the task off when pressed", () => {
         const onToggle = vi.fn();
-        const { container } = render(<TaskMark task={GOOGLE} color="#1a73e8" onToggle={onToggle} />, {
-            wrapper: MessagesWrapper
-        });
+        const { container } = render(
+            <TaskMark task={GOOGLE} color="#1a73e8" onToggle={onToggle} />,
+            {
+                wrapper: MessagesWrapper
+            }
+        );
         expect(container.querySelector("svg circle")).not.toBeNull();
         fireEvent.click(screen.getByRole("button", { name: "Mark as done" }));
         expect(onToggle).toHaveBeenCalledWith(GOOGLE);
     });
 
     it("offers to undo a done one, and is only a picture where it cannot be changed", () => {
-        render(<TaskMark task={{ ...GOOGLE, done: true, statusType: "done" }} color="#000" onToggle={vi.fn()} />, {
-            wrapper: MessagesWrapper
-        });
+        render(
+            <TaskMark
+                task={{ ...GOOGLE, done: true, statusType: "done" }}
+                color="#000"
+                onToggle={vi.fn()}
+            />,
+            {
+                wrapper: MessagesWrapper
+            }
+        );
         expect(screen.getByRole("button", { name: "Mark as not done" })).toBeTruthy();
         cleanup();
         render(<TaskMark task={{ ...GOOGLE, editable: false }} color="#000" onToggle={vi.fn()} />, {

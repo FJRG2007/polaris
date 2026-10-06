@@ -78,9 +78,9 @@ describe("where a count sits in the rail", () => {
         expect(
             railCount({ href: "/admin/integrations", appId: "", inApp: true, waiting, admin: off })
         ).toBe(2);
-        expect(railCount({ href: "/admin", appId: "admin", inApp: true, waiting, admin: off })).toBe(
-            0
-        );
+        expect(
+            railCount({ href: "/admin", appId: "admin", inApp: true, waiting, admin: off })
+        ).toBe(0);
     });
 
     it("leaves other apps' rails as they were", () => {
