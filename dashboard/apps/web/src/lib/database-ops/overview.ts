@@ -124,3 +124,39 @@ export async function copySources(databaseId: string, ownerId: string) {
         where: `${source.environment.project.name} / ${source.environment.name}`
     }));
 }
+
+/**
+ * The connections the reader saved in Databases that a copy can come from: the
+ * same engine, and not one of Polaris' own databases (those are the list
+ * above). Whether each goes through SSH is said, because only a destination on
+ * this machine can take one that does.
+ */
+export async function copyConnections(databaseId: string, ownerId: string, userId: string) {
+    const row = await prisma.managedDatabase.findFirst({
+        where: { id: databaseId, environment: { project: { ownerId } } },
+        select: { engine: true }
+    });
+    if (!row) throw new DatabaseOperationError("That database is not there any more.");
+    const engines = row.engine === "mysql" || row.engine === "mariadb" ? ["mysql", "mariadb"] : [row.engine];
+    const rows = await prisma.dataConnection.findMany({
+        where: { ownerId: userId, managedDatabaseId: null, engine: { in: engines } },
+        orderBy: [{ lastUsedAt: "desc" }, { name: "asc" }],
+        take: 200,
+        select: {
+            id: true,
+            name: true,
+            host: true,
+            port: true,
+            sshMode: true,
+            sshHost: true,
+            sshServer: { select: { name: true } }
+        }
+    });
+    return rows.map((connection) => ({
+        id: connection.id,
+        name: connection.name,
+        where: `${connection.host ?? ""}${connection.port ? `:${connection.port}` : ""}`,
+        viaSsh: Boolean(connection.sshMode),
+        sshName: connection.sshServer?.name ?? connection.sshHost ?? null
+    }));
+}

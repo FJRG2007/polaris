@@ -155,7 +155,13 @@
             "confirmBody": "Todo lo que hay en {name} se sustituye por una copia de {source}. Síguelo en Actividad.",
             "thatDatabase": "esa base de datos",
             "thatAddress": "la base de datos de esa dirección",
-            "copy": "Copiar"
+            "copy": "Copiar",
+            "saved": "Una conexión guardada",
+            "pickSaved": "Elige una conexión",
+            "noSaved": "No hay conexiones de {engine} en Bases de datos.",
+            "openDatabases": "Ir a Bases de datos",
+            "savedViaSsh": "{name} (por SSH a través de {server})",
+            "throughSsh": "Polaris abre el túnel SSH y se lo da solo al contenedor de esta base, así que no hay que publicar nada."
         },
         "running": "En curso",
         "failed": "Fallida",

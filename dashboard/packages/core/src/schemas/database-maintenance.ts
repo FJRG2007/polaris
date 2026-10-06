@@ -898,13 +898,20 @@ export const databaseCopySchema = z
         databaseId: z.string().uuid(),
         /** A managed database to copy from... */
         fromDatabaseId: z.string().uuid().optional(),
-        /** ...or a connection string to one somewhere else. */
-        fromUrl: z.string().trim().max(2048).optional()
+        /** ...or a connection string to one somewhere else... */
+        fromUrl: z.string().trim().max(2048).optional(),
+        /** ...or a connection saved in Databases, which may reach its database
+         *  through an SSH tunnel nothing else here can open. */
+        fromConnectionId: z.string().uuid().optional()
     })
-    .refine((value) => Boolean(value.fromDatabaseId) !== Boolean(value.fromUrl), {
-        message: "Copy from one managed database or one connection string",
-        path: ["fromUrl"]
-    });
+    .refine(
+        (value) =>
+            [value.fromDatabaseId, value.fromUrl, value.fromConnectionId].filter(Boolean).length === 1,
+        {
+            message: "Copy from one managed database, one connection string or one saved connection",
+            path: ["fromUrl"]
+        }
+    );
 
 /** A connection string, parsed and checked for the engine it has to be. */
 export interface ExternalSource {

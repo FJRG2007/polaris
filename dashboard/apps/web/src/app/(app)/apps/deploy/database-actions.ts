@@ -28,7 +28,12 @@ import { recordDeployAudit } from "@/lib/deploy-audit";
 import * as settings from "@/lib/database-ops/settings";
 import { databaseMembers } from "@/lib/database-ops/topology";
 import { requireDatabaseAccess, requireDomainAccess } from "@/lib/deploy-project-access";
-import { copySources, databaseOverview, type DatabaseOverview } from "@/lib/database-ops/overview";
+import {
+    copyConnections,
+    copySources,
+    databaseOverview,
+    type DatabaseOverview
+} from "@/lib/database-ops/overview";
 
 const DEPLOY_PATH = "/apps/deploy";
 
@@ -94,12 +99,21 @@ export async function databaseMembersAction(
 
 export async function copySourcesAction(
     databaseId: string
-): Promise<Result<{ sources: Awaited<ReturnType<typeof copySources>> }>> {
+): Promise<
+    Result<{
+        sources: Awaited<ReturnType<typeof copySources>>;
+        connections: Awaited<ReturnType<typeof copyConnections>>;
+    }>
+> {
     const parsed = z.string().uuid().safeParse(databaseId);
     if (!parsed.success) return invalid(parsed.error);
     try {
-        const { ownerId } = await manage(parsed.data);
-        return { sources: await copySources(parsed.data, ownerId) };
+        const { userId, ownerId } = await manage(parsed.data);
+        const [sources, connections] = await Promise.all([
+            copySources(parsed.data, ownerId),
+            copyConnections(parsed.data, ownerId, userId)
+        ]);
+        return { sources, connections };
     } catch (caught) {
         return failure(caught, "databases.copySourcesFailed");
     }
@@ -268,12 +282,20 @@ export async function copyIntoDatabaseAction(input: z.input<typeof core.database
             parsed.data.databaseId,
             ownerId,
             userId,
-            parsed.data.fromDatabaseId ? { fromDatabaseId: parsed.data.fromDatabaseId } : { fromUrl: parsed.data.fromUrl ?? "" }
+            parsed.data.fromDatabaseId
+                ? { fromDatabaseId: parsed.data.fromDatabaseId }
+                : parsed.data.fromConnectionId
+                  ? { fromConnectionId: parsed.data.fromConnectionId }
+                  : { fromUrl: parsed.data.fromUrl ?? "" }
         );
         // The connection string carries a password: only where the copy came
         // from is recorded, never the string itself.
         await audit(userId, "deploy.db.copy", parsed.data.databaseId, {
-            from: parsed.data.fromDatabaseId ?? "connection string"
+            from:
+                parsed.data.fromDatabaseId ??
+                (parsed.data.fromConnectionId
+                    ? `saved connection ${parsed.data.fromConnectionId}`
+                    : "connection string")
         });
         return {};
     } catch (caught) {
