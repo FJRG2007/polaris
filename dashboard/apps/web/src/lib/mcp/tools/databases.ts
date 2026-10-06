@@ -24,6 +24,7 @@
 
 import { z } from "zod";
 import { reachesDatabase } from "../oauth/database-reach";
+import { defineMcpSearch } from "../search";
 import { McpRefusal, defineMcpTool, type McpCaller, type McpTool } from "../protocol";
 
 /**
@@ -225,6 +226,7 @@ const listTool: McpTool<z.infer<typeof listInput>> = {
         // i18n-ignore read by the calling model, not shown to a person
         "The databases this account can open in Polaris - connections it saved, databases Polaris runs in its projects - with each one's engine and whether it is read-only. Never an address or a password. Read-only.",
     input: listInput,
+    category: "databases",
     scope: "databases.read",
     readOnly: true,
     async run(input, caller) {
@@ -295,6 +297,7 @@ const schemaTool: McpTool<z.infer<typeof schemaInput>> = {
         // i18n-ignore read by the calling model, not shown to a person
         "What is inside one database: its schemas and the tables, views or collections in one of them, or, given a relation, that table's columns and types. Read-only.",
     input: schemaInput,
+    category: "databases",
     scope: "databases.read",
     readOnly: true,
     async run(input, caller) {
@@ -370,6 +373,7 @@ const queryTool: McpTool<z.infer<typeof queryInput>> = {
         // i18n-ignore read by the calling model, not shown to a person
         "Run a read-only statement on one database and read the rows back. Runs in a read-only session, so anything that would write is refused by the database itself; databases_execute changes data. Each statement stops after 30 seconds.",
     input: queryInput,
+    category: "databases",
     scope: "databases.read",
     readOnly: true,
     async run(input, caller) {
@@ -411,6 +415,7 @@ const executeTool: McpTool<z.infer<typeof executeInput>> = {
         // i18n-ignore read by the calling model, not shown to a person
         "Run a statement that changes one database - insert, update, delete, create, alter, drop - as the Databases app's statement box does. Takes effect at once and cannot be undone from here: run only what the person asked for. A connection marked read-only still refuses.",
     input: executeInput,
+    category: "databases",
     scope: "databases.write",
     readOnly: false,
     destructive: true,
@@ -438,6 +443,35 @@ const executeTool: McpTool<z.infer<typeof executeInput>> = {
         return answered(results, input.maxRows);
     }
 };
+
+/**
+ * What `polaris_search` finds here: every database this connection may open,
+ * with the same reach and the same silence about addresses as databases_list.
+ */
+export const DATABASE_SEARCH = defineMcpSearch({
+    id: "databases.connections",
+    app: "databases",
+    category: "databases",
+    scope: "databases.read",
+    async search(_query, caller, limit) {
+        const userId = await actorFor(caller);
+        const { connections } = await services();
+        return (await connections.listOpenable(userId))
+            .filter((entry) => reachesDatabase(caller.databaseIds, entry.id))
+            .slice(0, limit)
+            .map((entry) => ({
+                id: entry.id,
+                name: entry.name,
+                kind: "database",
+                where: entry.origin === "managed" ? entry.where : null,
+                keywords: [entry.engine],
+                next: [
+                    { tool: "databases_schema", args: { databaseId: entry.id } },
+                    { tool: "databases_query", args: { databaseId: entry.id } }
+                ]
+            }));
+    }
+});
 
 export const DATABASE_TOOLS: readonly McpTool<never>[] = [
     defineMcpTool(listTool),

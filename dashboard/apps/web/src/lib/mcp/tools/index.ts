@@ -21,7 +21,7 @@ import { DEPLOY_SEARCH, DEPLOY_TOOLS } from "./deploy";
 import { SESSION_TOOLS } from "./sessions";
 import type { McpTool } from "../protocol";
 import { MAIL_SEARCH, MAIL_TOOLS } from "./mail";
-import { DATABASE_TOOLS } from "./databases";
+import { DATABASE_SEARCH, DATABASE_TOOLS } from "./databases";
 import { DISCOVERY_TOOLS } from "./discovery";
 import type { McpSearchProvider } from "../search";
 
@@ -89,5 +89,6 @@ export const MCP_SEARCH_PROVIDERS: readonly McpSearchProvider[] = [
     CHAT_SEARCH,
     DRIVE_SEARCH,
     MAIL_SEARCH,
-    DEPLOY_SEARCH
+    DEPLOY_SEARCH,
+    DATABASE_SEARCH
 ];

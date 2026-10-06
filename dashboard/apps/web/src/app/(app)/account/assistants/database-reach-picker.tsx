@@ -104,7 +104,7 @@ export function DatabaseReachPicker({
                             />
                         </span>
                     ) : null}
-                    <ul className="flex max-h-56 flex-col gap-1.5 overflow-y-auto">
+                    <ul className="flex max-h-56 flex-col gap-1.5 overflow-y-auto overscroll-contain">
                         {shown.map((database) => (
                             <li key={database.id}>
                                 <label className="flex min-w-0 items-start gap-2 text-sm">

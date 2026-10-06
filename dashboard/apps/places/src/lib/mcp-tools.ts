@@ -288,15 +288,12 @@ const devicesTool = () =>
                 { one: "device", other: "devices" },
                 DEVICE_LIMIT
             );
-            const lines = found.items.map((row) => deviceLine(row, now)).join("
-");
+            const lines = found.items.map((row) => deviceLine(row, now)).join("\n");
             const stale = fresh
                 ? ""
-                : "
-(Could not read them again just now: each shows its last reading, as of the time given.)";
+                : "\n(Could not read them again just now: each shows its last reading, as of the time given.)";
             return {
-                text: `${found.note ? `${found.note}
-` : ""}${lines}${stale}`,
+                text: `${found.note ? `${found.note}\n` : ""}${lines}${stale}`,
                 structured: { devices: found.items, matched: found.matched, fresh }
             };
         }

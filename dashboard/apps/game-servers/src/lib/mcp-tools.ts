@@ -311,6 +311,7 @@ const eventKindsTool = () =>
             // i18n-ignore read by the calling model, not shown to a person
             "Every kind of event Polaris can run on a Minecraft Java server - mining rush, trivia, boss fights, parkour and the rest - with what each is, how long it runs by default, and the settings it takes. Events are set up on a server's Events screen; games_events lists the ones a server has. Read-only.",
         input: kindsInput,
+        category: "games",
         scope: "gameservers.read",
         readOnly: true,
         async run(input, caller) {
@@ -362,6 +363,7 @@ const eventsTool = () =>
             // i18n-ignore read by the calling model, not shown to a person
             "The events one Minecraft server has set up, the one on now with its standings, and how the recent ones went (winners and scores). Needs the console on that server. Read-only; games_event_start starts one.",
         input: z.object({ serverId }),
+        category: "games",
         scope: "gameservers.read",
         readOnly: true,
         async run(input, caller) {
@@ -457,6 +459,7 @@ const eventStartTool = () =>
             // i18n-ignore read by the calling model, not shown to a person
             "Start one of a Minecraft server's events now, as its Run button does: a countdown is announced to everybody on the server, then the event runs and hands out its prizes. Refused while another is on, with nobody on, or when the server cannot play it. Confirm with the person first.",
         input: startInput,
+        category: "games",
         scope: "gameservers.manage",
         readOnly: false,
         async run(input, caller) {
@@ -502,6 +505,7 @@ const eventCancelTool = () =>
             // i18n-ignore read by the calling model, not shown to a person
             "Call off the event on now on a Minecraft server, as its Cancel button does. It is taken down on its next tick and its arena, if it built one, is cleared; nobody is ranked.",
         input: z.object({ serverId }),
+        category: "games",
         scope: "gameservers.manage",
         readOnly: false,
         async run(input, caller) {

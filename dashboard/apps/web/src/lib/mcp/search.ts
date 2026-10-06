@@ -43,7 +43,7 @@
  *                     kind: "database",
  *                     where: row.server,
  *                     keywords: [row.engine],
- *                     next: [{ tool: "databases_query", args: { connectionId: row.id } }]
+ *                     next: [{ tool: "databases_query", args: { databaseId: row.id } }]
  *                 }));
  *             }
  *         })

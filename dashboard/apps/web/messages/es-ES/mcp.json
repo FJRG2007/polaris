@@ -186,11 +186,11 @@
             "allow": "Permitir {app}"
         },
         "databases": {
-            "title": "Bases de datos a las que puede acceder",
+            "title": "Bases que puede abrir",
             "hint": "Se aplica a sus herramientas de bases de datos desde su próxima llamada.",
-            "all": "Todas las bases de datos que puedes abrir",
+            "all": "Todas las que puedes abrir",
             "chosen": "Solo las que elija",
-            "search": "Buscar bases de datos",
+            "search": "Buscar bases",
             "noneToChoose": "No tienes bases de datos entre las que elegir.",
             "noneChosen": "Ninguna elegida: sus herramientas de bases de datos se rechazan.",
             "failed": "No se pudo cambiar a qué bases de datos puede acceder. Recarga e inténtalo de nuevo.",

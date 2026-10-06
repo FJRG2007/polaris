@@ -41,7 +41,9 @@ vi.mock("@/lib/data/browser", () => ({ browseAt: mocks.browseAt, runAt: mocks.ru
 vi.mock("@/lib/data/open", () => ({ withDriver: mocks.withDriver }));
 vi.mock("@/lib/data/driver", () => ({ DataRequestError, ReadOnlyError }));
 
-const { DATABASE_TOOLS, statementFailure } = await import("@/lib/mcp/tools/databases");
+const { DATABASE_SEARCH, DATABASE_TOOLS, statementFailure } = await import(
+    "@/lib/mcp/tools/databases"
+);
 const { handleMcpMessage } = await import("@/lib/mcp/protocol");
 
 const SERVER = { name: "polaris", version: "1", instructions: "" };
@@ -419,5 +421,40 @@ describe("statementFailure", () => {
             statementFailure(Object.assign(new Error("no route"), { code: "08006" }))
         ).toBeNull();
         expect(statementFailure(new Error("socket hang up"))).toBeNull();
+    });
+});
+
+describe("the search provider", () => {
+    const caller = (databaseIds?: string[] | null) => ({
+        userId: "user-1",
+        isAdmin: false,
+        scopes: ["databases.read"] as never,
+        ...(databaseIds === undefined ? {} : { databaseIds })
+    });
+
+    it("finds the databases this connection reaches, with the tools to call next", async () => {
+        const hits = await DATABASE_SEARCH.search("shop", caller([SHOP, MANAGED]), 10);
+        expect(hits.map((hit) => hit.id)).toEqual([SHOP, MANAGED]);
+        expect(hits[0]).toMatchObject({
+            name: "Shop",
+            kind: "database",
+            next: expect.arrayContaining([
+                { tool: "databases_schema", args: { databaseId: SHOP } },
+                { tool: "databases_query", args: { databaseId: SHOP } }
+            ])
+        });
+        expect(hits[1]?.where).toBe("Store / production");
+    });
+
+    it("never says where a saved connection points or how it signs in", async () => {
+        const hits = await DATABASE_SEARCH.search("", caller(), 10);
+        expect(hits).toHaveLength(3);
+        const said = JSON.stringify(hits);
+        expect(said).not.toContain("db.internal.example.test");
+        expect(said).not.toContain("shop_owner");
+    });
+
+    it("is filed under the databases scope and category", () => {
+        expect(DATABASE_SEARCH).toMatchObject({ scope: "databases.read", category: "databases" });
     });
 });
