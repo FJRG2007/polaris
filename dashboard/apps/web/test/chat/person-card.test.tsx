@@ -248,7 +248,13 @@ describe("the larger view", () => {
         conversation();
         await user.click(screen.getByRole("button", { name: "Grace Hopper" }));
         const card = await openCard();
-        await user.click(within(card).getByRole("button", { name: "View full profile" }));
+        // The face is the way in, as in Discord: one press target, no corner
+        // button beside it.
+        const face = within(card).getAllByRole("button", { name: "View full profile" });
+        expect(face).toHaveLength(1);
+        expect(face[0]!.querySelector(".lucide-maximize2")).toBeNull();
+        expect(face[0]!.querySelector("[data-avatar]")).not.toBeNull();
+        await user.click(face[0]!);
 
         const link = await screen.findByRole("link", { name: /Open profile page/ });
         expect(link.getAttribute("href")).toBe("/u/grace");

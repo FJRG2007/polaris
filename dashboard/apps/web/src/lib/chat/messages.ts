@@ -29,7 +29,7 @@ import {
 } from "./references";
 import { pollsFor, type ChatPollView } from "./polls";
 import { mentionsReader, readerTeams } from "./notify";
-import { noticePeople, renderNotice } from "./notice-text";
+import { noticeParts, noticePeople, renderNotice, type NoticePart } from "./notice-text";
 import { plainExcerpt } from "@/components/rich-text/excerpt";
 import { announceRoomMention, refuseRoomMention } from "./room-mentions";
 import { requireNotSpam, requireRoomMentionAllowed } from "./spam-guard";
@@ -60,6 +60,9 @@ export interface ChatMessageView {
     readonly kind: core.ChatMessageKind;
     /** Empty for a deleted message - the tombstone carries no text. */
     readonly body: string;
+    /** A line Polaris wrote ("You added Grace"), in pieces, so each person it
+     *  names can be pressed like a mention. Only on a system message. */
+    readonly notice?: readonly NoticePart[];
     readonly parentId: string | null;
     readonly replyCount: number;
     readonly lastReplyAt: string | null;
@@ -1737,6 +1740,9 @@ export async function decorateMessages(
             : row.kind === "system"
               ? renderNotice(row.body, names, actor.id)
               : row.body,
+        ...(row.kind === "system" && !row.deletedAt
+            ? { notice: noticeParts(row.body, names, actor.id) }
+            : {}),
         parentId: row.parentId,
         replyCount: row.replyCount,
         lastReplyAt: row.lastReplyAt?.toISOString() ?? null,
