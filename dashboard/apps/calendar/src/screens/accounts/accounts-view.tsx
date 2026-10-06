@@ -35,7 +35,6 @@ import {
     ArrowLeft,
     CheckCircle2,
     Clock,
-    ExternalLink,
     KeyRound,
     Link2,
     Loader2,
@@ -451,7 +450,8 @@ function statusTone(status: SourceView["status"]): "success" | "warning" | "dang
 /**
  * A Google source waiting on the Calendar API being switched on for this
  * Polaris. Connecting again cannot fix that, so it is not offered: an
- * administrator gets the switch and a retry, everybody else who to ask.
+ * administrator is sent to Integrations with a retry, everybody else told who
+ * to ask.
  */
 function SetupNote({
     setup,
@@ -464,20 +464,31 @@ function SetupNote({
 }) {
     const t = useCalendarT();
     if (!setup) return <StatusNote tone="warning">{t("accounts.setup.member")}</StatusNote>;
+    return <AdminApiNote words={t("accounts.setup.admin")} syncing={syncing} onRetry={onRetry} />;
+}
+
+/**
+ * A Google API this Polaris has switched off, said to the administrator who can
+ * switch it on - and pointed at Management's Integrations screen, which is where
+ * that is done and where it is counted until it is, rather than at the Cloud
+ * console from somebody's own calendar settings.
+ */
+function AdminApiNote({
+    words,
+    syncing,
+    onRetry
+}: {
+    words: string;
+    syncing: boolean;
+    onRetry: () => void;
+}) {
+    const t = useCalendarT();
     return (
         <StatusNote tone="warning" className="flex flex-col gap-2">
-            <span>{t("accounts.setup.admin")}</span>
-            {setup.project ? (
-                <span className="text-xs">
-                    {t("accounts.setup.project", { project: setup.project })}
-                </span>
-            ) : null}
+            <span>{words}</span>
             <span className="flex flex-wrap items-center gap-2">
                 <Button size="sm" variant="outline" asChild>
-                    <a href={setup.enableUrl} target="_blank" rel="noopener noreferrer">
-                        {t("accounts.setup.open")}
-                        <ExternalLink aria-hidden />
-                    </a>
+                    <a href="/admin/integrations">{t("accounts.setup.openIntegrations")}</a>
                 </Button>
                 <Button size="sm" variant="ghost" disabled={syncing} onClick={onRetry}>
                     {syncing ? <Loader2 className="animate-spin" aria-hidden /> : null}
@@ -521,26 +532,7 @@ function TasksNote({
     if (!tasksApiOff.enableUrl)
         return <StatusNote tone="neutral">{t("accounts.tasks.apiMember")}</StatusNote>;
     return (
-        <StatusNote tone="warning" className="flex flex-col gap-2">
-            <span>{t("accounts.tasks.apiAdmin")}</span>
-            {tasksApiOff.project ? (
-                <span className="text-xs">
-                    {t("accounts.setup.project", { project: tasksApiOff.project })}
-                </span>
-            ) : null}
-            <span className="flex flex-wrap items-center gap-2">
-                <Button size="sm" variant="outline" asChild>
-                    <a href={tasksApiOff.enableUrl} target="_blank" rel="noopener noreferrer">
-                        {t("accounts.setup.open")}
-                        <ExternalLink aria-hidden />
-                    </a>
-                </Button>
-                <Button size="sm" variant="ghost" disabled={syncing} onClick={onRetry}>
-                    {syncing ? <Loader2 className="animate-spin" aria-hidden /> : null}
-                    {t("accounts.retry")}
-                </Button>
-            </span>
-        </StatusNote>
+        <AdminApiNote words={t("accounts.tasks.apiAdmin")} syncing={syncing} onRetry={onRetry} />
     );
 }
 

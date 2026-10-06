@@ -20,7 +20,7 @@
 
 import { readFile } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
-import { updateIsWaiting } from "@/lib/admin-waiting";
+import { googleApisOff, updateIsWaiting } from "@/lib/admin-waiting";
 import { translate } from "@/lib/i18n/translate";
 
 const SRC = new URL("../../src/", import.meta.url);
@@ -50,6 +50,26 @@ describe("an update that is waiting for somebody", () => {
     });
 });
 
+describe("a Google API switched off for this Polaris", () => {
+    // The report: the Linked calendars screen told the person whose tasks were
+    // missing to turn an API on in Google Cloud. That is the administrator's to
+    // do, so it is counted on Management, where the administrator looks.
+    const at = { since: "2026-10-06T00:00:00.000Z", checkedAt: "2026-10-06T00:00:00.000Z" };
+    const off = JSON.stringify({
+        state: "disabled",
+        project: "100000000001",
+        activationUrl: null,
+        ...at
+    });
+    const on = JSON.stringify({ state: "enabled", project: null, activationUrl: null, ...at });
+
+    it("counts each one off, and nothing for one on or never checked", () => {
+        expect(googleApisOff([off, on, null])).toBe(1);
+        expect(googleApisOff([off, off, off])).toBe(3);
+        expect(googleApisOff([null, "not json", on])).toBe(0);
+    });
+});
+
 describe("what a badge says it is counting", () => {
     // The words live in the `nav` catalog, where the rail reads them.
     it("is messages for an app that does not say otherwise", () => {
@@ -58,8 +78,12 @@ describe("what a badge says it is counting", () => {
     });
 
     it("is whatever the app says, for one that does", () => {
-        expect(translate("en-US", "nav.waiting.byApp.admin", { count: 1 })).toBe("1 thing needs an administrator");
-        expect(translate("en-US", "nav.waiting.byApp.admin", { count: 3 })).toBe("3 things need an administrator");
+        expect(translate("en-US", "nav.waiting.byApp.admin", { count: 1 })).toBe(
+            "1 thing needs an administrator"
+        );
+        expect(translate("en-US", "nav.waiting.byApp.admin", { count: 3 })).toBe(
+            "3 things need an administrator"
+        );
     });
 });
 
@@ -90,8 +114,12 @@ describe("the count reaching every badge in Polaris", () => {
         // opening the queue clears the badge is the reader's setting, asserted in
         // `badge-seen.test.ts`; what is counted is always what is still open.
         const waiting = await readFile(new URL("lib/admin-waiting.ts", SRC), "utf8");
-        expect(waiting).toContain('prisma.chatReport.count({ where: { status: "open", ...newer } })');
-        expect(waiting).toContain('prisma.safetyCase.count({ where: { status: "open", ...newer } })');
+        expect(waiting).toContain(
+            'prisma.chatReport.count({ where: { status: "open", ...newer } })'
+        );
+        expect(waiting).toContain(
+            'prisma.safetyCase.count({ where: { status: "open", ...newer } })'
+        );
     });
 
     it("tells the administrators when a message is reported", async () => {

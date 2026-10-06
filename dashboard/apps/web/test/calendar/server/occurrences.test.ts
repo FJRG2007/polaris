@@ -232,6 +232,12 @@ describe("occurrences in a window", () => {
             ["tasks", "Write report"]
         ]);
         expect(range.tasks[0]?.due).toBe("2026-10-20T10:00:00.000Z");
+        // Each carries the state it is in, the way Tasks draws it: a calendar's
+        // task as not started or done, a Tasks task as its own status.
+        expect(range.tasks.map((task) => [task.statusType, task.statusColor])).toEqual([
+            ["open", null],
+            ["open", "#64748b"]
+        ]);
         expect((await read(alice, false)).tasks).toEqual([]);
     });
 

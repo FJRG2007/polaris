@@ -50,7 +50,13 @@ beforeEach(() => {
 
 describe("before the screen has been opened", () => {
     it("counts the update and every open report and case", async () => {
-        expect(await adminWaiting("ada")).toEqual({ reports: 3, cases: 3, update: true, total: 7 });
+        expect(await adminWaiting("ada")).toEqual({
+            reports: 3,
+            cases: 3,
+            update: true,
+            apis: 0,
+            total: 7
+        });
     });
 });
 
@@ -83,7 +89,13 @@ describe("an account that keeps its badges", () => {
             { key: "admin.update", mark: "new4567" },
             { key: "admin.safety", mark: "2026-09-29T09:00:00.000Z" }
         ];
-        expect(await adminWaiting("ada")).toEqual({ reports: 3, cases: 3, update: true, total: 7 });
+        expect(await adminWaiting("ada")).toEqual({
+            reports: 3,
+            cases: 3,
+            update: true,
+            apis: 0,
+            total: 7
+        });
     });
 });
 

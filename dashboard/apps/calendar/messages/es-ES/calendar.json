@@ -633,6 +633,12 @@
         "scheduled": "Tarea con fecha"
     },
     "todo": {
+        "delete": "Eliminar tarea",
+        "deleteBody": "\"{title}\" va a la papelera.",
+        "deleteFailed": "No se eliminó la tarea",
+        "deleteTitle": "¿Eliminar esta tarea?",
+        "deleted": "Tarea eliminada",
+        "doneFailed": "No se actualizó la tarea",
         "due": "Vence",
         "dueDate": "Día límite",
         "dueKind": {
@@ -641,8 +647,12 @@
             "time": "A una hora"
         },
         "dueTime": "Hora límite",
+        "duplicateFailed": "No se copió la tarea",
         "editTitle": "Editar tarea",
         "loadFailed": "No se ha podido abrir esta tarea.",
+        "markDone": "Marcar hecha",
+        "markNotDone": "Marcar como no hecha",
+        "openInTasks": "Abrir en Tareas",
         "saveFailed": "No se ha guardado la tarea",
         "saved": "Guardada",
         "status": "Estado",
@@ -651,6 +661,13 @@
             "COMPLETED": "Hecha",
             "IN-PROCESS": "En curso",
             "NEEDS-ACTION": "Por hacer"
+        },
+        "statusType": {
+            "open": "Sin empezar",
+            "active": "En curso",
+            "blocked": "Bloqueada",
+            "done": "Hecha",
+            "closed": "Cerrada"
         },
         "title": "Título",
         "viewTitle": "Tarea"

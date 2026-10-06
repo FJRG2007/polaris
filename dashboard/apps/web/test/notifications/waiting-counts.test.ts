@@ -9,10 +9,13 @@
 import { describe, expect, it } from "vitest";
 import { railCount, tabWaiting } from "@/lib/waiting-counts";
 
-const queue = (over: Partial<{ reports: number; cases: number; update: boolean }> = {}) => ({
+const queue = (
+    over: Partial<{ reports: number; cases: number; update: boolean; apis: number }> = {}
+) => ({
     reports: 0,
     cases: 0,
     update: false,
+    apis: 0,
     ...over
 });
 const row = (type: string, read = false) => ({ type, read });
@@ -68,6 +71,16 @@ describe("where a count sits in the rail", () => {
         expect(railCount({ href: "/admin/safety", appId: "", inApp: true, waiting, admin })).toBe(
             2
         );
+    });
+
+    it("puts a Google API switched off on Integrations, where it is switched on", () => {
+        const off = queue({ apis: 2 });
+        expect(
+            railCount({ href: "/admin/integrations", appId: "", inApp: true, waiting, admin: off })
+        ).toBe(2);
+        expect(
+            railCount({ href: "/admin", appId: "admin", inApp: true, waiting, admin: off })
+        ).toBe(0);
     });
 
     it("leaves other apps' rails as they were", () => {

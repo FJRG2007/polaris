@@ -12,6 +12,7 @@
  * Server-only.
  */
 
+import * as core from "@polaris/core";
 import { loadEnv } from "@polaris/config";
 import { prisma, VISIBLE_USER } from "@polaris/db";
 import { CredentialDecryptError, decryptSecret, encryptSecret } from "@polaris/storage";
@@ -344,6 +345,10 @@ export interface CalendarTask {
     readonly timed: boolean;
     readonly done: boolean;
     readonly listName: string;
+    /** Its status, as Tasks draws its round mark. */
+    readonly statusType: core.TaskStatusType;
+    readonly statusColor: string;
+    readonly statusName: string;
 }
 
 /**
@@ -372,7 +377,8 @@ export async function assignedTasks(
             timed: true,
             completedAt: true,
             list: { select: { name: true } },
-            space: { select: { prefix: true } }
+            space: { select: { prefix: true } },
+            status: { select: { type: true, color: true, name: true } }
         },
         orderBy: { dueDate: "asc" },
         take: limit
@@ -384,8 +390,57 @@ export async function assignedTasks(
         due: row.dueDate?.toISOString() ?? null,
         timed: row.timed,
         done: row.completedAt !== null,
-        listName: row.list.name
+        listName: row.list.name,
+        statusType: statusTypeOf(row.status?.type, row.completedAt !== null),
+        statusColor: row.status?.color ?? DEFAULT_STATUS_COLOR,
+        statusName: row.status?.name ?? ""
     }));
+}
+
+/** A stored status kind, or - for a task with none, or one that does not read -
+ *  the kind its completion says. */
+function statusTypeOf(type: string | undefined, done: boolean): core.TaskStatusType {
+    if (type && core.isTaskStatusType(type)) return type;
+    return done ? "done" : "open";
+}
+
+/** What a task with no status of its own is drawn in: Tasks' own default. */
+const DEFAULT_STATUS_COLOR = "#64748b";
+
+/**
+ * Tick a task off, or back, from the calendar - as its round mark does in
+ * Tasks: to the first done status of its space, or back to the first not
+ * started one. Through the Tasks service, so history, automations and
+ * watchers see it as a change made on the task. A space with no status to
+ * move it to answers with the reason, in the reader's words.
+ */
+export async function setTaskDone(
+    actor: { id: string; isAdmin: boolean },
+    taskId: string,
+    done: boolean
+): Promise<{ refused?: string }> {
+    const access = await import("@/lib/tasks/access");
+    const { readerWords } = await import("@/lib/i18n/reader-words");
+    const tasks = await import("@/lib/tasks/task-service");
+    await access.requireTask(actor, taskId, "member");
+    const task = await prisma.task.findUnique({ where: { id: taskId }, select: { spaceId: true } });
+    if (!task) return { refused: (await readerWords("tasks"))("refusals.taskGone") };
+    const statuses = await prisma.taskStatus.findMany({
+        where: { spaceId: task.spaceId },
+        select: { id: true, type: true },
+        orderBy: { order: "asc" }
+    });
+    const target = statuses.find((status) =>
+        done ? status.type === "done" : status.type === "open"
+    );
+    if (!target)
+        return {
+            refused: (await readerWords("tasks"))(
+                done ? "refusals.noDoneStatus" : "refusals.noOpenStatus"
+            )
+        };
+    await tasks.updateTask(actor.id, { taskId, statusId: target.id });
+    return {};
 }
 
 /**

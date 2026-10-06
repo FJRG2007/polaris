@@ -98,3 +98,4 @@ export {
     type BoardPoint,
     type BoardView
 } from "./lib/board-gestures";
+export { StatusIcon } from "./components/status-icon";

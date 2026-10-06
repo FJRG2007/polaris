@@ -368,6 +368,8 @@
         "folderTooDeepMove": "Folders can nest {limit} deep, and that would go further",
         "folderTooDeep": "Folders can nest {limit} deep",
         "noStatusCalled": "This task's space has no status called \"{name}\"",
+        "noDoneStatus": "This task's space has no done status",
+        "noOpenStatus": "This task's space has no not started status",
         "ruleNotInSpace": "That rule is not in this space",
         "sprintNotInSpace": "That sprint is not in this space"
     },

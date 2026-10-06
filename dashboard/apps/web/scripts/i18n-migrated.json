@@ -45,6 +45,7 @@
         "calendar/src/screens/shortcuts.ts",
         "calendar/src/screens/sidebar.tsx",
         "calendar/src/screens/slots.ts",
+        "calendar/src/screens/task-card.tsx",
         "game-servers/src/lib/minecraft/suspicion.ts",
         "game-servers/src/lib/player-vocabulary.ts",
         "game-servers/src/routes/api/apps/games/live/route.ts",

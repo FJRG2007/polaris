@@ -267,6 +267,40 @@ describe("calendar actions", () => {
         expect(item.component === "VTODO" && item.todo.summary).toBe("Taxes");
     });
 
+    it("ticks a calendar task off and back from its mark, and a Tasks task through Tasks", async () => {
+        const todo = world.storeItem(
+            calendar,
+            engine.todoItem(engine.newTodo({ uid: "todo-1", summary: "Taxes" }))
+        );
+        const done = await tasks.setTaskDoneAction({
+            source: "calendar",
+            id: todo.id,
+            done: true,
+            zone: ZONE
+        });
+        expect(done).toEqual({ ok: true });
+        const item = world.itemIn(db.byId("calendarObject", String(todo.id)));
+        if (item.component !== "VTODO") throw new Error("a task expected");
+        expect(item.todo).toMatchObject({ status: "COMPLETED", percent: 100 });
+        expect(item.todo.completed).not.toBeNull();
+
+        await tasks.setTaskDoneAction({ source: "calendar", id: todo.id, done: false, zone: ZONE });
+        const undone = world.itemIn(db.byId("calendarObject", String(todo.id)));
+        if (undone.component !== "VTODO") throw new Error("a task expected");
+        expect(undone.todo).toMatchObject({ status: "NEEDS-ACTION", completed: null });
+
+        expect(
+            await tasks.setTaskDoneAction({ source: "tasks", id: MISSING, done: true, zone: ZONE })
+        ).toEqual({ ok: true });
+        expect(fake.doneSet).toEqual([{ taskId: MISSING, done: true }]);
+
+        fake.doneRefusal = "This task's space has no done status";
+        expect(
+            await tasks.setTaskDoneAction({ source: "tasks", id: MISSING, done: true, zone: ZONE })
+        ).toEqual({ ok: false, error: "This task's space has no done status" });
+        expect(fake.doneSet).toHaveLength(1);
+    });
+
     it("saves a calendar task and schedules a Tasks-app task", async () => {
         const todo = world.storeItem(
             calendar,

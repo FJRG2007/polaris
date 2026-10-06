@@ -42,10 +42,17 @@ export interface AdminWaiting {
     readonly reports: number;
     readonly cases: number;
     readonly update: boolean;
+    readonly apis: number;
     readonly total: number;
 }
 
-export const NO_ADMIN_WAITING: AdminWaiting = { reports: 0, cases: 0, update: false, total: 0 };
+export const NO_ADMIN_WAITING: AdminWaiting = {
+    reports: 0,
+    cases: 0,
+    update: false,
+    apis: 0,
+    total: 0
+};
 
 const WaitingContext = createContext<AdminWaiting>(NO_ADMIN_WAITING);
 /** Asks for the count again now, for a screen that just changed what it is. */
@@ -63,6 +70,8 @@ const waitingSchema = z.object({
     reports: z.number(),
     cases: z.number(),
     update: z.boolean(),
+    // Absent from a server older than this page, which counted no APIs.
+    apis: z.number().default(0),
     total: z.number()
 });
 

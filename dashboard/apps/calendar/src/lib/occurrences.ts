@@ -11,6 +11,7 @@
  */
 
 import * as engine from "../engine";
+import type * as core from "@polaris/core";
 import { prisma } from "@polaris/db";
 import { host } from "@polaris/app-host";
 import type { OccurrenceView, RangeView, TaskItemView } from "./wire";
@@ -24,6 +25,15 @@ import {
 
 /** The widest window answered: a year view with the weeks around it. */
 export const MAX_WINDOW_DAYS = 400;
+
+/** A calendar task's status as the kind Tasks reasons about: what tells a
+ *  ring, a filling ring, a tick and a cross apart. */
+export function todoStatusType(status: engine.TodoStatus): core.TaskStatusType {
+    if (status === "COMPLETED") return "done";
+    if (status === "CANCELLED") return "closed";
+    if (status === "IN-PROCESS") return "active";
+    return "open";
+}
 
 /** Objects read for one window at most. A calendar that holds more inside one
  *  year view than this is drawn partially and says so. */
@@ -156,7 +166,10 @@ export async function occurrencesIn(
                 done: item.todo.status === "COMPLETED",
                 reference: null,
                 listName: null,
-                editable
+                editable,
+                statusType: todoStatusType(item.todo.status),
+                statusColor: null,
+                statusName: null
             });
             continue;
         }
@@ -212,7 +225,10 @@ export async function occurrencesIn(
                 done: task.done,
                 reference: task.reference,
                 listName: task.listName,
-                editable: true
+                editable: true,
+                statusType: task.statusType,
+                statusColor: task.statusColor,
+                statusName: task.statusName
             });
         }
     }

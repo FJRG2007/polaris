@@ -33,7 +33,10 @@ export async function unscheduledTasksAction(): Promise<Outcome<{ tasks: TaskIte
                 done: task.done,
                 reference: task.reference,
                 listName: task.listName,
-                editable: true
+                editable: true,
+                statusType: task.statusType,
+                statusColor: task.statusColor,
+                statusName: task.statusName
             }))
         };
     });
@@ -126,6 +129,55 @@ export async function saveTodoAction(input: unknown): Promise<Outcome<object>> {
             status: parsed.data.status,
             percent: done ? 100 : item.todo.percent === 100 ? 0 : item.todo.percent,
             completed: done ? (item.todo.completed ?? new Date().toISOString()) : null
+        };
+        await writeItem(
+            row.calendarId,
+            row,
+            { ...item, todo },
+            { actor: user, floatingZone: parsed.data.zone }
+        );
+        return {};
+    });
+}
+
+const doneInput = z.object({
+    source: z.enum(["calendar", "tasks"]),
+    id: uuidSchema,
+    done: z.boolean(),
+    zone: z.string().max(64).refine(isKnownZone)
+});
+
+/**
+ * Tick a task off, or back, from its mark on the grid - as the round mark on a
+ * Tasks row does. A calendar's task is marked completed (or needing action) in
+ * its own calendar, which a synced one carries back to its provider; a Tasks
+ * task goes through the Tasks service, to the first done (or not started)
+ * status of its space.
+ */
+export async function setTaskDoneAction(input: unknown): Promise<Outcome<object>> {
+    const parsed = doneInput.safeParse(input);
+    if (!parsed.success) return invalid(parsed.error.issues);
+    return outcome(async () => {
+        const user = await requireCalendarUser();
+        if (parsed.data.source === "tasks") {
+            const answer = await host.calendarHost.setTaskDone(
+                { id: user.id, isAdmin: user.isAdmin },
+                parsed.data.id,
+                parsed.data.done
+            );
+            if (answer.refused) throw new CalendarRefusal(answer.refused);
+            return {};
+        }
+        const { row } = await writableObject(user, parsed.data.id);
+        const item = await itemOf(row);
+        if (item.component !== "VTODO") return {};
+        const done = parsed.data.done;
+        if ((item.todo.status === "COMPLETED") === done) return {};
+        const todo: engine.CalendarTodo = {
+            ...item.todo,
+            status: done ? "COMPLETED" : "NEEDS-ACTION",
+            percent: done ? 100 : item.todo.percent === 100 ? 0 : item.todo.percent,
+            completed: done ? new Date().toISOString() : null
         };
         await writeItem(
             row.calendarId,

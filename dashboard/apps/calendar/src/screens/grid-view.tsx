@@ -33,6 +33,8 @@ import timeGridPlugin from "@fullcalendar/timegrid";
 import multiMonthPlugin from "@fullcalendar/multimonth";
 import interactionPlugin from "@fullcalendar/interaction";
 import { elapsedToday, type GridItem } from "./grid-events";
+import { TaskMark } from "./task-card";
+import type { TaskItemView } from "../lib/wire";
 import type { CalendarViewName } from "../lib/preferences";
 import type { EventReceiveArg, EventResizeDoneArg } from "@fullcalendar/interaction";
 import type {
@@ -115,6 +117,8 @@ export interface GridViewProps {
      *  opened the menu ends in one), and the highlight goes back to `selection`. */
     readonly onSelectRange: (range: GridRange, anchor: DOMRect | null) => boolean;
     readonly onItemClick: (item: GridItem, id: string, anchor: DOMRect) => void;
+    /** A task's round mark was pressed: tick it off, or back. */
+    readonly onTaskToggle: (task: TaskItemView) => void;
     readonly onItemFocus: (id: string) => void;
     readonly onChange: (change: GridChange) => void;
     readonly onTaskDrop: (taskId: string, at: GridMoment) => void;
@@ -494,6 +498,26 @@ export default function GridView(props: GridViewProps) {
                 }
                 eventAllow={(drop, dragged) => (dragged ? drop.allDay === dragged.allDay : true)}
                 events={events}
+                // A task wears Tasks' round status mark before its title, and the
+                // mark ticks it off; everything else is drawn as the grid draws it.
+                eventContent={(arg) => {
+                    const item = (arg.event.extendedProps as { item?: GridItem }).item;
+                    if (item?.kind !== "task") return true;
+                    return (
+                        <span className="pc-task-chip flex min-w-0 items-center gap-1 overflow-hidden px-0.5">
+                            <TaskMark
+                                task={item.task}
+                                color={arg.event.textColor || "currentColor"}
+                                size={12}
+                                onToggle={(task) => propsRef.current.onTaskToggle(task)}
+                            />
+                            {arg.timeText ? (
+                                <span className="shrink-0 tabular-nums">{arg.timeText}</span>
+                            ) : null}
+                            <span className="min-w-0 truncate">{arg.event.title}</span>
+                        </span>
+                    );
+                }}
                 eventDidMount={(arg) => {
                     // The dimmed past is drawing, not something a menu can be about.
                     if (arg.event.display === "background") return;
@@ -515,6 +539,8 @@ export default function GridView(props: GridViewProps) {
                 eventClick={(arg: EventClickArg) => {
                     arg.jsEvent.preventDefault();
                     if (!(arg.event.extendedProps as { item?: GridItem }).item) return;
+                    const target = arg.jsEvent.target;
+                    if (target instanceof Element && target.closest("[data-task-mark]")) return;
                     propsRef.current.onItemClick(
                         itemOf(arg.event),
                         arg.event.id,

@@ -59,6 +59,7 @@ import { calendarSlots } from "./slots";
 import { MiniMonth } from "./mini-month";
 import type { PartStat } from "../engine";
 import { TodoEditor } from "./todo-editor";
+import { TaskCard } from "./task-card";
 import * as taskActions from "../actions/tasks";
 import { useScopeChoice } from "./scope-dialog";
 import type { GridTarget } from "./grid-target";
@@ -110,6 +111,11 @@ type Popover =
     | {
           readonly kind: "event";
           readonly occurrence: OccurrenceView;
+          readonly anchor: DOMRect | null;
+      }
+    | {
+          readonly kind: "task";
+          readonly task: TaskItemView;
           readonly anchor: DOMRect | null;
       }
     | {
@@ -596,13 +602,128 @@ export function CalendarScreen({ path }: { path: string[] }) {
     const openItem = (item: GridItem, id: string, anchorRect: DOMRect | null) => {
         setSelected({ id, item });
         if (item.kind === "task") {
-            if (item.task.source === "tasks") router.push(`/tasks/t/${item.task.id}`);
-            else setTodoId(item.task.id);
+            if (preferences.skipPopover) openTask(item.task);
+            else setPopover({ kind: "task", task: item.task, anchor: anchorRect });
             return;
         }
         const occurrence = item.occurrence;
         if (preferences.skipPopover && !occurrence.busyOnly) openEditor(occurrence);
         else setPopover({ kind: "event", occurrence, anchor: anchorRect });
+    };
+
+    /** A task's own editor: the calendar's form for a calendar's task, Tasks for
+     *  a Tasks task. */
+    const openTask = (task: TaskItemView) => {
+        setPopover(null);
+        if (task.source === "tasks") router.push(`/tasks/t/${task.id}`);
+        else setTodoId(task.id);
+    };
+
+    /** Tick a task off, or back, from its mark - drawn at once, put back if the
+     *  change does not land. */
+    const toggleTask = async (task: TaskItemView) => {
+        const previous = rangeRead.data;
+        const done = !task.done;
+        const flipped = (entry: TaskItemView): TaskItemView =>
+            entry.source === task.source && entry.id === task.id
+                ? {
+                      ...entry,
+                      done,
+                      statusType: done ? "done" : "open",
+                      // A Tasks status is the space's to name; which one Tasks
+                      // picks is read back with the window.
+                      statusColor: entry.source === "tasks" ? null : entry.statusColor,
+                      statusName: entry.source === "tasks" ? null : entry.statusName
+                  }
+                : entry;
+        if (previous) replaceRange({ ...previous, tasks: previous.tasks.map(flipped) });
+        setPopover((current) =>
+            current?.kind === "task" ? { ...current, task: flipped(current.task) } : current
+        );
+        try {
+            await unwrap(
+                () =>
+                    taskActions.setTaskDoneAction({ source: task.source, id: task.id, done, zone }),
+                t("screen.failed")
+            );
+            eventsChanged();
+        } catch (caught) {
+            if (previous) replaceRange(previous);
+            setPopover((current) =>
+                current?.kind === "task" && current.task.id === task.id
+                    ? { ...current, task }
+                    : current
+            );
+            failed(t("todo.doneFailed"), caught);
+        }
+    };
+
+    const duplicateTask = async (task: TaskItemView) => {
+        setPopover(null);
+        try {
+            const answer = await unwrap(
+                () => eventActions.duplicateEventAction({ objectId: task.id, zone }),
+                t("screen.failed")
+            );
+            eventsChanged();
+            setTodoId(answer.objectId);
+        } catch (caught) {
+            failed(t("todo.duplicateFailed"), caught);
+        }
+    };
+
+    const deleteTask = async (task: TaskItemView) => {
+        if (!task.editable || task.source !== "calendar") return;
+        if (
+            !(await confirm({
+                title: t("todo.deleteTitle"),
+                description: t("todo.deleteBody", { title: task.title || t("screen.untitled") }),
+                confirmLabel: t("screen.delete"),
+                danger: true
+            }))
+        )
+            return;
+        setPopover(null);
+        const previous = rangeRead.data;
+        if (previous)
+            replaceRange({
+                ...previous,
+                tasks: previous.tasks.filter(
+                    (entry) => !(entry.source === "calendar" && entry.id === task.id)
+                )
+            });
+        try {
+            await unwrap(
+                () =>
+                    eventActions.deleteEventAction({
+                        objectId: task.id,
+                        recurrenceKey: null,
+                        scope: "all",
+                        zone
+                    }),
+                t("screen.failed")
+            );
+            undo.current = {
+                run: async () => {
+                    await unwrap(
+                        () => trashActions.restoreTrashAction({ kind: "event", id: task.id, zone }),
+                        t("screen.failed")
+                    );
+                    eventsChanged();
+                }
+            };
+            toast.show({
+                key: "calendar-deleted-task",
+                title: t("todo.deleted"),
+                life: 8000,
+                actions: [{ label: t("screen.undo"), run: async () => await runUndo() }]
+            });
+            setSelected(null);
+            eventsChanged();
+        } catch (caught) {
+            if (previous) replaceRange(previous);
+            failed(t("todo.deleteFailed"), caught);
+        }
     };
 
     const openEditor = (occurrence: OccurrenceView) => {
@@ -1704,6 +1825,7 @@ export function CalendarScreen({ path }: { path: string[] }) {
                                         onItemClick={(item, id, anchorRect) =>
                                             openItem(item, id, anchorRect)
                                         }
+                                        onTaskToggle={(task) => void toggleTask(task)}
                                         onItemFocus={(id) => {
                                             const found = events.find((event) => event.id === id);
                                             if (found)
@@ -1763,6 +1885,24 @@ export function CalendarScreen({ path }: { path: string[] }) {
                 </AnchoredPanel>
             ) : null}
 
+            {popover?.kind === "task" ? (
+                <TaskCard
+                    task={popover.task}
+                    calendar={
+                        popover.task.calendarId
+                            ? calendarsById.get(popover.task.calendarId)
+                            : undefined
+                    }
+                    anchor={popover.anchor}
+                    zone={zone}
+                    locale={locale}
+                    onClose={() => setPopover(null)}
+                    onToggle={(task) => void toggleTask(task)}
+                    onEdit={() => openTask(popover.task)}
+                    onDuplicate={() => void duplicateTask(popover.task)}
+                    onDelete={() => void deleteTask(popover.task)}
+                />
+            ) : null}
             {popover?.kind === "event" ? (
                 <EventCard
                     occurrence={popover.occurrence}
