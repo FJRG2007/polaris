@@ -617,15 +617,18 @@ export async function giveBack(
     // a death in it included. Put back once, as close as the game lets it be,
     // and never again: a give-back tried later from the panel must not undo
     // what they have lived through since. Gone before they could be asked:
-    // kept for when they are next on.
+    // kept for when they are next on. Draining food takes seconds of game
+    // time, so it runs on its own: a game's tick or an end sending everybody
+    // home does not wait on one player's hunger.
     const vitals = kept.vitals ?? copy.vitals;
     if (vitals) {
-        const back = await vitalsBack(server, name, vitals, wait);
-        if (back === "unasked" && !(await readLiveInventory(askerOf(server), name)).answered) {
+        const now = await vitalsOf(server, name);
+        if (!now && !(await readLiveInventory(askerOf(server), name)).answered) {
             await save({ ...kept, kept: owed, experience, vitals });
             return "offline";
         }
-        if (back !== "given")
+        if (now) restoreVitals(server, name, now, vitals, wait);
+        else
             console.warn(
                 "polaris: health and hunger not put back exactly",
                 server.installedAppId,
@@ -657,13 +660,52 @@ export async function giveBack(
     return "done";
 }
 
+/** Each player's health and hunger being put back, by server and name: one at a
+ *  time for the same player, so two never fight over their food. */
+const restoring = new Map<string, Promise<void>>();
+
+function restoreVitals(
+    server: ServerContainer,
+    name: string,
+    now: { vitals: stash.Vitals; absorption: number },
+    wanted: stash.Vitals,
+    wait: (ms: number) => Promise<unknown>
+): void {
+    const key = `${server.installedAppId}:${name.toLowerCase()}`;
+    const before = restoring.get(key);
+    const run = (async () => {
+        if (before) await before;
+        const back = await vitalsBack(server, name, before ? null : now, wanted, wait).catch(
+            (error: unknown) => {
+                console.warn("polaris: putting back health and hunger failed", name, String(error));
+                return "unasked" as const;
+            }
+        );
+        if (back !== "given")
+            console.warn(
+                "polaris: health and hunger not put back exactly",
+                server.installedAppId,
+                name
+            );
+    })();
+    restoring.set(key, run);
+    void run.finally(() => {
+        if (restoring.get(key) === run) restoring.delete(key);
+    });
+}
+
+/** Done once every health and hunger being put back for `name` is. */
+export async function vitalsSettled(installedAppId: string, name: string): Promise<void> {
+    await restoring.get(`${installedAppId}:${name.toLowerCase()}`);
+}
+
 /** How many times food and health are each stepped towards what is wanted. */
 const VITAL_STEPS = 6;
 
 /**
- * Put `name`'s health and hunger back to `wanted` (`stash` has how): the food
- * first, with their health full so the game's own healing takes nothing from
- * it, then the health - healed to full and the exact rest taken off, past
+ * Put `name`'s health and hunger back to `wanted` (`stash` has how), from
+ * `read` when they were just read: the food first, with their health full so
+ * the game's own healing takes nothing from it, then the health - healed to full and the exact rest taken off, past
  * whatever armor, enchantment or Resistance they have on. Answers "given",
  * "near" when the game would not come closer (a peaceful world refills food on
  * its own), or "unasked" when they could not be asked.
@@ -671,10 +713,11 @@ const VITAL_STEPS = 6;
 async function vitalsBack(
     server: ServerContainer,
     name: string,
+    read: { vitals: stash.Vitals; absorption: number } | null,
     wanted: stash.Vitals,
     wait: (ms: number) => Promise<unknown>
 ): Promise<"given" | "near" | "unasked"> {
-    let now = await vitalsOf(server, name);
+    let now = read ?? (await vitalsOf(server, name));
     if (!now) return "unasked";
     if (stash.sameVitals(now.vitals, wanted) && now.absorption === 0) return "given";
     await server.sayAll([stash.healLine(name)]);

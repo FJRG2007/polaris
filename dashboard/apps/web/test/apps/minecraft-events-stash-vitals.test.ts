@@ -27,8 +27,7 @@ vi.mock("@polaris/db", () => ({
                 rows.set(where.id, { ...rows.get(where.id), ...data });
                 return rows.get(where.id);
             },
-            findUnique: async ({ where }: { where: { id: string } }) =>
-                rows.get(where.id) ?? null,
+            findUnique: async ({ where }: { where: { id: string } }) => rows.get(where.id) ?? null,
             deleteMany: async ({ where }: { where: { id: string } }) => {
                 rows.delete(where.id);
                 return { count: 1 };
@@ -52,7 +51,7 @@ vi.mock("@polaris-app/game-servers/src/lib/minecraft/service", () => ({
     }
 }));
 
-const { stashIn, giveBack } = await import(
+const { stashIn, giveBack, vitalsSettled } = await import(
     "@polaris-app/game-servers/src/lib/minecraft/events/kinds/stash-service"
 );
 type Stash = Parameters<typeof giveBack>[2];
@@ -151,10 +150,11 @@ async function cameIn(): Promise<Stash> {
 /** Back as they came: exhaustion to a tenth and a half wherever Hunger ran -
  *  and, where it did not have to, left as the event left it, since nothing in
  *  the game lowers it. */
-function expectBack(
+async function expectBack(
     wanted: { health: number; food: number; saturation: number; exhaustion: number },
     ended: { exhaustion: number }
 ) {
+    await vitalsSettled("app", "Ana");
     expect(ana.health).toBeCloseTo(wanted.health, 2);
     expect(ana.absorption).toBe(0);
     expect(ana.food).toBe(wanted.food);
@@ -187,7 +187,7 @@ describe("health and hunger through an event", () => {
         ana = { health: 4, absorption: 4, food: 20, saturation: 20, exhaustion: 0.3 };
         const ended = { ...ana };
         expect(await giveBack(server, "Ana", kept, async () => undefined, wait)).toBe("done");
-        expectBack(joined, ended);
+        await expectBack(joined, ended);
         expect(rows.size).toBe(0);
     });
 
@@ -199,7 +199,7 @@ describe("health and hunger through an event", () => {
         ana = { health: 20, absorption: 0, food: 20, saturation: 5, exhaustion: 0 };
         const ended = { ...ana };
         expect(await giveBack(server, "Ana", kept, async () => undefined, wait)).toBe("done");
-        expectBack(joined, ended);
+        await expectBack(joined, ended);
     });
 
     it("fills up somebody who came in fuller than the event left them", async () => {
@@ -209,7 +209,7 @@ describe("health and hunger through an event", () => {
         ana = { health: 1, absorption: 0, food: 3, saturation: 0, exhaustion: 2 };
         const ended = { ...ana };
         expect(await giveBack(server, "Ana", kept, async () => undefined, wait)).toBe("done");
-        expectBack(joined, ended);
+        await expectBack(joined, ended);
     });
 
     it("keeps them for a player who logged off, and gives them back on their return", async () => {
@@ -220,16 +220,16 @@ describe("health and hunger through an event", () => {
         const ended = { ...ana };
         online = false;
         let left: Stash | null = kept;
-        expect(
-            await giveBack(server, "Ana", kept, async (each) => void (left = each), wait)
-        ).toBe("offline");
+        expect(await giveBack(server, "Ana", kept, async (each) => void (left = each), wait)).toBe(
+            "offline"
+        );
         expect(left).toBe(kept);
         // Back on, with the run's copy lost to a restart: the database row has them.
         online = true;
         expect(
             await giveBack(server, "Ana", { ...kept, vitals: null }, async () => undefined, wait)
         ).toBe("done");
-        expectBack(joined, ended);
+        await expectBack(joined, ended);
     });
 
     it("leaves health and hunger alone for a stash kept before they were", async () => {
@@ -247,8 +247,36 @@ describe("health and hunger through an event", () => {
         expect(
             await giveBack(server, "Ana", { ...kept, vitals: null }, async () => undefined, wait)
         ).toBe("done");
+        await vitalsSettled("app", "Ana");
         expect(said.some((line) => /^(effect|damage) /.test(line))).toBe(false);
         expect(ana.health).toBe(6);
+    });
+
+    it("gives back without waiting for their food to drain", async () => {
+        const joined = { health: 12, food: 10, saturation: 0, exhaustion: 0.5 };
+        ana = { ...joined, absorption: 0 };
+        const kept = await cameIn();
+        ana = { health: 20, absorption: 0, food: 20, saturation: 20, exhaustion: 0 };
+        const ended = { ...ana };
+        let release: () => void = () => undefined;
+        const held = () =>
+            new Promise<void>((resolve) => {
+                release = () => {
+                    runHunger();
+                    resolve();
+                };
+            });
+        expect(await giveBack(server, "Ana", kept, async () => undefined, held)).toBe("done");
+        expect(rows.size).toBe(0);
+        expect(said.some((line) => line.includes("minecraft:hunger "))).toBe(true);
+        expect(ana.food).toBe(20);
+        let settled = false;
+        void vitalsSettled("app", "Ana").then(() => (settled = true));
+        while (!settled) {
+            release();
+            await new Promise((resolve) => setTimeout(resolve, 0));
+        }
+        await expectBack(joined, ended);
     });
 
     it("touches nothing when they leave as they came", async () => {
@@ -256,6 +284,7 @@ describe("health and hunger through an event", () => {
         const kept = await cameIn();
         said = [];
         expect(await giveBack(server, "Ana", kept, async () => undefined, wait)).toBe("done");
+        await vitalsSettled("app", "Ana");
         expect(said.some((line) => /^(effect|damage) /.test(line))).toBe(false);
     });
 
@@ -281,7 +310,7 @@ describe("health and hunger through an event", () => {
             const ended = { ...ana };
             said = [];
             expect(await giveBack(server, "Ana", kept, async () => undefined, wait)).toBe("done");
-            expectBack(joined, ended);
+            await expectBack(joined, ended);
         }
     });
 });

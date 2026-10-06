@@ -1152,6 +1152,8 @@ One entry per bug: what a player saw, why, and the rule that keeps it gone.
   under a point over (Hunger takes it a whole point at a time), exhaustion
   within about 0.1 - except that nothing lowers exhaustion, so when no drain
   was needed it stays where the event left it, under one saturation point.
-  Draining takes game time: up to about 10 s per player at the end. Restored
-  once and never by a retry from the panel. A peaceful world refills food on
-  its own; not exact there.
+  Draining takes game time - up to about 10 s per player - so it runs in the
+  background once their things are back (`restoreVitals`, one at a time per
+  player): a stage tick or an arena end never waits on it. Somebody who logs
+  off mid-drain keeps what it reached. Restored once and never by a retry from
+  the panel. A peaceful world refills food on its own; not exact there.
