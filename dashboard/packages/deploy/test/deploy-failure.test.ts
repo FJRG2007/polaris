@@ -73,6 +73,18 @@ describe("an image taken off the machine while it was coming down", () => {
     it("is still a full disk when the image store said there was no room", () => {
         expect(isFetchCutShort(CONTAINERD_FULL_DISK)).toBe(false);
     });
+
+    it("is not claimed for an unpack that failed for another reason", () => {
+        for (const raw of [
+            `failed to extract layer sha256:0b1c: failed to Lchown "/var/lib/containerd/snapshots/412/fs/usr": invalid argument`,
+            `failed to extract layer sha256:0b1c: operation not permitted`
+        ]) {
+            const said = deployFailureReason(raw, STEP);
+            expect(said).not.toContain("removed from the machine while it was being fetched");
+            expect(said).toBe(raw);
+            expect(isFetchCutShort(raw)).toBe(false);
+        }
+    });
 });
 
 describe("the other ways a deploy gives up", () => {

@@ -33,10 +33,15 @@ const CUT_SHORT_SIGNS = [
     "failed to extract layer"
 ] as const;
 
+/** What both of those say when the download is what went missing. */
+const GONE = "no such file or directory";
+
 /** One thing a deploy failure can mean, and how to recognize it. */
 interface Meaning {
     /** Matched case-insensitively against whatever the runtime said. */
     readonly signs: readonly string[];
+    /** Also required, when a sign alone is said for more than one reason. */
+    readonly also?: string;
     readonly says: string;
 }
 
@@ -73,6 +78,7 @@ const MEANINGS: readonly Meaning[] = [
         // the image itself is fine and fetching it again gets it whole. After
         // the disk entry, so a write that found no room is still called that.
         signs: CUT_SHORT_SIGNS,
+        also: GONE,
         says: "part of the image was removed from the machine while it was being fetched - the image store was cleaned up at the same moment. Nothing was deployed; deploying again fetches it whole."
     },
     {
@@ -126,11 +132,16 @@ export function deployFailureReason(raw: string, fallback: string): string {
     const said = raw.trim();
     if (!said) return fallback;
     const lowered = said.toLowerCase();
-    const meaning = MEANINGS.find((entry) => entry.signs.some((sign) => lowered.includes(sign)));
+    const meaning = MEANINGS.find((entry) => matches(entry, lowered));
     // Unrecognized: the runtime's own words, which are better than a wrong
     // translation of them.
     if (!meaning) return said;
     return `${meaning.says} (${said})`;
+}
+
+function matches(meaning: Meaning, lowered: string): boolean {
+    if (meaning.also && !lowered.includes(meaning.also)) return false;
+    return meaning.signs.some((sign) => lowered.includes(sign));
 }
 
 /** Whether this failure was the disk filling up, for a caller that wants to do
@@ -148,10 +159,7 @@ export function isOutOfSpace(raw: string): boolean {
 export function isFetchCutShort(raw: string): boolean {
     if (isOutOfSpace(raw)) return false;
     const lowered = raw.toLowerCase();
-    return (
-        lowered.includes("no such file or directory") &&
-        CUT_SHORT_SIGNS.some((sign) => lowered.includes(sign))
-    );
+    return lowered.includes(GONE) && CUT_SHORT_SIGNS.some((sign) => lowered.includes(sign));
 }
 
 /**
