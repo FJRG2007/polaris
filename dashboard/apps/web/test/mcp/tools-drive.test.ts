@@ -184,6 +184,26 @@ describe("the drive tools", () => {
         expect(mocks.driver.dispose).toHaveBeenCalled();
     });
 
+    it("find an entry loosely, best first, and list the folder when nothing matches", async () => {
+        mocks.driver.list.mockResolvedValue({
+            entries: [entry("photos", "dir"), entry("notes.txt"), entry("Factura enero.pdf")]
+        });
+        const found = (await call("drive_list", { source: "c1", path: "docs", query: "facturas" }))
+            ?.result as ToolResult;
+        expect(found.structuredContent.entries[0].name).toBe("Factura enero.pdf");
+        expect(found.structuredContent.matched).toBe(true);
+
+        const none = (await call("drive_list", { source: "c1", path: "docs", query: "zebra" }))
+            ?.result as ToolResult;
+        expect(none.structuredContent.entries.map((row: { name: string }) => row.name)).toEqual([
+            "photos",
+            "Factura enero.pdf",
+            "notes.txt"
+        ]);
+        expect(none.structuredContent.matched).toBe(false);
+        expect(none.content[0]?.text).toContain('No match for "zebra"; these are all 3 entries.');
+    });
+
     it("name the storages and nothing about how they are reached", async () => {
         mocks.listAccessibleConnections.mockResolvedValue([
             {

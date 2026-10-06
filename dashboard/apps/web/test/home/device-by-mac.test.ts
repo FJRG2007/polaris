@@ -172,6 +172,32 @@ describe("a driver handed a MAC", () => {
         expect(handed).toEqual([]);
     });
 
+    it("keeps a channel the driver can listen on, handed the IP", async () => {
+        table.set("10.0.1.40", "c8:f7:42:1a:2b:3c");
+        const heard: string[] = [];
+        const driver = withAddresses({
+            connection: "shelly-local",
+            async verify() {},
+            async list() {
+                return [];
+            },
+            async act() {},
+            async listen(credentials, changed) {
+                heard.push(credentials.host!);
+                changed(["relay-0"]);
+            }
+        });
+        const changed: (readonly string[])[] = [];
+        await driver.listen!(
+            { host: MAC },
+            (ids) => changed.push(ids),
+            new AbortController().signal
+        );
+        expect(heard).toEqual(["10.0.1.40"]);
+        expect(changed).toEqual([["relay-0"]]);
+        expect(shelly(new Set()).driver.listen).toBeUndefined();
+    });
+
     it("leaves an address that is an IP or a name alone, and never looks anything up", async () => {
         const { driver, handed } = shelly(new Set(["10.0.1.40", "shelly-plug.local"]));
         await driver.list({ host: "10.0.1.40" });

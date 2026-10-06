@@ -166,6 +166,38 @@ describe("the Places tools", () => {
         expect(mocks.operateDevice).not.toHaveBeenCalled();
     });
 
+    it("find a device by what it is, in another language, best match first", async () => {
+        // The report: "door" against a lock called "Puerta principal" answered
+        // "No devices.", and the assistant told its person there was no door.
+        mocks.listDevices.mockResolvedValue([
+            device("light", { id: "44444444-4444-4444-8444-444444444444", name: "Lámpara" }),
+            device("lock", { name: "Puerta principal", zone: "Entrada" })
+        ]);
+        const door = await call("places_devices", { query: "door" }, ["places.read"]);
+        expect(door.structuredContent.devices[0]).toMatchObject({ name: "Puerta principal" });
+        expect(door.structuredContent.matched).toBe(true);
+        expect(door.content[0]?.text).not.toContain("No devices");
+
+        const typo = await call("places_devices", { query: "puerat" }, ["places.read"]);
+        expect(typo.structuredContent.devices[0]).toMatchObject({ name: "Puerta principal" });
+    });
+
+    it("answer every device it may see, said as such, when nothing matches", async () => {
+        mocks.listDevices.mockResolvedValue([device("lock", { name: "Puerta principal" })]);
+        const result = await call("places_devices", { query: "zebra" }, ["places.read"]);
+        expect(result.structuredContent.devices).toHaveLength(1);
+        expect(result.structuredContent.matched).toBe(false);
+        expect(result.content[0]?.text).toContain('No match for "zebra"; these are all 1 device.');
+    });
+
+    it("still answer nothing past what the person may see", async () => {
+        mocks.placesReach.mockResolvedValue({ everything: false, devices: new Map() });
+        mocks.listDevices.mockResolvedValue([device("lock", { name: "Puerta principal" })]);
+        const result = await call("places_devices", { query: "zebra" }, ["places.read"]);
+        expect(result.structuredContent.devices).toEqual([]);
+        expect(result.content[0]?.text).toBe("No devices.");
+    });
+
     it("operate a device through the panel's own path, as the person", async () => {
         const result = await call("places_device_control", { deviceId: DEVICE, action: "unlock" }, [
             "places.control"

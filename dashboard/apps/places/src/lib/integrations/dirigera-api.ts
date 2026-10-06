@@ -123,6 +123,9 @@ export async function pairHub(
     }
 }
 
+const HUB_REFUSED =
+    "The DIRIGERA hub no longer accepts Polaris. Connect it again and press the hub's button.";
+
 async function call(
     hub: DirigeraHub,
     method: "GET" | "PATCH",
@@ -140,10 +143,7 @@ async function call(
         trust: { pin: hub.fingerprint }
     });
     if (response.status === 401 || response.status === 403) {
-        throw new DriverError(
-            "The DIRIGERA hub no longer accepts Polaris. Connect it again and press the hub's button.",
-            "unauthorized"
-        );
+        throw new DriverError(HUB_REFUSED, "unauthorized");
     }
     if (response.status < 200 || response.status >= 300) {
         throw new DriverError("The DIRIGERA hub refused the request.", "refused");
@@ -179,4 +179,48 @@ export async function setOn(hub: DirigeraHub, deviceId: string, on: boolean): Pr
     await call(hub, "PATCH", `/devices/${encodeURIComponent(deviceId)}`, [
         { attributes: { isOn: on } }
     ]);
+}
+
+const hubEvent = z.object({
+    type: z.string(),
+    data: z.object({ id: z.string().optional() }).passthrough().optional()
+});
+
+/**
+ * Hear the hub's devices change, over the event stream it serves at
+ * `wss://<hub>:8443/v1` to the same bearer token (`hub.py`'s
+ * `create_event_listener`), checked against the same pinned certificate before
+ * the token is sent. Hands `changed` the device id of each event about one, or
+ * null for an event about the hub as a whole. Resolves when the stream closes;
+ * rejects when it could not be opened.
+ */
+export async function listenHub(
+    hub: DirigeraHub,
+    changed: (deviceId: string | null) => void,
+    signal: AbortSignal
+): Promise<void> {
+    const { openLanSocket, eachMessage } = await import("./lan-socket");
+    const ws = await openLanSocket({
+        url: `wss://${hub.host}:${PORT}/v1`,
+        headers: { authorization: `Bearer ${hub.token}` },
+        trust: { pin: hub.fingerprint },
+        signInRefused: HUB_REFUSED
+    });
+    await eachMessage(
+        ws,
+        (text) => {
+            let parsed: unknown;
+            try {
+                parsed = JSON.parse(text) as unknown;
+            } catch {
+                return;
+            }
+            const event = hubEvent.safeParse(parsed);
+            if (!event.success) return;
+            // `deviceStateChanged`, `deviceAdded`, `deviceRemoved`, and the
+            // same for scenes and rooms; only a device's are news here.
+            if (event.data.type.startsWith("device")) changed(event.data.data?.id ?? null);
+        },
+        signal
+    );
 }

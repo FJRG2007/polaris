@@ -9,7 +9,9 @@
  * the table to both catalogs.
  */
 
+import { join } from "node:path";
 import { PERMISSIONS } from "@polaris/core";
+import { readFileSync, readdirSync } from "node:fs";
 import { describe, expect, it, vi } from "vitest";
 import enMcp from "../../messages/en-US/mcp.json";
 import esMcp from "../../messages/es-ES/mcp.json";
@@ -71,6 +73,12 @@ describe("the scope table", () => {
             "calendar.manage"
         ]);
         expect(table.expandScopes(["tasks.manage"])).toEqual(["tasks.read", "tasks.manage"]);
+        expect(table.expandScopes(["databases.write"])).toEqual([
+            "databases.read",
+            "databases.write"
+        ]);
+        expect(table.scopeRequires("databases.write")).toBe("deploy.read");
+        expect(table.scopeRequires("places.cameras")).toBe("home.read");
     });
 
     it("ignores, rather than trusts, a stored scope it does not know", () => {
@@ -82,8 +90,60 @@ describe("the scope table", () => {
     it("waits for the person to tick what reaches outside Polaris", () => {
         expect(table.isSensitiveScope("mail.send")).toBe(true);
         expect(table.isSensitiveScope("places.control")).toBe(true);
+        expect(table.isSensitiveScope("places.cameras")).toBe(true);
+        expect(table.isSensitiveScope("databases.read")).toBe(true);
+        expect(table.isSensitiveScope("databases.write")).toBe(true);
         expect(table.isSensitiveScope("mail.read")).toBe(false);
         expect(table.isSensitiveScope("tasks.manage")).toBe(false);
+    });
+});
+
+/** Every locale the dashboard ships, read from disk so a new one is held to
+ *  the same rule without anybody remembering this test. */
+const MESSAGES = join(import.meta.dirname, "../../messages");
+const LOCALES = readdirSync(MESSAGES, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory())
+    .map((entry) => entry.name);
+
+function mcpCatalog(locale: string): { categories?: Record<string, string> } {
+    return JSON.parse(readFileSync(join(MESSAGES, locale, "mcp.json"), "utf8"));
+}
+
+describe("scope categories", () => {
+    it("files every scope, and every permission, under a category", () => {
+        for (const scope of table.MCP_SCOPES)
+            expect(table.MCP_CATEGORIES, scope).toContain(table.scopeCategory(scope));
+        for (const permission of PERMISSIONS)
+            expect(table.MCP_CATEGORIES, permission).toContain(table.scopeCategory(permission));
+    });
+
+    it("files a finer scope where the permission it stands on is filed", () => {
+        expect(table.scopeCategory("places.control")).toBe(table.scopeCategory("home.control"));
+        expect(table.scopeCategory("mail.send")).toBe("mail");
+        expect(table.scopeCategory("gameservers.manage")).toBe("games");
+    });
+
+    it("labels every category in every locale", () => {
+        expect(LOCALES.length).toBeGreaterThan(1);
+        for (const locale of LOCALES) {
+            const categories = mcpCatalog(locale).categories ?? {};
+            for (const category of table.MCP_CATEGORIES)
+                expect(categories[category], `${locale} ${category}`).toBeTruthy();
+        }
+    });
+
+    it("puts the categories in order, scopes inside each in the table's order", () => {
+        const grouped = table.groupByCategory([
+            "tasks.read",
+            "mail.send",
+            "places.read",
+            "mail.read"
+        ]);
+        expect(grouped).toEqual([
+            { category: "home", scopes: ["places.read"] },
+            { category: "mail", scopes: ["mail.read", "mail.send"] },
+            { category: "productivity", scopes: ["tasks.read"] }
+        ]);
     });
 });
 
@@ -110,6 +170,11 @@ describe("every tool against the table", () => {
         }
     });
 
+    it("files every tool under a category", () => {
+        for (const tool of EVERY_TOOL)
+            expect(table.MCP_CATEGORIES, tool.name).toContain(tool.category);
+    });
+
     it("asks each app's own scopes of each app's tools", () => {
         const scopes = (tools: readonly { scope: unknown }[]) =>
             new Set(tools.flatMap((tool) => toolScopes(tool as never)));
@@ -119,6 +184,7 @@ describe("every tool against the table", () => {
             "calendar.use"
         ]);
         expect([...scopes(APP_TOOLS.home)].sort()).toEqual([
+            "places.cameras",
             "places.control",
             "places.read",
             "places.routines"

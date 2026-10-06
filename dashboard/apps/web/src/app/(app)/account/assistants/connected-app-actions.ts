@@ -11,7 +11,9 @@
  * person's to give, and the screen says which those are. Setting where it may
  * call from applies on its next call and next token refresh, and so does an
  * exception to the account's network rules - which only an administrator may
- * widen, since those rules are an administrator's.
+ * widen, since those rules are an administrator's. Which databases its database
+ * tools may reach applies on its next call too, and only ever names databases
+ * this person can open in the Databases app.
  */
 
 import { z } from "zod";
@@ -26,6 +28,12 @@ import { MCP_SCOPES, expandScopes, orderScopes, type McpScope } from "@/lib/mcp/
 import { localized } from "@/app/(app)/account/security/action-messages";
 import { ipPolicyNarrows, ipPolicySchema, type IpPolicy } from "@/lib/mcp/oauth/ip-policy";
 import {
+    databaseReachNarrows,
+    databaseReachSchema,
+    sameDatabaseReach,
+    type DatabaseReach
+} from "@/lib/mcp/oauth/database-reach";
+import {
     exceptionNarrows,
     networkExceptionSchema,
     sameException,
@@ -35,6 +43,7 @@ import {
     changeGrantScopes,
     findConnectedApp,
     revokeConnectedApp,
+    setGrantDatabases,
     setGrantIpPolicy,
     setGrantNetworkException
 } from "@/lib/mcp/oauth/grants";
@@ -202,4 +211,55 @@ export async function setAppNetworkExceptionAction(
     });
     revalidatePath(PAGE);
     return { exception };
+}
+
+const databasesSchema = z.object({ id: z.string().uuid(), databaseIds: databaseReachSchema });
+
+/**
+ * Set which databases a connected app's database tools may reach: null for
+ * every one this person can open, or a list of them. Answers with what is now
+ * held.
+ *
+ * A list is cut to the databases this person can open now, so it never holds
+ * an id somebody typed. Taking databases away is always allowed; anything that
+ * could widen the reach waits out a new device, as any widening of a
+ * credential does.
+ */
+export async function setAppDatabasesAction(
+    input: unknown
+): Promise<{ databaseIds?: DatabaseReach; error?: string }> {
+    const user = await requireUser();
+    const t = await getTranslations("mcp");
+    const parsed = databasesSchema.safeParse(input);
+    if (!parsed.success || user.viewingAs) return { error: t("connectedApps.databases.failed") };
+
+    const app = await findConnectedApp(user.id, parsed.data.id);
+    if (!app) return { error: t("connectedApps.databases.failed") };
+    let reach: DatabaseReach = parsed.data.databaseIds;
+    if (reach !== null) {
+        // Loaded here rather than at the top: the connection store reaches the
+        // database drivers, which nothing else on this page needs.
+        const { listOpenable } = await import("@/lib/data/connections");
+        const openable = new Set((await listOpenable(user.id)).map((entry) => entry.id));
+        reach = reach.filter((id) => openable.has(id));
+    }
+    if (sameDatabaseReach(app.databaseIds, reach)) return { databaseIds: reach };
+
+    if (!databaseReachNarrows(app.databaseIds, reach)) {
+        const blocked = await newDeviceRefusal(user);
+        if (blocked) return localized({ error: blocked });
+    }
+
+    if (!(await setGrantDatabases(user.id, app.id, reach))) {
+        return { error: t("connectedApps.databases.failed") };
+    }
+    await recordAudit({
+        actorId: user.id,
+        action: "account.oauth.databases-changed",
+        targetType: "oauthGrant",
+        targetId: app.id,
+        metadata: { app: app.name, before: app.databaseIds, after: reach }
+    });
+    revalidatePath(PAGE);
+    return { databaseIds: reach };
 }

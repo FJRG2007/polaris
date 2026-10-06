@@ -18,6 +18,7 @@ import { getTranslations } from "@/lib/i18n/request";
 import { Messages } from "@/components/i18n/messages";
 import { rulesAreEmpty } from "@/lib/network-rules";
 import { listConnectedApps } from "@/lib/mcp/oauth/grants";
+import type { DatabaseOption } from "./database-reach-picker";
 import { Card, CardBody, CardHeader, Skeleton } from "@polaris/ui";
 
 export const dynamic = "force-dynamic";
@@ -39,10 +40,42 @@ async function ConnectedAppsSection({ userId, isAdmin }: { userId: string; isAdm
         const unrequested = offered.filter((scope) => !requestable.has(scope));
         return { ...app, offered, unrequested };
     });
+    // The databases an app may be pointed at, read only when some app could be
+    // given a database permission: the list reaches the connection store.
+    const databases = rows.some((app) =>
+        app.offered.some((scope) => scope.startsWith("databases."))
+    )
+        ? await databaseOptions(userId)
+        : [];
     // The rules a connected assistant is held to are the ones an administrator
     // imposed (the account's own sign-in rules govern sign-ins, not
     // assistants), so those are what decide whether the note is shown.
-    return <ConnectedApps apps={rows} restricted={!rulesAreEmpty(enforced)} canExcept={isAdmin} />;
+    return (
+        <ConnectedApps
+            apps={rows}
+            restricted={!rulesAreEmpty(enforced)}
+            canExcept={isAdmin}
+            databases={databases}
+        />
+    );
+}
+
+/** The databases this person can open, as the picker lists them: names and
+ *  engines, never an address. Empty when the list cannot be read - the
+ *  dialog then has nothing to tick, and the server keeps what is held. */
+async function databaseOptions(userId: string): Promise<DatabaseOption[]> {
+    try {
+        const { listOpenable } = await import("@/lib/data/connections");
+        return (await listOpenable(userId)).map((entry) => ({
+            id: entry.id,
+            name: entry.name,
+            engine: entry.engine,
+            project: entry.origin === "managed" ? entry.where : null
+        }));
+    } catch (error) {
+        console.error("assistants: the databases could not be listed", error);
+        return [];
+    }
 }
 
 /** The shape of the list while it is read. */

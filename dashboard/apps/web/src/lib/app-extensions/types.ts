@@ -13,6 +13,7 @@
 
 import type { McpTool } from "@/lib/mcp/protocol";
 import type { PendingAppLink } from "@polaris/core";
+import type { McpSearchProvider } from "@/lib/mcp/search";
 import type { BackupSource } from "@/lib/backups/sources/types";
 import type { GamePortRow, GamePortsReading } from "@/lib/apps/port-advice";
 
@@ -132,6 +133,14 @@ export interface AppExtension {
      */
     readonly mcpTools?: () => Promise<readonly AppMcpTool[]>;
 
+    /**
+     * How `polaris_search` finds its things: one provider per kind of thing,
+     * each naming the scope it needs and enforcing the app's own reach, built
+     * with `host.mcp.defineSearch`. Asked only while the app is installed,
+     * like its tools. See `lib/mcp/search.ts`.
+     */
+    readonly mcpSearch?: () => Promise<readonly AppMcpSearchProvider[]>;
+
     /** The ports the router has to forward for it. */
     readonly forwardedPorts?: () => Promise<readonly GamePortRow[]>;
 
@@ -231,6 +240,9 @@ export interface AppExtension {
 /** A tool an app offers over MCP, its input type already erased by
  *  `defineTool` (`host.mcp.defineTool`). */
 export type AppMcpTool = McpTool<never>;
+
+/** A search provider an app offers `polaris_search`. */
+export type AppMcpSearchProvider = McpSearchProvider;
 
 /** A sanction a game server put on a player linked to an account. */
 export interface GameSanction {

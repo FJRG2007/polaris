@@ -26,6 +26,7 @@
 
 import { z } from "zod";
 import * as core from "@polaris/core";
+import { defineMcpSearch } from "../search";
 import type { StorageDriver } from "@polaris/storage";
 import { moreLine, pageFields, pageOf } from "./paging";
 import { McpRefusal, type McpCaller, type McpTool } from "../protocol";
@@ -149,6 +150,7 @@ const sourcesTool: McpTool<z.infer<typeof sourcesInput>> = {
         // i18n-ignore read by the calling model, not shown to a person
         "The storages this account can browse in Drive - its own, ones shared with it, its organization's. Start here to find the id drive_list takes.",
     input: sourcesInput,
+    category: "files",
     scope: "drive.read",
     readOnly: true,
     async run(_input, caller) {
@@ -182,10 +184,17 @@ const listInput = z.object({
         .max(200)
         .default("")
         .describe(
-            "Only entries whose name contains this. Searches this folder, not the ones inside it."
+            "Words for an entry's name, in any language. Searches this folder, not the ones inside it; the best matches come first, and when nothing matches the whole folder is listed."
         ),
     ...pageFields
 });
+
+/** Where an entry search reads: its name, then whether it is a folder. */
+const ENTRY_FIELDS: readonly core.SearchField<{ readonly name: string; readonly kind: string }>[] =
+    [
+        { text: (entry) => entry.name, weight: 1 },
+        { text: (entry) => (entry.kind === "dir" ? "folder" : "file"), weight: 0.3 }
+    ];
 
 const listTool: McpTool<z.infer<typeof listInput>> = {
     name: "drive_list",
@@ -195,6 +204,7 @@ const listTool: McpTool<z.infer<typeof listInput>> = {
         // i18n-ignore read by the calling model, not shown to a person
         "What is in one folder of a storage: names, kinds, sizes and when each changed. Folders first. Does not read any file's contents.",
     input: listInput,
+    category: "files",
     scope: "drive.read",
     readOnly: true,
     async run(input, caller) {
@@ -206,11 +216,9 @@ const listTool: McpTool<z.infer<typeof listInput>> = {
             // folder only Legal opens) is its own, and is asked per entry.
             const { authz } = await services();
             const mayRead = await authz.drivePathFilter(caller.userId, input.source, "read");
-            const needle = input.query.toLowerCase();
             const visible = [];
             for (const entry of listing.entries) {
                 if (isReservedRootPath(entry.path)) continue;
-                if (needle && !entry.name.toLowerCase().includes(needle)) continue;
                 if (!(await mayRead(entry.path))) continue;
                 visible.push(entry);
             }
@@ -219,7 +227,13 @@ const listTool: McpTool<z.infer<typeof listInput>> = {
                     Number(b.kind === "dir") - Number(a.kind === "dir") ||
                     a.name.localeCompare(b.name)
             );
-            const page = pageOf(visible, input.offset, input.limit);
+            // Best match first for a query; the folder in its own order when
+            // there is none, or when nothing matched (said above the list).
+            const found = core.matchForModel(visible, input.query, ENTRY_FIELDS, {
+                one: "entry",
+                other: "entries"
+            });
+            const page = pageOf(found.items, input.offset, input.limit);
             const entries = page.items.map((entry) => ({
                 name: entry.name,
                 path: entry.path,
@@ -229,12 +243,16 @@ const listTool: McpTool<z.infer<typeof listInput>> = {
             }));
             if (entries.length === 0) {
                 return {
-                    text: needle ? "Nothing in that folder matched." : "That folder is empty.",
+                    text:
+                        visible.length === 0
+                            ? "That folder is empty."
+                            : "Nothing past that offset; the folder has fewer entries.",
                     structured: { entries: [], nextOffset: null }
                 };
             }
             return {
                 text:
+                    (found.note ? `${found.note}\n` : "") +
                     entries
                         .map(
                             (entry) =>
@@ -242,8 +260,9 @@ const listTool: McpTool<z.infer<typeof listInput>> = {
                                     entry.size === null ? "" : `  ${entry.size} bytes`
                                 }`
                         )
-                        .join("\n") + moreLine(page),
-                structured: { entries, nextOffset: page.nextOffset }
+                        .join("\n") +
+                    moreLine(page),
+                structured: { entries, nextOffset: page.nextOffset, matched: found.matched }
             };
         } finally {
             await driver.dispose();
@@ -264,6 +283,7 @@ const statTool: McpTool<z.infer<typeof statInput>> = {
         // i18n-ignore read by the calling model, not shown to a person
         "One file or folder's details: its kind, size, type and when it changed. Does not read its contents.",
     input: statInput,
+    category: "files",
     scope: "drive.read",
     readOnly: true,
     async run(input, caller) {
@@ -336,6 +356,7 @@ const shareTool: McpTool<z.infer<typeof shareInput>> = {
         // i18n-ignore read by the calling model, not shown to a person
         "Make a public link to a file or folder that anybody holding it can open, and return it. Only do this when the person asked for a link; it can be revoked in Drive.",
     input: shareInput,
+    category: "files",
     scope: "shares.create",
     readOnly: false,
     // Additive, but it publishes: whatever the link points at becomes readable
@@ -404,6 +425,85 @@ const shareTool: McpTool<z.infer<typeof shareInput>> = {
         };
     }
 };
+
+/** How many storages a search opens, and how long it waits on each. A
+ *  storage can be a share across the internet; the rest are found by name. */
+const SEARCHED_STORAGES = 5;
+
+/**
+ * The storages this account can browse and what is at the top of each, for
+ * `polaris_search`. Not a walk of every folder - that is the Drive search
+ * screen's, with its own bounds - but enough for "the invoices folder" to be
+ * found and opened with drive_list. A storage that cannot be opened is
+ * skipped; it is still found by its name.
+ */
+export const DRIVE_SEARCH = defineMcpSearch({
+    id: "drive.files",
+    app: "drive",
+    category: "files",
+    scope: "drive.read",
+    async search(_query, caller, limit) {
+        const { storage, workspace, authz } = await services();
+        const connections = await storage.listAccessibleConnections(
+            caller.userId,
+            await workspace.scopeOrgIdFor(caller.userId)
+        );
+        const storages = connections.map((connection) => ({
+            id: connection.id,
+            name: connection.name,
+            kind: "storage",
+            keywords: [connection.kind],
+            next: [{ tool: "drive_list", args: { source: connection.id, path: "" } }]
+        }));
+        const tops = await Promise.all(
+            connections.slice(0, SEARCHED_STORAGES).map(async (connection) => {
+                let driver: StorageDriver | null = null;
+                try {
+                    driver = await openFor(caller, connection.id, "", "read");
+                    const listing = await driver.list("");
+                    const mayRead = await authz.drivePathFilter(
+                        caller.userId,
+                        connection.id,
+                        "read"
+                    );
+                    const found = [];
+                    for (const entry of listing.entries) {
+                        if (isReservedRootPath(entry.path)) continue;
+                        if (!(await mayRead(entry.path))) continue;
+                        const folder = entry.kind === "dir";
+                        found.push({
+                            id: `${connection.id}:${entry.path}`,
+                            name: entry.name,
+                            kind: folder ? "folder" : "file",
+                            where: connection.name,
+                            next: [
+                                folder
+                                    ? {
+                                          tool: "drive_list",
+                                          args: { source: connection.id, path: entry.path }
+                                      }
+                                    : {
+                                          tool: "drive_stat",
+                                          args: { source: connection.id, path: entry.path }
+                                      },
+                                {
+                                    tool: "drive_share_create",
+                                    args: { source: connection.id, path: entry.path }
+                                }
+                            ]
+                        });
+                    }
+                    return found;
+                } catch {
+                    return [];
+                } finally {
+                    await driver?.dispose().catch(() => undefined);
+                }
+            })
+        );
+        return [...storages, ...tops.flat()].slice(0, limit);
+    }
+});
 
 export const DRIVE_TOOLS = [
     sourcesTool,

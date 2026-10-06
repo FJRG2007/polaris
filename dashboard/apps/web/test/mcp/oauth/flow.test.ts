@@ -136,6 +136,26 @@ vi.mock("@/lib/notes/note-service", () => ({
     createNote: async () => "33333333-3333-4333-8333-333333333333"
 }));
 vi.mock("@/lib/notes/shelf-service", () => ({}));
+vi.mock("@/lib/data/connections", () => ({
+    DataConnectionError: class extends Error {},
+    addressOf: async () => {
+        throw new Error("no database is opened in this test");
+    },
+    listOpenable: async () =>
+        ["0190a5b8-0000-7000-8000-00000000c0de", "0190a5b8-0000-7000-8000-0000000010f5"].map(
+            (id, index) => ({
+                id,
+                name: index === 0 ? "Shop" : "Logs",
+                engine: "postgres",
+                origin: "saved",
+                where: "db.example.test:5432",
+                database: "app",
+                readOnly: false,
+                unreachable: false,
+                note: null
+            })
+        )
+}));
 
 const { createFakeDb: makeDb } = await import("./fake-db");
 const register = await import("@/app/api/oauth/register/route");
@@ -150,9 +170,12 @@ const serverMetadata = await import(
 );
 const { answerAuthorizationAction } = await import("@/app/oauth/authorize/actions");
 const { listConnectedApps, revokeConnectedApp } = await import("@/lib/mcp/oauth/grants");
-const { changeAppScopesAction, setAppIpPolicyAction, setAppNetworkExceptionAction } = await import(
-    "@/app/(app)/account/assistants/connected-app-actions"
-);
+const {
+    changeAppScopesAction,
+    setAppDatabasesAction,
+    setAppIpPolicyAction,
+    setAppNetworkExceptionAction
+} = await import("@/app/(app)/account/assistants/connected-app-actions");
 const { clearPresetRanges } = await import("@/lib/mcp/oauth/preset-ranges");
 
 const REDIRECT = "http://127.0.0.1/callback";
@@ -721,6 +744,12 @@ describe("calling /api/mcp with the token", () => {
             `${ORIGIN}/polaris-mark-192.png`,
             `${ORIGIN}/polaris-mark-512.png`
         ]);
+        // One server for every app: a model that does not know where a thing
+        // lives is sent to the search before it guesses at a tool.
+        const instructions = String(answer.body?.result.instructions);
+        expect(instructions).toContain("one MCP server");
+        expect(instructions).toContain("polaris_search first");
+        expect(instructions).toContain("polaris_tools");
     });
 
     it("acts as the person, with the approved scopes", async () => {
@@ -1545,5 +1574,77 @@ describe("a connection's exception to the account's network rules", () => {
         const { app, access } = await connectedApp();
         await setAppNetworkExceptionAction({ id: app.id, exception: { presets: ["openai"] } });
         expect((await mcpCall(access, whoami)).status).toBe(403);
+    });
+});
+
+describe("the databases a connection may reach", () => {
+    const SHOP = "0190a5b8-0000-7000-8000-00000000c0de";
+    const LOGS = "0190a5b8-0000-7000-8000-0000000010f5";
+    const list = { method: "tools/call", params: { name: "databases_list", arguments: {} } };
+
+    async function connectedApp() {
+        state.permissions = new Set(["tasks.read", "deploy.read"]);
+        const result = await connect(["databases.read"], "databases.read");
+        const grant = state.db.tables.oAuthGrant!.at(-1)!;
+        const app = (await listConnectedApps(ADA.id)).find((entry) => entry.id === grant.id)!;
+        return { app, access: String(result.tokens.body.access_token) };
+    }
+
+    const listed = async (access: string) =>
+        (
+            (await mcpCall(access, list)).body?.result?.structuredContent?.databases as {
+                id: string;
+            }[]
+        ).map((row) => row.id);
+
+    it("reaches every database the person can open until they choose", async () => {
+        const { app, access } = await connectedApp();
+        expect(app.databaseIds).toBeNull();
+        expect(await listed(access)).toEqual([SHOP, LOGS]);
+    });
+
+    it("reaches only the databases chosen, from the very next call", async () => {
+        const { app, access } = await connectedApp();
+        const saved = await setAppDatabasesAction({
+            id: app.id,
+            databaseIds: [LOGS, "0190a5b8-0000-7000-8000-00000000dead"]
+        });
+        // An id the person cannot open is never stored.
+        expect(saved.databaseIds).toEqual([LOGS]);
+        expect(await listed(access)).toEqual([LOGS]);
+
+        const refused = await mcpCall(access, {
+            method: "tools/call",
+            params: {
+                name: "databases_query",
+                arguments: { databaseId: SHOP, statement: "select 1" }
+            }
+        });
+        expect(refused.body?.result?.isError).toBe(true);
+        expect(refused.body?.result?.content[0]?.text).toContain("not allowed to reach");
+
+        expect(state.audit.map((entry) => entry.action)).toContain(
+            "account.oauth.databases-changed"
+        );
+        const [shown] = await listConnectedApps(ADA.id);
+        expect(shown!.databaseIds).toEqual([LOGS]);
+
+        // Every database again.
+        expect(
+            (await setAppDatabasesAction({ id: app.id, databaseIds: null })).databaseIds
+        ).toBeNull();
+        expect(await listed(access)).toEqual([SHOP, LOGS]);
+    });
+
+    it("refuses what is not a database id, and another person's connection", async () => {
+        const { app } = await connectedApp();
+        expect(
+            (await setAppDatabasesAction({ id: app.id, databaseIds: ["'; drop table x"] })).error
+        ).toBe("connectedApps.databases.failed");
+        state.user = { ...state.user, id: BOB.id };
+        expect((await setAppDatabasesAction({ id: app.id, databaseIds: [LOGS] })).error).toBe(
+            "connectedApps.databases.failed"
+        );
+        expect(state.db.tables.oAuthGrant!.at(-1)!.databaseIds ?? null).toBeNull();
     });
 });

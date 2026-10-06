@@ -11,7 +11,7 @@
 
 import { z } from "zod";
 import { describe, expect, it } from "vitest";
-import { InitializeResultSchema } from "@modelcontextprotocol/sdk/types.js";
+import { CallToolResultSchema, InitializeResultSchema } from "@modelcontextprotocol/sdk/types.js";
 import {
     MCP_PROTOCOL_VERSION,
     RPC_INVALID_PARAMS,
@@ -57,6 +57,23 @@ const explodes: McpTool<Record<string, never>> = {
     readOnly: true,
     async run() {
         throw new Error("connect ECONNREFUSED 10.0.0.4:5432");
+    }
+};
+
+const picture: McpTool<Record<string, never>> = {
+    name: "picture",
+    description: "Answers with a picture and a sentence about it.",
+    input: z.object({}),
+    scope: "tasks.read",
+    readOnly: true,
+    async run() {
+        return {
+            text: "The front door, just now.",
+            images: [
+                { data: Buffer.from([0xff, 0xd8, 0xff]).toString("base64"), mimeType: "image/jpeg" }
+            ],
+            structured: { camera: "front" }
+        };
     }
 };
 
@@ -184,6 +201,23 @@ describe("tools/call", () => {
         )?.result as { content: { text: string }[]; structuredContent: unknown };
         expect(result.content[0]?.text).toBe("hi");
         expect(result.structuredContent).toEqual({ what: "hi" });
+    });
+
+    it("sends a picture as image content after the text, in the shape the spec defines", async () => {
+        const result = (
+            await handleMcpMessage(
+                { jsonrpc: "2.0", id: 9, method: "tools/call", params: { name: "picture" } },
+                [picture] as unknown as McpTool<never>[],
+                caller,
+                SERVER
+            )
+        )?.result;
+        const parsed = CallToolResultSchema.parse(result);
+        expect(parsed.content).toEqual([
+            { type: "text", text: "The front door, just now." },
+            { type: "image", data: "/9j/", mimeType: "image/jpeg" }
+        ]);
+        expect(parsed.structuredContent).toEqual({ camera: "front" });
     });
 
     it("reports a missing scope to the model rather than to the client alone", async () => {

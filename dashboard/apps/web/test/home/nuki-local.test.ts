@@ -24,6 +24,9 @@ vi.mock("@polaris-app/places/src/lib/integrations/nuki-mqtt", () => ({
         kind = "unreachable";
     },
     readBroker: async () => contents,
+    watchBroker: async (_broker: unknown, changed: (deviceId: string) => void) => {
+        changed("2BB28570");
+    },
     sendAction: async (_broker: unknown, deviceId: string, action: number) => {
         sent.push({ deviceId, action });
     }
@@ -123,5 +126,17 @@ describe("what a broker is holding", () => {
             nukiLocalDriver.act(BROKER, { externalId: "2BB28570", kind: "lock" }, "turn-on")
         ).rejects.toThrow();
         expect(sent).toHaveLength(0);
+    });
+});
+
+describe("listening to the locks", () => {
+    it("names the lock behind every message it publishes", async () => {
+        const changed: (readonly string[])[] = [];
+        await nukiLocalDriver.listen!(
+            BROKER,
+            (ids) => changed.push(ids),
+            new AbortController().signal
+        );
+        expect(changed).toEqual([["2BB28570"]]);
     });
 });

@@ -193,5 +193,9 @@ export const gameServersExtension: AppExtension = {
     // What a connected assistant may do with the servers: see them and who is
     // on them, and - on the scope that says so - start, stop, restart and use
     // the console, by the same standing the server pages read.
-    mcpTools: async () => (await import("./mcp-tools")).gameMcpTools()
+    mcpTools: async () => (await import("./mcp-tools")).gameMcpTools(),
+
+    // How `polaris_search` finds the servers and a Minecraft server's events,
+    // by the same standing.
+    mcpSearch: async () => (await import("./mcp-search")).gameMcpSearch()
 };

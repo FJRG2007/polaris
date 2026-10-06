@@ -13,14 +13,15 @@
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const mocks = vi.hoisted(() => ({ readRetained: vi.fn(), publish: vi.fn() }));
+const mocks = vi.hoisted(() => ({ readRetained: vi.fn(), publish: vi.fn(), watchTopics: vi.fn() }));
 
 vi.mock("@polaris-app/places/src/lib/integrations/mqtt-broker", () => ({
     BrokerError: class extends Error {
         kind = "unreachable";
     },
     readRetained: mocks.readRetained,
-    publish: mocks.publish
+    publish: mocks.publish,
+    watchTopics: mocks.watchTopics
 }));
 
 const { mqttDiscoveryDriver } = await import("@polaris-app/places/src/lib/drivers/mqtt-discovery");
@@ -291,5 +292,51 @@ describe("working one", () => {
         await expect(
             mqttDiscoveryDriver.act(BROKER, { externalId: "gone", kind: "switch" }, "turn-off")
         ).rejects.toThrow(/no longer announcing/);
+    });
+});
+
+describe("listening to a broker", () => {
+    it("watches what everything announced points at, and names the device behind each message", async () => {
+        broker({
+            "homeassistant/switch/kitchen/config": {
+                name: "Kettle",
+                unique_id: "z2m_kettle",
+                state_topic: "zigbee2mqtt/Kettle",
+                availability_topic: "zigbee2mqtt/bridge/state",
+                command_topic: "zigbee2mqtt/Kettle/set"
+            },
+            "homeassistant/lock/door/config": {
+                name: "Door",
+                unique_id: "z2m_door",
+                state_topic: "zigbee2mqtt/Door",
+                availability_topic: "zigbee2mqtt/bridge/state",
+                command_topic: "zigbee2mqtt/Door/set"
+            }
+        });
+        mocks.watchTopics.mockImplementation(
+            async (_address: unknown, _filters: string[], onMessage: (topic: string) => void) => {
+                onMessage("zigbee2mqtt/Kettle");
+                onMessage("zigbee2mqtt/bridge/state");
+                onMessage("homeassistant/light/new/config");
+            }
+        );
+        const changed: (readonly string[])[] = [];
+        await mqttDiscoveryDriver.listen!(
+            BROKER,
+            (ids) => changed.push(ids),
+            new AbortController().signal
+        );
+        const filters = mocks.watchTopics.mock.calls[0]?.[1] as string[];
+        expect(filters).toEqual(
+            expect.arrayContaining([
+                "homeassistant/+/+/config",
+                "homeassistant/+/+/+/config",
+                "zigbee2mqtt/Kettle",
+                "zigbee2mqtt/Door",
+                "zigbee2mqtt/bridge/state"
+            ])
+        );
+        // A new description could be anything: a change nobody can name.
+        expect(changed).toEqual([["z2m_kettle"], ["z2m_kettle", "z2m_door"], []]);
     });
 });

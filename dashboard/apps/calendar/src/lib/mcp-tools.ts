@@ -167,6 +167,7 @@ const upcomingTool = () =>
             // i18n-ignore read by the calling model, not shown to a person
             "This account's next events over the coming two weeks, soonest first, from the calendars it shows. Read-only; calendar_events reads any range.",
         input: upcomingInput,
+        category: "calendar",
         scope: ["calendar.read", "calendar.use"],
         readOnly: true,
         async run(input, caller) {
@@ -200,6 +201,7 @@ const calendarsTool = () =>
             // i18n-ignore read by the calling model, not shown to a person
             "The calendars this account reaches, with their ids and whether it may add events to them. Use an id with calendar_events or calendar_create.",
         input: z.object({}),
+        category: "calendar",
         scope: "calendar.read",
         readOnly: true,
         async run(_input, caller) {
@@ -244,6 +246,7 @@ const eventsTool = () =>
             // i18n-ignore read by the calling model, not shown to a person
             "Every event between two days, as the person's calendar shows them, repeating ones expanded. Each comes with the objectId and recurrenceKey that calendar_update and calendar_delete take.",
         input: eventsInput,
+        category: "calendar",
         scope: "calendar.read",
         readOnly: true,
         async run(input, caller) {
@@ -322,6 +325,7 @@ const createTool = () =>
             // i18n-ignore read by the calling model, not shown to a person
             "Add an event to one of this account's writable calendars, with the calendar's usual reminders. It invites nobody.",
         input: createInput,
+        category: "calendar",
         scope: "calendar.manage",
         readOnly: false,
         destructive: false,
@@ -391,6 +395,7 @@ const updateTool = () =>
             // i18n-ignore read by the calling model, not shown to a person
             "Change the title, times, location or notes of an event this account may edit. Anything not given stays as it is; people invited are told of the change as they would be from the screen.",
         input: updateInput,
+        category: "calendar",
         scope: "calendar.manage",
         readOnly: false,
         idempotent: true,
@@ -445,6 +450,7 @@ const deleteTool = () =>
             // i18n-ignore read by the calling model, not shown to a person
             "Delete an event this account may edit - or one occurrence of a repeating one - into the Calendar's trash. People invited are told it is cancelled.",
         input: deleteInput,
+        category: "calendar",
         scope: "calendar.manage",
         readOnly: false,
         destructive: true,
@@ -461,6 +467,103 @@ const deleteTool = () =>
             return { text: "Deleted.", structured: { objectId: input.objectId } };
         }
     });
+
+// ---------------------------------------------------------------------------
+// Search
+// ---------------------------------------------------------------------------
+
+/** How far back and ahead a search reads events, in days. */
+const SEARCH_BEHIND_DAYS = 14;
+const SEARCH_AHEAD_DAYS = 60;
+
+/**
+ * The calendars this account reaches and the events on the ones it shows,
+ * from two weeks ago to two months ahead, for `polaris_search`. Read through
+ * the same `occurrencesIn` the grid and `calendar_events` use, so a busy
+ * block stays "(busy)" and a calendar not lent is not read.
+ */
+const searchProvider = () =>
+    host.mcp.defineSearch({
+        id: "calendar.events",
+        app: "calendar",
+        category: "calendar",
+        scope: ["calendar.read", "calendar.use"],
+        async search(_query, caller, limit) {
+            const acting = await host.mcp.actingUser(caller.userId);
+            const reader = acting ? await readerView(caller.userId) : null;
+            if (!acting || !reader) return [];
+            const now = Date.now();
+            const [calendars, view] = await Promise.all([
+                listCalendars(acting),
+                occurrencesIn(
+                    acting,
+                    {
+                        from: new Date(now - SEARCH_BEHIND_DAYS * 86_400_000),
+                        to: new Date(now + SEARCH_AHEAD_DAYS * 86_400_000)
+                    },
+                    {
+                        floatingZone: reader.zone,
+                        calendarIds: reader.shown.map((entry) => entry.id),
+                        emails: await addressesOf(acting),
+                        includeTasks: false
+                    }
+                )
+            ]);
+            const names = new Map(calendars.map((calendar) => [calendar.id, calendar.name]));
+            const hits: AppHostTypes["McpSearchHit"][] = calendars.map((calendar) => ({
+                id: calendar.id,
+                name: calendar.name,
+                kind: "calendar",
+                keywords: [calendar.owner?.name],
+                next: calendar.writable
+                    ? [{ tool: "calendar_create", args: { calendarId: calendar.id } }]
+                    : []
+            }));
+            for (const occurrence of view.occurrences.slice(0, MAX_ROWS)) {
+                if (occurrence.busyOnly) continue;
+                const day = (occurrence.allDay ? occurrence.startDate : occurrence.start)?.slice(
+                    0,
+                    10
+                );
+                hits.push({
+                    id: occurrence.recurring
+                        ? `${occurrence.objectId}:${occurrence.recurrenceKey}`
+                        : occurrence.objectId,
+                    name: occurrence.summary,
+                    kind: "calendar event",
+                    where: [day, names.get(occurrence.calendarId)].filter(Boolean).join(", "),
+                    keywords: [occurrence.location],
+                    next: [
+                        {
+                            tool: "calendar_events",
+                            args: { from: day, to: day, calendarId: occurrence.calendarId }
+                        },
+                        ...(occurrence.editable
+                            ? [
+                                  {
+                                      tool: "calendar_update",
+                                      args: {
+                                          objectId: occurrence.objectId,
+                                          ...(occurrence.recurring
+                                              ? { recurrenceKey: occurrence.recurrenceKey }
+                                              : {})
+                                      }
+                                  }
+                              ]
+                            : [])
+                    ]
+                });
+            }
+            return hits.slice(0, limit);
+        }
+    });
+
+let searched: readonly AppHostTypes["McpSearchProvider"][] | undefined;
+
+export function calendarMcpSearch(): readonly AppHostTypes["McpSearchProvider"][] {
+    searched ??= [searchProvider()];
+    return searched;
+}
 
 /** Built when the app is first asked for its tools, not when this module
  *  loads: `defineTool` is the host's, and a module of this app can be loaded

@@ -128,6 +128,12 @@ export const nukiLocalDriver: DeviceDriver = {
         return snapshots;
     },
 
+    /** Everything a lock publishes from now on, by the device id in its topic. */
+    async listen(credentials, changed, signal) {
+        const broker = brokerOf(credentials);
+        await speaking(() => mqtt.watchBroker(broker, (deviceId) => changed([deviceId]), signal));
+    },
+
     async act(credentials, device, action) {
         const code =
             action === "lock"

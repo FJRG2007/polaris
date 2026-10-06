@@ -271,6 +271,7 @@
         "web/src/app/(app)/account/assistants/connect-guides.tsx",
         "web/src/app/(app)/account/assistants/connected-app-actions.ts",
         "web/src/app/(app)/account/assistants/connected-apps.tsx",
+        "web/src/app/(app)/account/assistants/database-reach-picker.tsx",
         "web/src/app/(app)/account/assistants/ip-rule-dialog.tsx",
         "web/src/app/(app)/account/assistants/mcp-assistants.tsx",
         "web/src/app/(app)/account/assistants/page.tsx",

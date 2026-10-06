@@ -72,5 +72,8 @@ export const calendarExtension: AppExtension = {
 
     // What a connected assistant may do with the calendar: read it, and - on
     // the scope that says so - change it, by the app's own rules.
-    mcpTools: async () => (await import("./mcp-tools")).calendarMcpTools()
+    mcpTools: async () => (await import("./mcp-tools")).calendarMcpTools(),
+
+    // How `polaris_search` finds its calendars and events, by the same rules.
+    mcpSearch: async () => (await import("./mcp-tools")).calendarMcpSearch()
 };

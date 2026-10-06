@@ -27,7 +27,12 @@
             "tooMany": "Demasiados intentos de conexión. Espera unos minutos y vuelve a empezar desde la app.",
             "failed": "Polaris no ha podido terminar de conectar la app. Vuelve a empezar desde la app."
         },
-        "home": "Ir a Polaris"
+        "home": "Ir a Polaris",
+        "sensitive": "Sensible",
+        "sensitiveHint": "Actúa fuera de Polaris o sobre dispositivos reales",
+        "groupCount": "{count} de {total}",
+        "groupAll": "Permitir todo en {category}",
+        "groupShow": "Mostrar {category}"
     },
     "scopes": {
         "drive_read": "Ver archivos y descargarlos",
@@ -58,6 +63,8 @@
         "chat_meetings": "Crear enlaces de reunión",
         "deploy_read": "Ver apps, despliegues y registros",
         "deploy_manage": "Desplegar, reiniciar y cambiar apps",
+        "databases_read": "Ver tus bases de datos y leer sus datos",
+        "databases_write": "Cambiar datos de tus bases de datos",
         "games_read": "Ver servidores",
         "games_moderate": "Moderar jugadores",
         "games_console": "Usar consolas de juego",
@@ -72,6 +79,7 @@
         "places_read": "Ver los dispositivos de tus lugares",
         "places_control": "Manejar dispositivos: encender, cerrar, ajustar",
         "places_routines": "Ver y ejecutar rutinas",
+        "places_cameras": "Ver una imagen fija de tus cámaras",
         "tools_use": "Usar herramientas",
         "tools_manage": "Crear enlaces cortos",
         "tasks_read": "Leer espacios, listas y tareas",
@@ -176,6 +184,31 @@
             "askAdmin": "Solo un administrador puede dejar pasar una conexión por encima de estas reglas.",
             "rules": "Ver tus reglas de acceso",
             "allow": "Permitir {app}"
+        },
+        "databases": {
+            "title": "Bases que puede abrir",
+            "hint": "Se aplica a sus herramientas de bases de datos desde su próxima llamada.",
+            "all": "Todas las que puedes abrir",
+            "chosen": "Solo las que elija",
+            "search": "Buscar bases",
+            "noneToChoose": "No tienes bases de datos entre las que elegir.",
+            "noneChosen": "Ninguna elegida: sus herramientas de bases de datos se rechazan.",
+            "failed": "No se pudo cambiar a qué bases de datos puede acceder. Recarga e inténtalo de nuevo.",
+            "summaryAll": "Bases de datos: todas las que puedes abrir",
+            "summaryChosen": "{count, plural, =0 {Bases de datos: ninguna} one {Bases de datos: # elegida} other {Bases de datos: # elegidas}}"
         }
+    },
+    "categories": {
+        "polaris": "Polaris",
+        "home": "Casa y cámaras",
+        "mail": "Correo",
+        "calendar": "Calendario",
+        "chat": "Chat y bandeja",
+        "productivity": "Productividad",
+        "files": "Archivos y enlaces",
+        "development": "Desarrollo y despliegue",
+        "databases": "BBDD",
+        "games": "Juegos",
+        "account": "Cuenta y administración"
     }
 }

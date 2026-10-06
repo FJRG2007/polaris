@@ -1,28 +1,45 @@
 /**
- * Keeping the devices fresh while somebody is looking at them.
+ * Keeping the devices fresh, whether or not anybody is looking at them.
  *
  * The browser used to do this: every open devices screen asked every account
  * again on a half-minute timer, so two tabs were two calls to each account, and
- * nothing changed on the screen until the timer came round. Now the server reads
- * - once per account however many screens are open - and pushes what changed to
- * all of them (`device-live`). It is Home Assistant's split: integrations poll
- * on the backend through one coordinator, and the frontend only ever subscribes.
+ * nothing changed on the screen until the timer came round. Then the server read
+ * - once per account however many screens were open - and pushed what changed
+ * to all of them (`device-live`), but only while a screen was open: with nobody
+ * looking, nothing was read, and an assistant asking about the front door was
+ * told what the last open screen had seen, hours ago.
+ *
+ * So this is Home Assistant's DataUpdateCoordinator now. Every install with a
+ * device account is read in the background from boot (`startDeviceCoordinator`),
+ * at its own pace; an open screen only makes it faster. Right after a command
+ * the account is read again a few times (`requestFollowUps`, HA's
+ * `async_request_refresh`), stopping as soon as the device has stopped moving,
+ * and a reader that cannot wait for the next turn can ask for one now
+ * (`refreshAccounts`). Every read goes through the one path, shared while it is
+ * in flight, so a follow-up, the timer and an assistant asking at the same
+ * moment are one call to the account.
  *
  * Paced per account, by how it is reached. Something on the same network
  * answers in milliseconds and costs nobody anything, so it is read every ten
  * seconds; a cloud account is somebody else's quota and keeps the half minute
  * the screen used; SwitchBot's is ten thousand calls a day for everything, so
- * once a minute. An account that fails is read less and less often - doubling up
- * to five minutes - until it answers again, and an account any other path just
- * read (an automation, the button, a press) is not read again until it is due.
+ * once a minute. With no screen open each of those is doubled - SwitchBot then
+ * costs 720 calls a day, a fraction of its quota. An account that fails is read
+ * less and less often - doubling up to five minutes - until it answers again, and
+ * an account any other path just read (an automation, the button, a press) is
+ * not read again until it is due.
+ *
+ * Where a make pushes its changes - Home Assistant, a DIRIGERA hub, a broker -
+ * a channel is held open beside the timer (`device-push.ts`), and a change on
+ * it reads the account at once instead of at its next turn.
  *
  * None of this wakes a device: it is the same quiet read the timer made. The
  * button that does wake them is still the person's to press.
  *
- * Runs only while a stream that may sync is open; the last one closing stops
- * it. Server-only.
+ * Server-only.
  */
 
+import * as push from "./device-push";
 import * as accounts from "./device-accounts";
 import { deviceConnection } from "./device-connections";
 
@@ -34,6 +51,12 @@ export const LOCAL_POLL_MS = 10 * SECOND;
 export const CLOUD_POLL_MS = 30 * SECOND;
 /** The ceiling a failing account backs off to. */
 export const MAX_BACKOFF_MS = 5 * 60 * SECOND;
+/** How much slower an account is read while no screen is open. */
+export const UNWATCHED_FACTOR = 2;
+/** When an account is read again after a command, counted from the command. */
+export const FOLLOW_UP_MS: readonly number[] = [2 * SECOND, 6 * SECOND, 15 * SECOND];
+/** How often the coordinator looks for installs that gained or lost accounts. */
+export const DISCOVER_MS = 5 * 60 * SECOND;
 
 /** Accounts whose quota is too small for the cloud cadence. SwitchBot allows
  *  10,000 calls a day per account, across every device on it. */
@@ -46,12 +69,18 @@ const SLOW_CONNECTIONS: Readonly<Record<string, number>> = {
  *  one request at a time. */
 const CAREFUL_CONNECTIONS = new Set(["philips-coap", "philips-dynalite"]);
 
-/** How often one account is read while somebody is watching. */
-export function pollInterval(connection: string): number {
+/** How often one account is read: at the screen's pace while somebody is
+ *  watching, and `UNWATCHED_FACTOR` times slower while nobody is. */
+export function pollInterval(connection: string, watched = true): number {
     const slow = SLOW_CONNECTIONS[connection];
-    if (slow) return slow;
-    if (CAREFUL_CONNECTIONS.has(connection)) return CLOUD_POLL_MS;
-    return deviceConnection(connection)?.reach === "same-network" ? LOCAL_POLL_MS : CLOUD_POLL_MS;
+    const base =
+        slow ??
+        (CAREFUL_CONNECTIONS.has(connection)
+            ? CLOUD_POLL_MS
+            : deviceConnection(connection)?.reach === "same-network"
+              ? LOCAL_POLL_MS
+              : CLOUD_POLL_MS);
+    return watched ? base : base * UNWATCHED_FACTOR;
 }
 
 /** How long to wait after `failures` failures in a row. */
@@ -64,24 +93,34 @@ export function backoff(interval: number, failures: number): number {
  * The accounts due a read now, and how long until the next one is.
  *
  * Pure, so the pacing can be asserted without a clock: `lastSyncedAt` is when
- * anything last read the account, `failures` is this watcher's own count.
+ * anything last read the account, `failures` is the coordinator's own count.
+ * `followUps` is when each account is next to be read again after a command:
+ * that read is due at its time however recently the account was read, and is
+ * held back only by a failing account's backoff.
  */
 export function dueAccounts(
     list: readonly Pick<accounts.DeviceAccountView, "id" | "connection" | "lastSyncedAt">[],
     failures: ReadonlyMap<string, { count: number; at: number }>,
-    now: number
+    now: number,
+    options: { watched?: boolean; followUps?: ReadonlyMap<string, number> } = {}
 ): { due: string[]; nextInMs: number } {
+    const watched = options.watched ?? true;
     const due: string[] = [];
     let nextInMs = MAX_BACKOFF_MS;
     for (const account of list) {
         if (!accounts.isConnectable(account.connection)) continue;
-        const interval = pollInterval(account.connection);
+        const interval = pollInterval(account.connection, watched);
         const failed = failures.get(account.id);
         const last = Math.max(
             account.lastSyncedAt ? Date.parse(account.lastSyncedAt) || 0 : 0,
             failed?.at ?? 0
         );
-        const wait = backoff(interval, failed?.count ?? 0) - (now - last);
+        let wait = backoff(interval, failed?.count ?? 0) - (now - last);
+        const followUp = options.followUps?.get(account.id);
+        if (followUp !== undefined) {
+            const held = failed ? backoff(interval, failed.count) - (now - failed.at) : 0;
+            wait = Math.min(wait, Math.max(followUp - now, held));
+        }
         if (wait <= 0) {
             due.push(account.id);
             nextInMs = Math.min(nextInMs, interval);
@@ -92,11 +131,153 @@ export function dueAccounts(
     return { due, nextInMs: Math.max(SECOND, nextInMs) };
 }
 
+// ---------------------------------------------------------------------------
+// Reading an account, once however many ask
+// ---------------------------------------------------------------------------
+
+interface Shared {
+    /** Reads in flight, by account, with when each started. */
+    readonly inflight: Map<string, { startedAt: number; read: Promise<boolean> }>;
+    /** When each account's last read that worked was started. */
+    readonly readAt: Map<string, number>;
+    /** Waiting for an account's next read. */
+    readonly waiters: Set<{ accountId: string; after: number; done: (read: boolean) => void }>;
+}
+
+const SHARED = Symbol.for("polaris.places.devices.reads");
+
+function shared(): Shared {
+    const holder = globalThis as unknown as Record<symbol, Shared | undefined>;
+    holder[SHARED] ??= { inflight: new Map(), readAt: new Map(), waiters: new Set() };
+    return holder[SHARED];
+}
+
+/**
+ * Read these accounts now, through the one sync path (`syncDevices`, quietly -
+ * never a probe). An account already being read is not read twice: the caller
+ * waits for the read in flight, unless it started no later than the time
+ * `after` holds for that account. Answers the accounts that failed.
+ */
+export async function readAccounts(
+    installedAppId: string,
+    accountIds: readonly string[],
+    after: ReadonlyMap<string, number> = new Map()
+): Promise<string[]> {
+    const { inflight, readAt, waiters } = shared();
+    const waiting = new Map<string, Promise<boolean>>();
+    const fresh: string[] = [];
+    for (const id of new Set(accountIds)) {
+        const running = inflight.get(id);
+        if (running && running.startedAt > (after.get(id) ?? -Infinity))
+            waiting.set(id, running.read);
+        else fresh.push(id);
+    }
+    if (fresh.length > 0) {
+        const startedAt = Date.now();
+        // Loaded when needed: `devices` publishes through `device-live`, and
+        // reaches this module itself after a command.
+        const read = import("./devices").then((devices) =>
+            devices.syncDevices(installedAppId, { probe: false, only: fresh })
+        );
+        for (const id of fresh) {
+            const one = read.then(
+                (outcome) => !outcome.failed.includes(id),
+                () => false
+            );
+            const entry = { startedAt, read: one };
+            inflight.set(id, entry);
+            void one.then((worked) => {
+                if (inflight.get(id) === entry) inflight.delete(id);
+                if (!worked) return;
+                if (startedAt > (readAt.get(id) ?? 0)) readAt.set(id, startedAt);
+                for (const waiter of [...waiters]) {
+                    if (waiter.accountId === id && startedAt > waiter.after) waiter.done(true);
+                }
+            });
+            waiting.set(id, one);
+        }
+    }
+    const failed: string[] = [];
+    for (const [id, read] of waiting) if (!(await read)) failed.push(id);
+    return failed;
+}
+
+/**
+ * Resolve once a read of an account started after `after` (epoch ms) has
+ * worked, or with false when `timeoutMs` passes first.
+ */
+export function waitForRead(accountId: string, after: number, timeoutMs: number): Promise<boolean> {
+    const { readAt, waiters } = shared();
+    if ((readAt.get(accountId) ?? 0) > after) return Promise.resolve(true);
+    return new Promise((resolve) => {
+        const waiter = {
+            accountId,
+            after,
+            done: (read: boolean) => {
+                clearTimeout(timer);
+                waiters.delete(waiter);
+                resolve(read);
+            }
+        };
+        const timer = setTimeout(() => waiter.done(false), Math.max(0, timeoutMs));
+        timer.unref?.();
+        waiters.add(waiter);
+    });
+}
+
+/**
+ * Read these accounts now for a reader that cannot wait for the next turn,
+ * within `timeoutMs`. "read" when every one of them answered in time,
+ * "timeout" when the time ran out first (the reads carry on and land for the
+ * next reader), "failed" when one refused.
+ */
+export async function refreshAccounts(
+    installedAppId: string,
+    accountIds: readonly string[],
+    timeoutMs: number
+): Promise<"read" | "timeout" | "failed"> {
+    if (accountIds.length === 0) return "read";
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const late = new Promise<"timeout">((resolve) => {
+        timer = setTimeout(() => resolve("timeout"), timeoutMs);
+        timer.unref?.();
+    });
+    const reading = readAccounts(installedAppId, accountIds).then(
+        (failed) => (failed.length > 0 ? ("failed" as const) : ("read" as const)),
+        () => "failed" as const
+    );
+    try {
+        return await Promise.race([reading, late]);
+    } finally {
+        if (timer) clearTimeout(timer);
+    }
+}
+
+// ---------------------------------------------------------------------------
+// The coordinator
+// ---------------------------------------------------------------------------
+
+interface FollowUp {
+    /** When to read the account again, soonest first. */
+    times: number[];
+    /** When the last command was sent: a read started before it is not one. */
+    since: number;
+    /** The devices commanded, read after each pass to see whether they have
+     *  stopped moving. */
+    devices: Set<string>;
+}
+
 interface Watch {
+    /** Open screens. */
     viewers: number;
+    /** Kept read by the coordinator, whether or not anybody is looking. */
+    background: boolean;
     timer: ReturnType<typeof setTimeout> | null;
+    /** When the timer fires, for bringing it forward. */
+    dueAt: number;
     running: boolean;
     failures: Map<string, { count: number; at: number }>;
+    followUps: Map<string, FollowUp>;
 }
 
 const REGISTRY = Symbol.for("polaris.places.devices.watch");
@@ -107,24 +288,82 @@ function watches(): Map<string, Watch> {
     return holder[REGISTRY];
 }
 
+function watchFor(installedAppId: string): Watch {
+    const all = watches();
+    let watch = all.get(installedAppId);
+    if (!watch) {
+        watch = {
+            viewers: 0,
+            background: false,
+            timer: null,
+            dueAt: 0,
+            running: false,
+            failures: new Map(),
+            followUps: new Map()
+        };
+        all.set(installedAppId, watch);
+    }
+    return watch;
+}
+
+function active(watch: Watch): boolean {
+    return watch.viewers > 0 || watch.background || watch.followUps.size > 0;
+}
+
+function nextFollowUps(watch: Watch): Map<string, number> {
+    const next = new Map<string, number>();
+    for (const [id, followUp] of watch.followUps) {
+        const at = followUp.times[0];
+        if (at !== undefined) next.set(id, at);
+    }
+    return next;
+}
+
+/** After a pass: drop the follow-up times that have come, and the whole
+ *  follow-up once none of its devices is still moving. */
+async function settleFollowUps(
+    installedAppId: string,
+    watch: Watch,
+    read: readonly string[]
+): Promise<void> {
+    const now = Date.now();
+    const devices = await import("./devices");
+    for (const id of read) {
+        const followUp = watch.followUps.get(id);
+        if (!followUp) continue;
+        followUp.times = followUp.times.filter((at) => at > now);
+        let moving = false;
+        for (const deviceId of followUp.devices) {
+            const device = await devices.getDevice(installedAppId, deviceId).catch(() => null);
+            if (device?.state === "moving") moving = true;
+        }
+        if (!moving || followUp.times.length === 0) watch.followUps.delete(id);
+    }
+}
+
 async function tick(installedAppId: string, watch: Watch): Promise<void> {
     watch.timer = null;
-    if (watch.viewers <= 0) return;
+    if (!active(watch)) return;
     watch.running = true;
     let nextInMs = CLOUD_POLL_MS;
     try {
         const list = await accounts.listAccounts(installedAppId);
-        const now = Date.now();
-        const plan = dueAccounts(list, watch.failures, now);
+        // The makes that push are heard between passes too (`device-push`). A
+        // channel that cannot be kept never costs the timer its pass.
+        try {
+            push.keepListening(installedAppId, list, (id) => readAccounts(installedAppId, [id]));
+        } catch (error) {
+            console.error("places: the devices could not be listened to:", error);
+        }
+        const known = new Set(list.map((account) => account.id));
+        for (const id of watch.followUps.keys()) if (!known.has(id)) watch.followUps.delete(id);
+        const options = { watched: watch.viewers > 0, followUps: nextFollowUps(watch) };
+        const plan = dueAccounts(list, watch.failures, Date.now(), options);
         if (plan.due.length > 0) {
-            // Loaded when needed: `devices` publishes through `device-live`, and
-            // the stream route that starts this loads both.
-            const devices = await import("./devices");
-            const outcome = await devices.syncDevices(installedAppId, {
-                probe: false,
-                only: plan.due
-            });
-            const failed = new Set(outcome.failed);
+            const since = new Map(
+                [...watch.followUps].map(([id, followUp]) => [id, followUp.since])
+            );
+            const failed = new Set(await readAccounts(installedAppId, plan.due, since));
             for (const id of plan.due) {
                 if (failed.has(id)) {
                     const count = (watch.failures.get(id)?.count ?? 0) + 1;
@@ -133,6 +372,7 @@ async function tick(installedAppId: string, watch: Watch): Promise<void> {
                     watch.failures.delete(id);
                 }
             }
+            await settleFollowUps(installedAppId, watch, plan.due);
             // Planned again as of now, so a fast account is not held to the pace
             // of the slow one read beside it. What was just read counts as read
             // now; what failed is paced by its failure.
@@ -142,12 +382,15 @@ async function tick(installedAppId: string, watch: Watch): Promise<void> {
                     ? { ...account, lastSyncedAt: readAt }
                     : account
             );
-            nextInMs = dueAccounts(after, watch.failures, Date.now()).nextInMs;
+            nextInMs = dueAccounts(after, watch.failures, Date.now(), {
+                watched: watch.viewers > 0,
+                followUps: nextFollowUps(watch)
+            }).nextInMs;
         } else {
             nextInMs = plan.nextInMs;
         }
     } catch (error) {
-        console.error("places: the devices could not be read for an open screen:", error);
+        console.error("places: the devices could not be read:", error);
         nextInMs = MAX_BACKOFF_MS / 5;
     } finally {
         watch.running = false;
@@ -155,37 +398,132 @@ async function tick(installedAppId: string, watch: Watch): Promise<void> {
     schedule(installedAppId, watch, nextInMs);
 }
 
+/** Set the timer, or bring it forward when it would fire later than asked. A
+ *  pass in flight plans its own next one. */
 function schedule(installedAppId: string, watch: Watch, delayMs: number): void {
-    if (watch.viewers <= 0 || watch.timer || watch.running) return;
+    if (!active(watch) || watch.running) return;
+    const dueAt = Date.now() + delayMs;
+    if (watch.timer) {
+        if (watch.dueAt <= dueAt) return;
+        clearTimeout(watch.timer);
+    }
+    watch.dueAt = dueAt;
     watch.timer = setTimeout(() => void tick(installedAppId, watch), delayMs);
     watch.timer.unref?.();
 }
 
+function idle(installedAppId: string, watch: Watch): void {
+    if (active(watch)) return;
+    if (watch.timer) clearTimeout(watch.timer);
+    watch.timer = null;
+    watch.failures.clear();
+    push.stopListening(installedAppId);
+}
+
 /**
- * Keep an install's devices fresh for as long as the returned release has not
- * been called. Any number of screens share one loop.
+ * Keep an install's devices at the screen's pace for as long as the returned
+ * release has not been called. Any number of screens share one loop, which the
+ * coordinator keeps going at its own pace once the last one closes.
  */
 export function watchDevices(installedAppId: string): () => void {
-    const all = watches();
-    let watch = all.get(installedAppId);
-    if (!watch) {
-        watch = { viewers: 0, timer: null, running: false, failures: new Map() };
-        all.set(installedAppId, watch);
-    }
+    const watch = watchFor(installedAppId);
     watch.viewers += 1;
     // The first screen is read for at once, where an account is due: it was
     // drawn from the last stored read, and the sooner that is confirmed the
     // sooner anything stale on it is put right.
     schedule(installedAppId, watch, 0);
     let released = false;
-    const held = watch;
     return () => {
         if (released) return;
         released = true;
-        held.viewers -= 1;
-        if (held.viewers > 0) return;
-        if (held.timer) clearTimeout(held.timer);
-        held.timer = null;
-        held.failures.clear();
+        watch.viewers -= 1;
+        idle(installedAppId, watch);
     };
+}
+
+/**
+ * Read a device's account again shortly after a command - at each of
+ * `FOLLOW_UP_MS` - until the device has stopped moving. A lock told to lock is
+ * "moving" until its account says where it got to, and without this that is
+ * what it would read as until the next turn of the timer.
+ */
+export function requestFollowUps(
+    installedAppId: string,
+    accountId: string,
+    deviceId: string
+): void {
+    const watch = watchFor(installedAppId);
+    const now = Date.now();
+    const current = watch.followUps.get(accountId);
+    const devices = new Set(current?.devices ?? []);
+    devices.add(deviceId);
+    watch.followUps.set(accountId, {
+        times: FOLLOW_UP_MS.map((ms) => now + ms),
+        since: now,
+        devices
+    });
+    schedule(installedAppId, watch, FOLLOW_UP_MS[0]!);
+}
+
+interface Coordinator {
+    timer: ReturnType<typeof setInterval> | null;
+}
+
+const COORDINATOR = Symbol.for("polaris.places.devices.coordinator");
+
+function coordinator(): Coordinator {
+    const holder = globalThis as unknown as Record<symbol, Coordinator | undefined>;
+    holder[COORDINATOR] ??= { timer: null };
+    return holder[COORDINATOR];
+}
+
+/** Keep every install that has a device account read in the background, and
+ *  stop keeping one that no longer has any. */
+export async function discoverInstalls(): Promise<string[]> {
+    const installs = new Set(await accounts.installsWithAccounts());
+    for (const [installedAppId, watch] of watches()) {
+        if (installs.has(installedAppId)) continue;
+        watch.background = false;
+        idle(installedAppId, watch);
+    }
+    for (const installedAppId of installs) {
+        const watch = watchFor(installedAppId);
+        if (watch.background) continue;
+        watch.background = true;
+        schedule(installedAppId, watch, 0);
+    }
+    return [...installs];
+}
+
+/**
+ * Start the background coordinator: once per process, however often it is
+ * called. Looks for installs with accounts now and every `DISCOVER_MS`.
+ */
+export function startDeviceCoordinator(): void {
+    const state = coordinator();
+    if (state.timer) return;
+    const look = () =>
+        void discoverInstalls().catch((error) =>
+            console.error("places: the device accounts could not be listed:", error)
+        );
+    state.timer = setInterval(look, DISCOVER_MS);
+    state.timer.unref?.();
+    look();
+}
+
+/** Stop the background reads. Open screens and follow-ups keep their own. */
+export function stopDeviceCoordinator(): void {
+    const state = coordinator();
+    if (state.timer) clearInterval(state.timer);
+    state.timer = null;
+    for (const [installedAppId, watch] of watches()) {
+        watch.background = false;
+        idle(installedAppId, watch);
+    }
+}
+
+/** How long an install's account goes between reads right now: faster while a
+ *  screen is open. What an assistant measures a device's age against. */
+export function currentInterval(installedAppId: string, connection: string): number {
+    return pollInterval(connection, (watches().get(installedAppId)?.viewers ?? 0) > 0);
 }

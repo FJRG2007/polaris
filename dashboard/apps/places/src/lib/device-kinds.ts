@@ -738,6 +738,9 @@ export interface DeviceView {
     readonly air?: AirSettings | null;
     /** What a kitchen appliance is doing. Null, or absent, for every other kind. */
     readonly appliance?: ApplianceView | null;
+    /** The account it is read through, for reading that account again. Null on a
+     *  device connected to nothing; absent where a view was built without it. */
+    readonly accountId?: string | null;
 }
 
 /** How something came to happen. `polaris` is the one that carries weight: it is

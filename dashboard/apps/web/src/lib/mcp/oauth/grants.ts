@@ -27,6 +27,7 @@ import { verifierMatches } from "./pkce";
 import { clientBrand, type ClientBrand } from "./client-brand";
 import { IP_REFUSED_DESCRIPTION, grantAllowsIp } from "./ip-guard";
 import { readIpPolicy, type IpPolicy } from "./ip-policy";
+import { readDatabaseReach, storedDatabaseReach, type DatabaseReach } from "./database-reach";
 import {
     readNetworkException,
     storedNetworkException,
@@ -404,6 +405,9 @@ export interface VerifiedAccess {
     readonly approvedIp: string | null;
     /** Where it may call from past the account's network rules. */
     readonly networkException: NetworkException;
+    /** Which databases the database tools may reach; null for every one the
+     *  person can open. */
+    readonly databaseIds: DatabaseReach;
 }
 
 /**
@@ -434,6 +438,7 @@ export async function verifyAccessToken(
                     ipPolicy: true,
                     approvedIp: true,
                     networkException: true,
+                    databaseIds: true,
                     lastUsedAt: true,
                     user: { select: { bannedAt: true, isAdmin: true } }
                 }
@@ -465,7 +470,8 @@ export async function verifyAccessToken(
         scopes,
         ipPolicy: row.grant.ipPolicy,
         approvedIp: row.grant.approvedIp,
-        networkException: readNetworkException(row.grant.networkException)
+        networkException: readNetworkException(row.grant.networkException),
+        databaseIds: readDatabaseReach(row.grant.databaseIds)
     };
 }
 
@@ -512,6 +518,8 @@ export interface ConnectedAppView {
     readonly lastRefusedIp: string | null;
     /** Where it may call from past the account's network rules. */
     readonly networkException: NetworkException;
+    /** Which databases the database tools may reach; null for every one. */
+    readonly databaseIds: DatabaseReach;
 }
 
 /** What the account screen reads of a grant and its app. */
@@ -527,6 +535,7 @@ const APP_SELECT = {
     lastRefusedAt: true,
     lastRefusedIp: true,
     networkException: true,
+    databaseIds: true,
     client: { select: { name: true, clientUri: true, clientId: true, redirectUris: true } }
 } as const;
 
@@ -542,6 +551,7 @@ function appView(row: {
     lastRefusedAt: Date | null;
     lastRefusedIp: string | null;
     networkException: string | null;
+    databaseIds: string | null;
     client: { name: string; clientUri: string | null; redirectUris: string };
 }): ConnectedAppView {
     const redirects = parseStringList(row.client.redirectUris);
@@ -569,7 +579,8 @@ function appView(row: {
         approvedIp: row.approvedIp,
         lastRefusedAt: row.lastRefusedAt?.toISOString() ?? null,
         lastRefusedIp: row.lastRefusedIp,
-        networkException: readNetworkException(row.networkException)
+        networkException: readNetworkException(row.networkException),
+        databaseIds: readDatabaseReach(row.databaseIds)
     };
 }
 
@@ -672,6 +683,23 @@ export async function setGrantNetworkException(
     const changed = await prisma.oAuthGrant.updateMany({
         where: { id: grantId, userId, revokedAt: null },
         data: { networkException: storedNetworkException(exception) }
+    });
+    return changed.count === 1;
+}
+
+/**
+ * Set which databases a connected app's database tools may reach. Applies to
+ * its very next call: the MCP endpoint reads it from the grant every time.
+ * False when the grant is not this person's or was disconnected.
+ */
+export async function setGrantDatabases(
+    userId: string,
+    grantId: string,
+    reach: DatabaseReach
+): Promise<boolean> {
+    const changed = await prisma.oAuthGrant.updateMany({
+        where: { id: grantId, userId, revokedAt: null },
+        data: { databaseIds: storedDatabaseReach(reach) }
     });
     return changed.count === 1;
 }

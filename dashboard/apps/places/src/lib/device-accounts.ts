@@ -209,6 +209,17 @@ const ACCOUNT_FIELDS = {
     lastSyncedAt: true
 } as const;
 
+/** The installs that have at least one device account: what the background
+ *  reads (`device-watch`) keep fresh. A handful of rows on any instance. */
+export async function installsWithAccounts(): Promise<string[]> {
+    const rows = await prisma.placeDeviceAccount.findMany({
+        distinct: ["installedAppId"],
+        select: { installedAppId: true },
+        take: 100
+    });
+    return rows.map((row) => row.installedAppId);
+}
+
 export async function listAccounts(installedAppId: string): Promise<DeviceAccountView[]> {
     await adoptLegacyAccount(installedAppId);
     const rows = await prisma.placeDeviceAccount.findMany({

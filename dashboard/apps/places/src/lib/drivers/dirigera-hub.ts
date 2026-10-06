@@ -132,6 +132,19 @@ export const dirigeraHubDriver: DeviceDriver = {
         return (await ikea.hubDevices(hubOf(credentials))).flatMap(rowsOf);
     },
 
+    /** The hub's event stream. A device's sensors are rows of their own
+     *  (`<id>#temperature`), so an event about it names those too. */
+    async listen(credentials, changed, signal) {
+        await ikea.listenHub(
+            hubOf(credentials),
+            (deviceId) =>
+                changed(
+                    deviceId ? [deviceId, `${deviceId}#temperature`, `${deviceId}#humidity`] : []
+                ),
+            signal
+        );
+    },
+
     async act(credentials, device, action) {
         if (action !== "turn-on" && action !== "turn-off") {
             throw new HomeError("An IKEA device cannot be told to do that");

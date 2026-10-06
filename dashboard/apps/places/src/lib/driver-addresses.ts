@@ -165,6 +165,20 @@ export function withAddresses(driver: DeviceDriver): DeviceDriver {
                       ).value
               }
             : {}),
+        ...(driver.listen
+            ? {
+                  listen: async (
+                      credentials: Credentials,
+                      changed: (externalIds: readonly string[]) => void,
+                      signal: AbortSignal
+                  ) =>
+                      (
+                          await run(id, credentials, own, (resolved) =>
+                              driver.listen!(resolved, changed, signal)
+                          )
+                      ).value
+              }
+            : {}),
         ...(driver.probe
             ? {
                   probe: async (credentials: Credentials, externalIds: readonly string[]) =>

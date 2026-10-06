@@ -16,6 +16,10 @@
  * When the account's network rules restrict where it may be used from, a note
  * at the top says what that does to assistants calling from their own servers
  * and how one connection is let through.
+ *
+ * An app that holds a database permission is also told which databases it may
+ * reach, in the same dialog as its permissions: every one the person can open,
+ * or the ones they tick.
  */
 
 import { useMemo, useState } from "react";
@@ -32,6 +36,8 @@ import { useLocale, useTranslations } from "@/components/i18n/i18n-provider";
 import { expandScopes, scopeRequires, isMcpScope, type McpScope } from "@/lib/mcp/scope-table";
 import { McpScopeChecklist } from "@/components/mcp-scope-checklist";
 import { IpRuleDialog } from "./ip-rule-dialog";
+import { DatabaseReachPicker, type DatabaseOption } from "./database-reach-picker";
+import { sameDatabaseReach, type DatabaseReach } from "@/lib/mcp/oauth/database-reach";
 import type { IpPolicy } from "@/lib/mcp/oauth/ip-policy";
 import {
     exceptionIsEmpty,
@@ -41,6 +47,7 @@ import {
 import {
     Bot,
     ChevronRight,
+    Database,
     Globe,
     Network,
     Pencil,
@@ -51,6 +58,7 @@ import {
 import {
     changeAppScopesAction,
     disconnectAppAction,
+    setAppDatabasesAction,
     setAppIpPolicyAction,
     setAppNetworkExceptionAction
 } from "./connected-app-actions";
@@ -92,16 +100,25 @@ function samePolicy(a: IpPolicy, b: IpPolicy): boolean {
     return JSON.stringify(a) === JSON.stringify(b);
 }
 
+/** Whether a set of scopes reaches the database tools at all. */
+function holdsDatabases(scopes: Iterable<string>): boolean {
+    for (const scope of scopes) if (scope.startsWith("databases.")) return true;
+    return false;
+}
+
 export function ConnectedApps({
     apps: initial,
     restricted = false,
-    canExcept = false
+    canExcept = false,
+    databases = []
 }: {
     apps: ConnectedAppRow[];
     /** Whether the account's network rules restrict where it may be used from. */
     restricted?: boolean;
     /** Whether this person may let a connection past those rules. */
     canExcept?: boolean;
+    /** The databases this person can open, for choosing which an app reaches. */
+    databases?: DatabaseOption[];
 }) {
     const t = useTranslations("mcp");
     const router = useRouter();
@@ -148,30 +165,61 @@ export function ConnectedApps({
         router.refresh();
     }
 
-    async function save(app: ConnectedAppRow, picked: McpScope[]) {
+    async function save(app: ConnectedAppRow, picked: McpScope[], reach: DatabaseReach) {
         setEditing(null);
         // What the dialog did not show is kept as it was, here as on the server.
         const shown = new Set<string>(app.offered);
         const scopes = [...picked, ...app.scopes.filter((scope) => !shown.has(scope))];
-        if (sameSet(scopes, app.scopes)) return;
+        const scopesChanged = !sameSet(scopes, app.scopes);
+        const reachChanged = holdsDatabases(scopes) && !sameDatabaseReach(reach, app.databaseIds);
+        if (!scopesChanged && !reachChanged) return;
         setError(null);
         const before = apps;
         setApps((current) =>
-            current.map((entry) => (entry.id === app.id ? { ...entry, scopes } : entry))
+            current.map((entry) =>
+                entry.id === app.id
+                    ? { ...entry, scopes, ...(reachChanged ? { databaseIds: reach } : {}) }
+                    : entry
+            )
         );
-        const result = await changeAppScopesAction({ id: app.id, scopes }).catch(() => ({
-            error: t("connectedApps.changeFailed"),
-            scopes: undefined
-        }));
-        if (result.error || !result.scopes) {
-            setApps(before);
-            setError(result.error ?? t("connectedApps.changeFailed"));
-            return;
+        if (scopesChanged) {
+            const result = await changeAppScopesAction({ id: app.id, scopes }).catch(() => ({
+                error: t("connectedApps.changeFailed"),
+                scopes: undefined
+            }));
+            if (result.error || !result.scopes) {
+                setApps(before);
+                setError(result.error ?? t("connectedApps.changeFailed"));
+                return;
+            }
+            const held = result.scopes;
+            setApps((current) =>
+                current.map((entry) => (entry.id === app.id ? { ...entry, scopes: held } : entry))
+            );
         }
-        const held = result.scopes;
-        setApps((current) =>
-            current.map((entry) => (entry.id === app.id ? { ...entry, scopes: held } : entry))
-        );
+        if (reachChanged) {
+            const result = await setAppDatabasesAction({ id: app.id, databaseIds: reach }).catch(
+                () => ({ error: t("connectedApps.databases.failed"), databaseIds: undefined })
+            );
+            if (result.error || result.databaseIds === undefined) {
+                // The permissions, when they changed, did save: only the
+                // databases go back.
+                setApps((current) =>
+                    current.map((entry) =>
+                        entry.id === app.id ? { ...entry, databaseIds: app.databaseIds } : entry
+                    )
+                );
+                setError(result.error ?? t("connectedApps.databases.failed"));
+                router.refresh();
+                return;
+            }
+            const held = result.databaseIds;
+            setApps((current) =>
+                current.map((entry) =>
+                    entry.id === app.id ? { ...entry, databaseIds: held } : entry
+                )
+            );
+        }
         router.refresh();
     }
 
@@ -298,8 +346,9 @@ export function ConnectedApps({
             {editing ? (
                 <EditScopes
                     app={editing}
+                    databases={databases}
                     onCancel={() => setEditing(null)}
-                    onSave={(scopes) => void save(editing, scopes)}
+                    onSave={(scopes, reach) => void save(editing, scopes, reach)}
                 />
             ) : null}
             {network ? (
@@ -478,6 +527,18 @@ function AppRow({
                         </span>
                     </p>
                 ) : null}
+                {holdsDatabases(app.scopes) ? (
+                    <p className="flex min-w-0 items-start gap-1.5 text-xs text-muted-foreground">
+                        <Database className="mt-0.5 size-3 shrink-0" aria-hidden />
+                        <span className="min-w-0 [overflow-wrap:anywhere]">
+                            {app.databaseIds === null
+                                ? t("connectedApps.databases.summaryAll")
+                                : t("connectedApps.databases.summaryChosen", {
+                                      count: app.databaseIds.length
+                                  })}
+                        </span>
+                    </p>
+                ) : null}
                 {app.lastRefusedAt ? (
                     <p className="flex min-w-0 items-start gap-1.5 text-xs text-warning-ink">
                         <ShieldAlert className="mt-0.5 size-3 shrink-0" aria-hidden />
@@ -579,12 +640,14 @@ function ScopeGroups({ id, scopes }: { id: string; scopes: readonly string[] }) 
 /** The consent screen's boxes, for an app that is already connected. */
 function EditScopes({
     app,
+    databases,
     onCancel,
     onSave
 }: {
     app: ConnectedAppRow;
+    databases: readonly DatabaseOption[];
     onCancel: () => void;
-    onSave: (scopes: McpScope[]) => void;
+    onSave: (scopes: McpScope[], reach: DatabaseReach) => void;
 }) {
     const t = useTranslations("mcp");
     const tc = useTranslations("common");
@@ -599,8 +662,19 @@ function EditScopes({
         [selected, offered]
     );
     const unrequested = useMemo(() => new Set(app.unrequested), [app.unrequested]);
+    // Only ids the person can open now are drawn, and only those are kept.
+    const openable = useMemo(() => new Set(databases.map((entry) => entry.id)), [databases]);
+    const initialReach = useMemo<DatabaseReach>(
+        () => app.databaseIds && app.databaseIds.filter((id) => openable.has(id)),
+        [app.databaseIds, openable]
+    );
+    const [reach, setReach] = useState<DatabaseReach>(initialReach);
+    const showDatabases = holdsDatabases(effective);
+    const chosenReach = sameDatabaseReach(reach, initialReach) ? app.databaseIds : reach;
     const name = app.name || t("consent.unnamed");
-    const unchanged = sameSet([...effective], holding);
+    const unchanged =
+        sameSet([...effective], holding) &&
+        (!showDatabases || sameDatabaseReach(chosenReach, app.databaseIds));
     const empty = effective.size === 0;
 
     return (
@@ -626,11 +700,17 @@ function EditScopes({
                     }
                 />
                 {empty ? <p className="text-xs text-danger">{t("connectedApps.pickOne")}</p> : null}
+                {showDatabases ? (
+                    <DatabaseReachPicker databases={databases} reach={reach} onChange={setReach} />
+                ) : null}
                 <div className="mt-4 flex justify-end gap-2">
                     <Button variant="ghost" onClick={onCancel}>
                         {tc("actions.cancel")}
                     </Button>
-                    <Button disabled={unchanged || empty} onClick={() => onSave([...effective])}>
+                    <Button
+                        disabled={unchanged || empty}
+                        onClick={() => onSave([...effective], chosenReach)}
+                    >
                         {t("connectedApps.save")}
                     </Button>
                 </div>

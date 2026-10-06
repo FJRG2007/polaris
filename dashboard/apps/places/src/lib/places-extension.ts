@@ -116,6 +116,14 @@ export const placesExtension: AppExtension = {
         void import("./watcher")
             .then(({ startCameraWatcher }) => startCameraWatcher())
             .catch((error) => console.error("polaris: could not start the camera watcher:", error));
+        // Keep every device account read in the background, as Home Assistant's
+        // coordinator does, so what a door is doing is known with no screen
+        // open. Once per process; does nothing without device accounts.
+        void import("./device-watch")
+            .then(({ startDeviceCoordinator }) => startDeviceCoordinator())
+            .catch((error) =>
+                console.error("polaris: could not start reading the devices:", error)
+            );
     },
 
     // Places is the one app a single item of can be lent to somebody who holds
@@ -126,5 +134,9 @@ export const placesExtension: AppExtension = {
     // What a connected assistant may do in the house: see the devices, and -
     // on the scopes that say so - operate them and run its routines, by the
     // same rules as the screens.
-    mcpTools: async () => (await import("./mcp-tools")).placesMcpTools()
+    mcpTools: async () => (await import("./mcp-tools")).placesMcpTools(),
+
+    // How `polaris_search` finds its devices, cameras, places, rooms and
+    // routines, by the same rules.
+    mcpSearch: async () => (await import("./mcp-search")).placesMcpSearch()
 };

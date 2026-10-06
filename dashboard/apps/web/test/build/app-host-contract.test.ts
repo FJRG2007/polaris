@@ -104,9 +104,11 @@ const EAGER = [
     // What an app's MCP tools are written with: the refusal a model is shown,
     // a class like the one above, and the identity function that types a tool
     // against its own schema. Both are reached for once a tool module loads,
-    // which is after the dashboard has provided them.
+    // which is after the dashboard has provided them. A search provider is
+    // typed by its identity function the same way.
     "mcp.McpRefusal",
-    "mcp.defineTool"
+    "mcp.defineTool",
+    "mcp.defineSearch"
 ];
 
 const CLIENT = readFileSync(join(SRC, "components/app-host/client.tsx"), "utf8");

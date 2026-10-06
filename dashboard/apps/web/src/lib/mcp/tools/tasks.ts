@@ -26,6 +26,7 @@ import * as tasks from "@/lib/tasks/task-service";
 import { addComment } from "@/lib/tasks/task-detail-service";
 import type { TaskRow } from "@/lib/tasks/facts";
 import { McpRefusal, type McpCaller, type McpTool, type McpToolResult } from "../protocol";
+import { defineMcpSearch, preferMatches } from "../search";
 
 /** The actor shape the task layer authorises against, built from the key. */
 async function actorFor(caller: McpCaller): Promise<access.TaskActor> {
@@ -147,7 +148,9 @@ const listInput = z.object({
         .trim()
         .max(200)
         .default("")
-        .describe("Match against the name or the reference."),
+        .describe(
+            "Words for the task's name or its reference, in any language. The best matches come first; when nothing matches, the tasks this key reaches are listed."
+        ),
     space: z.string().trim().max(80).default("").describe("Limit to one space, by name or id."),
     mine: z
         .boolean()
@@ -160,6 +163,71 @@ const listInput = z.object({
     limit: z.number().int().min(1).max(100).default(25)
 });
 
+/** Where a task search reads: its name, its reference, then where it is. */
+const TASK_FIELDS: readonly core.SearchField<TaskRow>[] = [
+    { text: (row) => row.name, weight: 1 },
+    { text: (row) => row.reference, weight: 1 },
+    { text: (row) => [row.listName, row.spaceName, row.statusName], weight: 0.4 }
+];
+
+/** How many spaces a refusal names before it stops. */
+const SPACES_NAMED = 20;
+
+/**
+ * The space a name means once accents and case are set aside ("diseno" is
+ * "Diseño"), or a refusal naming the spaces there are, so the model picks one
+ * rather than stopping. Only reached when the exact lookup found nothing.
+ */
+async function spaceByFoldedName(
+    spaceIds: readonly string[],
+    name: string
+): Promise<{ id: string }> {
+    const spaces = await prisma.taskSpace.findMany({
+        where: { id: { in: [...spaceIds] } },
+        select: { id: true, name: true },
+        orderBy: { name: "asc" },
+        take: 200
+    });
+    const wanted = core.normalizeSearchText(name);
+    const found = spaces.find((space) => core.normalizeSearchText(space.name) === wanted);
+    if (found) return found;
+    const names = spaces.slice(0, SPACES_NAMED).map((space) => space.name);
+    throw new McpRefusal(
+        names.length > 0
+            ? `No space called "${name}" that this key can reach. It can reach: ${names.join(", ")}.`
+            : `No space called "${name}" that this key can reach.`
+    );
+}
+
+/**
+ * The same for a list a task is created in. Two lists of one name in two
+ * spaces are not guessed between: the refusal names both, with their spaces.
+ */
+async function listByFoldedName(
+    spaceIds: readonly string[],
+    name: string
+): Promise<{ id: string; spaceId: string }> {
+    const lists = await prisma.taskList.findMany({
+        where: { archived: false, spaceId: { in: [...spaceIds] } },
+        select: { id: true, name: true, spaceId: true, space: { select: { name: true } } },
+        orderBy: { name: "asc" },
+        take: 200
+    });
+    const wanted = core.normalizeSearchText(name);
+    const found = lists.filter((list) => core.normalizeSearchText(list.name) === wanted);
+    if (found.length === 1) return found[0]!;
+    const named = (found.length > 1 ? found : lists)
+        .slice(0, SPACES_NAMED)
+        .map((list) => `${list.name} (${list.space.name})`);
+    throw new McpRefusal(
+        found.length > 1
+            ? `More than one list is called "${name}": ${named.join(", ")}. Pass the list's id.`
+            : named.length > 0
+              ? `No list called "${name}" that this key can reach. It can reach: ${named.join(", ")}.`
+              : `No list called "${name}" that this key can reach.`
+    );
+}
+
 const listTasksTool: McpTool<z.infer<typeof listInput>> = {
     name: "tasks_list",
     // i18n-ignore shown by the calling client, which has no locale to ask for
@@ -168,6 +236,7 @@ const listTasksTool: McpTool<z.infer<typeof listInput>> = {
         // i18n-ignore read by the calling model, not shown to a person
         "Find tasks this key can reach. Returns a summary of each - reference, name, status, assignees - not the full description; use tasks_get for that.",
     input: listInput,
+    category: "productivity",
     scope: "tasks.read",
     readOnly: true,
     async run(input, caller) {
@@ -175,18 +244,17 @@ const listTasksTool: McpTool<z.infer<typeof listInput>> = {
         const spaceIds = access.scopeSpaceIds(scope);
         let wanted = spaceIds;
         if (input.space) {
-            const space = await prisma.taskSpace.findFirst({
-                where: {
-                    id: { in: spaceIds },
-                    OR: [
-                        { id: input.space },
-                        { name: { equals: input.space, mode: "insensitive" } }
-                    ]
-                },
-                select: { id: true }
-            });
-            if (!space)
-                throw new McpRefusal(`No space called "${input.space}" that this key can reach.`);
+            const space =
+                (await prisma.taskSpace.findFirst({
+                    where: {
+                        id: { in: spaceIds },
+                        OR: [
+                            { id: input.space },
+                            { name: { equals: input.space, mode: "insensitive" } }
+                        ]
+                    },
+                    select: { id: true }
+                })) ?? (await spaceByFoldedName(spaceIds, input.space));
             wanted = [space.id];
         }
 
@@ -198,22 +266,22 @@ const listTasksTool: McpTool<z.infer<typeof listInput>> = {
             },
             { openOnly: input.openOnly, limit: 500 }
         );
-        const needle = input.query.toLowerCase();
-        const matched = (
-            needle
-                ? rows.filter(
-                      (row) =>
-                          row.name.toLowerCase().includes(needle) ||
-                          row.reference.toLowerCase().includes(needle)
-                  )
-                : rows
-        ).slice(0, input.limit);
+        const found = core.matchForModel(
+            rows,
+            input.query,
+            TASK_FIELDS,
+            { one: "task", other: "tasks" },
+            input.limit
+        );
 
-        if (matched.length === 0) return text("Nothing matched.", { tasks: [] });
-        const summaries = matched.map(summarize);
+        if (found.items.length === 0) return text("Nothing matched.", { tasks: [] });
+        const summaries = found.items.map(summarize);
         return text(
-            matched.map((row) => `${row.reference}  ${row.name}  [${row.statusName}]`).join("\n"),
-            { tasks: summaries }
+            (found.note ? `${found.note}\n` : "") +
+                found.items
+                    .map((row) => `${row.reference}  ${row.name}  [${row.statusName}]`)
+                    .join("\n"),
+            { tasks: summaries, matched: found.matched }
         );
     }
 };
@@ -228,6 +296,7 @@ const getTaskTool: McpTool<z.infer<typeof getInput>> = {
         // i18n-ignore read by the calling model, not shown to a person
         "Read one task in full: its description, status, assignees, subtasks and comments.",
     input: getInput,
+    category: "productivity",
     scope: "tasks.read",
     readOnly: true,
     async run(input, caller) {
@@ -277,6 +346,7 @@ const createTaskTool: McpTool<z.infer<typeof createInput>> = {
         // i18n-ignore read by the calling model, not shown to a person
         "Create a task. Use this for work you found that is out of scope for what you were asked to do, rather than doing it unasked.",
     input: createInput,
+    category: "productivity",
     scope: "tasks.manage",
     readOnly: false,
     destructive: false,
@@ -284,15 +354,15 @@ const createTaskTool: McpTool<z.infer<typeof createInput>> = {
         const actor = await actorFor(caller);
         const scope = await access.visibleScope(actor);
         const spaceIds = access.scopeSpaceIds(scope);
-        const list = await prisma.taskList.findFirst({
-            where: {
-                archived: false,
-                spaceId: { in: spaceIds },
-                OR: [{ id: input.list }, { name: { equals: input.list, mode: "insensitive" } }]
-            },
-            select: { id: true, spaceId: true }
-        });
-        if (!list) throw new McpRefusal(`No list called "${input.list}" that this key can reach.`);
+        const list =
+            (await prisma.taskList.findFirst({
+                where: {
+                    archived: false,
+                    spaceId: { in: spaceIds },
+                    OR: [{ id: input.list }, { name: { equals: input.list, mode: "insensitive" } }]
+                },
+                select: { id: true, spaceId: true }
+            })) ?? (await listByFoldedName(spaceIds, input.list));
         // Same rule as the screen: reaching a list is not permission to add to it.
         await access.requireList(actor, list.id, "member");
 
@@ -336,6 +406,7 @@ const updateTaskTool: McpTool<z.infer<typeof updateInput>> = {
         // i18n-ignore read by the calling model, not shown to a person
         "Change a task: move it to another status, rename it, set its priority, take it. Only the fields you send are written.",
     input: updateInput,
+    category: "productivity",
     scope: "tasks.manage",
     readOnly: false,
     idempotent: true,
@@ -381,6 +452,7 @@ const commentTaskTool: McpTool<z.infer<typeof commentInput>> = {
         // i18n-ignore read by the calling model, not shown to a person
         "Leave a comment on a task. This is where what you found, what you changed and what you could not do belong - not in the task description.",
     input: commentInput,
+    category: "productivity",
     scope: "tasks.manage",
     readOnly: false,
     destructive: false,
@@ -408,6 +480,7 @@ const listSpacesTool: McpTool<z.infer<typeof spacesInput>> = {
         // i18n-ignore read by the calling model, not shown to a person
         "The spaces, lists and statuses this key can reach. Call this once if you need to know what a status or a list is called before using it.",
     input: spacesInput,
+    category: "productivity",
     scope: "tasks.read",
     readOnly: true,
     async run(_input, caller) {
@@ -441,6 +514,33 @@ const listSpacesTool: McpTool<z.infer<typeof spacesInput>> = {
         return text(lines.join("\n\n") || "This key reaches no spaces.", { spaces });
     }
 };
+
+/** The open tasks this key reaches, for `polaris_search`. */
+export const TASK_SEARCH = defineMcpSearch({
+    id: "tasks.tasks",
+    app: "tasks",
+    category: "productivity",
+    scope: "tasks.read",
+    async search(query, caller, limit) {
+        const scope = await access.visibleScope(await actorFor(caller));
+        const rows = await tasks.listTasks(
+            { spaceIds: access.scopeSpaceIds(scope), listIds: scope.listIds },
+            { openOnly: true, limit: 500 }
+        );
+        return preferMatches(rows, query, TASK_FIELDS, limit).map((row) => ({
+            id: row.reference,
+            name: row.name,
+            kind: "task",
+            where: `${row.spaceName} / ${row.listName}`,
+            keywords: [row.reference, row.statusName],
+            next: [
+                { tool: "tasks_get", args: { task: row.reference } },
+                { tool: "tasks_update", args: { task: row.reference } },
+                { tool: "tasks_comment", args: { task: row.reference } }
+            ]
+        }));
+    }
+});
 
 export const TASK_TOOLS = [
     listSpacesTool,
