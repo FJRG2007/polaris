@@ -375,6 +375,9 @@ describe("a channel that stays open", () => {
                 url: origin.replace("http", "ws"),
                 signInRefused: "The hub no longer accepts Polaris."
             })
-        ).rejects.toMatchObject({ kind: "unauthorized", message: "The hub no longer accepts Polaris." });
+        ).rejects.toMatchObject({
+            kind: "unauthorized",
+            message: "The hub no longer accepts Polaris."
+        });
     });
 });

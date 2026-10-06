@@ -132,7 +132,11 @@ describe("what a broker is holding", () => {
 describe("listening to the locks", () => {
     it("names the lock behind every message it publishes", async () => {
         const changed: (readonly string[])[] = [];
-        await nukiLocalDriver.listen!(BROKER, (ids) => changed.push(ids), new AbortController().signal);
+        await nukiLocalDriver.listen!(
+            BROKER,
+            (ids) => changed.push(ids),
+            new AbortController().signal
+        );
         expect(changed).toEqual([["2BB28570"]]);
     });
 });

@@ -222,9 +222,12 @@ export async function watchTopics(
                 return;
             }
             signal.addEventListener("abort", close);
-            client.on("message", (topic: string, _payload: Buffer, packet: { retain?: boolean }) => {
-                if (!packet.retain) onMessage(topic);
-            });
+            client.on(
+                "message",
+                (topic: string, _payload: Buffer, packet: { retain?: boolean }) => {
+                    if (!packet.retain) onMessage(topic);
+                }
+            );
             client.once("close", close);
             client.subscribe([...filters], { qos: 0 }, (error) => {
                 if (!error) return;

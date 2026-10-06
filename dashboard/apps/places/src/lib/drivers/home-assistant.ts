@@ -243,7 +243,11 @@ export const homeAssistantDriver: DeviceDriver = {
      *  air unit's sensors are entities of their own and are caught by the
      *  next turn instead. */
     async listen(credentials, changed, signal) {
-        await ha.listenHomeAssistant(homeOf(credentials), (entityId) => changed([entityId]), signal);
+        await ha.listenHomeAssistant(
+            homeOf(credentials),
+            (entityId) => changed([entityId]),
+            signal
+        );
     },
 
     async act(credentials, device, action, command) {

@@ -138,7 +138,9 @@ export const dirigeraHubDriver: DeviceDriver = {
         await ikea.listenHub(
             hubOf(credentials),
             (deviceId) =>
-                changed(deviceId ? [deviceId, `${deviceId}#temperature`, `${deviceId}#humidity`] : []),
+                changed(
+                    deviceId ? [deviceId, `${deviceId}#temperature`, `${deviceId}#humidity`] : []
+                ),
             signal
         );
     },

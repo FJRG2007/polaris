@@ -263,7 +263,10 @@ describe("the hub's event stream", () => {
     it("is opened with the token over the pinned certificate, and names each device that changed", async () => {
         stream.opened = [];
         stream.messages = [
-            JSON.stringify({ type: "deviceStateChanged", data: { id: "lamp-1", attributes: { isOn: true } } }),
+            JSON.stringify({
+                type: "deviceStateChanged",
+                data: { id: "lamp-1", attributes: { isOn: true } }
+            }),
             JSON.stringify({ type: "sceneUpdated", data: { id: "scene-1" } }),
             "not json",
             JSON.stringify({ type: "deviceAdded", data: {} })

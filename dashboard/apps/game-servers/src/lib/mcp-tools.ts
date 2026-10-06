@@ -281,8 +281,7 @@ function describeOption(schema: z.ZodTypeAny): unknown {
     if (schema instanceof z.ZodBoolean) return { type: "boolean" };
     if (schema instanceof z.ZodString) return { type: "text" };
     if (schema instanceof z.ZodArray) return { listOf: describeOption(schema.element) };
-    if (schema instanceof z.ZodDiscriminatedUnion)
-        return { oneOf: [...schema.optionsMap.keys()] };
+    if (schema instanceof z.ZodDiscriminatedUnion) return { oneOf: [...schema.optionsMap.keys()] };
     if (schema instanceof z.ZodObject)
         return Object.fromEntries(
             Object.entries(schema.shape as z.ZodRawShape).map(([key, field]) => [

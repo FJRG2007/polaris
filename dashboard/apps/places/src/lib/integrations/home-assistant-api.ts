@@ -271,8 +271,11 @@ export async function listenHomeAssistant(
                 );
                 ws.close();
             } else if (said.type === "event" && said.event?.event_type === "state_changed") {
-                const { entity_id: entityId, old_state: before, new_state: after } =
-                    said.event.data;
+                const {
+                    entity_id: entityId,
+                    old_state: before,
+                    new_state: after
+                } = said.event.data;
                 const detail =
                     STATE_ONLY_DOMAINS.has(entityId.split(".")[0] ?? "") &&
                     before?.state === after?.state;

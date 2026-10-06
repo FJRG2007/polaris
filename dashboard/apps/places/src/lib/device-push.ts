@@ -138,9 +138,11 @@ async function open(channel: Channel): Promise<void> {
             channel.installedAppId,
             channel.accountId
         );
-        await accounts
-            .driverFor(channel.connection)
-            .listen!(credentials, (ids) => changed(channel, ids), signal);
+        await accounts.driverFor(channel.connection).listen!(
+            credentials,
+            (ids) => changed(channel, ids),
+            signal
+        );
         // It closed. One that had been working starts over; one that closes as
         // soon as it opens is a failure like any other.
         channel.failures = Date.now() - openedAt >= HEALTHY_MS ? 1 : channel.failures + 1;

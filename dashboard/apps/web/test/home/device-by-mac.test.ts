@@ -188,7 +188,11 @@ describe("a driver handed a MAC", () => {
             }
         });
         const changed: (readonly string[])[] = [];
-        await driver.listen!({ host: MAC }, (ids) => changed.push(ids), new AbortController().signal);
+        await driver.listen!(
+            { host: MAC },
+            (ids) => changed.push(ids),
+            new AbortController().signal
+        );
         expect(heard).toEqual(["10.0.1.40"]);
         expect(changed).toEqual([["relay-0"]]);
         expect(shelly(new Set()).driver.listen).toBeUndefined();

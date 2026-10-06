@@ -96,11 +96,7 @@ export async function openLanSocket(options: LanSocketOptions): Promise<WebSocke
             ws.removeAllListeners("open");
             ws.terminate();
             socket?.destroy();
-            reject(
-                error instanceof DriverError
-                    ? error
-                    : refusal(error as NodeJS.ErrnoException)
-            );
+            reject(error instanceof DriverError ? error : refusal(error as NodeJS.ErrnoException));
         };
         ws.once("open", () => {
             ws.removeAllListeners("unexpected-response");
@@ -113,9 +109,9 @@ export async function openLanSocket(options: LanSocketOptions): Promise<WebSocke
             fail(
                 status === 401 || status === 403
                     ? new DriverError(
-                              options.signInRefused ?? "The device refused the sign-in.",
-                              "unauthorized"
-                          )
+                          options.signInRefused ?? "The device refused the sign-in.",
+                          "unauthorized"
+                      )
                     : new DriverError("The device would not keep a connection open.", "refused")
             );
         });

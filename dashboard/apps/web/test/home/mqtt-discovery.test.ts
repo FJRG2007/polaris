@@ -321,7 +321,11 @@ describe("listening to a broker", () => {
             }
         );
         const changed: (readonly string[])[] = [];
-        await mqttDiscoveryDriver.listen!(BROKER, (ids) => changed.push(ids), new AbortController().signal);
+        await mqttDiscoveryDriver.listen!(
+            BROKER,
+            (ids) => changed.push(ids),
+            new AbortController().signal
+        );
         const filters = mocks.watchTopics.mock.calls[0]?.[1] as string[];
         expect(filters).toEqual(
             expect.arrayContaining([
