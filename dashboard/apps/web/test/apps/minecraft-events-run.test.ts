@@ -1878,6 +1878,7 @@ const events = await import("@polaris-app/game-servers/src/lib/minecraft/events/
 const speechService = await import("@polaris-app/game-servers/src/lib/minecraft/speech-service");
 const triviaBank = await import("@polaris-app/game-servers/src/lib/minecraft/events/trivia-bank");
 const { readEventState } = await import("@polaris-app/game-servers/src/lib/minecraft/events/state");
+const stored = await import("@polaris-app/game-servers/src/lib/minecraft/events/state");
 const { gameMessageIn } = await import("@polaris-app/game-servers/src/lib/game-message");
 const commands = await import("@polaris-app/game-servers/src/lib/minecraft/events/commands");
 const eventMessages = await import("@polaris-app/game-servers/src/lib/minecraft/events/messages");
@@ -7397,9 +7398,10 @@ async function joinAndStart(presetId: string, joiners = ["Ana", "Ben"]): Promise
         "Dee",
         "hello"
     ]);
-    await play(30_000);
+    // Read before the window closes: the start follows on its second now.
+    await play(26_000);
     expect(state().run?.joined).toEqual(joiners);
-    await play(20_000);
+    await play(24_000);
 }
 
 /** A king of the hill anybody walks to: fists only off. */
@@ -8244,6 +8246,20 @@ describe("a king of the hill", () => {
                 / positioned over motion_blocking_no_leaves run tp Ana ~ ~ ~ /.test(line)
             )
         ).toBe(true);
+        // Started inside the ring in force at "Go!", never on or past its edge.
+        const ringRadius = (run.preset.options as catalog.EventOptions<"king-of-the-hill">).radius;
+        for (const name of ["Ana", "Ben"]) {
+            const at = world.sent
+                .map((line) =>
+                    new RegExp(
+                        `^execute in minecraft:overworld positioned (\\S+) \\S+ (\\S+) positioned over motion_blocking_no_leaves run tp ${name} `
+                    ).exec(line)
+                )
+                .filter((found) => found !== null)
+                .at(-1)!;
+            const far = Math.hypot(Number(at[1]) - (run.place!.x + 0.5), Number(at[2]) - (run.place!.z + 0.5));
+            expect(far).toBeLessThanOrEqual(ringRadius - 1);
+        }
         // keepInventory held.
         expect(world.sent).toContain("gamerule keepInventory true");
         await play(2_100);
@@ -8273,14 +8289,19 @@ describe("a king of the hill", () => {
         expect(world.sent).toContain(
             'scoreboard players display numberformat Ana pe_score fixed {"text":"1.3 min"}'
         );
-        // Only those it brought score, and only one standing in the ring alone.
+        // Only those it brought score: everybody in the ring, and three times
+        // over whoever stands in it alone.
+        const ringScore = "as @a[tag=pe_arena,distance=..6,gamemode=!spectator] run scoreboard players add @s pe_score";
+        expect(
+            world.sent.some(
+                (line) => line.startsWith("execute in ") && line.endsWith(`${ringScore} 2`)
+            )
+        ).toBe(true);
         expect(
             world.sent.some(
                 (line) =>
                     line.startsWith("execute if score #inside pe_kin matches 1 ") &&
-                    line.endsWith(
-                        "as @a[tag=pe_arena,distance=..6,gamemode=!spectator] run scoreboard players add @s pe_score 2"
-                    )
+                    line.endsWith(`${ringScore} 4`)
             )
         ).toBe(true);
         // Knocked off, far down: brought back to the edge.
@@ -9612,6 +9633,8 @@ describe("the clock", () => {
     it("starts when the boss stands, with the whole of its time ahead, and says it is getting ready until then", async () => {
         const boss = groundBoss("boss", 10);
         setUp([boss]);
+        // Ground slow to load: the place takes a few ticks to find.
+        world.unsureGround = 2;
         await startArena("boss");
         await play(100);
         // Begun, the place still being looked for: no running time on the bar.
@@ -11118,6 +11141,58 @@ describe("hide and seek", () => {
         expect(told("Dee", hs.RADAR_RESET)).toEqual([]);
     });
 
+    it("owes the radar back to whoever was not on at the end, and gives it when they are", async () => {
+        const hs = await kind();
+        world.online = [...names];
+        setUp([hideOf(60)]);
+        await joinAndStart("hide", names);
+        await play(2_100);
+        // Ben is not on when it ends; Ana and Cy are, and are owed nothing.
+        world.online = ["Ana", "Cy"];
+        await events.cancelEvent("owner", SERVER);
+        await play(2_100);
+        expect(state().owedLines.map((one) => [one.player, one.reason])).toEqual([
+            ["Ben", "radar"]
+        ]);
+        const told = (name: string) =>
+            world.sent.filter(
+                (line) => line.startsWith(`tellraw ${name} `) && visible(line).includes(hs.RADAR_RESET)
+            );
+        world.sent = [];
+        world.online = [...names];
+        // Back: first taken out of the arena, then handed what was owed.
+        await events.sweepEvents();
+        await events.sweepEvents();
+        expect(told("Ben")).toHaveLength(1);
+        expect(told("Ana")).toEqual([]);
+        expect(state().owedLines).toEqual([]);
+        await events.sweepEvents();
+        expect(told("Ben")).toHaveLength(1);
+    });
+
+    it("lets go of an owed radar nobody came back for in time", async () => {
+        const hs = await kind();
+        world.online = [...names];
+        setUp([hideOf(60)]);
+        await joinAndStart("hide", names);
+        await play(2_100);
+        world.online = ["Ana", "Cy"];
+        await events.cancelEvent("owner", SERVER);
+        await play(2_100);
+        expect(state().owedLines).toHaveLength(1);
+        vi.setSystemTime(Date.now() + stored.PENDING_KEPT_MS + 1);
+        world.sent = [];
+        world.online = [...names];
+        await events.sweepEvents();
+        await events.sweepEvents();
+        expect(
+            world.sent.some(
+                (line) => line.startsWith("tellraw Ben ") && visible(line).includes(hs.RADAR_RESET)
+            )
+        ).toBe(false);
+        expect(state().owedLines).toEqual([]);
+    });
+
     it("lets the seeker out after the hiding time, finds hiders with a hit and ends when all are found", async () => {
         const hs = await kind();
         world.online = [...names];
@@ -11202,7 +11277,7 @@ describe("hide and seek", () => {
         const run = state().run!;
         const [seeker] = hs.seekersFor(run.id, names, 1) as [string];
         const [first, second] = names.filter((name) => name !== seeker) as [string, string];
-        await play(run.readyAt! + 15_000 - Date.now() + 2_100);
+        await play(Math.max(100, run.readyAt! + 15_000 - Date.now() + 2_100));
         expect(hs.stateOf(state().run!.game)?.released).toBe(true);
         // A hider drops off the gallery beside the seeker, who has just struck
         // the other: the fall is no find.
@@ -11496,5 +11571,170 @@ describe("SkyWars", () => {
             note: "Only 1 joined; it needs 2"
         });
         expect(fills()).toEqual([]);
+    });
+});
+
+/**
+ * The pace of an event between its steps, against a server that takes as long
+ * to reach as a real one does from the dashboard: every trip into it - a
+ * command, a batch of lines, a batch of questions - costs `TRIP_MS`. Each trip
+ * is written down with when it went, so a step can be timed from the one before.
+ */
+const TRIP_MS = 80;
+interface Trip {
+    readonly at: number;
+    readonly lines: readonly string[];
+}
+function paced(): { trips: Trip[]; restore: () => void } {
+    const trips: Trip[] = [];
+    const original = { say: server.say, sayAll: server.sayAll };
+    // The clock moved on by the trip, without running any timer: a step
+    // awaited from outside the loop (starting the event) still returns.
+    const wait = async () => {
+        vi.setSystemTime(Date.now() + TRIP_MS);
+    };
+    const target = server as typeof server & {
+        sayEach?: (argvs: readonly (readonly string[])[]) => Promise<(string | null)[]>;
+    };
+    target.say = async (argv) => {
+        trips.push({ at: Date.now(), lines: [argv.join(" ")] });
+        await wait();
+        return original.say(argv);
+    };
+    target.sayAll = async (lines) => {
+        trips.push({ at: Date.now(), lines: [...lines] });
+        await wait();
+        return original.sayAll(lines);
+    };
+    target.sayEach = async (argvs) => {
+        trips.push({ at: Date.now(), lines: argvs.map((argv) => argv.join(" ")) });
+        await wait();
+        return Promise.all(argvs.map(async (argv) => original.say(argv)));
+    };
+    return {
+        trips,
+        restore: () => {
+            target.say = original.say;
+            target.sayAll = original.sayAll;
+            delete target.sayEach;
+        }
+    };
+}
+
+/** The trips that carry a line matching `pattern`. */
+function tripsWith(trips: readonly Trip[], pattern: RegExp): Trip[] {
+    return trips.filter((trip) => trip.lines.some((line) => pattern.test(line)));
+}
+
+/**
+ * Each step of an arena or a stage event, timed from the one before: how long
+ * it took and how many trips into the server went in it. The steps are found
+ * by the first line each one sends; `tag` is the tag players carry inside.
+ */
+function stepsOf(trips: readonly Trip[], tag: string) {
+    const at = (pattern: RegExp, from = 0) =>
+        tripsWith(trips, pattern).find((trip) => trip.at >= from)?.at ?? Number.NaN;
+    const last = (pattern: RegExp, from = 0) =>
+        tripsWith(trips, pattern).filter((trip) => trip.at >= from).at(-1)?.at ?? Number.NaN;
+    const closed = at(/^scoreboard objectives remove pe_joined$/);
+    const built = at(/ fill .* keep$/, closed);
+    const entered = at(new RegExp(`^tag Ana add ${tag}$`), closed);
+    const countdown = at(/ times 0 25 5$/, entered);
+    const ending = at(new RegExp(`^execute if entity @a\\[name=Ana,tag=${tag}\\]$`), countdown);
+    const givenBack = last(/^item replace entity \w+ \S+ with minecraft:(bread|torch)/, ending);
+    const results = at(/ - results/, ending);
+    const between = (from: number, to: number) => ({
+        ms: to - from,
+        trips: trips.filter((trip) => trip.at >= from && trip.at < to).length
+    });
+    return {
+        "join closed -> building": between(closed, built),
+        "building -> brought in": between(built, entered),
+        "brought in -> countdown": between(entered, countdown),
+        "end -> given back": between(ending, givenBack),
+        "given back -> results": between(givenBack, results),
+        "join closed -> countdown": between(closed, countdown),
+        "end -> results": between(ending, results)
+    };
+}
+
+/** The timeline of `trips`, written down when `PACE_OUT` names a file. */
+async function writeTimeline(trips: readonly Trip[], tag: string, file: string | undefined) {
+    if (!file) return;
+    const fs = await import("node:fs");
+    const t0 = trips[0]?.at ?? 0;
+    fs.writeFileSync(
+        file,
+        trips
+            .map((trip) => `${trip.at - t0} ${trip.lines.length} ${trip.lines.slice(0, 3).join(" | ")}`)
+            .join(String.fromCharCode(10))
+    );
+    fs.writeFileSync(`${file}.json`, JSON.stringify(stepsOf(trips, tag), null, 1));
+}
+
+describe("the pace of an event", () => {
+    const bags = () => ({
+        Ana: new Map([[0, { id: "minecraft:bread", count: 5 }]]),
+        Ben: new Map([[4, { id: "minecraft:torch", count: 32 }]])
+    });
+
+    it("builds a duel, brings everybody in and counts down with no tick waited in between", async () => {
+        const { trips, restore } = paced();
+        try {
+            world.online = ["Ana", "Ben"];
+            world.inv = bags();
+            setUp([{ ...newPreset("team-duel", "duel"), minutes: 1 }]);
+            await joinAndStart("duel");
+            await play(5 * 60_000 + 20_000);
+        } finally {
+            restore();
+        }
+        await writeTimeline(trips, "pe_arena", process.env.PACE_OUT);
+        const steps = stepsOf(trips, "pe_arena");
+        // 17.8 s and 73 trips before; a tick is 2 s.
+        expect(steps["join closed -> countdown"].ms).toBeLessThan(5_000);
+        expect(steps["building -> brought in"].ms).toBeLessThan(2_000);
+        expect(steps["brought in -> countdown"].ms).toBeLessThan(1_000);
+        expect(steps["end -> results"].trips).toBeLessThanOrEqual(20);
+        expect(world.inv.Ana!.get(0)).toEqual({ id: "minecraft:bread", count: 5 });
+        expect(world.inv.Ben!.get(4)).toEqual({ id: "minecraft:torch", count: 32 });
+    });
+
+    it("builds a dropper a few trips at a time, and takes it down the same way", async () => {
+        const { trips, restore } = paced();
+        try {
+            world.online = ["Ana", "Ben"];
+            world.inv = bags();
+            setUp([
+                {
+                    ...newPreset("dropper", "drop"),
+                    minutes: 5,
+                    options: {
+                        place: { mode: "players" as const },
+                        levels: 6,
+                        difficulty: "medium" as const
+                    }
+                }
+            ]);
+            await startArena("drop");
+            await play(2_100);
+            chat(["Ana", "join"], ["Ben", "unirse"]);
+            await play(6 * 60_000);
+        } finally {
+            restore();
+        }
+        await writeTimeline(trips, "pe_in", process.env.PACE_OUT);
+        const steps = stepsOf(trips, "pe_in");
+        // 19.4 s and 168 trips before - a trip for every box built.
+        expect(steps["join closed -> countdown"].ms).toBeLessThan(5_000);
+        expect(steps["brought in -> countdown"].ms).toBeLessThan(1_000);
+        // 110 trips before, from the end to the results.
+        expect(steps["end -> results"].trips).toBeLessThanOrEqual(25);
+        const builds = tripsWith(trips, / fill .* keep$/).filter(
+            (trip) => !trip.lines.some((line) => line.includes("structure_void"))
+        );
+        expect(builds.length).toBeLessThanOrEqual(4);
+        expect(world.inv.Ana!.get(0)).toEqual({ id: "minecraft:bread", count: 5 });
+        onlyOurBlocks();
     });
 });

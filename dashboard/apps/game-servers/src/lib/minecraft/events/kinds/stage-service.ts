@@ -23,6 +23,7 @@ import * as boatRaceSaid from "./boat-race-messages";
 import * as stash from "./stash";
 import * as arrival from "./arrival";
 import * as stashService from "./stash-service";
+import * as pace from "./pace";
 import * as catalog from "../catalog";
 import * as commands from "../commands";
 import * as speech from "../../speech";
@@ -75,8 +76,9 @@ export interface StageTools {
     readonly stashOwner: stashService.StashOwner;
 }
 
-/** How many ticks the area gets to load before the site is given up. */
-const LOAD_WAITS = 3;
+/** How many looks the area gets to load before the site is given up: three
+ *  ticks, and the quick look straight after it is held (`stageTick`). */
+const LOAD_WAITS = 4;
 /** Never built closer to the ground than this, even under a low build limit. */
 const LEAST_HEIGHT = 20;
 /** How far outside the volume somebody can wander before they count as gone. */
@@ -270,8 +272,19 @@ export async function stageTick(
     const heard = await heardFrom(tools);
     if (!state(loop).built) {
         if (noteCalls(loop, heard, lines)) await tools.persist();
-        await raise(loop, server, tools, now, lines);
-        return null;
+        // The site chosen, then straight on in the same tick: its area held, a
+        // moment for its chunks (`pace.LOAD_PAUSE_MS`), proved empty, built and
+        // everybody brought in - and below, the first look at whether they are
+        // all there. What has to wait - the site searched, chunks slow to load,
+        // somebody not there yet - waits for the next tick as it always did.
+        for (let step = 0; step < pace.STEPS_AT_ONCE; step += 1) {
+            const hadOrigin = state(loop).origin !== null;
+            await raise(loop, server, tools, now, lines);
+            if (state(loop).built || hadOrigin || state(loop).origin === null) break;
+            await server.sayAll(lines.splice(0, lines.length));
+            await pace.pause(pace.LOAD_PAUSE_MS);
+        }
+        if (!state(loop).built) return null;
     }
     lines.push(stage.PROTECT_INSIDE);
     if (Math.floor(now / 2_000) % 5 === 0) lines.push(stage.FEED_INSIDE);
@@ -397,12 +410,15 @@ async function raise(
     const before = state(loop).boxes;
     change(loop, { boxes: [...before, ...layout.boxes] });
     await tools.persist();
-    let whole = true;
-    for (const box of layout.boxes) {
-        if (stage.fillCount(await server.say([stage.buildLine(box)])) !== stage.volumeOf(box)) {
-            whole = false;
-        }
-    }
+    // Built a paced trip at a time (`pace.buildPacer`), every box counted.
+    const counts = await pace.answered(
+        server,
+        layout.boxes.map((box) => stage.buildLine(box)),
+        pace.buildPacer()
+    );
+    const whole = layout.boxes.every(
+        (box, index) => stage.fillCount(counts[index]!) === stage.volumeOf(box)
+    );
     change(loop, { built: true });
     if (!whole) throw new CalledOff("Its structure could not be built whole");
 
@@ -436,15 +452,22 @@ async function provedEmpty(
     await tools.persist();
     let filled = 0;
     let unloaded = false;
-    for (const box of probes) {
-        const count = stage.fillCount(await server.say([stage.buildLine(box)]));
+    for (const said of await pace.answered(
+        server,
+        probes.map((box) => stage.buildLine(box)),
+        pace.buildPacer()
+    )) {
+        const count = stage.fillCount(said);
         if (count === null) unloaded = true;
         else filled += count;
     }
-    let cleared = true;
-    for (const box of probes) {
-        if (stage.fillCount(await server.say([stage.removeLine(box)])) === null) cleared = false;
-    }
+    const cleared = (
+        await pace.answered(
+            server,
+            probes.map((box) => stage.removeLine(box)),
+            pace.teardownPacer()
+        )
+    ).every((said) => stage.fillCount(said) !== null);
     if (cleared) change(loop, { boxes: kept });
     const current = state(loop);
     if (!unloaded && cleared && filled === stage.volumeOf(volume)) return true;
@@ -578,9 +601,17 @@ async function admit(
             ? (loop.boatWay ??= await tools.boatWay())
             : null;
     const ready: { index: number; one: stage.Saved }[] = [];
+    const stashed = stashing
+        ? await stashAll(
+              loop,
+              server,
+              tools,
+              fresh.map((one) => one.name),
+              false
+          )
+        : null;
     for (const [index, one] of fresh.entries())
-        if (!stashing || (await stashSaved(loop, server, tools, one.name, false)))
-            ready.push({ index, one });
+        if (!stashed || stashed[index]) ready.push({ index, one });
     const brought: string[] = [];
     const going: string[] = [];
     for (const { index, one } of ready) {
@@ -629,50 +660,74 @@ async function admit(
     // And once in, a last look: whatever turned up on them on the way is put
     // away with the rest; anybody it cannot be taken from is sent back out.
     if (!stashing) return brought.length;
-    let inside = 0;
-    for (const name of brought) if (await stashSaved(loop, server, tools, name, true)) inside += 1;
-    return inside;
+    return (await stashAll(loop, server, tools, brought, true)).filter(Boolean).length;
 }
 
 /**
- * One player's own things put away (`stash`) - or, `inside`, what turned up on
- * them on the way in put away with the rest. Answers whether they are in:
- * somebody whose things cannot all be put away is kept out - told why, sent
- * back where they were if they had been brought in, and handed back whatever
- * was taken.
+ * Each of `names`' own things put away (`stash`) - or, `inside`, what turned up
+ * on them on the way in put away with the rest. Answers, for each, whether they
+ * are in: somebody whose things cannot all be put away is kept out - told why,
+ * sent back where they were if they had been brought in, and handed back
+ * whatever was taken.
+ *
+ * Side by side, their reads and writes sharing trips (`pace.coalescing`): one
+ * trip a step for everybody rather than one each. Whoever is kept out is then
+ * seen to one at a time, in order, as before.
  */
-async function stashSaved(
+async function stashAll(
+    loop: StageLoop,
+    server: ServerContainer,
+    tools: StageTools,
+    names: readonly string[],
+    inside: boolean
+): Promise<boolean[]> {
+    const shared = pace.coalescing(server);
+    const results = await Promise.all(
+        names.map(async (name) => {
+            const saved = state(loop).saved.find((one) => same(one.name, name));
+            if (!saved) return "out" as const;
+            if (!inside && saved.stash) return null;
+            return stashService.stashIn(
+                shared,
+                tools.stashOwner,
+                name,
+                async (kept) => {
+                    change(loop, {
+                        saved: state(loop).saved.map((each) =>
+                            same(each.name, name) ? { ...each, stash: kept } : each
+                        )
+                    });
+                    await tools.persist();
+                },
+                inside ? saved.stash : null
+            );
+        })
+    );
+    const inOrOut: boolean[] = [];
+    for (const [index, name] of names.entries()) {
+        const result = results[index];
+        if (result === "out") inOrOut.push(false);
+        else if (!result?.refused) inOrOut.push(true);
+        else inOrOut.push(await keptOut(loop, server, tools, name, result.refused));
+    }
+    return inOrOut;
+}
+
+/** Somebody whose things could not all be put away (`refused`), kept out. */
+async function keptOut(
     loop: StageLoop,
     server: ServerContainer,
     tools: StageTools,
     name: string,
-    inside: boolean
+    refused: NonNullable<stashService.StashResult["refused"]>
 ): Promise<boolean> {
-    const saved = state(loop).saved.find((one) => same(one.name, name));
-    if (!saved) return false;
-    if (!inside && saved.stash) return true;
-    const result = await stashService.stashIn(
-        server,
-        tools.stashOwner,
-        name,
-        async (kept) => {
-            change(loop, {
-                saved: state(loop).saved.map((each) =>
-                    same(each.name, name) ? { ...each, stash: kept } : each
-                )
-            });
-            await tools.persist();
-        },
-        inside ? saved.stash : null
-    );
-    if (!result.refused) return true;
     loop.run = {
         ...loop.run,
         keptOut: await stashService.keepOut(
             server,
             loop.run.keptOut,
             name,
-            result.refused,
+            refused,
             loop.language
         )
     };
@@ -736,10 +791,14 @@ async function returnAll(
     await server.sayAll(saved.flatMap((one) => stage.fallProof(one.name)));
     // Sent home already, by an end that stopped before it gave everything back:
     // not moved again, only given what they are still owed.
-    const say = (line: string) => server.say([line]);
+    // Everybody's reads and writes below share trips (`pace.coalescing`).
+    const shared = pace.coalescing(server);
+    const say = (line: string) => shared.say([line]);
     const back = new Set<stage.Saved>();
-    for (const one of saved)
-        if (await commands.alreadyBack(say, one.name, stage.IN_ARENA)) back.add(one);
+    const wereBack = await Promise.all(
+        saved.map((one) => commands.alreadyBack(say, one.name, stage.IN_ARENA))
+    );
+    for (const [index, one] of saved.entries()) if (wereBack[index]) back.add(one);
     // Their own gravity too, should that end have stopped before it.
     if (back.size > 0)
         await server.sayAll([...back].flatMap((one) => stage.normalFallLines(one.name)));
@@ -760,24 +819,35 @@ async function returnAll(
         await server.sayAll(home.flatMap((one) => stage.afterReturnLines(one, items, note)));
     // Their own things back only once they are home and down: nothing is given
     // back to a player who could still fall with it. Everybody is home by now,
-    // so each one's wait overlaps everybody else's.
-    for (const one of saved) {
-        if (!back.has(one) && !home.includes(one)) continue;
-        let current = one;
-        const down = await stashService.settle(server, one.name, (name) =>
-            stage.fallProof(name, 5)
-        );
-        if (!current.stash) continue;
-        if (!down) {
-            still.push(current);
-            continue;
-        }
-        const how = await stashService.giveBack(server, one.name, current.stash, async (kept) => {
-            current = { ...current, stash: kept };
-            await keep(one.name, kept);
-        });
-        if (how !== "done" && how !== "failed") still.push(current);
+    // and they are seen to side by side: each one's wait overlaps everybody
+    // else's, and their reads and writes share trips.
+    const owed = await Promise.allSettled(
+        saved.map(async (one): Promise<stage.Saved | null> => {
+            if (!back.has(one) && !home.includes(one)) return null;
+            let current = one;
+            const down = await stashService.settle(shared, one.name, (name) =>
+                stage.fallProof(name, 5)
+            );
+            if (!current.stash) return null;
+            if (!down) return current;
+            const how = await stashService.giveBack(
+                shared,
+                one.name,
+                current.stash,
+                async (kept) => {
+                    current = { ...current, stash: kept };
+                    await keep(one.name, kept);
+                }
+            );
+            return how !== "done" && how !== "failed" ? current : null;
+        })
+    );
+    let failed: unknown = null;
+    for (const outcome of owed) {
+        if (outcome.status === "rejected") failed ??= outcome.reason;
+        else if (outcome.value) still.push(outcome.value);
     }
+    if (failed !== null) throw failed;
     return still;
 }
 
@@ -1736,10 +1806,25 @@ export async function settle(
         // is built later can rest on - or, a dropper's water, be held in by -
         // what was built before it, so nothing goes before what it needs.
         let standing = boxes.length;
-        for (const box of [...boxes].reverse()) {
-            if (stage.fillCount(await server.say([stage.removeLine(box)])) === null) break;
-            standing -= 1;
-        }
+        const latestFirst = [...boxes].reverse();
+        // Taken out several to a trip only once every chunk under it is seen
+        // in (`pace.allLoaded`): in one trip, a box that would not come out
+        // could not stop the ones after it. Otherwise one at a time, as ever.
+        if (bounds && (await pace.allLoaded(server, bounds))) {
+            const said = await pace.answered(
+                server,
+                latestFirst.map((box) => stage.removeLine(box)),
+                pace.teardownPacer()
+            );
+            for (const answer of said) {
+                if (stage.fillCount(answer) === null) break;
+                standing -= 1;
+            }
+        } else
+            for (const box of latestFirst) {
+                if (stage.fillCount(await server.say([stage.removeLine(box)])) === null) break;
+                standing -= 1;
+            }
         boxes = boxes.slice(0, standing);
     }
     if (boxes.length === 0 && area) {

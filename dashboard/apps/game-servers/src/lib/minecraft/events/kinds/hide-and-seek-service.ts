@@ -352,5 +352,7 @@ export const hideAndSeek: ArenaGame = {
     endLines: (run) => [
         ...hs.TEARDOWN,
         ...run.entrants.map((one) => radarLine(one.name, hs.RADAR_RESET))
-    ]
+    ],
+    // Not on at the end: the radar is given back when they are next.
+    owedLines: (_run, name) => [{ reason: "radar", lines: [radarLine(name, hs.RADAR_RESET)] }]
 };
