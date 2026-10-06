@@ -24,6 +24,7 @@ export interface AdminQueue {
     readonly reports: number;
     readonly cases: number;
     readonly update: boolean;
+    readonly apis: number;
 }
 
 /** The notification each part of that queue is announced with. */
@@ -33,7 +34,8 @@ export const SAFETY_EVENT = "admin.safety.case";
 /** Management's own screens that carry a part of its count. */
 const ADMIN_SCREEN_COUNT: Readonly<Record<string, (queue: AdminQueue) => number>> = {
     "/admin/settings": (queue) => (queue.update ? 1 : 0),
-    "/admin/safety": (queue) => queue.reports + queue.cases
+    "/admin/safety": (queue) => queue.reports + queue.cases,
+    "/admin/integrations": (queue) => queue.apis
 };
 
 /** The Management app's id, as the app catalogue has it. */

@@ -100,7 +100,9 @@ afterEach(() => {
 });
 
 describe("a Google account waiting on the Calendar API", () => {
-    it("gives an administrator Google's own link and a retry, and no Connect again", async () => {
+    it("sends an administrator to Integrations, with a retry, and no Connect again", async () => {
+        // The report: the person whose calendar was empty was told to turn an
+        // API on in Google Cloud. That is Management's screen, not this one.
         accounts = view({
             canManage: true,
             googleSetup: { enableUrl: ENABLE, project: "100000000001" }
@@ -111,14 +113,11 @@ describe("a Google account waiting on the Calendar API", () => {
         });
         await show();
         expect(screen.getByText("Needs setup")).toBeTruthy();
-        expect(
-            screen.getByText(/Google Calendar API is turned off in the Google Cloud project/)
-        ).toBeTruthy();
-        expect(screen.getByText("Project 100000000001")).toBeTruthy();
-        const open = screen.getByRole("link", { name: /Turn on in Google Cloud/ });
-        expect(open.getAttribute("href")).toBe(ENABLE);
-        expect(open.getAttribute("target")).toBe("_blank");
-        expect(open.getAttribute("rel")).toContain("noopener");
+        expect(screen.getByText(/Google Calendar API is turned off for this Polaris/)).toBeTruthy();
+        expect(screen.getByRole("link", { name: /Open Integrations/ }).getAttribute("href")).toBe(
+            "/admin/integrations"
+        );
+        expect(screen.queryByRole("link", { name: /Google Cloud/ })).toBeNull();
         expect(screen.queryByText("Connect again for calendars")).toBeNull();
 
         await act(async () => {
@@ -203,7 +202,7 @@ describe("a Google account's tasks", () => {
         expect(screen.queryByRole("link", { name: "Show my tasks" })).toBeNull();
     });
 
-    it("gives an administrator the switch when the Tasks API is off", async () => {
+    it("sends an administrator to Integrations when the Tasks API is off", async () => {
         const enable =
             "https://console.cloud.google.com/apis/library/tasks.googleapis.com?project=100000000001";
         accounts = view({
@@ -213,10 +212,11 @@ describe("a Google account's tasks", () => {
             tasksApiOff: { enableUrl: enable, project: "100000000001" }
         });
         await show();
-        expect(screen.getByText(/Google Tasks API is turned off/)).toBeTruthy();
-        expect(
-            screen.getByRole("link", { name: /Turn on in Google Cloud/ }).getAttribute("href")
-        ).toBe(enable);
+        expect(screen.getByText(/Google Tasks API is turned off for this Polaris/)).toBeTruthy();
+        expect(screen.getByRole("link", { name: /Open Integrations/ }).getAttribute("href")).toBe(
+            "/admin/integrations"
+        );
+        expect(screen.queryByRole("link", { name: /Google Cloud/ })).toBeNull();
     });
 
     it("tells anybody else the administrator has to turn them on", async () => {

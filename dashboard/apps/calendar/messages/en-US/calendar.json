@@ -633,6 +633,12 @@
         "scheduled": "Task scheduled"
     },
     "todo": {
+        "delete": "Delete task",
+        "deleteBody": "\"{title}\" goes to the trash.",
+        "deleteFailed": "The task was not deleted",
+        "deleteTitle": "Delete this task?",
+        "deleted": "Task deleted",
+        "doneFailed": "The task was not updated",
         "due": "Due",
         "dueDate": "Due date",
         "dueKind": {
@@ -641,8 +647,12 @@
             "time": "At a time"
         },
         "dueTime": "Due time",
+        "duplicateFailed": "The task was not copied",
         "editTitle": "Edit task",
         "loadFailed": "This task could not be opened.",
+        "markDone": "Mark as done",
+        "markNotDone": "Mark as not done",
+        "openInTasks": "Open in Tasks",
         "saveFailed": "The task was not saved",
         "saved": "Task saved",
         "status": "Status",
@@ -651,6 +661,13 @@
             "COMPLETED": "Done",
             "IN-PROCESS": "In progress",
             "NEEDS-ACTION": "Not started"
+        },
+        "statusType": {
+            "open": "Not started",
+            "active": "In progress",
+            "blocked": "Blocked",
+            "done": "Done",
+            "closed": "Closed"
         },
         "title": "Title",
         "viewTitle": "Task"

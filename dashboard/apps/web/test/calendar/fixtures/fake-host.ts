@@ -85,8 +85,13 @@ function blankState() {
             done: boolean;
             reference: string;
             listName: string;
+            statusType?: "open" | "active" | "blocked" | "done" | "closed";
+            statusColor?: string;
+            statusName?: string;
         }[],
         scheduled: [] as { taskId: string; due: unknown }[],
+        /** Tasks-app tasks ticked or unticked from the calendar. */
+        doneSet: [] as { taskId: string; done: boolean }[],
         /** Lists a task can be created in; null when Tasks is not theirs. */
         taskLists: [] as { id: string; name: string; spaceName: string }[] | null,
         createdTasks: [] as {
@@ -280,7 +285,16 @@ export const host = {
                 reference: `T-${fake.createdTasks.length}`
             };
         },
-        assignedTasks: async () => [...fake.tasks],
+        assignedTasks: async () =>
+            fake.tasks.map((task) => ({
+                statusType: task.done ? "done" : "open",
+                statusColor: "#64748b",
+                statusName: task.done ? "Done" : "To do",
+                ...task
+            })),
+        setTaskDone: async (_actor: unknown, taskId: string, done: boolean) => {
+            fake.doneSet.push({ taskId, done });
+        },
         scheduleTask: async (_actor: unknown, taskId: string, due: unknown) => {
             fake.scheduled.push({ taskId, due });
         },

@@ -109,10 +109,9 @@
         "retry": "Try again",
         "save": "Save",
         "setup": {
-            "admin": "Google Calendar API is turned off in the Google Cloud project Polaris signs in with. Turn it on, then Polaris retries by itself.",
+            "admin": "Google Calendar API is turned off for this Polaris. Turn it on under Management > Integrations, then Polaris retries by itself.",
             "member": "Your administrator needs to finish setting up Google for calendars.",
-            "open": "Turn on in Google Cloud",
-            "project": "Project {project}"
+            "openIntegrations": "Open Integrations"
         },
         "sourcesEmpty": "Nothing linked yet. Add an account, a CalDAV server or a subscription below.",
         "sourcesTitle": "Your sources",
@@ -133,7 +132,7 @@
         },
         "syncNow": "Sync {name} now",
         "tasks": {
-            "apiAdmin": "Google Tasks API is turned off in the Google Cloud project Polaris signs in with, so tasks aren't shown. Turn it on, then sync.",
+            "apiAdmin": "Google Tasks API is turned off for this Polaris, so tasks aren't shown. Turn it on under Management > Integrations, then sync.",
             "apiMember": "Google tasks can't be shown until your administrator turns them on.",
             "grant": "Your Google tasks aren't shown yet: this account was linked before Polaris asked for them.",
             "grantButton": "Show my tasks"

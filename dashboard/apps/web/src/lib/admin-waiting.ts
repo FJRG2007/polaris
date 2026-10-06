@@ -19,13 +19,21 @@
  *   with automatic updates off has a person in the loop by definition, and that
  *   person is the one this badge is for.
  *
- * Deliberately cheap: two counts and two settings reads, no network. The update
+ * - **A Google API switched off** in the Cloud project this Polaris signs in
+ *   with. Nobody's Google calendar or tasks come through until the
+ *   administrator turns it on, and the person who notices is not the one who
+ *   can: so it is counted here, on Integrations, where it is switched on - and
+ *   the Calendar's own screen only says to ask. Counted until it is on again,
+ *   never cleared by a visit: it is a fault, not news.
+ *
+ * Deliberately cheap: two counts and a few settings reads, no network. The update
  * check itself is a registry call and belongs to the watcher that already makes
  * it on a loop - this reads what that left behind, which also means it survives
  * a container restart, where the in-memory status cache does not.
  */
 
 import { prisma } from "@polaris/db";
+import * as core from "@polaris/core";
 import { loadEnv } from "@polaris/config";
 import { getSetting } from "@/lib/setting-store";
 import { getAutoUpdatePolicy } from "@/lib/update-watcher";
@@ -44,6 +52,8 @@ export interface AdminWaiting {
     /** A published build this deployment is not running and nothing will install
      *  by itself. */
     readonly update: boolean;
+    /** Google APIs recorded as switched off for this Polaris. */
+    readonly apis: number;
     /** The three as one number, which is what a badge has room for. */
     readonly total: number;
 }
@@ -52,8 +62,26 @@ export const NOTHING_WAITING: AdminWaiting = {
     reports: 0,
     cases: 0,
     update: false,
+    apis: 0,
     total: 0
 };
+
+/** How many of these stored API states say the API is switched off. Pure: the
+ *  reads are the caller's. */
+export function googleApisOff(raws: readonly (string | null | undefined)[]): number {
+    return raws.filter((raw) => core.readProviderApiState(raw)?.state === "disabled").length;
+}
+
+/** The Google APIs switched off for this Polaris, as their states were stored by
+ *  whichever learned first - the Calendar's sync or the Integrations probe. */
+async function apisOff(): Promise<number> {
+    const raws = await Promise.all(
+        core.GOOGLE_APIS.map((api) =>
+            getSetting(core.googleApiStateKey(api.id)).catch(() => null)
+        )
+    );
+    return googleApisOff(raws);
+}
 
 /**
  * Whether a published build is sitting there waiting for somebody to press
@@ -122,13 +150,14 @@ export async function adminWaiting(userId?: string): Promise<AdminWaiting> {
     const seen = userId ? await seenMarks(userId).catch(() => null) : null;
     const since = seenAt(seen?.get("admin.safety"));
     const newer = since ? { createdAt: { gt: since } } : {};
-    const [reports, cases, build] = await Promise.all([
+    const [reports, cases, build, apis] = await Promise.all([
         prisma.chatReport.count({ where: { status: "open", ...newer } }).catch(() => 0),
         prisma.safetyCase.count({ where: { status: "open", ...newer } }).catch(() => 0),
-        updateWaiting().catch(() => null)
+        updateWaiting().catch(() => null),
+        apisOff().catch(() => 0)
     ]);
     const update = build !== null && seen?.get("admin.update") !== build;
-    return { reports, cases, update, total: reports + cases + (update ? 1 : 0) };
+    return { reports, cases, update, apis, total: reports + cases + (update ? 1 : 0) + apis };
 }
 
 /**

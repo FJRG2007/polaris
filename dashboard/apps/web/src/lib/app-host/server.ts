@@ -257,6 +257,7 @@ export const serverHost = {
     calendarHost: {
         accountsByEmail: later(load.calendarHost, "accountsByEmail"),
         assignedTasks: later(load.calendarHost, "assignedTasks"),
+        setTaskDone: later(load.calendarHost, "setTaskDone"),
         calendarAccessToken: later(load.calendarHost, "calendarAccessToken"),
         calendarFetch: later(load.calendarHost, "calendarFetch"),
         calendarLinkAvailable: later(load.calendarHost, "calendarLinkAvailable"),

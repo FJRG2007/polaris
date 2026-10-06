@@ -6,6 +6,7 @@
  * Pure types.
  */
 
+import type * as core from "@polaris/core";
 import type {
     Alarm,
     Attendee,
@@ -114,6 +115,12 @@ export interface TaskItemView {
     readonly reference: string | null;
     readonly listName: string | null;
     readonly editable: boolean;
+    /** The state it is in, as Tasks draws it: the kind of status, its colour
+     *  (null for a calendar's task, which takes its calendar's), and its name
+     *  (null for a calendar's task, which the screen names from the kind). */
+    readonly statusType: core.TaskStatusType;
+    readonly statusColor: string | null;
+    readonly statusName: string | null;
 }
 
 /** The window the calendar is drawing, as one answer. */

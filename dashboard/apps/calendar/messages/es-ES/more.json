@@ -109,10 +109,9 @@
         "retry": "Reintentar",
         "save": "Guardar",
         "setup": {
-            "admin": "La API de Google Calendar está desactivada en el proyecto de Google Cloud con el que Polaris inicia sesión. Actívala y Polaris lo reintentará solo.",
+            "admin": "La API de Google Calendar está desactivada en este Polaris. Actívala en Gestión > Integraciones y Polaris lo reintentará solo.",
             "member": "Tu administrador tiene que terminar de configurar Google para calendarios.",
-            "open": "Activar en Google Cloud",
-            "project": "Proyecto {project}"
+            "openIntegrations": "Abrir Integraciones"
         },
         "sourcesEmpty": "Aún no hay nada enlazado. Añade una cuenta, un servidor CalDAV o una suscripción abajo.",
         "sourcesTitle": "Tus orígenes",
@@ -133,7 +132,7 @@
         },
         "syncNow": "Sincronizar {name} ahora",
         "tasks": {
-            "apiAdmin": "La API de Google Tasks está desactivada en el proyecto de Google Cloud con el que Polaris inicia sesión, así que las tareas no se muestran. Actívala y sincroniza.",
+            "apiAdmin": "La API de Google Tasks está desactivada en este Polaris, así que no se ven las tareas. Actívala en Gestión > Integraciones y sincroniza.",
             "apiMember": "Las tareas de Google no se mostrarán hasta que tu administrador las active.",
             "grant": "Tus tareas de Google aún no se muestran: esta cuenta se enlazó antes de que Polaris las pidiera.",
             "grantButton": "Ver mis tareas"
