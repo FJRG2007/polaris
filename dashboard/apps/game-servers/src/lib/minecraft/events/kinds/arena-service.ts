@@ -60,8 +60,8 @@ const ONE_SIDED = "Everybody left in it was on the same team";
 const tooFew = (joined: number, needed: number) => `Only ${joined} joined; it needs ${needed}`;
 /** How far from the players the ground under an arena is looked for. */
 const PLACE_DISTANCE = 32;
-/** Ticks an arena's chunks are waited for before its site is given up. */
-const LOAD_WAITS = 5;
+/** How long an arena's chunks are waited for before its site is given up. */
+const LOAD_WAIT_MS = 10_000;
 /**
  * How many teardown fills go in one trip. A fill's answer is one short line, so
  * the 16 KiB a trip hands back is never the limit; the trip's time is, since
@@ -71,7 +71,7 @@ const FILLS_PER_TRIP = 25;
 
 /** What one run keeps in memory between ticks: nothing that must survive a restart. */
 interface Memory {
-    loadWaits: number;
+    loadingSince: number | null;
     dealt: hits.Tally;
     kills: hits.Tally;
     lastHit: Map<string, number>;
@@ -87,7 +87,7 @@ function memoryOf(runId: string): Memory {
     let memory = memories.get(runId);
     if (!memory) {
         memory = {
-            loadWaits: 0,
+            loadingSince: null,
             dealt: hits.tally(),
             kills: hits.tally(),
             lastHit: new Map(),
@@ -285,11 +285,12 @@ async function raise(ctx: KindContext): Promise<void> {
         else solid += count ?? Number.POSITIVE_INFINITY;
         if (solid > 0) break;
     }
-    if (solid === 0 && waiting && memory.loadWaits < LOAD_WAITS) {
-        memory.loadWaits += 1;
-        return;
+    if (solid === 0 && waiting) {
+        const now = Date.now();
+        memory.loadingSince ??= now;
+        if (now - memory.loadingSince < LOAD_WAIT_MS) return;
     }
-    memory.loadWaits = 0;
+    memory.loadingSince = null;
     if (solid > 0 || waiting) {
         await giveUpSite(ctx, place, solid > 0 ? "occupied" : "unloaded");
         return;

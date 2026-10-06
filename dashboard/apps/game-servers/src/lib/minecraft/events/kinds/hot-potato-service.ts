@@ -2,10 +2,11 @@
  * Playing hot potato (`hot-potato.ts`): the arena's own steps are
  * `arena-service`'s; this is its part of them.
  *
- * Each tick reads where everybody is and the hits since the last one - the
- * events data pack's (`hits.ts`), or the damage dealt and taken where the pack
- * is not on. In that order it then: puts out whoever has been gone from the
- * server two looks running; passes the potato when its holder struck and
+ * Each tick - twice a second, oftener than other events, so a hit passes the
+ * potato while the hand is still on the button - reads where everybody is and
+ * the hits since the last one - the events data pack's (`hits.ts`), or the
+ * damage dealt and taken where the pack is not on. In that order it then: puts
+ * out whoever has been gone from the server for `MISSING_MS`; passes the potato when its holder struck and
  * somebody was hurt - by the holder, where the game says who hurt them, and
  * the nearest of them; sets off a fuse that has run out -
  * its holder out, to the gallery - and after a breath draws the next round's
@@ -38,7 +39,7 @@ function optionsOf(run: stored.EventRun): catalog.EventOptions<"hot-potato"> {
 interface Memory {
     dealt: hits.Tally;
     taken: hits.Tally;
-    /** Looks running each player was not on the server. */
+    /** When each player was first seen gone from the server, this time. */
     missing: Map<string, number>;
 }
 
@@ -54,8 +55,10 @@ function memoryOf(runId: string): Memory {
     return memory;
 }
 
-/** Looks running a player may be off the server before they are out. */
-const MISSED_LOOKS = 2;
+/** How long a player may be off the server before they are out. A time, not a
+ *  count of looks: the looks are quick now, and a blink - a list read a moment
+ *  late - is not leaving. */
+const MISSING_MS = 4_000;
 
 /** The first round, as "Go!" left it: its holder drawn, its fuse lit then. */
 function firstRound(run: stored.EventRun, now: number): potato.PotatoState {
@@ -73,7 +76,7 @@ function firstRound(run: stored.EventRun, now: number): potato.PotatoState {
 }
 
 /** Handed the potato: on their head, glowing, told so - and still weak, until
- *  the tick after next frees them to pass it (`potato.canPass`). */
+ *  `PASS_COOLDOWN_MS` later frees them to pass it (`potato.canPass`). */
 function handedLines(
     name: string,
     marker: stored.Marker | null,
@@ -169,16 +172,16 @@ async function tick(ctx: KindContext, lines: string[]): Promise<string | null> {
         }
     };
 
-    // Gone from the server two looks running: out, or nobody could ever get
-    // the potato to them.
+    // Gone from the server for a while: out, or nobody could ever get the
+    // potato to them.
     for (const one of alive()) {
         if (here.has(lower(one.name))) {
             memory.missing.delete(lower(one.name));
             continue;
         }
-        const missed = (memory.missing.get(lower(one.name)) ?? 0) + 1;
-        memory.missing.set(lower(one.name), missed);
-        if (missed < MISSED_LOOKS) continue;
+        const since = memory.missing.get(lower(one.name)) ?? now;
+        memory.missing.set(lower(one.name), since);
+        if (now - since < MISSING_MS) continue;
         putOut(one.name);
         lines.push(
             commands.say(messages.tag(language) + potatoMessages.leftGame(one.name, language))

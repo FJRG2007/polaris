@@ -10667,6 +10667,41 @@ describe("hot potato", () => {
         onlyOurBlocks();
     });
 
+    it("passes it within the second of the hit, not on the next two-second look", async () => {
+        // The report: the potato took too long to reach the one who was hit -
+        // it was looked at with every other event, every two seconds.
+        world.online = ["Ana", "Ben", "Cy"];
+        setUp([potatoOf(40)]);
+        await joinAndStart("potato", ["Ana", "Ben", "Cy"]);
+        await play(2_100);
+        const first = (await holderNow())!;
+        const [near] = ["Ana", "Ben", "Cy"].filter((name) => name !== first) as [string];
+        world.at[near] = [world.at[first]![0] + 1, world.at[first]![1], world.at[first]![2]];
+        punch(first, near);
+        await play(700);
+        expect(await holderNow()).toBe(near);
+    });
+
+    it("puts out only somebody gone for seconds, not for a look or two", async () => {
+        world.online = ["Ana", "Ben", "Cy"];
+        setUp([potatoOf(40)]);
+        await joinAndStart("potato", ["Ana", "Ben", "Cy"]);
+        await play(2_100);
+        const potato = await kind();
+        const first = (await holderNow())!;
+        const gone = ["Ana", "Ben", "Cy"].find((name) => name !== first)!;
+        // A blink: off the list for a second, the quicker look sees it twice.
+        world.online = ["Ana", "Ben", "Cy"].filter((name) => name !== gone);
+        await play(1_000);
+        world.online = ["Ana", "Ben", "Cy"];
+        await play(1_000);
+        expect(potato.stateOf(state().run!.game)?.out.map((one) => one.name) ?? []).toEqual([]);
+        // Really gone: out.
+        world.online = ["Ana", "Ben", "Cy"].filter((name) => name !== gone);
+        await play(5_000);
+        expect(potato.stateOf(state().run!.game)?.out.map((one) => one.name)).toContain(gone);
+    });
+
     it("hands it only to whom the holder hit, not to somebody nearer hurt by another", async () => {
         world.online = ["Ana", "Ben", "Cy"];
         setUp([potatoOf(40)]);
@@ -10741,7 +10776,7 @@ describe("hot potato", () => {
     it("picked up after a restart, keeps the round, its holder and its fuse", async () => {
         const potato = await kind();
         world.online = ["Ana", "Ben", "Cy"];
-        setUp([potatoOf(20)]);
+        setUp([potatoOf(40)]);
         await joinAndStart("potato", ["Ana", "Ben", "Cy"]);
         await play(2_100);
         const saved = state().run!;
@@ -10770,7 +10805,7 @@ describe("hot potato", () => {
         const holder = (await holderNow())!;
         const gone = ["Ana", "Ben", "Cy"].find((name) => name !== holder)!;
         world.online = world.online.filter((name) => name !== gone);
-        await play(4_100);
+        await play(5_000);
         expect(potato.stateOf(state().run!.game)!.out.map((one) => one.name)).toEqual([gone]);
         expect(await holderNow()).toBe(holder);
     });

@@ -205,6 +205,17 @@ async function openServerContainer(
 }
 
 const TICK_MS = 2_000;
+/**
+ * A kind looked at oftener than that, for what its players feel in the hand.
+ * Hot potato is a hit passing it on: two seconds between the punch and the
+ * potato moving read as a game that missed it. A tick still never overlaps the
+ * one before (`kick`), so a slow server only slows it to its own pace.
+ */
+const KIND_TICK_MS: Partial<Record<catalog.EventKind, number>> = { "hot-potato": 500 };
+
+function tickMsOf(kind: catalog.EventKind): number {
+    return KIND_TICK_MS[kind] ?? TICK_MS;
+}
 /** How often the boss bar's clock moves: every second, on its own timer. */
 const CLOCK_MS = 1_000;
 /** How often a parkour race is looked at for falls and checkpoints: a fall is
@@ -947,7 +958,7 @@ function startLoop(
     if (run.finishing) return;
     const loop: Loop = {
         ownerId,
-        timer: setInterval(() => kick(installedAppId, loop), TICK_MS),
+        timer: setInterval(() => kick(installedAppId, loop), tickMsOf(run.preset.kind)),
         clock: null,
         quick: null,
         quickBusy: false,
@@ -1645,7 +1656,7 @@ async function play(
                   )
                 : await hillService.walkInTick(
                       kindContext(installedAppId, loop, server, now),
-                      TICK_MS / 1000,
+                      tickMsOf(preset.kind) / 1000,
                       lines
                   );
             break;
@@ -2361,7 +2372,7 @@ function kindContext(
         chat: () => chatSince(loop, server),
         atLeast: (wanted) => serverAtLeast(server, wanted),
         stashOwner: { installedAppId, runId: loop.run.id, event: loop.run.preset.name },
-        tickSeconds: TICK_MS / 1000,
+        tickSeconds: tickMsOf(loop.run.preset.kind) / 1000,
         owed: async () => {
             const row = await readRow(installedAppId);
             return row ? owedNames(stored.readEventState(row.config)) : new Set<string>();
