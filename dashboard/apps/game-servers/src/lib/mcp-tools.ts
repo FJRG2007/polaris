@@ -44,7 +44,7 @@ import type { AppHostTypes } from "@polaris/app-host";
 import { gameCatalogs } from "../../messages";
 import { playerTools } from "./mcp-player-tools";
 import { serverTools } from "./mcp-server-tools";
-import { actorFor, attempt, serverFor, serverId } from "./mcp-common";
+import { actorFor, attempt, refuse, serverFor, serverId } from "./mcp-common";
 import { restartServerNow, runConsoleCommand, setServerRunning } from "./games-operations";
 import { listGameServerFacts, listGameServerPresence, withNamesOnly } from "./games-service";
 
