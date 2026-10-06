@@ -275,9 +275,10 @@ export function readVitals(name: string): string[] {
 
 /** `Ana has the following entity data: 17.5f`. Null when it is not that answer. */
 export function readEntityNumber(output: string): number | null {
-    const match = /has the following entity data: (-?\d+(?:\.\d+)?(?:E-?\d+)?)[bsLfdBSFD]?\s*$/.exec(
-        output.trim()
-    );
+    const match =
+        /has the following entity data: (-?\d+(?:\.\d+)?(?:E-?\d+)?)[bsLfdBSFD]?\s*$/.exec(
+            output.trim()
+        );
     return match ? Number(match[1]) : null;
 }
 
@@ -293,7 +294,10 @@ export function hungerFor(exhaustion: number): { seconds: number; amplifier: num
     return { seconds, amplifier };
 }
 
-export function hungerLines(name: string, hunger: { seconds: number; amplifier: number }): string[] {
+export function hungerLines(
+    name: string,
+    hunger: { seconds: number; amplifier: number }
+): string[] {
     return [
         endHunger(name),
         `effect give ${name} minecraft:hunger ${hunger.seconds} ${hunger.amplifier} true`
@@ -333,10 +337,7 @@ export function hurtLine(name: string, amount: number): string {
 export function foodStep(
     now: Pick<Vitals, "food" | "saturation" | "exhaustion">,
     wanted: Pick<Vitals, "food" | "saturation" | "exhaustion">
-):
-    | { kind: "drain"; exhaustion: number }
-    | { kind: "feed"; points: number }
-    | null {
+): { kind: "drain"; exhaustion: number } | { kind: "feed"; points: number } | null {
     const reachable = Math.min(now.saturation + 2 * (wanted.food - now.food), wanted.food);
     if (now.food > wanted.food || reachable < wanted.saturation - 0.01) {
         const floor = Math.max(wanted.food - Math.ceil(wanted.saturation / 2 - 0.0001), 0);
@@ -362,7 +363,8 @@ function drain(
 ): { kind: "drain"; exhaustion: number } | null {
     const rest = points > 0 ? Math.min(Math.max(wanted, 0.1), 3.9) : wanted;
     const whole = 4 * points + rest - exhaustion;
-    if (whole > HUNGER_PER_SECOND) return { kind: "drain", exhaustion: 4 * points - exhaustion - 2 };
+    if (whole > HUNGER_PER_SECOND)
+        return { kind: "drain", exhaustion: 4 * points - exhaustion - 2 };
     return whole >= 0.05 ? { kind: "drain", exhaustion: whole } : null;
 }
 
