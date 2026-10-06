@@ -520,7 +520,9 @@ export function lightFallLines(name: string): string[] {
 }
 
 export function normalFallLines(name: string): string[] {
-    return GRAVITY.map((attribute) => `attribute ${name} ${attribute} modifier remove ${LIGHT_FALL}`);
+    return GRAVITY.map(
+        (attribute) => `attribute ${name} ${attribute} modifier remove ${LIGHT_FALL}`
+    );
 }
 
 /**

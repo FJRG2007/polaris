@@ -241,7 +241,12 @@ describe("a dropper's shaft", () => {
         let longest = 0;
         for (const difficulty of DIFFICULTIES)
             for (let seed = 0; seed < 200; seed += 1) {
-                const shaft = dropper.shaft({ levels: 20, difficulty }, `deep-${seed}`, { x: 0, z: 0 }, 60);
+                const shaft = dropper.shaft(
+                    { levels: 20, difficulty },
+                    `deep-${seed}`,
+                    { x: 0, z: 0 },
+                    60
+                );
                 let falling: dropper.Fall = { y: shaft.top + 1, velocity: 0 };
                 let ticks = 0;
                 while (falling.y > shaft.water) {
