@@ -1523,6 +1523,11 @@ model OAuthGrant {
     // network rules refuse it (see lib/mcp/oauth/network-exception.ts). Null
     // reads as "no exception": held to the account's rules like everything else.
     networkException String?
+    // JSON array: the database connections (as the Databases app names them)
+    // the database tools may reach for this connection. Null reads as "every
+    // one the person can open", which is what a grant made before it was kept
+    // reached.
+    databaseIds     String?
     revokedAt       DateTime?
 
     user   User         @relation(fields: [userId], references: [id], onDelete: Cascade)

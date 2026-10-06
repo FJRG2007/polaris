@@ -201,7 +201,8 @@ async function callerFor(
             userId: access.userId,
             isAdmin: access.isAdmin,
             scopes: access.scopes,
-            grantId: access.grantId
+            grantId: access.grantId,
+            databaseIds: access.databaseIds
         };
     }
 
