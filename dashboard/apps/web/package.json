@@ -64,7 +64,6 @@
         "@univerjs/presets": "0.25.1",
         "@xterm/addon-fit": "0.10.0",
         "@xterm/xterm": "5.5.0",
-        "@xyflow/react": "12.11.6",
         "acme-client": "5.4.0",
         "archiver": "7.0.1",
         "archiver-zip-encrypted": "2.0.0",

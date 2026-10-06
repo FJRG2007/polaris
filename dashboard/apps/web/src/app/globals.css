@@ -10,15 +10,6 @@
  */
 @import "@polaris/ui/styles.css";
 
-/*
- * React Flow's structural rules - how its viewport, nodes, edges and handles are
- * laid out - for the diagrams apps draw with it (the automation editor). Here
- * because an app's bundle is code only: a stylesheet it imported would be built
- * beside it and never loaded. Only the base sheet; the diagrams colour their own
- * nodes, edges and handles with the Polaris tokens.
- */
-@import "@xyflow/react/dist/base.css";
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;

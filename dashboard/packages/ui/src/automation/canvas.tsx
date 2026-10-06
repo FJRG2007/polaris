@@ -18,25 +18,12 @@
  * On a narrow screen a diagram is something to scroll around rather than read,
  * so the same nodes are drawn as a list there, opening the same cards.
  *
- * The diagram is React Flow (`@xyflow/react`). Its stylesheet comes from the
- * dashboard's global CSS: this package carries no CSS of its own.
+ * The diagram is drawn by `diagram.tsx`, with no library under it: the board,
+ * the lines and the gestures are Polaris' own, the same as the Deploy board's.
  */
 
-import {
-    Background,
-    Handle,
-    Panel,
-    Position,
-    ReactFlow,
-    ReactFlowProvider,
-    applyNodeChanges,
-    useReactFlow,
-    type Edge,
-    type Node,
-    type NodeChange,
-    type NodeProps
-} from "@xyflow/react";
-import { AlertCircle, Filter, Maximize, Play, Plus, X, Zap, ZoomIn, ZoomOut } from "lucide-react";
+import { AlertCircle, Filter, Play, Plus, X, Zap } from "lucide-react";
+import { Diagram, type DiagramNode } from "./diagram";
 import { cn } from "../lib/cn";
 import { Button } from "../components/button";
 import * as graphs from "./graph";
@@ -50,10 +37,8 @@ import {
     useCallback,
     useEffect,
     useMemo,
-    useRef,
     useState,
     useSyncExternalStore,
-    type CSSProperties,
     type ReactNode
 } from "react";
 
@@ -144,14 +129,7 @@ type ViewData = {
     readonly readOnly: boolean;
 };
 
-type ViewNode = Node<ViewData>;
-
-/** How the whole diagram is framed: never past life size, and never so small
- *  that a node's words cannot be read - a long automation is panned instead. */
-const FIT = { padding: 0.1, maxZoom: 1, minZoom: 0.6 };
-
-/** What removes the selected node: Delete, and the key Macs label delete. */
-const DELETE_KEYS = ["Delete", "Backspace"];
+type ViewNode = DiagramNode & { readonly data: ViewData };
 
 /** The width at which a diagram is worth drawing rather than a list. */
 const WIDE = "(min-width: 768px)";
@@ -200,28 +178,6 @@ function targetGroup(
     if (selection?.role !== "group") return null;
     const group = definition.conditions.groups[selection.index];
     return group && group.items.length < perGroup ? group : null;
-}
-
-/** The node a batch of React Flow's changes selects: its id, null when it only
- *  lets go of the one selected, undefined when it says nothing about that.
- *
- *  Selection is read from these changes - which React Flow makes only for what
- *  the reader did - and never from its `onSelectionChange`, which also reports
- *  the diagram's own state: empty for a moment each time the diagram is drawn
- *  afresh (back from the narrow list), and a render behind the nodes handed to
- *  it. Read as the reader's choice, that dropped the selection, and its answer
- *  and the nodes then chased each other until React gave up ("Maximum update
- *  depth exceeded"). */
-function selectedBy(
-    changes: readonly NodeChange[],
-    current: string | null
-): string | null | undefined {
-    const picked = changes.find((change) => change.type === "select" && change.selected);
-    if (picked?.type === "select") return picked.id;
-    const dropped = changes.some(
-        (change) => change.type === "select" && !change.selected && change.id === current
-    );
-    return dropped ? null : undefined;
 }
 
 function orderOf(definition: graphs.FlowDefinition): string {
@@ -324,35 +280,6 @@ function viewData<D extends graphs.FlowDefinition>(
     }
 }
 
-const HANDLE_STYLE = {
-    width: 8,
-    height: 8,
-    minWidth: 0,
-    minHeight: 0,
-    border: "none",
-    background: "hsl(var(--border-strong))"
-} as const;
-
-function Port({
-    type,
-    position,
-    id
-}: {
-    type: "source" | "target";
-    position: Position;
-    id: string;
-}) {
-    return (
-        <Handle
-            type={type}
-            position={position}
-            id={id}
-            isConnectable={false}
-            style={HANDLE_STYLE}
-        />
-    );
-}
-
 function RoleIcon({ role }: { role: graphs.GraphNodeType }) {
     if (role === "trigger") return <Zap aria-hidden="true" className="size-3.5 shrink-0" />;
     if (role === "step") return <Play aria-hidden="true" className="size-3.5 shrink-0" />;
@@ -409,88 +336,6 @@ function NodeFace({
         </span>
     );
 }
-
-function TriggerNode({ data, selected }: NodeProps<ViewNode>) {
-    return (
-        <>
-            <NodeFace role="trigger" data={data} selected={selected} />
-            <Port type="source" position={Position.Right} id="out" />
-        </>
-    );
-}
-
-function GateNode({ data, selected }: NodeProps<ViewNode>) {
-    return (
-        <>
-            <Port type="target" position={Position.Left} id="in" />
-            <NodeFace role="gate" data={data} selected={selected} />
-            <Port type="target" position={Position.Bottom} id="conditions" />
-            <Port type="source" position={Position.Right} id="out" />
-        </>
-    );
-}
-
-function GroupNode({ data, selected }: NodeProps<ViewNode>) {
-    return (
-        <div
-            className={cn(
-                "h-full w-full rounded-lg border border-dashed bg-muted/40",
-                selected
-                    ? "border-primary"
-                    : data.state === "invalid"
-                      ? "border-danger-edge"
-                      : "border-border-strong"
-            )}
-        >
-            <Port type="source" position={Position.Top} id="out" />
-            <p className="flex min-w-0 items-center gap-1.5 px-3 pt-2 text-[0.6875rem] font-medium text-muted-foreground">
-                <span className="shrink-0">{data.title}</span>
-                {data.summary && (
-                    <span className="min-w-0 truncate" title={data.summary}>
-                        {data.summary}
-                    </span>
-                )}
-                {data.state === "invalid" && (
-                    <AlertCircle aria-hidden="true" className="size-3.5 shrink-0 text-danger" />
-                )}
-            </p>
-        </div>
-    );
-}
-
-function ConditionNode({ data, selected }: NodeProps<ViewNode>) {
-    return <NodeFace role="condition" data={data} selected={selected} />;
-}
-
-function StepNode({ data, selected }: NodeProps<ViewNode>) {
-    return (
-        <>
-            <Port type="target" position={Position.Left} id="in" />
-            <Port type="target" position={Position.Top} id="prev" />
-            <NodeFace role="step" data={data} selected={selected} />
-            <Port type="source" position={Position.Bottom} id="out" />
-        </>
-    );
-}
-
-/** React Flow's name for each kind of node. Prefixed because a node's type is
- *  also its class, and React Flow's own sheet styles `react-flow__node-group`. */
-const FLOW_TYPE: Readonly<Record<graphs.GraphNodeType, string>> = {
-    trigger: "automation-trigger",
-    gate: "automation-gate",
-    group: "automation-group",
-    condition: "automation-condition",
-    step: "automation-step"
-};
-
-/** Module level, so React Flow is handed the same object every render. */
-const NODE_TYPES = {
-    [FLOW_TYPE.trigger]: TriggerNode,
-    [FLOW_TYPE.gate]: GateNode,
-    [FLOW_TYPE.group]: GroupNode,
-    [FLOW_TYPE.condition]: ConditionNode,
-    [FLOW_TYPE.step]: StepNode
-};
 
 type Adding = { readonly role: "trigger" | "condition" | "step"; readonly kind: string };
 
@@ -606,41 +451,6 @@ function Palette<D extends graphs.FlowDefinition>({
     );
 }
 
-function Toolbar({ labels }: { labels: FlowCanvasLabels }) {
-    const flow = useReactFlow();
-    const button = (label: string, icon: ReactNode, run: () => void) => (
-        <Button
-            size="sm"
-            variant="ghost"
-            className="size-8 p-0"
-            aria-label={label}
-            title={label}
-            onClick={run}
-        >
-            {icon}
-        </Button>
-    );
-    return (
-        <div className="flex items-center rounded-md border border-border bg-elevated">
-            {button(
-                labels.zoomIn,
-                <ZoomIn className="size-4" />,
-                () => void flow.zoomIn({ duration: 150 })
-            )}
-            {button(
-                labels.zoomOut,
-                <ZoomOut className="size-4" />,
-                () => void flow.zoomOut({ duration: 150 })
-            )}
-            {button(
-                labels.fit,
-                <Maximize className="size-4" />,
-                () => void flow.fitView({ ...FIT, duration: 200 })
-            )}
-        </div>
-    );
-}
-
 export interface FlowCanvasProps<D extends graphs.FlowDefinition> {
     definition: D;
     vocabulary: FlowVocabulary<D>;
@@ -660,15 +470,7 @@ export interface FlowCanvasProps<D extends graphs.FlowDefinition> {
     inspectorPlacement?: "beside" | "below";
 }
 
-export function FlowCanvas<D extends graphs.FlowDefinition>(props: FlowCanvasProps<D>) {
-    return (
-        <ReactFlowProvider>
-            <CanvasBody {...props} />
-        </ReactFlowProvider>
-    );
-}
-
-function CanvasBody<D extends graphs.FlowDefinition>({
+export function FlowCanvas<D extends graphs.FlowDefinition>({
     definition,
     vocabulary,
     readOnly,
@@ -682,8 +484,6 @@ function CanvasBody<D extends graphs.FlowDefinition>({
     const fixedTriggers = vocabulary.triggers.fixed === true;
     const wide = useWide();
     const [selectedId, setSelectedId] = useState<string | null>(null);
-    const dragging = useRef(false);
-    const [diagramFocused, setDiagramFocused] = useState(false);
 
     const graph = useMemo(() => graphs.automationToGraph(definition), [definition]);
     const selection = selectionOf(definition, selectedId);
@@ -701,124 +501,34 @@ function CanvasBody<D extends graphs.FlowDefinition>({
                     readOnly || node.type === "gate" || (fixedTriggers && node.type === "trigger");
                 return {
                     id: node.id,
-                    type: FLOW_TYPE[node.type],
-                    className:
-                        "rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                    role: node.type,
                     position: node.position,
                     data,
                     width: node.type === "group" ? node.width : graphs.NODE_WIDTH,
                     height: node.type === "group" ? node.height : graphs.NODE_HEIGHT,
-                    selected: node.id === selectedId,
                     draggable: !locked,
                     deletable: !locked,
-                    ...(node.type === "condition"
-                        ? { parentId: node.parentId, extent: "parent" as const }
-                        : {}),
-                    ...(node.type === "group" ? { zIndex: -1 } : {}),
+                    ...(node.type === "condition" ? { parentId: node.parentId } : {}),
                     ariaLabel: spoken(data, labels)
                 };
             }),
-        [graph, stateOf, vocabulary, labels, fixedTriggers, readOnly, selectedId]
+        [graph, stateOf, vocabulary, labels, fixedTriggers, readOnly]
     );
 
-    const [nodes, setNodes] = useState<ViewNode[]>(laidOut);
-    useEffect(() => setNodes(laidOut), [laidOut]);
-
-    // A node added below the fold, or the last of a column removed, is brought
-    // back into the frame rather than left for the reader to go looking for.
-    const flow = useReactFlow();
-    const count = graph.nodes.length;
-    const framed = useRef(count);
-    useEffect(() => {
-        if (!wide || framed.current === count) return;
-        framed.current = count;
-        const frame = requestAnimationFrame(() => void flow.fitView({ ...FIT, duration: 200 }));
-        return () => cancelAnimationFrame(frame);
-    }, [count, wide, flow]);
-
-    const edges = useMemo<Edge[]>(
-        () =>
-            graph.edges.map((edge) => ({
-                id: edge.id,
-                source: edge.source,
-                target: edge.target,
-                sourceHandle: edge.sourceHandle,
-                targetHandle: edge.targetHandle,
-                selectable: false,
-                focusable: false,
-                // The lines only repeat what the nodes' order already says, and
-                // React Flow would name each by its two node ids.
-                domAttributes: { "aria-hidden": true },
-                style: {
-                    stroke: "hsl(var(--border-strong))",
-                    strokeWidth: 1.5,
-                    ...(edge.kind === "feeds" ? { strokeDasharray: "4 4" } : {})
-                }
-            })),
-        [graph]
-    );
-
-    /** The order the nodes stand in now, put into the definition - or, where
-     *  nothing changed places, every node back where the layout puts it. */
-    const settle = useCallback(
-        (current: readonly ViewNode[]) => {
+    /** A node let go of at a new place, put into the definition as the order
+     *  that makes - or, where nothing changed places, nothing at all: the node
+     *  goes back where the layout puts it. */
+    const drop = useCallback(
+        (id: string, position: graphs.Position) => {
             const moved: graphs.AutomationGraph<D> = {
                 ...graph,
-                nodes: graph.nodes.map((node) => {
-                    const now = current.find((entry) => entry.id === node.id);
-                    return now ? { ...node, position: now.position } : node;
-                })
+                nodes: graph.nodes.map((node) => (node.id === id ? { ...node, position } : node))
             };
             const next = graphs.graphToAutomation(moved, definition);
-            if (orderOf(next) === orderOf(definition)) setNodes(laidOut);
-            else onChange((existing) => graphs.graphToAutomation(moved, existing));
+            if (orderOf(next) !== orderOf(definition))
+                onChange((existing) => graphs.graphToAutomation(moved, existing));
         },
-        [graph, definition, laidOut, onChange]
-    );
-
-    const onNodesChange = useCallback(
-        (changes: NodeChange<ViewNode>[]) => {
-            setSelectedId((current) => {
-                const next = selectedBy(changes, current);
-                return next === undefined ? current : next;
-            });
-            if (readOnly) {
-                setNodes((current) =>
-                    applyNodeChanges(
-                        changes.filter((change) => change.type === "dimensions"),
-                        current
-                    )
-                );
-                return;
-            }
-            // The arrow keys on a selected node move it a few pixels, which is
-            // never far enough to pass another: read as one place up or down.
-            const nudged = dragging.current
-                ? undefined
-                : changes.find(
-                      (change) =>
-                          change.type === "position" && change.dragging === false && change.position
-                  );
-            if (nudged && nudged.type === "position" && nudged.position) {
-                const before = nodes.find((node) => node.id === nudged.id);
-                const by = before ? Math.sign(nudged.position.y - before.position.y) : 0;
-                if (by !== 0)
-                    onChange((current) => graphs.shiftNode(current, nudged.id, by as -1 | 1));
-                else setNodes(laidOut);
-                return;
-            }
-            // Removal is the definition's to do (`onNodesDelete`); selection is
-            // `selectedId`'s, read above.
-            setNodes((current) =>
-                applyNodeChanges(
-                    changes.filter(
-                        (change) => change.type !== "remove" && change.type !== "select"
-                    ),
-                    current
-                )
-            );
-        },
-        [readOnly, nodes, laidOut, onChange]
+        [graph, definition, onChange]
     );
 
     const add = (adding: Adding) => {
@@ -864,20 +574,6 @@ function CanvasBody<D extends graphs.FlowDefinition>({
         }
         setSelectedId(node.id);
     };
-
-    // React Flow reads one of the two descriptions depending on whether its
-    // keyboard handling is on, and it is; both say the same here, for the reader
-    // who can change the automation and for the one who cannot.
-    const ariaLabelConfig = useMemo(() => {
-        const help = readOnly ? labels.nodeHelpReadOnly : labels.nodeHelp;
-        return {
-            "node.a11yDescription.default": help,
-            "node.a11yDescription.keyboardDisabled": help,
-            "node.a11yDescription.ariaLiveMessage": () => labels.moved,
-            "edge.a11yDescription.default": labels.edgeHelp,
-            "handle.ariaLabel": labels.handle
-        };
-    }, [readOnly, labels]);
 
     // Beside the diagram the card says which stage it is from; under a node of
     // the narrow list, which already sits under that stage's heading, it does not.
@@ -968,64 +664,30 @@ function CanvasBody<D extends graphs.FlowDefinition>({
                     role="region"
                     aria-label={labels.diagram}
                     className="relative h-[min(40rem,75vh)] min-h-[24rem] min-w-0 overflow-hidden rounded-lg border border-border bg-surface"
-                    onFocus={() => setDiagramFocused(true)}
-                    onBlur={(event) => {
-                        if (
-                            !event.currentTarget.contains(
-                                event.relatedTarget as globalThis.Node | null
-                            )
-                        )
-                            setDiagramFocused(false);
-                    }}
                 >
-                    <ReactFlow<ViewNode>
-                        nodes={nodes}
-                        edges={edges}
-                        nodeTypes={NODE_TYPES}
-                        onNodesChange={onNodesChange}
-                        onNodeDragStart={() => {
-                            dragging.current = true;
+                    <Diagram
+                        nodes={laidOut}
+                        edges={graph.edges}
+                        selectedId={selectedId}
+                        readOnly={readOnly}
+                        labels={{
+                            zoomIn: labels.zoomIn,
+                            zoomOut: labels.zoomOut,
+                            fit: labels.fit,
+                            help: readOnly ? labels.nodeHelpReadOnly : labels.nodeHelp,
+                            moved: labels.moved
                         }}
-                        onNodeDragStop={(_, __, dragged) => {
-                            dragging.current = false;
-                            settle(
-                                nodes.map(
-                                    (node) => dragged.find((entry) => entry.id === node.id) ?? node
-                                )
-                            );
-                        }}
-                        onNodesDelete={(removed) => {
-                            onChange((current) =>
-                                removed.reduce(
-                                    (next, node) => graphs.removeNode(next, node.id),
-                                    current
-                                )
-                            );
+                        face={(node, selected) => (
+                            <ViewFace node={node as ViewNode} selected={selected} />
+                        )}
+                        onSelect={setSelectedId}
+                        onDrop={drop}
+                        onNudge={(id, by) => onChange((current) => graphs.shiftNode(current, id, by))}
+                        onDelete={(id) => {
+                            onChange((current) => graphs.removeNode(current, id));
                             setSelectedId(null);
                         }}
-                        nodesDraggable={!readOnly}
-                        nodesConnectable={false}
-                        edgesFocusable={false}
-                        elementsSelectable
-                        selectionKeyCode={null}
-                        multiSelectionKeyCode={null}
-                        deleteKeyCode={readOnly || !diagramFocused ? null : DELETE_KEYS}
-                        fitView
-                        fitViewOptions={FIT}
-                        minZoom={0.25}
-                        maxZoom={1.75}
-                        ariaLabelConfig={ariaLabelConfig}
-                        style={
-                            {
-                                "--xy-attribution-background-color": "transparent"
-                            } as CSSProperties
-                        }
-                    >
-                        <Background gap={20} size={1} color="hsl(var(--border))" />
-                        <Panel position="bottom-left" className="!m-2">
-                            <Toolbar labels={labels} />
-                        </Panel>
-                    </ReactFlow>
+                    />
                 </div>
                 <aside aria-label={labels.inspector} className="min-w-0">
                     {inspector ?? <p className="text-xs text-muted-foreground">{labels.pick}</p>}
@@ -1034,6 +696,37 @@ function CanvasBody<D extends graphs.FlowDefinition>({
             {!readOnly && (
                 <p className="text-[0.6875rem] text-foreground-subtle">{labels.reorderHint}</p>
             )}
+        </div>
+    );
+}
+
+/** How a node is drawn on the diagram: a group is a frame its conditions sit
+ *  in; every other node is its face. */
+function ViewFace({ node, selected }: { node: ViewNode; selected: boolean }) {
+    const { data } = node;
+    if (node.role !== "group") return <NodeFace role={node.role} data={data} selected={selected} />;
+    return (
+        <div
+            className={cn(
+                "h-full w-full rounded-lg border border-dashed bg-muted/40",
+                selected
+                    ? "border-primary"
+                    : data.state === "invalid"
+                      ? "border-danger-edge"
+                      : "border-border-strong"
+            )}
+        >
+            <p className="flex min-w-0 items-center gap-1.5 px-3 pt-2 text-[0.6875rem] font-medium text-muted-foreground">
+                <span className="shrink-0">{data.title}</span>
+                {data.summary && (
+                    <span className="min-w-0 truncate" title={data.summary}>
+                        {data.summary}
+                    </span>
+                )}
+                {data.state === "invalid" && (
+                    <AlertCircle aria-hidden="true" className="size-3.5 shrink-0 text-danger" />
+                )}
+            </p>
         </div>
     );
 }

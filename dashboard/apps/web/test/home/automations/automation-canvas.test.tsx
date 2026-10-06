@@ -178,7 +178,7 @@ function press(element: HTMLElement, key: string): void {
 }
 
 function node(id: string): HTMLElement {
-    const found = document.querySelector<HTMLElement>(`.react-flow__node[data-id="${id}"]`);
+    const found = document.querySelector<HTMLElement>(`[data-flow-node][data-id="${id}"]`);
     if (!found) throw new Error(`no node ${id} drawn`);
     return found;
 }
@@ -324,7 +324,7 @@ describe("an automation saved by the form, opened as a diagram", () => {
         await painted();
         press(node("step02"), "Delete");
         await painted();
-        expect(document.querySelector('.react-flow__node[data-id="step02"]')).toBeNull();
+        expect(document.querySelector('[data-flow-node][data-id="step02"]')).toBeNull();
         fireEvent.click(screen.getByRole("button", { name: "Save" }));
         await painted();
         const removed = saved[1] as { definition: AutomationView["definition"] };

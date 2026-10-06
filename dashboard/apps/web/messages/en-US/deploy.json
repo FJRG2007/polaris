@@ -301,7 +301,7 @@
         "viewInDrive": "View in Drive",
         "editMount": "Edit mount",
         "hint": "Drag nodes to arrange them. Drag from a node's right handle onto another service to link them. Right-click the board to add a service, or a service for more.",
-        "hintZoom": "Hold Ctrl (Cmd on a Mac) and scroll to zoom.",
+        "hintZoom": "Scroll to zoom, and drag the board to move around.",
         "removeService": "This removes the service, its container, domains, and variables.",
         "deleteServiceTitle": "Delete service",
         "zoomControls": "Zoom",

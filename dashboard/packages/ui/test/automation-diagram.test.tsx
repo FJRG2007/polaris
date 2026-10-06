@@ -1,15 +1,13 @@
 // @vitest-environment jsdom
 
 /**
- * A selected node stays selected while the window changes width.
+ * The automation diagram, drawn by Polaris rather than by a diagram library.
  *
- * The report: with a node open, the window crossing the width at which the
- * diagram becomes a list and back - a resize, a rotated tablet, a full-page
- * screenshot - took the editor down with React's "Maximum update depth
- * exceeded". The diagram is drawn afresh when it comes back, and its own
- * selection, empty at that moment, was read back as the reader's: the two then
- * answered each other, one render apart, for ever. Places' automations and
- * Mail's filters share this canvas, so both went down.
+ * The report: the filters' visual editor carried a "React Flow" credit in its
+ * corner, and the Deploy board zoomed only with Ctrl held. Both now answer the
+ * same hand: the wheel zooms towards the pointer, dragging the board moves it,
+ * and a node is still reordered by dragging it or by the arrow keys, and
+ * removed with Delete.
  */
 
 import { useState } from "react";
@@ -18,8 +16,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { FlowCanvas, type FlowCanvasLabels, type FlowVocabulary } from "../src/automation/canvas";
 
-let wide = true;
-const listeners = new Set<() => void>();
 
 const LABELS: FlowCanvasLabels = {
     when: "When",
@@ -78,8 +74,14 @@ const DEFINITION: FlowDefinition = {
         match: "all",
         groups: [{ id: "grp001", match: "all", items: [{ id: "cond01", kind: "fixture" }] }]
     },
-    actions: [{ id: "step01", kind: "fixture" }]
+    actions: [
+        { id: "step01", kind: "fixture" },
+        { id: "step02", kind: "fixture" }
+    ]
 };
+
+/** The steps' order as the editor holds it. */
+let order: string[] = [];
 
 /** The canvas the way an editor holds it: the draft in state, everything it
  *  hands down kept the same object across renders. */
@@ -91,7 +93,13 @@ function Editor() {
             definition={definition}
             vocabulary={VOCABULARY}
             readOnly={false}
-            onChange={(change) => setDefinition(change)}
+            onChange={(change) =>
+                setDefinition((current) => {
+                    const next = change(current);
+                    order = next.actions.map((step) => step.id);
+                    return next;
+                })
+            }
             stateOf={stateOf}
             renderInspector={(selection) => <p>Card for the {selection.role}</p>}
             stageIssues={[]}
@@ -118,27 +126,19 @@ async function painted(): Promise<void> {
     });
 }
 
-/** The window crossing the width at which the diagram is drawn. */
-async function resize(next: boolean): Promise<void> {
-    wide = next;
-    act(() => {
-        for (const listener of listeners) listener();
-    });
-    await painted();
+function layer(): HTMLElement {
+    return node("trig01").parentElement!;
 }
 
 beforeEach(() => {
-    wide = true;
-    listeners.clear();
+    order = [];
     vi.stubGlobal("ResizeObserver", Observer);
     vi.stubGlobal("matchMedia", (query: string) => ({
-        get matches() {
-            return wide;
-        },
+        matches: true,
         media: query,
         onchange: null,
-        addEventListener: (_: string, listener: () => void) => void listeners.add(listener),
-        removeEventListener: (_: string, listener: () => void) => void listeners.delete(listener),
+        addEventListener: () => undefined,
+        removeEventListener: () => undefined,
         addListener: () => undefined,
         removeListener: () => undefined,
         dispatchEvent: () => false
@@ -150,33 +150,51 @@ afterEach(() => {
     vi.unstubAllGlobals();
 });
 
-describe("a selected node, as the window changes width", () => {
-    it("keeps its card open through the list and back to the diagram", async () => {
-        render(<Editor />);
-        await painted();
-        // The trigger is fixed in place, so a click selects it rather than
-        // starting a drag.
-        fireEvent.click(node("trig01"));
-        await painted();
-        expect(screen.getByText("Card for the trigger")).toBeDefined();
-
-        await resize(false);
-        expect(screen.getByText("Card for the trigger")).toBeDefined();
-
-        await resize(true);
-        expect(screen.getByRole("region", { name: "Fixture diagram" })).toBeDefined();
-        expect(screen.getByText("Card for the trigger")).toBeDefined();
-        expect(node("trig01").classList.contains("selected")).toBe(true);
+describe("the diagram", () => {
+    it("carries no library's credit", () => {
+        const { container } = render(<Editor />);
+        expect(container.textContent).not.toMatch(/react flow/i);
+        expect(container.querySelector(".react-flow__attribution")).toBeNull();
     });
 
-    it("lets go of the node when the reader closes its card", async () => {
+    it("zooms on the wheel and moves when the board is dragged", () => {
         render(<Editor />);
-        await painted();
-        fireEvent.click(node("trig01"));
-        await painted();
-        fireEvent.click(screen.getByRole("button", { name: "Close" }));
-        await painted();
-        expect(screen.getByText("Select a node to change it.")).toBeDefined();
-        expect(node("trig01").classList.contains("selected")).toBe(false);
+        const frame = layer().parentElement!;
+        const before = layer().style.transform;
+        fireEvent(frame, new WheelEvent("wheel", { deltaY: -200, bubbles: true, cancelable: true }));
+        expect(layer().style.transform).not.toBe(before);
+
+        const zoomed = layer().style.transform;
+        act(() => {
+            frame.dispatchEvent(new PointerEvent("pointerdown", { button: 0, clientX: 100, clientY: 100, bubbles: true }));
+            window.dispatchEvent(new PointerEvent("pointermove", { clientX: 140, clientY: 130 }));
+            window.dispatchEvent(new PointerEvent("pointerup", { clientX: 140, clientY: 130 }));
+        });
+        expect(layer().style.transform).not.toBe(zoomed);
+    });
+
+    it("reorders a step dragged below the next one", () => {
+        render(<Editor />);
+        const step = node("step01");
+        act(() => {
+            step.dispatchEvent(new PointerEvent("pointerdown", { button: 0, clientX: 10, clientY: 10, bubbles: true }));
+            window.dispatchEvent(new PointerEvent("pointermove", { clientX: 10, clientY: 400 }));
+            window.dispatchEvent(new PointerEvent("pointerup", { clientX: 10, clientY: 400 }));
+        });
+        expect(order).toEqual(["step02", "step01"]);
+    });
+
+    it("moves a step with the arrow keys and removes it with Delete", () => {
+        render(<Editor />);
+        fireEvent.keyDown(node("step01"), { key: "ArrowDown" });
+        expect(order).toEqual(["step02", "step01"]);
+        fireEvent.keyDown(node("step01"), { key: "Delete" });
+        expect(order).toEqual(["step02"]);
+    });
+
+    it("leaves a fixed trigger where it is", () => {
+        render(<Editor />);
+        fireEvent.keyDown(node("trig01"), { key: "Delete" });
+        expect(node("trig01")).toBeTruthy();
     });
 });
