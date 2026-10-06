@@ -33,5 +33,8 @@ export const RICH_TEXT_PROSE = cn(
     // exclusion this rule wins on specificity and paints a second background
     // inside the first.
     "[&_pre:not([data-code])]:overflow-x-auto [&_pre:not([data-code])]:rounded-md [&_pre:not([data-code])]:bg-muted [&_pre:not([data-code])]:p-3 [&_pre:not([data-code])]:font-mono [&_pre:not([data-code])]:text-xs",
-    "[&_:not(pre)>code]:rounded [&_:not(pre)>code]:bg-muted [&_:not(pre)>code]:px-1 [&_:not(pre)>code]:py-0.5"
+    // Code in a line reads as code: fixed-width letters a touch smaller than the
+    // words around them, and an edge - the background alone is the
+    // conversation's own in the dark theme, and `this` looked like any word.
+    "[&_:not(pre)>code]:rounded [&_:not(pre)>code]:border [&_:not(pre)>code]:border-border [&_:not(pre)>code]:bg-muted [&_:not(pre)>code]:px-1 [&_:not(pre)>code]:py-0.5 [&_:not(pre)>code]:font-mono [&_:not(pre)>code]:text-[0.875em]"
 );
