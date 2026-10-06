@@ -398,7 +398,7 @@ export function Diagram({
                 })}
             </div>
             <div
-                className="absolute bottom-2 left-2 flex items-center rounded-md border border-border bg-elevated"
+                className="absolute bottom-2 right-2 flex items-center rounded-md border border-border bg-elevated"
                 onClick={(event) => event.stopPropagation()}
             >
                 {(
