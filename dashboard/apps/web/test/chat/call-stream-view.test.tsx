@@ -178,6 +178,28 @@ describe("a stream in a direct message", () => {
         expect(screen.getByText("You")).toBeTruthy();
     });
 
+    it("leaves the speaking ring room in the strip of faces under a stream", () => {
+        // The report: with a screen shared, a talking person's green ring was cut
+        // off top and bottom - the strip scrolls sideways, which clips the other
+        // way too, and the ring is drawn outside the tile.
+        render(
+            <CallRoom
+                meetingId="m1"
+                place="direct"
+                call={call()}
+                expanded
+                onExpand={() => undefined}
+                onLeave={() => undefined}
+            />,
+            { wrapper: MessagesWrapper }
+        );
+        fireEvent.click(screen.getByTitle("Watch Bo - screen"));
+        const strip = screen.getByText("You").closest(".grid") as HTMLElement;
+        expect(strip.className).toContain("overflow-x-auto");
+        // As much room inside its edges as the ring is wide (ring-2: 2px).
+        expect(strip.className.split(" ")).toEqual(expect.arrayContaining(["p-0.5"]));
+    });
+
     it("offers expanding the call, and says which way it goes", () => {
         const onExpand = vi.fn();
         const { rerender } = render(
