@@ -149,7 +149,8 @@ const inventoryInput = z.object({
 
 /** What an offline player, an old server or a silent one is said as. */
 const INVENTORY_REFUSALS = {
-    offline: "That player is not on the server, and Polaris has not kept a copy of what they carry yet.",
+    offline:
+        "That player is not on the server, and Polaris has not kept a copy of what they carry yet.",
     unsupported: "This server's version has no command to read what a player carries.",
     unanswered: "The server did not answer with an inventory"
 } as const;

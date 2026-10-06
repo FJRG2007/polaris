@@ -370,11 +370,9 @@ describe("the Game servers tools", () => {
                 takenAt: "2026-10-06T20:00:00.000Z"
             }
         });
-        const result = await call(
-            "games_player_inventory",
-            { serverId: GAME, player: "Steve" },
-            ["gameservers.read"]
-        );
+        const result = await call("games_player_inventory", { serverId: GAME, player: "Steve" }, [
+            "gameservers.read"
+        ]);
         expect(mocks.gameServerAccess).toHaveBeenCalledWith(ADA, GAME, "games.read");
         expect(mocks.readPlayerInventory).toHaveBeenCalledWith("owner-1", GAME, "Steve");
         expect(result.isError).toBeFalsy();

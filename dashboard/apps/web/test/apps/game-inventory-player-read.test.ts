@@ -25,12 +25,10 @@ vi.mock("@/lib/apps/install-access", () => ({
     reachableInstallIds: vi.fn()
 }));
 
-const { readPlayerInventory } = await import(
-    "@polaris-app/game-servers/src/lib/minecraft/inventory-service"
-);
-const { readPlayerInventoryAction } = await import(
-    "@polaris-app/game-servers/src/screens/installed/minecraft-actions"
-);
+const { readPlayerInventory } =
+    await import("@polaris-app/game-servers/src/lib/minecraft/inventory-service");
+const { readPlayerInventoryAction } =
+    await import("@polaris-app/game-servers/src/screens/installed/minecraft-actions");
 
 const SERVER = "33333333-3333-4333-8333-333333333333";
 const KEPT = {
@@ -122,6 +120,10 @@ describe("readPlayerInventoryAction", () => {
         mocks.findFirst.mockResolvedValue(KEPT);
         const result = await readPlayerInventoryAction(SERVER, "Steve");
         expect(result.reading).toMatchObject({ live: false, items: [{ id: "minecraft:bow" }] });
-        expect(mocks.withServerContainer).toHaveBeenCalledWith("owner-1", SERVER, expect.anything());
+        expect(mocks.withServerContainer).toHaveBeenCalledWith(
+            "owner-1",
+            SERVER,
+            expect.anything()
+        );
     });
 });
