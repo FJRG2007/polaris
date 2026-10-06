@@ -164,9 +164,7 @@ describe("editing a value where it is", () => {
         const row = (await screen.findByText("NODE_ENV")).closest("li")!;
         await userEvent.hover(row);
         await userEvent.keyboard("{F2}");
-        expect(
-            await within(row).findByRole("textbox", { name: "Value of NODE_ENV" })
-        ).toBeTruthy();
+        expect(await within(row).findByRole("textbox", { name: "Value of NODE_ENV" })).toBeTruthy();
 
         const other = screen.getByText("GOOGLE_CLIENT_ID").closest("li")!;
         await userEvent.unhover(row);
@@ -296,11 +294,11 @@ describe("the raw editor", () => {
             },
             revokeObjectURL: () => undefined
         });
-        const click = vi
-            .spyOn(HTMLAnchorElement.prototype, "click")
-            .mockImplementation(function (this: HTMLAnchorElement) {
-                saved.push(this.download);
-            });
+        const click = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(function (
+            this: HTMLAnchorElement
+        ) {
+            saved.push(this.download);
+        });
         open();
         await screen.findByText("DATABASE_URL");
         await userEvent.click(screen.getByRole("button", { name: /Raw editor/ }));
@@ -308,7 +306,9 @@ describe("the raw editor", () => {
             name: "Variables as text"
         })) as HTMLTextAreaElement;
         await waitFor(() => expect(text.value).toContain("NODE_ENV"));
-        expect(screen.getByRole("button", { name: "Copy all" }).querySelector("svg")).not.toBeNull();
+        expect(
+            screen.getByRole("button", { name: "Copy all" }).querySelector("svg")
+        ).not.toBeNull();
 
         await userEvent.click(screen.getByRole("button", { name: "Download" }));
         expect(saved).toEqual([".env"]);

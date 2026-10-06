@@ -219,29 +219,29 @@ export function VariablesRawDialog({
                                 <Search className="size-4" />
                             </Button>
                             {canWrite && format === "env" && (
-                            <label className="flex cursor-pointer items-center gap-1.5 text-xs text-primary hover:underline">
-                                <Upload className="size-3.5" />
-                                {t("variables.upload")}
-                                <input
-                                    type="file"
-                                    accept=".env,text/plain"
-                                    className="hidden"
-                                    onChange={(event) => {
-                                        const file = event.target.files?.[0];
-                                        event.target.value = "";
-                                        if (file)
-                                            void file
-                                                .text()
-                                                .then((more) =>
-                                                    setText((now) =>
-                                                        now.trim()
-                                                            ? `${now.trimEnd()}\n${more}`
-                                                            : more
-                                                    )
-                                                );
-                                    }}
-                                />
-                            </label>
+                                <label className="flex cursor-pointer items-center gap-1.5 text-xs text-primary hover:underline">
+                                    <Upload className="size-3.5" />
+                                    {t("variables.upload")}
+                                    <input
+                                        type="file"
+                                        accept=".env,text/plain"
+                                        className="hidden"
+                                        onChange={(event) => {
+                                            const file = event.target.files?.[0];
+                                            event.target.value = "";
+                                            if (file)
+                                                void file
+                                                    .text()
+                                                    .then((more) =>
+                                                        setText((now) =>
+                                                            now.trim()
+                                                                ? `${now.trimEnd()}\n${more}`
+                                                                : more
+                                                        )
+                                                    );
+                                        }}
+                                    />
+                                </label>
                             )}
                         </div>
                     </div>

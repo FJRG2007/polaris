@@ -202,8 +202,7 @@ export function VariablesEditor({
         function onKey(event: KeyboardEvent): void {
             if (event.key !== "F2" || event.defaultPrevented || !hovered.current) return;
             const target = event.target;
-            if (target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement)
-                return;
+            if (target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement) return;
             if (
                 target !== document.body &&
                 !(target instanceof Node && listRef.current?.contains(target))

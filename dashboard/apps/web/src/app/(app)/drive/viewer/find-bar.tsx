@@ -74,7 +74,10 @@ export function FindBar({
                     ? ""
                     : total === 0
                       ? t("find.noMatches")
-                      : t("find.matchOf", { current: current + 1, total: `${total}${total === MOST_MATCHES ? "+" : ""}` })}
+                      : t("find.matchOf", {
+                            current: current + 1,
+                            total: `${total}${total === MOST_MATCHES ? "+" : ""}`
+                        })}
             </span>
             <div className="ml-auto flex items-center gap-1">
                 <Button
@@ -97,7 +100,13 @@ export function FindBar({
                 >
                     <ChevronDown className="size-4" />
                 </Button>
-                <Button size="sm" variant="ghost" onClick={onClose} aria-label={t("find.closeFind")} title={t("find.closeEsc")}>
+                <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={onClose}
+                    aria-label={t("find.closeFind")}
+                    title={t("find.closeEsc")}
+                >
                     <X className="size-4" />
                 </Button>
             </div>
