@@ -36,7 +36,7 @@ import { PersonPressContext, type PersonPress } from "@/components/person-press"
 import { useCallback, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { ProfileDetails, useChatProfile, type ProfilePerson } from "./profile-details";
 import { Button, Dialog, DialogContent, DialogFloating, DialogTitle } from "@polaris/ui";
-import { ArrowUpRight, Maximize2, MessageSquare, MoreHorizontal, Pencil } from "lucide-react";
+import { ArrowUpRight, MessageSquare, MoreHorizontal, Pencil } from "lucide-react";
 
 /** Somebody pressed, and what they were pressed on. */
 interface Opened {
@@ -125,7 +125,10 @@ export function PersonCardProvider({
 }
 
 /** Their role here, in words, or null when they have none. */
-function roleWords(role: ChatRole | null | undefined, channel: ChatChannelView | undefined): string | null {
+function roleWords(
+    role: ChatRole | null | undefined,
+    channel: ChatChannelView | undefined
+): string | null {
     if (!role) return null;
     if (!channel?.spaceId) return role === "owner" ? "Group owner" : null;
     return role === "owner" ? "Space owner" : "Space admin";
@@ -243,7 +246,6 @@ function PersonCard({
     onClose: () => void;
     onExpand: () => void;
 }) {
-    const t = useTranslations("chat");
     const { channels } = useChat();
     const channel = channels.find((entry) => entry.id === channelId);
     const { profile, loading } = useChatProfile(channelId, person.id);
@@ -312,22 +314,15 @@ function PersonCard({
                 // A press on what opened it is the toggle closing it, not a
                 // press somewhere else - see `PersonCardProvider`.
                 onInteractOutside={(event) => {
-                    if (event.target instanceof Node && anchor.contains(event.target)) event.preventDefault();
+                    if (event.target instanceof Node && anchor.contains(event.target))
+                        event.preventDefault();
                 }}
             >
                 <DialogTitle className="sr-only">{profile?.name || person.name}</DialogTitle>
                 <div className="relative">
-                    <button
-                        type="button"
-                        onClick={onExpand}
-                        aria-label={t("personCard.viewFullProfile")}
-                        title={t("personCard.viewFullProfile")}
-                        className="absolute right-2 top-2 z-10 rounded-md bg-black/35 p-1.5 text-white transition-colors hover:bg-black/55"
-                    >
-                        <Maximize2 className="size-3.5" />
-                    </button>
                     <ProfileDetails
                         size="card"
+                        onAvatar={onExpand}
                         person={person}
                         profile={profile}
                         loading={loading}

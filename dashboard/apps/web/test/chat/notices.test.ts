@@ -84,7 +84,9 @@ vi.mock("@polaris/db", () => ({
 }));
 
 const chat = await import("@/lib/chat/chat-service");
-const { noticeBody, noticePeople, renderNotice } = await import("@/lib/chat/notice-text");
+const { noticeBody, noticeParts, noticePeople, renderNotice } = await import(
+    "@/lib/chat/notice-text"
+);
 
 const ada = { id: ADA };
 const grace = { id: GRACE };
@@ -195,5 +197,26 @@ describe("a direct message", () => {
         // person makes a group, which is a different room.
         await expect(chat.removeChannelMember(grace, "channel-1", GRACE)).rejects.toThrow();
         expect(written).toEqual([]);
+    });
+});
+
+describe("a notice's people", () => {
+    // The report: "You added Elepd" named somebody who could not be pressed,
+    // where every mention and every author name opens that person's card.
+    it("come back as people beside the words, so each can be pressed", () => {
+        const ada = { id: "u-ada", name: "Ada" };
+        const grace = { id: "u-grace", name: "Grace" };
+        const names = new Map([["u-ada", "Ada Lovelace"]]);
+        expect(noticeParts(noticeBody("added", ada, grace), names, "u-grace")).toEqual([
+            { userId: "u-grace", name: "You" },
+            { text: " added " },
+            { userId: "u-ada", name: "Ada Lovelace" }
+        ]);
+        // The words are the same as the plain sentence, part for part.
+        expect(
+            noticeParts(noticeBody("added", ada, grace), names, "u-grace")
+                .map((part) => ("text" in part ? part.text : part.name))
+                .join("")
+        ).toBe(renderNotice(noticeBody("added", ada, grace), names, "u-grace"));
     });
 });

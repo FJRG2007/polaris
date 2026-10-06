@@ -87,7 +87,8 @@ export function ProfileDetails({
     loading,
     size = "panel",
     role,
-    actions
+    actions,
+    onAvatar
 }: {
     person: ProfilePerson;
     profile: ChatProfile | null;
@@ -98,6 +99,10 @@ export function ProfileDetails({
     role?: string | null;
     /** What can be done about them, drawn under their name. */
     actions?: React.ReactNode;
+    /** Pressing the face opens their full profile - the card's way in, as in
+     *  Discord, rather than a button of its own. Without it the face opens
+     *  their picture. */
+    onAvatar?: () => void;
 }) {
     const t = useTranslations("chat");
     const where = usePresence(person.id);
@@ -117,13 +122,30 @@ export function ProfileDetails({
                     than a border: it is the cut-out, not a decoration. The dot
                     rides on the face here as it does everywhere else. */}
                 <div className={full ? "-mt-12" : "-mt-8"}>
-                    <Avatar
-                        openable
-                        decorated
-                        person={{ id: person.id, name }}
-                        size={full ? 96 : 72}
-                        className="ring-[3px] ring-background"
-                    />
+                    {onAvatar ? (
+                        <button
+                            type="button"
+                            onClick={onAvatar}
+                            aria-label={t("personCard.viewFullProfile")}
+                            title={t("personCard.viewFullProfile")}
+                            className="rounded-full transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        >
+                            <Avatar
+                                decorated
+                                person={{ id: person.id, name }}
+                                size={full ? 96 : 72}
+                                className="ring-[3px] ring-background"
+                            />
+                        </button>
+                    ) : (
+                        <Avatar
+                            openable
+                            decorated
+                            person={{ id: person.id, name }}
+                            size={full ? 96 : 72}
+                            className="ring-[3px] ring-background"
+                        />
+                    )}
                 </div>
 
                 <div className="flex min-w-0 flex-col gap-0.5">
@@ -163,12 +185,17 @@ export function ProfileDetails({
                     {/* Their name, when it is not already what they are called
                         here and they allow this reader to see it. */}
                     {profile?.fullName && profile.fullName !== name && (
-                        <p className="truncate text-xs text-muted-foreground" title={profile.fullName}>
+                        <p
+                            className="truncate text-xs text-muted-foreground"
+                            title={profile.fullName}
+                        >
                             {profile.fullName}
                         </p>
                     )}
                     {profile?.headline ? (
-                        <p className="mt-1 break-words text-xs text-foreground/90">{profile.headline}</p>
+                        <p className="mt-1 break-words text-xs text-foreground/90">
+                            {profile.headline}
+                        </p>
                     ) : null}
                     {role ? (
                         <span className="mt-1.5">

@@ -91,6 +91,9 @@ const noted = vi.hoisted(
     () => [] as { installedAppId: string; player: string; address: string | null; why: string }[]
 );
 vi.mock("@polaris-app/game-servers/src/lib/minecraft/player-access", () => ({
+    // The door brings a linked player's sign-ins up to date first; nothing to
+    // bring here.
+    syncLinkedAddresses: vi.fn(async () => undefined),
     playerAccessRules: vi.fn(async () => rules.value),
     noteRefusal: vi.fn(
         async (

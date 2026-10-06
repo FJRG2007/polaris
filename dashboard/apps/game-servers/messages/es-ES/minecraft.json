@@ -512,7 +512,8 @@
         "whitelistOn": "Lista blanca activa",
         "whitelistOff": "Sin lista blanca",
         "allBanned": "Todas las direcciones bloqueadas ya estaban vetadas aquí",
-        "bannedCount": "{count, plural, one {Vetada # dirección} other {Vetadas # direcciones}}"
+        "bannedCount": "{count, plural, one {Vetada # dirección} other {Vetadas # direcciones}}",
+        "notSignedInThere": "La cuenta de Polaris de {player} no tiene sesión desde esta dirección. Si abre Polaris desde esa conexión, podrá entrar; o permítela aquí para siempre."
     },
     "xray": {
         "everythingRecordedAgainstThemIs": "Se olvida todo lo registrado contra él, como si no hubiera pasado.",

@@ -1005,14 +1005,18 @@ export function CallRoom({
             {peopleShown && !bareFaces && (
                 <div
                     className={cn(
-                        "grid min-h-0 gap-2",
+                        // Room inside the edges for the speaking ring, which is
+                        // drawn outside a tile (ring-2): the strip scrolls
+                        // sideways, which clips top and bottom too, and the ring
+                        // of whoever was talking was cut in half.
+                        "grid min-h-0 gap-2 p-0.5",
                         // A strip of thumbnails along the bottom while something
                         // has the room, and an even grid when nothing does.
                         // Scrolling sideways rather than shrinking further: eight
                         // faces on a phone, each a twelfth of a strip, are eight
                         // grey squares.
                         staged
-                            ? "h-24 shrink-0 auto-cols-[9rem] grid-flow-col overflow-x-auto"
+                            ? "h-[6.25rem] shrink-0 auto-cols-[9rem] grid-flow-col overflow-x-auto"
                             : cn("flex-1", columns)
                     )}
                 >

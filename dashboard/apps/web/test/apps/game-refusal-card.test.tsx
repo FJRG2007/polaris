@@ -50,7 +50,11 @@ const REFUSAL: PlayerRefusal = {
     at: "2026-09-21T20:32:57.000Z"
 };
 
-function screenWith(refusals: PlayerRefusal[], changed = vi.fn()): void {
+function screenWith(
+    refusals: PlayerRefusal[],
+    changed = vi.fn(),
+    links: { username: string; userId: string; name: string; followSignIns: boolean }[] = []
+): void {
     render(
         <MinecraftPlayers
             installedAppId="server-1"
@@ -60,7 +64,7 @@ function screenWith(refusals: PlayerRefusal[], changed = vi.fn()): void {
             access={{
                 rules: [],
                 refusals,
-                links: [],
+                links,
                 bindAddresses: true,
                 addressesAvailable: true,
                 edition: "java"
@@ -118,5 +122,21 @@ describe("turned away recently", () => {
         screenWith([{ ...REFUSAL, address: null }]);
         expect(screen.getByText(/an address the log did not carry/)).toBeTruthy();
         expect(screen.queryByRole("button", { name: "Allow this address too" })).toBeNull();
+    });
+
+    it("says why a player who follows their sign-ins was turned away, and how they get in", () => {
+        // The report: a linked player's refusal said a home connection changes
+        // address now and then - true of a typed address, and no help for one
+        // that follows a Polaris account's sign-ins, which was the case.
+        screenWith([REFUSAL], vi.fn(), [
+            { username: "Grumm", userId: "u-1", name: "Grumm M.", followSignIns: true }
+        ]);
+        expect(
+            screen.getByText(
+                "Grumm's Polaris account is not signed in from this address. Opening Polaris on that connection lets them in, or allow it here for good."
+            )
+        ).toBeTruthy();
+        expect(screen.queryByText(/given a new address by its provider/)).toBeNull();
+        expect(screen.getByRole("button", { name: "Allow this address too" })).toBeTruthy();
     });
 });

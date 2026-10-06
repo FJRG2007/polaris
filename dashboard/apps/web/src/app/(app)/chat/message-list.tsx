@@ -53,6 +53,7 @@ import { VideoPreview } from "@/components/video-preview";
 import { isPlayable, isVoiceMessage } from "./voice-recorder";
 import { AttachmentViewer, previewableAs, type ViewedFile } from "./attachment-viewer";
 import { usePersonPress } from "@/components/person-press";
+import { NoticeText } from "./notice-line";
 
 /**
  * A file on a message that is not a picture, a recording or a clip.
@@ -743,7 +744,7 @@ function Message({
     if (message.kind === "system") {
         return (
             <p className="py-1 pl-14 pr-4 text-xs text-muted-foreground">
-                {message.body} <MessageTime iso={message.createdAt} />
+                <NoticeText message={message} /> <MessageTime iso={message.createdAt} />
             </p>
         );
     }

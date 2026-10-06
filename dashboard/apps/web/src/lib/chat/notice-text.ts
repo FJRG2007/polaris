@@ -146,28 +146,61 @@ export function noticePeople(body: string): string[] {
     return [...found];
 }
 
+/** One piece of a notice as a reader sees it: words, or somebody named in it. */
+export type NoticePart =
+    | { readonly text: string }
+    | { readonly userId: string; readonly name: string };
+
 /**
- * A notice as one reader sees it: plain text, with every mention replaced by
- * what that person is called now - or by the label stored with it when the
- * account is no longer there to ask.
+ * A notice as one reader sees it, in pieces: the words, and every person named
+ * in it with what they are called now - or the label stored with it when the
+ * account is no longer there to ask - so each name can be pressed like a
+ * mention.
  *
  * The reader is "you", which is what every messenger does and what stops
  * somebody being told their own name did something. Capitalised in the first
  * position and not after it, because the first mention in each of these
  * sentences is its subject: "You added Grace", "Grace added you".
  */
+export function noticeParts(
+    body: string,
+    names: ReadonlyMap<string, string>,
+    viewerId: string | null = null
+): NoticePart[] {
+    const you = viewerId?.toLowerCase() ?? null;
+    const parts: NoticePart[] = [];
+    let at = 0;
+    let seen = 0;
+    for (const match of body.matchAll(MENTION)) {
+        const start = match.index ?? 0;
+        if (start > at) parts.push({ text: body.slice(at, start) });
+        const id = match[2]!;
+        const key = id.toLowerCase();
+        const first = seen === 0;
+        seen += 1;
+        const name =
+            you && key === you
+                ? first
+                    ? "You"
+                    : "you"
+                : (names.get(key) ?? (match[1] || "Somebody"));
+        parts.push({ userId: id, name });
+        at = start + match[0].length;
+    }
+    if (at < body.length) parts.push({ text: body.slice(at) });
+    return parts;
+}
+
+/** The same notice as one line of plain text. */
 export function renderNotice(
     body: string,
     names: ReadonlyMap<string, string>,
     viewerId: string | null = null
 ): string {
-    const you = viewerId?.toLowerCase() ?? null;
-    let seen = 0;
-    return body.replace(MENTION, (_whole, stored: string, id: string) => {
-        const key = id.toLowerCase();
-        const first = seen === 0;
-        seen += 1;
-        if (you && key === you) return first ? "You" : "you";
-        return names.get(key) ?? stored ?? "Somebody";
-    });
+    return noticeString(noticeParts(body, names, viewerId));
+}
+
+/** The plain text of parts already read from a notice. */
+export function noticeString(parts: readonly NoticePart[]): string {
+    return parts.map((part) => ("text" in part ? part.text : part.name)).join("");
 }

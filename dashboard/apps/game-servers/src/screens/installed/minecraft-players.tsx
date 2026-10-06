@@ -156,6 +156,11 @@ export function MinecraftPlayers({
     const schemaText = useSchemaText();
     const { playerAction, playerConfirm, playerFilters } = usePlayerWords();
     const t = useGameText("minecraft");
+    /** Whether a player's addresses follow a Polaris account's sign-ins. */
+    const followsSignIns = (player: string): boolean =>
+        (access?.links ?? []).some(
+            (link) => link.followSignIns && link.username.toLowerCase() === player.toLowerCase()
+        );
     const [pending, startTransition] = useTransition();
     const [error, setError] = useState<string | null>(null);
     const [note, setNote] = useState<string | null>(null);
@@ -453,6 +458,7 @@ export function MinecraftPlayers({
                         </p>
                         {(access?.refusals ?? []).map((refusal) => {
                             const from = refusal.address;
+                            const linked = followsSignIns(refusal.player);
                             return (
                                 <div
                                     key={`${refusal.player}-${refusal.at}`}
@@ -485,12 +491,27 @@ export function MinecraftPlayers({
                                             {t("playersTab.allowThisAddressToo")}
                                         </Button>
                                     )}
+                                    {/* Where they may connect from follows their
+                                        Polaris sign-ins, so the reason is a
+                                        sign-in missing from that connection, not
+                                        an address that changed. */}
+                                    {linked && (
+                                        <p className="basis-full text-xs text-muted-foreground">
+                                            {t("playersTab.notSignedInThere", {
+                                                player: refusal.player
+                                            })}
+                                        </p>
+                                    )}
                                 </div>
                             );
                         })}
-                        <p className="text-xs text-muted-foreground">
-                            {t("playersTab.aHomeConnectionIsGiven")}
-                        </p>
+                        {(access?.refusals ?? []).some(
+                            (refusal) => !followsSignIns(refusal.player)
+                        ) && (
+                            <p className="text-xs text-muted-foreground">
+                                {t("playersTab.aHomeConnectionIsGiven")}
+                            </p>
+                        )}
                     </CardBody>
                 </Card>
             )}
