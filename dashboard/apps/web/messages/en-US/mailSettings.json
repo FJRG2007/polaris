@@ -300,7 +300,7 @@
             "isNot": "is not",
             "startsWith": "starts with",
             "endsWith": "ends with",
-            "matches": "matches the pattern",
+            "matches": "matches the regular expression",
             "greaterThan": "is more than",
             "lessThan": "is less than",
             "similar": "is similar to"
@@ -328,7 +328,8 @@
             "header": "the {header} header",
             "largerThan": "it is larger than {size}",
             "smallerThan": "it is smaller than {size}",
-            "stop": "and stop the filters below"
+            "stop": "and stop the filters below",
+            "caseSensitive": " (capitals count)"
         },
         "sentence": "If {conditions}, {actions}.",
         "actions": {
@@ -427,7 +428,7 @@
             "noAttachments": "Has none",
             "size": "Size",
             "patternPlaceholder": "^PR run failed:",
-            "patternHint": "A regular expression, ignoring case, checked against the first {count} characters.",
+            "patternHint": "A regular expression, checked against the first {count} characters.",
             "chooseFolder": "Choose a folder",
             "chooseLabel": "Choose a label",
             "chooseAddress": "Choose an address",
@@ -436,7 +437,16 @@
             "noVerified": "Verify an address on your account to forward to it.",
             "verifyAddress": "Manage your addresses",
             "stopHint": "Filters below this one are not run on a message it matched.",
-            "nothingToSave": "Nothing has changed yet."
+            "nothingToSave": "Nothing has changed yet.",
+            "or": "or",
+            "nor": "nor",
+            "orAny": "Or any of these",
+            "norAny": "Nor any of these",
+            "addOr": "Or another value",
+            "addNor": "Nor another value",
+            "valueNumber": "Value {number}",
+            "removeValue": "Remove value {number}",
+            "caseSensitive": "Match capitals exactly"
         },
         "canvas": {
             "layout": "Layout",

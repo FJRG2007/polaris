@@ -49,3 +49,68 @@ describe("where the next slice starts", () => {
         }
     });
 });
+
+describe("a filter condition with several values", () => {
+    it("keeps the values that say something, and the switch for capitals", async () => {
+        const { mailFilterConditionSchema } = await import("./mailbox.js");
+        const parsed = mailFilterConditionSchema.parse({
+            id: "cond01",
+            kind: "subject",
+            operator: "contains",
+            value: "PR run failed:",
+            alternatives: ["  Run cancelled ", "", "   "],
+            caseSensitive: true
+        });
+        expect(parsed).toMatchObject({
+            value: "PR run failed:",
+            alternatives: ["Run cancelled"],
+            caseSensitive: true
+        });
+    });
+
+    it("refuses more values, or capitals, where the comparison has none", async () => {
+        const { mailFilterConditionSchema } = await import("./mailbox.js");
+        expect(
+            mailFilterConditionSchema.safeParse({
+                id: "cond01",
+                kind: "size",
+                operator: "greater-than",
+                value: "100",
+                alternatives: ["200"]
+            }).success
+        ).toBe(false);
+        expect(
+            mailFilterConditionSchema.safeParse({
+                id: "cond01",
+                kind: "subject",
+                operator: "matches",
+                value: "ok",
+                alternatives: ["(["]
+            }).success
+        ).toBe(false);
+    });
+
+    it("refuses more values, or capitals, on whether there are attachments", async () => {
+        const { mailFilterConditionSchema } = await import("./mailbox.js");
+        const attachment = { id: "cond01", kind: "attachment", operator: "is", value: "yes" };
+        expect(mailFilterConditionSchema.safeParse(attachment).success).toBe(true);
+        expect(
+            mailFilterConditionSchema.safeParse({ ...attachment, alternatives: ["no"] }).success
+        ).toBe(false);
+        expect(
+            mailFilterConditionSchema.safeParse({ ...attachment, caseSensitive: true }).success
+        ).toBe(false);
+    });
+
+    it("drops capitals from a subject's shape, which has none left", async () => {
+        const { mailFilterConditionSchema } = await import("./mailbox.js");
+        const parsed = mailFilterConditionSchema.parse({
+            id: "cond01",
+            kind: "subject",
+            operator: "similar",
+            value: "Run failed: CI - main",
+            caseSensitive: true
+        });
+        expect(parsed.caseSensitive).toBeUndefined();
+    });
+});

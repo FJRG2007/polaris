@@ -111,6 +111,12 @@ export const MAIL_REFUSALS: Readonly<Record<string, MailKey>> = {
     "That pattern is not valid": "schema.patternInvalid",
     "That pattern could take too long to check. Make it simpler": "schema.patternUnsafe",
     "That is longer than a condition can be": "schema.conditionTooLong",
+    "That comparison takes one value": "schema.oneValueOnly",
+    "That comparison has no capitals to tell apart": "schema.noCapitals",
+    "One of those patterns is not valid": "schema.alternativeInvalid",
+    "One of those patterns could take too long to check. Make it simpler":
+        "schema.alternativeUnsafe",
+    "That is more values than one condition can hold": "schema.tooManyValues",
     "That filter is damaged. Open it again": "schema.filterDamaged",
     "A group needs a condition": "schema.groupEmpty",
     "That is more than a group can hold": "schema.groupFull",

@@ -209,7 +209,12 @@
         "stopTwice": "Este filtro ya tiene «Parar aquí»",
         "chooseFolder": "Elige una carpeta",
         "chooseLabel": "Elige una etiqueta",
-        "chooseForward": "Elige adónde enviarlo"
+        "chooseForward": "Elige adónde enviarlo",
+        "oneValueOnly": "Esa comparación admite un solo valor",
+        "noCapitals": "Esa comparación no distingue mayúsculas",
+        "alternativeInvalid": "Uno de esos patrones no es válido",
+        "alternativeUnsafe": "Uno de esos patrones podría tardar mucho. Hazlo más sencillo",
+        "tooManyValues": "Son más valores de los que admite una condición"
     },
     "noSubject": "(sin asunto)",
     "notify": {

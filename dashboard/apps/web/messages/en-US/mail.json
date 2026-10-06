@@ -209,7 +209,12 @@
         "stopTwice": "Stop is already in this filter",
         "chooseFolder": "Choose a folder",
         "chooseLabel": "Choose a label",
-        "chooseForward": "Choose where to send it"
+        "chooseForward": "Choose where to send it",
+        "oneValueOnly": "That comparison takes one value",
+        "noCapitals": "That comparison has no capitals to tell apart",
+        "alternativeInvalid": "One of those patterns is not valid",
+        "alternativeUnsafe": "One of those patterns could take too long to check. Make it simpler",
+        "tooManyValues": "That is more values than one condition can hold"
     },
     "noSubject": "(no subject)",
     "notify": {

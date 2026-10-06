@@ -15,7 +15,8 @@ import * as words from "./filter-words";
 import * as flow from "@polaris/ui/automation";
 import type { MailLabelView } from "@/lib/mailbox/labels";
 import type { MailFolderView } from "@/lib/mailbox/views";
-import { Input, Select, SizeField } from "@polaris/ui";
+import { Plus, X } from "lucide-react";
+import { Checkbox, Input, Select, SizeField } from "@polaris/ui";
 import { swap, type Path } from "@polaris/ui/automation-graph";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 
@@ -167,6 +168,12 @@ export function ConditionCard({
     const t = useTranslations("mailSettings");
     const operators = core.mailOperatorsFor(condition.kind);
     const shape = condition.operator === "similar" ? core.mailSubjectShape(condition.value) : "";
+    // More values ("this or that") and capitals, for the comparisons over text.
+    const text = core.mailTakesValues(condition.operator, condition.kind);
+    const more = condition.alternatives ?? [];
+    const negative = condition.operator === "not-contains" || condition.operator === "is-not";
+    const setMore = (next: readonly string[]) =>
+        onChange({ ...condition, alternatives: next.length > 0 ? [...next] : undefined });
     /** A field changed under a condition keeps what it can of the rest: the
      *  comparison if the new field has it, the value if it still means one. */
     const changeKind = (kind: core.MailRuleField) => {
@@ -255,12 +262,16 @@ export function ConditionCard({
                                     value: operator,
                                     label: words.operatorText(operator, t)
                                 }))}
-                                onValueChange={(operator) =>
+                                onValueChange={(operator) => {
+                                    const next = operator as core.MailRuleOperator;
                                     onChange({
                                         ...condition,
-                                        operator: operator as core.MailRuleOperator
-                                    })
-                                }
+                                        operator: next,
+                                        caseSensitive: core.mailTellsCapitals(next, condition.kind)
+                                            ? condition.caseSensitive
+                                            : undefined
+                                    });
+                                }}
                             />
                         )}
                     </flow.Field>
@@ -310,6 +321,91 @@ export function ConditionCard({
                             )}
                         </flow.Field>
                     )}
+                    {text && more.length > 0 ? (
+                        <flow.Field
+                            label={negative ? t("rules.editor.norAny") : t("rules.editor.orAny")}
+                            path={[...path, "alternatives"]}
+                        >
+                            {() => (
+                                <div className="flex min-w-0 flex-col gap-2">
+                                    {more.map((value, at) => (
+                                        <div key={at} className="flex min-w-0 items-center gap-2">
+                                            <span className="w-6 shrink-0 text-xs text-muted-foreground">
+                                                {negative
+                                                    ? t("rules.editor.nor")
+                                                    : t("rules.editor.or")}
+                                            </span>
+                                            <Input
+                                                value={value}
+                                                disabled={disabled}
+                                                maxLength={core.MAIL_FILTER_LIMITS.value}
+                                                aria-label={t("rules.editor.valueNumber", {
+                                                    number: at + 2
+                                                })}
+                                                className="min-w-0 flex-1"
+                                                onChange={(event) =>
+                                                    setMore(
+                                                        more.map((entry, index) =>
+                                                            index === at
+                                                                ? event.target.value
+                                                                : entry
+                                                        )
+                                                    )
+                                                }
+                                            />
+                                            {!disabled && (
+                                                <button
+                                                    type="button"
+                                                    aria-label={t("rules.editor.removeValue", {
+                                                        number: at + 2
+                                                    })}
+                                                    title={t("rules.editor.removeValue", {
+                                                        number: at + 2
+                                                    })}
+                                                    className="inline-flex size-7 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
+                                                    onClick={() =>
+                                                        setMore(
+                                                            more.filter((_, index) => index !== at)
+                                                        )
+                                                    }
+                                                >
+                                                    <X className="size-3.5" />
+                                                </button>
+                                            )}
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </flow.Field>
+                    ) : null}
+                    {text && !disabled ? (
+                        <div className="flex min-w-0 flex-wrap items-center gap-x-4 gap-y-2 sm:col-span-2">
+                            {more.length < core.MAIL_FILTER_LIMITS.alternatives ? (
+                                <button
+                                    type="button"
+                                    className="inline-flex h-7 items-center gap-1 rounded-md px-2 text-xs text-muted-foreground hover:bg-muted hover:text-foreground"
+                                    onClick={() => setMore([...more, ""])}
+                                >
+                                    <Plus className="size-3.5" />
+                                    {negative ? t("rules.editor.addNor") : t("rules.editor.addOr")}
+                                </button>
+                            ) : null}
+                            {core.mailTellsCapitals(condition.operator, condition.kind) ? (
+                                <label className="flex items-center gap-2 text-xs text-muted-foreground">
+                                    <Checkbox
+                                        checked={condition.caseSensitive === true}
+                                        onChange={(event) =>
+                                            onChange({
+                                                ...condition,
+                                                caseSensitive: event.target.checked || undefined
+                                            })
+                                        }
+                                    />
+                                    {t("rules.editor.caseSensitive")}
+                                </label>
+                            ) : null}
+                        </div>
+                    ) : null}
                 </>
             )}
             {/* What "similar" and a pattern will actually do, so the condition
