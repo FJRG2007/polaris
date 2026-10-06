@@ -1,10 +1,15 @@
 package polaris.minecraft;
 
 import com.mojang.logging.LogUtils;
+import net.minecraft.nbt.CompoundTag;
 import net.neoforged.api.distmarker.Dist;
+import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.ModContainer;
 import net.neoforged.fml.common.Mod;
+import net.neoforged.neoforge.attachment.AttachmentType;
 import net.neoforged.neoforge.common.NeoForge;
+import net.neoforged.neoforge.registries.DeferredRegister;
+import net.neoforged.neoforge.registries.NeoForgeRegistries;
 import org.slf4j.Logger;
 
 /**
@@ -15,16 +20,29 @@ import org.slf4j.Logger;
  * server's environment switches it on, which is what makes a jar left in the mods
  * folder after the switch was turned off harmless. The anti-xray runs unless the
  * environment switches it off (POLARIS_ANTIXRAY=off). Chat moderation runs
- * wherever Polaris wrote its address, id and token, for either of them.
+ * wherever Polaris wrote its address, id and token, for either of them. The
+ * event commands ({@link EventCommands}) are always there: idle until the
+ * dashboard runs one.
  */
 @Mod(value = PolarisMod.ID, dist = Dist.DEDICATED_SERVER)
 public final class PolarisMod {
     public static final String ID = "polaris";
     static final Logger LOG = LogUtils.getLogger();
 
-    public PolarisMod(ModContainer container) {
+    private static final DeferredRegister<AttachmentType<?>> ATTACHMENTS =
+            DeferredRegister.create(NeoForgeRegistries.ATTACHMENT_TYPES, ID);
+
+    public PolarisMod(IEventBus modBus, ModContainer container) {
         PolarisConfig config = PolarisConfig.fromEnvironment(System.getenv());
         String version = container.getModInfo().getVersion().toString();
+        // Which event stashes a player is owed: saved in their player file and
+        // kept through death, so a crash can be told apart from a give-back.
+        EventStash.marks = ATTACHMENTS.register("event_stash", () -> AttachmentType.builder(() -> new CompoundTag())
+                .serialize(CompoundTag.CODEC)
+                .copyOnDeath()
+                .build());
+        ATTACHMENTS.register(modBus);
+        NeoForge.EVENT_BUS.register(new EventCommands(version));
         if (AntiXray.wanted(System.getenv())) {
             AntiXrayLink.start(PolarisConfig.linkFromEnvironment(System.getenv()));
             NeoForge.EVENT_BUS.register(new AntiXray());

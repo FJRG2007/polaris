@@ -5,11 +5,13 @@
     "compatibilityLevel": "JAVA_21",
     "server": [
         "BossEventPacketAccessor",
+        "ChunkMapAccessor",
         "ChunkPacketDataMixin",
         "HeldPacketMixin",
         "PacketSendMixin",
         "PlayerActionMixin",
         "SectionBlocksUpdateAccessor",
+        "TrackedEntityMixin",
         "ServerLevelMixin"
     ],
     "injectors": {
