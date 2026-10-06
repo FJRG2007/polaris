@@ -14,13 +14,15 @@ import net.minecraft.world.entity.Entity;
 import net.minecraft.world.level.ClipContext;
 import net.minecraft.world.phys.HitResult;
 import net.minecraft.world.phys.Vec3;
+import net.minecraft.world.scores.PlayerTeam;
 import polaris.minecraft.mixin.ChunkMapAccessor;
 
 /**
  * Hide and seek, kept honest by the server: a hider is not sent to a seeker who
  * cannot see them.
  *
- * While an event tags players {@link #HIDER} and {@link #SEEKER}, a hider's
+ * While an event tags players {@link #HIDER} and {@link #SEEKER} - or puts them
+ * in the hide and seek teams {@link #HIDER_TEAM} and {@link #SEEKER_TEAM} - a hider's
  * entity is not tracked by a seeker farther than {@link #NEAR} blocks without a
  * clear line from the seeker's eyes to the hider (a ray through blocks' visual
  * shapes, so glass hides nothing). The client never learns where the hider is,
@@ -37,6 +39,10 @@ import polaris.minecraft.mixin.ChunkMapAccessor;
 public final class EventSeek {
     static final String HIDER = "pe_hider";
     static final String SEEKER = "pe_seeker";
+    /** The teams the dashboard's hide and seek puts each side in (`TEAMS` in
+     *  `hide-and-seek.ts`): either marks a side, as the tags do. */
+    static final String HIDER_TEAM = "pe_hs_hide";
+    static final String SEEKER_TEAM = "pe_hs_seek";
     private static final double NEAR = 2.0;
     /** Farther than this nobody is drawn anyway. */
     private static final double FAR = 160.0;
@@ -83,10 +89,16 @@ public final class EventSeek {
     /** Whether the tracker must keep {@code entity} from {@code viewer} now. */
     public static boolean conceals(Entity entity, ServerPlayer viewer) {
         if (!active || !(entity instanceof ServerPlayer hider) || hider == viewer) return false;
-        if (!hider.getTags().contains(HIDER) || !viewer.getTags().contains(SEEKER)) return false;
+        if (!marked(hider, HIDER, HIDER_TEAM) || !marked(viewer, SEEKER, SEEKER_TEAM)) return false;
         if (hider.isSpectator() || hider.level() != viewer.level()) return false;
         if (hider.distanceToSqr(viewer) <= NEAR * NEAR) return false;
         return !visible.contains(pair(viewer.getId(), hider.getId()));
+    }
+
+    private static boolean marked(ServerPlayer player, String tag, String team) {
+        if (player.getTags().contains(tag)) return true;
+        PlayerTeam joined = player.getTeam();
+        return joined != null && joined.getName().equals(team);
     }
 
     /** The tracker held a hider back from a seeker. */
@@ -101,8 +113,8 @@ public final class EventSeek {
         List<ServerPlayer> seekers = new ArrayList<>();
         Int2ObjectMap<ServerPlayer> byId = new Int2ObjectOpenHashMap<>();
         for (ServerPlayer player : server.getPlayerList().getPlayers()) {
-            if (player.getTags().contains(HIDER)) hiders.add(player);
-            if (player.getTags().contains(SEEKER)) seekers.add(player);
+            if (marked(player, HIDER, HIDER_TEAM)) hiders.add(player);
+            if (marked(player, SEEKER, SEEKER_TEAM)) seekers.add(player);
             byId.put(player.getId(), player);
         }
         if (hiders.isEmpty() || seekers.isEmpty()) {

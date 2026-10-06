@@ -81,7 +81,8 @@ Always registered, idle until the dashboard runs one. Console and operators only
 - `polaris batch run <key> [blocksPerTick]`, `status <key>`, `cancel <key>`: runs
   the commands appended to `storage polaris:batch <key>` over as many ticks as
   it takes, under a block cap (8192 by default) and a 15 ms slice of each tick.
-- Hide and seek: while players carry `pe_hider` and `pe_seeker`, a hider is not
+- Hide and seek: while players carry `pe_hider` and `pe_seeker` (or sit in the
+  `pe_hs_hide` and `pe_hs_seek` teams), a hider is not
   sent to a seeker farther than 2 blocks without a line of sight (`EventSeek`).
 
 ## Configuration
