@@ -52,7 +52,11 @@ describe("itemDetails", () => {
             stored: [],
             damage: 41
         });
-        expect(itemDetails(dirt!.data)).toMatchObject({ name: null, enchantments: [], damage: null });
+        expect(itemDetails(dirt!.data)).toMatchObject({
+            name: null,
+            enchantments: [],
+            damage: null
+        });
     });
 
     it("reads 1.21.5's shape, without `levels`, and the old `tag` one", () => {
@@ -61,7 +65,10 @@ describe("itemDetails", () => {
                 era: "components",
                 snbt: '{"minecraft:enchantments": {"minecraft:efficiency": 4}, "minecraft:custom_name": {text: "Digger"}}'
             })
-        ).toMatchObject({ name: "Digger", enchantments: [{ id: "minecraft:efficiency", level: 4 }] });
+        ).toMatchObject({
+            name: "Digger",
+            enchantments: [{ id: "minecraft:efficiency", level: 4 }]
+        });
         expect(
             itemDetails({
                 era: "tag",

@@ -30,11 +30,7 @@ import { cn } from "@polaris/ui";
 import { ItemIcon } from "./minecraft-item-icon";
 import { itemLabel } from "../../lib/minecraft/items";
 import { isMovable } from "../../lib/minecraft/item-argument";
-import {
-    enchantmentText,
-    itemDetails,
-    type ItemDetails
-} from "../../lib/minecraft/item-details";
+import { enchantmentText, itemDetails, type ItemDetails } from "../../lib/minecraft/item-details";
 import {
     ARMOUR_SLOTS,
     HOTBAR_SLOTS,
@@ -127,7 +123,9 @@ export function InventoryGrid({
     // will replace it when they join, and drawing both in one square would be
     // drawing a bag that does not exist in either version.
     const waiting = new Map(
-        (pending ?? []).filter((stack) => !slots.has(stack.slot)).map((stack) => [stack.slot, stack])
+        (pending ?? [])
+            .filter((stack) => !slots.has(stack.slot))
+            .map((stack) => [stack.slot, stack])
     );
     const shared = {
         at: slots,
@@ -141,11 +139,28 @@ export function InventoryGrid({
         <div className="flex flex-col gap-3">
             <div className="flex flex-wrap items-end gap-6">
                 <Section label={t("inventory.worn")} slots={ARMOUR_SLOTS} columns={4} {...shared} />
-                <Section label={t("inventory.offhand")} slots={[OFFHAND_SLOT]} columns={1} {...shared} />
+                <Section
+                    label={t("inventory.offhand")}
+                    slots={[OFFHAND_SLOT]}
+                    columns={1}
+                    {...shared}
+                />
             </div>
 
-            <Section label={t("inventory.bag")} slots={MAIN_SLOT_ROWS.flat()} columns={9} grow {...shared} />
-            <Section label={t("inventory.hotbar")} slots={HOTBAR_SLOTS} columns={9} grow {...shared} />
+            <Section
+                label={t("inventory.bag")}
+                slots={MAIN_SLOT_ROWS.flat()}
+                columns={9}
+                grow
+                {...shared}
+            />
+            <Section
+                label={t("inventory.hotbar")}
+                slots={HOTBAR_SLOTS}
+                columns={9}
+                grow
+                {...shared}
+            />
 
             {/* Vanilla has nowhere else to put an item, so anything here came from
                 a mod - worth showing rather than quietly dropping. Never editable:
@@ -205,7 +220,9 @@ function Section({
 
     return (
         <div className={grow ? "flex min-w-0 flex-col gap-1" : "flex shrink-0 flex-col gap-1"}>
-            <span className="text-[0.6875rem] uppercase tracking-wide text-muted-foreground">{label}</span>
+            <span className="text-[0.6875rem] uppercase tracking-wide text-muted-foreground">
+                {label}
+            </span>
             <ul
                 aria-label={label}
                 // Capped as well as floored: nine slots stretched across a wide
@@ -261,11 +278,15 @@ function Slot({
         ? {
               onDragOver: (event: React.DragEvent) => {
                   event.preventDefault();
-                  event.dataTransfer.dropEffect = SLOT_DROP_EFFECT as typeof event.dataTransfer.dropEffect;
+                  event.dataTransfer.dropEffect =
+                      SLOT_DROP_EFFECT as typeof event.dataTransfer.dropEffect;
               },
               onDrop: (event: React.DragEvent) => {
                   event.preventDefault();
-                  handlers.onDropAt(slot, { whole: event.shiftKey, single: event.ctrlKey || event.metaKey });
+                  handlers.onDropAt(slot, {
+                      whole: event.shiftKey,
+                      single: event.ctrlKey || event.metaKey
+                  });
               }
           }
         : {};
@@ -330,7 +351,9 @@ function Slot({
     return (
         <li
             title={[`${heading} - ${where}`, ...described].join("\n")}
-            aria-label={[`${where}: ${details.name ?? name}, ${item.count}`, ...described].join(". ")}
+            aria-label={[`${where}: ${details.name ?? name}, ${item.count}`, ...described].join(
+                ". "
+            )}
             tabIndex={0}
             onPointerEnter={() => onInspect(slot)}
             onFocus={() => onInspect(slot)}
@@ -338,7 +361,8 @@ function Slot({
             draggable={canDrag}
             onDragStart={(event) => {
                 if (!canDrag) return;
-                event.dataTransfer.effectAllowed = DRAG_EFFECT_ALLOWED as typeof event.dataTransfer.effectAllowed;
+                event.dataTransfer.effectAllowed =
+                    DRAG_EFFECT_ALLOWED as typeof event.dataTransfer.effectAllowed;
                 // Something has to be set or Firefox refuses to start the drag.
                 event.dataTransfer.setData("text/plain", String(slot));
                 handlers.onPick(slot);
@@ -404,8 +428,7 @@ function StackDetails({ item, where }: { item: InventoryItem; where: string }) {
     const name = itemLabel(item.id);
     const heading = `${details.name ?? name}${item.count > 1 ? ` x${item.count}` : ""}`;
     return (
-        <div className="flex min-w-0 items-start gap-2 rounded-md border border-border bg-surface/40 px-3 py-2"
-        >
+        <div className="flex min-w-0 items-start gap-2 rounded-md border border-border bg-surface/40 px-3 py-2">
             <ItemIcon id={item.id} className="size-8 shrink-0" />
             <div className="flex min-w-0 flex-col gap-0.5 text-xs">
                 <span className="truncate font-medium" title={heading}>
