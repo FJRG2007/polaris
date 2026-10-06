@@ -147,6 +147,63 @@ describe("a variable's row", () => {
     });
 });
 
+describe("editing a value where it is", () => {
+    it("opens on a double click, with the value as it is", async () => {
+        open();
+        const row = (await screen.findByText("DATABASE_URL")).closest("li")!;
+        await userEvent.dblClick(within(row).getByTitle(/Double-click or F2/));
+        const input = (await within(row).findByRole("textbox", {
+            name: "Value of DATABASE_URL"
+        })) as HTMLInputElement;
+        expect(input.value).toBe(SECRETS.v1);
+        expect(document.activeElement).toBe(input);
+    });
+
+    it("opens on F2 for the row the pointer is on, or the one picked", async () => {
+        open();
+        const row = (await screen.findByText("NODE_ENV")).closest("li")!;
+        await userEvent.hover(row);
+        await userEvent.keyboard("{F2}");
+        expect(
+            await within(row).findByRole("textbox", { name: "Value of NODE_ENV" })
+        ).toBeTruthy();
+
+        const other = screen.getByText("GOOGLE_CLIENT_ID").closest("li")!;
+        await userEvent.unhover(row);
+        await userEvent.click(within(other).getByText("GOOGLE_CLIENT_ID"));
+        await userEvent.keyboard("{F2}");
+        expect(
+            await within(other).findByRole("textbox", { name: "Value of GOOGLE_CLIENT_ID" })
+        ).toBeTruthy();
+    });
+
+    it("keeps the change on Enter and puts it back on Escape", async () => {
+        open();
+        const row = (await screen.findByText("NODE_ENV")).closest("li")!;
+        await userEvent.dblClick(within(row).getByTitle(/Double-click or F2/));
+        const input = await within(row).findByRole("textbox", { name: "Value of NODE_ENV" });
+        await userEvent.clear(input);
+        await userEvent.type(input, "development{Enter}");
+        expect(await screen.findByText("1 unsaved change")).toBeTruthy();
+
+        await userEvent.dblClick(within(row).getByRole("textbox", { name: "Value of NODE_ENV" }));
+        await userEvent.keyboard("{Escape}");
+        await waitFor(() =>
+            expect(within(row).queryByRole("textbox", { name: "Value of NODE_ENV" })).toBeNull()
+        );
+        expect(screen.queryByText("1 unsaved change")).toBeNull();
+    });
+
+    it("is not offered to somebody who cannot edit", async () => {
+        open({ canWrite: false });
+        const row = (await screen.findByText("NODE_ENV")).closest("li")!;
+        expect(within(row).queryByTitle(/Double-click or F2/)).toBeNull();
+        await userEvent.hover(row);
+        await userEvent.keyboard("{F2}");
+        expect(within(row).queryByRole("textbox")).toBeNull();
+    });
+});
+
 describe("the list", () => {
     it("is searched by name", async () => {
         open();
@@ -219,6 +276,70 @@ describe("the raw editor", () => {
         await userEvent.type(text, '{{"PORT": 3000}');
         await userEvent.click(screen.getByRole("button", { name: "Update variables" }));
         expect(await screen.findByText(/PORT has to be text/)).toBeTruthy();
+    });
+
+    it("paints the text the way a code editor does", async () => {
+        open();
+        await screen.findByText("DATABASE_URL");
+        await userEvent.click(screen.getByRole("button", { name: /Raw editor/ }));
+        const dialog = await screen.findByRole("dialog");
+        await waitFor(() => expect(dialog.querySelector("[class^='hljs-']")).not.toBeNull());
+    });
+
+    it("has a copy icon, and downloads the set as the file it is", async () => {
+        const created: Blob[] = [];
+        const saved: string[] = [];
+        Object.assign(URL, {
+            createObjectURL: (blob: Blob) => {
+                created.push(blob);
+                return "blob:variables";
+            },
+            revokeObjectURL: () => undefined
+        });
+        const click = vi
+            .spyOn(HTMLAnchorElement.prototype, "click")
+            .mockImplementation(function (this: HTMLAnchorElement) {
+                saved.push(this.download);
+            });
+        open();
+        await screen.findByText("DATABASE_URL");
+        await userEvent.click(screen.getByRole("button", { name: /Raw editor/ }));
+        const text = (await screen.findByRole("textbox", {
+            name: "Variables as text"
+        })) as HTMLTextAreaElement;
+        await waitFor(() => expect(text.value).toContain("NODE_ENV"));
+        expect(screen.getByRole("button", { name: "Copy all" }).querySelector("svg")).not.toBeNull();
+
+        await userEvent.click(screen.getByRole("button", { name: "Download" }));
+        expect(saved).toEqual([".env"]);
+        expect(await created[0]!.text()).toBe(text.value);
+
+        await userEvent.click(screen.getByRole("radio", { name: "JSON" }));
+        await userEvent.click(screen.getByRole("button", { name: "Download" }));
+        expect(saved[1]).toBe("variables.json");
+        click.mockRestore();
+    });
+
+    it("finds a run of text in it, on Ctrl+F or its button", async () => {
+        open();
+        await screen.findByText("DATABASE_URL");
+        await userEvent.click(screen.getByRole("button", { name: /Raw editor/ }));
+        const text = (await screen.findByRole("textbox", {
+            name: "Variables as text"
+        })) as HTMLTextAreaElement;
+        await waitFor(() => expect(text.value).toContain("NODE_ENV"));
+        await userEvent.click(screen.getByRole("button", { name: "Find in the variables" }));
+        const find = screen.getByRole("textbox", { name: "Find in the variables" });
+        await userEvent.type(find, "node_env");
+        expect(await screen.findByText("1 of 1")).toBeTruthy();
+        await userEvent.keyboard("{Escape}");
+        await waitFor(() =>
+            expect(screen.queryByRole("textbox", { name: "Find in the variables" })).toBeNull()
+        );
+
+        text.focus();
+        await userEvent.keyboard("{Control>}f{/Control}");
+        expect(await screen.findByRole("textbox", { name: "Find in the variables" })).toBeTruthy();
     });
 
     it("is read-only for somebody who cannot edit, and still copies", async () => {

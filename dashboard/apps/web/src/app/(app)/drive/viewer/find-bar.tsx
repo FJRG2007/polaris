@@ -26,7 +26,8 @@ export function FindBar({
     total,
     current,
     onStep,
-    onClose
+    onClose,
+    label
 }: {
     query: string;
     onQuery: (value: string) => void;
@@ -35,6 +36,8 @@ export function FindBar({
     current: number;
     onStep: (by: 1 | -1) => void;
     onClose: () => void;
+    /** What the box says it searches, when it is not a file. */
+    label?: string;
 }) {
     const t = useTranslations("driveViewer");
     const box = useRef<HTMLInputElement>(null);
@@ -59,8 +62,8 @@ export function FindBar({
                         onClose();
                     }
                 }}
-                placeholder={t("find.findInThisFile")}
-                aria-label={t("find.findInThisFile")}
+                placeholder={label ?? t("find.findInThisFile")}
+                aria-label={label ?? t("find.findInThisFile")}
                 className="h-8 max-w-64"
             />
             <span
