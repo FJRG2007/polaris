@@ -1,3 +1,5 @@
+"use client";
+
 /**
  * Getting around a board: zooming on the wheel towards the pointer, moving by
  * dragging the board itself, and pinching on a touch screen.
