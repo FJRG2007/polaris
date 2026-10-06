@@ -207,6 +207,23 @@ describe("a linked player's addresses", () => {
         ]);
     });
 
+    it("are brought in step for one player alone when that player asks to join", async () => {
+        const BEA = "0190c1d2-0000-7000-8000-00000000000b";
+        signedInFrom[ADA] = ["1.1.1.1"];
+        signedInFrom[BEA] = ["3.3.3.3"];
+        await service.linkPlayerAccount(OWNER, SERVER, OWNER, { username: "AdaMC", userId: ADA });
+        links.push({ id: id(), installedAppId: SERVER, player: "BeaMC", userId: BEA });
+        await service.syncLinkedAddresses(SERVER);
+
+        signedInFrom[ADA] = ["2.2.2.2"];
+        signedInFrom[BEA] = ["4.4.4.4"];
+        await service.syncLinkedAddresses(SERVER, " adamc ");
+        expect(access.map((row) => [row.username, row.address])).toEqual([
+            ["BeaMC", "3.3.3.3"],
+            ["AdaMC", "2.2.2.2"]
+        ]);
+    });
+
     it("replace any address typed for that name before", async () => {
         await service.grantPlayerAccess(OWNER, SERVER, OWNER, {
             username: "AdaMC",

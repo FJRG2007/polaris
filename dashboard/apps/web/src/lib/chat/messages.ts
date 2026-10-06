@@ -29,7 +29,7 @@ import {
 } from "./references";
 import { pollsFor, type ChatPollView } from "./polls";
 import { mentionsReader, readerTeams } from "./notify";
-import { noticeParts, noticePeople, renderNotice, type NoticePart } from "./notice-text";
+import { noticeParts, noticePeople, noticeString, type NoticePart } from "./notice-text";
 import { plainExcerpt } from "@/components/rich-text/excerpt";
 import { announceRoomMention, refuseRoomMention } from "./room-mentions";
 import { requireNotSpam, requireRoomMentionAllowed } from "./spam-guard";
@@ -565,7 +565,9 @@ async function refuseIfBlocked(actor: ChatActor, access: ChannelAccess): Promise
 
     const name = others.find((row) => blocked.has(row.userId))?.user.name;
     throw new ChatRuleError(
-        name ? { key: "errors.blockedRecipient", params: { name } } : { key: "errors.blockedRecipientUnnamed" }
+        name
+            ? { key: "errors.blockedRecipient", params: { name } }
+            : { key: "errors.blockedRecipientUnnamed" }
     );
 }
 
@@ -590,7 +592,10 @@ async function requireSendable(
     // Code points rather than UTF-16 units: a limit that counted the latter
     // would refuse a message of emoji at half its stated length.
     if ([...body].length > rules.maxMessageLength) {
-        throw new ChatRuleError({ key: "errors.messageTooLong", params: { count: rules.maxMessageLength } });
+        throw new ChatRuleError({
+            key: "errors.messageTooLong",
+            params: { count: rules.maxMessageLength }
+        });
     }
 
     if (rules.maxPerMinute !== core.CHAT_NO_LIMIT && options.wait !== false) {
@@ -679,8 +684,7 @@ export async function edit(actor: ChatActor, input: core.ChatEditInput): Promise
     });
     if (!message) throw new ChatAccessError({ key: "errors.messageGone" });
     const editable = await requirePostable(actor, message.channelId);
-    if (message.authorId !== actor.id)
-        throw new ChatAccessError({ key: "errors.editOwnOnly" });
+    if (message.authorId !== actor.id) throw new ChatAccessError({ key: "errors.editOwnOnly" });
     if (message.deletedAt) throw new ChatAccessError({ key: "errors.messageDeleted" });
     // A poll's body is the question people answered. Changing it after the fact
     // would leave every vote already cast standing behind something nobody
@@ -1729,51 +1733,50 @@ export async function decorateMessages(
         onMessage.set(reaction.messageId, bucket);
     }
 
-    return rows.map((row) => ({
-        id: row.id,
-        channelId: row.channelId,
-        authorId: row.authorId,
-        authorName: row.authorId ? (names.get(row.authorId) ?? null) : null,
-        kind: row.kind as core.ChatMessageKind,
-        body: row.deletedAt
-            ? ""
-            : row.kind === "system"
-              ? renderNotice(row.body, names, actor.id)
-              : row.body,
-        ...(row.kind === "system" && !row.deletedAt
-            ? { notice: noticeParts(row.body, names, actor.id) }
-            : {}),
-        parentId: row.parentId,
-        replyCount: row.replyCount,
-        lastReplyAt: row.lastReplyAt?.toISOString() ?? null,
-        edited: row.editedAt !== null,
-        deleted: row.deletedAt !== null,
-        reactions: [...(onMessage.get(row.id) ?? new Map())]
-            .map(([emoji, tally]) => ({ emoji, count: tally.count, mine: tally.mine }))
-            // Most-reacted first, then by emoji so the order is stable between
-            // renders when two have the same count.
-            .sort(
-                (left, right) => right.count - left.count || left.emoji.localeCompare(right.emoji)
-            ),
-        attachments: onMessageFiles.get(row.id) ?? [],
-        poll: polls.get(row.id) ?? null,
-        quote: quoteViewOf(row, quotes, names, quoteReachable),
-        starred: kept.has(row.id),
-        blocked: row.authorId !== null && shut.has(row.authorId),
-        mentionsYou: mentioned.has(row.id),
-        references: (pointedAt.get(row.id) ?? [])
-            .map((key) => references.get(key))
-            .filter((found): found is ChatReferenceView => found !== undefined),
-        // A message whose author has since deleted their account carries no
-        // setting to honour, and a deleted one has nothing left to send.
-        forwardable:
-            row.deletedAt === null && (row.authorId === null || mayForward.has(row.authorId)),
-        link: links.get(row.id) ?? null,
-        preview: previewOf(row, links, previews),
-        previewPending: pendingOf(row, links, previews),
-        receipt: receiptFor(row, actor, receipts),
-        createdAt: row.createdAt.toISOString()
-    }));
+    return rows.map((row) => {
+        const notice =
+            row.kind === "system" && !row.deletedAt ? noticeParts(row.body, names, actor.id) : null;
+        return {
+            id: row.id,
+            channelId: row.channelId,
+            authorId: row.authorId,
+            authorName: row.authorId ? (names.get(row.authorId) ?? null) : null,
+            kind: row.kind as core.ChatMessageKind,
+            body: row.deletedAt ? "" : notice ? noticeString(notice) : row.body,
+            ...(notice ? { notice } : {}),
+            parentId: row.parentId,
+            replyCount: row.replyCount,
+            lastReplyAt: row.lastReplyAt?.toISOString() ?? null,
+            edited: row.editedAt !== null,
+            deleted: row.deletedAt !== null,
+            reactions: [...(onMessage.get(row.id) ?? new Map())]
+                .map(([emoji, tally]) => ({ emoji, count: tally.count, mine: tally.mine }))
+                // Most-reacted first, then by emoji so the order is stable between
+                // renders when two have the same count.
+                .sort(
+                    (left, right) =>
+                        right.count - left.count || left.emoji.localeCompare(right.emoji)
+                ),
+            attachments: onMessageFiles.get(row.id) ?? [],
+            poll: polls.get(row.id) ?? null,
+            quote: quoteViewOf(row, quotes, names, quoteReachable),
+            starred: kept.has(row.id),
+            blocked: row.authorId !== null && shut.has(row.authorId),
+            mentionsYou: mentioned.has(row.id),
+            references: (pointedAt.get(row.id) ?? [])
+                .map((key) => references.get(key))
+                .filter((found): found is ChatReferenceView => found !== undefined),
+            // A message whose author has since deleted their account carries no
+            // setting to honour, and a deleted one has nothing left to send.
+            forwardable:
+                row.deletedAt === null && (row.authorId === null || mayForward.has(row.authorId)),
+            link: links.get(row.id) ?? null,
+            preview: previewOf(row, links, previews),
+            previewPending: pendingOf(row, links, previews),
+            receipt: receiptFor(row, actor, receipts),
+            createdAt: row.createdAt.toISOString()
+        };
+    });
 }
 
 /** How far the other person in a one-to-one conversation has got. Null when

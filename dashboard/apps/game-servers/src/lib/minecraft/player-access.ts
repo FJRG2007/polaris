@@ -739,12 +739,18 @@ async function linkFor(
  * pass refuses - signing out of Polaris is signing out of the server. A link
  * that only says who the player is follows nothing, so it keeps none of these.
  */
-export async function syncLinkedAddresses(installedAppId: string): Promise<void> {
-    const links = (await linkedPlayers(installedAppId)).filter(follows);
-    const kept = await prisma.gamePlayerAccess.findMany({
-        where: { installedAppId, source: "session" },
-        select: { id: true, username: true, address: true }
-    });
+export async function syncLinkedAddresses(installedAppId: string, player?: string): Promise<void> {
+    const only = player?.trim().toLowerCase();
+    const mentioned = (name: string) => only === undefined || name.toLowerCase() === only;
+    const links = (await linkedPlayers(installedAppId)).filter(
+        (link) => follows(link) && mentioned(link.player)
+    );
+    const kept = (
+        await prisma.gamePlayerAccess.findMany({
+            where: { installedAppId, source: "session" },
+            select: { id: true, username: true, address: true }
+        })
+    ).filter((row) => mentioned(row.username));
     const byUser = await signInAddresses(links.map((link) => link.userId));
     const linkedNames = new Set(links.map((link) => link.player.toLowerCase()));
 

@@ -148,8 +148,7 @@ export function noticePeople(body: string): string[] {
 
 /** One piece of a notice as a reader sees it: words, or somebody named in it. */
 export type NoticePart =
-    | { readonly text: string }
-    | { readonly userId: string; readonly name: string };
+    { readonly text: string } | { readonly userId: string; readonly name: string };
 
 /**
  * A notice as one reader sees it, in pieces: the words, and every person named
@@ -197,7 +196,10 @@ export function renderNotice(
     names: ReadonlyMap<string, string>,
     viewerId: string | null = null
 ): string {
-    return noticeParts(body, names, viewerId)
-        .map((part) => ("text" in part ? part.text : part.name))
-        .join("");
+    return noticeString(noticeParts(body, names, viewerId));
+}
+
+/** The plain text of parts already read from a notice. */
+export function noticeString(parts: readonly NoticePart[]): string {
+    return parts.map((part) => ("text" in part ? part.text : part.name)).join("");
 }
