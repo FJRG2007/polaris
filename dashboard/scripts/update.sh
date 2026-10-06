@@ -595,11 +595,13 @@ main() {
         exit 1
     fi
 
-    # Reclaim what this update superseded - the previous `:latest` each pull leaves
-    # untagged - so many updates cannot creep the disk to full. Conservative and
-    # best-effort: tagged images (including deployed apps') are all kept, and
-    # cleanup must never fail an otherwise-successful update.
-    docker image prune -f >/dev/null 2>&1 || true
+    # No prune here. The dashboard just started redeploys its apps' workers at
+    # boot, and an image still being fetched has no container on it: a prune from
+    # out here took its layers mid-pull, and the deploy failed with a rename into
+    # a path that no longer existed - on every update. What this update
+    # superseded is handed back by the dashboard itself, after each deploy and on
+    # its timer, through the lock that holds a prune off a pull
+    # (apps/web/src/lib/deploy/image-store-lock.ts).
 
     running=$($compose ps -q web 2>/dev/null | head -n1)
     build=$(docker inspect "$running" --format '{{range .Config.Env}}{{println .}}{{end}}' 2>/dev/null \

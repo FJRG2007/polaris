@@ -155,6 +155,42 @@ describe("a deploy that gives up", () => {
         expect(log).toContain("unable to lease content");
     });
 
+    it("fetches the image again when its download was removed part-way", async () => {
+        // The report: every update, the vision worker's pull failed with a
+        // rename into a content-store path that was no longer there, and the
+        // screen called it a full disk on a machine with 5 GB free.
+        const pull = vi
+            .fn()
+            .mockRejectedValueOnce(
+                new Error(
+                    'failed commit on ref "layer-sha256:baf7": commit failed: rename /var/lib/containerd/io.containerd.content.v1.content/ingest/bce9/data /var/lib/containerd/io.containerd.content.v1.content/blobs/sha256/baf7: no such file or directory'
+                )
+            )
+            .mockResolvedValueOnce(undefined);
+        const { ctx, lines } = contextWith({ pull } as Partial<RuntimeContext["ports"]>);
+
+        const result = await new ComposeRuntime().deployApplication(planWithMount(), ctx);
+
+        expect(result.ok).toBe(true);
+        expect(pull).toHaveBeenCalledTimes(2);
+        expect(lines.join("")).toContain("fetching it again");
+        expect(lines.join("")).not.toContain("disk space");
+    });
+
+    it("gives up after one more fetch is cut short the same way", async () => {
+        const pull = vi.fn(async () => {
+            throw new Error(
+                'failed commit on ref "layer-sha256:baf7": commit failed: rename /a/ingest/bce9/data /a/blobs/sha256/baf7: no such file or directory'
+            );
+        });
+        const { ctx } = contextWith({ pull } as Partial<RuntimeContext["ports"]>);
+
+        const result = await new ComposeRuntime().deployApplication(planWithMount(), ctx);
+
+        expect(result.ok).toBe(false);
+        expect(pull).toHaveBeenCalledTimes(2);
+    });
+
     it("does not fetch an image that was built here", async () => {
         // A locally built tag has nowhere to be fetched from; a retry would fail
         // on the pull instead of on the thing that actually went wrong.

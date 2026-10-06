@@ -22,9 +22,19 @@
  * version and three deploys on every restart would make restarting Polaris slow
  * and noisy for nothing.
  *
+ * And only the ones whose image moved. CI publishes each of them only when its
+ * own sources change, so most builds of Polaris leave them exactly as they were
+ * - and redeploying them anyway made every update a pull, a recreate and a
+ * chance to fail for a container nobody had touched. The registry's digest for
+ * the tag is what a pull would fetch; what each one last came up on is kept
+ * beside the release it came up as (the technique Watchtower and Diun use). A
+ * registry that cannot be read is no evidence the image is current, so that
+ * one is redeployed as before.
+ *
  * Server-only.
  */
 
+import { z } from "zod";
 import { prisma } from "@polaris/db";
 import { loadEnv } from "@polaris/config";
 import { host } from "@polaris/app-host";
@@ -51,6 +61,46 @@ const BUILD_KEY = "home.services.build";
  * next release or for somebody to deploy it themselves, rather than making the
  * disk it filled worse on a loop. */
 const ATTEMPT_KEY = "home.services.attemptedBuild";
+
+/** What each one was last deployed from, by application: the image's digest
+ *  and the release that deploy started. Only trusted while that release is
+ *  the one serving - a deploy that never came up left another in its place. */
+const LANDED_KEY = "home.services.landed";
+
+const landedSchema = z.record(
+    z.string(),
+    z.object({ digest: z.string().min(1), deploymentId: z.string().min(1) })
+);
+
+type Landed = z.infer<typeof landedSchema>;
+
+async function readLanded(): Promise<Landed> {
+    try {
+        const parsed = landedSchema.safeParse(JSON.parse((await getSetting(LANDED_KEY)) ?? "{}"));
+        return parsed.success ? parsed.data : {};
+    } catch {
+        return {};
+    }
+}
+
+/** The image a service of the catalog runs, split into what the registry is
+ *  asked about. Null when it has none, or is pinned by digest and cannot move. */
+function imageOf(catalogId: string): { image: string; tag: string } | null {
+    const ref = catalogApps().find((app) => app.id === catalogId)?.template?.image?.trim();
+    if (!ref || ref.includes("@")) return null;
+    const slash = ref.lastIndexOf("/");
+    const colon = ref.lastIndexOf(":");
+    return colon > slash
+        ? { image: ref.slice(0, colon), tag: ref.slice(colon + 1) || "latest" }
+        : { image: ref, tag: "latest" };
+}
+
+/** What a pull of it would fetch now, or null when the registry cannot say. */
+async function publishedDigest(catalogId: string): Promise<string | null> {
+    const image = imageOf(catalogId);
+    if (!image) return null;
+    return host.registry.readTagDigest(image.image, image.tag).catch(() => null);
+}
 
 /**
  * The containers that are Polaris' rather than somebody's: the ones the catalog
@@ -102,6 +152,7 @@ export async function upgradeHomeServices(): Promise<void> {
         return;
     }
 
+    const landed = await readLanded();
     let allWell = true;
     for (const install of installs) {
         const applicationId = install.applicationId as string;
@@ -110,15 +161,26 @@ export async function upgradeHomeServices(): Promise<void> {
         // would be the worst possible reading of a switch.
         const application = await prisma.application.findFirst({
             where: { id: applicationId },
-            select: { desiredState: true }
+            select: { desiredState: true, currentDeploymentId: true }
         });
         if (application?.desiredState !== "running") continue;
+        const digest = await publishedDigest(install.catalogId);
+        const last = landed[applicationId];
+        if (
+            digest &&
+            last?.digest === digest &&
+            last.deploymentId === application.currentDeploymentId
+        )
+            continue;
         try {
-            await deployApplication(applicationId, install.ownerId, null);
+            const deploymentId = await deployApplication(applicationId, install.ownerId, null);
+            if (digest) landed[applicationId] = { digest, deploymentId };
+            else delete landed[applicationId];
         } catch (error) {
             allWell = false;
             console.error(`polaris: could not bring ${install.catalogId} to this build:`, error);
         }
     }
+    await setSetting(LANDED_KEY, JSON.stringify(landed));
     if (allWell) await setSetting(BUILD_KEY, build);
 }

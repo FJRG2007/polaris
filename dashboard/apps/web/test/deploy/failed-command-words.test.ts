@@ -12,7 +12,7 @@
  * What the deployment recorded, and what the screen said, was "the command
  * failed (exit 1)". The streamed command's error carried its exit code and
  * nothing else, so the translation in deploy-failure.ts - which exists to turn
- * exactly that rename into "the machine ran out of disk space" - had nothing to
+ * exactly that rename into a sentence a person can act on - had nothing to
  * read. Two features that each worked, with the sentence lost between them.
  */
 
@@ -48,7 +48,7 @@ describe("what a streamed command said before it gave up", () => {
     it("reaches the translation, which is the point of keeping it", () => {
         const said = `the command failed (exit 1): ${lastMeaningfulLine(PULL)}`;
         expect(deployFailureReason(said, "could not pull the image")).toContain(
-            "ran out of disk space"
+            "removed from the machine while it was being fetched"
         );
     });
 

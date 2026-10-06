@@ -785,12 +785,11 @@ main() {
     # to full over many updates (a full disk is exactly what took the dashboard
     # down). Everything here is conservative and best-effort - cleanup must never
     # fail an otherwise-successful update, and must never touch data:
-    #   - dangling images: the previous `:latest` each pull leaves untagged
-    #   - build cache: stale layers from source builds
     #   - unused networks: prune keeps any network that still has a container
-    # Tagged images (including deployed apps') are all kept.
-    docker image prune -f >/dev/null 2>&1 || true
-    docker builder prune -f >/dev/null 2>&1 || true
+    # Images and build cache are not pruned here: the dashboard just started
+    # redeploys its apps' workers, and a prune from out here takes the layers of
+    # an image still being fetched. The dashboard hands those back itself,
+    # through the lock that holds a prune off a pull (image-store-lock.ts).
     docker network prune -f >/dev/null 2>&1 || true
     # Orphan (anonymous) volumes only, and only on Docker >= 23 where `volume prune`
     # defaults to anonymous-only - named volumes (how Polaris names every app/data

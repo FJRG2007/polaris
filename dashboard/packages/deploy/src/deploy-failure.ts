@@ -9,11 +9,12 @@
  *   /var/lib/containerd/.../blobs/sha256/d54b0e...: no such file or directory
  *
  * Which is a sentence about a rename, and reads like a corrupted image or a bad
- * registry. It means the disk filled up while the image was coming down. The
- * machine was at 97%, the layer had nowhere to land, and nothing anywhere said
- * so - not the log, not the deployment record, not the screen. Somebody without
- * a terminal has no way to reach that fact at all, and somebody with one still
- * has to know to look.
+ * registry. It was first read as the disk filling up - that machine was at 97%.
+ * It is not: a write with no room says "no space left on device". A rename that
+ * finds nothing to move is a download removed from under the pull, and it came
+ * back on every update of a machine with 5 GB free, beside a prune run in the
+ * same second by the update script. Called a full disk, it sent somebody to
+ * look for room that was there.
  *
  * So the handful of failures that actually turn up get translated, and anything
  * unrecognized is passed through untouched rather than guessed at. The original
@@ -23,6 +24,14 @@
  * Pure - a string in and a string out - so every case here is a test rather than
  * an evening with a full disk.
  */
+
+/** A fetch whose download was taken away part-way, in the two places it is
+ *  noticed: filing a finished layer, and unpacking it. */
+const CUT_SHORT_SIGNS = [
+    "commit failed: rename",
+    "failed to lchown",
+    "failed to extract layer"
+] as const;
 
 /** One thing a deploy failure can mean, and how to recognize it. */
 interface Meaning {
@@ -37,15 +46,13 @@ interface Meaning {
  */
 const MEANINGS: readonly Meaning[] = [
     {
-        // Out of room, in each of its disguises. The last two are the ones worth
-        // having: the image store reports a full disk as a failed rename or a
-        // layer it could not register, and neither says anything about space.
+        // Out of room, in each of its disguises. A layer the image store could
+        // not register, or a write into it that failed, says nothing about space.
         signs: [
             "no space left on device",
             "enospc",
             "not enough space",
             "insufficient space",
-            "failed commit on ref",
             "failed to register layer",
             "write /var/lib/docker",
             "write /var/lib/containerd"
@@ -58,6 +65,15 @@ const MEANINGS: readonly Meaning[] = [
         // data: a volume, a database, somebody's files, and none of it is
         // Polaris's to remove. Storage is where they can see what it is.
         says: "the machine ran out of disk space while fetching the image. Nothing was deployed, and Polaris has already handed back every unused image and build cache on it - what is left is data. Servers > Storage shows what is taking the room."
+    },
+    {
+        // What was downloaded so far was removed before it could be filed or
+        // unpacked: the rename into the store, or the unpack into a snapshot,
+        // finds nothing there. A cleanup of the image store ran over the pull;
+        // the image itself is fine and fetching it again gets it whole. After
+        // the disk entry, so a write that found no room is still called that.
+        signs: CUT_SHORT_SIGNS,
+        says: "part of the image was removed from the machine while it was being fetched - the image store was cleaned up at the same moment. Nothing was deployed; deploying again fetches it whole."
     },
     {
         // The image store fetched the image and then lost its own claim on the
@@ -122,6 +138,20 @@ export function deployFailureReason(raw: string, fallback: string): string {
 export function isOutOfSpace(raw: string): boolean {
     const lowered = raw.toLowerCase();
     return MEANINGS[0]!.signs.some((sign) => lowered.includes(sign));
+}
+
+/**
+ * Whether a pull failed because what it had fetched so far was removed under
+ * it - the failure a pull can simply do again. Never when the image store said
+ * it had no room, which a second pull would only repeat.
+ */
+export function isFetchCutShort(raw: string): boolean {
+    if (isOutOfSpace(raw)) return false;
+    const lowered = raw.toLowerCase();
+    return (
+        lowered.includes("no such file or directory") &&
+        CUT_SHORT_SIGNS.some((sign) => lowered.includes(sign))
+    );
 }
 
 /**

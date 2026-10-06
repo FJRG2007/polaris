@@ -139,6 +139,7 @@ const load = {
     notificationsDispatch: once(() => import("@/lib/notifications/dispatch")),
     notificationsPreferences: once(() => import("@/lib/notifications/preferences")),
     rateLimitService: once(() => import("@/lib/rate-limit-service")),
+    registry: once(() => import("@/lib/registry")),
     requestContext: once(() => import("@/lib/request-context")),
     serverMetricsService: once(() => import("@/lib/server-metrics-service")),
     session: once(() => import("@/lib/session")),
@@ -431,6 +432,9 @@ export const serverHost = {
         sessionCan: later(load.session, "sessionCan"),
         sessionCanAny: later(load.session, "sessionCanAny"),
         userHasManage: later(load.session, "userHasManage")
+    },
+    registry: {
+        readTagDigest: later(load.registry, "readTagDigest")
     },
     sessionDirectory: {
         userSessionAddresses: later(load.sessionDirectory, "userSessionAddresses")

@@ -13,12 +13,20 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { deployFailureReason, isOutOfSpace } from "../src/deploy-failure.js";
+import { deployFailureReason, isFetchCutShort, isOutOfSpace } from "../src/deploy-failure.js";
 
 const STEP = "could not pull ghcr.io/example/app:latest";
 
-/** Verbatim, minus the length: the shape is the whole point. */
-const CONTAINERD_FULL_DISK = `failed commit on ref "layer-sha256:d54b0e95": commit failed: rename /var/lib/containerd/io.containerd.content.v1.content/ingest/3f7c6a40/data /var/lib/containerd/io.containerd.content.v1.content/blobs/sha256/d54b0e95: no such file or directory`;
+/** Verbatim, minus the length: the shape is the whole point. A containerd
+ *  write that found no room says so in its own words. */
+const CONTAINERD_FULL_DISK = `failed commit on ref "layer-sha256:d54b0e95": write /var/lib/containerd/io.containerd.content.v1.content/ingest/3f7c6a40/data: no space left on device`;
+
+/** A layer whose download was removed from under it before it could be filed:
+ *  the rename finds nothing to move. Seen on every update of a machine with
+ *  5 GB free, beside a prune that ran in the same second. */
+const CONTAINERD_CUT_SHORT = `failed commit on ref "index-sha256:a8217ddc": commit failed: rename /var/lib/containerd/io.containerd.content.v1.content/ingest/6ce6cb7e/data /var/lib/containerd/io.containerd.content.v1.content/blobs/sha256/a8217ddc: no such file or directory`;
+
+const CONTAINERD_LCHOWN = `failed to extract layer sha256:0b1c: failed to Lchown "/var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/snapshots/412/fs/usr": no such file or directory`;
 
 describe("a disk with no room left", () => {
     it("is named as one, however the image store phrased it", () => {
@@ -47,6 +55,23 @@ describe("a disk with no room left", () => {
     it("can be recognized by a caller that wants to act on it", () => {
         expect(isOutOfSpace(CONTAINERD_FULL_DISK)).toBe(true);
         expect(isOutOfSpace("manifest unknown")).toBe(false);
+    });
+});
+
+describe("an image taken off the machine while it was coming down", () => {
+    it("is not called a full disk, because it is not one", () => {
+        for (const raw of [CONTAINERD_CUT_SHORT, CONTAINERD_LCHOWN]) {
+            const said = deployFailureReason(raw, STEP);
+            expect(said).not.toContain("ran out of disk space");
+            expect(said).toContain("removed from the machine while it was being fetched");
+            expect(said).toContain("no such file or directory");
+            expect(isOutOfSpace(raw)).toBe(false);
+            expect(isFetchCutShort(raw)).toBe(true);
+        }
+    });
+
+    it("is still a full disk when the image store said there was no room", () => {
+        expect(isFetchCutShort(CONTAINERD_FULL_DISK)).toBe(false);
     });
 });
 
