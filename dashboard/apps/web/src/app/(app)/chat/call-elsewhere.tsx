@@ -31,9 +31,22 @@ import type { CallElsewhere as Found } from "@/lib/chat/meetings";
 import { joinCallAction } from "./meeting-actions";
 import { askCallElsewhere } from "@/lib/chat/call-elsewhere-request";
 
-/** How long to wait before asking again after being dismissed, so that saying
- *  "not now" is not undone by the next thing that happens in any conversation. */
+/**
+ * The call this browser was told to leave alone. Kept per call, not per tab:
+ * saying "leave it" in one tab answers every tab of this browser, now and after
+ * a reload, and only a different call asks again.
+ */
 const ASKED = "polaris.call.elsewhere.dismissed";
+
+/** The call dismissed in this browser, or null. Storage can be refused (a
+ *  private window, blocked site data), and then nothing was dismissed. */
+function readDismissed(): string | null {
+    try {
+        return window.localStorage.getItem(ASKED);
+    } catch {
+        return null;
+    }
+}
 
 export function CallElsewhere() {
     const t = useTranslations("chat");
@@ -56,10 +69,19 @@ export function CallElsewhere() {
 
     useEffect(() => {
         look();
-        if (typeof window !== "undefined") {
-            setHidden(window.sessionStorage?.getItem(ASKED) ?? null);
-        }
     }, [look]);
+
+    // Read once on mount, and again whenever another tab of this browser
+    // dismisses a call: the `storage` event fires in every tab but the one that
+    // wrote, which is exactly the set that still shows the card.
+    useEffect(() => {
+        setHidden(readDismissed());
+        const onStorage = (event: StorageEvent) => {
+            if (event.key === ASKED) setHidden(event.newValue);
+        };
+        window.addEventListener("storage", onStorage);
+        return () => window.removeEventListener("storage", onStorage);
+    }, []);
 
     // Anything happening to a call anywhere is a reason to ask again: it may
     // have ended, and a card offering to move a call that is over is worse than
@@ -117,7 +139,7 @@ export function CallElsewhere() {
     const dismiss = () => {
         setHidden(found.meetingId);
         try {
-            window.sessionStorage?.setItem(ASKED, found.meetingId);
+            window.localStorage.setItem(ASKED, found.meetingId);
         } catch {
             // Storage refused. The card stays gone for this page either way,
             // which is what was asked for.
