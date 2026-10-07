@@ -87,19 +87,21 @@ import {
     type WorldRules
 } from "../../lib/minecraft/rules-service";
 import {
-    clearInventory,
-    clearItem,
     clearSlot,
-    giveItem,
     giveToSlot,
     moveStack,
     recentlyGivenItems,
-    transferInventory,
     transferStack
 } from "../../lib/minecraft/item-service";
 import {
+    emptyPlayerInventory,
+    givePlayerItems,
+    isPlayerOnline,
+    sendPlayerInventory,
+    takePlayerItems
+} from "../../lib/minecraft/item-operations";
+import {
     applyFirewallBans,
-    getServerPlayers,
     runServerCommand,
     setPlayerExperience,
     withServerContainer
@@ -322,34 +324,12 @@ export async function givePlayerItemAction(
     const { installedAppId, player, item, count } = parsed.data;
     try {
         const { user, access } = await requireGameServer("games.moderate", installedAppId);
-        // `/give` needs somebody standing there. Deciding at four in the afternoon
-        // to hand something to a player who is asleep is the ordinary case, so it
-        // is written down and happens when they next join - the same way putting
-        // something in a particular slot already worked.
-        if (!(await isOnline(access.ownerId, installedAppId, player))) {
-            await queueAction({
-                installedAppId,
-                username: player,
-                payload: { kind: "give", item, count },
-                requestedById: user.id
-            });
-            return { queued: true };
-        }
-        const { given, output } = await giveItem(
-            access.ownerId,
-            installedAppId,
-            player,
+        const done = await givePlayerItems(
+            { ownerId: access.ownerId, installedAppId, actorId: user.id, player },
             item,
             count
         );
-        await recordAudit({
-            actorId: user.id,
-            action: "minecraft.give",
-            targetType: "installedApp",
-            targetId: installedAppId,
-            metadata: { player, item, count: given }
-        });
-        return { output: output.trim() };
+        return done.queued ? { queued: true } : { output: done.output };
     } catch (caught) {
         return {
             error:
@@ -3006,13 +2986,6 @@ const slotItemSchema = z.object({
 export type SlotItemInput = z.infer<typeof slotItemSchema>;
 
 /** Whether this player is standing on the server right now. */
-async function isOnline(ownerId: string, installedAppId: string, player: string): Promise<boolean> {
-    const status = await getServerPlayers(ownerId, installedAppId).catch(() => null);
-    return (
-        status?.players.players.some((name) => name.toLowerCase() === player.toLowerCase()) === true
-    );
-}
-
 /**
  * Put an item in a slot.
  *
@@ -3033,7 +3006,7 @@ export async function setInventorySlotAction(
     const { installedAppId, player, slot, item, count } = parsed.data;
     try {
         const { user, access } = await requireGameServer("games.moderate", installedAppId);
-        if (!(await isOnline(access.ownerId, installedAppId, player))) {
+        if (!(await isPlayerOnline(access.ownerId, installedAppId, player))) {
             await queueAction({
                 installedAppId,
                 username: player,
@@ -3134,24 +3107,12 @@ export async function clearPlayerItemAction(
     const { installedAppId, player, item, count } = parsed.data;
     try {
         const { user, access } = await requireGameServer("games.moderate", installedAppId);
-        if (!(await isOnline(access.ownerId, installedAppId, player))) {
-            await queueAction({
-                installedAppId,
-                username: player,
-                payload: { kind: "clear", item, count },
-                requestedById: user.id
-            });
-            return { queued: true };
-        }
-        const output = await clearItem(access.ownerId, installedAppId, player, item, count);
-        await recordAudit({
-            actorId: user.id,
-            action: "minecraft.inventory-take",
-            targetType: "installedApp",
-            targetId: installedAppId,
-            metadata: { player, item, count }
-        });
-        return { output: output.trim() };
+        const done = await takePlayerItems(
+            { ownerId: access.ownerId, installedAppId, actorId: user.id, player },
+            item,
+            count
+        );
+        return done.queued ? { queued: true } : { output: done.output };
     } catch (caught) {
         return {
             error:
@@ -3179,24 +3140,13 @@ export async function clearPlayerInventoryAction(input: {
     const { installedAppId, player } = parsed.data;
     try {
         const { user, access } = await requireGameServer("games.moderate", installedAppId);
-        if (!(await isOnline(access.ownerId, installedAppId, player))) {
-            await queueAction({
-                installedAppId,
-                username: player,
-                payload: { kind: "clear-all" },
-                requestedById: user.id
-            });
-            return { queued: true };
-        }
-        await clearInventory(access.ownerId, installedAppId, player);
-        await recordAudit({
+        const done = await emptyPlayerInventory({
+            ownerId: access.ownerId,
+            installedAppId,
             actorId: user.id,
-            action: "minecraft.inventory-empty",
-            targetType: "installedApp",
-            targetId: installedAppId,
-            metadata: { player }
+            player
         });
-        return {};
+        return done.queued ? { queued: true } : {};
     } catch (caught) {
         return {
             error:
@@ -3275,15 +3225,10 @@ export async function transferInventoryAction(input: {
     const { installedAppId, from, to } = parsed.data;
     try {
         const { user, access } = await requireGameServer("games.moderate", installedAppId);
-        const result = await transferInventory(access.ownerId, installedAppId, from, to);
-        await recordAudit({
-            actorId: user.id,
-            action: "minecraft.inventory-send-all",
-            targetType: "installedApp",
-            targetId: installedAppId,
-            metadata: { from, to, moved: result.moved, kept: result.kept }
-        });
-        return result;
+        return await sendPlayerInventory(
+            { ownerId: access.ownerId, installedAppId, actorId: user.id, player: from },
+            to
+        );
     } catch (caught) {
         return {
             error:

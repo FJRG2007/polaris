@@ -23,7 +23,8 @@
  * that server, as every one of the screen's actions does, and starts an event
  * through the same service call, so its preconditions refuse exactly as there.
  *
- * Players (`mcp-player-tools.ts`) and announcements, restarts and worlds
+ * Players (`mcp-player-tools.ts`), what a Minecraft player carries
+ * (`mcp-item-tools.ts`) and announcements, restarts and worlds
  * (`mcp-server-tools.ts`) are offered from their own modules, on the same
  * standing.
  *
@@ -42,6 +43,7 @@ import { slotLabel } from "./minecraft/inventory";
 import { MAX_CONSOLE_LINE } from "./console-queue";
 import type { AppHostTypes } from "@polaris/app-host";
 import { gameCatalogs } from "../../messages";
+import { itemTools } from "./mcp-item-tools";
 import { playerTools } from "./mcp-player-tools";
 import { serverTools } from "./mcp-server-tools";
 import { actorFor, attempt, refuse, serverFor, serverId } from "./mcp-common";
@@ -588,6 +590,7 @@ export function gameMcpTools(): readonly McpTool[] {
         eventStartTool,
         eventCancelTool,
         ...playerTools,
+        ...itemTools,
         ...serverTools
     ].map((tool) => tool());
     return built;
