@@ -124,15 +124,64 @@ async function taskByName(
     scope: Awaited<ReturnType<typeof access.visibleScope>>,
     name: string
 ): Promise<{ id: string; spaceId: string }> {
-    const rows = await tasks.listTasks(
-        { spaceIds: access.scopeSpaceIds(scope), listIds: scope.listIds },
-        { openOnly: false, limit: 500 }
-    );
+    const reachable = { AND: [access.scopeTaskWhere(scope), { archived: false }] };
+    const exact = await prisma.task.findMany({
+        where: { AND: [reachable, { name: { equals: name, mode: "insensitive" } }] },
+        select: NAMED_TASK,
+        orderBy: { updatedAt: "desc" },
+        take: NAMES_SHARED
+    });
+    const rows =
+        exact.length > 0
+            ? exact
+            : await prisma.task.findMany({
+                  where: reachable,
+                  select: NAMED_TASK,
+                  orderBy: { updatedAt: "desc" },
+                  take: NAMES_SCANNED
+              });
     const pick = core.pickByName(rows, name, (row) => row.name);
     if (pick.kind === "one") return { id: pick.item.id, spaceId: pick.item.spaceId };
     throw new McpRefusal(
-        core.missedNameText(pick, name, "task", (row) => `${row.reference} ${row.name}`)
+        core.missedNameText(
+            pick,
+            name,
+            "task",
+            (row) => `${row.space.prefix}-${row.number} ${row.name}`
+        )
     );
+}
+
+/** What naming a task back needs, and no more. */
+const NAMED_TASK = {
+    id: true,
+    spaceId: true,
+    name: true,
+    number: true,
+    space: { select: { prefix: true } }
+} as const;
+
+/** How many tasks sharing one name a refusal names. */
+const NAMES_SHARED = 10;
+
+/** How many recently touched tasks a near miss is looked for among. */
+const NAMES_SCANNED = 500;
+
+/** An instant as the person reads it: "Thu 8 Oct, 09:00", in their zone. */
+async function onTheirClock(userId: string, at: readonly Date[]): Promise<string[]> {
+    const { resolveDisplayPreferencesFor } = await import("@/lib/display-prefs-service");
+    const { timeZone } = await resolveDisplayPreferencesFor(userId);
+    const format = new Intl.DateTimeFormat("en-GB", {
+        timeZone,
+        weekday: "short",
+        day: "numeric",
+        month: "short",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+        hourCycle: "h23"
+    });
+    return at.map((instant) => format.format(instant));
 }
 
 /** A day or a wall time as a model writes one: what the person would say. */
@@ -143,10 +192,7 @@ const WALL = /^(\d{4})-(\d{2})-(\d{2})(?:T([01]\d|2[0-3]):([0-5]\d))?$/;
  * clock - the zone their dates are shown in, not the server's. A day alone is
  * the start of it, which is how the date picker stores an all-day due date.
  */
-async function wallInstant(
-    userId: string,
-    value: string
-): Promise<{ at: Date; timed: boolean }> {
+async function wallInstant(userId: string, value: string): Promise<{ at: Date; timed: boolean }> {
     const parts = WALL.exec(value);
     if (!parts) throw new McpRefusal("Write YYYY-MM-DD, or YYYY-MM-DDTHH:mm.");
     const [year, month, day] = [Number(parts[1]), Number(parts[2]), Number(parts[3])];
@@ -472,9 +518,11 @@ const updateInput = z.object({
     description: z.string().max(20_000).optional(),
     priority: z.enum(core.TASK_PRIORITIES).optional(),
     assignToMe: z.boolean().optional().describe("Put the account this key belongs to on it."),
-    due: dueField.optional().describe(
-        `A new due date: "YYYY-MM-DD", "YYYY-MM-DDTHH:mm" on the person's own clock, or "" to clear it.`
-    )
+    due: dueField
+        .optional()
+        .describe(
+            `A new due date: "YYYY-MM-DD", "YYYY-MM-DDTHH:mm" on the person's own clock, or "" to clear it.`
+        )
 });
 
 const updateTaskTool: McpTool<z.infer<typeof updateInput>> = {
@@ -637,6 +685,10 @@ const listRemindersTool: McpTool<z.infer<typeof remindersInput>> = {
                 task: { select: { number: true, name: true, space: { select: { prefix: true } } } }
             }
         });
+        const shown = await onTheirClock(
+            caller.userId,
+            rows.map((row) => row.remindAt)
+        );
         const reminders = rows.map((row) => ({
             id: row.id,
             at: row.remindAt.toISOString(),
@@ -647,8 +699,8 @@ const listRemindersTool: McpTool<z.infer<typeof remindersInput>> = {
         return text(
             reminders
                 .map(
-                    (row) =>
-                        `${row.at}  ${row.task} ${row.taskName}${row.note ? ` - ${row.note}` : ""}  [${row.id}]`
+                    (row, index) =>
+                        `${shown[index]}  ${row.task} ${row.taskName}${row.note ? ` - ${row.note}` : ""}  [${row.id}]`
                 )
                 .join("\n") || "No reminders pending.",
             { reminders }
@@ -709,14 +761,17 @@ const remindTool: McpTool<z.infer<typeof remindInput>> = {
         await access.requireTask(actor, id, "guest");
         const at = await instantOf(caller.userId, input.at);
         if (at.getTime() <= Date.now())
-            throw new McpRefusal(`${at.toISOString()} has already passed. Pick a time ahead.`);
+            throw new McpRefusal(
+                `${(await onTheirClock(caller.userId, [at]))[0]} has already passed. Pick a time ahead.`
+            );
         const parsed = core.reminderSchema.parse({
             taskId: id,
             remindAt: at.toISOString(),
             note: input.note
         });
         await addReminder(caller.userId, id, parsed.remindAt, parsed.note);
-        return text(`Reminder set for ${parsed.remindAt}.`, { at: parsed.remindAt });
+        const [shown] = await onTheirClock(caller.userId, [at]);
+        return text(`Reminder set for ${shown}.`, { at: parsed.remindAt });
     }
 };
 

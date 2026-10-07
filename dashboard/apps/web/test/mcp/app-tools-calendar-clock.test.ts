@@ -219,6 +219,13 @@ describe("the timer tools", () => {
         expect(mocks.createTimer).not.toHaveBeenCalled();
     });
 
+    it("blame a label too long on the label, not the length", async () => {
+        const result = await call("clock_timer_start", { minutes: 5, label: "x".repeat(70) });
+        expect(result.isError).toBe(true);
+        expect(result.content[0]?.text).toContain("timer's label");
+        expect(mocks.createTimer).not.toHaveBeenCalled();
+    });
+
     it("resume a timer found by its label", async () => {
         await call("clock_timer_change", { timer: "tea", action: "resume" });
         expect(mocks.changeTimer).toHaveBeenCalledWith("user-1", TEA, "start");

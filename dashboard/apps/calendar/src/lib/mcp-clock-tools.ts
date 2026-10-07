@@ -183,9 +183,7 @@ const alarmSetInput = z.object({
         .trim()
         .max(200)
         .optional()
-        .describe(
-            "To change an alarm: its id, label or time. Absent sets a new one."
-        ),
+        .describe("To change an alarm: its id, label or time. Absent sets a new one."),
     time: z
         .string()
         .regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Write the time as HH:mm, 24-hour")
@@ -319,7 +317,11 @@ const timerStartInput = z.object({
     hours: z.number().int().min(0).max(99).default(0),
     minutes: z.number().int().min(0).max(5999).default(0),
     seconds: z.number().int().min(0).max(359_999).default(0),
-    label: z.string().max(200).default("").describe("What the timer is for."),
+    label: z
+        .string()
+        .max(200)
+        .default("")
+        .describe(`What the timer is for, up to ${model.CLOCK_LABEL_MAX} characters.`),
     sound: z.enum(model.CLOCK_SOUNDS).default("chime")
 });
 
@@ -338,8 +340,7 @@ const timerStartTool = () =>
         destructive: false,
         async run(input, caller) {
             const { user } = await readerFor(caller);
-            const durationMs =
-                ((input.hours * 60 + input.minutes) * 60 + input.seconds) * 1000;
+            const durationMs = ((input.hours * 60 + input.minutes) * 60 + input.seconds) * 1000;
             const parsed = model.timerInputSchema.safeParse({
                 label: input.label,
                 durationMs,
@@ -348,7 +349,9 @@ const timerStartTool = () =>
             });
             if (!parsed.success)
                 refuse(
-                    `A timer runs from 1 second to ${model.formatClockMs(model.CLOCK_TIMER_MAX_MS)}.`
+                    parsed.error.issues.some((issue) => issue.path[0] === "label")
+                        ? `Check the timer's label: it is too long. Keep it to ${model.CLOCK_LABEL_MAX} characters.`
+                        : `A timer runs from 1 second to ${model.formatClockMs(model.CLOCK_TIMER_MAX_MS)}.`
                 );
             const id = await attempt(() => clock.createTimer(user.id, parsed.data));
             return {
@@ -451,8 +454,8 @@ const clockSearch = () =>
     });
 
 export function clockMcpTools(): McpTool[] {
-    return [listTool, alarmSetTool, alarmChangeTool, timerStartTool, timerChangeTool].map(
-        (tool) => tool()
+    return [listTool, alarmSetTool, alarmChangeTool, timerStartTool, timerChangeTool].map((tool) =>
+        tool()
     );
 }
 

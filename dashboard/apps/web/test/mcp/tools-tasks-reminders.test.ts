@@ -17,6 +17,7 @@ const mocks = vi.hoisted(() => ({
     requireList: vi.fn(),
     requireTask: vi.fn(),
     listFindFirst: vi.fn(),
+    taskFindMany: vi.fn(),
     reminderFindMany: vi.fn(),
     reminderFindFirst: vi.fn(),
     addReminder: vi.fn(),
@@ -25,7 +26,10 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("@polaris/db", () => ({
     prisma: {
-        task: { findFirst: async () => ({ id: TASK_1, spaceId: "space-1" }) },
+        task: {
+            findFirst: async () => ({ id: TASK_1, spaceId: "space-1" }),
+            findMany: mocks.taskFindMany
+        },
         taskList: { findFirst: mocks.listFindFirst },
         taskReminder: { findMany: mocks.reminderFindMany, findFirst: mocks.reminderFindFirst }
     }
@@ -80,23 +84,29 @@ async function call(
 function row(number: number, name: string) {
     return {
         id: `00000000-0000-4000-8000-00000000000${number}`,
-        reference: `ENG-${number}`,
+        number,
         name,
         spaceId: "space-1",
-        spaceName: "Engineering",
-        listName: "Backlog",
-        statusName: "Open"
+        space: { prefix: "ENG" }
     };
 }
+
+const NAMED = [
+    row(1, "Send the October invoices"),
+    row(2, "Renew the domain"),
+    row(3, "Renew the domain")
+];
 
 beforeEach(() => {
     vi.clearAllMocks();
     mocks.visibleScope.mockResolvedValue({ listIds: [] });
-    mocks.listTasks.mockResolvedValue([
-        row(1, "Send the October invoices"),
-        row(2, "Renew the domain"),
-        row(3, "Renew the domain")
-    ]);
+    mocks.listTasks.mockResolvedValue([]);
+    mocks.taskFindMany.mockImplementation(async ({ where }) => {
+        const exact = where.AND[1]?.name?.equals as string | undefined;
+        return exact === undefined
+            ? NAMED
+            : NAMED.filter((task) => task.name.toLowerCase() === exact.toLowerCase());
+    });
     mocks.listFindFirst.mockResolvedValue({ id: LIST, spaceId: "space-1" });
     mocks.createTask.mockResolvedValue({ id: "task-9", reference: "ENG-9" });
 });
@@ -133,6 +143,25 @@ describe("a task by its name", () => {
         });
     });
 
+    it("is looked up in the database rather than in the first page of every task", async () => {
+        await call("tasks_update", { task: "Send the October invoices", priority: "high" });
+        expect(mocks.listTasks).not.toHaveBeenCalled();
+        expect(mocks.taskFindMany).toHaveBeenCalledTimes(1);
+        expect(mocks.taskFindMany.mock.calls[0]![0].where).toEqual({
+            AND: [
+                { AND: [{ reachable: true }, { archived: false }] },
+                { name: { equals: "Send the October invoices", mode: "insensitive" } }
+            ]
+        });
+    });
+
+    it("offers the closest for a miss, and acts on none of them", async () => {
+        const result = await call("tasks_update", { task: "Renew domain", priority: "high" });
+        expect(result.content[0]?.text).toContain('No task is called "Renew domain"');
+        expect(result.content[0]?.text).toContain("ENG-2 Renew the domain");
+        expect(mocks.updateTask).not.toHaveBeenCalled();
+    });
+
     it("is named back with references when two share it, and nothing changes", async () => {
         const result = await call("tasks_update", { task: "Renew the domain", priority: "high" });
         expect(result.content[0]?.text).toContain("More than one task");
@@ -152,6 +181,8 @@ describe("reminders", () => {
                 note: "Chase the bank"
             });
             expect(result.isError).toBeUndefined();
+            expect(result.content[0]?.text).toBe("Reminder set for Thu, 8 Oct 2026, 09:00.");
+            expect(result.structuredContent.at).toBe("2026-10-08T07:00:00.000Z");
             expect(mocks.requireTask).toHaveBeenCalledWith(
                 { id: "user-1", isAdmin: false },
                 TASK_1,
@@ -194,6 +225,7 @@ describe("reminders", () => {
             }
         ]);
         const result = await call("tasks_reminders", {});
+        expect(result.content[0]?.text).toContain("Thu, 8 Oct 2026, 09:00  ENG-1");
         expect(mocks.reminderFindMany.mock.calls[0]![0].where).toEqual({
             userId: "user-1",
             sentAt: null,
