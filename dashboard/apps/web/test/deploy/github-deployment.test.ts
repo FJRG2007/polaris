@@ -104,7 +104,9 @@ function requestTo(fragment: string): (typeof sent)[number] | undefined {
 /** The one that WRITES the check row, rather than the read that looks for an
  *  existing one - both are under /check-runs, and only one carries a body. */
 function checkWritten(): (typeof sent)[number] | undefined {
-    return sent.find((request) => request.url.includes("check-runs") && request.body.head_sha !== undefined);
+    return sent.find(
+        (request) => request.url.includes("check-runs") && request.body.head_sha !== undefined
+    );
 }
 
 beforeEach(() => {
@@ -115,7 +117,13 @@ beforeEach(() => {
 describe("minting the deployment", () => {
     it("asks GitHub not to merge anything and not to wait for checks", async () => {
         githubAnswers(201, { id: 4212 });
-        await createDeployment({ ...CALL, ref: SHA, environment: "production/api", description: "x", production: true });
+        await createDeployment({
+            ...CALL,
+            ref: SHA,
+            environment: "production/api",
+            description: "x",
+            production: true
+        });
 
         expect(sent[0]?.url).toContain("/repos/acme/widgets/deployments");
         expect(sent[0]?.body.auto_merge).toBe(false);
@@ -124,7 +132,13 @@ describe("minting the deployment", () => {
 
     it("announces the commit rather than the branch, so it cannot drift", async () => {
         githubAnswers(201, { id: 4212 });
-        await createDeployment({ ...CALL, ref: SHA, environment: "production/api", description: "x", production: true });
+        await createDeployment({
+            ...CALL,
+            ref: SHA,
+            environment: "production/api",
+            description: "x",
+            production: true
+        });
 
         expect(sent[0]?.body.ref).toBe(SHA);
     });
@@ -145,7 +159,13 @@ describe("minting the deployment", () => {
         // 409 and 202 both answer with a message instead of a deployment. Reading
         // one as a deployment would leave every later state posting to a made-up id.
         githubAnswers(409, { message: "Conflict merging main into 9f2c1b0" });
-        const minted = await createDeployment({ ...CALL, ref: SHA, environment: "production/api", description: "x", production: true });
+        const minted = await createDeployment({
+            ...CALL,
+            ref: SHA,
+            environment: "production/api",
+            description: "x",
+            production: true
+        });
         expect(minted.id).toBeNull();
         // Kept, because the sentence the deploy log gets is chosen by it.
         expect(minted.status).toBe(409);
@@ -170,7 +190,12 @@ describe("minting the deployment", () => {
 describe("posting a state against it", () => {
     it("sends the state, and retires whatever was serving that environment", async () => {
         githubAnswers(201, {});
-        await setDeploymentState({ ...CALL, deploymentId: "4212", state: "success", description: "Live" });
+        await setDeploymentState({
+            ...CALL,
+            deploymentId: "4212",
+            state: "success",
+            description: "Live"
+        });
 
         expect(sent[0]?.url).toContain("/deployments/4212/statuses");
         expect(sent[0]?.body.state).toBe("success");
@@ -283,7 +308,9 @@ describe("why a deploy was not announced at all", () => {
         mocks.applicationFindUnique.mockResolvedValue({
             name: "api",
             slug: "api",
-            sourceConfig: JSON.stringify(options.repoUrl ? { repoUrl: options.repoUrl } : { imageRef: "nginx" }),
+            sourceConfig: JSON.stringify(
+                options.repoUrl ? { repoUrl: options.repoUrl } : { imageRef: "nginx" }
+            ),
             environment: {
                 name: "production",
                 projectId: "project-1",
@@ -373,21 +400,24 @@ describe("why a deploy was not announced at all", () => {
         deployOf({ repoUrl: "https://github.com/acme/widgets.git" });
         mocks.githubAppInstallationToken.mockResolvedValue("ghs_installed");
         let attempt = 0;
-        vi.stubGlobal("fetch", async (url: string, init: { body?: string; headers?: Record<string, string> }) => {
-            sent.push({
-                url,
-                body: JSON.parse(init.body ?? "{}") as Record<string, unknown>,
-                as: credentialOf(init)
-            });
-            attempt += 1;
-            // The App is asked first and refused; the person's account mints it.
-            const refused = attempt === 1;
-            return {
-                status: refused ? 403 : 201,
-                ok: !refused,
-                json: async () => ({ id: 4212 })
-            } as unknown as Response;
-        });
+        vi.stubGlobal(
+            "fetch",
+            async (url: string, init: { body?: string; headers?: Record<string, string> }) => {
+                sent.push({
+                    url,
+                    body: JSON.parse(init.body ?? "{}") as Record<string, unknown>,
+                    as: credentialOf(init)
+                });
+                attempt += 1;
+                // The App is asked first and refused; the person's account mints it.
+                const refused = attempt === 1;
+                return {
+                    status: refused ? 403 : 201,
+                    ok: !refused,
+                    json: async () => ({ id: 4212 })
+                } as unknown as Response;
+            }
+        );
 
         await announceDeployQueued("dep-1");
 
@@ -553,21 +583,33 @@ describe("why a deploy was not announced at all", () => {
         mocks.domainFindMany.mockResolvedValue([]);
         vi.stubGlobal(
             "fetch",
-            async (url: string, init: { method?: string; body?: string; headers?: Record<string, string> }) => {
+            async (
+                url: string,
+                init: { method?: string; body?: string; headers?: Record<string, string> }
+            ) => {
                 sent.push({
                     url,
                     body: JSON.parse(init.body ?? "{}") as Record<string, unknown>,
                     as: credentialOf(init)
                 });
-                const payload = url.includes("/commits/") ? { check_runs: [{ id: 77 }] } : { id: 77 };
-                return { status: init.method === "PATCH" ? 200 : 201, ok: true, json: async () => payload } as unknown as Response;
+                const payload = url.includes("/commits/")
+                    ? { check_runs: [{ id: 77 }] }
+                    : { id: 77 };
+                return {
+                    status: init.method === "PATCH" ? 200 : 201,
+                    ok: true,
+                    json: async () => payload
+                } as unknown as Response;
             }
         );
 
         await announceDeployFinished("dep-1", "running");
 
         expect(requestTo("/statuses/9f2c1b0")?.body.state).toBe("success");
-        expect(requestTo("/check-runs/77")?.body).toMatchObject({ status: "completed", conclusion: "success" });
+        expect(requestTo("/check-runs/77")?.body).toMatchObject({
+            status: "completed",
+            conclusion: "success"
+        });
     });
 
     it("writes no check run beside a status when none was opened", async () => {

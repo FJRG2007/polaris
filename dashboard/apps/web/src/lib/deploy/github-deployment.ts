@@ -38,7 +38,12 @@ import {
 } from "@/lib/github-service";
 import { noteDeploymentsRefused } from "@/lib/connections/health";
 import { isPublicUrl } from "@/lib/agents/agent-repo-service";
-import { createDeployment, setDeploymentState, type AnnounceResult, type DeploymentState } from "@/lib/github-service";
+import {
+    createDeployment,
+    setDeploymentState,
+    type AnnounceResult,
+    type DeploymentState
+} from "@/lib/github-service";
 
 /** What a deploy needs before it can be announced at all. */
 interface Announceable {
@@ -104,7 +109,9 @@ async function announceable(deploymentId: string): Promise<AnnounceTarget> {
             name: true,
             slug: true,
             sourceConfig: true,
-            environment: { select: { name: true, project: { select: { name: true, ownerId: true } } } }
+            environment: {
+                select: { name: true, project: { select: { name: true, ownerId: true } } }
+            }
         }
     });
     if (!app) return NOT_APPLICABLE;
@@ -174,7 +181,9 @@ async function announceableOf(deploymentId: string): Promise<Announceable | null
 }
 
 /** The repository and id a deployment was announced as, or null when it never was. */
-async function announced(deploymentId: string): Promise<{ owner: string; repo: string; id: string } | null> {
+async function announced(
+    deploymentId: string
+): Promise<{ owner: string; repo: string; id: string } | null> {
     const row = await prisma.deployment.findUnique({
         where: { id: deploymentId },
         select: { githubRepo: true, githubDeploymentId: true }
@@ -202,7 +211,9 @@ async function reachableUrl(deploymentId: string, applicationId: string): Promis
         select: { hostname: true, https: true, pathPrefix: true, kind: true, deploymentId: true }
     });
     const ordered = [
-        ...domains.filter((domain) => domain.kind === "release" && domain.deploymentId === deploymentId),
+        ...domains.filter(
+            (domain) => domain.kind === "release" && domain.deploymentId === deploymentId
+        ),
         ...domains.filter((domain) => domain.kind !== "release")
     ];
     for (const domain of ordered) {
@@ -253,7 +264,8 @@ export function announceRefusal(status: number, owner: string, repo: string): st
     if (status === 409) {
         return `[warn] GitHub will not show this deploy on the commit: ${owner}/${repo} answered that this commit conflicts with the branch it deploys.`;
     }
-    if (status === 0) return "[warn] GitHub could not be reached, so this deploy is not shown on the commit.";
+    if (status === 0)
+        return "[warn] GitHub could not be reached, so this deploy is not shown on the commit.";
     return `[warn] GitHub answered ${status} and will not show this deploy on the commit.`;
 }
 
@@ -473,7 +485,14 @@ export async function announceDeployFinished(deploymentId: string, status: strin
 /** What the check row says for each state a deploy reaches. The words are the
  *  ones somebody reads without opening anything, which is what that row is
  *  for. */
-const CHECK_WORDS: Record<DeploymentState, { status: "queued" | "in_progress" | "completed"; conclusion?: "success" | "failure" | "cancelled"; summary: string }> = {
+const CHECK_WORDS: Record<
+    DeploymentState,
+    {
+        status: "queued" | "in_progress" | "completed";
+        conclusion?: "success" | "failure" | "cancelled";
+        summary: string;
+    }
+> = {
     queued: { status: "queued", summary: "Waiting for a build slot" },
     in_progress: { status: "in_progress", summary: "Deployment is building" },
     success: { status: "completed", conclusion: "success", summary: "Deployment has completed" },
@@ -485,7 +504,11 @@ const CHECK_WORDS: Record<DeploymentState, { status: "queued" | "in_progress" | 
     inactive: { status: "completed", conclusion: "success", summary: "Deployment has completed" }
 };
 
-async function postState(deploymentId: string, state: DeploymentState, description: string): Promise<void> {
+async function postState(
+    deploymentId: string,
+    state: DeploymentState,
+    description: string
+): Promise<void> {
     try {
         const target = await announced(deploymentId);
         if (!target) return;
@@ -514,7 +537,8 @@ async function postState(deploymentId: string, state: DeploymentState, descripti
                 // The reason a deploy failed says more than the word "failure", and
                 // it is the line somebody reads before deciding whether to open the
                 // log at all.
-                description: state === "failure" && deployment.error ? deployment.error : description,
+                description:
+                    state === "failure" && deployment.error ? deployment.error : description,
                 environmentUrl,
                 logUrl: where,
                 token: as
@@ -531,7 +555,10 @@ async function postState(deploymentId: string, state: DeploymentState, descripti
         // turned down is the same refusal as the verdict that follows it, and three
         // identical warnings in one log is noise nobody reads to the end of.
         if (posted.status !== 201 && state !== "queued" && state !== "in_progress") {
-            await noteOnDeploy(deploymentId, announceRefusal(posted.status, target.owner, target.repo));
+            await noteOnDeploy(
+                deploymentId,
+                announceRefusal(posted.status, target.owner, target.repo)
+            );
         }
 
         // And the row on the commit, which moves with it.
