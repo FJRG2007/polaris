@@ -442,6 +442,17 @@ html:has(.page-bleed) {
     outline-offset: 2px;
 }
 
+/* Something that appears or leaves moves on the same curve as everything that
+   changes colour. tailwindcss-animate sets a name and a duration and leaves the
+   timing to the browser's default `ease`, which is a second curve nobody chose.
+   Zero specificity, so an element that asks for another one still gets it.
+   Matched on the class text rather than the class, because most of them carry it
+   behind a variant - `data-[state=open]:animate-in` - and `.animate-in` alone
+   matched none of the menus, popovers and dialogs it was written for. */
+:where([class*="animate-in"], [class*="animate-out"]) {
+    animation-timing-function: var(--ease);
+}
+
 /* Nothing animates for somebody who asked for less motion. Kept as one rule
    rather than a prop threaded through every component. */
 @media (prefers-reduced-motion: reduce) {

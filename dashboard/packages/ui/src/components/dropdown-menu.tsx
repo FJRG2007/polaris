@@ -3,6 +3,7 @@
 /** Dropdown menu built on Radix. Used by the app switcher and row actions. */
 
 import { cn } from "../lib/cn";
+import { FLOATING_MOTION } from "../lib/motion";
 import { ChevronRight } from "lucide-react";
 import { useSettledHover } from "../lib/menu-hover";
 import { ignoreOpeningPress } from "../lib/menu-press";
@@ -34,7 +35,8 @@ export const DropdownMenuContent = forwardRef<
             // that clipped its overflow left the bottom half of it unreachable.
             collisionPadding={collisionPadding}
             className={cn(
-                "z-50 max-h-[--radix-dropdown-menu-content-available-height] min-w-[min(12rem,calc(100vw-2rem))] max-w-[--radix-dropdown-menu-content-available-width] overflow-y-auto overflow-x-hidden overscroll-contain rounded-lg border border-border-strong bg-elevated p-1 text-foreground shadow-popover data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
+                "z-50 max-h-[--radix-dropdown-menu-content-available-height] min-w-[min(12rem,calc(100vw-2rem))] max-w-[--radix-dropdown-menu-content-available-width] overflow-y-auto overflow-x-hidden overscroll-contain rounded-lg border border-border-strong bg-elevated p-1 text-foreground shadow-popover",
+                FLOATING_MOTION,
                 className
             )}
             {...props}
@@ -133,7 +135,8 @@ export const DropdownMenuSubContent = forwardRef<
             ref={ref}
             collisionPadding={collisionPadding}
             className={cn(
-                "z-50 max-h-[--radix-dropdown-menu-content-available-height] min-w-[min(12rem,calc(100vw-2rem))] max-w-[--radix-dropdown-menu-content-available-width] overflow-y-auto overflow-x-hidden overscroll-contain rounded-lg border border-border-strong bg-elevated p-1 text-foreground shadow-popover data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
+                "z-50 max-h-[--radix-dropdown-menu-content-available-height] min-w-[min(12rem,calc(100vw-2rem))] max-w-[--radix-dropdown-menu-content-available-width] overflow-y-auto overflow-x-hidden overscroll-contain rounded-lg border border-border-strong bg-elevated p-1 text-foreground shadow-popover",
+                FLOATING_MOTION,
                 className
             )}
             {...props}

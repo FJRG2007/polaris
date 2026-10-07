@@ -223,7 +223,7 @@ export function ColorPicker({
                                 const parsed = hexToHsv(suggestion);
                                 if (parsed) emit(parsed);
                             }}
-                            className="size-5 rounded border border-border transition-transform hover:scale-110"
+                            className="size-5 rounded border border-border transition-[border-color,box-shadow] duration-fast hover:border-border-strong hover:ring-2 hover:ring-border-strong"
                             style={{ backgroundColor: suggestion }}
                         />
                     ))}
