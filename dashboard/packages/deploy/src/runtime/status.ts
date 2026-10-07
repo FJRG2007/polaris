@@ -56,13 +56,15 @@ function healthcheckOf(container: Record<string, unknown>): ContainerState["heal
     if (Array.isArray(record.Test) && record.Test[0] === "NONE") return undefined;
     return {
         intervalSeconds: seconds(record.Interval),
-        retries: typeof record.Retries === "number" && record.Retries > 0 ? record.Retries : undefined,
+        retries:
+            typeof record.Retries === "number" && record.Retries > 0 ? record.Retries : undefined,
         startPeriodSeconds: seconds(record.StartPeriod)
     };
 }
 
 export function parseContainerState(inspect: unknown): ContainerState {
-    if (typeof inspect !== "object" || inspect === null) return { status: "unknown", restartCount: 0 };
+    if (typeof inspect !== "object" || inspect === null)
+        return { status: "unknown", restartCount: 0 };
     const container = inspect as Record<string, unknown>;
     // Not under State, unlike everything else here, so it is read before the
     // early return that a container with no State block takes.
