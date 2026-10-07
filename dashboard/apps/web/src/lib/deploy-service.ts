@@ -1863,9 +1863,9 @@ export async function setApplicationDomainEnabled(
  * that mount is lost on a host reboot, and the app container then comes back bound
  * to an empty local dir. This runs at boot (like `syncAppRoutes`): for every running
  * app with a nas volume it re-ensures the mount and - only when the mount was
- * actually absent (`created`, i.e. after a reboot; a routine restart keeps the mount
- * alive via rshared propagation, so nothing is disturbed) - restarts the app so its
- * bind resolves back onto the NAS. Best-effort: failures are logged, never fatal.
+ * actually absent (`created`, i.e. after a reboot or a session that died) - restarts
+ * every app bound to that share, not only the one whose turn it was. Best-effort:
+ * failures are logged, never fatal.
  */
 export async function reconcileNasMounts(): Promise<void> {
     const apps = await prisma.application.findMany({
@@ -1883,6 +1883,10 @@ export async function reconcileNasMounts(): Promise<void> {
             }
         }
     });
+    // A share several apps bind onto is mounted once per machine: the first app to
+    // ask re-creates it and every later one is told it was already there, so the
+    // restart has to cover all of them at that moment rather than only the asker.
+    const settled = new Set<string>();
     for (const app of apps) {
         const ownerId = app.environment.project.ownerId;
         const connectionIds = [
@@ -1896,27 +1900,113 @@ export async function reconcileNasMounts(): Promise<void> {
             continue;
         }
         try {
-            let recreated = false;
             for (const id of connectionIds) {
+                const machine = machineOf(app.target as TargetRow);
+                const key = `${machine ?? ""}:${id}`;
+                if (settled.has(key)) continue;
                 const mount = await resolveMountTarget(id, ownerId).catch(() => null);
                 if (!mount) continue;
-                if (await ports.ensureMount(mount)) recreated = true;
-            }
-            // Only after a mount had to be re-created (a reboot) does the running
-            // container hold a stale bind; restart it so the bind re-resolves.
-            if (recreated) {
-                // A service with a NAS volume never runs its releases side by side, so
-                // its own container name is the one serving it.
-                const container = deployReleases.serviceRef(
-                    app.environment.project.slug,
-                    app.slug,
-                    app.id
-                ).name;
-                await ports.container(container, "restart");
-                console.log(`polaris: re-established NAS mount for ${app.slug} and restarted it`);
+                const created = await ports.ensureMount(mount);
+                settled.add(key);
+                if (created) await restartAppsOnShare(id, machine);
             }
         } catch (error) {
             console.error(`polaris: NAS mount reconcile failed for ${app.slug}:`, error);
+        } finally {
+            await ports.dispose().catch(() => undefined);
+        }
+    }
+}
+
+/** The machine a target runs on: null for this one, else its SSH host. A share is
+ *  mounted once per machine, so this is what decides who shares a mount. */
+function machineOf(target: Pick<TargetRow, "kind" | "hostId">): string | null {
+    return target.kind === "local" || !target.hostId ? null : target.hostId;
+}
+
+/** Ports that, whenever a deploy has to mount a share again, restart the other
+ *  apps on the machine still bound to the mount it replaced. */
+function restartingOnRemount(
+    ports: RuntimePorts,
+    machine: string | null,
+    deploying: string | undefined
+): RuntimePorts {
+    const ensureMount: RuntimePorts["ensureMount"] = async (spec) => {
+        const created = await ports.ensureMount(spec);
+        if (created) void restartAppsOnShare(spec.id, machine, deploying);
+        return created;
+    };
+    return new Proxy(ports, {
+        get: (target, key) => {
+            if (key === "ensureMount") return ensureMount;
+            const value: unknown = Reflect.get(target, key, target);
+            return typeof value === "function" ? value.bind(target) : value;
+        }
+    });
+}
+
+/**
+ * Restart every running app on one machine that binds onto a share which has just
+ * been mounted there again.
+ *
+ * A container's bind is resolved once, when it starts, onto whatever filesystem
+ * held the path then. When that mount dies - the NAS rebooted, or came back on a
+ * new address - and something mounts the share again, the host sees the new one
+ * and every container started before it is still bound to the dead one, where
+ * every file answers "Host is down". Nothing short of a restart moves the bind, so
+ * whoever re-creates the mount (a deploy, Drive, the boot reconcile) calls this.
+ *
+ * `except` is the app a deploy is bringing up right now, whose new container binds
+ * the fresh mount anyway. Best-effort: failures are logged, never thrown.
+ */
+export async function restartAppsOnShare(
+    connectionId: string,
+    machine: string | null,
+    except?: string
+): Promise<void> {
+    const apps = await prisma.application
+        .findMany({
+            where: {
+                id: except ? { not: except } : undefined,
+                desiredState: "running",
+                currentDeploymentId: { not: null },
+                volumes: { some: { kind: "nas", connectionId } },
+                target:
+                    machine === null
+                        ? { OR: [{ kind: "local" }, { hostId: null }] }
+                        : { kind: { not: "local" }, hostId: machine }
+            },
+            select: {
+                id: true,
+                slug: true,
+                target: true,
+                environment: { select: { project: { select: { ownerId: true, slug: true } } } }
+            }
+        })
+        .catch((error) => {
+            console.error(`polaris: could not list the apps on share ${connectionId}:`, error);
+            return [];
+        });
+    for (const app of apps) {
+        let ports;
+        try {
+            ports = await getPorts(app.target as TargetRow, app.environment.project.ownerId);
+        } catch (error) {
+            console.error(`polaris: could not reach ${app.slug}'s target to restart it:`, error);
+            continue;
+        }
+        try {
+            // A service with a NAS volume never runs its releases side by side, so
+            // its own container name is the one serving it.
+            const container = deployReleases.serviceRef(
+                app.environment.project.slug,
+                app.slug,
+                app.id
+            ).name;
+            await ports.container(container, "restart");
+            console.log(`polaris: share ${connectionId} was mounted again, restarted ${app.slug}`);
+        } catch (error) {
+            console.error(`polaris: could not restart ${app.slug} onto share ${connectionId}:`, error);
         } finally {
             await ports.dispose().catch(() => undefined);
         }
@@ -4548,7 +4638,7 @@ export async function executeDeployment(
     // so there is nothing to unwind - and starting now would ignore the operator.
     const queuedRow = await prisma.deployment.findUnique({
         where: { id: deploymentId },
-        select: { status: true }
+        select: { status: true, deployableType: true, deployableId: true }
     });
     if (!queuedRow || TERMINAL_DEPLOY_STATUSES.has(queuedRow.status)) return;
 
@@ -4584,7 +4674,11 @@ export async function executeDeployment(
     let ports: RuntimePorts | undefined;
     let builderPorts: RuntimePorts | undefined;
     try {
-        ports = await getPorts(target, ownerId, controller.signal);
+        ports = restartingOnRemount(
+            await getPorts(target, ownerId, controller.signal),
+            machineOf(target),
+            queuedRow.deployableType === "application" ? queuedRow.deployableId : undefined
+        );
         // The build machine, opened alongside the one that runs it and bound to the
         // same cancel.
         if (builder) builderPorts = await getPorts(builder.target, ownerId, controller.signal);

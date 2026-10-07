@@ -268,8 +268,9 @@ async function hostMountedDriver(row: ConnectionRow): Promise<StorageDriver | nu
     }
     const failedAt = mountsFailed.get(row.id);
     if (failedAt !== undefined && Date.now() - failedAt < MOUNT_RETRY_MS) return null;
+    let created = false;
     try {
-        await withTimeout(
+        ({ created } = await withTimeout(
             new HostdClient().createMount({
                 id: spec.id,
                 kind: spec.kind,
@@ -281,7 +282,7 @@ async function hostMountedDriver(row: ConnectionRow): Promise<StorageDriver | nu
             }),
             MOUNT_REQUEST_TIMEOUT_MS,
             `the host did not finish mounting it within ${MOUNT_REQUEST_TIMEOUT_MS / 1000} seconds`
-        );
+        ));
     } catch (error) {
         // The daemon is the fast path, not the only one. A share it cannot mount
         // (no daemon, an NFS export that moved, a NAS that is briefly away) falls
@@ -291,6 +292,14 @@ async function hostMountedDriver(row: ConnectionRow): Promise<StorageDriver | nu
         return null;
     }
     mountsFailed.delete(row.id);
+    // Mounted afresh, which is what happens after the old mount died: every
+    // service on this machine started before it is still bound to the dead one.
+    // Imported here, not at the top, because the deploy service imports this file.
+    if (created) {
+        void import("./deploy-service")
+            .then((deploy) => deploy.restartAppsOnShare(row.id, null))
+            .catch((error) => console.error(`storage: could not restart the apps on ${row.id}:`, error));
+    }
     // The daemon mounts into the HOST's namespace; this process only sees that
     // mount when `<mount_root>` is bound into its own container with slave
     // propagation. Where it is not - an older compose file, a deployment that
