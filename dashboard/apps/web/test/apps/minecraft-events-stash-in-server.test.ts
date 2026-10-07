@@ -21,7 +21,12 @@ vi.mock("@polaris/db", () => ({
     }
 }));
 vi.mock("@polaris/app-host", () => ({
-    host: { appsInstallConfig: { readInstallConfig: () => ({}), patchInstallConfig: async () => undefined } }
+    host: {
+        appsInstallConfig: {
+            readInstallConfig: () => ({}),
+            patchInstallConfig: async () => undefined
+        }
+    }
 }));
 vi.mock("@polaris-app/game-servers/src/lib/minecraft/service", () => ({
     withServerContainer: async () => {
@@ -79,7 +84,9 @@ describe("stashing in the server", () => {
 
     it("keeps out somebody the mod could not stash", async () => {
         answer = (command) =>
-            command === "polaris caps" ? CAPS : '{"key":"k","player":"Ana","ok":false,"why":"unsaved"}';
+            command === "polaris caps"
+                ? CAPS
+                : '{"key":"k","player":"Ana","ok":false,"why":"unsaved"}';
         const result = await stashIn(server, OWNER, "Ana", async () => undefined);
         expect(result.refused?.why).toBe("unsaved");
     });
@@ -87,7 +94,16 @@ describe("stashing in the server", () => {
     it("takes the second look under a key of its own", async () => {
         answer = (command) => (command === "polaris caps" ? CAPS : '{"ok":true,"already":false}');
         const first = inServer.stashKey("run-1", "Ana");
-        const existing = { barrels: [], casing: [], kept: [], experience: null, vitals: null, state: "stashed", record: null, mod: [first] } as Stash;
+        const existing = {
+            barrels: [],
+            casing: [],
+            kept: [],
+            experience: null,
+            vitals: null,
+            state: "stashed",
+            record: null,
+            mod: [first]
+        } as Stash;
         const result = await stashIn(server, OWNER, "Ana", async () => undefined, existing);
         expect(result.stash?.mod).toEqual([first, `${first}-1`]);
     });
@@ -95,12 +111,23 @@ describe("stashing in the server", () => {
 
 describe("giving back in the server", () => {
     const kept = (keys: string[]) =>
-        ({ barrels: [], casing: [], kept: [], experience: null, vitals: null, state: "stashed", record: null, mod: keys }) as Stash;
+        ({
+            barrels: [],
+            casing: [],
+            kept: [],
+            experience: null,
+            vitals: null,
+            state: "stashed",
+            record: null,
+            mod: keys
+        }) as Stash;
 
     it("restores each key and is done", async () => {
         answer = () => '{"ok":true,"restored":true,"slotted":12,"moved":0,"dropped":1}';
         const saves: (Stash | null)[] = [];
-        expect(await giveBack(server, "Ana", kept(["a", "a-1"]), async (left) => void saves.push(left))).toBe("done");
+        expect(
+            await giveBack(server, "Ana", kept(["a", "a-1"]), async (left) => void saves.push(left))
+        ).toBe("done");
         expect(said).toEqual(["polaris stash restore Ana a", "polaris stash restore Ana a-1"]);
         expect(saves.at(-1)).toBeNull();
     });
@@ -115,7 +142,9 @@ describe("giving back in the server", () => {
     it("keeps a key whose file the mod could not read, for later", async () => {
         answer = () => '{"ok":false,"why":"unreadable"}';
         const saves: (Stash | null)[] = [];
-        expect(await giveBack(server, "Ana", kept(["a"]), async (left) => void saves.push(left))).toBe("later");
+        expect(
+            await giveBack(server, "Ana", kept(["a"]), async (left) => void saves.push(left))
+        ).toBe("later");
         expect(saves).toEqual([]);
     });
 
@@ -126,7 +155,9 @@ describe("giving back in the server", () => {
                 : "";
         const saves: (Stash | null)[] = [];
         const mixed = { ...kept(["a"]), record: "row-1" } as Stash;
-        expect(await giveBack(server, "Ana", mixed, async (left) => void saves.push(left))).toBe("offline");
+        expect(await giveBack(server, "Ana", mixed, async (left) => void saves.push(left))).toBe(
+            "offline"
+        );
         expect(said[0]).toBe("polaris stash restore Ana a");
         expect(saves).toEqual([{ ...mixed, mod: [] }]);
     });

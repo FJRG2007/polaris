@@ -702,13 +702,13 @@ which stays fully supported and tested.
 
 **Which servers get which path**
 
-| Server | Path |
-| --- | --- |
-| NeoForge 1.21.4 with the Polaris mod (every one Polaris manages, after one restart) | In-server: `polaris stash`, `polaris batch`, hiding by line of sight |
-| NeoForge 1.21.4 not yet restarted onto the new jar | Plain commands until it restarts |
-| NeoForge on another release, Forge, Fabric, Quilt | Plain commands - no Polaris mod build |
-| Paper, Purpur, Spigot, Folia | Plain commands - the Polaris plugins there (anti-cheat, login) have no event commands |
-| Vanilla, Bedrock | Plain commands |
+| Server                                                                              | Path                                                                                  |
+| ----------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
+| NeoForge 1.21.4 with the Polaris mod (every one Polaris manages, after one restart) | In-server: `polaris stash`, `polaris batch`, hiding by line of sight                  |
+| NeoForge 1.21.4 not yet restarted onto the new jar                                  | Plain commands until it restarts                                                      |
+| NeoForge on another release, Forge, Fabric, Quilt                                   | Plain commands - no Polaris mod build                                                 |
+| Paper, Purpur, Spigot, Folia                                                        | Plain commands - the Polaris plugins there (anti-cheat, login) have no event commands |
+| Vanilla, Bedrock                                                                    | Plain commands                                                                        |
 
 **The fallback rule.** Never decide from the loader. `in-server.capabilities`
 asks `polaris caps` and uses a command only when the mod lists it (`stash`,

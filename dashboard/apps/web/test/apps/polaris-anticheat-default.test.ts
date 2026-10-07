@@ -171,7 +171,11 @@ describe("the Polaris mod on every server it has a build for", () => {
     });
 
     it("leaves a server that has it, one with no build, and a plugin server", async () => {
-        server("1", { TYPE: "NEOFORGE", VERSION: "1.21.4", MODS: JAR.replace("polaris.example", "old.example") });
+        server("1", {
+            TYPE: "NEOFORGE",
+            VERSION: "1.21.4",
+            MODS: JAR.replace("polaris.example", "old.example")
+        });
         server("2", { TYPE: "NEOFORGE", VERSION: "1.21.1" });
         server("3", { TYPE: "PAPER", VERSION: "1.21.4" });
         server("4", { TYPE: "VANILLA", VERSION: "1.21.4" });

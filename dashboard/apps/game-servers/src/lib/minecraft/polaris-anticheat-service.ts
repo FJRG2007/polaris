@@ -11,7 +11,15 @@ import { ownerLocale } from "../owner-words";
 import { gameMessage } from "../game-message";
 import { prisma } from "@polaris/db";
 import { host } from "@polaris/app-host";
-import { MODS_KEY, TOKEN_KEY, carriesFile, componentFileFor, loginOn, modUrl, withMod } from "./polaris-login";
+import {
+    MODS_KEY,
+    TOKEN_KEY,
+    carriesFile,
+    componentFileFor,
+    loginOn,
+    modUrl,
+    withMod
+} from "./polaris-login";
 import { SOFTWARE_KEY } from "./join-guard";
 import { anticheatBundled } from "./polaris-mod-files";
 import { EVIDENCE_WINDOW_MS, readXray } from "./xray";
@@ -218,7 +226,10 @@ export async function adoptPolarisComponent(): Promise<{ adopted: number }> {
             ]);
             adopted += 1;
         } catch (caught) {
-            console.error(`[minecraft-component] could not add the Polaris mod to ${install.id}:`, caught);
+            console.error(
+                `[minecraft-component] could not add the Polaris mod to ${install.id}:`,
+                caught
+            );
         }
     }
     return { adopted };

@@ -150,7 +150,8 @@ export function batchLines(
     const lines = [
         `data remove storage polaris:batch ${key}`,
         ...commands.map(
-            (command) => `data modify storage polaris:batch ${key} append value ${snbtString(command)}`
+            (command) =>
+                `data modify storage polaris:batch ${key} append value ${snbtString(command)}`
         ),
         `polaris batch run ${key} ${blocksPerTick}`
     ];

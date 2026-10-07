@@ -36,9 +36,9 @@ function fakeServer(answer: (command: string) => string, edition: "java" | "bedr
 describe("capabilities", () => {
     it("counts only what the mod lists", () => {
         expect([...inServer.parseCaps(CAPS)]).toEqual(["stash", "batch", "seek"]);
-        expect(inServer.parseCaps('{"ok":true,"polaris":"0.5.0","caps":["stash","later"]}')).toEqual(
-            new Set(["stash"])
-        );
+        expect(
+            inServer.parseCaps('{"ok":true,"polaris":"0.5.0","caps":["stash","later"]}')
+        ).toEqual(new Set(["stash"]));
     });
 
     it("is nothing on a server without the mod", () => {
@@ -51,7 +51,9 @@ describe("capabilities", () => {
 
     it("asks once a minute per server, and never a Bedrock one", async () => {
         const { server, said } = fakeServer(() => CAPS);
-        expect(await inServer.capabilities(server, 1_000)).toEqual(new Set(["stash", "batch", "seek"]));
+        expect(await inServer.capabilities(server, 1_000)).toEqual(
+            new Set(["stash", "batch", "seek"])
+        );
         await inServer.capabilities(server, 30_000);
         expect(said).toEqual(["polaris caps"]);
         await inServer.capabilities(server, 62_000);
@@ -78,7 +80,9 @@ describe("stash commands", () => {
 
     it("reads the mod's answer, and nothing else", () => {
         expect(
-            inServer.parseStashReply('{"key":"k","player":"Steve","ok":true,"already":false,"items":3}')
+            inServer.parseStashReply(
+                '{"key":"k","player":"Steve","ok":true,"already":false,"items":3}'
+            )
         ).toMatchObject({ ok: true, already: false, items: 3 });
         expect(inServer.parseStashReply('{"ok":false,"why":"offline"}')).toEqual({
             ok: false,
@@ -90,7 +94,11 @@ describe("stash commands", () => {
 
 describe("batches", () => {
     it("writes each command to storage, escaped, and starts it", () => {
-        const lines = inServer.batchLines("pb1", ['say "hi"', "fill 0 0 0 9 9 9 minecraft:stone"], 4096)!;
+        const lines = inServer.batchLines(
+            "pb1",
+            ['say "hi"', "fill 0 0 0 9 9 9 minecraft:stone"],
+            4096
+        )!;
         expect(lines).toEqual([
             "data remove storage polaris:batch pb1",
             'data modify storage polaris:batch pb1 append value "say \\"hi\\""',
@@ -112,9 +120,14 @@ describe("batches", () => {
             polls += 1;
             return `{"ok":true,"key":"k","done":${polls >= 2},"total":2,"ran":${polls},"failed":0}`;
         });
-        expect(await inServer.build(server, ["fill 0 0 0 9 9 9 stone", "say done"], undefined, async () => undefined)).toBe(
-            true
-        );
+        expect(
+            await inServer.build(
+                server,
+                ["fill 0 0 0 9 9 9 stone", "say done"],
+                undefined,
+                async () => undefined
+            )
+        ).toBe(true);
         expect(sent[0]).toMatch(/^data remove storage polaris:batch pb/);
         expect(sent).toHaveLength(3);
         expect(said.filter((one) => one.startsWith("polaris batch status"))).toHaveLength(2);
