@@ -30,6 +30,7 @@
         "unpublishedShort": "Runs on another server and is not published on a port, so Polaris cannot reach it from here.",
         "redisCluster": "A Redis cluster spreads its keys over several masters, and the browser reads one server at a time, so it cannot open one.",
         "noSuchName": "There is nothing here by that name.",
+        "noSuchDatabase": "There is no database by that name on this server.",
         "notEditable": "Values in this kind of database are not edited from the grid.",
         "redisOnly": "Only a Redis key has a value to open.",
         "noPrimaryKey": "This table has no primary key, so there is no way to change one row of it without risking the others. Use the statement box.",
@@ -401,6 +402,8 @@
     },
     "bench": {
         "schema": "Which schema",
+        "database": "Which database",
+        "databaseHome": "{name} (default)",
         "findTable": "Find a table",
         "orderBy": "Order by",
         "orderTables": "Order the tables by",

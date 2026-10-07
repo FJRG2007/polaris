@@ -30,6 +30,7 @@
         "unpublishedShort": "Corre en otro servidor y no está publicada en un puerto, así que Polaris no llega a ella desde aquí.",
         "redisCluster": "Un clúster de Redis reparte sus claves entre varios maestros, y el explorador lee un servidor cada vez, así que no puede abrirlo.",
         "noSuchName": "Aquí no hay nada con ese nombre.",
+        "noSuchDatabase": "En este servidor no hay ninguna base de datos con ese nombre.",
         "notEditable": "Los valores de este tipo de base de datos no se editan desde la tabla.",
         "redisOnly": "Solo una clave de Redis tiene un valor que abrir.",
         "noPrimaryKey": "Esta tabla no tiene clave primaria, así que no hay forma de cambiar una fila sin arriesgar las demás. Usa el cuadro de sentencias.",
@@ -401,6 +402,8 @@
     },
     "bench": {
         "schema": "Qué esquema",
+        "database": "Qué base de datos",
+        "databaseHome": "{name} (predeterminada)",
         "findTable": "Buscar tabla",
         "orderBy": "Ordenar por",
         "orderTables": "Ordenar las tablas por",

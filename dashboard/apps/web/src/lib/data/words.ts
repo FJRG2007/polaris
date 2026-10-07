@@ -106,6 +106,7 @@ const EXACT: Readonly<Record<string, Key>> = {
         "refusals.redisCluster",
     // The drivers.
     "There is nothing here by that name.": "refusals.noSuchName",
+    "There is no database by that name on this server.": "refusals.noSuchDatabase",
     "Values in this kind of database are not edited from the grid.": "refusals.notEditable",
     "Only a Redis key has a value to open.": "refusals.redisOnly",
     "This table has no primary key, so there is no way to change one row of it without risking the others. Use the statement box.":

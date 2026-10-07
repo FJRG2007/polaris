@@ -13,7 +13,7 @@
  */
 
 import * as data from "./driver";
-import { withDriver } from "./open";
+import { serverDatabases, withDriver, withDriverOn } from "./open";
 import { addressOf } from "./connections";
 import type { RedisValue } from "./drivers/redis";
 import type { RowDelete, RowInsert, RowWriteResult, TableDraft } from "./row-edit";
@@ -51,7 +51,8 @@ export async function versionAt(address: data.DataAddress): Promise<string> {
 export async function browse(
     userId: string,
     connectionId: string,
-    namespace: string | null
+    namespace: string | null,
+    database: string | null = null
 ): Promise<{
     shape: data.DataShape;
     namespaces: data.DataNamespace[];
@@ -66,28 +67,47 @@ export async function browse(
      * schema. One answer, sent back, and there is nothing left to drift.
      */
     namespace: string | null;
+    /** The other databases on the server this connection may open, for an
+     *  engine whose connection is bound to one (Postgres). Null elsewhere. */
+    databases: string[] | null;
+    /** The database these were read from; null where the engine has no list. */
+    database: string | null;
 }> {
-    return browseAt(await addressOf(userId, connectionId), namespace);
+    return browseAt(await addressOf(userId, connectionId), namespace, database);
 }
 
 /** `browse`, for an address already resolved and authorized by the caller. */
 export async function browseAt(
     address: data.DataAddress,
-    namespace: string | null
+    namespace: string | null,
+    database: string | null = null
 ): Promise<{
     shape: data.DataShape;
     namespaces: data.DataNamespace[];
     relations: data.DataRelation[];
     namespace: string | null;
+    databases: string[] | null;
+    database: string | null;
 }> {
-    return withDriver(address, async (driver) => {
+    return withDriverOn(address, database, async (driver) => {
         const namespaces = await driver.namespaces();
         // The one it was asked for, or the one a database is worth opening on -
         // `public` before the engine's own bookkeeping. A tree that opens on
         // nothing is a tree somebody has to click before it says anything.
         const chosen = namespace ?? data.openingNamespace(namespaces);
         const relations = chosen === null ? [] : await driver.relations(chosen);
-        return { shape: driver.shape, namespaces, relations, namespace: chosen };
+        // `pg_database` is shared by every database on the server, so the list
+        // read from inside the switched-to one is the same list.
+        const databases = driver.databases ? await serverDatabases(address, driver) : null;
+        const opened = databases === null ? null : (database ?? address.database ?? null);
+        return {
+            shape: driver.shape,
+            namespaces,
+            relations,
+            namespace: chosen,
+            databases,
+            database: opened
+        };
     });
 }
 
@@ -97,18 +117,20 @@ export async function rows(
     connectionId: string,
     namespace: string | null,
     relation: string,
-    request: RowRequest
+    request: RowRequest,
+    database: string | null = null
 ): Promise<data.DataPage> {
-    return rowsAt(await addressOf(userId, connectionId), namespace, relation, request);
+    return rowsAt(await addressOf(userId, connectionId), namespace, relation, request, database);
 }
 
 export async function rowsAt(
     address: data.DataAddress,
     namespace: string | null,
     relation: string,
-    request: RowRequest
+    request: RowRequest,
+    database: string | null = null
 ): Promise<data.DataPage> {
-    return withDriver(address, async (driver) => {
+    return withDriverOn(address, database, async (driver) => {
         // The relation has to be one this connection actually holds. The name
         // goes into a statement in a position no parameter can occupy, so being
         // on the list the engine just gave us is the gate in front of the
@@ -145,16 +167,18 @@ export async function rowsAt(
 export async function updateCell(
     userId: string,
     connectionId: string,
-    edit: data.CellEdit
+    edit: data.CellEdit,
+    database: string | null = null
 ): Promise<data.CellEditResult> {
-    return updateCellAt(await addressOf(userId, connectionId), edit);
+    return updateCellAt(await addressOf(userId, connectionId), edit, database);
 }
 
 export async function updateCellAt(
     address: data.DataAddress,
-    edit: data.CellEdit
+    edit: data.CellEdit,
+    database: string | null = null
 ): Promise<data.CellEditResult> {
-    return withDriver(address, async (driver) => {
+    return withDriverOn(address, database, async (driver) => {
         if (!driver.updateCell) {
             throw new data.DataRequestError(
                 "Values in this kind of database are not edited from the grid."
@@ -172,16 +196,18 @@ export async function updateCellAt(
 export async function run(
     userId: string,
     connectionId: string,
-    statement: string
+    statement: string,
+    database: string | null = null
 ): Promise<data.QueryResult[]> {
-    return runAt(await addressOf(userId, connectionId), statement);
+    return runAt(await addressOf(userId, connectionId), statement, database);
 }
 
 export async function runAt(
     address: data.DataAddress,
-    statement: string
+    statement: string,
+    database: string | null = null
 ): Promise<data.QueryResult[]> {
-    return withDriver(address, (driver) => driver.run(statement));
+    return withDriverOn(address, database, (driver) => driver.run(statement));
 }
 
 /** What one Redis key holds. */
@@ -233,16 +259,18 @@ const NO_ROW_WRITES = "Rows in this kind of database are not added or removed fr
 export async function insertRow(
     userId: string,
     connectionId: string,
-    insert: RowInsert
+    insert: RowInsert,
+    database: string | null = null
 ): Promise<RowWriteResult> {
-    return insertRowAt(await addressOf(userId, connectionId), insert);
+    return insertRowAt(await addressOf(userId, connectionId), insert, database);
 }
 
 export async function insertRowAt(
     address: data.DataAddress,
-    insert: RowInsert
+    insert: RowInsert,
+    database: string | null = null
 ): Promise<RowWriteResult> {
-    return withDriver(address, async (driver) => {
+    return withDriverOn(address, database, async (driver) => {
         if (!driver.insertRow) throw new data.DataRequestError(NO_ROW_WRITES);
         await knownRelation(driver, insert.namespace, insert.relation);
         return driver.insertRow(insert);
@@ -253,16 +281,18 @@ export async function insertRowAt(
 export async function deleteRows(
     userId: string,
     connectionId: string,
-    removal: RowDelete
+    removal: RowDelete,
+    database: string | null = null
 ): Promise<RowWriteResult> {
-    return deleteRowsAt(await addressOf(userId, connectionId), removal);
+    return deleteRowsAt(await addressOf(userId, connectionId), removal, database);
 }
 
 export async function deleteRowsAt(
     address: data.DataAddress,
-    removal: RowDelete
+    removal: RowDelete,
+    database: string | null = null
 ): Promise<RowWriteResult> {
-    return withDriver(address, async (driver) => {
+    return withDriverOn(address, database, async (driver) => {
         if (!driver.deleteRows) throw new data.DataRequestError(NO_ROW_WRITES);
         await knownRelation(driver, removal.namespace, removal.relation);
         return driver.deleteRows(removal);
@@ -273,13 +303,18 @@ export async function deleteRowsAt(
 export async function createTable(
     userId: string,
     connectionId: string,
-    draft: TableDraft
+    draft: TableDraft,
+    database: string | null = null
 ): Promise<void> {
-    return createTableAt(await addressOf(userId, connectionId), draft);
+    return createTableAt(await addressOf(userId, connectionId), draft, database);
 }
 
-export async function createTableAt(address: data.DataAddress, draft: TableDraft): Promise<void> {
-    return withDriver(address, async (driver) => {
+export async function createTableAt(
+    address: data.DataAddress,
+    draft: TableDraft,
+    database: string | null = null
+): Promise<void> {
+    return withDriverOn(address, database, async (driver) => {
         if (!driver.createTable) {
             throw new data.DataRequestError(
                 "Tables in this kind of database are not created from here."

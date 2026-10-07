@@ -30,6 +30,7 @@ import { rateLimit } from "@/lib/rate-limit-service";
 import * as connections from "@/lib/data/connections";
 import type { TableDraft } from "@/lib/data/row-edit";
 import { readPrivateKey, SshKeyError } from "@/lib/data/ssh-key";
+import { databaseChoiceSchema } from "@/lib/data/connection-schema";
 import { engineStats, type DatabaseStats } from "@/lib/data/stats";
 import { databaseInsights, type DatabaseInsights } from "@/lib/data/insights";
 import { rowDeleteSchema, rowInsertSchema, tableDraftSchema } from "@/lib/data/row-edit-schema";
@@ -241,9 +242,19 @@ export async function trustCertificateAction(
     return {};
 }
 
+/**
+ * Which database a call is for, as the server will open it. Absent or null is
+ * the connection's own; any other name is checked for shape here and then has
+ * to be on the server's own list before it is dialled.
+ */
+function databaseOf(database: unknown): string | null {
+    return parsed(databaseChoiceSchema, database);
+}
+
 export async function browseAction(
     id: string,
-    namespace: string | null
+    namespace: string | null,
+    database?: string | null
 ): Promise<{
     shape?: string;
     namespaces?: DataNamespace[];
@@ -251,10 +262,16 @@ export async function browseAction(
     /** The schema the relations came from, so the screen names the one it is
      *  showing rather than choosing again and disagreeing. */
     namespace?: string | null;
+    /** Every database on the server this connection may open (Postgres). */
+    databases?: string[] | null;
+    /** The one these were read from. */
+    database?: string | null;
     error?: string;
 }> {
     const me = await actor();
-    const result = await guard(() => browser.browse(me.id, String(id), namespace));
+    const result = await guard(async () =>
+        browser.browse(me.id, String(id), namespace, databaseOf(database))
+    );
     return result.error ? { error: result.error } : { ...result.value };
 }
 
@@ -262,19 +279,25 @@ export async function rowsAction(
     id: string,
     namespace: string | null,
     relation: string,
-    query: browser.RowRequest
+    query: browser.RowRequest,
+    database?: string | null
 ): Promise<{ page?: DataPage; columns?: DataColumn[]; error?: string }> {
     const me = await actor();
-    const result = await guard(() => browser.rows(me.id, String(id), namespace, relation, query));
+    const result = await guard(async () =>
+        browser.rows(me.id, String(id), namespace, relation, query, databaseOf(database))
+    );
     return result.error ? { error: result.error } : { page: result.value };
 }
 
 export async function runAction(
     id: string,
-    statement: string
+    statement: string,
+    database?: string | null
 ): Promise<{ results?: QueryResult[]; error?: string }> {
     const me = await actor();
-    const result = await guard(() => browser.run(me.id, String(id), String(statement)));
+    const result = await guard(async () =>
+        browser.run(me.id, String(id), String(statement), databaseOf(database))
+    );
     return result.error ? { error: result.error } : { results: result.value };
 }
 
@@ -295,17 +318,23 @@ export async function updateCellAction(
         column: string;
         value: string | null;
         key: Record<string, unknown>;
-    }
+    },
+    database?: string | null
 ): Promise<{ changed?: number; error?: string }> {
     const me = await actor();
-    const result = await guard(() =>
-        browser.updateCell(me.id, String(id), {
-            namespace: edit.namespace,
-            relation: String(edit.relation),
-            column: String(edit.column),
-            value: edit.value === null ? null : String(edit.value),
-            key: edit.key
-        })
+    const result = await guard(async () =>
+        browser.updateCell(
+            me.id,
+            String(id),
+            {
+                namespace: edit.namespace,
+                relation: String(edit.relation),
+                column: String(edit.column),
+                value: edit.value === null ? null : String(edit.value),
+                key: edit.key
+            },
+            databaseOf(database)
+        )
     );
     return result.error ? { error: result.error } : { changed: result.value?.changed ?? 0 };
 }
@@ -321,30 +350,51 @@ export async function updateCellAction(
  */
 export async function insertRowAction(
     id: string,
-    insert: unknown
+    insert: unknown,
+    database?: string | null
 ): Promise<{ changed?: number; error?: string }> {
     const me = await actor();
     const result = await guard(async () =>
-        browser.insertRow(me.id, String(id), parsed(rowInsertSchema, insert))
+        browser.insertRow(
+            me.id,
+            String(id),
+            parsed(rowInsertSchema, insert),
+            databaseOf(database)
+        )
     );
     return result.error ? { error: result.error } : { changed: result.value?.changed ?? 0 };
 }
 
 export async function deleteRowsAction(
     id: string,
-    removal: unknown
+    removal: unknown,
+    database?: string | null
 ): Promise<{ changed?: number; error?: string }> {
     const me = await actor();
     const result = await guard(async () =>
-        browser.deleteRows(me.id, String(id), parsed(rowDeleteSchema, removal))
+        browser.deleteRows(
+            me.id,
+            String(id),
+            parsed(rowDeleteSchema, removal),
+            databaseOf(database)
+        )
     );
     return result.error ? { error: result.error } : { changed: result.value?.changed ?? 0 };
 }
 
-export async function createTableAction(id: string, draft: unknown): Promise<{ error?: string }> {
+export async function createTableAction(
+    id: string,
+    draft: unknown,
+    database?: string | null
+): Promise<{ error?: string }> {
     const me = await actor();
     const result = await guard(async () =>
-        browser.createTable(me.id, String(id), parsed(tableDraftSchema, draft) as TableDraft)
+        browser.createTable(
+            me.id,
+            String(id),
+            parsed(tableDraftSchema, draft) as TableDraft,
+            databaseOf(database)
+        )
     );
     return result.error ? { error: result.error } : {};
 }

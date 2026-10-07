@@ -177,6 +177,18 @@ describe("what the browser lists", () => {
 });
 
 describe("resolving an offered id", () => {
+    it("keeps Polaris' own database confined to itself, and a managed one server-wide", async () => {
+        runsTheInstance = true;
+        managed = [managedRow()];
+
+        expect(await addressOf(ALICE, "polaris")).toMatchObject({
+            database: "polaris",
+            readOnly: true,
+            confined: true
+        });
+        expect((await addressOf(ALICE, `managed:${DB}`)).confined).toBeFalsy();
+    });
+
     it("reads a managed database's address and credentials, read-only", async () => {
         managed = [managedRow()];
 

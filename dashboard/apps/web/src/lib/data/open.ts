@@ -51,7 +51,62 @@ export async function withDriver<T>(
     address: data.DataAddress,
     use: (driver: data.DataDriver) => Promise<T>
 ): Promise<T> {
-    if (!address.tunnel) return withOpenDriver(address, use);
+    return withRoute(address, (reached) => withOpenDriver(reached, use));
+}
+
+/**
+ * `withDriver`, on another database of the same server.
+ *
+ * Null, or the database the connection already names, is `withDriver` itself.
+ * Anything else is a name that came from a browser, so it is opened only once
+ * the server has listed it for this account (`serverDatabases`), over a first
+ * connection to the configured database - the same credentials, the same TLS
+ * and, through one tunnel for both, the same SSH route. A name that is not on
+ * that list is refused before anything dials it.
+ *
+ * This is how Beekeeper Studio switches databases on Postgres too: the server's
+ * settings are kept and a new connection is made to the other database.
+ */
+export async function withDriverOn<T>(
+    address: data.DataAddress,
+    database: string | null | undefined,
+    use: (driver: data.DataDriver) => Promise<T>
+): Promise<T> {
+    if (database === null || database === undefined || database === address.database) {
+        return withDriver(address, use);
+    }
+    return withRoute(address, async (reached) => {
+        const listed = await withOpenDriver(reached, (driver) =>
+            serverDatabases(address, driver)
+        );
+        if (!listed.includes(database)) throw new data.DataRequestError(data.NO_SUCH_DATABASE);
+        return withOpenDriver({ ...reached, database }, use);
+    });
+}
+
+/**
+ * The databases a connection may switch to, from a driver already open on it.
+ *
+ * Null for an engine that has no such list (its namespaces are the databases
+ * already, or there are none). A confined address - Polaris' own - lists only
+ * itself, whatever else shares its server.
+ */
+export async function serverDatabases(
+    address: data.DataAddress,
+    driver: data.DataDriver
+): Promise<string[]> {
+    if (!driver.databases) return address.database ? [address.database] : [];
+    if (address.confined) return address.database ? [address.database] : [];
+    return driver.databases();
+}
+
+/** Reach the address - through its SSH tunnel when it has one - for the length
+ *  of one call. */
+async function withRoute<T>(
+    address: data.DataAddress,
+    work: (reached: data.DataAddress) => Promise<T>
+): Promise<T> {
+    if (!address.tunnel) return work(address);
 
     // Through SSH: the driver dials a loopback port that leads to the database
     // as the SSH server sees it, and the tunnel closes with the call.
@@ -62,10 +117,7 @@ export async function withDriver<T>(
         }
     );
     try {
-        return await withOpenDriver(
-            { ...address, host: tunnel.host, port: tunnel.port, tunnel: null },
-            use
-        );
+        return await work({ ...address, host: tunnel.host, port: tunnel.port, tunnel: null });
     } finally {
         tunnel.close();
     }

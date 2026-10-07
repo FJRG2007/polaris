@@ -51,13 +51,20 @@ describe("what browse hands back", () => {
         const relations = vi.fn(async (namespace: string) => [
             { name: `${namespace}_table`, namespace, rows: null } as never
         ]);
+        const driver = {
+            shape: "sql",
+            namespaces: async () => schemas("information_schema", "public"),
+            relations
+        };
         vi.doMock("@/lib/data/open", () => ({
             withDriver: async (_address: unknown, work: (driver: unknown) => Promise<unknown>) =>
-                work({
-                    shape: "sql",
-                    namespaces: async () => schemas("information_schema", "public"),
-                    relations
-                })
+                work(driver),
+            withDriverOn: async (
+                _address: unknown,
+                _database: unknown,
+                work: (driver: unknown) => Promise<unknown>
+            ) => work(driver),
+            serverDatabases: async () => []
         }));
         vi.doMock("@/lib/data/connections", () => ({
             addressOf: async () => ({ engine: "postgres", readOnly: false })

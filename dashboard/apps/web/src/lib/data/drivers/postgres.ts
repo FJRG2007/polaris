@@ -105,6 +105,42 @@ export class PostgresDriver implements data.DataDriver {
         }));
     }
 
+    /**
+     * Every database on this server the account could open, the open one first
+     * among equals.
+     *
+     * `pg_database` is a shared catalogue, so any connection reads the whole
+     * server's list. Beekeeper Studio drops the templates (`datistemplate`); this
+     * also drops what refuses connections outright (`datallowconn`, which is
+     * `template0`'s state and a database being taken offline) and what this
+     * account has no CONNECT on, since offering a name that only answers
+     * "permission denied" is offering nothing. The open database is kept
+     * whatever its flags say - it is the one already open.
+     *
+     * An account that may not read the catalogue gets the database it is in, the
+     * way the MongoDB driver falls back when `listDatabases` is refused.
+     */
+    async databases(): Promise<string[]> {
+        const client = await this.open();
+        try {
+            const result = await client.query<{ name: string }>(
+                `SELECT datname AS name
+                   FROM pg_database
+                  WHERE (NOT datistemplate AND datallowconn AND has_database_privilege(datname, 'CONNECT'))
+                     OR datname = current_database()
+                  ORDER BY datname`
+            );
+            return result.rows.map((row) => row.name);
+        } catch {
+            const current = await client
+                .query<{ name: string }>("SELECT current_database() AS name")
+                .then((result) => result.rows[0]?.name ?? null)
+                .catch(() => null);
+            const fallback = current ?? this.address.database ?? null;
+            return fallback ? [fallback] : [];
+        }
+    }
+
     async relations(namespace: string | null): Promise<data.DataRelation[]> {
         const client = await this.open();
         const result = await client.query<{ name: string; kind: string; rows: string }>(

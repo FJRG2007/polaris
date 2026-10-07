@@ -541,7 +541,10 @@ function polarisAddress(): DataAddress | null {
             ca: mode.startsWith("verify") ? polarisAuthority(url) : null,
             name: url.hostname
         },
-        readOnly: true
+        readOnly: true,
+        // Its own database only: whatever else shares Polaris' server is not
+        // something this read-only window was opened onto.
+        confined: true
     };
 }
 
