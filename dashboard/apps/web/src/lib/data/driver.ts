@@ -79,6 +79,13 @@ export interface DataAddress {
      * share its server.
      */
     readonly confined?: boolean;
+    /**
+     * Whose connection this is, when it was resolved for one account's saved or
+     * offered connection (`addressOf`). Set, calls on it share a held session
+     * (`sessions.ts`) - never with another account, never with another id.
+     * Absent, every call opens and closes its own, as a test of a draft does.
+     */
+    readonly session?: { readonly userId: string; readonly connectionId: string } | null;
 }
 
 /** A container of things: a schema, a database, a numbered Redis keyspace. */

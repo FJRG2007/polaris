@@ -1214,6 +1214,17 @@ export async function deleteConnection(userId: string, id: string): Promise<void
  * answered once rather than at each of a dozen call sites.
  */
 export async function addressOf(userId: string, id: string): Promise<DataAddress> {
+    // Owned by this account and this id, so calls on it share a held session
+    // with nobody else's (`sessions.ts`). Resolved afresh every time all the
+    // same: the session is found by what this resolves to, never instead of it.
+    const owned = (address: DataAddress): DataAddress => ({
+        ...address,
+        session: { userId, connectionId: id }
+    });
+    return owned(await resolvedAddress(userId, id));
+}
+
+async function resolvedAddress(userId: string, id: string): Promise<DataAddress> {
     // The two offered ids carry no row, so each re-asks its own question here
     // rather than being trusted for having been in the list a moment ago.
     if (id.startsWith(MANAGED_PREFIX)) {

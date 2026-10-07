@@ -188,6 +188,9 @@ export interface OpenTunnel {
     readonly host: string;
     readonly port: number;
     close(): void;
+    /** False once an SSH client under it has closed, so a session holding the
+     *  tunnel knows to open another rather than dial into a dead one. */
+    alive?(): boolean;
 }
 
 /**
@@ -216,6 +219,14 @@ export async function openTunnel(
     const endAll = () => {
         for (const client of clients) client.end();
     };
+    let alive = true;
+    for (const client of clients) {
+        if (typeof client.once === "function") {
+            client.once("close", () => {
+                alive = false;
+            });
+        }
+    }
     try {
         const channel = await deps
             .forward(clients[0]!, remoteHost, remotePort)
@@ -228,9 +239,11 @@ export async function openTunnel(
             host: forward.host,
             port: forward.port,
             close() {
+                alive = false;
                 forward.close();
                 endAll();
-            }
+            },
+            alive: () => alive
         };
     } catch (error) {
         endAll();
