@@ -9,5 +9,6 @@ import challenges from "./challenges.json";
 import fivem from "./fivem.json";
 import games from "./games.json";
 import minecraft from "./minecraft.json";
+import mcpTools from "./mcp-tools.json";
 
-export default { ark, challenges, fivem, games, minecraft };
+export default { ark, challenges, fivem, games, minecraft, mcpTools };

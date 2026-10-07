@@ -25,7 +25,8 @@ import { scopesAvailableTo } from "@polaris/auth";
 import { isLoopback } from "@/lib/mcp/oauth/urls";
 import { mcpScopes } from "@/lib/mcp/oauth/scopes";
 import { scopeRequires } from "@/lib/mcp/scope-table";
-import { getTranslations } from "@/lib/i18n/request";
+import { scopeAbilities } from "@/lib/mcp/abilities";
+import { getLocale, getTranslations } from "@/lib/i18n/request";
 import { rateLimit } from "@/lib/rate-limit-service";
 import { Messages } from "@/components/i18n/messages";
 import { currentOrigin } from "@/lib/mcp/oauth/origin";
@@ -98,6 +99,8 @@ export default async function AuthorizePage({ searchParams }: { searchParams: Se
 
     const { request } = check;
     const held = new Set(await scopesAvailableTo(user.id, user.isAdmin));
+    const offered = request.scopes.filter((scope) => held.has(scopeRequires(scope)));
+    const abilities = await scopeAbilities(await getLocale(), offered);
     const redirectUrl = new URL(request.redirectUri);
     let website: string | null = null;
     try {
@@ -118,8 +121,9 @@ export default async function AuthorizePage({ searchParams }: { searchParams: Se
                     loopback: isLoopback(redirectUrl)
                 }}
                 person={user.name || user.email}
-                offered={request.scopes.filter((scope) => held.has(scopeRequires(scope)))}
+                offered={offered}
                 withheld={request.scopes.filter((scope) => !held.has(scopeRequires(scope)))}
+                abilities={abilities}
             />
         </Messages>
     );

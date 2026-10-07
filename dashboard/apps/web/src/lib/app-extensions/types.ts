@@ -12,8 +12,8 @@
  */
 
 import type { McpTool } from "@/lib/mcp/protocol";
-import type { PendingAppLink } from "@polaris/core";
 import type { McpSearchProvider } from "@/lib/mcp/search";
+import type { Locale, PendingAppLink } from "@polaris/core";
 import type { BackupSource } from "@/lib/backups/sources/types";
 import type { GamePortRow, GamePortsReading } from "@/lib/apps/port-advice";
 
@@ -132,6 +132,15 @@ export interface AppExtension {
      * not imported with the registry. See docs/installable-apps-plan.md.
      */
     readonly mcpTools?: () => Promise<readonly AppMcpTool[]>;
+
+    /**
+     * What a person reads for each of those tools, by tool name, in their
+     * language: the list behind a permission's info button on the consent
+     * screen and on a connected app's permissions. One for every tool it
+     * offers, from the app's own catalogs (`mcp-tools.json`); a test holds it
+     * to that.
+     */
+    readonly mcpToolLabels?: (locale: Locale) => Promise<Readonly<Record<string, string>>>;
 
     /**
      * How `polaris_search` finds its things: one provider per kind of thing,

@@ -1,0 +1,13 @@
+{
+    "clock_list": "Ver alarmas y temporizadores",
+    "clock_alarm_set": "Poner alarma",
+    "clock_alarm_change": "Activar, desactivar, saltar, posponer o borrar una alarma",
+    "clock_timer_start": "Iniciar un temporizador",
+    "clock_timer_change": "Pausar, reanudar, reiniciar o borrar un temporizador",
+    "calendar_upcoming": "Próximos eventos",
+    "calendar_calendars": "Ver calendarios",
+    "calendar_events": "Eventos de un periodo",
+    "calendar_create": "Crear un evento",
+    "calendar_update": "Cambiar un evento",
+    "calendar_delete": "Borrar un evento"
+}

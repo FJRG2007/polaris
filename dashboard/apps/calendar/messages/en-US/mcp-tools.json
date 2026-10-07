@@ -1,0 +1,13 @@
+{
+    "clock_list": "List alarms and timers",
+    "clock_alarm_set": "Set an alarm",
+    "clock_alarm_change": "Turn an alarm on, off, skip, snooze or delete it",
+    "clock_timer_start": "Start a countdown timer",
+    "clock_timer_change": "Pause, resume, reset or delete a timer",
+    "calendar_upcoming": "Upcoming events",
+    "calendar_calendars": "List calendars",
+    "calendar_events": "Events in a range",
+    "calendar_create": "Create an event",
+    "calendar_update": "Change an event",
+    "calendar_delete": "Delete an event"
+}
