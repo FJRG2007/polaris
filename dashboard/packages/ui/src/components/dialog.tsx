@@ -19,13 +19,13 @@ const OVERLAY =
  * It is centred with a -50% translate, and the enter and exit keyframes write
  * `transform` as well - which on their own replace the centring, so the first
  * frame of an opening dialog sat half its size down and to the right and swept
- * into place. Composing the animation onto the transform the element already
- * has keeps the centring (and any caller's own placement, such as a dialog
- * docked to an edge with `translate-x-0`) and animates only the small scale on
- * top of it.
+ * into place. Seeding the keyframes' translate with the element's own keeps the
+ * centring (and any caller's own placement, such as a dialog docked to an edge
+ * with `translate-x-0`) and animates only the fade and the small scale on top
+ * of it. A caller's own `slide-in-from-*` still wins, being behind a variant.
  */
 const CENTRED_MOTION =
-    "[animation-composition:add] data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=open]:fade-in-0 data-[state=closed]:fade-out-0 data-[state=open]:zoom-in-[0.98] data-[state=closed]:zoom-out-[0.98] data-[state=closed]:duration-fast";
+    "[--tw-enter-translate-x:var(--tw-translate-x)] [--tw-enter-translate-y:var(--tw-translate-y)] [--tw-exit-translate-x:var(--tw-translate-x)] [--tw-exit-translate-y:var(--tw-translate-y)] data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=open]:fade-in-0 data-[state=closed]:fade-out-0 data-[state=open]:zoom-in-[0.98] data-[state=closed]:zoom-out-[0.98] data-[state=closed]:duration-fast";
 
 /** The corner close button every dialog and sheet carries. */
 const CLOSE =
