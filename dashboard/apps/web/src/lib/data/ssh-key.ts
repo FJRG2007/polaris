@@ -99,6 +99,17 @@ function finish(privateKey: string, passphrase: string | null, converted: boolea
     };
 }
 
+/**
+ * The public half of a private key, as one `authorized_keys` line: its type and
+ * its SSH wire blob in base64, which is what `ssh-keygen -y` prints. Read with
+ * ssh2's own parser from a key Polaris already stored (`readPrivateKey` wrote it
+ * in a form ssh2 reads), and nothing of the private half is in it.
+ */
+export function publicKeyLine(privateKey: string, passphrase: string | null): string {
+    const parsed = parseWithSsh2(privateKey, passphrase);
+    return `${parsed.type} ${parsed.getPublicSSH().toString("base64")}`;
+}
+
 function parseWithSsh2(privateKey: string, passphrase: string | null): ParsedKey {
     const result = parseKey(privateKey, passphrase ?? undefined);
     if (result instanceof Error) throw new SshKeyError(ssh2Refusal(result.message));

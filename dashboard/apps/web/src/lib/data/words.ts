@@ -28,6 +28,7 @@ const EXACT: Readonly<Record<string, Key>> = {
     "That user is too long.": "refusals.userTooLong",
     "Pick the server to jump through.": "refusals.pickJump",
     "That connection is not there any more.": "refusals.connectionGone",
+    "This connection has no SSH key of its own to show.": "refusals.noStoredKey",
     "Give the connection a name.": "refusals.nameMissing",
     "That name is too long.": "refusals.nameTooLong",
     "Unknown engine.": "refusals.unknownEngine",

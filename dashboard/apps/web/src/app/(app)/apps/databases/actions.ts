@@ -187,6 +187,37 @@ export async function inspectKeyAction(
     }
 }
 
+/** A saved connection's id, as a request carries one. */
+const CONNECTION_GONE = "That connection is not there any more.";
+const connectionIdSchema = z
+    .string({ invalid_type_error: CONNECTION_GONE, required_error: CONNECTION_GONE })
+    .uuid(CONNECTION_GONE);
+
+/**
+ * The public line of the SSH key a saved connection signs in with, for the
+ * reader to put in the server's `authorized_keys`. Never the private key: it is
+ * decrypted and read on this side, and only the public half comes back. Counted
+ * with the key checks, since a key locked with a passphrase costs its KDF here.
+ */
+export async function sshPublicKeyAction(
+    id: unknown
+): Promise<{ publicKey?: string; error?: string }> {
+    const me = await actor();
+    const throttle = await rateLimit(`databases-key:${me.id}`, 30, DIAL_WINDOW_MS);
+    if (!throttle.ok) {
+        const t = await getTranslations("databases");
+        return {
+            error: t("refusals.tooManyAttempts", {
+                seconds: Math.ceil(throttle.retryAfterMs / 1000)
+            })
+        };
+    }
+    const result = await guard(async () =>
+        connections.savedPublicKey(me.id, parsed(connectionIdSchema, id))
+    );
+    return result.error ? { error: result.error } : { publicKey: result.value };
+}
+
 /** The SSH key the server presents now, next to the pinned one. Read without
  *  signing in. */
 export async function checkHostKeyAction(

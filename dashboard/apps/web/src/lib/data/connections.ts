@@ -58,7 +58,7 @@ import { readFileSync } from "node:fs";
 import { loadEnv } from "@polaris/config";
 import { userHasPermission } from "@polaris/auth";
 import type { DataAddress, DataEngine } from "./driver";
-import { readPrivateKey, SshKeyError } from "./ssh-key";
+import { publicKeyLine, readPrivateKey, SshKeyError } from "./ssh-key";
 import { legacyTlsMode, NO_TLS, type DataTls } from "./tls";
 import { databaseCredentials } from "@/lib/database-service";
 import type { SshAuth, SshConnectOptions } from "@polaris/ssh";
@@ -203,6 +203,7 @@ export const CONNECTION_REFUSALS = {
     notTrustOnFirstUse:
         "This connection does not trust the server's own certificate, so there is nothing to check.",
     notManualTunnel: "This connection has no SSH login of its own to check.",
+    noStoredKey: "This connection has no SSH key of its own to show.",
     secretUnreadable: "The saved password could not be read. Enter it again."
 } as const;
 
@@ -1354,6 +1355,38 @@ async function manualTunnelRow(userId: string, id: string) {
         : null;
     const host = jump ? view.host : await judged(view.host, await egressScope(userId));
     return { row, view, jump, host };
+}
+
+/**
+ * The public half of the SSH key a saved connection signs in with, as the line
+ * that goes in the SSH server's `authorized_keys`.
+ *
+ * Only ever the public line. The private key is decrypted here, read, and goes
+ * no further: a screen that could get the private key back would make every
+ * saved login one XSS or one shoulder away from being copied, and the public
+ * line is all anybody needs to let this key in somewhere. Owner only, through
+ * the same `savedRow` every other read of a saved connection goes through.
+ */
+export async function savedPublicKey(userId: string, id: string): Promise<string> {
+    const row = await savedRow(userId, id);
+    const view = tunnelView(row);
+    if (
+        !view ||
+        view.mode !== "manual" ||
+        view.authMethod !== "key" ||
+        !row.sshEncryptedCredential ||
+        !row.sshCredentialNonce
+    ) {
+        throw new DataConnectionError(CONNECTION_REFUSALS.noStoredKey);
+    }
+    const credentials = readSshCredentials(row);
+    if (credentials.method !== "key") throw new DataConnectionError(CONNECTION_REFUSALS.noStoredKey);
+    try {
+        return publicKeyLine(credentials.privateKey, credentials.passphrase ?? null);
+    } catch (error) {
+        if (error instanceof SshKeyError) throw new DataConnectionError(error.message);
+        throw error;
+    }
 }
 
 /** Read the key the SSH server presents now, without signing in, next to the
