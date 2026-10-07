@@ -15,8 +15,8 @@
 #
 # So the script also leaves behind the one thing that puts new files there: a
 # scheduled task of this user's own (no administrator rights, nothing for anybody
-# else on the machine) that runs a few times a day and at sign-in, asks GitHub
-# for the newest extension release, and swaps the folder when there is one.
+# else on the machine) that runs every six hours, out of sight, asks GitHub for
+# the newest extension release, and swaps the folder when there is one.
 # What the task runs is a copy of THIS script as the release attached it,
 # checked against the digest GitHub publishes for it and refreshed with every
 # update, so the updater is always the one the installed version shipped with.
@@ -239,28 +239,62 @@ function Invoke-PolarisExtensionInstall {
             }
         }
 
-        # Registered by a person's run only; a scheduled run leaves its own task
-        # alone. -Force replaces a task of the same name, which is what makes
-        # running the line twice leave one task rather than two.
-        if (-not $scheduled -and (Test-Path $updater)) {
+        # What the task runs. A console program started with the user's own
+        # token gets a console window from conhost before PowerShell starts, so
+        # -WindowStyle Hidden can only hide it after it has flashed on screen.
+        # conhost's headless mode (Windows 10 1809 and later) starts the same
+        # command with no window to flash. Older builds keep the direct launch.
+        # A logon type that runs with no window at all ("whether the user is
+        # logged on or not") is not used: assigning one needs elevation, and
+        # this line runs without it.
+        $powershell = Join-Path $PSHOME "powershell.exe"
+        if (-not (Test-Path $powershell)) { $powershell = "powershell.exe" }
+        $command = '-NoProfile -NonInteractive -ExecutionPolicy Bypass -WindowStyle Hidden -File "{0}" scheduled "{1}" "{2}" "{3}"' -f
+            $updater, $dir, $repo, $api
+        $conhost = Join-Path $env:SystemRoot "System32\conhost.exe"
+        if ([System.Environment]::OSVersion.Version.Build -ge 17763 -and (Test-Path $conhost)) {
+            $execute = $conhost
+            $arguments = '--headless "{0}" {1}' -f $powershell, $command
+        } else {
+            $execute = $powershell
+            $arguments = $command
+        }
+
+        # A person's run always (re)registers the task. A scheduled run leaves
+        # its own task alone, except to bring one an older release registered
+        # up to date: those ran at sign-in and opened a console window every
+        # time, and nobody who installed them will run the line again to get
+        # the fix. Once it matches, this is one comparison per run. A task the
+        # user deleted is not put back.
+        $register = -not $scheduled
+        if ($scheduled) {
+            $held = Get-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue
+            if ($held) {
+                $atLogOn = @($held.Triggers | Where-Object { $_.CimClass.CimClassName -eq "MSFT_TaskLogonTrigger" }).Count -gt 0
+                $register = $atLogOn -or $held.Actions.Count -ne 1 -or
+                    $held.Actions[0].Execute -ne $execute -or $held.Actions[0].Arguments -ne $arguments
+            }
+        }
+
+        # -Force replaces a task of the same name, which is what makes running
+        # the line twice leave one task rather than two. The repeating trigger
+        # is enough on its own: -StartWhenAvailable runs a window that passed
+        # while the machine was off shortly after it starts again.
+        if ($register -and (Test-Path $updater)) {
             try {
                 $user = "$env:USERDOMAIN\$env:USERNAME"
-                $powershell = Join-Path $PSHOME "powershell.exe"
-                if (-not (Test-Path $powershell)) { $powershell = "powershell.exe" }
-                $action = New-ScheduledTaskAction -Execute $powershell -Argument (
-                    ('-NoProfile -NonInteractive -ExecutionPolicy Bypass -WindowStyle Hidden -File "{0}" scheduled "{1}" "{2}" "{3}"' -f
-                        $updater, $dir, $repo, $api)
-                )
-                $triggers = @(
-                    (New-ScheduledTaskTrigger -AtLogOn -User $user),
-                    (New-ScheduledTaskTrigger -Once -At (Get-Date).AddMinutes(10) -RepetitionInterval (New-TimeSpan -Hours 6))
-                )
+                $action = New-ScheduledTaskAction -Execute $execute -Argument $arguments
+                $trigger = New-ScheduledTaskTrigger -Once -At (Get-Date).AddMinutes(10) -RepetitionInterval (New-TimeSpan -Hours 6)
                 $settings = New-ScheduledTaskSettingsSet -StartWhenAvailable -AllowStartIfOnBatteries `
                     -DontStopIfGoingOnBatteries -ExecutionTimeLimit (New-TimeSpan -Minutes 15) -MultipleInstances IgnoreNew
                 $principal = New-ScheduledTaskPrincipal -UserId $user -LogonType Interactive -RunLevel Limited
-                Register-ScheduledTask -TaskName $taskName -Action $action -Trigger $triggers -Settings $settings `
+                Register-ScheduledTask -TaskName $taskName -Action $action -Trigger $trigger -Settings $settings `
                     -Principal $principal -Description "Keeps the Polaris browser extension in $dir up to date." -Force | Out-Null
-                Write-Log "it updates itself: every 6 hours and when you sign in to Windows"
+                if ($scheduled) {
+                    Write-Log "updated the updates task: no sign-in run, no console window"
+                } else {
+                    Write-Log "it updates itself every 6 hours"
+                }
                 $updating = $true
             } catch {
                 Write-Log "could not set up the updates task: $($_.Exception.Message)"
