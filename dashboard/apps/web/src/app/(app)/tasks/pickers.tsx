@@ -352,7 +352,7 @@ export function StatusMarker({
                     type="button"
                     title={statusName}
                     aria-label={t("pickers.statusNamed", { name: statusName })}
-                    className="inline-flex size-5 shrink-0 items-center justify-center transition-transform hover:scale-110 disabled:cursor-not-allowed disabled:opacity-50"
+                    className="inline-flex size-5 shrink-0 items-center justify-center rounded transition-colors duration-fast hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50"
                 >
                     <StatusIcon
                         color={statusColor}
@@ -379,7 +379,8 @@ export function PriorityPicker({
     disabled,
     trigger
 }: {
-    value: core.TaskPriority;
+    /** Null when there is no one answer to tick - a selection of several tasks. */
+    value: core.TaskPriority | null;
     onChange: (priority: core.TaskPriority) => void;
     disabled?: boolean;
     trigger?: React.ReactNode;
@@ -392,10 +393,10 @@ export function PriorityPicker({
                     <button
                         type="button"
                         aria-label={t("pickers.priority")}
-                        title={optionLabel(t, "priority", value)}
-                        className="inline-flex items-center gap-1.5 rounded-md px-1.5 py-1 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                        title={optionLabel(t, "priority", value ?? "none")}
+                        className="inline-flex items-center gap-1.5 rounded-md px-1.5 py-1 text-xs text-muted-foreground transition-colors duration-fast hover:bg-muted hover:text-foreground data-[state=open]:bg-muted"
                     >
-                        <PriorityMark priority={value} />
+                        <PriorityMark priority={value ?? "none"} />
                     </button>
                 )}
             </DropdownMenuTrigger>

@@ -40,7 +40,19 @@
         "deleteTitle": "{count, plural, one {Eliminar tarea} other {Eliminar tareas}}",
         "deleteQuestion": "¿Eliminar <strong>{name}</strong>?",
         "deleteDescription": "Los comentarios, las checklists y el tiempo registrado se van con ellas. Archivarlas lo conserva todo y las quita del tablero.",
-        "deleteConfirm": "{count, plural, one {Eliminar tarea} other {Eliminar # tareas}}"
+        "deleteConfirm": "{count, plural, one {Eliminar tarea} other {Eliminar # tareas}}",
+        "selected": "{count, plural, one {# seleccionada} other {# seleccionadas}}",
+        "selectAll": "Marcar las {count}",
+        "toolbar": "Tareas marcadas",
+        "status": "Estado",
+        "priority": "Prioridad",
+        "assign": "Asignar",
+        "export": "Exportar CSV",
+        "changed": "{count, plural, one {Cambiada una tarea} other {Cambiadas # tareas}}",
+        "nothingToChange": "Todas las tareas marcadas ya lo tienen.",
+        "undo": "Deshacer",
+        "undoFailed": "No se pudo deshacer.",
+        "selectionLimit": "Una selección guarda {held} tareas a la vez, así que {count, plural, one {una quedó fuera} other {# quedaron fuera}}."
     },
     "paste": {
         "aStatus": "un estado",
@@ -64,7 +76,10 @@
         "ascending": "Ascendente",
         "descending": "Descendente",
         "showClosed": "Ver cerradas",
-        "search": "Buscar tareas"
+        "search": "Buscar tareas",
+        "count": "{shown} de {total}",
+        "view": "Vista",
+        "clearSearch": "Borrar búsqueda"
     },
     "empty": {
         "title": "Aquí no hay nada todavía.",
@@ -91,7 +106,12 @@
         "priority": "Prioridad",
         "due": "Vence",
         "estimate": "Estimación",
-        "tracked": "Registrado"
+        "tracked": "Registrado",
+        "selectAll": "Marcar todas",
+        "selectRow": "Marcar {name}",
+        "columns": "Columnas",
+        "reference": "Referencia",
+        "list": "Lista"
     },
     "calendar": {
         "previous": "{scope, select, day {Día anterior} week {Semana anterior} other {Mes anterior}}",

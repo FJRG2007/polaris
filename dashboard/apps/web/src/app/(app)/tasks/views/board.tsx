@@ -20,20 +20,26 @@
 
 import * as core from "@polaris/core";
 import type { TaskRow } from "@/lib/tasks/facts";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useDisplayFormat } from "@/components/display-format";
 import { optionLabel } from "../option-label";
 import { useTranslations } from "@/components/i18n/i18n-provider";
-import { clickMode, type BoardMove, type ColumnWorkFate, type SelectMode, type ViewProps } from "./shared";
+import {
+    clickMode,
+    type BoardMove,
+    type ColumnWorkFate,
+    type SelectMode,
+    type ViewProps
+} from "./shared";
 import { dropEdge, neighbours as edgeNeighbours, type DropEdge } from "../drop-edge";
 import { commandsFor, TaskMenu, TaskStatusMarker, type TaskCommands } from "./task-actions";
 import {
     ChevronLeft,
     ChevronRight,
     GripVertical,
+    ListTree,
     MessageSquare,
     MoreHorizontal,
-    Paperclip,
     Pencil,
     Plus,
     Repeat,
@@ -252,13 +258,20 @@ function CornerControl({
     );
 }
 
+/** How long a card that was just dropped stays marked, so the eye can find
+ *  where it landed. Long enough to be seen once the pointer is lifted, short
+ *  enough to be gone before the next drag. */
+const LANDED_MS = 1200;
+
 export function TaskCard({
     commands,
     accepting = true,
     onDragStart,
+    onDragEnd,
     onDropAt,
     positioned,
     selected,
+    landed = false,
     showLocation,
     onSelect
 }: {
@@ -268,6 +281,9 @@ export function TaskCard({
      *  being swallowed by a card that has nothing to do with it. */
     accepting?: boolean;
     onDragStart: () => void;
+    /** The drag this card started is over, dropped or not. A drag let go
+     *  outside every column, or called off with Escape, never reaches a drop. */
+    onDragEnd?: () => void;
     /** Dropped on this card, on the half of it the pointer was in. */
     onDropAt: (edge: DropEdge) => void;
     /** Whether dropping here would actually put the card here. False while a
@@ -275,12 +291,30 @@ export function TaskCard({
      *  insert line would be a promise the next render breaks. */
     positioned: boolean;
     selected: boolean;
+    /** This card was just dropped here - see `LANDED_MS`. */
+    landed?: boolean;
     showLocation?: boolean;
     onSelect: (mode: SelectMode) => void;
 }) {
     const format = useDisplayFormat();
     const t = useTranslations("tasksViews");
     const [over, setOver] = useState<DropEdge | null>(null);
+    /**
+     * Whether this card is the one in the air.
+     *
+     * Set a frame after the drag starts rather than in the handler: the browser
+     * takes its picture of the card for the pointer once `dragstart` returns, and
+     * a card already faded by then is dragged as a faded picture. What stays
+     * behind is the place it is leaving, drawn as a ghost of itself.
+     */
+    const [lifted, setLifted] = useState(false);
+    const liftFrame = useRef<number | null>(null);
+    useEffect(
+        () => () => {
+            if (liftFrame.current !== null) cancelAnimationFrame(liftFrame.current);
+        },
+        []
+    );
     const { task, context, canEdit, onOpen } = commands;
     // The bottom line only earns its space when there is something on it.
     const hasMeta =
@@ -303,6 +337,12 @@ export function TaskCard({
                     event.dataTransfer.effectAllowed = "move";
                     event.dataTransfer.setData("text/plain", task.id);
                     onDragStart();
+                    liftFrame.current = requestAnimationFrame(() => setLifted(true));
+                }}
+                onDragEnd={() => {
+                    if (liftFrame.current !== null) cancelAnimationFrame(liftFrame.current);
+                    setLifted(false);
+                    onDragEnd?.();
                 }}
                 onDragOver={(event) => {
                     if (!accepting || !canEdit) return;
@@ -324,7 +364,7 @@ export function TaskCard({
                     <span
                         aria-hidden
                         className={cn(
-                            "pointer-events-none absolute left-0 z-10 h-0.5 w-full rounded bg-primary",
+                            "pointer-events-none absolute left-0 z-10 h-0.5 w-full rounded bg-primary animate-in fade-in-0 duration-fast",
                             over === "before" ? "-top-1" : "-bottom-1"
                         )}
                     />
@@ -345,7 +385,9 @@ export function TaskCard({
                         }
                     }}
                     className={cn(
-                        "group flex cursor-pointer flex-col gap-2 rounded-lg border border-border bg-card p-3 text-left transition-colors hover:border-primary/50",
+                        "group flex cursor-pointer flex-col gap-2 rounded-lg border border-border bg-card p-3 text-left transition-[border-color,background-color,opacity] duration-fast hover:border-border-strong active:bg-card-hover",
+                        landed && "border-border-strong bg-card-hover",
+                        lifted && "border-dashed opacity-40",
                         selected && "border-primary ring-1 ring-primary"
                     )}
                 >
@@ -449,23 +491,27 @@ export function TaskCard({
                             />
                             {task.subtaskCount > 0 && (
                                 <span
-                                    className="inline-flex items-center gap-0.5"
+                                    className="inline-flex items-center gap-0.5 tabular-nums"
                                     title={t("board.subtasks", { count: task.subtaskCount })}
                                 >
-                                    <Paperclip className="size-3" />
+                                    <ListTree className="size-3" />
                                     {task.subtaskCount}
                                 </span>
                             )}
                             {task.commentCount > 0 && (
                                 <span
-                                    className="inline-flex items-center gap-0.5"
+                                    className="inline-flex items-center gap-0.5 tabular-nums"
                                     title={t("board.comments", { count: task.commentCount })}
                                 >
                                     <MessageSquare className="size-3" />
                                     {task.commentCount}
                                 </span>
                             )}
-                            {task.points !== null && <span title={t("board.points")}>{t("board.pts", { count: task.points })}</span>}
+                            {task.points !== null && (
+                                <span title={t("board.points")}>
+                                    {t("board.pts", { count: task.points })}
+                                </span>
+                            )}
                         </div>
                     )}
                 </div>
@@ -583,6 +629,17 @@ export function BoardView(props: ViewProps) {
     const t = useTranslations("tasksViews");
     const tc = useTranslations("common");
     const [dragging, setDragging] = useState<string | null>(null);
+    // The column a card is being held over, which is the one that lights up:
+    // the line between two cards says where, this says which column at all -
+    // including an empty one, which has no cards to draw a line between.
+    const [cardOver, setCardOver] = useState<string | null>(null);
+    // The card that was just dropped, marked for a moment - see `LANDED_MS`.
+    const [landed, setLanded] = useState<string | null>(null);
+    useEffect(() => {
+        if (!landed) return;
+        const timer = window.setTimeout(() => setLanded(null), LANDED_MS);
+        return () => window.clearTimeout(timer);
+    }, [landed]);
     const [addingTo, setAddingTo] = useState<string | null>(null);
     const [draft, setDraft] = useState("");
     const [creating, setCreating] = useState(false);
@@ -649,6 +706,7 @@ export function BoardView(props: ViewProps) {
     ) => {
         if (!dragging) return;
         setDragging(null);
+        setCardOver(null);
         // Let go on its own card: the place it is already in, and nothing to write.
         if (target?.id === dragging) return;
         // While a search is on, the card the drop landed on says which column was
@@ -657,6 +715,7 @@ export function BoardView(props: ViewProps) {
         const position = neighbours(tasks, orderable ? target : null, dragging);
         if (!position) return;
         onMove({ taskId: dragging, groupKey, position });
+        setLanded(dragging);
     };
 
     const columnIds = (key: string) => columnStatusIds(columns, key);
@@ -699,7 +758,10 @@ export function BoardView(props: ViewProps) {
 
     return (
         <>
-            <div className="flex gap-3 overflow-x-auto pb-4">
+            {/* On a phone one column fills the screen with the next one showing
+                at the edge, and a swipe settles on a column rather than between
+                two - a board is read one stage at a time there. */}
+            <div className="flex snap-x snap-mandatory gap-3 overflow-x-auto pb-4 sm:snap-none">
                 {shown.map((group) => {
                     // The pile of work with no status is not a column of the space:
                     // there is nothing there to rename, remove or move.
@@ -726,9 +788,13 @@ export function BoardView(props: ViewProps) {
                             canEdit={canEdit}
                             canAddColumn={canAddColumn}
                             canRename={isColumn && props.onUpdateStatus !== undefined}
-                            canDelete={isColumn && props.onDeleteStatus !== undefined && columns.length > 1}
+                            canDelete={
+                                isColumn && props.onDeleteStatus !== undefined && columns.length > 1
+                            }
                             canMoveLeft={movable && columnAt > 0}
-                            canMoveRight={movable && columnAt !== -1 && columnAt < columns.length - 1}
+                            canMoveRight={
+                                movable && columnAt !== -1 && columnAt < columns.length - 1
+                            }
                             onAddTask={() => {
                                 setAddingTo(group.key);
                                 setDraft("");
@@ -740,24 +806,31 @@ export function BoardView(props: ViewProps) {
                         >
                             <section
                                 className={cn(
-                                    "group/column flex w-72 shrink-0 flex-col rounded-lg bg-muted/40 transition-shadow",
+                                    "group/column flex w-[85vw] shrink-0 snap-start flex-col rounded-lg bg-muted/40 transition-[box-shadow,background-color,opacity] duration-fast sm:w-72",
                                     draggingColumn === group.key && "opacity-60",
-                                    columnOver === group.key && "ring-2 ring-primary"
+                                    columnOver === group.key && "ring-2 ring-primary",
+                                    cardOver === group.key && "bg-muted/70 ring-1 ring-primary/50"
                                 )}
                                 onDragOver={(event) => {
                                     event.preventDefault();
                                     if (draggingColumn && draggingColumn !== group.key && isColumn)
                                         setColumnOver(group.key);
+                                    if (dragging) setCardOver(group.key);
                                 }}
                                 onDragLeave={(event) => {
                                     // Moving between the column's own children leaves it as
                                     // far as the browser is concerned, so the pointer is only
                                     // gone when what it entered is outside.
                                     if (
-                                        event.currentTarget.contains(event.relatedTarget as Node | null)
+                                        event.currentTarget.contains(
+                                            event.relatedTarget as Node | null
+                                        )
                                     )
                                         return;
                                     setColumnOver((current) =>
+                                        current === group.key ? null : current
+                                    );
+                                    setCardOver((current) =>
                                         current === group.key ? null : current
                                     );
                                 }}
@@ -801,7 +874,8 @@ export function BoardView(props: ViewProps) {
                                         onKeyDown={(event) => {
                                             if (event.key !== "Delete") return;
                                             if (event.target !== event.currentTarget) return;
-                                            if (!isColumn || props.onDeleteStatus === undefined) return;
+                                            if (!isColumn || props.onDeleteStatus === undefined)
+                                                return;
                                             if (columns.length <= 1) return;
                                             event.preventDefault();
                                             askToRemove(group);
@@ -836,7 +910,12 @@ export function BoardView(props: ViewProps) {
                                         >
                                             {group.label}
                                         </h3>
-                                        <span className="rounded bg-background px-1.5 text-[0.6875rem] text-muted-foreground">
+                                        <span
+                                            className={cn(
+                                                "rounded bg-background px-1.5 text-[0.6875rem] tabular-nums text-muted-foreground transition-colors duration-fast",
+                                                cardOver === group.key && "text-foreground"
+                                            )}
+                                        >
                                             {group.tasks.length}
                                         </span>
                                         <span className="flex-1" />
@@ -849,7 +928,7 @@ export function BoardView(props: ViewProps) {
                                                     setAddingTo(group.key);
                                                     setDraft("");
                                                 }}
-                                                className="rounded p-1 text-muted-foreground transition-colors hover:bg-background hover:text-foreground"
+                                                className="rounded p-1 text-muted-foreground transition-colors duration-fast hover:bg-background hover:text-foreground active:bg-muted"
                                             >
                                                 <Plus className="size-3.5" />
                                             </button>
@@ -859,9 +938,11 @@ export function BoardView(props: ViewProps) {
                                                 <DropdownMenuTrigger asChild>
                                                     <button
                                                         type="button"
-                                                        aria-label={t("board.optionsFor", { name: group.label })}
+                                                        aria-label={t("board.optionsFor", {
+                                                            name: group.label
+                                                        })}
                                                         title={t("board.options")}
-                                                        className="rounded p-1 text-muted-foreground transition-colors hover:bg-background hover:text-foreground"
+                                                        className="rounded p-1 text-muted-foreground transition-colors duration-fast hover:bg-background hover:text-foreground active:bg-muted data-[state=open]:bg-background data-[state=open]:text-foreground"
                                                     >
                                                         <MoreHorizontal className="size-3.5" />
                                                     </button>
@@ -929,17 +1010,31 @@ export function BoardView(props: ViewProps) {
                                             commands={commandsFor(props, task)}
                                             accepting={draggingColumn === null}
                                             selected={selection.has(task.id)}
+                                            landed={landed === task.id}
                                             showLocation={props.showLocation}
                                             positioned={orderable && dragging !== task.id}
                                             onSelect={(mode) => onSelect(task.id, mode, rendered)}
                                             onDragStart={() => setDragging(task.id)}
+                                            onDragEnd={() => {
+                                                setDragging(null);
+                                                setCardOver(null);
+                                            }}
                                             onDropAt={(edge) =>
                                                 drop(group.key, group.tasks, { id: task.id, edge })
                                             }
                                         />
                                     ))}
                                     {group.tasks.length === 0 && addingTo !== group.key && (
-                                        <li className="rounded-lg border border-dashed border-border px-3 py-6 text-center text-xs text-muted-foreground">
+                                        <li
+                                            className={cn(
+                                                "rounded-lg border border-dashed px-3 py-6 text-center text-xs transition-colors duration-fast",
+                                                cardOver === group.key
+                                                    ? "border-primary/60 bg-primary/5 text-foreground"
+                                                    : dragging
+                                                      ? "border-border-strong text-muted-foreground"
+                                                      : "border-border text-muted-foreground"
+                                            )}
+                                        >
                                             {t("board.dropHere")}
                                         </li>
                                     )}
@@ -970,14 +1065,14 @@ export function BoardView(props: ViewProps) {
                         <button
                             type="button"
                             onClick={() => setCreating(true)}
-                            className="flex h-10 w-56 shrink-0 items-center justify-center gap-1.5 rounded-lg border border-dashed border-border text-xs text-muted-foreground transition-colors hover:border-primary/50 hover:text-foreground"
+                            className="flex h-10 w-56 shrink-0 snap-start items-center justify-center gap-1.5 rounded-lg border border-dashed border-border text-xs text-muted-foreground transition-colors duration-fast hover:border-border-strong hover:text-foreground active:bg-muted/40"
                         >
                             <Plus className="size-3.5" /> {t("board.newColumn")}
                         </button>
                     ))}
             </div>
 
-<ConfirmDeleteDialog
+            <ConfirmDeleteDialog
                 open={removing !== null}
                 onOpenChange={(open) => (open ? undefined : setRemoving(null))}
                 name={removing?.label ?? ""}

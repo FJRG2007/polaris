@@ -162,7 +162,13 @@ export function shortfallMessage(
 ): string | null {
     if (count === undefined || count >= asked) return null;
     const rest = asked - count;
-    if (t) return t("bulk.shortfall", { verb: verb === "Deleted" ? "deleted" : "changed", count, asked, rest });
+    if (t)
+        return t("bulk.shortfall", {
+            verb: verb === "Deleted" ? "deleted" : "changed",
+            count,
+            asked,
+            rest
+        });
     return `${verb} ${count} of ${asked}: ${rest === 1 ? "one task is" : `${rest} tasks are`} not yours to change.`;
 }
 
@@ -206,6 +212,9 @@ export interface ViewProps {
      * rows.
      */
     readonly onSelect: (taskId: string, mode: SelectMode, ordered: readonly string[]) => void;
+    /** Make the selection exactly these tasks - all of them, or none. What the
+     *  box at the head of a table's checkbox column does. */
+    readonly onReplaceSelection?: (taskIds: readonly string[]) => void;
     readonly onMove: (move: BoardMove) => void;
     readonly onQuickCreate: (groupKey: string, name: string) => void;
     /** Apply a change from the row itself, optimistically. */

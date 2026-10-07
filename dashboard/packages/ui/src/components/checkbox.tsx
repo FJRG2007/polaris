@@ -10,7 +10,13 @@
 
 import { cn } from "../lib/cn";
 import { Check, Minus } from "lucide-react";
-import { forwardRef, type InputHTMLAttributes } from "react";
+import {
+    forwardRef,
+    useEffect,
+    useImperativeHandle,
+    useRef,
+    type InputHTMLAttributes
+} from "react";
 
 export interface CheckboxProps extends Omit<InputHTMLAttributes<HTMLInputElement>, "type"> {
     /** Render a dash instead of a tick, for a partial (some-selected) state. */
@@ -20,6 +26,14 @@ export interface CheckboxProps extends Omit<InputHTMLAttributes<HTMLInputElement
 export const Checkbox = forwardRef<HTMLInputElement, CheckboxProps>(
     ({ className, checked, indeterminate, ...props }, ref) => {
         const active = Boolean(checked) || Boolean(indeterminate);
+        // The dash is drawn for the eye; the input's own `indeterminate` is what a
+        // screen reader announces as "mixed", and it exists only as a property,
+        // never an attribute, so it is set on the element after each render.
+        const input = useRef<HTMLInputElement>(null);
+        useImperativeHandle(ref, () => input.current as HTMLInputElement);
+        useEffect(() => {
+            if (input.current) input.current.indeterminate = Boolean(indeterminate);
+        }, [indeterminate]);
         return (
             <span
                 className={cn(
@@ -37,7 +51,7 @@ export const Checkbox = forwardRef<HTMLInputElement, CheckboxProps>(
                 )}
             >
                 <input
-                    ref={ref}
+                    ref={input}
                     type="checkbox"
                     checked={checked}
                     className="absolute inset-0 cursor-pointer opacity-0 disabled:cursor-default"

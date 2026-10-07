@@ -18,6 +18,7 @@
  */
 
 import { cn } from "../lib/cn";
+import { FLOATING_MOTION } from "../lib/motion";
 import { Check, ChevronDown } from "lucide-react";
 import * as RadixSelect from "@radix-ui/react-select";
 import { forwardRef, type ComponentPropsWithoutRef, type ElementRef, type ReactNode } from "react";
@@ -58,7 +59,8 @@ export const SelectContent = forwardRef<
             position={position}
             sideOffset={position === "popper" ? 6 : undefined}
             className={cn(
-                "relative z-50 max-h-[--radix-select-content-available-height] min-w-[8rem] overflow-hidden rounded-lg border border-border-strong bg-elevated text-foreground shadow-popover data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95",
+                "relative z-50 max-h-[--radix-select-content-available-height] min-w-[8rem] overflow-hidden rounded-lg border border-border-strong bg-elevated text-foreground shadow-popover",
+                FLOATING_MOTION,
                 // The menu starts at the trigger's width but is allowed to grow
                 // past it: a narrow trigger must not clip the option it names.
                 // Capped to the viewport so a long option cannot push it off screen.

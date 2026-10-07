@@ -67,7 +67,9 @@ export function ColorPicker({
      * so dragging to the bottom of the square and back would otherwise lose which
      * hue somebody had chosen, and the handle would jump to red.
      */
-    const [hsv, setHsv] = useState<Hsv>(() => hexToHsv(value) ?? { hue: 220, saturation: 70, value: 90 });
+    const [hsv, setHsv] = useState<Hsv>(
+        () => hexToHsv(value) ?? { hue: 220, saturation: 70, value: 90 }
+    );
     /** What is in the hex box while it is being typed, which is allowed to be
      *  something that is not a colour yet. */
     const [typed, setTyped] = useState(value);
@@ -223,7 +225,7 @@ export function ColorPicker({
                                 const parsed = hexToHsv(suggestion);
                                 if (parsed) emit(parsed);
                             }}
-                            className="size-5 rounded border border-border transition-transform hover:scale-110"
+                            className="size-5 rounded border border-border transition-[border-color,box-shadow] duration-fast hover:border-border-strong hover:ring-2 hover:ring-border-strong"
                             style={{ backgroundColor: suggestion }}
                         />
                     ))}
