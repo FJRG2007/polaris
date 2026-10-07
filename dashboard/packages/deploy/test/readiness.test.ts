@@ -97,6 +97,32 @@ describe("waiting for a release to come up", () => {
         expect(await waitUntilServing(context([{}]), "web", {}, fakeClock())).toEqual({ ok: true });
     });
 
+    it("waits out the image's own healthcheck when the plan declared none", async () => {
+        // A Minecraft image reports "starting" until its world has loaded. With
+        // no healthcheck in the plan, 45 seconds failed a server that was fine.
+        const imageCheck = {
+            Config: { Healthcheck: { Test: ["CMD", "mc-health"], Interval: 60e9, Retries: 3, StartPeriod: 120e9 } }
+        };
+        const starting = { ...container({ Status: "running", Health: { Status: "starting" } }), ...imageCheck };
+        const healthy = { ...container({ Status: "running", Health: { Status: "healthy" } }), ...imageCheck };
+        const states = [...Array.from({ length: 80 }, () => starting), healthy];
+        const result = await waitUntilServing(context(states), "mc", {}, fakeClock());
+        expect(result).toEqual({ ok: true });
+
+        // Still bounded: the image's worst case, said in the reason.
+        const stuck = await waitUntilServing(context([starting]), "mc", {}, fakeClock());
+        expect(stuck).toEqual({ ok: false, reason: "the new version did not report healthy within 375 seconds" });
+    });
+
+    it("keeps the short window when the image's healthcheck is switched off", async () => {
+        const off = {
+            ...container({ Status: "running", Health: { Status: "starting" } }),
+            Config: { Healthcheck: { Test: ["NONE"] } }
+        };
+        const result = await waitUntilServing(context([off]), "web", {}, fakeClock());
+        expect(result).toEqual({ ok: false, reason: "the new version did not report healthy within 45 seconds" });
+    });
+
     it("bounds the wait by the healthcheck's own worst case", () => {
         expect(readinessDeadlineMs({})).toBe(45_000);
         expect(
