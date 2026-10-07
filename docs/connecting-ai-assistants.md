@@ -398,17 +398,33 @@ their next call.
 Read tools first, then the ones that change something. Clients use the
 annotations to ask you before a change; tools marked "changes" ask by default.
 
+An assistant is only shown the tools its permissions let it call, so one
+approved for the calendar is not handed the deploy tools as well. Ask it for
+`polaris_tools` to see the rest and the permission each one needs.
+`polaris_search` finds a thing by the name you gave it - a task, an alarm, a
+server - and says which tool acts on it.
+
+Where a tool takes a task, an alarm, a timer or an app by name, only an exact
+name is acted on, with case and accents set aside. When two share a name the
+assistant is told both and asked for the one it means; it never picks.
+
 | Tool                                                                                                                                            | Permission                 | Kind                         |
 | ----------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------- | ---------------------------- |
 | `polaris_whoami`                                                                                                                                | none                       | read                         |
 | `tasks_list`, `tasks_get`, `tasks_spaces`                                                                                                       | `tasks.read`               | read                         |
 | `tasks_create`, `tasks_comment`                                                                                                                 | `tasks.manage`             | adds                         |
 | `tasks_update`                                                                                                                                  | `tasks.manage`             | changes                      |
+| `tasks_reminders`                                                                                                                               | `tasks.read`               | read                         |
+| `tasks_remind`                                                                                                                                  | `tasks.manage`             | adds                         |
+| `tasks_reminder_cancel`                                                                                                                         | `tasks.manage`             | changes                      |
 | `agent_sessions_list`, `agent_session_get`                                                                                                      | `agents.read`              | read                         |
 | `agent_session_start`, `agent_session_prompt`                                                                                                   | `agents.manage`            | adds                         |
 | `deploy_projects`, `deploy_service`, `deploy_deployments`, `deploy_deployment`, `deploy_logs`, `deploy_variables`, `env_list`, `deploy_domains` | `deploy.read`              | read                         |
 | `deploy_add_domain`                                                                                                                             | `deploy.manage`            | adds                         |
 | `deploy_start`, `deploy_set_variable`, `env_set`, `env_delete`, `deploy_restart`, `deploy_rollback`                                             | `deploy.manage`            | changes                      |
+| `watch_alarms`                                                                                                                                  | `deploy.read`              | read                         |
+| `watch_alarm_create`                                                                                                                            | `deploy.manage`            | adds                         |
+| `watch_alarm_change`                                                                                                                            | `deploy.manage`            | changes                      |
 | `notes_list`, `notes_get`                                                                                                                       | `notes.use`                | read                         |
 | `notes_create`                                                                                                                                  | `notes.use`                | adds                         |
 | `notes_update`                                                                                                                                  | `notes.use`                | changes                      |
@@ -422,19 +438,22 @@ annotations to ask you before a change; tools marked "changes" ask by default.
 
 Offered only while their app is installed:
 
-| Tool                                    | Permission                        | Kind                   |
-| --------------------------------------- | --------------------------------- | ---------------------- |
-| `calendar_upcoming`                     | `calendar.read` or `calendar.use` | read                   |
-| `calendar_calendars`, `calendar_events` | `calendar.read`                   | read                   |
-| `calendar_create`                       | `calendar.manage`                 | adds                   |
-| `calendar_update`                       | `calendar.manage`                 | changes                |
-| `calendar_delete`                       | `calendar.manage`                 | changes (to the trash) |
-| `places_devices`                        | `places.read`                     | read                   |
-| `places_device_control`                 | `places.control`                  | changes                |
-| `places_routines`                       | `places.routines`                 | read                   |
-| `places_routine_run`                    | `places.routines`                 | adds (a run)           |
-| `games_servers`, `games_server_status`  | `gameservers.read`                | read                   |
-| `games_server_power`, `games_console`   | `gameservers.manage`              | changes                |
+| Tool                                                          | Permission                        | Kind                   |
+| ------------------------------------------------------------- | --------------------------------- | ---------------------- |
+| `calendar_upcoming`                                           | `calendar.read` or `calendar.use` | read                   |
+| `calendar_calendars`, `calendar_events`                       | `calendar.read`                   | read                   |
+| `calendar_create`                                             | `calendar.manage`                 | adds                   |
+| `calendar_update`                                             | `calendar.manage`                 | changes                |
+| `calendar_delete`                                             | `calendar.manage`                 | changes (to the trash) |
+| `clock_list`                                                  | `calendar.read`                   | read                   |
+| `clock_timer_start`                                           | `calendar.manage`                 | adds                   |
+| `clock_alarm_set`, `clock_alarm_change`, `clock_timer_change` | `calendar.manage`                 | changes                |
+| `places_devices`                                              | `places.read`                     | read                   |
+| `places_device_control`                                       | `places.control`                  | changes                |
+| `places_routines`                                             | `places.routines`                 | read                   |
+| `places_routine_run`                                          | `places.routines`                 | adds (a run)           |
+| `games_servers`, `games_server_status`                        | `gameservers.read`                | read                   |
+| `games_server_power`, `games_console`                         | `gameservers.manage`              | changes                |
 
 Each tool applies the same rules as the app's own screens: a calendar shared
 with you read-only stays read-only, a device somebody lent you is the only one

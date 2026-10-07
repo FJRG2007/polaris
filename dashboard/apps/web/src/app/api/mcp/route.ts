@@ -89,7 +89,12 @@ const SERVER: McpServerInfo = {
         "Work you find that is out of scope belongs in tasks_create, not in this change.",
         "The deploy_ tools name a service as project/service or project/environment/service;",
         "deploy_projects lists them. After deploy_start, read deploy_deployment until it finishes",
-        "and report a failure with the lines that explain it."
+        "and report a failure with the lines that explain it.",
+        "Three different things are called alarms or reminders here: an alarm or timer that",
+        "rings for the person (clock_ tools), a reminder on a task (tasks_remind) or on a",
+        "calendar event (the reminders of calendar_create and calendar_update), and a",
+        "monitoring alarm on an app, server or domain (watch_ tools). Days and times are on",
+        "the person's own clock."
     ].join(" ")
 };
 

@@ -21,7 +21,8 @@
 import { z } from "zod";
 import * as engine from "../engine";
 import { host } from "@polaris/app-host";
-import { CalendarRefusal } from "./errors";
+import { attempt, readerFor, refuse } from "./mcp-common";
+import { clockMcpSearch, clockMcpTools } from "./mcp-clock-tools";
 import { listCalendars } from "./calendars";
 import { eventDetail } from "./event-detail";
 import { deleteEvent, saveEvent } from "./objects";
@@ -40,38 +41,12 @@ import {
 } from "../screens/editor-model";
 
 type McpTool = AppHostTypes["McpTool"];
-type McpCaller = AppHostTypes["McpCaller"];
 
 /** The widest window one read answers. A model asking for a year at once is
  *  better told to ask for it a piece at a time than handed thousands of rows. */
 const MAX_RANGE_DAYS = 62;
 /** The most occurrences one read returns. */
 const MAX_ROWS = 200;
-
-/** A refusal the model reads as written. A class from the host, so it is
- *  only reached for once a call is running. */
-function refuse(message: string): never {
-    throw new host.mcp.McpRefusal(message);
-}
-
-/** Run Calendar's own work, turning its refusals - written for the person,
- *  naming nothing internal - into ones the model reads. */
-async function attempt<T>(run: () => Promise<T>): Promise<T> {
-    try {
-        return await run();
-    } catch (caught) {
-        if (caught instanceof CalendarRefusal) refuse(caught.message);
-        throw caught;
-    }
-}
-
-/** The person a call acts for, with the zone they read their calendar in. */
-async function readerFor(caller: McpCaller) {
-    const acting = await host.mcp.actingUser(caller.userId);
-    const reader = acting ? await readerView(caller.userId) : null;
-    if (!acting || !reader) refuse("This account cannot use the Calendar.");
-    return { ...reader, user: acting };
-}
 
 const day = z
     .string()
@@ -102,6 +77,22 @@ const recurrenceKey = z
     .describe(
         "For one occurrence of a repeating event: its recurrenceKey from calendar_events. Absent is the whole event."
     );
+
+/** Four weeks, the furthest ahead of an event a reminder can be set. */
+const REMINDER_MAX_MINUTES = 4 * 7 * 24 * 60;
+
+const reminders = z
+    .array(z.number().int().min(0).max(REMINDER_MAX_MINUTES))
+    .max(5)
+    .describe(
+        "Minutes before the start to be reminded, e.g. [10, 60]; for an all-day event, before its midnight. [] for none."
+    );
+
+/** Reminders as a model gives them - minutes before - as the editor holds
+ *  them: an offset from the start, negative for before. */
+function remindersOf(minutes: readonly number[]) {
+    return alarmsFromMinutes(minutes.map((value) => (value === 0 ? 0 : -value)));
+}
 
 const editScope = z
     .enum(["this", "following", "all"])
@@ -313,7 +304,12 @@ const createInput = z.object({
     ),
     timeZone,
     location: z.string().trim().max(1000).default("").describe("Where it is."),
-    description: z.string().max(20_000).default("").describe("Notes on it.")
+    description: z.string().max(20_000).default("").describe("Notes on it."),
+    reminders: reminders
+        .optional()
+        .describe(
+            "Minutes before the start to be reminded, e.g. [10, 60]. Absent uses the calendar's usual reminders; [] sets none."
+        )
 });
 
 const createTool = () =>
@@ -323,7 +319,7 @@ const createTool = () =>
         title: "Create an event",
         description:
             // i18n-ignore read by the calling model, not shown to a person
-            "Add an event to one of this account's writable calendars, with the calendar's usual reminders. It invites nobody.",
+            "Add an event to one of this account's writable calendars, with the reminders asked for or else the calendar's usual ones. It invites nobody.",
         input: createInput,
         category: "calendar",
         scope: "calendar.manage",
@@ -352,7 +348,9 @@ const createTool = () =>
                 ...timed,
                 location: input.location,
                 description: input.description,
-                alarms: alarmsFromMinutes(defaultAlarmMinutes(timed.allDay, calendar, preferences))
+                alarms: input.reminders
+                    ? remindersOf(input.reminders)
+                    : alarmsFromMinutes(defaultAlarmMinutes(timed.allDay, calendar, preferences))
             };
             const event = await eventOf(form);
             const saved = await attempt(() =>
@@ -383,7 +381,10 @@ const updateInput = z.object({
         .describe("A new end, the same form as start. For all-day, the last day (inclusive)."),
     timeZone,
     location: z.string().trim().max(1000).optional().describe("A new location; empty clears it."),
-    description: z.string().max(20_000).optional().describe("New notes; empty clears them.")
+    description: z.string().max(20_000).optional().describe("New notes; empty clears them."),
+    reminders: reminders
+        .optional()
+        .describe("Replaces the event's reminders: minutes before the start; [] removes them all.")
 });
 
 const updateTool = () =>
@@ -393,7 +394,7 @@ const updateTool = () =>
         title: "Change an event",
         description:
             // i18n-ignore read by the calling model, not shown to a person
-            "Change the title, times, location or notes of an event this account may edit. Anything not given stays as it is; people invited are told of the change as they would be from the screen.",
+            "Change the title, times, location, notes or reminders of an event this account may edit. Anything not given stays as it is; people invited are told of the change as they would be from the screen.",
         input: updateInput,
         category: "calendar",
         scope: "calendar.manage",
@@ -422,7 +423,8 @@ const updateTool = () =>
                 ...form,
                 ...(input.title !== undefined ? { summary: input.title } : {}),
                 ...(input.location !== undefined ? { location: input.location } : {}),
-                ...(input.description !== undefined ? { description: input.description } : {})
+                ...(input.description !== undefined ? { description: input.description } : {}),
+                ...(input.reminders !== undefined ? { alarms: remindersOf(input.reminders) } : {})
             };
             const event = await eventOf(form);
             await attempt(() =>
@@ -561,7 +563,7 @@ const searchProvider = () =>
 let searched: readonly AppHostTypes["McpSearchProvider"][] | undefined;
 
 export function calendarMcpSearch(): readonly AppHostTypes["McpSearchProvider"][] {
-    searched ??= [searchProvider()];
+    searched ??= [searchProvider(), ...clockMcpSearch()];
     return searched;
 }
 
@@ -571,8 +573,11 @@ export function calendarMcpSearch(): readonly AppHostTypes["McpSearchProvider"][
 let built: readonly McpTool[] | undefined;
 
 export function calendarMcpTools(): readonly McpTool[] {
-    built ??= [upcomingTool, calendarsTool, eventsTool, createTool, updateTool, deleteTool].map(
-        (tool) => tool()
-    );
+    built ??= [
+        ...[upcomingTool, calendarsTool, eventsTool, createTool, updateTool, deleteTool].map(
+            (tool) => tool()
+        ),
+        ...clockMcpTools()
+    ];
     return built;
 }

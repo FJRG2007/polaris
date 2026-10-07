@@ -796,3 +796,71 @@ export function matchForModel<T>(
         matched: found.outcome === "matched" || found.outcome === "all"
     };
 }
+
+/**
+ * One thing a model named, read the way a person names it.
+ *
+ * - `one`: exactly one row is called that, once case, accents and spacing are
+ *   set aside.
+ * - `many`: more than one is, so the caller asks which rather than picking.
+ * - `none`: nothing is; `closest` holds the rows nearest to what was asked,
+ *   best first, for the refusal to offer.
+ */
+export type NamedPick<T> =
+    | { readonly kind: "one"; readonly item: T }
+    | { readonly kind: "many"; readonly items: T[] }
+    | { readonly kind: "none"; readonly closest: T[] };
+
+/** How many near misses a `none` answer carries. */
+const CLOSEST_NAMED = 5;
+
+/**
+ * The row a name means, for a tool that acts on it.
+ *
+ * Only an exact name - folded, not fuzzy - is acted on: a tool that changes or
+ * deletes something must not guess between "Gym" and "Gym (old)". A fuzzy match
+ * is only ever offered back, so the model can call again with the name it
+ * meant. `nameOf` may answer several names for one row (a server's name and
+ * its address); any of them counts.
+ */
+export function pickByName<T>(
+    items: readonly T[],
+    wanted: string,
+    nameOf: (item: T) => string | readonly string[]
+): NamedPick<T> {
+    const target = normalizeSearchText(wanted);
+    const names = (item: T) => {
+        const value = nameOf(item);
+        return typeof value === "string" ? [value] : value;
+    };
+    const exact = items.filter((item) =>
+        names(item).some((name) => normalizeSearchText(name) === target)
+    );
+    if (exact.length === 1) return { kind: "one", item: exact[0]! };
+    if (exact.length > 1) return { kind: "many", items: exact };
+    const closest = rankEntities(items, wanted, [{ text: (item) => [...names(item)] }])
+        .slice(0, CLOSEST_NAMED)
+        .map((entry) => entry.item);
+    return { kind: "none", closest };
+}
+
+/**
+ * What a tool says when a name did not settle on one row: which ones share it,
+ * or which come closest. English, as every tool's text is: the model reads it,
+ * and passes the right name or the id on its next call.
+ */
+export function missedNameText<T>(
+    pick: Exclude<NamedPick<T>, { kind: "one" }>,
+    wanted: string,
+    noun: string,
+    describe: (item: T) => string
+): string {
+    if (pick.kind === "many") {
+        return `More than one ${noun} is called "${wanted}": ${pick.items
+            .map(describe)
+            .join("; ")}. Pass the id of the one you mean.`;
+    }
+    return pick.closest.length > 0
+        ? `No ${noun} is called "${wanted}". The closest: ${pick.closest.map(describe).join("; ")}.`
+        : `No ${noun} is called "${wanted}".`;
+}
