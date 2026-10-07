@@ -28,10 +28,43 @@ export interface ContainerState {
      * it - which is why it corroborates a loop and never decides one.
      */
     readonly restarting?: boolean;
+    /**
+     * The healthcheck the container runs, as the image or the compose file set
+     * it - what makes `health` "starting" on a container whose plan declared
+     * none. Its timings say how long "starting" may honestly last.
+     */
+    readonly healthcheck?: {
+        readonly intervalSeconds?: number;
+        readonly retries?: number;
+        readonly startPeriodSeconds?: number;
+    };
+}
+
+/** A Docker duration (nanoseconds) in whole seconds; absent or zero is unset. */
+function seconds(value: unknown): number | undefined {
+    return typeof value === "number" && value > 0 ? Math.ceil(value / 1e9) : undefined;
+}
+
+/** `Config.Healthcheck`, when the container has one that runs. */
+function healthcheckOf(container: Record<string, unknown>): ContainerState["healthcheck"] {
+    const config = container.Config;
+    if (typeof config !== "object" || config === null) return undefined;
+    const check = (config as Record<string, unknown>).Healthcheck;
+    if (typeof check !== "object" || check === null) return undefined;
+    const record = check as Record<string, unknown>;
+    // ["NONE"] is a healthcheck switched off.
+    if (Array.isArray(record.Test) && record.Test[0] === "NONE") return undefined;
+    return {
+        intervalSeconds: seconds(record.Interval),
+        retries:
+            typeof record.Retries === "number" && record.Retries > 0 ? record.Retries : undefined,
+        startPeriodSeconds: seconds(record.StartPeriod)
+    };
 }
 
 export function parseContainerState(inspect: unknown): ContainerState {
-    if (typeof inspect !== "object" || inspect === null) return { status: "unknown", restartCount: 0 };
+    if (typeof inspect !== "object" || inspect === null)
+        return { status: "unknown", restartCount: 0 };
     const container = inspect as Record<string, unknown>;
     // Not under State, unlike everything else here, so it is read before the
     // early return that a container with no State block takes.
@@ -49,6 +82,7 @@ export function parseContainerState(inspect: unknown): ContainerState {
         exitCode: typeof record.ExitCode === "number" ? record.ExitCode : undefined,
         restartCount,
         startedAt: typeof record.StartedAt === "string" ? record.StartedAt : undefined,
-        restarting: typeof record.Restarting === "boolean" ? record.Restarting : undefined
+        restarting: typeof record.Restarting === "boolean" ? record.Restarting : undefined,
+        healthcheck: healthcheckOf(container)
     };
 }

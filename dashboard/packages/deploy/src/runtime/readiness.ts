@@ -57,7 +57,9 @@ export async function waitUntilServing(
 ): Promise<Readiness> {
     // A port that cannot inspect at all has nothing to judge the release by.
     if (typeof ctx.ports.inspect !== "function") return { ok: true };
-    const deadline = clock.now() + readinessDeadlineMs(plan);
+    const began = clock.now();
+    let budget = readinessDeadlineMs(plan);
+    let deadline = began + budget;
     let firstRestarts: number | null = null;
     let seen = false;
     for (;;) {
@@ -66,6 +68,15 @@ export async function waitUntilServing(
             .then(parseContainerState)
             .catch(() => null);
         if (state && state.status !== "unknown") {
+            if (!seen && !plan.healthcheck && state.healthcheck) {
+                // The plan declared no healthcheck, but the image did - a game
+                // server's reports "starting" until its world has loaded, which
+                // takes minutes. Its own timings say how long that may last; the
+                // short window meant for a container with no healthcheck at all
+                // failed a server that came up fine a minute later.
+                budget = readinessDeadlineMs({ healthcheck: { test: [], ...state.healthcheck } });
+                deadline = began + budget;
+            }
             seen = true;
             if (firstRestarts === null) firstRestarts = state.restartCount;
             if (state.status === "exited" || state.status === "dead") {
@@ -95,7 +106,7 @@ export async function waitUntilServing(
             if (state?.health === "starting") {
                 return {
                     ok: false,
-                    reason: `the new version did not report healthy within ${Math.round(readinessDeadlineMs(plan) / 1000)} seconds`
+                    reason: `the new version did not report healthy within ${Math.round(budget / 1000)} seconds`
                 };
             }
             if (!seen) return { ok: false, reason: "the new version's container never appeared" };
