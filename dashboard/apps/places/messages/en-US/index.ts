@@ -5,5 +5,6 @@
  */
 
 import places from "./places.json";
+import mcpTools from "./mcp-tools.json";
 
-export default { places };
+export default { places, mcpTools };

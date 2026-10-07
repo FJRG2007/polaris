@@ -26,6 +26,7 @@ import { ConsentCard, ConsentFacts } from "@/components/consent-card";
 import { ClientMark } from "@/components/client-logo";
 import type { ClientBrand } from "@/lib/mcp/oauth/client-brand";
 import { McpScopeChecklist } from "@/components/mcp-scope-checklist";
+import type { ScopeAbilities } from "@/lib/mcp/abilities";
 
 interface AppSummary {
     readonly name: string;
@@ -41,13 +42,16 @@ export function ConsentView({
     app,
     person,
     offered,
-    withheld
+    withheld,
+    abilities
 }: {
     query: string;
     app: AppSummary;
     person: string;
     offered: McpScope[];
     withheld: McpScope[];
+    /** What each offered scope lets the app do, behind its info button. */
+    abilities: ScopeAbilities;
 }) {
     const t = useTranslations("mcp");
     const [selected, setSelected] = useState<McpScope[]>(() =>
@@ -152,6 +156,7 @@ export function ConsentView({
                             selected={selected}
                             effective={effective}
                             disabled={pending !== null}
+                            abilities={abilities}
                             onToggle={toggle}
                         />
                     </fieldset>

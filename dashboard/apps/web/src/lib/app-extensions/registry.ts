@@ -11,6 +11,7 @@
 
 import { withBundleSlot } from "@/lib/app-bundles/code";
 import { installedExtensions } from "./installed";
+import type { Locale } from "@polaris/core";
 import { isAppInstalled } from "@/lib/apps/install-presence";
 import type { BackupSource } from "@/lib/backups/sources/types";
 import type { GamePortRow, GamePortsReading } from "@/lib/apps/port-advice";
@@ -342,6 +343,24 @@ export async function appMcpTools(): Promise<{ app: string; tool: AppMcpTool }[]
         })
     );
     return lists.flat();
+}
+
+/**
+ * What a person reads for each installed app's MCP tools, by tool name, in
+ * their language. One app failing to say leaves its tools to their English
+ * titles and never anybody else's.
+ */
+export async function appMcpToolLabels(locale: Locale): Promise<Map<string, string>> {
+    const labels = new Map<string, string>();
+    for (const extension of await installedWith("mcpToolLabels")) {
+        try {
+            const own = await extension.mcpToolLabels!(locale);
+            for (const [name, label] of Object.entries(own)) labels.set(name, label);
+        } catch (caught) {
+            console.error(`polaris: ${extension.id} could not name its MCP tools:`, caught);
+        }
+    }
+    return labels;
 }
 
 /**

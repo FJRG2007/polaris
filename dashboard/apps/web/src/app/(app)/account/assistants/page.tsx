@@ -14,7 +14,9 @@ import { McpAssistants } from "./mcp-assistants";
 import { ConnectedApps } from "./connected-apps";
 import { resolveEnforcedRules, scopesAvailableTo } from "@polaris/auth";
 import { editableScopes, mcpScopes } from "@/lib/mcp/oauth/scopes";
-import { getTranslations } from "@/lib/i18n/request";
+import { scopeAbilities } from "@/lib/mcp/abilities";
+import { isMcpScope, type McpScope } from "@/lib/mcp/scope-table";
+import { getLocale, getTranslations } from "@/lib/i18n/request";
 import { Messages } from "@/components/i18n/messages";
 import { rulesAreEmpty } from "@/lib/network-rules";
 import { listConnectedApps } from "@/lib/mcp/oauth/grants";
@@ -47,6 +49,14 @@ async function ConnectedAppsSection({ userId, isAdmin }: { userId: string; isAdm
     )
         ? await databaseOptions(userId)
         : [];
+    // What every permission on the page opens to: the ones each app holds and
+    // the ones its dialog offers, in one read of the tool list.
+    const shown = new Set<McpScope>();
+    for (const app of rows) {
+        for (const scope of [...app.scopes, ...app.offered])
+            if (isMcpScope(scope)) shown.add(scope);
+    }
+    const abilities = shown.size > 0 ? await scopeAbilities(await getLocale(), [...shown]) : {};
     // The rules a connected assistant is held to are the ones an administrator
     // imposed (the account's own sign-in rules govern sign-ins, not
     // assistants), so those are what decide whether the note is shown.
@@ -56,6 +66,7 @@ async function ConnectedAppsSection({ userId, isAdmin }: { userId: string; isAdm
             restricted={!rulesAreEmpty(enforced)}
             canExcept={isAdmin}
             databases={databases}
+            abilities={abilities}
         />
     );
 }

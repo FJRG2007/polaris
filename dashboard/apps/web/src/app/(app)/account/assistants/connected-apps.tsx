@@ -34,7 +34,8 @@ import type { ConnectedAppView } from "@/lib/mcp/oauth/grants";
 import { groupScopes, scopeGroupKey } from "@/lib/api-key-scopes";
 import { useLocale, useTranslations } from "@/components/i18n/i18n-provider";
 import { expandScopes, scopeRequires, isMcpScope, type McpScope } from "@/lib/mcp/scope-table";
-import { McpScopeChecklist } from "@/components/mcp-scope-checklist";
+import type { ScopeAbilities } from "@/lib/mcp/abilities";
+import { McpScopeChecklist, ScopeAbilityList } from "@/components/mcp-scope-checklist";
 import { IpRuleDialog } from "./ip-rule-dialog";
 import { DatabaseReachPicker, type DatabaseOption } from "./database-reach-picker";
 import { sameDatabaseReach, type DatabaseReach } from "@/lib/mcp/oauth/database-reach";
@@ -49,6 +50,7 @@ import {
     ChevronRight,
     Database,
     Globe,
+    Info,
     Network,
     Pencil,
     Search,
@@ -110,7 +112,8 @@ export function ConnectedApps({
     apps: initial,
     restricted = false,
     canExcept = false,
-    databases = []
+    databases = [],
+    abilities = {}
 }: {
     apps: ConnectedAppRow[];
     /** Whether the account's network rules restrict where it may be used from. */
@@ -119,6 +122,8 @@ export function ConnectedApps({
     canExcept?: boolean;
     /** The databases this person can open, for choosing which an app reaches. */
     databases?: DatabaseOption[];
+    /** What each scope lets an app do, behind the permissions' info buttons. */
+    abilities?: ScopeAbilities;
 }) {
     const t = useTranslations("mcp");
     const router = useRouter();
@@ -335,6 +340,7 @@ export function ConnectedApps({
                             <AppRow
                                 key={app.id}
                                 app={app}
+                                abilities={abilities}
                                 onEdit={() => setEditing(app)}
                                 onNetwork={() => setNetwork(app)}
                                 onDisconnect={() => void disconnect(app)}
@@ -347,6 +353,7 @@ export function ConnectedApps({
                 <EditScopes
                     app={editing}
                     databases={databases}
+                    abilities={abilities}
                     onCancel={() => setEditing(null)}
                     onSave={(scopes, reach) => void save(editing, scopes, reach)}
                 />
@@ -449,11 +456,13 @@ function ruleSummary(t: ReturnType<typeof useTranslations<"mcp">>, app: Connecte
 
 function AppRow({
     app,
+    abilities,
     onEdit,
     onNetwork,
     onDisconnect
 }: {
     app: ConnectedAppRow;
+    abilities: ScopeAbilities;
     onEdit: () => void;
     onNetwork: () => void;
     onDisconnect: () => void;
@@ -564,7 +573,9 @@ function AppRow({
                     />
                     {t("connectedApps.scopeCount", { count: app.scopes.length })}
                 </button>
-                {open ? <ScopeGroups id={listId} scopes={app.scopes} /> : null}
+                {open ? (
+                    <ScopeGroups id={listId} scopes={app.scopes} abilities={abilities} />
+                ) : null}
             </div>
             <div className="flex shrink-0 items-center gap-0.5">
                 <Button
@@ -601,9 +612,19 @@ function AppRow({
 }
 
 /** What an app may do, one line per area, each permission a chip. */
-function ScopeGroups({ id, scopes }: { id: string; scopes: readonly string[] }) {
+function ScopeGroups({
+    id,
+    scopes,
+    abilities
+}: {
+    id: string;
+    scopes: readonly string[];
+    abilities: ScopeAbilities;
+}) {
     const t = useTranslations("mcp");
     const ta = useTranslations("account");
+    // The one permission whose abilities are open under its row, if any.
+    const [explained, setExplained] = useState<McpScope | null>(null);
     // A finer scope sits in the area of the permission it stands on.
     const { groups, rest } = groupScopes(scopes, (scope) =>
         isMcpScope(scope) ? scopeRequires(scope) : scope
@@ -624,12 +645,50 @@ function ScopeGroups({ id, scopes }: { id: string; scopes: readonly string[] }) 
             {rows.map((row) => (
                 <div key={row.title} className="flex min-w-0 flex-col gap-1 sm:flex-row sm:gap-2">
                     <dt className="w-28 shrink-0 text-xs text-muted-foreground">{row.title}</dt>
-                    <dd className="flex min-w-0 flex-wrap gap-1">
-                        {row.scopes.map((scope) => (
-                            <Badge key={scope} variant="neutral" title={scope}>
-                                {t(scopeLabelKey(scope))}
-                            </Badge>
-                        ))}
+                    <dd className="flex min-w-0 flex-1 flex-col gap-1.5">
+                        <span className="flex min-w-0 flex-wrap gap-1">
+                            {row.scopes.map((scope) =>
+                                isMcpScope(scope) ? (
+                                    <button
+                                        key={scope}
+                                        type="button"
+                                        aria-expanded={explained === scope}
+                                        aria-label={t("consent.abilitiesShow", {
+                                            scope: t(scopeLabelKey(scope))
+                                        })}
+                                        title={t("consent.abilitiesShow", {
+                                            scope: t(scopeLabelKey(scope))
+                                        })}
+                                        onClick={() =>
+                                            setExplained((current) =>
+                                                current === scope ? null : scope
+                                            )
+                                        }
+                                        className="min-w-0 max-w-full rounded-md text-left"
+                                    >
+                                        <Badge
+                                            variant={explained === scope ? "primary" : "neutral"}
+                                            className="max-w-full gap-1"
+                                        >
+                                            <span className="truncate">
+                                                {t(scopeLabelKey(scope))}
+                                            </span>
+                                            <Info aria-hidden className="size-3 shrink-0" />
+                                        </Badge>
+                                    </button>
+                                ) : (
+                                    <Badge key={scope} variant="neutral" title={scope}>
+                                        {t(scopeLabelKey(scope))}
+                                    </Badge>
+                                )
+                            )}
+                        </span>
+                        {explained && row.scopes.includes(explained) ? (
+                            <ScopeAbilityList
+                                scope={explained}
+                                abilities={abilities[explained] ?? []}
+                            />
+                        ) : null}
                     </dd>
                 </div>
             ))}
@@ -641,11 +700,13 @@ function ScopeGroups({ id, scopes }: { id: string; scopes: readonly string[] }) 
 function EditScopes({
     app,
     databases,
+    abilities,
     onCancel,
     onSave
 }: {
     app: ConnectedAppRow;
     databases: readonly DatabaseOption[];
+    abilities: ScopeAbilities;
     onCancel: () => void;
     onSave: (scopes: McpScope[], reach: DatabaseReach) => void;
 }) {
@@ -691,6 +752,7 @@ function EditScopes({
                     selected={selected}
                     effective={effective}
                     unrequested={unrequested}
+                    abilities={abilities}
                     onToggle={(scope, checked) =>
                         setSelected((current) =>
                             checked

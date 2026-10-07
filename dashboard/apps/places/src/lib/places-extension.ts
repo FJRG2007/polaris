@@ -136,6 +136,10 @@ export const placesExtension: AppExtension = {
     // same rules as the screens.
     mcpTools: async () => (await import("./mcp-tools")).placesMcpTools(),
 
+    // What a person reads for each of those tools, in their language.
+    mcpToolLabels: async (locale) =>
+        (await import("../../messages")).placesCatalogs.catalogs[locale].mcpTools,
+
     // How `polaris_search` finds its devices, cameras, places, rooms and
     // routines, by the same rules.
     mcpSearch: async () => (await import("./mcp-search")).placesMcpSearch()

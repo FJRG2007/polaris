@@ -195,6 +195,10 @@ export const gameServersExtension: AppExtension = {
     // the console, by the same standing the server pages read.
     mcpTools: async () => (await import("./mcp-tools")).gameMcpTools(),
 
+    // What a person reads for each of those tools, in their language.
+    mcpToolLabels: async (locale) =>
+        (await import("../../messages")).gameCatalogs.catalogs[locale].mcpTools,
+
     // How `polaris_search` finds the servers and a Minecraft server's events,
     // by the same standing.
     mcpSearch: async () => (await import("./mcp-search")).gameMcpSearch()
