@@ -71,8 +71,16 @@ describe("a section of the consent list", () => {
                     effective={new Set()}
                     abilities={{
                         "tasks.manage": [
-                            { name: "tasks_reminders", label: "List task reminders", readOnly: true },
-                            { name: "tasks_remind", label: "Remind me about a task", readOnly: false }
+                            {
+                                name: "tasks_reminders",
+                                label: "List task reminders",
+                                readOnly: true
+                            },
+                            {
+                                name: "tasks_remind",
+                                label: "Remind me about a task",
+                                readOnly: false
+                            }
                         ]
                     }}
                     onToggle={toggle}
@@ -112,7 +120,12 @@ describe("a section of the consent list", () => {
         unmount();
         render(
             withMessages(
-                <McpScopeChecklist offered={["notes.use"]} selected={[]} effective={new Set()} onToggle={vi.fn()} />
+                <McpScopeChecklist
+                    offered={["notes.use"]}
+                    selected={[]}
+                    effective={new Set()}
+                    onToggle={vi.fn()}
+                />
             )
         );
         expect(screen.queryByLabelText("What it allows: Read and write your notes")).toBeNull();

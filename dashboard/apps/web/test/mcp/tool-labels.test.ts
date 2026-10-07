@@ -60,7 +60,7 @@ describe("what a scope opens", () => {
             name,
             title: `${name} title`,
             description: name,
-            input: (undefined as never),
+            input: undefined as never,
             scope: scope as never,
             readOnly,
             async run() {
