@@ -23,7 +23,7 @@ import { prisma } from "@polaris/db";
 import * as core from "@polaris/core";
 import * as access from "@/lib/tasks/access";
 import * as tasks from "@/lib/tasks/task-service";
-import { addComment } from "@/lib/tasks/task-detail-service";
+import { addComment, addReminder, deleteReminder } from "@/lib/tasks/task-detail-service";
 import type { TaskRow } from "@/lib/tasks/facts";
 import { McpRefusal, type McpCaller, type McpTool, type McpToolResult } from "../protocol";
 import { defineMcpSearch, preferMatches } from "../search";
@@ -68,8 +68,8 @@ const taskRef = z
     .string()
     .trim()
     .min(1)
-    .max(80)
-    .describe('The task, as its reference ("ENG-42") or its id.');
+    .max(200)
+    .describe('The task, as its reference ("ENG-42"), its id, or its exact name.');
 
 /**
  * Resolve a reference or an id to a task the caller may at least read.
@@ -98,9 +98,7 @@ async function resolveTask(
     if (match && (!Number.isSafeInteger(number) || number > INT_MAX)) {
         throw new McpRefusal(`No task called ${trimmed} that this key can reach.`);
     }
-    if (!match && !UUID.test(trimmed)) {
-        throw new McpRefusal(`No task called ${trimmed} that this key can reach.`);
-    }
+    if (!match && !UUID.test(trimmed)) return taskByName(scope, trimmed);
     const task = match
         ? await prisma.task.findFirst({
               where: {
@@ -115,6 +113,82 @@ async function resolveTask(
     if (!task) throw new McpRefusal(`No task called ${trimmed} that this key can reach.`);
     return task;
 }
+
+/**
+ * A task named the way a person names it ("the invoice task" is not this, but
+ * "Send the October invoices" is). Only an exact name, case and accents aside,
+ * is taken: two tasks of one name are named back with their references rather
+ * than one being guessed at, and a near miss is offered, not acted on.
+ */
+async function taskByName(
+    scope: Awaited<ReturnType<typeof access.visibleScope>>,
+    name: string
+): Promise<{ id: string; spaceId: string }> {
+    const rows = await tasks.listTasks(
+        { spaceIds: access.scopeSpaceIds(scope), listIds: scope.listIds },
+        { openOnly: false, limit: 500 }
+    );
+    const pick = core.pickByName(rows, name, (row) => row.name);
+    if (pick.kind === "one") return { id: pick.item.id, spaceId: pick.item.spaceId };
+    throw new McpRefusal(
+        core.missedNameText(pick, name, "task", (row) => `${row.reference} ${row.name}`)
+    );
+}
+
+/** A day or a wall time as a model writes one: what the person would say. */
+const WALL = /^(\d{4})-(\d{2})-(\d{2})(?:T([01]\d|2[0-3]):([0-5]\d))?$/;
+
+/**
+ * A day or a time the model wrote, as the instant it names on the person's own
+ * clock - the zone their dates are shown in, not the server's. A day alone is
+ * the start of it, which is how the date picker stores an all-day due date.
+ */
+async function wallInstant(
+    userId: string,
+    value: string
+): Promise<{ at: Date; timed: boolean }> {
+    const parts = WALL.exec(value);
+    if (!parts) throw new McpRefusal("Write YYYY-MM-DD, or YYYY-MM-DDTHH:mm.");
+    const [year, month, day] = [Number(parts[1]), Number(parts[2]), Number(parts[3])];
+    const check = new Date(Date.UTC(year, month - 1, day));
+    if (check.getUTCMonth() !== month - 1 || check.getUTCDate() !== day)
+        throw new McpRefusal(`There is no day ${value.slice(0, 10)}.`);
+    const timed = parts[4] !== undefined;
+    // Loaded when a date is read: the preferences reach the session layer, which
+    // the rest of the catalogue has no need of.
+    const { resolveDisplayPreferencesFor } = await import("@/lib/display-prefs-service");
+    const { timeZone } = await resolveDisplayPreferencesFor(userId);
+    const at = core.zonedInstant(
+        {
+            year,
+            month,
+            day,
+            hours: timed ? Number(parts[4]) : 0,
+            minutes: timed ? Number(parts[5]) : 0
+        },
+        timeZone
+    );
+    return { at, timed };
+}
+
+/** A due date as `tasks_create` and `tasks_update` take it; empty clears it. */
+async function dueOf(
+    userId: string,
+    value: string
+): Promise<{ dueDate: string | null; timed: boolean }> {
+    if (value === "") return { dueDate: null, timed: false };
+    const { at, timed } = await wallInstant(userId, value);
+    return { dueDate: at.toISOString(), timed };
+}
+
+const dueField = z
+    .string()
+    .trim()
+    .max(16)
+    .refine((value) => value === "" || WALL.test(value), "Write YYYY-MM-DD, or YYYY-MM-DDTHH:mm")
+    .describe(
+        `When it is due: "YYYY-MM-DD" for a day, "YYYY-MM-DDTHH:mm" for a time, on the person's own clock.`
+    );
 
 /** The status in a space whose name the caller meant. Compared case-insensitively
  *  and with the spacing ignored, because "in progress", "In Progress" and
@@ -335,7 +409,8 @@ const createInput = z.object({
     // i18n-ignore read by the calling model, not shown to a person
     description: z.string().max(20_000).default(""),
     priority: z.enum(core.TASK_PRIORITIES).default("none"),
-    assignToMe: z.boolean().default(false)
+    assignToMe: z.boolean().default(false),
+    due: dueField.default("")
 });
 
 const createTaskTool: McpTool<z.infer<typeof createInput>> = {
@@ -344,7 +419,7 @@ const createTaskTool: McpTool<z.infer<typeof createInput>> = {
     title: "Create a task",
     description:
         // i18n-ignore read by the calling model, not shown to a person
-        "Create a task. Use this for work you found that is out of scope for what you were asked to do, rather than doing it unasked.",
+        "Create a task, with a due date if one is given. Use this for work you found that is out of scope for what you were asked to do, rather than doing it unasked.",
     input: createInput,
     category: "productivity",
     scope: "tasks.manage",
@@ -373,7 +448,8 @@ const createTaskTool: McpTool<z.infer<typeof createInput>> = {
                 // i18n-ignore read by the calling model, not shown to a person
                 description: input.description,
                 priority: input.priority,
-                assigneeIds: input.assignToMe ? [caller.userId] : []
+                assigneeIds: input.assignToMe ? [caller.userId] : [],
+                ...(await dueOf(caller.userId, input.due))
             })
         });
         return text(`Created ${created.reference}.`, {
@@ -395,7 +471,10 @@ const updateInput = z.object({
     // i18n-ignore read by the calling model, not shown to a person
     description: z.string().max(20_000).optional(),
     priority: z.enum(core.TASK_PRIORITIES).optional(),
-    assignToMe: z.boolean().optional().describe("Put the account this key belongs to on it.")
+    assignToMe: z.boolean().optional().describe("Put the account this key belongs to on it."),
+    due: dueField.optional().describe(
+        `A new due date: "YYYY-MM-DD", "YYYY-MM-DDTHH:mm" on the person's own clock, or "" to clear it.`
+    )
 });
 
 const updateTaskTool: McpTool<z.infer<typeof updateInput>> = {
@@ -404,7 +483,7 @@ const updateTaskTool: McpTool<z.infer<typeof updateInput>> = {
     title: "Change a task",
     description:
         // i18n-ignore read by the calling model, not shown to a person
-        "Change a task: move it to another status, rename it, set its priority, take it. Only the fields you send are written.",
+        "Change a task: move it to another status, rename it, set its priority or due date, take it. Only the fields you send are written.",
     input: updateInput,
     category: "productivity",
     scope: "tasks.manage",
@@ -433,7 +512,8 @@ const updateTaskTool: McpTool<z.infer<typeof updateInput>> = {
             ...(input.description === undefined ? {} : { description: input.description }),
             ...(input.priority === undefined ? {} : { priority: input.priority }),
             ...(statusId === undefined ? {} : { statusId }),
-            ...(assignees === undefined ? {} : { assigneeIds: assignees })
+            ...(assignees === undefined ? {} : { assigneeIds: assignees }),
+            ...(input.due === undefined ? {} : await dueOf(caller.userId, input.due))
         });
         return text("Updated.");
     }
@@ -515,6 +595,158 @@ const listSpacesTool: McpTool<z.infer<typeof spacesInput>> = {
     }
 };
 
+// ---------------------------------------------------------------------------
+// Reminders
+// ---------------------------------------------------------------------------
+
+/** The most reminders one read lists: a person's pending ones are a handful. */
+const REMINDERS_LISTED = 50;
+
+const remindersInput = z.object({
+    task: taskRef.optional().describe("Only the reminders on this task. Absent lists them all.")
+});
+
+const listRemindersTool: McpTool<z.infer<typeof remindersInput>> = {
+    name: "tasks_reminders",
+    // i18n-ignore shown by the calling client, which has no locale to ask for
+    title: "List task reminders",
+    description:
+        // i18n-ignore read by the calling model, not shown to a person
+        "The reminders this account has set on tasks and that have not gone off yet, soonest first, with their ids. Reminders are the person's own; nobody else sees them.",
+    input: remindersInput,
+    category: "productivity",
+    scope: "tasks.read",
+    readOnly: true,
+    async run(input, caller) {
+        const scope = await access.visibleScope(await actorFor(caller));
+        const only = input.task ? (await resolveTask(caller, input.task)).id : undefined;
+        const rows = await prisma.taskReminder.findMany({
+            where: {
+                userId: caller.userId,
+                sentAt: null,
+                ...(only ? { taskId: only } : {}),
+                // A task the account no longer reaches is not named back to it.
+                task: access.scopeTaskWhere(scope)
+            },
+            orderBy: { remindAt: "asc" },
+            take: REMINDERS_LISTED,
+            select: {
+                id: true,
+                remindAt: true,
+                note: true,
+                task: { select: { number: true, name: true, space: { select: { prefix: true } } } }
+            }
+        });
+        const reminders = rows.map((row) => ({
+            id: row.id,
+            at: row.remindAt.toISOString(),
+            note: row.note,
+            task: `${row.task.space.prefix}-${row.task.number}`,
+            taskName: row.task.name
+        }));
+        return text(
+            reminders
+                .map(
+                    (row) =>
+                        `${row.at}  ${row.task} ${row.taskName}${row.note ? ` - ${row.note}` : ""}  [${row.id}]`
+                )
+                .join("\n") || "No reminders pending.",
+            { reminders }
+        );
+    }
+};
+
+const remindInput = z.object({
+    task: taskRef,
+    at: z
+        .string()
+        .trim()
+        .min(1)
+        .max(40)
+        .describe(
+            `When to remind: "YYYY-MM-DDTHH:mm" on the person's own clock, or an ISO time with its offset.`
+        ),
+    note: z
+        .string()
+        .trim()
+        .max(200)
+        .default("")
+        .describe("What the reminder says. Empty says the task's name.")
+});
+
+/** An instant from a model: a wall time on the person's clock, or one with
+ *  its own offset already, which is taken as written. */
+async function instantOf(userId: string, value: string): Promise<Date> {
+    if (WALL.test(value)) {
+        const { at, timed } = await wallInstant(userId, value);
+        if (!timed) throw new McpRefusal("Give a time as well as a day: YYYY-MM-DDTHH:mm.");
+        return at;
+    }
+    const parsed = z.string().datetime({ offset: true }).safeParse(value);
+    if (!parsed.success)
+        throw new McpRefusal("Write the time as YYYY-MM-DDTHH:mm, or ISO with its offset.");
+    return new Date(parsed.data);
+}
+
+const remindTool: McpTool<z.infer<typeof remindInput>> = {
+    name: "tasks_remind",
+    // i18n-ignore shown by the calling client, which has no locale to ask for
+    title: "Remind me about a task",
+    description:
+        // i18n-ignore read by the calling model, not shown to a person
+        "Set a reminder on a task for the account this key belongs to: at that time it gets a notification that opens the task. Only it is reminded.",
+    input: remindInput,
+    category: "productivity",
+    // The screen lets a reader set one; a connection approved to read, though,
+    // changes nothing - setting a reminder is a change like any other.
+    scope: "tasks.manage",
+    readOnly: false,
+    destructive: false,
+    async run(input, caller) {
+        const actor = await actorFor(caller);
+        const { id } = await resolveTask(caller, input.task);
+        // The screen's rule: reading a task is enough to be reminded of it.
+        await access.requireTask(actor, id, "guest");
+        const at = await instantOf(caller.userId, input.at);
+        if (at.getTime() <= Date.now())
+            throw new McpRefusal(`${at.toISOString()} has already passed. Pick a time ahead.`);
+        const parsed = core.reminderSchema.parse({
+            taskId: id,
+            remindAt: at.toISOString(),
+            note: input.note
+        });
+        await addReminder(caller.userId, id, parsed.remindAt, parsed.note);
+        return text(`Reminder set for ${parsed.remindAt}.`, { at: parsed.remindAt });
+    }
+};
+
+const cancelInput = z.object({
+    reminder: z.string().uuid().describe("The reminder's id, as tasks_reminders returned it.")
+});
+
+const cancelReminderTool: McpTool<z.infer<typeof cancelInput>> = {
+    name: "tasks_reminder_cancel",
+    // i18n-ignore shown by the calling client, which has no locale to ask for
+    title: "Cancel a task reminder",
+    description:
+        // i18n-ignore read by the calling model, not shown to a person
+        "Cancel one of this account's task reminders before it goes off.",
+    input: cancelInput,
+    category: "productivity",
+    scope: "tasks.manage",
+    readOnly: false,
+    idempotent: true,
+    async run(input, caller) {
+        const held = await prisma.taskReminder.findFirst({
+            where: { id: input.reminder, userId: caller.userId },
+            select: { id: true }
+        });
+        if (!held) throw new McpRefusal("This account has no reminder with that id.");
+        await deleteReminder(caller.userId, input.reminder);
+        return text("Cancelled.");
+    }
+};
+
 /** The open tasks this key reaches, for `polaris_search`. */
 export const TASK_SEARCH = defineMcpSearch({
     id: "tasks.tasks",
@@ -536,7 +768,8 @@ export const TASK_SEARCH = defineMcpSearch({
             next: [
                 { tool: "tasks_get", args: { task: row.reference } },
                 { tool: "tasks_update", args: { task: row.reference } },
-                { tool: "tasks_comment", args: { task: row.reference } }
+                { tool: "tasks_comment", args: { task: row.reference } },
+                { tool: "tasks_remind", args: { task: row.reference } }
             ]
         }));
     }
@@ -548,5 +781,8 @@ export const TASK_TOOLS = [
     getTaskTool,
     createTaskTool,
     updateTaskTool,
-    commentTaskTool
+    commentTaskTool,
+    listRemindersTool,
+    remindTool,
+    cancelReminderTool
 ] as unknown as McpTool<never>[];

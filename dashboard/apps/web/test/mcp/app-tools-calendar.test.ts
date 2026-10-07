@@ -184,6 +184,24 @@ describe("the calendar tools", () => {
         });
     });
 
+    it("set the reminders asked for, in minutes before, in place of the calendar's", async () => {
+        const args = {
+            calendarId: CALENDAR,
+            title: "Flight",
+            start: "2026-10-07T10:00",
+            end: "2026-10-07T12:00"
+        };
+        await call("calendar_create", { ...args, reminders: [60, 10] }, ["calendar.manage"]);
+        await call("calendar_create", { ...args, reminders: [] }, ["calendar.manage"]);
+        const [asked, none] = mocks.saveEvent.mock.calls.map(([, input]) => input.event.alarms);
+        expect(asked.map((alarm: any) => alarm.trigger.minutes)).toEqual([-60, -10]);
+        expect(none).toEqual([]);
+        const tooFar = await call("calendar_create", { ...args, reminders: [60 * 24 * 40] }, [
+            "calendar.manage"
+        ]);
+        expect(tooFar.message ?? tooFar.content?.[0]?.text).toContain("reminders");
+    });
+
     it("refuse a calendar the person may only read, and an end before the start", async () => {
         mocks.listCalendars.mockResolvedValue([calendar(false)]);
         const shared = await call(

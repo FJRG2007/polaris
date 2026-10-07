@@ -23,6 +23,7 @@ import type { McpTool } from "../protocol";
 import { MAIL_SEARCH, MAIL_TOOLS } from "./mail";
 import { DATABASE_SEARCH, DATABASE_TOOLS } from "./databases";
 import { DISCOVERY_TOOLS } from "./discovery";
+import { WATCH_SEARCH, WATCH_TOOLS } from "./watch";
 import type { McpSearchProvider } from "../search";
 
 const whoamiInput = z.object({});
@@ -71,6 +72,7 @@ export const MCP_TOOLS: readonly McpTool<never>[] = [
     ...TASK_TOOLS,
     ...SESSION_TOOLS,
     ...DEPLOY_TOOLS,
+    ...WATCH_TOOLS,
     ...NOTE_TOOLS,
     ...CHAT_TOOLS,
     ...DRIVE_TOOLS,
@@ -90,5 +92,6 @@ export const MCP_SEARCH_PROVIDERS: readonly McpSearchProvider[] = [
     DRIVE_SEARCH,
     MAIL_SEARCH,
     DEPLOY_SEARCH,
+    WATCH_SEARCH,
     DATABASE_SEARCH
 ];
