@@ -42,6 +42,13 @@ describe("a refused connection", () => {
         expect(driverRefusal(wrapped)).toBe(DRIVER_REFUSALS.timeout);
     });
 
+    it("stops at causes that point back at each other", () => {
+        const first = new Error("first");
+        const second = Object.assign(new Error("second"), { cause: first });
+        Object.assign(first, { cause: second });
+        expect(driverRefusal(first)).toBeNull();
+    });
+
     it("leaves anything else to the generic sentence", () => {
         expect(driverRefusal(new Error('relation "users" does not exist'))).toBeNull();
         expect(driverRefusal(coded("42P01"))).toBeNull();

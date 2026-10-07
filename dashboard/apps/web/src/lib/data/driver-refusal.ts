@@ -54,8 +54,8 @@ const BY_CODE: Readonly<Record<string, Refusal>> = {
 const MONGO_AUTH = new Set<unknown>([18, "AuthenticationFailed"]);
 
 /** What a refused connection means, or null when it is not one of those. */
-export function driverRefusal(caught: unknown): Refusal | null {
-    if (!caught || typeof caught !== "object") return null;
+export function driverRefusal(caught: unknown, depth = 0): Refusal | null {
+    if (depth > 5 || !caught || typeof caught !== "object") return null;
     const error = caught as { code?: unknown; codeName?: unknown; message?: unknown; cause?: unknown };
     if (MONGO_AUTH.has(error.code) || MONGO_AUTH.has(error.codeName)) return DRIVER_REFUSALS.credentials;
     if (typeof error.code === "string" && BY_CODE[error.code]) return BY_CODE[error.code]!;
@@ -66,5 +66,5 @@ export function driverRefusal(caught: unknown): Refusal | null {
     // pg's own sentence when the server answers the SSL request with "no".
     if (message === "The server does not support SSL connections") return DRIVER_REFUSALS.noTls;
     // A driver that wraps the socket's error keeps it as the cause.
-    return error.cause && error.cause !== caught ? driverRefusal(error.cause) : null;
+    return error.cause && error.cause !== caught ? driverRefusal(error.cause, depth + 1) : null;
 }
