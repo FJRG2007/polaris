@@ -95,7 +95,10 @@ export const stashSchema = z.object({
      *  `failed` for a give-back that could not finish. */
     state: z.enum(["taking", "stashed", "failed"]).default("stashed"),
     /** The database row that holds each stack whole. */
-    record: z.string().nullable().default(null)
+    record: z.string().nullable().default(null),
+    /** The keys the Polaris mod keeps this player's things under, inside the
+     *  server (`in-server`): given back by the mod, not from `kept`. */
+    mod: z.array(z.string()).default([])
 });
 
 export type Stash = z.infer<typeof stashSchema>;

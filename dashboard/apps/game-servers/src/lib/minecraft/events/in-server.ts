@@ -57,7 +57,12 @@ export function parseCaps(reply: string): ReadonlySet<Capability> {
 }
 
 const CAPS_TTL_MS = 60_000;
-const known = new Map<string, { readonly at: number; readonly caps: ReadonlySet<Capability> }>();
+/** Per server, the answer - or the question still out, so players stashed at
+ *  once share one ask rather than a trip each. */
+const known = new Map<
+    string,
+    { readonly at: number; readonly caps: Promise<ReadonlySet<Capability>> }
+>();
 
 /** What this server's Polaris mod can do now; empty where it has none. */
 export async function capabilities(
@@ -67,7 +72,10 @@ export async function capabilities(
     if (server.edition !== "java") return new Set();
     const cached = known.get(server.installedAppId);
     if (cached && now - cached.at < CAPS_TTL_MS) return cached.caps;
-    const caps = parseCaps(await server.say(["polaris caps"]).catch(() => ""));
+    const caps = server
+        .say(["polaris caps"])
+        .catch(() => "")
+        .then(parseCaps);
     known.set(server.installedAppId, { at: now, caps });
     return caps;
 }
@@ -172,14 +180,16 @@ const pause = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 /**
  * Run `lines` the fastest way this server allows without freezing it: through
- * the mod's paced batch where it can, waited for until every line has run; as
- * plain lines in one trip otherwise. Either way the lines have all been run when
- * this answers - a build that will not finish in time is cancelled and answered
- * as false, and the caller treats it as a build that did not go in.
+ * the mod's paced batch where it can, waited for until every line has run;
+ * through `plain` - the paced console trips every server has - otherwise.
+ * Either way the lines have all been run when this answers. A batch that will
+ * not finish in time is cancelled and answered as false, and the caller treats
+ * it as a build that did not go in.
  */
 export async function build(
     server: ServerContainer,
     lines: readonly string[],
+    plain: (lines: readonly string[]) => Promise<unknown> = (all) => server.sayAll(all),
     wait: (ms: number) => Promise<unknown> = pause
 ): Promise<boolean> {
     if (lines.length === 0) return true;
@@ -188,7 +198,7 @@ export async function build(
     const key = `pb${Date.now().toString(36)}${batches.toString(36)}`;
     const written = caps.has("batch") ? batchLines(key, lines) : null;
     if (!written) {
-        await server.sayAll(lines);
+        await plain(lines);
         return true;
     }
     await server.sayAll(written.slice(0, -1));
@@ -196,7 +206,7 @@ export async function build(
     if (!status) {
         // It answered as something else: not the mod after all.
         forgetCapabilities(server.installedAppId);
-        await server.sayAll(lines);
+        await plain(lines);
         return true;
     }
     const until = Date.now() + BATCH_WAIT_MS;

@@ -41,6 +41,7 @@ import * as hillService from "./hill-service";
 import * as hitsService from "./hits-service";
 import * as stashService from "./stash-service";
 import * as pace from "./pace";
+import * as inServer from "../in-server";
 import * as commands from "../commands";
 import * as speech from "../../speech";
 import * as written from "../messages";
@@ -328,17 +329,24 @@ async function raise(ctx: KindContext): Promise<void> {
     const marker = game?.decorate ? (run.marker ?? (await kitMarker(ctx))) : run.marker;
     ctx.run = { ...ctx.run, arena: built, marker, game: game?.built?.(run) ?? ctx.run.game };
     await ctx.persist();
-    // A paced trip at a time (`pace.buildPacer`): a big arena is never one
-    // trip that holds the server's tick for as long as all of it takes.
+    // Inside the server where the Polaris mod can (`in-server.build`: a block
+    // cap a tick); otherwise a paced trip at a time (`pace.buildPacer`). Either
+    // way a big arena never holds the server's tick for all of it at once.
     const building = pace.buildPacer();
-    await pace.inTrips(
+    const raised = await inServer.build(
+        ctx.server,
         fills.flatMap((one) =>
             arena.slices(one.box).map((piece) => arena.fillKeep(piece, one.block))
         ),
-        building,
-        (trip) => ctx.server.sayAll(trip)
+        (lines) => pace.inTrips([...lines], building, (trip) => ctx.server.sayAll(trip))
     );
     await ctx.server.sayAll([commands.CLEAR_MARK]);
+    if (!raised) {
+        await ctx.server.sayAll(arena.teardown(built));
+        ctx.run = { ...ctx.run, arena: null };
+        await giveUpSite(ctx, place, "refused");
+        return;
+    }
     // A protected area refuses blocks without a word: what was asked for has
     // to be there, or it comes down again and another place is tried.
     const floor = fills.at(-1)!;

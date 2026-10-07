@@ -6,6 +6,7 @@
  * and sends them back; this plays it).
  */
 
+import * as inServer from "../in-server";
 import { formatDuration } from "../../../figures";
 import * as hill from "./hill";
 import * as arrival from "./arrival";
@@ -120,7 +121,8 @@ async function buildPlatform(ctx: KindContext, at: stored.Point, radius: number)
     const built: stored.Arena = { box: floor, blocks: [...hill.PLATFORM_BLOCKS] };
     ctx.run = { ...ctx.run, arena: built };
     await ctx.persist();
-    await ctx.server.sayAll([
+    // Paced inside the server where the Polaris mod can (`in-server.build`).
+    await inServer.build(ctx.server, [
         ...hill.platformDecor(at, radius).map((one) => arena.fillKeep(one.box, one.block)),
         arena.fillKeep(floor, hill.PLATFORM_BLOCK)
     ]);

@@ -112,7 +112,7 @@ describe("batches", () => {
             polls += 1;
             return `{"ok":true,"key":"k","done":${polls >= 2},"total":2,"ran":${polls},"failed":0}`;
         });
-        expect(await inServer.build(server, ["fill 0 0 0 9 9 9 stone", "say done"], async () => undefined)).toBe(
+        expect(await inServer.build(server, ["fill 0 0 0 9 9 9 stone", "say done"], undefined, async () => undefined)).toBe(
             true
         );
         expect(sent[0]).toMatch(/^data remove storage polaris:batch pb/);
