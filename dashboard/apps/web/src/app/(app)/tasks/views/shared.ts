@@ -206,6 +206,9 @@ export interface ViewProps {
      * rows.
      */
     readonly onSelect: (taskId: string, mode: SelectMode, ordered: readonly string[]) => void;
+    /** Make the selection exactly these tasks - all of them, or none. What the
+     *  box at the head of a table's checkbox column does. */
+    readonly onReplaceSelection?: (taskIds: readonly string[]) => void;
     readonly onMove: (move: BoardMove) => void;
     readonly onQuickCreate: (groupKey: string, name: string) => void;
     /** Apply a change from the row itself, optimistically. */

@@ -10,15 +10,24 @@
  */
 
 import * as core from "@polaris/core";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toFacts } from "@/lib/tasks/facts";
 import { useRowCursor } from "./row-cursor";
-import { cn, EmptyState } from "@polaris/ui";
+import {
+    Checkbox,
+    cn,
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuLabel,
+    DropdownMenuTrigger,
+    EmptyState
+} from "@polaris/ui";
 import { CustomFieldValue } from "../custom-fields";
 import { PriorityMark } from "@/components/priority-mark";
 import { columnStatusIds, reorderColumns } from "./board";
 import { useDisplayFormat } from "@/components/display-format";
-import { ChevronDown, ChevronRight, Plus } from "lucide-react";
+import { Check, ChevronDown, ChevronRight, Columns3, Plus } from "lucide-react";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { dropEdge, neighbours, type DropEdge } from "../drop-edge";
 import { clickMode, type SelectMode, type ViewProps } from "./shared";
@@ -37,6 +46,7 @@ import {
     DuePicker,
     PriorityPicker,
     StatusDot,
+    StatusPicker,
     TagChip,
     TaskLocation
 } from "../pickers";
@@ -46,6 +56,7 @@ function TaskLine({
     commands,
     depth,
     selected,
+    selecting = false,
     cursor,
     showStatus,
     showLocation,
@@ -59,6 +70,9 @@ function TaskLine({
     commands: TaskCommands;
     depth: number;
     selected: boolean;
+    /** Whether anything on the screen is selected, which keeps every row's box
+     *  showing rather than only the one under the pointer. */
+    selecting?: boolean;
     /** Whether the keyboard cursor is on this row. Drawn as a rail down the left
      *  edge rather than as a background, so it stays legible on a row that is
      *  also selected - the two mean different things and have to be tellable
@@ -82,6 +96,7 @@ function TaskLine({
     onDropAt?: (edge: DropEdge) => void;
 }) {
     const format = useDisplayFormat();
+    const t = useTranslations("tasksViews");
     const [over, setOver] = useState<DropEdge | null>(null);
     const { task, canEdit, onOpen } = commands;
 
@@ -114,7 +129,7 @@ function TaskLine({
                     onDropAt(edge);
                 }}
                 className={cn(
-                    "group relative flex items-center gap-2 border-b border-border px-2 py-1.5 transition-colors hover:bg-card-hover",
+                    "group relative flex items-center gap-2 border-b border-border px-2 py-1.5 transition-colors duration-fast hover:bg-card-hover",
                     selected && "bg-primary/5",
                     cursor &&
                         "bg-card-hover before:absolute before:inset-y-0 before:left-0 before:w-0.5 before:bg-primary"
@@ -133,6 +148,23 @@ function TaskLine({
                         )}
                     />
                 )}
+                {/* Selecting without a modifier key, which is the only way there
+                    is on a touch screen. Out of the way on a desktop until the
+                    row is pointed at, and kept once anything is selected, so a
+                    selection being built can be seen and added to. */}
+                <span
+                    className={cn(
+                        "flex shrink-0 items-center transition-opacity duration-fast focus-within:opacity-100 md:group-hover:opacity-100",
+                        !selecting && "md:opacity-0"
+                    )}
+                >
+                    <Checkbox
+                        checked={selected}
+                        aria-label={t("table.selectRow", { name: task.name })}
+                        onChange={() => undefined}
+                        onClick={(event) => onSelect(event.shiftKey ? "range" : "toggle")}
+                    />
+                </span>
                 <TaskStatusMarker commands={commands} />
                 <div className="flex min-w-0 flex-1 flex-col">
                     <button
@@ -416,6 +448,7 @@ export function ListView(props: ViewProps) {
                                             commands={commandsFor(props, task)}
                                             depth={node.depth}
                                             selected={selection.has(task.id)}
+                                            selecting={selection.size > 0}
                                             cursor={cursor.at === task.id}
                                             showStatus={props.groupBy !== "status"}
                                             showLocation={props.showLocation}
@@ -504,6 +537,43 @@ export function ListView(props: ViewProps) {
     );
 }
 
+/**
+ * The table's own columns, in the order they are drawn. The task's name and its
+ * status marker are not among them: a row with no name is not a row anybody can
+ * read, so those two cannot be hidden.
+ */
+const TABLE_COLUMNS = ["status", "assignees", "priority", "due", "estimate", "tracked"] as const;
+
+/**
+ * Which columns this reader has taken off the table, kept in their browser.
+ *
+ * One set for every table rather than one per list: the built-in columns are the
+ * same everywhere, and a custom field's id belongs to one space, so hiding it
+ * here can never hide something on another screen. It is a reader's own
+ * convenience, so a browser that refuses storage just shows every column.
+ */
+const HIDDEN_COLUMNS_KEY = "polaris.tasks.table.hidden";
+
+function readHiddenColumns(): ReadonlySet<string> {
+    try {
+        const raw = window.localStorage.getItem(HIDDEN_COLUMNS_KEY);
+        const parsed: unknown = raw ? JSON.parse(raw) : [];
+        return new Set(
+            Array.isArray(parsed) ? parsed.filter((id): id is string => typeof id === "string") : []
+        );
+    } catch {
+        return new Set();
+    }
+}
+
+function writeHiddenColumns(hidden: ReadonlySet<string>): void {
+    try {
+        window.localStorage.setItem(HIDDEN_COLUMNS_KEY, JSON.stringify([...hidden]));
+    } catch {
+        // Private browsing or a full quota: the choice holds for this visit only.
+    }
+}
+
 export function TableView(props: ViewProps) {
     const { rows, context, selection, onOpen, onSelect } = props;
     const format = useDisplayFormat();
@@ -511,47 +581,147 @@ export function TableView(props: ViewProps) {
     const tp = useTranslations("tasks");
     // Every custom field gets a column here: being able to compare them side by
     // side is the whole reason to look at a table rather than a list.
-    const columns = context.fields;
+    const fields = context.fields;
     // A table is flat, so the rows themselves are the order a shift-click spans.
     const rendered = useMemo(() => rows.map((task) => task.id), [rows]);
     const cursor = useRowCursor(rendered, { onOpen, onSelect });
+
+    // Read after mount: the server has no localStorage, and a first paint that
+    // disagreed with what it rendered would be a hydration mismatch.
+    const [hidden, setHidden] = useState<ReadonlySet<string>>(new Set());
+    useEffect(() => setHidden(readHiddenColumns()), []);
+    const shows = (id: string) => !hidden.has(id);
+    const toggleColumn = (id: string) => {
+        const next = new Set(hidden);
+        if (next.has(id)) next.delete(id);
+        else next.add(id);
+        setHidden(next);
+        writeHiddenColumns(next);
+    };
+    const shownFields = fields.filter((field) => shows(field.id));
+    const span = 3 + TABLE_COLUMNS.filter(shows).length + shownFields.length + 1;
+
+    // The box at the head of the column says what the boxes under it add up to:
+    // ticked when every row is in the selection, a dash when some are.
+    const chosen = rows.reduce((count, task) => count + (selection.has(task.id) ? 1 : 0), 0);
+    const allChosen = rows.length > 0 && chosen === rows.length;
+
+    const columnLabel: Record<(typeof TABLE_COLUMNS)[number], string> = {
+        status: t("table.status"),
+        assignees: t("table.assignees"),
+        priority: t("table.priority"),
+        due: t("table.due"),
+        estimate: t("table.estimate"),
+        tracked: t("table.tracked")
+    };
 
     return (
         <div className="overflow-x-auto rounded-lg border border-border">
             <table className="w-full min-w-[52rem] border-collapse text-sm">
                 <thead className="sticky top-0 z-10">
                     <tr className="border-b border-border bg-surface text-left text-xs text-muted-foreground">
-                        <th className="w-8 px-2 py-2" />
+                        <th className="w-8 py-2 pl-3 pr-1">
+                            {props.onReplaceSelection && (
+                                <Checkbox
+                                    checked={allChosen}
+                                    indeterminate={chosen > 0 && !allChosen}
+                                    disabled={rows.length === 0}
+                                    aria-label={t("table.selectAll")}
+                                    title={t("table.selectAll")}
+                                    onChange={() =>
+                                        props.onReplaceSelection?.(allChosen ? [] : rendered)
+                                    }
+                                />
+                            )}
+                        </th>
+                        <th className="w-8 px-1 py-2" />
                         <th className="px-2 py-2 font-medium">{t("table.task")}</th>
-                        <th className="px-2 py-2 font-medium">{t("table.status")}</th>
-                        <th className="px-2 py-2 font-medium">{t("table.assignees")}</th>
-                        <th className="px-2 py-2 font-medium">{t("table.priority")}</th>
-                        <th className="px-2 py-2 font-medium">{t("table.due")}</th>
-                        <th className="px-2 py-2 font-medium">{t("table.estimate")}</th>
-                        <th className="px-2 py-2 font-medium">{t("table.tracked")}</th>
-                        {columns.map((field) => (
+                        {TABLE_COLUMNS.filter(shows).map((id) => (
+                            <th key={id} className="px-2 py-2 font-medium">
+                                {columnLabel[id]}
+                            </th>
+                        ))}
+                        {shownFields.map((field) => (
                             <th key={field.id} className="px-2 py-2 font-medium">
                                 {field.name}
                             </th>
                         ))}
+                        <th className="w-8 px-1 py-1 text-right">
+                            <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                    <button
+                                        type="button"
+                                        aria-label={t("table.columns")}
+                                        title={t("table.columns")}
+                                        className="inline-flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors duration-fast hover:bg-card-hover hover:text-foreground active:bg-muted data-[state=open]:bg-card-hover data-[state=open]:text-foreground"
+                                    >
+                                        <Columns3 className="size-4" />
+                                    </button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end" className="w-52">
+                                    <DropdownMenuLabel>{t("table.columns")}</DropdownMenuLabel>
+                                    {[
+                                        ...TABLE_COLUMNS.map((id) => ({ id, label: columnLabel[id] })),
+                                        ...fields.map((field) => ({ id: field.id, label: field.name }))
+                                    ].map((column) => (
+                                        <DropdownMenuItem
+                                            key={column.id}
+                                            role="menuitemcheckbox"
+                                            aria-checked={shows(column.id)}
+                                            // Stays open, so several columns can be
+                                            // switched in one visit to the menu.
+                                            onSelect={(event) => {
+                                                event.preventDefault();
+                                                toggleColumn(column.id);
+                                            }}
+                                        >
+                                            <span className="flex size-4 items-center justify-center">
+                                                {shows(column.id) && (
+                                                    <Check className="text-primary" />
+                                                )}
+                                            </span>
+                                            <span className="min-w-0 flex-1 truncate" title={column.label}>
+                                                {column.label}
+                                            </span>
+                                        </DropdownMenuItem>
+                                    ))}
+                                </DropdownMenuContent>
+                            </DropdownMenu>
+                        </th>
                     </tr>
                 </thead>
                 <tbody>
                     {rows.map((task) => {
                         const commands = commandsFor(props, task);
+                        const isSelected = selection.has(task.id);
                         return (
                             <TaskMenu key={task.id} commands={commands}>
                                 <tr
                                     ref={(element) => cursor.register(task.id, element)}
                                     onMouseDown={() => cursor.moveTo(task.id)}
+                                    aria-selected={isSelected}
                                     className={cn(
-                                        "group border-b border-border transition-colors hover:bg-card-hover",
-                                        selection.has(task.id) && "bg-primary/5",
+                                        "group border-b border-border transition-colors duration-fast hover:bg-card-hover",
+                                        isSelected && "bg-primary/5",
                                         cursor.at === task.id &&
                                             "bg-card-hover shadow-[inset_2px_0_0_0_hsl(var(--primary))]"
                                     )}
                                 >
-                                    <td className="px-2 py-1.5">
+                                    <td className="py-1.5 pl-3 pr-1">
+                                        <Checkbox
+                                            checked={isSelected}
+                                            aria-label={t("table.selectRow", { name: task.name })}
+                                            onChange={() => undefined}
+                                            onClick={(event) =>
+                                                onSelect(
+                                                    task.id,
+                                                    event.shiftKey ? "range" : "toggle",
+                                                    rendered
+                                                )
+                                            }
+                                        />
+                                    </td>
+                                    <td className="px-1 py-1.5">
                                         <TaskStatusMarker commands={commands} />
                                     </td>
                                     <td className="max-w-xs px-2 py-1.5">
@@ -567,79 +737,115 @@ export function TableView(props: ViewProps) {
                                             }}
                                             className="flex w-full items-center gap-2 text-left"
                                         >
-                                            <span className="font-mono text-[0.6875rem] text-muted-foreground">
+                                            <span className="shrink-0 whitespace-nowrap font-mono text-[0.6875rem] text-muted-foreground">
                                                 {task.reference}
                                             </span>
-                                            <span className="truncate" title={task.name}>
+                                            <span className="min-w-0 truncate" title={task.name}>
                                                 {task.name}
                                             </span>
                                         </button>
                                         {props.showLocation && <TaskLocation task={task} />}
                                     </td>
-                                    <td className="whitespace-nowrap px-2 py-1.5">
-                                        <span className="inline-flex items-center gap-1.5 text-xs">
-                                            <StatusDot color={task.statusColor} />
-                                            {task.statusName}
-                                        </span>
-                                    </td>
-                                    <td className="px-2 py-1.5">
-                                        <span className="flex items-center gap-1">
-                                            <AvatarStack people={task.assignees} size={20} />
-                                            <span className="transition-opacity md:opacity-0 focus-within:opacity-100 md:group-hover:opacity-100">
-                                                <AssigneePicker
-                                                    people={context.people}
-                                                    selected={task.assignees.map(
-                                                        (person) => person.id
-                                                    )}
-                                                    disabled={!props.canEdit}
-                                                    onChange={(assigneeIds) =>
-                                                        props.onEdit(task, { assigneeIds })
-                                                    }
-                                                />
+                                    {shows("status") && (
+                                        <td className="whitespace-nowrap px-2 py-1">
+                                            {/* The status says itself and is the control
+                                                that changes it, the way the priority beside
+                                                it always was. */}
+                                            <StatusPicker
+                                                statuses={context.statuses}
+                                                value={task.statusId}
+                                                disabled={!props.canEdit}
+                                                spaceId={context.spaceId}
+                                                onChange={(statusId) => props.onEdit(task, { statusId })}
+                                                trigger={
+                                                    <button
+                                                        type="button"
+                                                        title={task.statusName}
+                                                        aria-label={tp("pickers.statusNamed", {
+                                                            name: task.statusName
+                                                        })}
+                                                        className="inline-flex max-w-[12rem] items-center gap-1.5 rounded-md px-1.5 py-0.5 text-xs transition-colors duration-fast hover:bg-muted active:bg-muted/70 disabled:cursor-default disabled:hover:bg-transparent data-[state=open]:bg-muted"
+                                                    >
+                                                        <StatusDot color={task.statusColor} />
+                                                        <span className="truncate" title={task.statusName}>{task.statusName}</span>
+                                                    </button>
+                                                }
+                                            />
+                                        </td>
+                                    )}
+                                    {shows("assignees") && (
+                                        <td className="px-2 py-1.5">
+                                            <span className="flex items-center gap-1">
+                                                <AvatarStack people={task.assignees} size={20} />
+                                                <span className="transition-opacity duration-fast md:opacity-0 focus-within:opacity-100 md:group-hover:opacity-100 has-[[data-state=open]]:opacity-100">
+                                                    <AssigneePicker
+                                                        people={context.people}
+                                                        selected={task.assignees.map(
+                                                            (person) => person.id
+                                                        )}
+                                                        disabled={!props.canEdit}
+                                                        onChange={(assigneeIds) =>
+                                                            props.onEdit(task, { assigneeIds })
+                                                        }
+                                                    />
+                                                </span>
                                             </span>
-                                        </span>
-                                    </td>
-                                    <td className="whitespace-nowrap px-2 py-1.5 text-xs">
-                                        <span className="inline-flex items-center gap-1.5">
+                                        </td>
+                                    )}
+                                    {shows("priority") && (
+                                        <td className="whitespace-nowrap px-2 py-1 text-xs">
                                             <PriorityPicker
                                                 value={task.priority}
                                                 disabled={!props.canEdit}
-                                                onChange={(priority) =>
-                                                    props.onEdit(task, { priority })
+                                                onChange={(priority) => props.onEdit(task, { priority })}
+                                                trigger={
+                                                    <button
+                                                        type="button"
+                                                        aria-label={tp("pickers.priority")}
+                                                        className="inline-flex items-center gap-1.5 rounded-md px-1.5 py-0.5 transition-colors duration-fast hover:bg-muted active:bg-muted/70 disabled:cursor-default disabled:hover:bg-transparent data-[state=open]:bg-muted"
+                                                    >
+                                                        <PriorityMark priority={task.priority} />
+                                                        {tp(`labels.priority.${task.priority}`)}
+                                                    </button>
                                                 }
                                             />
-                                            {tp(`labels.priority.${task.priority}`)}
-                                        </span>
-                                    </td>
-                                    <td className="whitespace-nowrap px-2 py-1.5">
-                                        <span className="inline-flex items-center gap-1">
-                                            <DueBadge
-                                                dueDate={task.dueDate}
-                                                statusType={task.statusType}
-                                                timed={task.timed}
-                                                format={format.date}
-                                            />
-                                            <span className="transition-opacity md:opacity-0 focus-within:opacity-100 md:group-hover:opacity-100">
-                                                <DuePicker
+                                        </td>
+                                    )}
+                                    {shows("due") && (
+                                        <td className="whitespace-nowrap px-2 py-1.5">
+                                            <span className="inline-flex items-center gap-1">
+                                                <DueBadge
                                                     dueDate={task.dueDate}
+                                                    statusType={task.statusType}
                                                     timed={task.timed}
-                                                    disabled={!props.canEdit}
-                                                    onChange={(dueDate) =>
-                                                        props.onEdit(task, { dueDate })
-                                                    }
+                                                    format={format.date}
                                                 />
+                                                <span className="transition-opacity duration-fast md:opacity-0 focus-within:opacity-100 md:group-hover:opacity-100 has-[[data-state=open]]:opacity-100">
+                                                    <DuePicker
+                                                        dueDate={task.dueDate}
+                                                        timed={task.timed}
+                                                        disabled={!props.canEdit}
+                                                        onChange={(dueDate) =>
+                                                            props.onEdit(task, { dueDate })
+                                                        }
+                                                    />
+                                                </span>
                                             </span>
-                                        </span>
-                                    </td>
-                                    <td className="whitespace-nowrap px-2 py-1.5 text-xs text-muted-foreground">
-                                        {core.formatDurationMinutes(task.timeEstimate) || "-"}
-                                    </td>
-                                    <td className="whitespace-nowrap px-2 py-1.5 text-xs text-muted-foreground">
-                                        {task.trackedSeconds > 0
-                                            ? core.formatTrackedSeconds(task.trackedSeconds)
-                                            : "-"}
-                                    </td>
-                                    {columns.map((field) => (
+                                        </td>
+                                    )}
+                                    {shows("estimate") && (
+                                        <td className="whitespace-nowrap px-2 py-1.5 text-xs tabular-nums text-muted-foreground">
+                                            {core.formatDurationMinutes(task.timeEstimate) || "-"}
+                                        </td>
+                                    )}
+                                    {shows("tracked") && (
+                                        <td className="whitespace-nowrap px-2 py-1.5 text-xs tabular-nums text-muted-foreground">
+                                            {task.trackedSeconds > 0
+                                                ? core.formatTrackedSeconds(task.trackedSeconds)
+                                                : "-"}
+                                        </td>
+                                    )}
+                                    {shownFields.map((field) => (
                                         <td
                                             key={field.id}
                                             className="max-w-[12rem] px-2 py-1.5 text-xs"
@@ -651,6 +857,7 @@ export function TableView(props: ViewProps) {
                                             />
                                         </td>
                                     ))}
+                                    <td />
                                 </tr>
                             </TaskMenu>
                         );
@@ -658,7 +865,7 @@ export function TableView(props: ViewProps) {
                     {rows.length === 0 && (
                         <tr>
                             <td
-                                colSpan={8 + columns.length}
+                                colSpan={span}
                                 className="px-4 py-10 text-center text-sm text-muted-foreground"
                             >
                                 {t("list.noMatch")}

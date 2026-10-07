@@ -40,7 +40,19 @@
         "deleteTitle": "{count, plural, one {Delete task} other {Delete tasks}}",
         "deleteQuestion": "Delete <strong>{name}</strong>?",
         "deleteDescription": "Comments, checklists and tracked time go with them. Archiving keeps all of that and takes them off the board.",
-        "deleteConfirm": "{count, plural, one {Delete task} other {Delete # tasks}}"
+        "deleteConfirm": "{count, plural, one {Delete task} other {Delete # tasks}}",
+        "selected": "{count} selected",
+        "selectAll": "Select all {count}",
+        "toolbar": "Selected tasks",
+        "status": "Status",
+        "priority": "Priority",
+        "assign": "Assign",
+        "export": "Export CSV",
+        "changed": "{count, plural, one {Changed one task} other {Changed # tasks}}",
+        "nothingToChange": "Every selected task already has that.",
+        "undo": "Undo change",
+        "undoFailed": "Could not undo it.",
+        "selectionLimit": "A selection holds {held} tasks at a time, so {count, plural, one {one was} other {# were}} left out."
     },
     "paste": {
         "aStatus": "a status",
@@ -64,7 +76,10 @@
         "ascending": "Ascending",
         "descending": "Descending",
         "showClosed": "Show closed",
-        "search": "Search tasks"
+        "search": "Search tasks",
+        "count": "{shown} of {total}",
+        "view": "View",
+        "clearSearch": "Clear search"
     },
     "empty": {
         "title": "Nothing here yet.",
@@ -91,7 +106,12 @@
         "priority": "Priority",
         "due": "Due",
         "estimate": "Estimate",
-        "tracked": "Tracked"
+        "tracked": "Tracked",
+        "selectAll": "Select all",
+        "selectRow": "Select {name}",
+        "columns": "Columns",
+        "reference": "Reference",
+        "list": "List"
     },
     "calendar": {
         "previous": "Previous {scope}",

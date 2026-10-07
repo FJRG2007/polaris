@@ -28,7 +28,10 @@ import { readTaskClipboard, writeTaskClipboard } from "./clipboard";
 import { useStableOrder } from "./stable-order";
 import { ListView, TableView } from "./views/rows";
 import { TaskCreateDialog } from "./task-create-dialog";
-import { AssigneePicker, StatusPicker } from "./pickers";
+import { affected, undoSteps } from "./bulk-edits";
+import { BarButton, SelectionBar } from "./selection-bar";
+import { downloadCsv, tasksToCsv } from "./export-csv";
+import { AssigneePicker, PriorityPicker, StatusPicker } from "./pickers";
 import type { SavedView } from "@/lib/tasks/view-service";
 import { useDisplayFormat } from "@/components/display-format";
 import { holdSelection, shortfallMessage } from "./views/shared";
@@ -39,9 +42,36 @@ import { useEffect, useMemo, useState, useTransition } from "react";
 import { toFacts, type SpaceContext, type TaskRow } from "@/lib/tasks/facts";
 import { searchItems, type SearchField } from "@polaris/core/search-text";
 import { settleTagIds, useTagCreation, withCreatedTags } from "./tag-creation";
-import { Button, ConfirmDeleteDialog, EmptyState, Select, cn, useToast } from "@polaris/ui";
+import {
+    Button,
+    Checkbox,
+    ConfirmDeleteDialog,
+    EmptyState,
+    SegmentedControl,
+    Select,
+    cn,
+    useToast
+} from "@polaris/ui";
 import { readViewPreferences, viewScopeKey, writeViewPreferences } from "./view-preferences";
-import { CalendarDays, GanttChart, LayoutList, Plus, Rows3, Search, Table2, X } from "lucide-react";
+import {
+    Archive,
+    ArrowDownWideNarrow,
+    ArrowUpNarrowWide,
+    CalendarDays,
+    CircleDot,
+    FileSpreadsheet,
+    Flag,
+    GanttChart,
+    LayoutList,
+    Plus,
+    Rows3,
+    Search,
+    Table2,
+    Trash2,
+    Undo2,
+    UserPlus,
+    X
+} from "lucide-react";
 import type {
     BulkVerb,
     SelectMode,
@@ -595,10 +625,7 @@ export function ListScreen({
     const hold = (next: ReadonlySet<string>) => {
         const { taken, dropped } = holdSelection(next);
         setSelection(taken);
-        if (dropped > 0) {
-            const left = dropped === 1 ? "one task was" : `${dropped} tasks were`;
-            setError(`A selection holds ${taken.size} tasks at a time, so ${left} left out.`);
-        }
+        if (dropped > 0) setError(t("bulk.selectionLimit", { held: taken.size, count: dropped }));
     };
 
     /**
@@ -655,9 +682,12 @@ export function ListScreen({
      * verbs are the same ones either way, and two paths to them is two places
      * for the assignee toggle to disagree with itself.
      */
-    const applyToTasks = async (targets: readonly TaskRow[], change: TaskBulkEdit) => {
+    const applyToTasks = async (
+        targets: readonly TaskRow[],
+        change: TaskBulkEdit
+    ): Promise<boolean> => {
         const taskIds = targets.map((task) => task.id);
-        if (taskIds.length === 0) return;
+        if (taskIds.length === 0) return true;
 
         // A move and an archive decide which rows belong on this screen at all,
         // so they are left to the reload rather than painted on rows that are
@@ -687,6 +717,66 @@ export function ListScreen({
         else reportShortfall(result?.count, taskIds.length, "Changed");
         if (leaves) clearSelection();
         refresh(taskIds);
+        return result !== null && !result.error;
+    };
+
+    /**
+     * A verb from the selection bar: only the tasks it would change are written,
+     * and what it did is said with the way back beside it.
+     *
+     * The way back puts each task back to what it said before - a selection
+     * rarely started out in one status - so it is worked out from the rows as
+     * they were when the verb was pressed, not from what the screen shows by the
+     * time somebody reaches for it.
+     */
+    const applyFromBar = async (change: TaskBulkEdit) => {
+        const reached = affected(selected, change);
+        if (reached.length === 0) {
+            toast.show({ key: "tasks-bulk", title: t("bulk.nothingToChange") });
+            return;
+        }
+        if (!(await applyToTasks(reached, change))) return;
+        const steps = undoSteps(reached, change);
+        toast.show({
+            key: "tasks-bulk",
+            title: t("bulk.changed", { count: reached.length }),
+            actions:
+                steps.length > 0
+                    ? [
+                          {
+                              label: t("bulk.undo"),
+                              icon: <Undo2 className="size-3.5" />,
+                              run: async () => {
+                                  for (const step of steps) {
+                                      if (!(await applyToTasks(step.tasks, step.change)))
+                                          return t("bulk.undoFailed");
+                                  }
+                                  return null;
+                              }
+                          }
+                      ]
+                    : undefined
+        });
+    };
+
+    /** The selection as a spreadsheet, in the reader's own words. */
+    const exportSelection = () => {
+        if (selected.length === 0) return;
+        const csv = tasksToCsv(
+            selected,
+            {
+                reference: t("table.reference"),
+                task: t("table.task"),
+                list: t("table.list"),
+                status: t("table.status"),
+                priority: t("table.priority"),
+                assignees: t("table.assignees"),
+                due: t("table.due")
+            },
+            (priority) => optionLabel(tt, "priority", priority)
+        );
+        const day = new Date().toISOString().slice(0, 10);
+        downloadCsv(`tasks-${day}.csv`, csv);
     };
 
     /**
@@ -849,6 +939,10 @@ export function ListScreen({
         lists,
         onOpen: setOpenTaskId,
         onSelect: select,
+        onReplaceSelection: (taskIds) => {
+            hold(new Set(taskIds));
+            setAnchor(null);
+        },
         onMove: move,
         onQuickCreate: quickCreate,
         onEdit: editTask,
@@ -918,7 +1012,9 @@ export function ListScreen({
     };
 
     return (
-        <div className="flex min-w-0 flex-col gap-4">
+        // Room under the last row while the selection bar is up, so the bar never
+        // sits over the task somebody is trying to reach.
+        <div className={cn("flex min-w-0 flex-col gap-4", selected.length > 0 && "pb-16")}>
             <header className="flex flex-wrap items-center gap-3">
                 <div className="min-w-0">
                     <h1
@@ -946,31 +1042,29 @@ export function ListScreen({
             </header>
 
             <div className="flex flex-wrap items-center gap-2">
-                <div className="flex rounded-md border border-border p-0.5">
-                    {core.TASK_VIEW_TYPES.map((type) => {
+                {/* The design system's own segmented control, which brings the
+                    arrow keys with it. Icons alone on a phone, each still named
+                    by its title for a screen reader and on hover. */}
+                <SegmentedControl
+                    size="sm"
+                    value={viewType}
+                    onValueChange={setViewType}
+                    aria-label={t("toolbar.view")}
+                    options={core.TASK_VIEW_TYPES.map((type) => {
                         const Icon = VIEW_ICONS[type];
-                        return (
-                            <button
-                                key={type}
-                                type="button"
-                                onClick={() => setViewType(type)}
-                                aria-pressed={viewType === type}
-                                title={core.TASK_VIEW_LABELS[type]}
-                                className={cn(
-                                    "inline-flex items-center gap-1.5 rounded px-2 py-1 text-xs transition-colors",
-                                    viewType === type
-                                        ? "bg-muted font-medium text-foreground"
-                                        : "text-muted-foreground hover:text-foreground"
-                                )}
-                            >
-                                <Icon className="size-3.5" />
-                                <span className="hidden sm:inline">
-                                    {core.TASK_VIEW_LABELS[type]}
+                        const label = optionLabel(tt, "view", type);
+                        return {
+                            value: type,
+                            title: label,
+                            label: (
+                                <span className="inline-flex items-center gap-1.5">
+                                    <Icon className="size-3.5" />
+                                    <span className="hidden sm:inline">{label}</span>
                                 </span>
-                            </button>
-                        );
+                            )
+                        };
                     })}
-                </div>
+                />
 
                 {(viewType === "list" || viewType === "board") && (
                     <Select
@@ -997,23 +1091,31 @@ export function ListScreen({
                     aria-label={t("toolbar.sortBy")}
                     className="h-8 w-44 text-xs"
                 />
+                {/* The direction as the arrow it is, named by what it is now. */}
                 <button
                     type="button"
                     onClick={() =>
                         setSort({ ...sort, direction: sort.direction === "asc" ? "desc" : "asc" })
                     }
-                    className="rounded-md border border-border px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                    aria-label={
+                        sort.direction === "asc" ? t("toolbar.ascending") : t("toolbar.descending")
+                    }
+                    title={sort.direction === "asc" ? t("toolbar.ascending") : t("toolbar.descending")}
+                    className="inline-flex size-8 items-center justify-center rounded-md border border-border text-muted-foreground transition-colors duration-fast hover:border-border-strong hover:bg-card-hover hover:text-foreground active:bg-muted"
                 >
-                    {sort.direction === "asc" ? t("toolbar.ascending") : t("toolbar.descending")}
+                    {sort.direction === "asc" ? (
+                        <ArrowUpNarrowWide className="size-4" />
+                    ) : (
+                        <ArrowDownWideNarrow className="size-4" />
+                    )}
                 </button>
 
                 {/* Not offered while grouping by status, where closed work is in
                     a column of its own and the box would change nothing. A
                     control that does nothing is read as a broken one. */}
                 {groupBy === "status" ? null : (
-                    <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                        <input
-                            type="checkbox"
+                    <label className="flex cursor-pointer items-center gap-1.5 text-xs text-muted-foreground">
+                        <Checkbox
                             checked={showClosed}
                             onChange={(event) => setShowClosed(event.target.checked)}
                         />
@@ -1026,10 +1128,30 @@ export function ListScreen({
                     <input
                         value={search}
                         onChange={(event) => setSearch(event.target.value)}
+                        onKeyDown={(event) => {
+                            // Escape empties the box before it does anything else,
+                            // the way every search field does.
+                            if (event.key === "Escape" && search) {
+                                event.preventDefault();
+                                event.stopPropagation();
+                                setSearch("");
+                            }
+                        }}
                         placeholder={t("toolbar.search")}
                         aria-label={t("toolbar.search")}
-                        className="h-8 w-44 rounded-md border border-border bg-field pl-7 pr-2 text-xs hover:border-border-strong focus:border-border-strong"
+                        className="h-8 w-44 rounded-md border border-border bg-field pl-7 pr-7 text-xs transition-colors duration-fast hover:border-border-strong focus:border-border-strong"
                     />
+                    {search && (
+                        <button
+                            type="button"
+                            aria-label={t("toolbar.clearSearch")}
+                            title={t("toolbar.clearSearch")}
+                            onClick={() => setSearch("")}
+                            className="absolute right-1 top-1/2 inline-flex size-6 -translate-y-1/2 items-center justify-center rounded text-muted-foreground transition-colors duration-fast hover:bg-card-hover hover:text-foreground"
+                        >
+                            <X className="size-3.5" />
+                        </button>
+                    )}
                 </div>
 
                 <FilterBar
@@ -1044,8 +1166,8 @@ export function ListScreen({
                     }}
                 />
 
-                <span className="text-xs text-muted-foreground">
-                    {visible.length} of {rows.length}
+                <span className="text-xs tabular-nums text-muted-foreground">
+                    {t("toolbar.count", { shown: visible.length, total: rows.length })}
                 </span>
             </div>
 
@@ -1058,58 +1180,72 @@ export function ListScreen({
                 </p>
             )}
 
-            {selected.length > 0 && (
-                <div className="flex flex-wrap items-center gap-2 rounded-lg border border-primary/40 bg-primary/5 px-3 py-2">
-                    <span className="text-sm font-medium">{selected.length} selected</span>
-                    {/* The same verbs the right-click menu applies, through the
-                        same call: two ways in, one answer to what each one does -
-                        including being absent for somebody who may read this work
-                        and not change it. Selecting is still theirs: it is how a
-                        few tasks are held together to be read. */}
-                    {context.canEdit && (
-                        <>
-                            <StatusPicker
-                                statuses={context.statuses}
-                                value={null}
-                                onChange={(statusId) => void applyToTasks(selected, { statusId })}
-                            />
-                            <AssigneePicker
-                                people={context.people}
-                                selected={[]}
-                                onChange={(ids) =>
-                                    void applyToTasks(selected, { addAssigneeIds: ids })
-                                }
-                            />
-                            <Button
-                                size="sm"
-                                variant="ghost"
-                                onClick={() => void applyToTasks(selected, { archived: true })}
-                            >
-                                {t("bulk.archive")}
-                            </Button>
-                            <Button size="sm" variant="ghost" onClick={() => setDeleting(selected)}>
-                                {t("bulk.delete")}
-                            </Button>
-                        </>
-                    )}
-                    <span className="flex-1" />
-                    <button
-                        type="button"
-                        aria-label={t("bulk.clear")}
-                        title={t("bulk.clearKey")}
-                        onClick={clearSelection}
-                        className="rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                    >
-                        <X className="size-4" />
-                    </button>
-                </div>
-            )}
+            <SelectionBar
+                count={selected.length}
+                total={visible.length}
+                onSelectAll={() => {
+                    hold(new Set(visible.map((task) => task.id)));
+                    setAnchor(null);
+                }}
+                onClear={clearSelection}
+            >
+                {/* The same verbs the right-click menu applies, through the same
+                    call: two ways in, one answer to what each one does - including
+                    being absent for somebody who may read this work and not
+                    change it. Selecting is still theirs: it is how a few tasks are
+                    held together to be read, and taken away as a spreadsheet. */}
+                {context.canEdit && (
+                    <>
+                        <StatusPicker
+                            statuses={context.statuses}
+                            value={null}
+                            onChange={(statusId) => void applyFromBar({ statusId })}
+                            trigger={<BarButton label={t("bulk.status")} icon={<CircleDot />} />}
+                        />
+                        <PriorityPicker
+                            value={null}
+                            onChange={(priority) => void applyFromBar({ priority })}
+                            trigger={<BarButton label={t("bulk.priority")} icon={<Flag />} />}
+                        />
+                        <AssigneePicker
+                            people={context.people}
+                            selected={[]}
+                            onChange={(ids) => void applyFromBar({ addAssigneeIds: ids })}
+                            trigger={<BarButton label={t("bulk.assign")} icon={<UserPlus />} />}
+                        />
+                    </>
+                )}
+                <BarButton
+                    label={t("bulk.export")}
+                    icon={<FileSpreadsheet />}
+                    onClick={exportSelection}
+                />
+                {context.canEdit && (
+                    <>
+                        <BarButton
+                            label={t("bulk.archive")}
+                            icon={<Archive />}
+                            onClick={() => void applyFromBar({ archived: true })}
+                        />
+                        <BarButton
+                            label={t("bulk.delete")}
+                            icon={<Trash2 />}
+                            danger
+                            onClick={() => setDeleting(selected)}
+                        />
+                    </>
+                )}
+            </SelectionBar>
 
-            {viewType === "board" && <BoardView {...viewProps} />}
-            {viewType === "list" && <ListView {...viewProps} />}
-            {viewType === "table" && <TableView {...viewProps} />}
-            {viewType === "calendar" && <CalendarView {...viewProps} />}
-            {viewType === "gantt" && <GanttView {...viewProps} />}
+            {/* Keyed by the view, so switching between them settles in rather than
+                swapping in a single frame. */}
+            <div key={viewType} className="min-w-0 animate-in fade-in-0 duration-fast">
+                {viewType === "board" && <BoardView {...viewProps} />}
+                {viewType === "list" && <ListView {...viewProps} />}
+                {viewType === "table" && <TableView {...viewProps} />}
+                {viewType === "calendar" && <CalendarView {...viewProps} />}
+                {viewType === "gantt" && <GanttView {...viewProps} />}
+            </div>
 
             {/* List and Table say so in their own rows; the board, the calendar
                 and the timeline keep drawing their columns and days, so a
