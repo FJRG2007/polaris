@@ -80,7 +80,10 @@ describe("a share mounted again", () => {
         expect(restarted).toHaveLength(2);
         // Each one's owner hears that its files were unreadable until now.
         expect(notifyVolumeHealth).toHaveBeenCalledTimes(2);
-        expect(notifyVolumeHealth).toHaveBeenCalledWith(expect.objectContaining({ applicationId: "a" }), "reconnected");
+        expect(notifyVolumeHealth).toHaveBeenCalledWith(
+            expect.objectContaining({ applicationId: "a" }),
+            "reconnected"
+        );
         const [args] = findMany.mock.calls[0] as [{ where: Record<string, unknown> }];
         expect(args.where).toMatchObject({
             desiredState: "running",

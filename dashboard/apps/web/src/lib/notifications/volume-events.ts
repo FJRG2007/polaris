@@ -52,14 +52,19 @@ export interface VolumeSubject {
  * Raise the notice. Never throws: it runs inside the watcher and the remount, and
  * a service that already lost its files must not also lose the restart.
  */
-export async function notifyVolumeHealth(subject: VolumeSubject, health: VolumeHealth): Promise<void> {
+export async function notifyVolumeHealth(
+    subject: VolumeSubject,
+    health: VolumeHealth
+): Promise<void> {
     try {
         const app = await prisma.application.findUnique({
             where: { id: subject.applicationId },
             select: {
                 name: true,
                 environment: {
-                    select: { project: { select: { id: true, name: true, ownerId: true, orgId: true } } }
+                    select: {
+                        project: { select: { id: true, name: true, ownerId: true, orgId: true } }
+                    }
                 }
             }
         });
@@ -67,11 +72,16 @@ export async function notifyVolumeHealth(subject: VolumeSubject, health: VolumeH
         const project = app.environment.project;
         const service = `${project.name} / ${app.name}`;
         const recipients = new Set([project.ownerId]);
-        for (const userId of await follow.followers("app", subject.applicationId)) recipients.add(userId);
+        for (const userId of await follow.followers("app", subject.applicationId))
+            recipients.add(userId);
         const down = health === "unreachable" || health === "detached";
         for (const userId of recipients) {
             const t = await wordsFor(userId, "notices");
-            const words = { service, storage: subject.storage, volumes: subject.volumes.join(", ") };
+            const words = {
+                service,
+                storage: subject.storage,
+                volumes: subject.volumes.join(", ")
+            };
             await notify({
                 userId,
                 event: down ? "volume.down" : "volume.up",
@@ -87,6 +97,9 @@ export async function notifyVolumeHealth(subject: VolumeSubject, health: VolumeH
             });
         }
     } catch (error) {
-        console.error(`polaris: could not tell anybody about the volumes of ${subject.applicationId}:`, error);
+        console.error(
+            `polaris: could not tell anybody about the volumes of ${subject.applicationId}:`,
+            error
+        );
     }
 }

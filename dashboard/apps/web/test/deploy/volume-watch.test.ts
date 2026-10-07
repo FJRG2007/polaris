@@ -16,12 +16,25 @@ const row = {
     target: LOCAL,
     environment: { project: { ownerId: "owner-1", slug: "orphion" } },
     volumes: [
-        { name: "secrets", mountPath: "/app/secrets", connectionId: "share-1", connection: { name: "Office NAS" } },
-        { name: "uploads", mountPath: "/app/uploads", connectionId: "share-1", connection: { name: "Office NAS" } }
+        {
+            name: "secrets",
+            mountPath: "/app/secrets",
+            connectionId: "share-1",
+            connection: { name: "Office NAS" }
+        },
+        {
+            name: "uploads",
+            mountPath: "/app/uploads",
+            connectionId: "share-1",
+            connection: { name: "Office NAS" }
+        }
     ]
 };
 
-const DEAD = { code: 1, output: "ls: /app/secrets: Host is down\nls: /app/uploads: Host is down\n" };
+const DEAD = {
+    code: 1,
+    output: "ls: /app/secrets: Host is down\nls: /app/uploads: Host is down\n"
+};
 const FINE = { code: 0, output: "/app/secrets\n/app/uploads\n" };
 
 /** What `ls` inside the service answers, one entry per call, the last repeating. */

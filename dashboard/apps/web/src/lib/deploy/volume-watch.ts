@@ -102,7 +102,10 @@ async function pass(): Promise<void> {
         } catch (error) {
             // The machine itself is away, which its own screens already say; the
             // volumes on it are not the news.
-            console.error(`polaris: NAS volume check could not reach ${apps[0]!.slug}'s machine:`, error);
+            console.error(
+                `polaris: NAS volume check could not reach ${apps[0]!.slug}'s machine:`,
+                error
+            );
             continue;
         }
         try {
@@ -131,7 +134,12 @@ async function watchedServices(): Promise<Watched[]> {
             environment: { select: { project: { select: { ownerId: true, slug: true } } } },
             volumes: {
                 where: { kind: "nas", connectionId: { not: null } },
-                select: { name: true, mountPath: true, connectionId: true, connection: { select: { name: true } } }
+                select: {
+                    name: true,
+                    mountPath: true,
+                    connectionId: true,
+                    connection: { select: { name: true } }
+                }
             }
         }
     });
@@ -157,7 +165,8 @@ async function checkMachine(ports: RuntimePorts, apps: Watched[]): Promise<void>
     /** Services the share step restarted, each already told it was reconnected. */
     const restarted = new Set<string>();
     const shares = new Set(apps.flatMap((app) => app.volumes.map((volume) => volume.connectionId)));
-    const machine = apps[0]!.target.kind === "local" || !apps[0]!.target.hostId ? null : apps[0]!.target.hostId;
+    const machine =
+        apps[0]!.target.kind === "local" || !apps[0]!.target.hostId ? null : apps[0]!.target.hostId;
     // An edition with no host daemon mounts nothing here, so there is no share to
     // keep attached - and every pass would otherwise read as a NAS that is away.
     if (machine === null && !getCapabilities().nativeMounts) return;
@@ -232,7 +241,11 @@ async function answers(ports: RuntimePorts, container: string, app: Watched): Pr
 }
 
 /** Say a service's volumes are down, once for as long as they stay that way. */
-async function say(app: Watched, health: "unreachable" | "detached", volumes: Watched["volumes"]): Promise<void> {
+async function say(
+    app: Watched,
+    health: "unreachable" | "detached",
+    volumes: Watched["volumes"]
+): Promise<void> {
     if (told.get(app.id) === health) return;
     told.set(app.id, health);
     await notifyVolumeHealth(subjectOf(app, volumes), health);

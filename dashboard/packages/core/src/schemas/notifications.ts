@@ -182,7 +182,8 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         id: "volume.down",
         group: "deploy",
         label: "A service lost its NAS volumes",
-        description: "The storage a service keeps its volumes on stopped answering, and Polaris could not reconnect it.",
+        description:
+            "The storage a service keeps its volumes on stopped answering, and Polaris could not reconnect it.",
         level: "danger",
         // Mail on, like a domain that stopped serving: the service keeps running,
         // so nothing on screen turns red, and the first to notice is its users.
@@ -192,7 +193,8 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         id: "volume.up",
         group: "deploy",
         label: "A service has its NAS volumes back",
-        description: "A service's volumes answer again, or Polaris reconnected them and restarted it.",
+        description:
+            "A service's volumes answer again, or Polaris reconnected them and restarted it.",
         level: "success",
         defaults: { inapp: true, email: false }
     },
