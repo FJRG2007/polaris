@@ -64,7 +64,11 @@ const mockPublicUrl = vi.hoisted(() => ({ value: null as string | null }));
 vi.mock("@/lib/domain-service", () => ({ publicAppUrl: async () => mockPublicUrl.value }));
 
 import { createDeployment, setDeploymentState } from "@/lib/github-service";
-import { announceDeployFinished, announceDeployQueued, announceRefusal } from "@/lib/deploy/github-deployment";
+import {
+    announceDeployFinished,
+    announceDeployQueued,
+    announceRefusal
+} from "@/lib/deploy/github-deployment";
 
 const SHA = "9f2c1b0a4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f90";
 const CALL = { owner: "acme", repo: "widgets", token: "gho_test" };
@@ -485,7 +489,13 @@ describe("why a deploy was not announced at all", () => {
             error: null
         });
         mocks.domainFindMany.mockResolvedValue([
-            { hostname: "api.acme.example", https: true, pathPrefix: null, kind: "service", deploymentId: null }
+            {
+                hostname: "api.acme.example",
+                https: true,
+                pathPrefix: null,
+                kind: "service",
+                deploymentId: null
+            }
         ]);
         await announceDeployFinished("dep-1", "running");
 

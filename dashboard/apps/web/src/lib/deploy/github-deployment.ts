@@ -31,7 +31,11 @@ import { publicAppUrl } from "@/lib/domain-service";
 import { noteOnDeploy } from "@/lib/deploy/log-file";
 import { parseGithubRepo } from "@/lib/repo-reference";
 import { githubTokenForOwner } from "@/lib/github-access";
-import { githubAppInstallationToken, publishCheck, publishCommitStatus } from "@/lib/github-service";
+import {
+    githubAppInstallationToken,
+    publishCheck,
+    publishCommitStatus
+} from "@/lib/github-service";
 import { noteDeploymentsRefused } from "@/lib/connections/health";
 import { isPublicUrl } from "@/lib/agents/agent-repo-service";
 import { createDeployment, setDeploymentState, type AnnounceResult, type DeploymentState } from "@/lib/github-service";
