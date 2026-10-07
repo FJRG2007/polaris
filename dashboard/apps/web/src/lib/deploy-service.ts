@@ -2006,7 +2006,10 @@ export async function restartAppsOnShare(
             await ports.container(container, "restart");
             console.log(`polaris: share ${connectionId} was mounted again, restarted ${app.slug}`);
         } catch (error) {
-            console.error(`polaris: could not restart ${app.slug} onto share ${connectionId}:`, error);
+            console.error(
+                `polaris: could not restart ${app.slug} onto share ${connectionId}:`,
+                error
+            );
         } finally {
             await ports.dispose().catch(() => undefined);
         }

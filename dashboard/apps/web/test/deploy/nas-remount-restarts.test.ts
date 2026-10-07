@@ -13,7 +13,13 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 interface AppRow {
     id: string;
     slug: string;
-    target: { id: string; kind: string; hostId: string | null; runtime: string; proxyNetwork: string };
+    target: {
+        id: string;
+        kind: string;
+        hostId: string | null;
+        runtime: string;
+        proxyNetwork: string;
+    };
     environment: { project: { ownerId: string; slug: string } };
     volumes?: Array<{ connectionId: string }>;
 }

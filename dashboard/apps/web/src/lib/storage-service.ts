@@ -298,7 +298,9 @@ async function hostMountedDriver(row: ConnectionRow): Promise<StorageDriver | nu
     if (created) {
         void import("./deploy-service")
             .then((deploy) => deploy.restartAppsOnShare(row.id, null))
-            .catch((error) => console.error(`storage: could not restart the apps on ${row.id}:`, error));
+            .catch((error) =>
+                console.error(`storage: could not restart the apps on ${row.id}:`, error)
+            );
     }
     // The daemon mounts into the HOST's namespace; this process only sees that
     // mount when `<mount_root>` is bound into its own container with slave
