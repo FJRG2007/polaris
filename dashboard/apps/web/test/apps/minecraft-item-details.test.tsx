@@ -111,9 +111,11 @@ describe("the inventory grid", () => {
         expect(before).toBeTruthy();
         for (const label of [/Enchanted Book/, /Old Faithful/, /Dirt/]) {
             fireEvent.pointerEnter(screen.getByLabelText(label));
-            expect(panel()?.className.split(" ").filter((name) => name.startsWith("h-"))).toEqual([
-                "h-24"
-            ]);
+            expect(
+                panel()
+                    ?.className.split(" ")
+                    .filter((name) => name.startsWith("h-"))
+            ).toEqual(["h-24"]);
         }
         // The glint marks the enchanted stacks only.
         expect(container.querySelectorAll("li .item-glint")).toHaveLength(2);

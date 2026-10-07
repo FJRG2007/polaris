@@ -385,7 +385,12 @@ function Slot({
             )}
         >
             <ItemIcon id={item.id} className="size-full" />
-            {enchanted && <span aria-hidden className="item-glint pointer-events-none absolute inset-0 rounded" />}
+            {enchanted && (
+                <span
+                    aria-hidden
+                    className="item-glint pointer-events-none absolute inset-0 rounded"
+                />
+            )}
             {item.count > 1 && (
                 <span
                     style={COUNT_OUTLINE}
@@ -446,14 +451,21 @@ function StackDetails({ item, where }: { item: InventoryItem | null; where: stri
         <div className={shell}>
             <span className="relative size-8 shrink-0">
                 <ItemIcon id={item.id} className="size-full" />
-                {enchanted && <span aria-hidden className="item-glint pointer-events-none absolute inset-0 rounded" />}
+                {enchanted && (
+                    <span
+                        aria-hidden
+                        className="item-glint pointer-events-none absolute inset-0 rounded"
+                    />
+                )}
             </span>
             <div className="flex h-full min-w-0 flex-1 flex-col gap-0.5 text-xs">
                 <span
                     className={cn(
                         "truncate font-medium",
                         // A named or enchanted item's name is coloured in game.
-                        enchanted ? "text-violet-500 dark:text-violet-300" : details.name && "italic"
+                        enchanted
+                            ? "text-violet-500 dark:text-violet-300"
+                            : details.name && "italic"
                     )}
                     title={heading}
                 >
