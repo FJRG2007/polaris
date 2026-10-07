@@ -102,8 +102,9 @@ export interface DataRelation {
     readonly name: string;
     readonly namespace: string | null;
     readonly kind: "table" | "view" | "collection" | "keys";
-    /** An estimate, when the engine keeps one. Never a count(*) over a table
-     *  nobody asked to count - that is a full scan somebody did not ask for. */
+    /** An estimate, when the engine keeps one - and always drawn as one. Never a
+     *  count(*) over a table nobody asked to count - that is a full scan
+     *  somebody did not ask for. */
     readonly rows: number | null;
 }
 
@@ -120,6 +121,8 @@ export interface DataPage {
     readonly rows: readonly Record<string, unknown>[];
     /** The total the page came out of, when it is known without a scan. */
     readonly total: number | null;
+    /** True when that total is the engine's estimate rather than a count. */
+    readonly estimated?: boolean;
     /** A cursor for the next page, for an engine that pages by cursor rather
      *  than by offset (Redis). */
     readonly cursor?: string | null;

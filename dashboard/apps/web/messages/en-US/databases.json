@@ -438,6 +438,8 @@
         "keysOf": "{count} keys of about {total}",
         "rows": "rows {from}-{to}",
         "rowsOf": "rows {from}-{to} of {total}",
+        "rowsOfAbout": "rows {from}-{to} of about {total}",
+        "rowsEstimate": "About {count} rows (estimate)",
         "previous": "Previous page",
         "next": "Next page",
         "noMatchThat": "Nothing matches that.",

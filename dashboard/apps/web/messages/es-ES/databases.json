@@ -438,6 +438,8 @@
         "keysOf": "{count} claves de unas {total}",
         "rows": "filas {from}-{to}",
         "rowsOf": "filas {from}-{to} de {total}",
+        "rowsOfAbout": "filas {from}-{to} de unas {total}",
+        "rowsEstimate": "Unas {count} filas (estimación)",
         "previous": "Página anterior",
         "next": "Siguiente",
         "noMatchThat": "Nada coincide con eso.",

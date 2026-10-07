@@ -33,7 +33,7 @@ import * as openTabs from "./workbench-tabs";
 import type { KeyValueView } from "@/lib/data/browser";
 import { CodeSurface } from "@/components/code-surface";
 import { spreadsheetSafe } from "@/lib/data/spreadsheet";
-import { useTranslations } from "@/components/i18n/i18n-provider";
+import { useLocale, useTranslations } from "@/components/i18n/i18n-provider";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { searchItems, type SearchField } from "@polaris/core/search-text";
 import { DeleteRowsDialog, NewRowDialog, NewTableDialog } from "./row-dialogs";
@@ -480,9 +480,7 @@ function Bench({
                                                 {entry.name}
                                             </span>
                                             {entry.rows !== null && (
-                                                <span className="shrink-0 text-xs text-muted-foreground">
-                                                    {entry.rows}
-                                                </span>
+                                                <RowEstimate rows={entry.rows} />
                                             )}
                                         </button>
                                     </li>
@@ -578,6 +576,33 @@ function Bench({
                 }}
             />
         </DataSourceProvider>
+    );
+}
+
+/**
+ * A table's size in the list, as the estimate it is.
+ *
+ * Every engine's figure here is kept rather than counted - Postgres's stats,
+ * InnoDB's `TABLE_ROWS`, MongoDB's metadata - so it is drawn short and marked
+ * (`~1.2k`), and the whole figure is in the label for a screen reader and in
+ * the tooltip, the way the table header of a desktop client says "estimated".
+ */
+function RowEstimate({ rows }: { rows: number }) {
+    const t = useTranslations("databases");
+    const locale = useLocale();
+    const short = new Intl.NumberFormat(locale, {
+        notation: "compact",
+        maximumFractionDigits: 1
+    }).format(rows);
+    const full = t("bench.rowsEstimate", { count: new Intl.NumberFormat(locale).format(rows) });
+    return (
+        <span
+            className="shrink-0 text-xs text-muted-foreground"
+            title={full}
+            aria-label={full}
+        >
+            ~{short}
+        </span>
     );
 }
 
@@ -984,7 +1009,7 @@ function RowsPanel({
                                       from: page.rows.length === 0 ? 0 : offset + 1,
                                       to: offset + page.rows.length
                                   })
-                                : t("bench.rowsOf", {
+                                : t(page.estimated ? "bench.rowsOfAbout" : "bench.rowsOf", {
                                       from: page.rows.length === 0 ? 0 : offset + 1,
                                       to: offset + page.rows.length,
                                       total: page.total

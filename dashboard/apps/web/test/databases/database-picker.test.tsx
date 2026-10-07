@@ -28,12 +28,20 @@ vi.mock("@/app/(app)/apps/databases/actions", () => ({
         return {
             shape: "sql",
             namespaces: [{ name: "public", kind: "schema", count: 1 }],
-            relations: [{ name: `t_${opened}`, namespace: "public", kind: "table", rows: 3 }],
+            relations: [{ name: `t_${opened}`, namespace: "public", kind: "table", rows: 1234 }],
             namespace: "public",
             databases: serverDatabases,
             database: serverDatabases ? opened : null
         };
-    }
+    },
+    rowsAction: async () => ({
+        page: {
+            columns: [{ name: "id", type: "int", nullable: false, primaryKey: true }],
+            rows: [{ id: 1 }],
+            total: 50,
+            estimated: true
+        }
+    })
 }));
 
 const { Workbench } = await import("@/app/(app)/apps/databases/workbench");
@@ -118,5 +126,20 @@ describe("the database picker", () => {
         await waitFor(() =>
             expect(screen.queryByRole("combobox", { name: "Which database" })).toBeNull()
         );
+    });
+});
+
+describe("row counts", () => {
+    it("marks a table's size in the list as an estimate, with the whole figure reachable", async () => {
+        open();
+        const figure = await screen.findByText("~1.2K");
+        expect(figure.getAttribute("title")).toBe("About 1,234 rows (estimate)");
+        expect(figure.getAttribute("aria-label")).toBe("About 1,234 rows (estimate)");
+    });
+
+    it("says an estimated total under the grid is about that many", async () => {
+        open();
+        await userEvent.click(await screen.findByText("t_app"));
+        expect(await screen.findByText("rows 1-1 of about 50")).toBeTruthy();
     });
 });

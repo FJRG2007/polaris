@@ -53,6 +53,37 @@ const ROW_ALIAS = '"row"';
 const SYSTEM_SCHEMA_NAMES = ["information_schema"];
 const SYSTEM_SCHEMA_PREFIX = "pg\\_%";
 
+/**
+ * A table's row count, from what Postgres keeps rather than a scan.
+ *
+ * `live` is `pg_stat_all_tables.n_live_tup`, which the statistics system moves
+ * on every insert and delete, so it follows a table that grew since it was last
+ * analysed. `planned` is `pg_class.reltuples`, the planner's figure, refreshed
+ * only by ANALYZE and autovacuum - the one this list used to show, which is how
+ * a table holding thousands of rows came to read "2". pgAdmin shows both for
+ * the same reason.
+ *
+ * The live count wins. The planner's is used where the statistics have nothing
+ * (no row for the table, a partitioned parent) or say 0 while the planner has a
+ * figure - statistics are reset after a crash and by `pg_stat_reset`, and a
+ * table really empty is 0 in both. -1 is "never analysed", which is not a count.
+ */
+export function rowEstimate(live: string | null, planned: string | null): number | null {
+    const stats = figure(live);
+    const plan = figure(planned);
+    if (stats !== null && stats > 0) return stats;
+    if (plan !== null && plan > 0) return plan;
+    if (stats !== null && stats >= 0) return stats;
+    if (plan !== null && plan >= 0) return plan;
+    return null;
+}
+
+function figure(text: string | null | undefined): number | null {
+    if (text === null || text === undefined || text === "") return null;
+    const value = Number(text);
+    return Number.isFinite(value) ? value : null;
+}
+
 export class PostgresDriver implements data.DataDriver {
     readonly shape = "sql" as const;
     private client: Client | null = null;
@@ -143,12 +174,21 @@ export class PostgresDriver implements data.DataDriver {
 
     async relations(namespace: string | null): Promise<data.DataRelation[]> {
         const client = await this.open();
-        const result = await client.query<{ name: string; kind: string; rows: string }>(
+        // How many rows, without counting them: both figures Postgres keeps,
+        // chosen between by `rowEstimate`.
+        const result = await client.query<{
+            name: string;
+            relkind: string;
+            live: string | null;
+            planned: string | null;
+        }>(
             `SELECT c.relname AS name,
-                    CASE WHEN c.relkind IN ('v','m') THEN 'view' ELSE 'table' END AS kind,
-                    c.reltuples::bigint::text AS rows
+                    c.relkind::text AS relkind,
+                    s.n_live_tup::text AS live,
+                    c.reltuples::bigint::text AS planned
                FROM pg_class c
                JOIN pg_namespace n ON n.oid = c.relnamespace
+               LEFT JOIN pg_stat_all_tables s ON s.relid = c.oid
               WHERE c.relkind IN ('r','v','m','p','f') AND n.nspname = $1
               ORDER BY c.relname`,
             [namespace ?? "public"]
@@ -156,10 +196,9 @@ export class PostgresDriver implements data.DataDriver {
         return result.rows.map((row) => ({
             name: row.name,
             namespace: namespace ?? "public",
-            kind: row.kind === "view" ? ("view" as const) : ("table" as const),
-            // -1 is "never analysed", which is not a row count and must not be
-            // drawn as one.
-            rows: Number(row.rows) < 0 ? null : Number(row.rows)
+            kind: row.relkind === "v" || row.relkind === "m" ? ("view" as const) : ("table" as const),
+            // A plain view holds no rows of its own to estimate.
+            rows: row.relkind === "v" ? null : rowEstimate(row.live, row.planned)
         }));
     }
 
