@@ -84,6 +84,7 @@ describe("a service holding a dead mount", () => {
         const { checkNasVolumes } = await watcher();
         await checkNasVolumes();
         await checkNasVolumes();
+        expect(ports.container).toHaveBeenCalledOnce();
         expect(notifyVolumeHealth).toHaveBeenCalledOnce();
         expect(notifyVolumeHealth).toHaveBeenLastCalledWith(expect.anything(), "detached");
 
@@ -119,6 +120,20 @@ describe("a share that does not answer", () => {
         expect(restartAppsOnShare).toHaveBeenCalledWith("share-1", null);
         // The share step said it already; the service answering after it is not news.
         expect(notifyVolumeHealth).not.toHaveBeenCalled();
+    });
+
+    it("mounted again by a deploy, after being said down, is not said back a second time", async () => {
+        mount = async () => {
+            throw new Error("mounting //nas/share failed: Host is down");
+        };
+        const { checkNasVolumes, forgetVolumeNotice } = await watcher();
+        await checkNasVolumes();
+        expect(notifyVolumeHealth).toHaveBeenLastCalledWith(expect.anything(), "unreachable");
+
+        forgetVolumeNotice("app-1");
+        mount = async () => false;
+        await checkNasVolumes();
+        expect(notifyVolumeHealth).toHaveBeenCalledOnce();
     });
 });
 

@@ -82,6 +82,7 @@ import {
     githubTokenForOwner
 } from "./github-access";
 import * as deployReleases from "./deploy/releases";
+import { forgetVolumeNotice } from "./deploy/volume-watch";
 import { notifyVolumeHealth } from "./notifications/volume-events";
 import {
     appEdgeConfigSchema,
@@ -2014,6 +2015,7 @@ export async function restartAppsOnShare(
             await ports.container(container, "restart");
             console.log(`polaris: share ${connectionId} was mounted again, restarted ${app.slug}`);
             restarted.push(app.id);
+            forgetVolumeNotice(app.id);
             // Its files were unreadable until now, which the owner hears about
             // even though Polaris mended it: a service that could not read its
             // volumes for a while may have failed somebody in the meantime.

@@ -57,6 +57,12 @@ const told = new Map<string, Exclude<VolumeHealth, "back" | "reconnected">>();
 let timer: ReturnType<typeof setTimeout> | null = null;
 let inFlight: Promise<void> | null = null;
 
+/** Forget what was said about a service's volumes, once something else has said
+ *  they are back - a share mounted again restarts it and tells its owner so. */
+export function forgetVolumeNotice(applicationId: string): void {
+    told.delete(applicationId);
+}
+
 export function startVolumeWatcher(): void {
     if (timer) return;
     schedule(FIRST_PASS_MS);
@@ -187,6 +193,9 @@ async function checkMachine(ports: RuntimePorts, apps: Watched[]): Promise<void>
             else await settle(app);
             continue;
         }
+        // Restarted once already this outage without the volumes coming back: a
+        // restart every pass would only cut its connections again.
+        if (told.get(app.id) === "detached") continue;
         // The share is fine on the machine, so the service holds a mount that is
         // not it any more. A restart binds it again.
         try {
