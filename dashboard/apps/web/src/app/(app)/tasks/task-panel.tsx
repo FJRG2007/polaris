@@ -38,20 +38,22 @@ import { RichTextEditor } from "@/components/rich-text/rich-text-editor";
 import { settleTagIds, useTagCreation, withCreatedTags } from "./tag-creation";
 import { taskOverlay, useLatest, wouldChange, type TaskOverlay } from "./optimistic";
 import { ChecklistSection, DependencySection, SubtaskSection } from "./task-subwork";
-import { Bell, BellOff, Loader2, MoreHorizontal, Repeat, Share2 } from "lucide-react";
+import { Bell, BellOff, Loader2, Maximize2, Minimize2, MoreHorizontal, Repeat, Share2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import {
     Button,
+    cn,
     ConfirmDeleteDialog,
     Dialog,
-    DialogContent,
     DialogTitle,
     DropdownMenu,
     DropdownMenuContent,
     DropdownMenuItem,
     DropdownMenuSeparator,
     DropdownMenuTrigger,
-    keepFocusOnClose
+    keepFocusOnClose,
+    SheetContent,
+    Skeleton
 } from "@polaris/ui";
 
 /**
@@ -67,6 +69,64 @@ import {
  *   closing. The view behind is told, so a name that changed changes on the board.
  */
 type WriteMode = "picker" | "typing" | "typed";
+
+/**
+ * Whether this reader keeps the panel wide - the task and its conversation side
+ * by side - or narrow, with the board still in view beside it. Their own
+ * convenience, kept in their browser; wide is what it opens on until they say
+ * otherwise, which is the shape it has always had.
+ */
+const WIDE_KEY = "polaris.tasks.panel.wide";
+
+function readWide(): boolean {
+    try {
+        return window.localStorage.getItem(WIDE_KEY) !== "0";
+    } catch {
+        return true;
+    }
+}
+
+function writeWide(wide: boolean): void {
+    try {
+        window.localStorage.setItem(WIDE_KEY, wide ? "1" : "0");
+    } catch {
+        // Private browsing or a full quota: it holds for this visit only.
+    }
+}
+
+/**
+ * The panel while its task is on the way: the shape of what is coming - the
+ * reference, the name, the properties, the description - rather than a spinner
+ * in an empty box, so the eye is already where the name will be when it lands.
+ */
+function PanelSkeleton({ label }: { label: string }) {
+    return (
+        <div role="status" aria-label={label} className="flex flex-col gap-6 p-5">
+            <div className="flex items-center gap-2 pr-10">
+                <Skeleton className="h-4 w-16" />
+                <Skeleton className="h-4 w-4" />
+                <span className="flex-1" />
+                <Skeleton className="h-6 w-20" />
+                <Skeleton className="h-6 w-6" />
+            </div>
+            <Skeleton className="h-7 w-2/3" />
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                {Array.from({ length: 6 }, (_, index) => (
+                    <div key={index} className="flex items-center gap-3">
+                        <Skeleton className="h-4 w-20" />
+                        <Skeleton className="h-6 flex-1" />
+                    </div>
+                ))}
+            </div>
+            <div className="flex flex-col gap-2 border-t border-border pt-4">
+                <Skeleton className="h-4 w-24" />
+                <Skeleton className="h-4 w-full" />
+                <Skeleton className="h-4 w-5/6" />
+                <Skeleton className="h-4 w-1/2" />
+            </div>
+        </div>
+    );
+}
 
 /** What a change touches, which is what the autosave holds it under: a later
  *  keystroke in the same field replaces the one before it rather than queuing up
@@ -127,6 +187,18 @@ export function TaskPanel({
     const stuck = useRef(false);
     /** Where the panel was going when it was asked whether to leave the edit behind. */
     const [discarding, setDiscarding] = useState<{ next: string | null } | null>(null);
+    /**
+     * The task the panel was showing when it was closed, kept for the length of
+     * its way out. The panel slides away rather than vanishing, and a panel that
+     * emptied itself into a skeleton on the first frame of leaving would be
+     * sliding away the wrong picture.
+     */
+    const [parting, setParting] = useState<TaskDetail | null>(null);
+    const shownDetail = useRef(detail);
+    shownDetail.current = detail;
+    const [wide, setWide] = useState(true);
+    // Read after mount: the server has no localStorage to agree with.
+    useEffect(() => setWide(readWide()), []);
 
     useEffect(() => setOpenId(taskId), [taskId]);
 
@@ -146,9 +218,11 @@ export function TaskPanel({
         stuck.current = false;
         if (!openId) {
             saved.current = null;
+            setParting(shownDetail.current);
             setDetail(null);
             return;
         }
+        setParting(null);
         load(openId);
     }, [openId, load]);
 
@@ -358,11 +432,14 @@ export function TaskPanel({
      *  turns its id into a real one. */
     const createTag = (name: string, color: string) => tagBook.create(name, color);
 
-    const task = detail?.task;
+    // What the panel draws: the task it is on, or - while it closes - the one it
+    // was on. Everything below reads this rather than `detail`.
+    const view = detail ?? (openId === null ? parting : null);
+    const task = view?.task;
     const watching =
-        detail?.watchers.some((person) => person.id === context.currentUserId) ?? false;
+        view?.watchers.some((person) => person.id === context.currentUserId) ?? false;
     const runningHere =
-        detail?.timeEntries.some(
+        view?.timeEntries.some(
             (entry) => entry.running && entry.userId === context.currentUserId
         ) ?? false;
 
@@ -381,20 +458,32 @@ export function TaskPanel({
                 caps the width otherwise, and the panel renders at half the size
                 its two columns were laid out for. The header keeps clear of the
                 dialog's close button rather than sliding under it. */}
-            <DialogContent className="flex max-h-[92vh] w-[min(72rem,96vw)] max-w-[min(72rem,96vw)] flex-col gap-0 overflow-hidden p-0">
-                {!task && (
-                    <div className="flex h-64 items-center justify-center text-sm text-muted-foreground">
-                        {/* The dialog is announced before its content arrives, so
-                            it needs a name while it is still loading - otherwise a
-                            screen reader opens an unnamed window. */}
-                        <DialogTitle className="sr-only">{t("panel.task")}</DialogTitle>
-                        {loading ? (
-                            <Loader2 className="size-5 animate-spin" />
-                        ) : (
-                            error || t("panel.loading")
-                        )}
-                    </div>
+            {/* Docked to the right, with the board still there beside it: a task
+                is opened to be worked on next to the rest of the list, not
+                instead of it. Wide by default, which is the shape it has always
+                had - the task and its conversation side by side - and narrow on
+                request, for keeping an eye on the board while it is open. */}
+            <SheetContent
+                className={cn(
+                    "gap-0 p-0",
+                    wide ? "sm:w-[min(72rem,calc(100vw-1rem))]" : "sm:w-[min(40rem,calc(100vw-1rem))]"
                 )}
+            >
+                {!task &&
+                    (loading || !error ? (
+                        <>
+                            {/* The dialog is announced before its content arrives,
+                                so it needs a name while it is still loading -
+                                otherwise a screen reader opens an unnamed window. */}
+                            <DialogTitle className="sr-only">{t("panel.task")}</DialogTitle>
+                            <PanelSkeleton label={t("panel.loading")} />
+                        </>
+                    ) : (
+                        <div className="flex h-64 items-center justify-center px-5 text-sm text-muted-foreground">
+                            <DialogTitle className="sr-only">{t("panel.task")}</DialogTitle>
+                            <p role="alert">{error}</p>
+                        </div>
+                    ))}
 
                 {task && (
                     <>
@@ -406,13 +495,13 @@ export function TaskPanel({
                                 acknowledgement included - a reference people
                                 quote in chat is a reference they copy. */}
                             <CopyButton value={task.reference} label={t("panel.referenceLabel")} />
-                            {detail?.parent && (
+                            {view?.parent && (
                                 <button
                                     type="button"
-                                    onClick={() => void openTask(detail.parent!.id)}
+                                    onClick={() => void openTask(view.parent!.id)}
                                     className="min-w-0 truncate text-xs text-muted-foreground hover:text-foreground hover:underline"
                                 >
-                                    {t("panel.inParent", { name: detail.parent.name })}
+                                    {t("panel.inParent", { name: view.parent.name })}
                                 </button>
                             )}
                             {/* The actions are a group of their own rather than a
@@ -461,6 +550,26 @@ export function TaskPanel({
                                     name={task.name}
                                     description={task.description}
                                 />
+                                {/* Phones get the whole screen either way, so the
+                                    choice only exists where there is a page beside
+                                    the panel to keep in view. */}
+                                <button
+                                    type="button"
+                                    aria-label={wide ? t("panel.narrow") : t("panel.widen")}
+                                    title={wide ? t("panel.narrow") : t("panel.widen")}
+                                    aria-pressed={wide}
+                                    onClick={() => {
+                                        setWide(!wide);
+                                        writeWide(!wide);
+                                    }}
+                                    className="hidden rounded-md p-1.5 text-muted-foreground transition-colors duration-fast hover:bg-muted hover:text-foreground active:bg-muted/70 sm:inline-flex"
+                                >
+                                    {wide ? (
+                                        <Minimize2 className="size-4" />
+                                    ) : (
+                                        <Maximize2 className="size-4" />
+                                    )}
+                                </button>
                                 <Button
                                     size="sm"
                                     variant="ghost"
@@ -482,7 +591,7 @@ export function TaskPanel({
                                         );
                                         load(task.id);
                                     }}
-                                    className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                                    className="rounded-md p-1.5 text-muted-foreground transition-colors duration-fast hover:bg-muted hover:text-foreground active:bg-muted/70"
                                 >
                                     {watching ? (
                                         <Bell className="size-4" />
@@ -497,7 +606,7 @@ export function TaskPanel({
                                                 type="button"
                                                 aria-label={t("panel.more")}
                                                 title={t("panel.more")}
-                                                className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                                                className="rounded-md p-1.5 text-muted-foreground transition-colors duration-fast hover:bg-muted hover:text-foreground active:bg-muted/70 data-[state=open]:bg-muted data-[state=open]:text-foreground"
                                             >
                                                 <MoreHorizontal className="size-4" />
                                             </button>
@@ -548,8 +657,18 @@ export function TaskPanel({
 
                         {/* Each column scrolls on its own so a long thread cannot
                             carry the properties off the screen. */}
-                        <div className="grid min-h-0 flex-1 grid-cols-1 overflow-y-auto overscroll-contain md:grid-cols-[minmax(0,1fr)_24rem] md:overflow-hidden">
-                            <div className="flex flex-col gap-6 p-5 md:overflow-y-auto overscroll-contain">
+                        <div
+                            className={cn(
+                                "grid min-h-0 flex-1 grid-cols-1 overflow-y-auto overscroll-contain",
+                                wide && "md:grid-cols-[minmax(0,1fr)_24rem] md:overflow-hidden"
+                            )}
+                        >
+                            <div
+                                className={cn(
+                                    "flex flex-col gap-6 p-5 overscroll-contain",
+                                    wide && "md:overflow-y-auto md:overscroll-contain"
+                                )}
+                            >
                                 <DialogTitle asChild>
                                     <TaskNameField
                                         defaultValue={task.name}
@@ -589,7 +708,7 @@ export function TaskPanel({
                                     context={context}
                                     running={runningHere}
                                     waitingOn={
-                                        detail?.dependencies.filter(
+                                        view?.dependencies.filter(
                                             (edge) =>
                                                 edge.direction === "waitingOn" && !edge.finished
                                         ).length ?? 0
@@ -653,7 +772,7 @@ export function TaskPanel({
                                 <SubtaskSection
                                     taskId={task.id}
                                     listId={task.listId}
-                                    subtasks={detail?.subtasks ?? []}
+                                    subtasks={view?.subtasks ?? []}
                                     context={context}
                                     onOpen={openTask}
                                     onChanged={() => {
@@ -666,7 +785,7 @@ export function TaskPanel({
 
                                 <ChecklistSection
                                     taskId={task.id}
-                                    checklists={detail?.checklists ?? []}
+                                    checklists={view?.checklists ?? []}
                                     canEdit={context.canEdit}
                                     onChanged={() => load(task.id)}
                                     onError={setError}
@@ -674,7 +793,7 @@ export function TaskPanel({
 
                                 <DependencySection
                                     taskId={task.id}
-                                    dependencies={detail?.dependencies ?? []}
+                                    dependencies={view?.dependencies ?? []}
                                     candidates={context.siblings}
                                     canEdit={context.canEdit}
                                     onOpen={openTask}
@@ -684,7 +803,7 @@ export function TaskPanel({
 
                                 <AttachmentSection
                                     taskId={task.id}
-                                    attachments={detail?.attachments ?? []}
+                                    attachments={view?.attachments ?? []}
                                     canEdit={context.canEdit}
                                     onChanged={() => load(task.id)}
                                     onError={setError}
@@ -692,7 +811,7 @@ export function TaskPanel({
 
                                 <CommitSection
                                     taskId={task.id}
-                                    links={detail?.commits ?? []}
+                                    links={view?.commits ?? []}
                                     canEdit={context.canEdit}
                                     onChanged={() => load(task.id)}
                                     onError={setError}
@@ -700,7 +819,7 @@ export function TaskPanel({
 
                                 <TimeSection
                                     taskId={task.id}
-                                    entries={detail?.timeEntries ?? []}
+                                    entries={view?.timeEntries ?? []}
                                     estimate={task.timeEstimate}
                                     currentUserId={context.currentUserId}
                                     canModerate={context.canModerate}
@@ -712,11 +831,16 @@ export function TaskPanel({
                                 />
                             </div>
 
-                            <aside className="flex min-h-0 flex-col border-t border-border md:border-l md:border-t-0">
+                            <aside
+                                className={cn(
+                                    "flex min-h-0 flex-col border-t border-border",
+                                    wide && "md:border-l md:border-t-0"
+                                )}
+                            >
                                 <ActivityStream
                                     taskId={task.id}
-                                    comments={detail?.comments ?? []}
-                                    activity={detail?.activity ?? []}
+                                    comments={view?.comments ?? []}
+                                    activity={view?.activity ?? []}
                                     currentUserId={context.currentUserId}
                                     canModerate={context.canModerate}
                                     onChanged={() => load(task.id)}
@@ -781,7 +905,7 @@ export function TaskPanel({
                         />
                     </>
                 )}
-            </DialogContent>
+            </SheetContent>
         </Dialog>
     );
 }

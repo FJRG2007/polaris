@@ -205,7 +205,9 @@
         "leaveTitle": "Leave the change behind?",
         "leaveDescription": "The last change could not be saved.",
         "leaveQuestion": "Everything else stays as it was saved. What is still in the boxes goes.",
-        "leaveConfirm": "Leave it behind"
+        "leaveConfirm": "Leave it behind",
+        "widen": "Expand panel",
+        "narrow": "Narrow panel"
     },
     "priority": {
         "urgent": "Urgent",
