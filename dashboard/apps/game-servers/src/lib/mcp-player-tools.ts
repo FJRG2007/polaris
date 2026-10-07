@@ -14,8 +14,8 @@
  * named by their account name; an ARK survivor by their SteamID64, because a
  * survivor's name can be changed at will and two may share one.
  *
- * Deliberately not offered: op, kill, items and teleporting. The console tool
- * reaches them for whoever holds its grant.
+ * Deliberately not offered: op, kill and teleporting. The console tool reaches
+ * them for whoever holds its grant. Items are `mcp-item-tools.ts`.
  *
  * Server-only.
  */

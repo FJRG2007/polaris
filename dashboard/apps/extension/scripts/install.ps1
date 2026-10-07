@@ -291,7 +291,7 @@ function Invoke-PolarisExtensionInstall {
                 Register-ScheduledTask -TaskName $taskName -Action $action -Trigger $trigger -Settings $settings `
                     -Principal $principal -Description "Keeps the Polaris browser extension in $dir up to date." -Force | Out-Null
                 if ($scheduled) {
-                    Write-Log "updated the updates task: no sign-in run, no console window"
+                    Write-Log "re-registered the updates task with this release's settings"
                 } else {
                     Write-Log "it updates itself every 6 hours"
                 }

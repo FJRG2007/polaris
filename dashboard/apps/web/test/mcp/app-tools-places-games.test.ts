@@ -30,7 +30,11 @@ const mocks = vi.hoisted(() => ({
     setServerRunning: vi.fn(),
     restartServerNow: vi.fn(),
     runConsoleCommand: vi.fn(),
-    readPlayerInventory: vi.fn()
+    readPlayerInventory: vi.fn(),
+    givePlayerItems: vi.fn(),
+    takePlayerItems: vi.fn(),
+    emptyPlayerInventory: vi.fn(),
+    sendPlayerInventory: vi.fn()
 }));
 
 vi.mock("@polaris/db", () => ({ prisma: {} }));
@@ -78,6 +82,12 @@ vi.mock("@polaris-app/game-servers/src/lib/games-operations", () => ({
 
 vi.mock("@polaris-app/game-servers/src/lib/minecraft/inventory-service", () => ({
     readPlayerInventory: mocks.readPlayerInventory
+}));
+vi.mock("@polaris-app/game-servers/src/lib/minecraft/item-operations", () => ({
+    givePlayerItems: mocks.givePlayerItems,
+    takePlayerItems: mocks.takePlayerItems,
+    emptyPlayerInventory: mocks.emptyPlayerInventory,
+    sendPlayerInventory: mocks.sendPlayerInventory
 }));
 
 const { placesExtension } = await import("@polaris-app/places/src/lib/places-extension");
@@ -426,6 +436,102 @@ describe("the Game servers tools", () => {
         // Refused at the schema, as a protocol error or a tool error, never run.
         expect(badName === undefined || badName.isError === true).toBe(true);
         expect(mocks.readPlayerInventory).not.toHaveBeenCalled();
+    });
+
+    it("change a player's items through the panel's functions, to the moderators or the managers", async () => {
+        const minecraft = { ...STANDING, install: { ...STANDING.install, catalogId: "minecraft" } };
+        mocks.gameServerAccess.mockResolvedValue(minecraft);
+        const target = {
+            ownerId: "owner-1",
+            installedAppId: GAME,
+            actorId: "user-1",
+            player: "Steve",
+            via: "mcp"
+        };
+        mocks.givePlayerItems.mockResolvedValue({
+            queued: false,
+            output: "Gave 64 [Diamond] to Steve"
+        });
+        const given = await call(
+            "games_player_give",
+            { serverId: GAME, player: "Steve", item: "Diamond", count: 64 },
+            ["gameservers.moderate"]
+        );
+        expect(mocks.gameServerAccess).toHaveBeenCalledWith(ADA, GAME, "games.moderate");
+        expect(mocks.givePlayerItems).toHaveBeenCalledWith(target, "diamond", 64);
+        expect(given.content[0]?.text).toContain("Gave 64 [Diamond]");
+
+        // The managers' scope reaches it too: their console already does.
+        mocks.takePlayerItems.mockResolvedValue({ queued: true });
+        const taken = await call(
+            "games_player_take",
+            { serverId: GAME, player: "Steve", item: "minecraft:dirt", count: 5 },
+            ["gameservers.manage"]
+        );
+        expect(mocks.takePlayerItems).toHaveBeenCalledWith(target, "minecraft:dirt", 5);
+        expect(taken.content[0]?.text).toContain("when they next join");
+
+        mocks.emptyPlayerInventory.mockResolvedValue({ queued: false, output: "" });
+        await call("games_player_inventory_empty", { serverId: GAME, player: "Steve" }, [
+            "gameservers.moderate"
+        ]);
+        expect(mocks.emptyPlayerInventory).toHaveBeenCalledWith(target);
+
+        mocks.sendPlayerInventory.mockResolvedValue({ moved: 3, kept: 1 });
+        const sent = await call(
+            "games_player_inventory_send",
+            { serverId: GAME, player: "Steve", to: "Alex" },
+            ["gameservers.moderate"]
+        );
+        expect(mocks.sendPlayerInventory).toHaveBeenCalledWith(target, "Alex");
+        expect(sent.content[0]?.text).toContain("Sent 3 stack(s)");
+        expect(sent.content[0]?.text).toContain("1 stayed with Steve");
+    });
+
+    it("refuse item changes to the read scope, off Minecraft, without the grant, or to oneself", async () => {
+        const read = await call(
+            "games_player_give",
+            { serverId: GAME, player: "Steve", item: "diamond", count: 1 },
+            ["gameservers.read"]
+        );
+        expect(read.content[0]?.text).toContain("gameservers.moderate");
+
+        mocks.gameServerAccess.mockResolvedValue({
+            ...STANDING,
+            install: { ...STANDING.install, catalogId: "valheim" }
+        });
+        const other = await call(
+            "games_player_inventory_empty",
+            { serverId: GAME, player: "Steve" },
+            ["gameservers.moderate"]
+        );
+        expect(other.content[0]?.text).toContain("not something Polaris can do");
+
+        mocks.gameServerAccess.mockResolvedValue(null);
+        const refused = await call(
+            "games_player_take",
+            { serverId: GAME, player: "Steve", item: "diamond", count: 1 },
+            ["gameservers.moderate"]
+        );
+        expect(refused.content[0]?.text).toContain("cannot do that");
+
+        const self = await call(
+            "games_player_inventory_send",
+            { serverId: GAME, player: "Steve", to: "steve" },
+            ["gameservers.moderate"]
+        );
+        expect(self.content[0]?.text).toContain("same player");
+
+        const badItem = await call(
+            "games_player_give",
+            { serverId: GAME, player: "Steve", item: "diamond 64 {x}", count: 1 },
+            ["gameservers.moderate"]
+        );
+        expect(badItem === undefined || badItem.isError === true).toBe(true);
+        expect(mocks.givePlayerItems).not.toHaveBeenCalled();
+        expect(mocks.takePlayerItems).not.toHaveBeenCalled();
+        expect(mocks.emptyPlayerInventory).not.toHaveBeenCalled();
+        expect(mocks.sendPlayerInventory).not.toHaveBeenCalled();
     });
 
     it("stop and restart through the same functions as the page's buttons", async () => {
