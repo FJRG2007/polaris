@@ -83,6 +83,13 @@ export function radarOff(language: Language): string {
         : `${INFO}Minimap radars are switched off for this round.`;
 }
 
+/** Told at "Go!" in a house with secret rooms: where else to look. */
+export function secretTip(language: Language): string {
+    return language === "es"
+        ? `${INFO}Hay estanterías que esconden una sala: pulsa su botón. Y mira hacia arriba.`
+        : `${INFO}Some bookcases hide a room: press the button beside one. And look up.`;
+}
+
 /** Said with the results. */
 export function summary(found: number, hiders: number, language: Language): string {
     return language === "es"

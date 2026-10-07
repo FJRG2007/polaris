@@ -461,8 +461,9 @@ left out.
   out, the same moment the same place.
 - **Hide and seek** is played in a closed house in the air: nine rooms, three
   by three, 39 by 39 inside under a solid roof, a doorway in every wall between
-  two rooms, and a loft along an outer wall of two corner rooms (see "Building
-  a map" for how it is laid out and checked). Each room has four lamps in its
+  two rooms, a loft along an outer wall of two corner rooms, places to climb
+  up to and secret rooms behind bookcases (see "Building a map" for how it is
+  laid out and checked, and "Secret doors" below for how they open). Each room has four lamps in its
   floor and no more, so corners stay dim but never dark enough for a monster.
   The seekers (`seekers`, never everybody) are drawn from the run's id and
   wait in a barrier cage in the middle room, blind and unable to walk, for
@@ -530,6 +531,46 @@ left out.
       the nearest of those who struck.
     - Where the pack cannot be put on, the damage statistics are read, a
       first score counted as a rise from 0 (`hits.rose`).
+- **Secret doors** (`kinds/secret-doors.ts`): hide and seek's secret rooms
+  (design 3) open and shut in the events data pack, never by redstone of
+  their own.
+    - A door is two bookshelves in a bookcase. A sticky piston under the
+      floor, facing up, and one in the lintel, facing down, hold them in the
+      doorway while powered; unpowered they pull them into the floor and the
+      lintel and the doorway is open. Built, nothing powers them: every door
+      starts open, and stays a way in where the pack is not on.
+    - The power is a block of redstone the pack sets beside each piston and
+      takes away (`door/open`, `door/shut`), only where that piston is - so
+      nothing is ever set into a world the house has gone from. A button
+      (oak, beside the doorway inside and out, a corner off its column) is
+      only read: `powered=true` sets the door's timer to `OPEN_TICKS` (70),
+      five seconds from a press with the wooden button's 30-tick pulse. A
+      button's own pulse is too short to walk through, and a pulse extender
+      built of redstone is one more thing a stray signal could power.
+    - It shuts by itself once the time is up, on a tick when no entity's
+      hitbox touches the doorway or the column of blocks round it (3 by 3, the
+      doorway's height): a closing piston pushes a player along, and with
+      blocks from above and below they would end up in one. Shut on somebody
+      after all, it opens again at once. No piston is powered or unpowered
+      again until `SETTLE_TICKS` (4) after the last change: a sticky piston
+      cut off mid-push drops its block, which would leave a bookshelf in the
+      doorway for good.
+    - Each door is an invisible marker stand in the wall over it, and every
+      offset is from there (`RISE`). The pack works only the doors within 12
+      of a player an arena took in - players first, then doors near each by
+      distance, which the game looks up by chunk - and each once a tick
+      (`polaris_dlast` against `#now`, the game time). Its work is a handful of
+      block tests per door near somebody, and nothing elsewhere.
+    - At "Go!" the markers are summoned and each door worked once, so they
+      shut as the game starts (`hide-and-seek.doorLines`). At the end the
+      markers are killed and every power block in the box taken away, so every
+      door opens before anybody is sent home (`doorsOff`); the arena's close
+      kills the markers again (`doorsStill`) and the teardown takes the
+      pistons before their power, so nothing moves while the house comes
+      down. The scores (`polaris_door`, `polaris_dwait`, `polaris_dlast`) go
+      with the game's own.
+    - Pistons, redstone and bookshelves are not in either anti-xray's hidden
+      set (it hides only ores), so every player sees the doors as they are.
 
 ## Building a map
 
@@ -623,10 +664,23 @@ new map:
     - **lofts**: a platform under the roof reached by a ladder (seekers look
       ahead, not up), with cover on it and under it, against the wall only, so
       the rows in front stay a way through;
-    - **cover**: walls, hedges, crates and stacks of barrels to crouch behind.
+    - **cover**: walls, hedges, crates and stacks of barrels to crouch behind;
+    - **climbs** (design 3): a wardrobe against a wall with three barrels as
+      steps up to its top (`steps`, standing four up), a crow's nest on a post
+      with a ladder (`perch`, four up) and a beam six long under the roof,
+      reached by a ladder up the wall, a post under its far end (`rafter`,
+      five up). One to a room, so they spread over the house;
+    - **secret rooms** (design 3): an alcove of bookshelves under a soffit
+      against an outer wall, to the roof; one bookshelf column is a door into
+      a room two by three behind it, lit by its own lamp. Only the middle of
+      the outer wall of a room between two corners is long enough between a
+      room's lamps, so two of those four places are drawn, and which end of
+      the shelves the door is at.
 
     Doorways, lofts and every piece are drawn from the run's id; the whole house
-    is mirrored into one of four ways. Each piece stays inside one room, keeps a
+    is mirrored into one of four ways. The climbs and secret rooms are drawn
+    first, and only by design 3: a run built by design 2 still draws exactly
+    its own house (`layoutFor(seed, 2)`). Each piece stays inside one room, keeps a
     block of air from every other and from the doorways, the ladders and the
     posts, the lamps and the cage with the ring the hiders start on, fits under
     what is over it, and a closet stands against a wall. Everything inside the
@@ -635,12 +689,18 @@ new map:
     `layoutProblems` then walks the house from the hiders' start the way a
     player moves - level, a block up with room to jump it, down at most three,
     through doors, onto a shut hatch, up and down the loft ladders - and fails it
-    if any place to stand on the floor or a loft cannot be reached, and spreads
+    if any place to stand on the floor, a loft, a climb (at any height) or in a
+    secret room cannot be reached - up the perches' and rafters' ladders,
+    through a secret door as it is built, open - and spreads
     the lamps' light the way the game does (a level less a block, through air,
     doors, hatches, ladders, fences, leaves and barrier) and fails it if anywhere
-    a mob could stand, a pit's floor included, has block light 0. Over 1,000
-    seeds: no rule broken, never the empty fallback, on average 7 closets, 6
-    hatches, 4 bushes and 26 pieces of cover; about 265 fills a house.
+    a mob could stand, a pit's floor included, has block light 0 - with the
+    secret doors open, and again shut, when a secret room has only its own
+    lamp. A climb or a secret room is in one room, out of a loft's way,
+    against a wall where it needs one, and a secret room never in the cage's.
+    Over 1,000 seeds: no rule broken, never the empty fallback, on average 2
+    secret rooms, 2 of each climb, 6 closets, 6 hatches, 4 bushes and 26
+    pieces of cover.
 
 - **No island is a jump from another**: SkyWars' islands are drawn from the
   run's id (`sky-wars.layoutFor`) - each a blob with a waving edge, grass over
@@ -677,21 +737,21 @@ new map:
 Everything below is part of the arena's own boxes: built into air with
 `keep`, and taken out with the rest.
 
-| Arena            | Look                                                                                                                              |
-| ---------------- | --------------------------------------------------------------------------------------------------------------------------------- |
-| Spleef           | each floor walled in its own color, a sea lantern on every corner post                                                            |
-| TNT run          | TNT floors, a rim in its own color at each one, glass walls, corner lanterns                                                      |
-| Dropper          | white walls banded by each floor's color, a ring of light round every hole                                                        |
-| Ice boat race    | packed ice, white walls with a glass rail and lights, an arch over each gate                                                      |
-| Parkour          | the course's theme, a light under every checkpoint                                                                                |
-| King of the ring | polished stone edge, sea lanterns at the corners, the circle drawn in yellow                                                      |
-| Build battle     | a stone curb between plots and glowstone where the lines meet, at floor level                                                     |
-| Team duel        | a stone rim round the floor and a post of light at each corner                                                                    |
-| Hot potato       | a floor in orange and white stripes, glass walls on a stone rim, sea lanterns up the corners, a spruce gallery                    |
-| Hide and seek    | a stone brick house under a dark oak roof, spruce walls between nine rooms, oak closets, spruce hatches, birch lofts on log posts |
-| SkyWars          | grass, dirt and flecked stone islands with oaks, boulders and flowers, invisible cages and gallery over the middle, barrier walls |
-| Capture the flag | the duel's rim and posts, bases in red and blue, banners on sea lanterns, cover of stone brick, spruce and chiseled stone         |
-| Boss sky arena   | glass, with a pillar of sea lantern at each corner                                                                                |
+| Arena            | Look                                                                                                                                                                                                                            |
+| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Spleef           | each floor walled in its own color, a sea lantern on every corner post                                                                                                                                                          |
+| TNT run          | TNT floors, a rim in its own color at each one, glass walls, corner lanterns                                                                                                                                                    |
+| Dropper          | white walls banded by each floor's color, a ring of light round every hole                                                                                                                                                      |
+| Ice boat race    | packed ice, white walls with a glass rail and lights, an arch over each gate                                                                                                                                                    |
+| Parkour          | the course's theme, a light under every checkpoint                                                                                                                                                                              |
+| King of the ring | polished stone edge, sea lanterns at the corners, the circle drawn in yellow                                                                                                                                                    |
+| Build battle     | a stone curb between plots and glowstone where the lines meet, at floor level                                                                                                                                                   |
+| Team duel        | a stone rim round the floor and a post of light at each corner                                                                                                                                                                  |
+| Hot potato       | a floor in orange and white stripes, glass walls on a stone rim, sea lanterns up the corners, a spruce gallery                                                                                                                  |
+| Hide and seek    | a stone brick house under a dark oak roof, spruce walls between nine rooms, oak closets, spruce hatches, birch lofts on log posts, bookcases in spruce alcoves, barrel steps up oak wardrobes, birch crow's nests, spruce beams |
+| SkyWars          | grass, dirt and flecked stone islands with oaks, boulders and flowers, invisible cages and gallery over the middle, barrier walls                                                                                               |
+| Capture the flag | the duel's rim and posts, bases in red and blue, banners on sea lanterns, cover of stone brick, spruce and chiseled stone                                                                                                       |
+| Boss sky arena   | glass, with a pillar of sea lantern at each corner                                                                                                                                                                              |
 
 ## In-server work (the Polaris mod)
 
@@ -1089,7 +1149,10 @@ A new kind follows all of them. A change to an old kind must not undo one.
   no longer be redrawn - so it is read back from the world instead: the
   barrier over the old cage's middle sits under exactly one of the four
   mirrors, and a test command says which (`hide-and-seek.mirrorTests`,
-  `73e33a69f`).
+  `73e33a69f`). So a later design adds to the draw only after a branch on
+  the run's design: design 3's climbs and secret rooms are drawn only for
+  design 3, and a design-2 run draws, checks and plays its own house bit for
+  bit (a fingerprint test holds it).
 - **A choice drawn per run stays the same after a restart**: it is seeded by
   the run's id (`trivia-bank.seeded`), never `Math.random()`, and a change to
   what can be drawn keeps the draw of a run saved before it

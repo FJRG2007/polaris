@@ -21,6 +21,17 @@
  * - **Cover**: walls, hedges, crates and stacks of them to crouch behind, in
  *   rooms lit by four lamps in their floor and no more, so their corners are
  *   dim.
+ * - **Climbs** (from design 3), spread over the rooms, one to a room: a
+ *   wardrobe against a wall with barrels as steps up onto its top (`steps`), a
+ *   crow's nest on a post with a ladder (`perch`), and a beam under the roof
+ *   across a room, reached by a ladder up the wall (`rafter`). Each is climbed
+ *   the way the checker walks - a block up at a time, or a ladder - so a seeker
+ *   gets up wherever a hider can.
+ * - **Secret rooms** (from design 3): a bookcase in an alcove against an outer
+ *   wall, one of whose bookshelves is a door two high moved by sticky pistons
+ *   under the floor and in the lintel, with a button beside it inside and out.
+ *   The events data pack (`secret-doors.ts`) works it: open at a press, shut
+ *   by itself a few seconds later, never on anybody.
  *
  * Nametags are hidden from the other side (`setupLines`) and no effect shows
  * particles, so a hider is found by looking, never by a label through a wall.
@@ -50,11 +61,18 @@ import { z } from "zod";
 import * as hits from "./hits";
 import type { Box } from "../state";
 import type { Spot } from "./arena";
+import * as doors from "./secret-doors";
 import type { Fill } from "./arena-game";
 import { seeded, shuffled } from "../trivia-bank";
 
-/** The layout's version, written into the run when it is built. */
-export const DESIGN = 2;
+/** The layout's version, written into the run when it is built. Design 2 was
+ *  the first house; 3 added the climbs and the secret rooms, drawn before
+ *  anything else, so a run built by 2 still draws exactly its own house
+ *  (`layoutFor(seed, 2)`). */
+export const DESIGN = 3;
+/** The first design built as this house: its shell, cage and starts are every
+ *  later design's too. */
+export const HOUSE = 2;
 
 /** The house, walls included: 41 by 41. */
 const SIZE = 41;
@@ -107,6 +125,9 @@ const CUPBOARD = "minecraft:oak_planks";
 const DOOR = "minecraft:oak_door";
 const HATCH = "minecraft:spruce_trapdoor";
 const LEAVES = "minecraft:oak_leaves[persistent=true]";
+const SHELF = "minecraft:bookshelf";
+const PISTON_HEAD = "minecraft:piston_head";
+const MOVING = "minecraft:moving_piston";
 const PIECE_BLOCKS = {
     wall: "minecraft:bricks",
     hedge: LEAVES,
@@ -114,13 +135,22 @@ const PIECE_BLOCKS = {
     stack: "minecraft:barrel[facing=up]"
 } as const;
 
-/** Every kind of block the house is built of, as bare ids: the ladders first,
- *  which come down before what they hang on (`arena.teardown`), and the doors
- *  and hatches before the floor and the cupboards round them. */
+/** Every kind of block the house is built of, as bare ids: the buttons and
+ *  ladders first, which come down before what they hang on
+ *  (`arena.teardown`), the doors and hatches before the floor and the
+ *  cupboards round them, and a secret door's pistons before their power - a
+ *  piston taken away leaves its bookshelf where it is, while power taken
+ *  first would set it moving as the rest came down. The power is never built:
+ *  the events data pack sets it, inside the box. */
 export const HALL_BLOCKS: readonly string[] = [
+    doors.BUTTON,
     LADDER,
     DOOR,
     HATCH,
+    doors.PISTON,
+    PISTON_HEAD,
+    MOVING,
+    doors.POWER,
     BARRIER,
     OUTER,
     INNER,
@@ -134,18 +164,23 @@ export const HALL_BLOCKS: readonly string[] = [
     CUPBOARD,
     "minecraft:bricks",
     "minecraft:oak_leaves",
-    "minecraft:barrel"
+    "minecraft:barrel",
+    SHELF
 ];
 
 // ------------------------------------------------------------------ the map
 
-export type PieceKind = keyof typeof PIECE_BLOCKS | "closet" | "bush" | "pit";
+/** The climbs and the secret rooms: design 3's, each a shape of its own. */
+export type FeatureKind = "secret" | "steps" | "perch" | "rafter";
+export type PieceKind = keyof typeof PIECE_BLOCKS | "closet" | "bush" | "pit" | FeatureKind;
 export type Side = "north" | "south" | "east" | "west";
 
 /** A hiding place, in the house's own blocks: `x`, `z` its corner with the
  *  least of each, `level` the first level it fills, `w` by `d` across, `h`
  *  high. A closet's `side` is the wall it stands against; a bush's, the side
- *  its way in is on. */
+ *  its way in is on; a climb's or secret room's, the wall it stands against
+ *  (a perch's, the side its ladder is on). A secret room's `at` is its door's
+ *  place along its front. */
 export interface Piece {
     readonly kind: PieceKind;
     readonly x: number;
@@ -155,6 +190,7 @@ export interface Piece {
     readonly d: number;
     readonly h: number;
     readonly side?: Side;
+    readonly at?: number;
 }
 
 /** A doorway two wide and `DOOR_HIGH` high in a wall between two rooms: in the
@@ -268,11 +304,14 @@ function loftLamp(loft: Loft): { x: number; z: number } {
         : { x: Math.floor((loft.x1 + loft.x2) / 2), z: wall };
 }
 
-/** Every lamp in the house: in the rooms' floors and the lofts'. */
-function lampsOf(layout: Pick<Layout, "lofts">): { x: number; level: number; z: number }[] {
+/** Every lamp in the house: in the rooms' floors, the lofts' and the secret rooms'. */
+function lampsOf(
+    layout: Pick<Layout, "lofts" | "pieces">
+): { x: number; level: number; z: number }[] {
     return [
         ...LAMPS.map((lamp) => ({ ...lamp, level: 0 })),
-        ...layout.lofts.map((loft) => ({ ...loftLamp(loft), level: LOFT }))
+        ...layout.lofts.map((loft) => ({ ...loftLamp(loft), level: LOFT })),
+        ...layout.pieces.flatMap((piece) => featureLamp(piece) ?? [])
     ];
 }
 
@@ -416,8 +455,221 @@ function isWallLine(at: number): boolean {
     return at === 0 || at === SIZE - 1 || (WALLS as readonly number[]).includes(at);
 }
 
+// ------------------------------------------------------------------ climbs and secret rooms
+
+/** The level a rafter's beam is at: a player on it stands at 6 with the roof
+ *  two over their feet. */
+const RAFTER = ROOF - 3;
+
+/** Each climb's and secret room's size: blocks out from the side it stands
+ *  against, along it, and high. */
+const FEATURE: Readonly<Record<FeatureKind, { out: number; along: number; h: number }>> = {
+    // An alcove of bookshelves under a soffit, to the roof: the room behind it
+    // two deep and three long, its door at one end of the shelves.
+    secret: { out: 4, along: 5, h: ROOF - 1 },
+    // A wardrobe two by two and four high against the wall, three barrels up to it.
+    steps: { out: 5, along: 2, h: 4 },
+    // A ladder up a post to a platform two by two at the lofts' height.
+    perch: { out: 3, along: 2, h: LOFT },
+    // A ladder up the wall to a beam six long, a post under its far end.
+    rafter: { out: 7, along: 1, h: RAFTER }
+};
+
+/** How many of each are wanted, one to a room at most. */
+const WANTED_FEATURES: Readonly<Record<FeatureKind, number>> = {
+    secret: 2,
+    rafter: 2,
+    steps: 2,
+    perch: 2
+};
+
+function isFeature(kind: PieceKind): kind is FeatureKind {
+    return kind in FEATURE;
+}
+
+function opposite(side: Side): Side {
+    return ({ north: "south", south: "north", east: "west", west: "east" } as const)[side];
+}
+
+/** A feature's width and depth across the house, from its side. */
+function featureSize(kind: FeatureKind, side: Side): { w: number; d: number; h: number } {
+    const size = FEATURE[kind];
+    return side === "west" || side === "east"
+        ? { w: size.out, d: size.along, h: size.h }
+        : { w: size.along, d: size.out, h: size.h };
+}
+
+/** The cell `out` blocks out from a feature's side and `along` it. */
+function cellOf(piece: Piece, out: number, along: number): { x: number; z: number } {
+    switch (piece.side) {
+        case "west":
+            return { x: piece.x + out, z: piece.z + along };
+        case "east":
+            return { x: piece.x + piece.w - 1 - out, z: piece.z + along };
+        case "north":
+            return { x: piece.x + along, z: piece.z + out };
+        default:
+            return { x: piece.x + along, z: piece.z + piece.d - 1 - out };
+    }
+}
+
+/** One block kind over a run of a feature's cells, in its own terms; an empty
+ *  block is air, kept from whatever comes after. */
+interface Part {
+    readonly block: string;
+    readonly out: [number, number];
+    readonly along: [number, number];
+    readonly levels: [number, number];
+}
+
+/** Where a secret room's door is along its front, and its buttons. */
+function secretDoor(piece: Piece): { door: number; button: number } {
+    return { door: piece.at ?? 1, button: 2 };
+}
+
+/**
+ * What a climb or a secret room is made of, first set first: a secret room's
+ * door open (`shut` false: as it is built, its pistons unpowered and its
+ * bookshelves pulled into the floor and the lintel) or shut (as the data pack
+ * holds it).
+ */
+function featureParts(piece: Piece, shut = false): Part[] {
+    const side = piece.side ?? "west";
+    const one = (block: string, out: number, along: number, l1: number, l2 = l1): Part => ({
+        block,
+        out: [out, out],
+        along: [along, along],
+        levels: [l1, l2]
+    });
+    const span = (
+        block: string,
+        out: [number, number],
+        along: [number, number],
+        levels: [number, number]
+    ): Part => ({ block, out, along, levels });
+    switch (piece.kind) {
+        case "secret": {
+            const { door, button } = secretDoor(piece);
+            const d = 2;
+            const low = 1;
+            const r = doors.RISE;
+            const head = (facing: "up" | "down") =>
+                `${PISTON_HEAD}[facing=${facing},type=sticky,short=false]`;
+            return [
+                one(
+                    `${doors.BUTTON}[face=wall,facing=${opposite(side)},powered=false]`,
+                    3,
+                    button,
+                    low + r.button
+                ),
+                one(
+                    `${doors.BUTTON}[face=wall,facing=${side},powered=false]`,
+                    1,
+                    button,
+                    low + r.button
+                ),
+                one(shut ? doors.POWER : "", d, door, low + r.lowPower),
+                one(`${doors.PISTON}[facing=up,extended=${shut}]`, d, door, low + r.lowPiston),
+                one(shut ? head("up") : SHELF, d, door, low + r.lowShelf),
+                one(shut ? SHELF : "", d, door, low, low + 1),
+                one(shut ? head("down") : SHELF, d, door, low + r.upperShelf),
+                one(`${doors.PISTON}[facing=down,extended=${shut}]`, d, door, low + r.topPiston),
+                one(shut ? doors.POWER : "", d, door, low + r.topPower),
+                one(LIGHT, 0, 2, 0),
+                span("", [0, 1], [1, 3], [1, 2]),
+                span("", [3, 3], [1, 3], [1, 2]),
+                span(SHELF, [2, 2], [1, 3], [1, 2]),
+                span(INNER, [0, 3], [0, 4], [1, ROOF - 1])
+            ];
+        }
+        case "steps":
+            return [
+                span(CUPBOARD, [0, 1], [0, 1], [1, 4]),
+                one(PIECE_BLOCKS.crate, 2, 0, 1, 3),
+                one(PIECE_BLOCKS.crate, 3, 0, 1, 2),
+                one(PIECE_BLOCKS.crate, 4, 0, 1)
+            ];
+        case "perch":
+            return [
+                one(`${LADDER}[facing=${side}]`, 0, 0, 1, LOFT),
+                one(POST, 1, 0, 1, LOFT - 1),
+                span(BOARDS, [1, 2], [0, 1], [LOFT, LOFT])
+            ];
+        case "rafter": {
+            const axis = side === "west" || side === "east" ? "x" : "z";
+            return [
+                one(`${LADDER}[facing=${opposite(side)}]`, 0, 0, 1, RAFTER),
+                one(POST, 6, 0, 1, RAFTER - 1),
+                span(`${POST}[axis=${axis}]`, [1, 6], [0, 0], [RAFTER, RAFTER])
+            ];
+        }
+        default:
+            return [];
+    }
+}
+
+/** Where a perch's or rafter's ladder starts on the floor and where it comes
+ *  out at the top, as places to stand. */
+function featureLink(
+    piece: Piece
+): { foot: [number, number, number]; top: [number, number, number] } | null {
+    if (piece.kind !== "perch" && piece.kind !== "rafter") return null;
+    const foot = cellOf(piece, 0, 0);
+    const top = cellOf(piece, 1, 0);
+    return {
+        foot: [foot.x, 1, foot.z],
+        top: [top.x, (piece.kind === "perch" ? LOFT : RAFTER) + 1, top.z]
+    };
+}
+
+/** The lamp in a secret room's floor: shut, nothing else lights it. */
+function featureLamp(piece: Piece): { x: number; level: number; z: number } | null {
+    if (piece.kind !== "secret") return null;
+    return { ...cellOf(piece, 0, 2), level: 0 };
+}
+
+function featureProblems(piece: Piece, lofts: readonly Loft[], index: number): string[] {
+    const kind = piece.kind as FeatureKind;
+    const problems: string[] = [];
+    const x2 = piece.x + piece.w - 1;
+    const z2 = piece.z + piece.d - 1;
+    if (piece.x < 1 || piece.z < 1 || x2 > LAST || z2 > LAST)
+        return [`piece ${index} is outside the house`];
+    if (piece.level !== 1) problems.push(`piece ${index} floats`);
+    const size = piece.side ? featureSize(kind, piece.side) : null;
+    if (!size || piece.w !== size.w || piece.d !== size.d || piece.h !== size.h)
+        problems.push(`${kind} ${index} is the wrong size`);
+    if (
+        spanOf(piece.x) < 0 ||
+        spanOf(piece.x) !== spanOf(x2) ||
+        spanOf(piece.z) < 0 ||
+        spanOf(piece.z) !== spanOf(z2)
+    )
+        problems.push(`piece ${index} is not inside one room`);
+    if (
+        lofts.some(
+            (loft) =>
+                apart(piece.x, x2, loft.x1, loft.x2) < 1 && apart(piece.z, z2, loft.z1, loft.z2) < 1
+        )
+    )
+        problems.push(`${kind} ${index} is in a loft's way`);
+    if (kind !== "perch" && piece.side) {
+        const behind = cellOf(piece, -1, 0);
+        const across = piece.side === "west" || piece.side === "east";
+        if (!isWallLine(across ? behind.x : behind.z))
+            problems.push(`${kind} ${index} is not against a wall`);
+    }
+    if (kind === "secret") {
+        if (spanOf(piece.x) === 1 && spanOf(piece.z) === 1)
+            problems.push(`secret ${index} is in the cage's room`);
+        if (piece.at !== 1 && piece.at !== 3) problems.push(`secret ${index} has no door`);
+    }
+    return problems;
+}
+
 /** Every rule a piece breaks by itself. */
 function pieceProblems(piece: Piece, lofts: readonly Loft[], index = 0): string[] {
+    if (isFeature(piece.kind)) return featureProblems(piece, lofts, index);
     const problems: string[] = [];
     const x2 = piece.x + piece.w - 1;
     const z2 = piece.z + piece.d - 1;
@@ -547,18 +799,32 @@ function drawLofts(random: () => number, pick: (from: number, to: number) => num
  * run's id - each piece kept only where it breaks no rule of its own and
  * touches nothing - and the whole checked once drawn.
  */
-export function layoutFor(seed: string): Layout {
+export function layoutFor(seed: string, design = DESIGN): Layout {
     let first: Layout | null = null;
     for (let draw = 0; draw < DRAWS; draw += 1) {
-        const layout = drawLayout(seed, draw);
+        const layout = drawLayout(seed, draw, design);
         first ??= layout;
         if (layoutProblems(layout).length === 0) return layout;
     }
     return { ...first!, flipX: false, flipZ: false, pieces: [], bare: true };
 }
 
+/** The four places a secret room can stand: the middle of each outer wall of
+ *  the rooms between the corners, the only stretch of wall long enough
+ *  between a room's lamps. */
+function secretSpots(): Omit<Piece, "at">[] {
+    const along = MIDDLE - 2;
+    const out = FEATURE.secret.out;
+    return SIDES.map((side) => {
+        const { w, d, h } = featureSize("secret", side);
+        const x = side === "west" ? 1 : side === "east" ? LAST - out + 1 : along;
+        const z = side === "north" ? 1 : side === "south" ? LAST - out + 1 : along;
+        return { kind: "secret", x, z, level: 1, w, d, h, side };
+    });
+}
+
 /** One draw of a run's house, unchecked: what `layoutFor` tries in turn. */
-export function drawLayout(seed: string, draw: number): Layout {
+export function drawLayout(seed: string, draw: number, design = DESIGN): Layout {
     const random = seeded(`${seed}-hide-${draw}`);
     const pick = (from: number, to: number) => from + Math.floor(random() * (to - from + 1));
     const choose = <T>(list: readonly T[]): T => list[Math.floor(random() * list.length)]!;
@@ -579,6 +845,66 @@ export function drawLayout(seed: string, draw: number): Layout {
         for (let attempt = 0; attempt < 400 && placed < wanted; attempt += 1)
             if (tryPlace(make())) placed += 1;
     };
+    // The climbs and the secret rooms first, one to a room, so they spread
+    // over the house: they take the most room. Design 2 drew none, and draws
+    // the rest exactly as it did.
+    if (design > HOUSE) {
+        const rooms = new Set<string>();
+        const roomOf = (piece: Piece) => `${spanOf(piece.x)},${spanOf(piece.z)}`;
+        const placeOne = (piece: Piece) => {
+            if (rooms.has(roomOf(piece)) || !tryPlace(piece)) return false;
+            rooms.add(roomOf(piece));
+            return true;
+        };
+        let secrets = 0;
+        for (const spot of shuffled(secretSpots(), random))
+            if (
+                secrets < WANTED_FEATURES.secret &&
+                placeOne({ ...spot, at: random() < 0.5 ? 1 : 3 })
+            )
+                secrets += 1;
+        const against = (kind: "rafter" | "steps"): Piece => {
+            const side = choose(SIDES);
+            const { w, d, h } = featureSize(kind, side);
+            const room = { x: choose(SPANS), z: choose(SPANS) };
+            const x =
+                side === "west"
+                    ? room.x[0]
+                    : side === "east"
+                      ? room.x[1] - w + 1
+                      : pick(room.x[0], room.x[1] - w + 1);
+            const z =
+                side === "north"
+                    ? room.z[0]
+                    : side === "south"
+                      ? room.z[1] - d + 1
+                      : pick(room.z[0], room.z[1] - d + 1);
+            return { kind, x, z, level: 1, w, d, h, side };
+        };
+        const free = (): Piece => {
+            const side = choose(SIDES);
+            const { w, d, h } = featureSize("perch", side);
+            return {
+                kind: "perch",
+                x: pick(1, LAST - w + 1),
+                z: pick(1, LAST - d + 1),
+                level: 1,
+                w,
+                d,
+                h,
+                side
+            };
+        };
+        for (const [wanted, make] of [
+            [WANTED_FEATURES.rafter, () => against("rafter")],
+            [WANTED_FEATURES.steps, () => against("steps")],
+            [WANTED_FEATURES.perch, free]
+        ] as const) {
+            let placed = 0;
+            for (let attempt = 0; attempt < 400 && placed < wanted; attempt += 1)
+                if (placeOne(make())) placed += 1;
+        }
+    }
     // Closets first: they need a wall, and a stretch of it free.
     tries(WANTED.closet, () => {
         const side = choose(SIDES);
@@ -655,6 +981,7 @@ export function drawLayout(seed: string, draw: number): Layout {
 type Cell = "air" | "solid" | "tall" | "ladder" | "door" | "hatch";
 
 const CELL_OF: Readonly<Record<string, Cell>> = {
+    [doors.BUTTON]: "air",
     [RAIL]: "tall",
     [BARRIER]: "solid",
     [LADDER]: "ladder",
@@ -662,7 +989,15 @@ const CELL_OF: Readonly<Record<string, Cell>> = {
     [HATCH]: "hatch"
 };
 /** Blocks light goes through: everything here but whole blocks. */
-const LIT_THROUGH = new Set([RAIL, BARRIER, LADDER, DOOR, HATCH, "minecraft:oak_leaves"]);
+const LIT_THROUGH = new Set([
+    RAIL,
+    BARRIER,
+    LADDER,
+    DOOR,
+    HATCH,
+    doors.BUTTON,
+    "minecraft:oak_leaves"
+]);
 
 const bare = (block: string) => block.replace(/\[.*$/, "");
 
@@ -775,9 +1110,27 @@ class Blocks {
 }
 
 /** Everything inside the house, in its own terms: fixtures first, so no piece
- *  can ever take their blocks, then the pieces, then the floor under it all. */
-function blocksOf(layout: Layout): Blocks {
+ *  can ever take their blocks, then the pieces, then the floor under it all.
+ *  The climbs and the secret rooms come first of all, whole: they reach
+ *  through the floor (a secret door's lower piston and power) and nothing else
+ *  stands where they are. `shut` draws every secret door as the data pack
+ *  holds it shut; built, it is open. */
+function blocksOf(layout: Layout, shut = false): Blocks {
     const blocks = new Blocks();
+    for (const piece of layout.pieces)
+        for (const part of featureParts(piece, shut)) {
+            const a = cellOf(piece, part.out[0], part.along[0]);
+            const b = cellOf(piece, part.out[1], part.along[1]);
+            blocks.set(
+                part.block,
+                Math.min(a.x, b.x),
+                part.levels[0],
+                Math.min(a.z, b.z),
+                Math.max(a.x, b.x),
+                part.levels[1],
+                Math.max(a.z, b.z)
+            );
+        }
     // The pits and the closets' and bushes' insides are air whatever comes after.
     for (const piece of layout.pieces) {
         if (piece.kind === "pit") {
@@ -862,7 +1215,7 @@ function blocksOf(layout: Layout): Blocks {
         const top = piece.level + piece.h - 1;
         if (piece.kind === "closet") blocks.set(CUPBOARD, piece.x, 1, piece.z, x2, top, z2);
         else if (piece.kind === "bush") blocks.set(LEAVES, piece.x, 1, piece.z, x2, top, z2);
-        else if (piece.kind !== "pit")
+        else if (piece.kind !== "pit" && !isFeature(piece.kind))
             blocks.set(PIECE_BLOCKS[piece.kind], piece.x, piece.level, piece.z, x2, top, z2);
     }
     // The pits' own air, down through the floor, kept from the floor below.
@@ -936,30 +1289,9 @@ function lightOf(blocks: Blocks, layout: Layout): (x: number, level: number, z: 
     return (x, level, z) => (Blocks.inside(x, level, z) ? light[index(x, level, z)]! : 0);
 }
 
-/**
- * Every rule a house breaks, one line each; empty when it keeps them all. What
- * the tests run over thousands of seeds, and what a house is checked against
- * before it is used.
- */
-export function layoutProblems(layout: Layout): string[] {
-    const problems: string[] = [];
-    const fixed = fixtures(layout);
-    layout.pieces.forEach((piece, index) => {
-        problems.push(...pieceProblems(piece, layout.lofts, index));
-        if (piece.kind === "pit" && LAMPS.some((lamp) => lamp.x === piece.x && lamp.z === piece.z))
-            problems.push(`pit ${index} is in a lamp`);
-        for (const one of fixed)
-            if (gapOf(one, piece) < 1) {
-                problems.push(
-                    `piece ${index} is in the way of a doorway, a ladder, a lamp or the cage`
-                );
-                break;
-            }
-        for (let other = index + 1; other < layout.pieces.length; other += 1)
-            if (gapOf(piece, layout.pieces[other]!) < 1)
-                problems.push(`pieces ${index} and ${other} touch`);
-    });
-    const blocks = blocksOf(layout);
+/** How a player meets one state of the house: where they can stand, and
+ *  whether a block leaves room for a body. */
+function standing(blocks: Blocks) {
     const at = (x: number, level: number, z: number) => blocks.cell(x, level, z);
     // Room for a body: air, a ladder, or a door, which opens.
     const open = (x: number, level: number, z: number) => {
@@ -972,6 +1304,22 @@ export function layoutProblems(layout: Layout): string[] {
         at(x, feet, z) === "hatch"
             ? open(x, feet + 1, z)
             : at(x, feet - 1, z) === "solid" && open(x, feet, z) && open(x, feet + 1, z);
+    return { at, open, stands };
+}
+
+/**
+ * Every place to stand a player reaches from the hiders' start the way a player
+ * moves - level, a block up with room to jump it, down at most three, through
+ * doors and an open secret door, onto a shut hatch, up and down the ladders of
+ * the lofts, the perches and the rafters. Whoever seeks moves the same way, so
+ * whatever a hider reaches a seeker does too.
+ */
+export function reachability(layout: Layout): (x: number, feet: number, z: number) => boolean {
+    return walk(layout, blocksOf(layout));
+}
+
+function walk(layout: Layout, blocks: Blocks): (x: number, feet: number, z: number) => boolean {
+    const { open, stands } = standing(blocks);
     const seen = new Uint8Array(SIZE * SIZE * Blocks.LEVELS);
     const mark = (x: number, feet: number, z: number) => ((feet - DEEPEST) * SIZE + x) * SIZE + z;
     const start = hiderCells()[0]!;
@@ -988,6 +1336,12 @@ export function layoutProblems(layout: Layout): string[] {
         const top = edgeCell(loft, loft.ladder);
         links.set(mark(foot.x, 1, foot.z), [top.x, LOFT + 1, top.z]);
         links.set(mark(top.x, LOFT + 1, top.z), [foot.x, 1, foot.z]);
+    }
+    for (const piece of layout.pieces) {
+        const link = featureLink(piece);
+        if (!link) continue;
+        links.set(mark(...link.foot), link.top);
+        links.set(mark(...link.top), link.foot);
     }
     while (queue.length > 0) {
         const [x, feet, z] = queue.pop()!;
@@ -1014,27 +1368,26 @@ export function layoutProblems(layout: Layout): string[] {
         const link = links.get(mark(x, feet, z));
         if (link) visit(...link);
     }
-    // The cage, its lid and the seekers' room in it, is walked from the start
-    // of the game only by the seekers, and gone once they are let go.
-    const onCage = (x: number, feet: number, z: number) =>
+    return (x, feet, z) => Blocks.inside(x, feet, z) && seen[mark(x, feet, z)] === 1;
+}
+
+/** The cage, its lid and the seekers' room in it, is walked from the start of
+ *  the game only by the seekers, and gone once they are let go. */
+function onCage(x: number, feet: number, z: number): boolean {
+    return (
         (feet === 1 || feet === LOFT + 1) &&
         x >= CAGE.x1 &&
         x <= CAGE.x2 &&
         z >= CAGE.z1 &&
-        z <= CAGE.z2;
-    const missed: string[] = [];
-    for (let x = 1; x <= LAST; x += 1)
-        for (let z = 1; z <= LAST; z += 1)
-            for (const feet of [1, LOFT + 1])
-                if (stands(x, feet, z) && !seen[mark(x, feet, z)] && !onCage(x, feet, z))
-                    missed.push(`${x},${feet},${z}`);
-    if (missed.length > 0)
-        problems.push(`${missed.length} places to stand cannot be reached, first ${missed[0]}`);
-    for (const cell of hiderCells())
-        if (!stands(cell.x, 1, cell.z))
-            problems.push(`a hider's start at ${cell.x},${cell.z} is taken`);
-    // No monster spawns where block light is 0: none anywhere a player stands,
-    // a pit's floor included.
+        z <= CAGE.z2
+    );
+}
+
+/** Every place to stand in one state of the house with no block light, where
+ *  a monster could spawn: none anywhere a player stands, a pit's floor
+ *  included. */
+function darkPlaces(layout: Layout, blocks: Blocks): string[] {
+    const { at, stands } = standing(blocks);
     const light = lightOf(blocks, layout);
     const dark: string[] = [];
     for (let x = 1; x <= LAST; x += 1)
@@ -1046,6 +1399,58 @@ export function layoutProblems(layout: Layout): string[] {
                     light(x, feet, z) === 0
                 )
                     dark.push(`${x},${feet},${z}`);
+    return dark;
+}
+
+/**
+ * Every rule a house breaks, one line each; empty when it keeps them all. What
+ * the tests run over thousands of seeds, and what a house is checked against
+ * before it is used.
+ */
+export function layoutProblems(layout: Layout): string[] {
+    const problems: string[] = [];
+    const fixed = fixtures(layout);
+    layout.pieces.forEach((piece, index) => {
+        problems.push(...pieceProblems(piece, layout.lofts, index));
+        if (piece.kind === "pit" && LAMPS.some((lamp) => lamp.x === piece.x && lamp.z === piece.z))
+            problems.push(`pit ${index} is in a lamp`);
+        for (const one of fixed)
+            if (gapOf(one, piece) < 1) {
+                problems.push(
+                    `piece ${index} is in the way of a doorway, a ladder, a lamp or the cage`
+                );
+                break;
+            }
+        for (let other = index + 1; other < layout.pieces.length; other += 1)
+            if (gapOf(piece, layout.pieces[other]!) < 1)
+                problems.push(`pieces ${index} and ${other} touch`);
+    });
+    const blocks = blocksOf(layout);
+    const { stands } = standing(blocks);
+    const seen = walk(layout, blocks);
+    const missed: string[] = [];
+    for (let x = 1; x <= LAST; x += 1)
+        for (let z = 1; z <= LAST; z += 1)
+            for (const feet of [1, LOFT + 1])
+                if (stands(x, feet, z) && !seen(x, feet, z) && !onCage(x, feet, z))
+                    missed.push(`${x},${feet},${z}`);
+    // Every place to stand on a climb, at any height, and in a secret room.
+    for (const piece of layout.pieces.filter((one) => isFeature(one.kind)))
+        for (let x = piece.x; x < piece.x + piece.w; x += 1)
+            for (let z = piece.z; z < piece.z + piece.d; z += 1)
+                for (let feet = 2; feet < ROOF - 1; feet += 1)
+                    if (feet !== LOFT + 1 && stands(x, feet, z) && !seen(x, feet, z))
+                        missed.push(`${x},${feet},${z}`);
+    if (missed.length > 0)
+        problems.push(`${missed.length} places to stand cannot be reached, first ${missed[0]}`);
+    for (const cell of hiderCells())
+        if (!stands(cell.x, 1, cell.z))
+            problems.push(`a hider's start at ${cell.x},${cell.z} is taken`);
+    // Dark nowhere, with every secret door open as built, or shut as the data
+    // pack holds it - a room shut in has only its own lamp.
+    const dark = darkPlaces(layout, blocks);
+    if (layout.pieces.some((piece) => piece.kind === "secret"))
+        dark.push(...darkPlaces(layout, blocksOf(layout, true)));
     if (dark.length > 0)
         problems.push(
             `${dark.length} places to stand are dark enough for monsters, first ${dark[0]}`
@@ -1062,7 +1467,11 @@ export function hidingPlaces(layout: Layout): Record<PieceKind, number> {
         stack: 0,
         closet: 0,
         bush: 0,
-        pit: 0
+        pit: 0,
+        secret: 0,
+        steps: 0,
+        perch: 0,
+        rafter: 0
     };
     for (const piece of layout.pieces) counts[piece.kind] += 1;
     return counts;
@@ -1115,7 +1524,7 @@ const STARTS: Starts = { size: SIZE, middle: MIDDLE, base: BASE };
 const FIRST_STARTS: Starts = { size: 27, middle: 15, base: 1 };
 
 function startsOf(design: number): Starts {
-    return design < DESIGN ? FIRST_STARTS : STARTS;
+    return design < HOUSE ? FIRST_STARTS : STARTS;
 }
 
 function startAt(box: Box, mirror: Mirror, starts: Starts, x: number, level: number, z: number) {
@@ -1151,6 +1560,33 @@ function placed(
     };
 }
 
+/** Where each secret door's marker stands in the world: in the wall over its
+ *  doorway, `doors.RISE.mark` over the doorway's lower block. */
+export function doorMarks(box: Box, layout: Layout): { x: number; y: number; z: number }[] {
+    return layout.pieces
+        .filter((piece) => piece.kind === "secret")
+        .map((piece) => {
+            const cell = cellOf(piece, 2, secretDoor(piece).door);
+            return worldOf(box, layout, cell.x, 1 + doors.RISE.mark, cell.z);
+        });
+}
+
+/** The secret doors put to work at "Go!" (`secret-doors.armLines`): nothing
+ *  for a house without any, as one built by design 2. */
+export function doorLines(box: Box, layout: Layout): string[] {
+    return doors.armLines(box, doorMarks(box, layout));
+}
+
+/** The secret doors stopped and left open, at the end: safe on any house. */
+export function doorsOff(box: Box): string[] {
+    return doors.stopLines(box);
+}
+
+/** The secret doors stopped where they are, before the house comes down. */
+export function doorsStill(box: Box): string[] {
+    return doors.markersOff(box);
+}
+
 /** The cage's own box in the world: what comes down when the seekers are let go. */
 export function cageBox(box: Box, layout: Layout): Box {
     return placed(box, layout, { ...CAGE, l1: 1, l2: 4, block: BARRIER }).box;
@@ -1173,7 +1609,11 @@ export function hallFills(box: Box, layout: Layout): Fill[] {
     ];
     const order = (block: string) => {
         const id = bare(block);
-        return id === FLOOR ? 2 : id === LADDER || id === DOOR || id === HATCH ? 0 : 1;
+        return id === FLOOR
+            ? 2
+            : id === LADDER || id === DOOR || id === HATCH || id === doors.BUTTON
+              ? 0
+              : 1;
     };
     const parts = blocksOf(layout)
         .boxes()
@@ -1347,7 +1787,8 @@ export const RADAR_RESET = "\u00a7r\u00a7e\u00a7s\u00a7e\u00a7t\u00a7x\u00a7a\u0
 export const TEARDOWN = [
     ...TEAMS.map((team) => `team remove ${team}`),
     ...[DEALT, TAKEN].map((objective) => `scoreboard objectives remove ${objective}`),
-    ...hits.TAGS_OFF
+    ...hits.TAGS_OFF,
+    ...doors.TEARDOWN
 ];
 
 /** Onto a side's team, only if they are on none of the server's own - or, found,
@@ -1375,11 +1816,11 @@ export function releasedLines(name: string): string[] {
 }
 
 /** The cage taken down: its barrier, only inside its own box. A run whose
- *  hall was built by an older design (`built`) has its cage somewhere else:
+ *  hall was built before the house (`built`) has its cage somewhere else:
  *  every barrier over its floor comes down instead, so its seekers are never
  *  left shut in by an update. */
 export function cageDown(box: Box, layout: Layout, design = DESIGN): string {
-    const cage = design < DESIGN ? { ...box, y1: box.y1 + 1 } : cageBox(box, layout);
+    const cage = design < HOUSE ? { ...box, y1: box.y1 + 1 } : cageBox(box, layout);
     return `execute in minecraft:overworld run fill ${cage.x1} ${cage.y1} ${cage.z1} ${cage.x2} ${cage.y2} ${cage.z2} minecraft:air replace ${BARRIER}`;
 }
 
