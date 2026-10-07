@@ -56,8 +56,14 @@ const MONGO_AUTH = new Set<unknown>([18, "AuthenticationFailed"]);
 /** What a refused connection means, or null when it is not one of those. */
 export function driverRefusal(caught: unknown, depth = 0): Refusal | null {
     if (depth > 5 || !caught || typeof caught !== "object") return null;
-    const error = caught as { code?: unknown; codeName?: unknown; message?: unknown; cause?: unknown };
-    if (MONGO_AUTH.has(error.code) || MONGO_AUTH.has(error.codeName)) return DRIVER_REFUSALS.credentials;
+    const error = caught as {
+        code?: unknown;
+        codeName?: unknown;
+        message?: unknown;
+        cause?: unknown;
+    };
+    if (MONGO_AUTH.has(error.code) || MONGO_AUTH.has(error.codeName))
+        return DRIVER_REFUSALS.credentials;
     if (typeof error.code === "string" && BY_CODE[error.code]) return BY_CODE[error.code]!;
     const message = typeof error.message === "string" ? error.message : "";
     // Redis answers a refused sign-in in its reply text, which is the protocol's

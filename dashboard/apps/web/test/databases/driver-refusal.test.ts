@@ -22,9 +22,11 @@ describe("a refused connection", () => {
     it("is a wrong password, whatever the engine", () => {
         expect(driverRefusal(coded("28P01"))).toBe(DRIVER_REFUSALS.credentials);
         expect(driverRefusal(coded("ER_ACCESS_DENIED_ERROR"))).toBe(DRIVER_REFUSALS.credentials);
-        expect(driverRefusal(Object.assign(new Error("x"), { code: 18, codeName: "AuthenticationFailed" }))).toBe(
-            DRIVER_REFUSALS.credentials
-        );
+        expect(
+            driverRefusal(
+                Object.assign(new Error("x"), { code: 18, codeName: "AuthenticationFailed" })
+            )
+        ).toBe(DRIVER_REFUSALS.credentials);
         expect(driverRefusal(new Error("WRONGPASS invalid username-password pair"))).toBe(
             DRIVER_REFUSALS.credentials
         );
