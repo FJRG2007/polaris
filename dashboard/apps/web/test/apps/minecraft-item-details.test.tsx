@@ -99,4 +99,23 @@ describe("the inventory grid", () => {
         expect(screen.getByText("Power V, Infinity I")).toBeTruthy();
         expect(screen.getByText("41 damage taken")).toBeTruthy();
     });
+
+    it("keeps the details panel one height, whatever is pointed at", () => {
+        const { container } = render(
+            <MessagesWrapper>
+                <InventoryGrid items={parseInventory(REPLY)} />
+            </MessagesWrapper>
+        );
+        const panel = () => container.querySelector(".h-24");
+        const before = panel()?.className;
+        expect(before).toBeTruthy();
+        for (const label of [/Enchanted Book/, /Old Faithful/, /Dirt/]) {
+            fireEvent.pointerEnter(screen.getByLabelText(label));
+            expect(panel()?.className.split(" ").filter((name) => name.startsWith("h-"))).toEqual([
+                "h-24"
+            ]);
+        }
+        // The glint marks the enchanted stacks only.
+        expect(container.querySelectorAll("li .item-glint")).toHaveLength(2);
+    });
 });

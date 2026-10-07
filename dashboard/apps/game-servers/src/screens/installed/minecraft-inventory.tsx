@@ -182,11 +182,9 @@ export function InventoryGrid({
                     : t("inventory.summary", { total, stacks: items.length })}
                 {waiting.size > 0 && ` ${t("inventory.waiting", { count: waiting.size })}`}
             </p>
-            {shown ? (
-                <StackDetails item={shown} where={slotLabelIn(t, shown.slot)} />
-            ) : items.length > 0 ? (
-                <p className="text-xs text-muted-foreground">{t("inventory.pointAtAStack")}</p>
-            ) : null}
+            {items.length > 0 && (
+                <StackDetails item={shown} where={shown ? slotLabelIn(t, shown.slot) : ""} />
+            )}
         </div>
     );
 }
@@ -376,9 +374,9 @@ function Slot({
             {...dropProps}
             className={cn(
                 "relative aspect-square rounded border border-border bg-surface p-0.5 outline-none focus-visible:ring-2 focus-visible:ring-primary",
-                // The game's glint, as a tint: an enchanted stack is told apart
-                // from a plain one at a glance, as it is in game.
-                enchanted && "border-primary/70 bg-primary/10",
+                // An enchanted stack carries the game's glint, so it is told
+                // apart from a plain one at a glance, as it is in game.
+                enchanted && "border-violet-400/70",
                 canDrag && "cursor-grab active:cursor-grabbing",
                 lifted && "opacity-40",
                 // A stack that cannot be moved says so by not offering to be. The
@@ -387,6 +385,7 @@ function Slot({
             )}
         >
             <ItemIcon id={item.id} className="size-full" />
+            {enchanted && <span aria-hidden className="item-glint pointer-events-none absolute inset-0 rounded" />}
             {item.count > 1 && (
                 <span
                     style={COUNT_OUTLINE}
@@ -421,27 +420,57 @@ function describe(t: GameText<"minecraft">, details: ItemDetails): string[] {
     return lines;
 }
 
-/** The stack pointed at, spelled out under the grid. */
-function StackDetails({ item, where }: { item: InventoryItem; where: string }) {
+/**
+ * The stack pointed at, spelled out under the grid.
+ *
+ * Always drawn at one height, empty or full, plain stone or a book of five
+ * enchantments: a panel that grew with what it held moved the whole dialog
+ * every time the pointer crossed a slot. What does not fit scrolls inside it.
+ */
+function StackDetails({ item, where }: { item: InventoryItem | null; where: string }) {
     const t = useGameText("minecraft");
+    const shell =
+        "flex h-24 min-w-0 items-start gap-2 overflow-hidden rounded-md border border-border bg-surface/40 px-3 py-2";
+    if (!item)
+        return (
+            <div className={cn(shell, "items-center")}>
+                <p className="text-xs text-muted-foreground">{t("inventory.pointAtAStack")}</p>
+            </div>
+        );
     const details = itemDetails(item.data);
     const name = itemLabel(item.id);
+    const enchanted = details.enchantments.length > 0 || details.stored.length > 0;
     const heading = `${details.name ?? name}${item.count > 1 ? ` x${item.count}` : ""}`;
+    const lines = describe(t, details);
     return (
-        <div className="flex min-w-0 items-start gap-2 rounded-md border border-border bg-surface/40 px-3 py-2">
-            <ItemIcon id={item.id} className="size-8 shrink-0" />
-            <div className="flex min-w-0 flex-col gap-0.5 text-xs">
-                <span className="truncate font-medium" title={heading}>
+        <div className={shell}>
+            <span className="relative size-8 shrink-0">
+                <ItemIcon id={item.id} className="size-full" />
+                {enchanted && <span aria-hidden className="item-glint pointer-events-none absolute inset-0 rounded" />}
+            </span>
+            <div className="flex h-full min-w-0 flex-1 flex-col gap-0.5 text-xs">
+                <span
+                    className={cn(
+                        "truncate font-medium",
+                        // A named or enchanted item's name is coloured in game.
+                        enchanted ? "text-violet-500 dark:text-violet-300" : details.name && "italic"
+                    )}
+                    title={heading}
+                >
                     {heading}
                 </span>
                 <span className="truncate text-muted-foreground">
                     {details.name ? `${name} - ${where}` : where}
                 </span>
-                {describe(t, details).map((line) => (
-                    <span key={line} className="break-words text-primary">
-                        {line}
-                    </span>
-                ))}
+                {lines.length > 0 && (
+                    <ul className="min-h-0 flex-1 overflow-y-auto">
+                        {lines.map((line) => (
+                            <li key={line} className="truncate text-muted-foreground" title={line}>
+                                {line}
+                            </li>
+                        ))}
+                    </ul>
+                )}
             </div>
         </div>
     );
