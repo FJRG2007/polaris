@@ -6,6 +6,7 @@
  * and sends them back; this plays it).
  */
 
+import * as inServer from "../in-server";
 import { formatDuration } from "../../../figures";
 import * as hill from "./hill";
 import * as arrival from "./arrival";
@@ -120,12 +121,13 @@ async function buildPlatform(ctx: KindContext, at: stored.Point, radius: number)
     const built: stored.Arena = { box: floor, blocks: [...hill.PLATFORM_BLOCKS] };
     ctx.run = { ...ctx.run, arena: built };
     await ctx.persist();
-    await ctx.server.sayAll([
+    // Paced inside the server where the Polaris mod can (`in-server.build`).
+    const raised = await inServer.build(ctx.server, [
         ...hill.platformDecor(at, radius).map((one) => arena.fillKeep(one.box, one.block)),
         arena.fillKeep(floor, hill.PLATFORM_BLOCK)
     ]);
     const probe = `execute in minecraft:overworld if block ${at.x} ${at.y} ${at.z} ${hill.PLATFORM_BLOCK}`;
-    if (commands.readTest(await ctx.server.say([probe])) !== "passed") {
+    if (!raised || commands.readTest(await ctx.server.say([probe])) !== "passed") {
         // A protected area refuses blocks without a word.
         await ctx.server.sayAll(arena.teardown(built));
         ctx.run = { ...ctx.run, arena: null };

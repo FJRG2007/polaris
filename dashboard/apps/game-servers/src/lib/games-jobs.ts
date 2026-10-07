@@ -405,6 +405,16 @@ export function gameJobTable(): readonly AppJob[] {
                 (await import("./minecraft/polaris-anticheat-service")).adoptAnticheatDefaults()
         },
         {
+            key: "game-polaris-component",
+            // The Polaris mod on every server Polaris has a mod build for,
+            // whatever its switches: the events run their heavy work through it.
+            // Written for the next start; a server that has it is left alone.
+            everyMs: 10 * MINUTE,
+            leaseMs: 15 * MINUTE,
+            run: async () =>
+                (await import("./minecraft/polaris-anticheat-service")).adoptPolarisComponent()
+        },
+        {
             key: "game-mod-announcements",
             // The mods that greet every joining player with thanks, tips or
             // another server's address, quietened on every running modded

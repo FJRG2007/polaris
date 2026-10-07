@@ -168,6 +168,30 @@ describe("switching it", () => {
         expect(login.loginOn(new Map([...on, ...env]))).toBe(false);
     });
 
+    it("keeps the mod where it is the server's Polaris component", () => {
+        const neo = new Map([
+            ["TYPE", "NEOFORGE"],
+            ["VERSION", "1.21.4"],
+            ["MODS", `a.jar,${URL}`],
+            ["POLARIS_LOGIN", "on"]
+        ]);
+        const env = login.disableEnv(neo);
+        expect(env.get("MODS")).toBe(`a.jar,${URL}`);
+        expect(env.get("POLARIS_LOGIN")).toBe("off");
+        expect(login.loginOn(new Map([...neo, ...env]))).toBe(false);
+        // Moving to a release with no build takes it off: it would end the boot.
+        expect(login.modMovedTo(neo, "NEOFORGE", "1.21.5")?.get("MODS")).toBe("a.jar");
+    });
+
+    it("names the component only for a mod loader with a build", () => {
+        expect(login.componentFileFor("NEOFORGE", "1.21.4")).toBe(JAR);
+        expect(login.componentFileFor("NEOFORGE", "1.21.5")).toBeNull();
+        expect(login.componentFileFor("PAPER", "1.21.4")).toBeNull();
+        expect(login.componentFileFor("VANILLA", "1.21.4")).toBeNull();
+        expect(login.carriesFile(`a.jar,${URL}`, JAR)).toBe(true);
+        expect(login.carriesFile("a.jar", JAR)).toBe(false);
+    });
+
     it("is off with the switch alone, or the jar alone", () => {
         expect(login.loginOn(new Map([["POLARIS_LOGIN", "on"]]))).toBe(false);
         expect(login.loginOn(new Map([["MODS", URL]]))).toBe(false);

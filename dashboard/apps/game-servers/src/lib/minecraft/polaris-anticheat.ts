@@ -246,15 +246,9 @@ export function withoutAnticheatBuild(env: ReadonlyMap<string, string>): string 
 export function anticheatDisableEnv(current: ReadonlyMap<string, string>): Map<string, string> {
     const build = anticheatBuildFor(current.get("TYPE") ?? "", current.get("VERSION") ?? "");
     if (build?.kind === "mod") {
-        // The mod is the login's too: it stays while the login is on, and is only
-        // told to stop hiding ore.
-        const mods = loginOn(current)
-            ? (current.get(MODS_KEY) ?? "")
-            : entries(current.get(MODS_KEY) ?? "")
-                  .filter((entry) => fileOf(entry) !== build.file)
-                  .join(",");
+        // The mod is the server's Polaris component (`componentFileFor`): it
+        // stays, and is only told to stop hiding ore.
         return new Map([
-            [MODS_KEY, mods],
             [ANTICHEAT_KEY, "off"],
             [ANTIXRAY_KEY, "off"]
         ]);

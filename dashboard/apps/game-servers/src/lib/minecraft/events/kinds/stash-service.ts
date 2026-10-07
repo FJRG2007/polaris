@@ -23,6 +23,7 @@ import { readWhole } from "../../stack-storage-service";
 import { applyPlanNow } from "../../inventory-transfer-service";
 import { parseStack, type InventoryItem } from "../../inventory";
 import { askerOf, readLiveContainer, readLiveInventory } from "../../inventory-service";
+import * as inServer from "../in-server";
 
 export type { Stash } from "./stash";
 
@@ -165,6 +166,8 @@ export async function stashIn(
     save: (kept: stash.Stash) => Promise<void>,
     existing: stash.Stash | null = null
 ): Promise<StashResult> {
+    const inside = await stashInServer(server, owner, name, save, existing);
+    if (inside) return inside;
     let current: stash.Stash | null = existing;
     const read = () => readLiveInventory(askerOf(server), name);
     const refuse = (why: StashRefusal, items: readonly InventoryItem[] = []): StashResult => ({
@@ -234,6 +237,7 @@ export async function stashIn(
         current = {
             barrels: existing?.barrels ?? [],
             casing: existing?.casing ?? [],
+            mod: existing?.mod ?? [],
             kept: copies.map((item) => ({
                 slot: item.slot,
                 id: item.id,
@@ -322,6 +326,81 @@ export async function stashIn(
     if (theirs.length > 0) return refuse("unsettled", theirs);
     return { stash: current, refused: null };
 }
+/**
+ * The same, inside the server, where the Polaris mod can (`in-server`): the bag,
+ * experience, health, hunger and effects kept in one tick under a key for this
+ * run and player, idempotent and crash-safe in the mod. Null where it cannot -
+ * no mod, a name it does not take, a stash already kept the plain way - and
+ * the plain path runs instead.
+ */
+async function stashInServer(
+    server: ServerContainer,
+    owner: StashOwner,
+    name: string,
+    save: (kept: stash.Stash) => Promise<void>,
+    existing: stash.Stash | null
+): Promise<StashResult | null> {
+    if (existing && (existing.record || existing.kept.length > 0 || existing.barrels.length > 0))
+        return null;
+    if (!(await inServer.capabilities(server)).has("stash")) return null;
+    const keys = existing?.mod ?? [];
+    const key = inServer.stashKey(owner.runId, name, keys.length);
+    const line = inServer.stashLine("save", name, key);
+    if (!line) return null;
+    const reply = inServer.parseStashReply(await server.say([line]));
+    if (!reply) {
+        inServer.forgetCapabilities(server.installedAppId);
+        return null;
+    }
+    const kept: stash.Stash = {
+        barrels: [],
+        casing: [],
+        kept: [],
+        experience: null,
+        vitals: null,
+        state: "stashed",
+        record: null,
+        mod: keys
+    };
+    if (!reply.ok) {
+        const why: StashRefusal =
+            reply.why === "offline" || reply.why === "dead" ? "unread" : "unsaved";
+        return { stash: existing, refused: { why, items: [] } };
+    }
+    const current = { ...kept, mod: [...keys, key] };
+    await save(current);
+    return { stash: current, refused: null };
+}
+
+/**
+ * Give back what the mod keeps (`stash.mod`), each key in one tick inside the
+ * server: their slots, the rest to free slots or dropped as theirs, their
+ * experience, health and hunger. Answers how it went; saves the keys still owed.
+ */
+async function giveBackInServer(
+    server: ServerContainer,
+    name: string,
+    kept: stash.Stash,
+    save: (left: stash.Stash | null) => Promise<void>
+): Promise<GiveBack> {
+    let owed = [...kept.mod];
+    for (const key of kept.mod) {
+        const line = inServer.stashLine("restore", name, key);
+        const reply = line ? inServer.parseStashReply(await server.say([line])) : null;
+        // The mod is gone (a move off it) or did not answer: what it keeps is in
+        // the world's own files, and is asked for again later.
+        if (!reply) return "later";
+        if (!reply.ok) {
+            if (reply.why === "offline") return "offline";
+            if (reply.why !== "missing") return "later";
+            console.warn("polaris: the mod had no stash under a key", server.installedAppId, name);
+        }
+        owed = owed.filter((one) => one !== key);
+        await save(owed.length > 0 ? { ...kept, mod: owed } : null);
+    }
+    return "done";
+}
+
 /** How long somebody sent home is waited for to be on the ground, a second a look. */
 const SETTLE_LOOKS = 15;
 
@@ -462,6 +541,20 @@ export async function giveBack(
     save: (left: stash.Stash | null) => Promise<void>,
     wait: (ms: number) => Promise<unknown> = pause
 ): Promise<GiveBack> {
+    if (kept.mod.length > 0) {
+        const rest: stash.Stash = { ...kept, mod: [] };
+        const plain =
+            rest.record !== null ||
+            rest.kept.length > 0 ||
+            rest.barrels.length > 0 ||
+            rest.casing.length > 0 ||
+            rest.experience !== null ||
+            rest.vitals !== null;
+        if (!plain) return giveBackInServer(server, name, kept, save);
+        const inside = await giveBackInServer(server, name, kept, (left) => save(left ?? rest));
+        if (inside !== "done") return inside;
+        kept = rest;
+    }
     const current = await readLiveInventory(askerOf(server), name);
     if (!current.answered) return "offline";
     const copy = await copyOf(kept.record);
@@ -982,6 +1075,7 @@ function stashOfRow(row: NonNullable<Awaited<ReturnType<typeof failedRow>>>): st
     return {
         barrels,
         casing: parse<stash.Spot[]>(row.casing, []),
+        mod: [],
         kept: items.map((item) => {
             const index = stash.SLOTS.indexOf(item.slot);
             return {

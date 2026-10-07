@@ -66,6 +66,26 @@ Messages the server or other mods send to players are not filtered: there is no
 event for them, and a filter on the outgoing packet would have to judge command
 output, death messages and every mod's feedback too.
 
+## Event commands
+
+Always registered, idle until the dashboard runs one. Console and operators only
+(permission level 4); each answers one line of JSON.
+
+- `polaris caps` (or `polaris capabilities`): the mod's version and what this
+  server can do (`stash`, `batch`, `seek`). The dashboard uses a command only when
+  it is listed here, and keeps its plain-command path otherwise.
+- `polaris stash save|restore <player> <key>`: a player's 41 slots (never the
+  ender chest or the event kit), experience, health, hunger and effects, to
+  `world/polaris/stash/<key>.dat` and back, each in one tick. Idempotent per key;
+  crash-safe through a mark saved in the player file (`EventStash`).
+- `polaris batch run <key> [blocksPerTick]`, `status <key>`, `cancel <key>`: runs
+  the commands appended to `storage polaris:batch <key>` over as many ticks as
+  it takes, under a block cap (8192 by default) and a 15 ms slice of each tick.
+  The commands run at permission level 2, the level that can write that storage.
+- Hide and seek: while players carry `pe_hider` and `pe_seeker` (or sit in the
+  `pe_hs_hide` and `pe_hs_seek` teams), a hider is not
+  sent to a seeker farther than 2 blocks without a line of sight (`EventSeek`).
+
 ## Configuration
 
 Polaris writes these when the server's join-password card switches the mod on.

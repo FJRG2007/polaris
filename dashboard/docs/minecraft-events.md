@@ -693,6 +693,76 @@ Everything below is part of the arena's own boxes: built into air with
 | Capture the flag | the duel's rim and posts, bases in red and blue, banners on sea lanterns, cover of stone brick, spruce and chiseled stone         |
 | Boss sky arena   | glass, with a pillar of sea lantern at each corner                                                                                |
 
+## In-server work (the Polaris mod)
+
+Big servers do event work inside the game, in the tick, not over a console
+trip per player. Where the Polaris NeoForge mod is on the server and says it
+can, the events do the same; everywhere else they keep the plain-command path,
+which stays fully supported and tested.
+
+**Which servers get which path**
+
+| Server                                                                              | Path                                                                                  |
+| ----------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
+| NeoForge 1.21.4 with the Polaris mod (every one Polaris manages, after one restart) | In-server: `polaris stash`, `polaris batch`, hiding by line of sight                  |
+| NeoForge 1.21.4 not yet restarted onto the new jar                                  | Plain commands until it restarts                                                      |
+| NeoForge on another release, Forge, Fabric, Quilt                                   | Plain commands - no Polaris mod build                                                 |
+| Paper, Purpur, Spigot, Folia                                                        | Plain commands - the Polaris plugins there (anti-cheat, login) have no event commands |
+| Vanilla, Bedrock                                                                    | Plain commands                                                                        |
+
+**The fallback rule.** Never decide from the loader. `in-server.capabilities`
+asks `polaris caps` and uses a command only when the mod lists it (`stash`,
+`batch`, `seek`); any other answer - an unknown command, an old jar, a Paper
+plugin - is "no", remembered for a minute. A mod command answered as anything
+but the mod's JSON forgets the answer and runs the plain lines instead.
+
+**The mod is always there on NeoForge.** Every server whose software and
+release has a Polaris mod build carries the jar whatever its switches:
+switching the login or the anti-cheat off only quiets it (`POLARIS_LOGIN=off`,
+`POLARIS_ANTIXRAY=off`), and the `game-polaris-component` job puts it on servers
+that lack it, for their next start. A move to a release with no build takes it
+off - a jar for the wrong release ends the boot.
+
+**Stash** (`polaris stash save|restore <player> <key>`, `EventStash.java`). The
+41 slots (never the ender chest, never the kit), experience, health, hunger and
+effects, written to `world/polaris/stash/<key>.dat` before anything is taken,
+and taken and given back in one tick each. The merge rule is the dashboard's:
+each stack to its own slot, what the player holds there moved to a free slot,
+and what fits nowhere dropped at their feet as theirs (only they can pick it
+up, it never despawns). Idempotent per key (`in-server.stashKey`: run and
+player). Wired in `stash-service.stashIn` and `giveBack`: a stash kept this way
+lists its keys in `stash.mod` and has no database copy; a stash already kept
+the plain way is finished the plain way, and the plain path (with its vitals
+restore) runs wherever the mod does not answer. Crash-safe through a mark saved in the player file: a stash file with
+no mark means the player file is from before the stash, so it is set aside as
+`.orphan` instead of being given twice; never deleted.
+
+**Batch** (`polaris batch run <key> [blocksPerTick]`, `EventBatch.java`). The
+dashboard appends each command to `storage polaris:batch <key>` and starts it,
+all in one trip (`in-server.build`), then polls `status` until it is done. The
+commands run in order, as many each tick as fit under **8192 changed blocks**
+(a fill or clone counts its volume, a place 4096, a setblock one) and **15 ms**
+of the tick; a fill too big for one tick is cut into boxes that each fit (only
+replace, keep and destroy - hollow and outline keep their meaning only whole).
+Arenas (`arena-service.raise`) and the hill's platform go through it; they are
+still built exactly where the plain path builds them, only the pace changes.
+Stage structures and teardowns keep the paced console trips (`pace.ts`): they
+check each fill's own count, which a batch does not answer. Measured on NeoForge 1.21.4 (a 50 x 10 x 100 = 50,000-block box): the
+plain path spends 24-42 ms of one tick per 25,000-block fill; the batch spreads
+it over 8 ticks with at most 10 ms of batch work in any one (5 ms over 16 ticks
+at 4096), and the 100-tick P99 stays under 8 ms.
+
+**Hide and seek** (`EventSeek.java`, a mixin on the entity tracker). A hider -
+tag `pe_hider` or team `pe_hs_hide` - is not sent to a seeker - `pe_seeker` or
+`pe_hs_seek` - farther than 2 blocks without a clear line from the seeker's eyes
+(rays through blocks' visual shapes, so glass hides nothing). The client never
+learns where the hider is, which defeats minimaps and ESP. At most 192 pairs are
+checked a tick, every pair every 4 ticks while that fits; with no marked players
+it does nothing. There is no NeoForge event that can withhold an entity, so it is
+a mixin, and a defensive one: optional, a no-op where another mod replaced the
+tracker (then `polaris caps` leaves `seek` out), and it switches itself off
+rather than ever failing a tick.
+
 ## Lessons from real servers
 
 Every rule below was learned from a bug, most of them seen on a live server.
@@ -1090,6 +1160,16 @@ A new kind follows all of them. A change to an old kind must not undo one.
 ### Pitfalls
 
 One entry per bug: what a player saw, why, and the rule that keeps it gone.
+
+- **Building an arena freezes the server for a moment.** A 50,000-block arena
+  as plain fills is two 25,000-block commands, each run whole in one tick
+  (24-42 ms measured, far more on a busy server). Where the Polaris mod can, the
+  build goes through `polaris batch`, capped at 8192 blocks and 15 ms a tick
+  (`in-server.build`). Never assume the mod: ask `polaris caps`.
+- **A command run from inside another is only queued.** In 1.20.3+, a command a
+  mod runs from inside a running command waits behind it, so the mod's batch
+  starts at the end of the tick rather than inside `polaris batch run` - counting
+  its blocks or time there counted nothing.
 
 - **Players arrive and leave an arena one by one, seconds apart.** Each
   entrant's stash and teleport went in its own RCON trip, so a SkyWars of

@@ -11,7 +11,15 @@ import { ownerLocale } from "../owner-words";
 import { gameMessage } from "../game-message";
 import { prisma } from "@polaris/db";
 import { host } from "@polaris/app-host";
-import { TOKEN_KEY, loginOn } from "./polaris-login";
+import {
+    MODS_KEY,
+    TOKEN_KEY,
+    carriesFile,
+    componentFileFor,
+    loginOn,
+    modUrl,
+    withMod
+} from "./polaris-login";
 import { SOFTWARE_KEY } from "./join-guard";
 import { anticheatBundled } from "./polaris-mod-files";
 import { EVIDENCE_WINDOW_MS, readXray } from "./xray";
@@ -167,6 +175,59 @@ export async function adoptAnticheatDefaults(): Promise<{ adopted: number }> {
             // One server that cannot be read is not a reason to skip the rest.
             console.error(
                 `[minecraft-anticheat] could not switch it on for ${install.id}:`,
+                caught
+            );
+        }
+    }
+    return { adopted };
+}
+
+/**
+ * Put the Polaris mod on every server whose software and release Polaris has a
+ * mod build for, whatever its switches say (`componentFileFor`): the servers
+ * made before it was always there, a server whose owner switched the login and
+ * the anti-cheat off, and a server that just moved to a release with a build.
+ * Written for the next start, never forced into a running one. Only `MODS`
+ * changes: an anti-xray switched off stays off, and the login stays as it was.
+ */
+export async function adoptPolarisComponent(): Promise<{ adopted: number }> {
+    const baseUrl = await publicAppUrl().catch(() => null);
+    if (baseUrl === null) return { adopted: 0 };
+    const installs = await prisma.installedApp.findMany({
+        where: { catalogId: "minecraft", status: { not: "removed" }, applicationId: { not: null } },
+        select: { id: true, ownerId: true, applicationId: true }
+    });
+    const rows = await prisma.envVar.findMany({
+        where: {
+            scopeType: "application",
+            scopeId: { in: installs.map((install) => install.applicationId!) },
+            key: { in: [MODS_KEY, SOFTWARE_KEY, "VERSION"] }
+        },
+        select: { scopeId: true, key: true, value: true }
+    });
+    const envs = new Map<string, Map<string, string>>();
+    for (const row of rows) {
+        const env = envs.get(row.scopeId) ?? new Map<string, string>();
+        env.set(row.key, row.value ?? "");
+        envs.set(row.scopeId, env);
+    }
+    const bundled = new Map<string, boolean>();
+    let adopted = 0;
+    for (const install of installs) {
+        const env = envs.get(install.applicationId!) ?? new Map<string, string>();
+        const file = componentFileFor(env.get(SOFTWARE_KEY) ?? "", env.get("VERSION") ?? "");
+        const mods = env.get(MODS_KEY) ?? "";
+        if (file === null || carriesFile(mods, file)) continue;
+        if (!bundled.has(file)) bundled.set(file, await anticheatBundled(file).catch(() => false));
+        if (!bundled.get(file)) continue;
+        try {
+            await setEnvVars("application", install.applicationId!, install.ownerId, [
+                { key: MODS_KEY, value: withMod(mods, modUrl(baseUrl, file)), isSecret: false }
+            ]);
+            adopted += 1;
+        } catch (caught) {
+            console.error(
+                `[minecraft-component] could not add the Polaris mod to ${install.id}:`,
                 caught
             );
         }

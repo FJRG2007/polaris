@@ -115,6 +115,8 @@ function answer(line: string): string {
     return "";
 }
 
+const inServer = await import("@polaris-app/game-servers/src/lib/minecraft/events/in-server");
+
 const server = {
     installedAppId: "app",
     edition: "java",
@@ -139,6 +141,9 @@ beforeEach(() => {
     rows.clear();
     players = new Map();
     trips = [];
+    // Whether the server has the Polaris mod is asked once a minute: asked
+    // afresh at every count, so each counts its own trips.
+    inServer.forgetCapabilities("app");
 });
 
 /** Everybody's things put away side by side, as an arena does it. */
@@ -166,6 +171,7 @@ describe("what several players need, in shared trips", () => {
                 ])
             );
             trips = [];
+            inServer.forgetCapabilities("app");
             await stashEverybody(named(count));
             for (const one of players.values()) expect(one.bread).toBe(0);
             return trips.length;
@@ -186,6 +192,7 @@ describe("what several players need, in shared trips", () => {
             // Hurt in the fight.
             for (const one of players.values()) one.health = 6;
             trips = [];
+            inServer.forgetCapabilities("app");
             const shared = pace.coalescing(server);
             await Promise.all(
                 named(count).map((name) =>
@@ -218,6 +225,7 @@ describe("what several players need, in shared trips", () => {
                 ])
             );
             trips = [];
+            inServer.forgetCapabilities("app");
             for (const name of together ? [] : named(count))
                 await stashIn(server, owner, name, async () => undefined);
             if (together) await stashEverybody(named(count));
