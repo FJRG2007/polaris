@@ -286,6 +286,11 @@ export const APP_PERMISSIONS: Readonly<Record<string, string>> = {
     // Announce a deploy on the commit it came from, so the repository shows what
     // Polaris is doing with it the way it shows Vercel and Railway.
     deployments: "write",
+    // Put a deploy's line in the commit's checks with a Details link that opens
+    // Polaris. A check run's Details always opens GitHub's own page for the run,
+    // with Polaris one more click away; a commit status links straight to its
+    // target, which is how Vercel's and Railway's rows go to them.
+    statuses: "write",
     // Write the workflow file itself. GitHub gates this separately from contents.
     workflows: "write",
     // Register self-hosted runners on a repository, which is what a runner pool
@@ -1486,6 +1491,54 @@ export async function setDeploymentState(input: {
                     auto_inactive: true,
                     ...(input.environmentUrl ? { environment_url: input.environmentUrl } : {}),
                     ...(input.logUrl ? { log_url: input.logUrl } : {})
+                })
+            }
+        );
+        return { id: null, status: res.status };
+    } catch {
+        return { id: null, status: 0 };
+    }
+}
+
+/**
+ * The line a commit shows in its list of checks, as a commit status.
+ *
+ * The same row a check run makes, with one difference that is the reason this
+ * exists: GitHub sends a check run's Details to its own page for the run, and
+ * only a commit status's Details goes straight to `target_url`. Vercel and
+ * Railway write statuses, which is why theirs open Vercel and Railway.
+ *
+ * A status with nowhere to go is not worth writing - its Details would be
+ * missing - so the target is required, and a caller without one writes the
+ * check run instead. Idempotent by context: GitHub keeps the latest state per
+ * context, so the three states of one deploy are one line that changes.
+ *
+ * Needs the App's Commit statuses permission, which Apps created before it was
+ * asked for do not hold; that answers 403 and the caller falls back.
+ */
+export async function publishCommitStatus(input: {
+    owner: string;
+    repo: string;
+    sha: string;
+    /** What the row is called, the same name the check run uses. */
+    context: string;
+    state: "pending" | "success" | "failure" | "error";
+    description: string;
+    targetUrl: string;
+    token: string;
+}): Promise<AnnounceResult> {
+    try {
+        const res = await fetch(
+            `${API}/repos/${input.owner}/${input.repo}/statuses/${encodeURIComponent(input.sha)}`,
+            {
+                method: "POST",
+                headers: { ...apiHeaders(input.token), "Content-Type": "application/json" },
+                cache: "no-store",
+                body: JSON.stringify({
+                    state: input.state,
+                    context: input.context,
+                    description: shortDescription(input.description),
+                    target_url: input.targetUrl
                 })
             }
         );

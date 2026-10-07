@@ -404,7 +404,9 @@ describe("why a deploy was not announced at all", () => {
      * that page. The released address is not it - that is what the deployment's
      * own "View deployment" button carries.
      */
-    it("points the check at Polaris rather than at GitHub", async () => {
+    it("points Details straight at Polaris with a commit status, not a check run", async () => {
+        // A check run's Details opens GitHub's own page for the run, whatever
+        // details_url says; only a commit status's opens its target.
         deployOf({ repoUrl: "https://github.com/acme/widgets.git" });
         mocks.githubAppInstallationToken.mockResolvedValue("ghs_installed");
         mockPublicUrl.value = "https://polaris.example.com";
@@ -412,8 +414,42 @@ describe("why a deploy was not announced at all", () => {
 
         await announceDeployQueued("dep-1");
 
-        const check = checkWritten();
-        expect(String(check?.body.details_url)).toBe(
+        const status = requestTo(`/repos/acme/widgets/statuses/9f2c1b0`);
+        expect(status?.body).toMatchObject({
+            state: "pending",
+            context: expect.stringMatching(/^Polaris - /),
+            target_url: "https://polaris.example.com/apps/deploy/project-1?service=app-1"
+        });
+        expect(checkWritten()).toBeUndefined();
+    });
+
+    it("falls back to a check run when the App may not write commit statuses", async () => {
+        // Apps created before Commit statuses was asked for answer 403 until the
+        // owner adds it; the row still appears, with Details one click further.
+        deployOf({ repoUrl: "https://github.com/acme/widgets.git" });
+        mocks.githubAppInstallationToken.mockResolvedValue("ghs_installed");
+        mockPublicUrl.value = "https://polaris.example.com";
+        vi.stubGlobal(
+            "fetch",
+            async (url: string, init: { body?: string; headers?: Record<string, string> }) => {
+                sent.push({
+                    url,
+                    body: JSON.parse(init.body ?? "{}") as Record<string, unknown>,
+                    as: credentialOf(init)
+                });
+                const refused = url.includes(`/statuses/9f2c1b0`);
+                return {
+                    status: refused ? 403 : 201,
+                    ok: !refused,
+                    json: async () => ({ id: 4212 })
+                } as unknown as Response;
+            }
+        );
+
+        await announceDeployQueued("dep-1");
+
+        expect(requestTo(`/statuses/9f2c1b0`)).toBeDefined();
+        expect(String(checkWritten()?.body.details_url)).toBe(
             "https://polaris.example.com/apps/deploy/project-1?service=app-1"
         );
     });

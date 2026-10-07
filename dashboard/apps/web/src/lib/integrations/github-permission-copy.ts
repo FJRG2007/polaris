@@ -40,6 +40,7 @@ export const GITHUB_PERMISSION_LABELS: Readonly<Record<string, string>> = {
     issues: "Issues",
     metadata: "Metadata",
     pull_requests: "Pull requests",
+    statuses: "Commit statuses",
     workflows: "Workflows"
 };
 

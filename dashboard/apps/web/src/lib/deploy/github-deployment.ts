@@ -31,7 +31,7 @@ import { publicAppUrl } from "@/lib/domain-service";
 import { noteOnDeploy } from "@/lib/deploy/log-file";
 import { parseGithubRepo } from "@/lib/repo-reference";
 import { githubTokenForOwner } from "@/lib/github-access";
-import { githubAppInstallationToken, publishCheck } from "@/lib/github-service";
+import { githubAppInstallationToken, publishCheck, publishCommitStatus } from "@/lib/github-service";
 import { noteDeploymentsRefused } from "@/lib/connections/health";
 import { isPublicUrl } from "@/lib/agents/agent-repo-service";
 import { createDeployment, setDeploymentState, type AnnounceResult, type DeploymentState } from "@/lib/github-service";
@@ -325,6 +325,16 @@ export async function announceDeployQueued(deploymentId: string): Promise<void> 
     }
 }
 
+/** A check run's status and conclusion as the one state a commit status has. */
+function commitState(
+    status: "queued" | "in_progress" | "completed",
+    conclusion?: "success" | "failure" | "cancelled"
+): "pending" | "success" | "failure" | "error" {
+    if (status !== "completed") return "pending";
+    if (conclusion === "failure") return "failure";
+    return conclusion === "cancelled" ? "error" : "success";
+}
+
 /**
  * The line the commit shows in its list of checks.
  *
@@ -361,17 +371,36 @@ async function announceCheck(
             status === "completed" && conclusion === "success"
                 ? await reachableUrl(deploymentId, info.applicationId)
                 : null;
+        // Named for the service, so a repository holding several gets a line
+        // each rather than one they take turns overwriting.
+        const name = `Polaris - ${info.label}`;
+        const target = where ?? live;
+        // A commit status first, when there is somewhere for its Details to go:
+        // a check run's Details opens GitHub's page for the run, a status's opens
+        // the target itself. An App without the Commit statuses permission gets
+        // the check run, as before.
+        if (target) {
+            const stated = await publishCommitStatus({
+                owner: info.owner,
+                repo: info.repo,
+                sha: info.commitSha,
+                context: name,
+                state: commitState(status, conclusion),
+                description: summary,
+                targetUrl: target,
+                token: info.token
+            });
+            if (stated.status === 201) return;
+        }
         const posted = await publishCheck({
             owner: info.owner,
             repo: info.repo,
             sha: info.commitSha,
-            // Named for the service, so a repository holding several gets a line
-            // each rather than one they take turns overwriting.
-            name: `Polaris - ${info.label}`,
+            name,
             status,
             conclusion,
             summary,
-            detailsUrl: where ?? live,
+            detailsUrl: target,
             token: info.token
         });
         // Only an App may write one, and only where it is installed. The
