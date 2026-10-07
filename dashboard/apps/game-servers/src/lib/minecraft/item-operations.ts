@@ -32,7 +32,9 @@ export interface ItemTarget {
 }
 
 /** Done now, with what the server said, or written down for their next join. */
-export type ItemOutcome = { readonly queued: true } | { readonly queued: false; readonly output: string };
+export type ItemOutcome =
+    | { readonly queued: true }
+    | { readonly queued: false; readonly output: string };
 
 /** Whether a player is on now, by the list the server answers with. A server
  *  that does not answer has nobody on. */

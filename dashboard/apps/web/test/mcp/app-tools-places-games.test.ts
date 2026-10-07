@@ -448,7 +448,10 @@ describe("the Game servers tools", () => {
             player: "Steve",
             via: "mcp"
         };
-        mocks.givePlayerItems.mockResolvedValue({ queued: false, output: "Gave 64 [Diamond] to Steve" });
+        mocks.givePlayerItems.mockResolvedValue({
+            queued: false,
+            output: "Gave 64 [Diamond] to Steve"
+        });
         const given = await call(
             "games_player_give",
             { serverId: GAME, player: "Steve", item: "Diamond", count: 64 },
@@ -497,9 +500,11 @@ describe("the Game servers tools", () => {
             ...STANDING,
             install: { ...STANDING.install, catalogId: "valheim" }
         });
-        const other = await call("games_player_inventory_empty", { serverId: GAME, player: "Steve" }, [
-            "gameservers.moderate"
-        ]);
+        const other = await call(
+            "games_player_inventory_empty",
+            { serverId: GAME, player: "Steve" },
+            ["gameservers.moderate"]
+        );
         expect(other.content[0]?.text).toContain("not something Polaris can do");
 
         mocks.gameServerAccess.mockResolvedValue(null);
