@@ -395,7 +395,32 @@ async function announceCheck(
                 targetUrl: where,
                 token: info.token
             });
-            if (stated.status === 201) return;
+            if (stated.status === 201) {
+                // A check run an earlier state left behind - the permission was
+                // granted while this deploy ran - is closed with it rather than
+                // left spinning beside the status, where it can hold up a branch
+                // protection rule. Only one that exists is touched.
+                if (status === "completed") {
+                    await publishCheck({
+                        owner: info.owner,
+                        repo: info.repo,
+                        sha: info.commitSha,
+                        name,
+                        status,
+                        conclusion,
+                        summary,
+                        detailsUrl: where,
+                        token: info.token,
+                        onlyExisting: true
+                    });
+                }
+                return;
+            }
+            // Only a refusal of the permission moves the row to a check run. A
+            // network error or a 5xx on one state is dropped instead: the next
+            // state's status replaces it by context, while a check run opened
+            // here would never be completed by a later status.
+            if (stated.status !== 403 && stated.status !== 404) return;
         }
         const posted = await publishCheck({
             owner: info.owner,

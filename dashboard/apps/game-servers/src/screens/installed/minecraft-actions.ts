@@ -2985,7 +2985,6 @@ const slotItemSchema = z.object({
 
 export type SlotItemInput = z.infer<typeof slotItemSchema>;
 
-/** Whether this player is standing on the server right now. */
 /**
  * Put an item in a slot.
  *

@@ -1583,6 +1583,9 @@ export async function publishCheck(input: {
      *  network resolves. */
     detailsUrl?: string | null;
     token: string;
+    /** Update the one already on the commit, and write nothing when there is
+     *  none - for closing a row an earlier state opened. */
+    onlyExisting?: boolean;
 }): Promise<AnnounceResult> {
     try {
         const base = `${API}/repos/${input.owner}/${input.repo}/check-runs`;
@@ -1606,6 +1609,7 @@ export async function publishCheck(input: {
             found?.ok === true
                 ? ((await found.json()) as { check_runs?: { id?: number }[] }).check_runs?.[0]?.id
                 : undefined;
+        if (input.onlyExisting && !existing) return { id: null, status: 204 };
 
         const res = await fetch(existing ? `${base}/${existing}` : base, {
             method: existing ? "PATCH" : "POST",

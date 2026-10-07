@@ -507,6 +507,90 @@ describe("why a deploy was not announced at all", () => {
         });
     });
 
+    it("drops a status GitHub failed to take rather than opening a check run for it", async () => {
+        // A check run opened on a transient failure would never be completed by
+        // the next state's status, and would spin on the commit for good.
+        deployOf({ repoUrl: "https://github.com/acme/widgets.git" });
+        mocks.githubAppInstallationToken.mockResolvedValue("ghs_installed");
+        mockPublicUrl.value = "https://polaris.example.com";
+        vi.stubGlobal(
+            "fetch",
+            async (url: string, init: { body?: string; headers?: Record<string, string> }) => {
+                sent.push({
+                    url,
+                    body: JSON.parse(init.body ?? "{}") as Record<string, unknown>,
+                    as: credentialOf(init)
+                });
+                const failing = url.includes("/statuses/9f2c1b0");
+                return {
+                    status: failing ? 502 : 201,
+                    ok: !failing,
+                    json: async () => ({ id: 4212 })
+                } as unknown as Response;
+            }
+        );
+
+        await announceDeployQueued("dep-1");
+
+        expect(requestTo("/statuses/9f2c1b0")).toBeDefined();
+        expect(checkWritten()).toBeUndefined();
+    });
+
+    it("closes a check run an earlier state opened once the status lands", async () => {
+        // The permission was granted mid-deploy: queued went out as a check run,
+        // done goes out as a status, and the check run is completed with it.
+        deployOf({ repoUrl: "https://github.com/acme/widgets.git" });
+        mocks.githubAppInstallationToken.mockResolvedValue("ghs_installed");
+        mockPublicUrl.value = "https://polaris.example.com";
+        mocks.deploymentFindUnique.mockResolvedValue({
+            commitSha: "9f2c1b0",
+            deployableType: "application",
+            deployableId: "app-1",
+            githubRepo: "acme/widgets",
+            githubDeploymentId: "4212",
+            error: null
+        });
+        mocks.domainFindMany.mockResolvedValue([]);
+        vi.stubGlobal(
+            "fetch",
+            async (url: string, init: { method?: string; body?: string; headers?: Record<string, string> }) => {
+                sent.push({
+                    url,
+                    body: JSON.parse(init.body ?? "{}") as Record<string, unknown>,
+                    as: credentialOf(init)
+                });
+                const payload = url.includes("/commits/") ? { check_runs: [{ id: 77 }] } : { id: 77 };
+                return { status: init.method === "PATCH" ? 200 : 201, ok: true, json: async () => payload } as unknown as Response;
+            }
+        );
+
+        await announceDeployFinished("dep-1", "running");
+
+        expect(requestTo("/statuses/9f2c1b0")?.body.state).toBe("success");
+        expect(requestTo("/check-runs/77")?.body).toMatchObject({ status: "completed", conclusion: "success" });
+    });
+
+    it("writes no check run beside a status when none was opened", async () => {
+        deployOf({ repoUrl: "https://github.com/acme/widgets.git" });
+        mocks.githubAppInstallationToken.mockResolvedValue("ghs_installed");
+        mockPublicUrl.value = "https://polaris.example.com";
+        mocks.deploymentFindUnique.mockResolvedValue({
+            commitSha: "9f2c1b0",
+            deployableType: "application",
+            deployableId: "app-1",
+            githubRepo: "acme/widgets",
+            githubDeploymentId: "4212",
+            error: null
+        });
+        mocks.domainFindMany.mockResolvedValue([]);
+        githubAnswers(201, { check_runs: [] });
+
+        await announceDeployFinished("dep-1", "running");
+
+        expect(requestTo("/statuses/9f2c1b0")).toBeDefined();
+        expect(checkWritten()).toBeUndefined();
+    });
+
     // The one case the log line could never fix: the person who can grant the
     // permission has no reason to open a build that succeeded.
     it("tells the project's owner once when the App cannot write it either", async () => {
