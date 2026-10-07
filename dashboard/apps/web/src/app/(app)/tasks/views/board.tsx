@@ -24,7 +24,13 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useDisplayFormat } from "@/components/display-format";
 import { optionLabel } from "../option-label";
 import { useTranslations } from "@/components/i18n/i18n-provider";
-import { clickMode, type BoardMove, type ColumnWorkFate, type SelectMode, type ViewProps } from "./shared";
+import {
+    clickMode,
+    type BoardMove,
+    type ColumnWorkFate,
+    type SelectMode,
+    type ViewProps
+} from "./shared";
 import { dropEdge, neighbours as edgeNeighbours, type DropEdge } from "../drop-edge";
 import { commandsFor, TaskMenu, TaskStatusMarker, type TaskCommands } from "./task-actions";
 import {
@@ -501,7 +507,11 @@ export function TaskCard({
                                     {task.commentCount}
                                 </span>
                             )}
-                            {task.points !== null && <span title={t("board.points")}>{t("board.pts", { count: task.points })}</span>}
+                            {task.points !== null && (
+                                <span title={t("board.points")}>
+                                    {t("board.pts", { count: task.points })}
+                                </span>
+                            )}
                         </div>
                     )}
                 </div>
@@ -778,9 +788,13 @@ export function BoardView(props: ViewProps) {
                             canEdit={canEdit}
                             canAddColumn={canAddColumn}
                             canRename={isColumn && props.onUpdateStatus !== undefined}
-                            canDelete={isColumn && props.onDeleteStatus !== undefined && columns.length > 1}
+                            canDelete={
+                                isColumn && props.onDeleteStatus !== undefined && columns.length > 1
+                            }
                             canMoveLeft={movable && columnAt > 0}
-                            canMoveRight={movable && columnAt !== -1 && columnAt < columns.length - 1}
+                            canMoveRight={
+                                movable && columnAt !== -1 && columnAt < columns.length - 1
+                            }
                             onAddTask={() => {
                                 setAddingTo(group.key);
                                 setDraft("");
@@ -808,7 +822,9 @@ export function BoardView(props: ViewProps) {
                                     // far as the browser is concerned, so the pointer is only
                                     // gone when what it entered is outside.
                                     if (
-                                        event.currentTarget.contains(event.relatedTarget as Node | null)
+                                        event.currentTarget.contains(
+                                            event.relatedTarget as Node | null
+                                        )
                                     )
                                         return;
                                     setColumnOver((current) =>
@@ -858,7 +874,8 @@ export function BoardView(props: ViewProps) {
                                         onKeyDown={(event) => {
                                             if (event.key !== "Delete") return;
                                             if (event.target !== event.currentTarget) return;
-                                            if (!isColumn || props.onDeleteStatus === undefined) return;
+                                            if (!isColumn || props.onDeleteStatus === undefined)
+                                                return;
                                             if (columns.length <= 1) return;
                                             event.preventDefault();
                                             askToRemove(group);
@@ -921,7 +938,9 @@ export function BoardView(props: ViewProps) {
                                                 <DropdownMenuTrigger asChild>
                                                     <button
                                                         type="button"
-                                                        aria-label={t("board.optionsFor", { name: group.label })}
+                                                        aria-label={t("board.optionsFor", {
+                                                            name: group.label
+                                                        })}
                                                         title={t("board.options")}
                                                         className="rounded p-1 text-muted-foreground transition-colors duration-fast hover:bg-background hover:text-foreground active:bg-muted data-[state=open]:bg-background data-[state=open]:text-foreground"
                                                     >
@@ -1053,7 +1072,7 @@ export function BoardView(props: ViewProps) {
                     ))}
             </div>
 
-<ConfirmDeleteDialog
+            <ConfirmDeleteDialog
                 open={removing !== null}
                 onOpenChange={(open) => (open ? undefined : setRemoving(null))}
                 name={removing?.label ?? ""}

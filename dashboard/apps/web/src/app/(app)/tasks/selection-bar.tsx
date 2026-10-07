@@ -16,7 +16,14 @@
 import { X } from "lucide-react";
 import { cn } from "@polaris/ui";
 import { useTranslations } from "@/components/i18n/i18n-provider";
-import { forwardRef, useEffect, useRef, useState, type ButtonHTMLAttributes, type ReactNode } from "react";
+import {
+    forwardRef,
+    useEffect,
+    useRef,
+    useState,
+    type ButtonHTMLAttributes,
+    type ReactNode
+} from "react";
 
 /** Longer than the leaving animation (`duration-fast`), so it has finished
  *  before the bar is taken off the page. */

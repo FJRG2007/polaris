@@ -162,7 +162,13 @@ export function shortfallMessage(
 ): string | null {
     if (count === undefined || count >= asked) return null;
     const rest = asked - count;
-    if (t) return t("bulk.shortfall", { verb: verb === "Deleted" ? "deleted" : "changed", count, asked, rest });
+    if (t)
+        return t("bulk.shortfall", {
+            verb: verb === "Deleted" ? "deleted" : "changed",
+            count,
+            asked,
+            rest
+        });
     return `${verb} ${count} of ${asked}: ${rest === 1 ? "one task is" : `${rest} tasks are`} not yours to change.`;
 }
 

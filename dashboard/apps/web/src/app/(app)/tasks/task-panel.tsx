@@ -38,7 +38,16 @@ import { RichTextEditor } from "@/components/rich-text/rich-text-editor";
 import { settleTagIds, useTagCreation, withCreatedTags } from "./tag-creation";
 import { taskOverlay, useLatest, wouldChange, type TaskOverlay } from "./optimistic";
 import { ChecklistSection, DependencySection, SubtaskSection } from "./task-subwork";
-import { Bell, BellOff, Loader2, Maximize2, Minimize2, MoreHorizontal, Repeat, Share2 } from "lucide-react";
+import {
+    Bell,
+    BellOff,
+    Loader2,
+    Maximize2,
+    Minimize2,
+    MoreHorizontal,
+    Repeat,
+    Share2
+} from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import {
     Button,
@@ -436,8 +445,7 @@ export function TaskPanel({
     // was on. Everything below reads this rather than `detail`.
     const view = detail ?? (openId === null ? parting : null);
     const task = view?.task;
-    const watching =
-        view?.watchers.some((person) => person.id === context.currentUserId) ?? false;
+    const watching = view?.watchers.some((person) => person.id === context.currentUserId) ?? false;
     const runningHere =
         view?.timeEntries.some(
             (entry) => entry.running && entry.userId === context.currentUserId
@@ -466,7 +474,9 @@ export function TaskPanel({
             <SheetContent
                 className={cn(
                     "gap-0 p-0",
-                    wide ? "sm:w-[min(72rem,calc(100vw-1rem))]" : "sm:w-[min(40rem,calc(100vw-1rem))]"
+                    wide
+                        ? "sm:w-[min(72rem,calc(100vw-1rem))]"
+                        : "sm:w-[min(40rem,calc(100vw-1rem))]"
                 )}
             >
                 {!task &&
@@ -534,7 +544,9 @@ export function TaskPanel({
                                         aria-label={t("panel.repeatsTitle")}
                                     >
                                         <Repeat className="size-3.5" />
-                                        <span className="hidden sm:inline">{t("panel.repeats")}</span>
+                                        <span className="hidden sm:inline">
+                                            {t("panel.repeats")}
+                                        </span>
                                     </span>
                                 )}
                                 {/* Icon-only on a phone, the way every other toolbar
@@ -582,7 +594,9 @@ export function TaskPanel({
                                 </Button>
                                 <button
                                     type="button"
-                                    aria-label={watching ? t("panel.stopWatching") : t("panel.watch")}
+                                    aria-label={
+                                        watching ? t("panel.stopWatching") : t("panel.watch")
+                                    }
                                     title={watching ? t("panel.stopWatching") : t("panel.watch")}
                                     onClick={async () => {
                                         await runAction(
@@ -633,14 +647,18 @@ export function TaskPanel({
                                                     void patch({ milestone: !task.milestone })
                                                 }
                                             >
-                                                {task.milestone ? t("panel.notMilestone") : t("panel.milestone")}
+                                                {task.milestone
+                                                    ? t("panel.notMilestone")
+                                                    : t("panel.milestone")}
                                             </DropdownMenuItem>
                                             <DropdownMenuItem
                                                 onSelect={() =>
                                                     void patch({ archived: !task.archived })
                                                 }
                                             >
-                                                {task.archived ? t("panel.unarchive") : t("panel.archive")}
+                                                {task.archived
+                                                    ? t("panel.unarchive")
+                                                    : t("panel.archive")}
                                             </DropdownMenuItem>
                                             <DropdownMenuSeparator />
                                             <DropdownMenuItem
@@ -724,7 +742,9 @@ export function TaskPanel({
                                 />
 
                                 <section className="flex flex-col gap-1 border-t border-border pt-4">
-                                    <h3 className="text-sm font-medium">{t("create.description")}</h3>
+                                    <h3 className="text-sm font-medium">
+                                        {t("create.description")}
+                                    </h3>
                                     <RichTextEditor
                                         key={task.id}
                                         value={task.description}
@@ -892,7 +912,11 @@ export function TaskPanel({
                             title={tt("deleteTask.title")}
                             question={tt.rich("deleteTask.question", {
                                 name: task.name,
-                                strong: (chunks) => <span key="name" className="font-medium text-foreground">{chunks}</span>
+                                strong: (chunks) => (
+                                    <span key="name" className="font-medium text-foreground">
+                                        {chunks}
+                                    </span>
+                                )
                             })}
                             description={tt("deleteTask.description")}
                             confirmLabel={tt("deleteTask.title")}

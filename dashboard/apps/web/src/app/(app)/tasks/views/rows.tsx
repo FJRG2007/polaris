@@ -238,8 +238,18 @@ function TaskLine({
 }
 
 export function ListView(props: ViewProps) {
-    const { groups, canEdit, context, groupBy, selection, onOpen, onSelect, onMove, onQuickCreate, orderable } =
-        props;
+    const {
+        groups,
+        canEdit,
+        context,
+        groupBy,
+        selection,
+        onOpen,
+        onSelect,
+        onMove,
+        onQuickCreate,
+        orderable
+    } = props;
     const t = useTranslations("tasksViews");
     const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(new Set());
     const [dragging, setDragging] = useState<string | null>(null);
@@ -291,7 +301,11 @@ export function ListView(props: ViewProps) {
         setDraggingGroup(null);
         setGroupOver(null);
         if (!dragged || !props.onReorderStatuses || !targetKey || dragged === targetKey) return;
-        const order = reorderColumns(shown.map((group) => group.key), dragged, targetKey);
+        const order = reorderColumns(
+            shown.map((group) => group.key),
+            dragged,
+            targetKey
+        );
         setPendingOrder(order);
         // A section can stand for more than one status - two statuses sharing a
         // name are read as one - so the order written down is every status
@@ -396,7 +410,10 @@ export function ListView(props: ViewProps) {
                                 )}
                             </button>
                             {group.color && <StatusDot color={group.color} />}
-                            <h3 className="min-w-0 truncate text-sm font-medium" title={group.label}>
+                            <h3
+                                className="min-w-0 truncate text-sm font-medium"
+                                title={group.label}
+                            >
                                 {group.label}
                             </h3>
                             <span className="rounded bg-background px-1.5 text-[0.6875rem] text-muted-foreground">
@@ -528,10 +545,7 @@ export function ListView(props: ViewProps) {
             })}
 
             {groups.length === 0 && (
-                <EmptyState
-                    title={t("list.noMatch")}
-                    description={t("list.noMatchDescription")}
-                />
+                <EmptyState title={t("list.noMatch")} description={t("list.noMatchDescription")} />
             )}
         </div>
     );
@@ -661,8 +675,14 @@ export function TableView(props: ViewProps) {
                                 <DropdownMenuContent align="end" className="w-52">
                                     <DropdownMenuLabel>{t("table.columns")}</DropdownMenuLabel>
                                     {[
-                                        ...TABLE_COLUMNS.map((id) => ({ id, label: columnLabel[id] })),
-                                        ...fields.map((field) => ({ id: field.id, label: field.name }))
+                                        ...TABLE_COLUMNS.map((id) => ({
+                                            id,
+                                            label: columnLabel[id]
+                                        })),
+                                        ...fields.map((field) => ({
+                                            id: field.id,
+                                            label: field.name
+                                        }))
                                     ].map((column) => (
                                         <DropdownMenuItem
                                             key={column.id}
@@ -680,7 +700,10 @@ export function TableView(props: ViewProps) {
                                                     <Check className="text-primary" />
                                                 )}
                                             </span>
-                                            <span className="min-w-0 flex-1 truncate" title={column.label}>
+                                            <span
+                                                className="min-w-0 flex-1 truncate"
+                                                title={column.label}
+                                            >
                                                 {column.label}
                                             </span>
                                         </DropdownMenuItem>
@@ -756,7 +779,9 @@ export function TableView(props: ViewProps) {
                                                 value={task.statusId}
                                                 disabled={!props.canEdit}
                                                 spaceId={context.spaceId}
-                                                onChange={(statusId) => props.onEdit(task, { statusId })}
+                                                onChange={(statusId) =>
+                                                    props.onEdit(task, { statusId })
+                                                }
                                                 trigger={
                                                     <button
                                                         type="button"
@@ -767,7 +792,12 @@ export function TableView(props: ViewProps) {
                                                         className="inline-flex max-w-[12rem] items-center gap-1.5 rounded-md px-1.5 py-0.5 text-xs transition-colors duration-fast hover:bg-muted active:bg-muted/70 disabled:cursor-default disabled:hover:bg-transparent data-[state=open]:bg-muted"
                                                     >
                                                         <StatusDot color={task.statusColor} />
-                                                        <span className="truncate" title={task.statusName}>{task.statusName}</span>
+                                                        <span
+                                                            className="truncate"
+                                                            title={task.statusName}
+                                                        >
+                                                            {task.statusName}
+                                                        </span>
                                                     </button>
                                                 }
                                             />
@@ -797,7 +827,9 @@ export function TableView(props: ViewProps) {
                                             <PriorityPicker
                                                 value={task.priority}
                                                 disabled={!props.canEdit}
-                                                onChange={(priority) => props.onEdit(task, { priority })}
+                                                onChange={(priority) =>
+                                                    props.onEdit(task, { priority })
+                                                }
                                                 trigger={
                                                     <button
                                                         type="button"

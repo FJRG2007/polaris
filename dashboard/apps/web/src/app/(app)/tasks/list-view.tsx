@@ -1100,7 +1100,9 @@ export function ListScreen({
                     aria-label={
                         sort.direction === "asc" ? t("toolbar.ascending") : t("toolbar.descending")
                     }
-                    title={sort.direction === "asc" ? t("toolbar.ascending") : t("toolbar.descending")}
+                    title={
+                        sort.direction === "asc" ? t("toolbar.ascending") : t("toolbar.descending")
+                    }
                     className="inline-flex size-8 items-center justify-center rounded-md border border-border text-muted-foreground transition-colors duration-fast hover:border-border-strong hover:bg-card-hover hover:text-foreground active:bg-muted"
                 >
                     {sort.direction === "asc" ? (

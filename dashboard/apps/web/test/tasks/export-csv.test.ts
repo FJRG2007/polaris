@@ -32,9 +32,12 @@ describe("one cell", () => {
         expect(csvCell("one\r\ntwo")).toBe('"one\r\ntwo"');
     });
 
-    it.each(["=1+1", "+1", "-1", "@SUM(A1)", "\t=1", "\r=1"])("writes %j as text, not a formula", (value) => {
-        expect(csvCell(value).replace(/^"/, "").startsWith("'")).toBe(true);
-    });
+    it.each(["=1+1", "+1", "-1", "@SUM(A1)", "\t=1", "\r=1"])(
+        "writes %j as text, not a formula",
+        (value) => {
+            expect(csvCell(value).replace(/^"/, "").startsWith("'")).toBe(true);
+        }
+    );
 
     it("guards a formula and quotes it when both apply", () => {
         expect(csvCell('=HYPERLINK("http://example.invalid","x")')).toBe(
@@ -61,7 +64,13 @@ describe("the file", () => {
             ],
             dueDate: "2026-02-01"
         } as unknown as TaskRow;
-        const blank = { ...task, reference: "FJRG-2", name: "=cmd", assignees: [], dueDate: null } as TaskRow;
+        const blank = {
+            ...task,
+            reference: "FJRG-2",
+            name: "=cmd",
+            assignees: [],
+            dueDate: null
+        } as TaskRow;
 
         const csv = tasksToCsv([task, blank], HEADINGS, (priority) => `P:${priority}`);
 

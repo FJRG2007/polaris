@@ -141,9 +141,13 @@ describe("selecting rows in the table", () => {
         tableScreen();
         const all = rtl.getByRole("checkbox", { name: "Select all" });
         fireEvent.click(all);
-        expect(rtl.getByRole("toolbar", { name: "Selected tasks" }).textContent).toContain("2 selected");
+        expect(rtl.getByRole("toolbar", { name: "Selected tasks" }).textContent).toContain(
+            "2 selected"
+        );
         fireEvent.click(all);
-        expect(rtl.getByRole("toolbar", { name: "Selected tasks" }).getAttribute("data-state")).toBe("closed");
+        expect(
+            rtl.getByRole("toolbar", { name: "Selected tasks" }).getAttribute("data-state")
+        ).toBe("closed");
     });
 
     it("leaves on clear, keeping its count while it goes, then is taken off the page", () => {
