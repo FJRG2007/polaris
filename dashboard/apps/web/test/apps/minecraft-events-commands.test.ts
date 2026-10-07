@@ -2198,7 +2198,8 @@ describe("a spleef floor", () => {
                     "polaris:spleef/tick",
                     "polaris:tntrun/tick",
                     "polaris:dropper/tick",
-                    "polaris:boat/tick"
+                    "polaris:boat/tick",
+                    "polaris:door/tick"
                 ]
             });
             for (const name of ["tick", "ball", "near", "step", "probe", "hit"])

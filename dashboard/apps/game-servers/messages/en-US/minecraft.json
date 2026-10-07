@@ -1736,7 +1736,7 @@
             },
             "hide-and-seek": {
                 "label": "Hide and seek",
-                "summary": "A house of nine rooms is built in the sky, full of hiding places: closets to shut yourself in, hatches in the floor, hollow bushes and lofts under the roof. The seekers wait, blinded, while the others hide; a seeker's hit finds a hider, who then seeks too. Hiders score for every second hidden and seekers for every hider found; names are hidden from the other side.",
+                "summary": "A house of nine rooms is built in the sky, full of hiding places: closets to shut yourself in, hatches in the floor, hollow bushes, lofts, rafters and perches to climb up to, and bookcases that open with a button onto a secret room. The seekers wait, blinded, while the others hide; a seeker's hit finds a hider, who then seeks too. Hiders score for every second hidden and seekers for every hider found; names are hidden from the other side.",
                 "unit": "points"
             },
             "hot-potato": {

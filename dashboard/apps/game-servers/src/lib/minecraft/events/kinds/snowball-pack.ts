@@ -28,6 +28,7 @@ import * as hits from "./hits";
 import type { Box } from "./stage";
 import * as tntRun from "./tnt-run";
 import * as dropper from "./dropper";
+import * as doors from "./secret-doors";
 import * as boatRace from "./boat-race";
 import { FLOOR, type Arena } from "./spleef";
 
@@ -123,7 +124,7 @@ const FUNCTIONS: Readonly<Record<string, readonly string[]>> = {
  * Every game the pack plays, by its folder under `polaris:`: the snowballs that
  * break a spleef floor, the floor a TNT run takes from under its players
  * (`tnt-run.ts`), a dropper's landings (`dropper.ts`) and a boat race's gates
- * (`boat-race.ts`). Each has a `tick`
+ * (`boat-race.ts`), and hide and seek's secret doors (`secret-doors.ts`). Each has a `tick`
  * function, which the game runs every tick and which does nothing while that
  * game's own switch is off. And the arenas' hits (`hits.ts`), which have no
  * tick: their functions are the rewards of the advancements under `hit/`.
@@ -133,7 +134,8 @@ const GAMES: readonly (readonly [string, Readonly<Record<string, readonly string
     ["tntrun", tntRun.FUNCTIONS],
     ["dropper", dropper.FUNCTIONS],
     ["boat", boatRace.FUNCTIONS],
-    ["hit", hits.FUNCTIONS]
+    ["hit", hits.FUNCTIONS],
+    ["door", doors.FUNCTIONS]
 ];
 
 /** The advancements, by their folder under `polaris:`. */

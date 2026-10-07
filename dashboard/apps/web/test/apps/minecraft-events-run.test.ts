@@ -11336,6 +11336,55 @@ describe("hide and seek", () => {
         expect(world.sent).toContain(hs.cageDown(saved.arena!.box, hs.layoutFor(saved.id)));
     });
 
+    it("puts the secret doors to work at Go, and leaves them open and unworked at the end", async () => {
+        const hs = await kind();
+        world.online = [...names];
+        setUp([hideOf(60)]);
+        await joinAndStart("hide", names);
+        const run = state().run!;
+        expect((run.game as { design?: number }).design).toBe(hs.DESIGN);
+        const box = run.arena!.box;
+        const arm = hs.doorLines(box, hs.layoutFor(run.id));
+        expect(arm.filter((line) => line.includes("summon minecraft:armor_stand"))).toHaveLength(
+            hs.hidingPlaces(hs.layoutFor(run.id)).secret
+        );
+        for (const line of arm) expect(world.sent).toContain(line);
+        await events.cancelEvent("owner", SERVER);
+        await play(2_100);
+        for (const line of [...hs.doorsOff(box), ...hs.doorsStill(box)])
+            expect(world.sent).toContain(line);
+        expect(world.sent).toContain("scoreboard objectives remove polaris_door");
+        // Stopped before the house came down, which took their power with it.
+        const stopped = world.sent.lastIndexOf(hs.doorsStill(box)[0]!);
+        const teardown = world.sent
+            .map((line) => line.endsWith("minecraft:air replace minecraft:redstone_block"))
+            .lastIndexOf(true);
+        expect(stopped).toBeGreaterThanOrEqual(0);
+        expect(teardown).toBeGreaterThan(stopped);
+        onlyOurBlocks();
+    });
+
+    it("plays a hall built by design 2 after an update in that design's own house", async () => {
+        const hs = await kind();
+        world.online = [...names];
+        setUp([hideOf(60)]);
+        await joinAndStart("hide", names);
+        const saved = state().run!;
+        const old = { ...saved, game: { ...(saved.game as object), design: 2 } };
+        const at = { ...world.at };
+        await restartedWith(old, tagsNow());
+        world.at = at;
+        const before = world.sent.length;
+        await play(saved.readyAt! + 60_000 - Date.now() + 2_100);
+        expect(hs.stateOf(state().run!.game)!.released).toBe(true);
+        const box = saved.arena!.box;
+        expect(world.sent).toContain(hs.cageDown(box, hs.layoutFor(saved.id, 2), 2));
+        // Nothing of design 3's doors is worked in it.
+        expect(
+            world.sent.slice(before).some((line) => line.includes("summon minecraft:armor_stand"))
+        ).toBe(false);
+    });
+
     it("called off while the seekers wait, takes everything down and the sides away", async () => {
         world.online = [...names];
         setUp([hideOf(60)]);

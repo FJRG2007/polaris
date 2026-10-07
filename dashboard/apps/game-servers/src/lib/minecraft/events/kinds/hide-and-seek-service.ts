@@ -10,6 +10,11 @@
  * seeker who struck is found, and seeks from then on. Everything is written into
  * the run as it happens, the release included, so a restart neither lets the
  * seekers out early nor builds the cage again.
+ *
+ * A house built by design 3 has secret rooms: at "Go!" their doors are put to
+ * work by the events data pack (`secret-doors.ts`), and at the end they are
+ * stopped and left open before anybody is sent home; the arena's own close
+ * takes their markers away again before the house comes down.
  */
 
 import * as hits from "./hits";
@@ -33,15 +38,18 @@ function optionsOf(run: stored.EventRun): catalog.EventOptions<"hide-and-seek"> 
     return run.preset.options as catalog.EventOptions<"hide-and-seek">;
 }
 
-/** A run's hall, drawn once and kept: the search is not repeated every tick. */
+/** A run's hall, drawn once and kept: the search is not repeated every tick.
+ *  Drawn by the design that built it, so a hall built before an update is the
+ *  one the run still plays in. */
 const layouts = new Map<string, hs.Layout>();
 
-function layoutOf(runId: string): hs.Layout {
-    let layout = layouts.get(runId);
+function layoutOf(runId: string, design = hs.DESIGN): hs.Layout {
+    const key = `${runId}:${design}`;
+    let layout = layouts.get(key);
     if (!layout) {
         if (layouts.size >= 16) layouts.delete(layouts.keys().next().value!);
-        layout = hs.layoutFor(runId);
-        layouts.set(runId, layout);
+        layout = hs.layoutFor(runId, design);
+        layouts.set(key, layout);
     }
     return layout;
 }
@@ -90,7 +98,7 @@ function designOf(run: stored.EventRun): number {
 async function mirrorOf(ctx: KindContext): Promise<hs.Mirror> {
     const run = ctx.run;
     const design = designOf(run);
-    if (design >= hs.DESIGN) return layoutOf(run.id);
+    if (design >= hs.HOUSE) return layoutOf(run.id, design);
     for (const test of hs.mirrorTests(run.arena!.box, design))
         if (commands.readTest(await ctx.server.say([test.line])) === "passed") return test.mirror;
     return layoutOf(run.id);
@@ -99,7 +107,7 @@ async function mirrorOf(ctx: KindContext): Promise<hs.Mirror> {
 function spotOf(
     run: stored.EventRun,
     entrant: stored.Entrant,
-    mirror: hs.Mirror = layoutOf(run.id)
+    mirror: hs.Mirror = layoutOf(run.id, designOf(run))
 ): arena.Spot {
     const box = run.arena!.box;
     const design = designOf(run);
@@ -147,6 +155,19 @@ async function goLines(ctx: KindContext): Promise<string[]> {
     const mirror = await mirrorOf(ctx);
     // No hit from before "Go!" - or from another arena's fight - read as a find.
     const out: string[] = [...hits.TAGS_OFF];
+    // The secret doors worked by the pack, where it is on: elsewhere they stay
+    // open as they were built, still a way in.
+    const design = designOf(run);
+    const layout = design >= hs.HOUSE ? layoutOf(run.id, design) : null;
+    if (layout && (await hitsService.ensure(ctx)))
+        out.push(...hs.doorLines(run.arena!.box, layout));
+    // Where else to look, in a house that has more than the floor.
+    if (layout && hs.hidingPlaces(layout).secret > 0)
+        out.push(
+            `tellraw @a[tag=${arena.IN_ARENA}] ${commands.text(
+                messages.tag(language) + seekMessages.secretTip(language)
+            )}`
+        );
     const memory = memoryOf(run.id);
     for (const one of run.entrants) {
         const seeking = seekers.includes(lower(one.name));
@@ -179,7 +200,7 @@ async function tick(ctx: KindContext, lines: string[]): Promise<string | null> {
     const language = ctx.language;
     const options = optionsOf(run);
     const box = run.arena!.box;
-    const layout = layoutOf(run.id);
+    const layout = layoutOf(run.id, designOf(run));
     const now = ctx.now;
     const memory = memoryOf(run.id);
     const say = (line: string) => ctx.server.say([line]);
@@ -327,7 +348,7 @@ export const hideAndSeek: ArenaGame = {
     reach: () => hs.REACH,
     box: (_run, place) => hs.hallBox(place, place.y + arena.ALTITUDE),
     built: () => ({ design: hs.DESIGN }),
-    fills: (run, box) => hs.hallFills(box, layoutOf(run.id)),
+    fills: (run, box) => hs.hallFills(box, layoutOf(run.id, hs.DESIGN)),
     blocks: () => [...hs.HALL_BLOCKS],
     kit: () => [],
     hits: true,
@@ -348,11 +369,16 @@ export const hideAndSeek: ArenaGame = {
         const hiders = run.entrants.filter((one) => !seekers.has(lower(one.name))).length;
         return [commands.say(seekMessages.summary(state.finds.length, hiders, language))];
     },
-    // Every entrant's minimap given back what the server allows.
+    // The secret doors stopped and open, so nobody is left shut in; every
+    // entrant's minimap given back what the server allows.
     endLines: (run) => [
+        ...(run.arena ? hs.doorsOff(run.arena.box) : []),
         ...hs.TEARDOWN,
         ...run.entrants.map((one) => radarLine(one.name, hs.RADAR_RESET))
     ],
+    // Nothing works the doors once the house is coming down, for a run that
+    // never reached its end too.
+    closeLines: (box) => hs.doorsStill(box),
     // Not on at the end: the radar is given back when they are next.
     owedLines: (_run, name) => [{ reason: "radar", lines: [radarLine(name, hs.RADAR_RESET)] }]
 };

@@ -1736,7 +1736,7 @@
             },
             "hide-and-seek": {
                 "label": "Escondite",
-                "summary": "Se construye en el cielo una casa de nueve salas llena de escondites: armarios donde encerrarse, trampillas en el suelo, arbustos huecos y altillos bajo el techo. Los buscadores esperan cegados mientras los demás se esconden; si un buscador golpea a alguien lo encuentra, y este pasa a buscar. Los escondidos puntúan por cada segundo oculto y los buscadores por cada uno encontrado; los nombres no se ven entre bandos.",
+                "summary": "Se construye en el cielo una casa de nueve salas llena de escondites: armarios donde encerrarse, trampillas en el suelo, arbustos huecos, altillos, vigas y atalayas a las que trepar, y estanterías que con un botón se abren a una sala secreta. Los buscadores esperan cegados mientras los demás se esconden; si un buscador golpea a alguien lo encuentra, y este pasa a buscar. Los escondidos puntúan por cada segundo oculto y los buscadores por cada uno encontrado; los nombres no se ven entre bandos.",
                 "unit": "puntos"
             },
             "hot-potato": {
