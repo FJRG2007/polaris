@@ -38,22 +38,13 @@ import { RichTextEditor } from "@/components/rich-text/rich-text-editor";
 import { settleTagIds, useTagCreation, withCreatedTags } from "./tag-creation";
 import { taskOverlay, useLatest, wouldChange, type TaskOverlay } from "./optimistic";
 import { ChecklistSection, DependencySection, SubtaskSection } from "./task-subwork";
-import {
-    Bell,
-    BellOff,
-    Loader2,
-    Maximize2,
-    Minimize2,
-    MoreHorizontal,
-    Repeat,
-    Share2
-} from "lucide-react";
+import { Bell, BellOff, Loader2, MoreHorizontal, Repeat, Share2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import {
     Button,
-    cn,
     ConfirmDeleteDialog,
     Dialog,
+    DialogContent,
     DialogTitle,
     DropdownMenu,
     DropdownMenuContent,
@@ -61,7 +52,6 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
     keepFocusOnClose,
-    SheetContent,
     Skeleton
 } from "@polaris/ui";
 
@@ -78,30 +68,6 @@ import {
  *   closing. The view behind is told, so a name that changed changes on the board.
  */
 type WriteMode = "picker" | "typing" | "typed";
-
-/**
- * Whether this reader keeps the panel wide - the task and its conversation side
- * by side - or narrow, with the board still in view beside it. Their own
- * convenience, kept in their browser; wide is what it opens on until they say
- * otherwise, which is the shape it has always had.
- */
-const WIDE_KEY = "polaris.tasks.panel.wide";
-
-function readWide(): boolean {
-    try {
-        return window.localStorage.getItem(WIDE_KEY) !== "0";
-    } catch {
-        return true;
-    }
-}
-
-function writeWide(wide: boolean): void {
-    try {
-        window.localStorage.setItem(WIDE_KEY, wide ? "1" : "0");
-    } catch {
-        // Private browsing or a full quota: it holds for this visit only.
-    }
-}
 
 /**
  * The panel while its task is on the way: the shape of what is coming - the
@@ -198,16 +164,13 @@ export function TaskPanel({
     const [discarding, setDiscarding] = useState<{ next: string | null } | null>(null);
     /**
      * The task the panel was showing when it was closed, kept for the length of
-     * its way out. The panel slides away rather than vanishing, and a panel that
+     * its way out. The panel fades away rather than vanishing, and a panel that
      * emptied itself into a skeleton on the first frame of leaving would be
-     * sliding away the wrong picture.
+     * fading away the wrong picture.
      */
     const [parting, setParting] = useState<TaskDetail | null>(null);
     const shownDetail = useRef(detail);
     shownDetail.current = detail;
-    const [wide, setWide] = useState(true);
-    // Read after mount: the server has no localStorage to agree with.
-    useEffect(() => setWide(readWide()), []);
 
     useEffect(() => setOpenId(taskId), [taskId]);
 
@@ -466,19 +429,7 @@ export function TaskPanel({
                 caps the width otherwise, and the panel renders at half the size
                 its two columns were laid out for. The header keeps clear of the
                 dialog's close button rather than sliding under it. */}
-            {/* Docked to the right, with the board still there beside it: a task
-                is opened to be worked on next to the rest of the list, not
-                instead of it. Wide by default, which is the shape it has always
-                had - the task and its conversation side by side - and narrow on
-                request, for keeping an eye on the board while it is open. */}
-            <SheetContent
-                className={cn(
-                    "gap-0 p-0",
-                    wide
-                        ? "sm:w-[min(72rem,calc(100vw-1rem))]"
-                        : "sm:w-[min(40rem,calc(100vw-1rem))]"
-                )}
-            >
+            <DialogContent className="flex max-h-[92vh] w-[min(72rem,96vw)] max-w-[min(72rem,96vw)] flex-col gap-0 overflow-hidden p-0">
                 {!task &&
                     (loading || !error ? (
                         <>
@@ -562,26 +513,6 @@ export function TaskPanel({
                                     name={task.name}
                                     description={task.description}
                                 />
-                                {/* Phones get the whole screen either way, so the
-                                    choice only exists where there is a page beside
-                                    the panel to keep in view. */}
-                                <button
-                                    type="button"
-                                    aria-label={wide ? t("panel.narrow") : t("panel.widen")}
-                                    title={wide ? t("panel.narrow") : t("panel.widen")}
-                                    aria-pressed={wide}
-                                    onClick={() => {
-                                        setWide(!wide);
-                                        writeWide(!wide);
-                                    }}
-                                    className="hidden rounded-md p-1.5 text-muted-foreground transition-colors duration-fast hover:bg-muted hover:text-foreground active:bg-muted/70 sm:inline-flex"
-                                >
-                                    {wide ? (
-                                        <Minimize2 className="size-4" />
-                                    ) : (
-                                        <Maximize2 className="size-4" />
-                                    )}
-                                </button>
                                 <Button
                                     size="sm"
                                     variant="ghost"
@@ -675,18 +606,8 @@ export function TaskPanel({
 
                         {/* Each column scrolls on its own so a long thread cannot
                             carry the properties off the screen. */}
-                        <div
-                            className={cn(
-                                "grid min-h-0 flex-1 grid-cols-1 overflow-y-auto overscroll-contain",
-                                wide && "md:grid-cols-[minmax(0,1fr)_24rem] md:overflow-hidden"
-                            )}
-                        >
-                            <div
-                                className={cn(
-                                    "flex flex-col gap-6 p-5 overscroll-contain",
-                                    wide && "md:overflow-y-auto md:overscroll-contain"
-                                )}
-                            >
+                        <div className="grid min-h-0 flex-1 grid-cols-1 overflow-y-auto overscroll-contain md:grid-cols-[minmax(0,1fr)_24rem] md:overflow-hidden">
+                            <div className="flex flex-col gap-6 p-5 md:overflow-y-auto overscroll-contain">
                                 <DialogTitle asChild>
                                     <TaskNameField
                                         defaultValue={task.name}
@@ -851,12 +772,7 @@ export function TaskPanel({
                                 />
                             </div>
 
-                            <aside
-                                className={cn(
-                                    "flex min-h-0 flex-col border-t border-border",
-                                    wide && "md:border-l md:border-t-0"
-                                )}
-                            >
+                            <aside className="flex min-h-0 flex-col border-t border-border md:border-l md:border-t-0">
                                 <ActivityStream
                                     taskId={task.id}
                                     comments={view?.comments ?? []}
@@ -929,7 +845,7 @@ export function TaskPanel({
                         />
                     </>
                 )}
-            </SheetContent>
+            </DialogContent>
         </Dialog>
     );
 }

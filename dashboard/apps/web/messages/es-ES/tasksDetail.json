@@ -205,9 +205,7 @@
         "leaveTitle": "¿Descartar el cambio?",
         "leaveDescription": "No se pudo guardar el último cambio.",
         "leaveQuestion": "Todo lo demás queda como se guardó. Lo que sigue en los campos se pierde.",
-        "leaveConfirm": "Descartarlo",
-        "widen": "Ampliar panel",
-        "narrow": "Reducir panel"
+        "leaveConfirm": "Descartarlo"
     },
     "priority": {
         "urgent": "Urgente",
