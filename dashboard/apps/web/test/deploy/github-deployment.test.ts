@@ -27,14 +27,15 @@ const mocks = vi.hoisted(() => ({
     noteOnDeploy: vi.fn(),
     githubTokenForOwner: vi.fn(),
     githubAppInstallationToken: vi.fn(),
-    noteDeploymentsRefused: vi.fn()
+    noteDeploymentsRefused: vi.fn(),
+    domainFindMany: vi.fn(async () => [] as unknown[])
 }));
 
 vi.mock("@polaris/db", () => ({
     prisma: {
         deployment: { findUnique: mocks.deploymentFindUnique, update: mocks.deploymentUpdate },
         application: { findUnique: mocks.applicationFindUnique },
-        domain: { findMany: async () => [] }
+        domain: { findMany: mocks.domainFindMany }
     }
 }));
 
@@ -63,7 +64,11 @@ const mockPublicUrl = vi.hoisted(() => ({ value: null as string | null }));
 vi.mock("@/lib/domain-service", () => ({ publicAppUrl: async () => mockPublicUrl.value }));
 
 import { createDeployment, setDeploymentState } from "@/lib/github-service";
-import { announceDeployQueued, announceRefusal } from "@/lib/deploy/github-deployment";
+import {
+    announceDeployFinished,
+    announceDeployQueued,
+    announceRefusal
+} from "@/lib/deploy/github-deployment";
 
 const SHA = "9f2c1b0a4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f90";
 const CALL = { owner: "acme", repo: "widgets", token: "gho_test" };
@@ -297,6 +302,8 @@ describe("why a deploy was not announced at all", () => {
         mocks.githubAppInstallationToken.mockReset();
         mocks.githubAppInstallationToken.mockResolvedValue(null);
         mocks.noteDeploymentsRefused.mockReset();
+        mocks.domainFindMany.mockReset();
+        mocks.domainFindMany.mockResolvedValue([]);
     });
 
     it("says nothing about an image, which was never going on a commit", async () => {
@@ -404,7 +411,9 @@ describe("why a deploy was not announced at all", () => {
      * that page. The released address is not it - that is what the deployment's
      * own "View deployment" button carries.
      */
-    it("points the check at Polaris rather than at GitHub", async () => {
+    it("points Details straight at Polaris with a commit status, not a check run", async () => {
+        // A check run's Details opens GitHub's own page for the run, whatever
+        // details_url says; only a commit status's opens its target.
         deployOf({ repoUrl: "https://github.com/acme/widgets.git" });
         mocks.githubAppInstallationToken.mockResolvedValue("ghs_installed");
         mockPublicUrl.value = "https://polaris.example.com";
@@ -412,8 +421,42 @@ describe("why a deploy was not announced at all", () => {
 
         await announceDeployQueued("dep-1");
 
-        const check = checkWritten();
-        expect(String(check?.body.details_url)).toBe(
+        const status = requestTo(`/repos/acme/widgets/statuses/9f2c1b0`);
+        expect(status?.body).toMatchObject({
+            state: "pending",
+            context: expect.stringMatching(/^Polaris - /),
+            target_url: "https://polaris.example.com/apps/deploy/project-1?service=app-1"
+        });
+        expect(checkWritten()).toBeUndefined();
+    });
+
+    it("falls back to a check run when the App may not write commit statuses", async () => {
+        // Apps created before Commit statuses was asked for answer 403 until the
+        // owner adds it; the row still appears, with Details one click further.
+        deployOf({ repoUrl: "https://github.com/acme/widgets.git" });
+        mocks.githubAppInstallationToken.mockResolvedValue("ghs_installed");
+        mockPublicUrl.value = "https://polaris.example.com";
+        vi.stubGlobal(
+            "fetch",
+            async (url: string, init: { body?: string; headers?: Record<string, string> }) => {
+                sent.push({
+                    url,
+                    body: JSON.parse(init.body ?? "{}") as Record<string, unknown>,
+                    as: credentialOf(init)
+                });
+                const refused = url.includes(`/statuses/9f2c1b0`);
+                return {
+                    status: refused ? 403 : 201,
+                    ok: !refused,
+                    json: async () => ({ id: 4212 })
+                } as unknown as Response;
+            }
+        );
+
+        await announceDeployQueued("dep-1");
+
+        expect(requestTo(`/statuses/9f2c1b0`)).toBeDefined();
+        expect(String(checkWritten()?.body.details_url)).toBe(
             "https://polaris.example.com/apps/deploy/project-1?service=app-1"
         );
     });
@@ -427,6 +470,41 @@ describe("why a deploy was not announced at all", () => {
 
         expect(checkWritten()).toBeDefined();
         expect(checkWritten()?.body.details_url).toBeUndefined();
+    });
+
+    it("closes the check run it opened when the deploy goes live with no Polaris link", async () => {
+        deployOf({ repoUrl: "https://github.com/acme/widgets.git" });
+        mocks.githubAppInstallationToken.mockResolvedValue("ghs_installed");
+        githubAnswers(201, { id: 4212 });
+        await announceDeployQueued("dep-1");
+        expect(checkWritten()?.body.status).toBe("queued");
+
+        sent = [];
+        mocks.deploymentFindUnique.mockResolvedValue({
+            commitSha: "9f2c1b0",
+            deployableType: "application",
+            deployableId: "app-1",
+            githubRepo: "acme/widgets",
+            githubDeploymentId: "4212",
+            error: null
+        });
+        mocks.domainFindMany.mockResolvedValue([
+            {
+                hostname: "api.acme.example",
+                https: true,
+                pathPrefix: null,
+                kind: "service",
+                deploymentId: null
+            }
+        ]);
+        await announceDeployFinished("dep-1", "running");
+
+        expect(requestTo("/statuses/")).toBeUndefined();
+        expect(checkWritten()?.body).toMatchObject({
+            status: "completed",
+            conclusion: "success",
+            details_url: "https://api.acme.example"
+        });
     });
 
     // The one case the log line could never fix: the person who can grant the
