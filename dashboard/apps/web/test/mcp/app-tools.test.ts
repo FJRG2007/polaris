@@ -102,7 +102,7 @@ describe("an app's MCP tools", () => {
         const listed = await handleMcpMessage(
             { jsonrpc: "2.0", id: 1, method: "tools/list" },
             tools,
-            { userId: "user-1", isAdmin: false, scopes: [] },
+            { userId: "user-1", isAdmin: false, scopes: ["places.read", "places.control"] },
             SERVER
         );
         const described = (listed?.result as { tools: { name: string; annotations: any }[] }).tools;

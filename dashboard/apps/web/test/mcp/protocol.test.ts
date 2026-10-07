@@ -174,13 +174,42 @@ describe("tools/list", () => {
                 inputSchema: { properties: Record<string, unknown>; required?: string[] };
             }[];
         };
-        expect(tools.map((tool) => tool.name)).toEqual(["echo", "forbidden", "explodes"]);
+        expect(tools.map((tool) => tool.name)).toEqual(["echo", "explodes"]);
         expect(tools[0]?.inputSchema.properties.what).toEqual({ type: "string", minLength: 1 });
         expect(tools[0]?.inputSchema.required).toEqual(["what"]);
     });
 
+    it("lists only the tools this connection's scopes let it call", async () => {
+        const list = async (scopes: string[]) =>
+            (
+                (
+                    await handleMcpMessage(
+                        { jsonrpc: "2.0", id: 1, method: "tools/list" },
+                        TOOLS,
+                        { ...caller, scopes: scopes as never },
+                        SERVER
+                    )
+                )?.result as { tools: { name: string }[] }
+            ).tools.map((tool) => tool.name);
+        // A tool with no scope is everybody's; a scoped one is listed once held.
+        expect(await list([])).toEqual(["explodes"]);
+        expect(await list(["system.manage"])).toEqual(["forbidden", "explodes"]);
+        expect(await list(["tasks.read", "system.manage"])).toEqual([
+            "echo",
+            "forbidden",
+            "explodes"
+        ]);
+    });
+
     it("says which tools cannot change anything", async () => {
-        const { tools } = (await send({ jsonrpc: "2.0", id: 1, method: "tools/list" }))?.result as {
+        const { tools } = (
+            await handleMcpMessage(
+                { jsonrpc: "2.0", id: 1, method: "tools/list" },
+                TOOLS,
+                { ...caller, scopes: ["tasks.read", "system.manage"] },
+                SERVER
+            )
+        )?.result as {
             tools: { name: string; annotations: { readOnlyHint: boolean } }[];
         };
         expect(tools.find((tool) => tool.name === "forbidden")?.annotations.readOnlyHint).toBe(

@@ -144,6 +144,12 @@ export function toolScopes(tool: Pick<McpTool<never>, "scope">): readonly McpSco
     return typeof tool.scope === "string" ? [tool.scope] : tool.scope;
 }
 
+/** Whether a caller holds a scope that lets it use a tool. */
+export function callerMayUse(tool: Pick<McpTool<never>, "scope">, caller: McpCaller): boolean {
+    const needs = toolScopes(tool);
+    return needs.length === 0 || needs.some((scope) => caller.scopes.includes(scope));
+}
+
 /** The heading a tool is listed under: its own, else its first scope's. */
 export function toolCategory(tool: Pick<McpTool<never>, "scope" | "category">): McpCategory {
     if (tool.category) return tool.category;
@@ -315,7 +321,13 @@ export async function handleMcpMessage(
         case "ping":
             return ok(id, {});
         case "tools/list":
-            return ok(id, { tools: tools.map(describeTool) });
+            // Only what this connection may call. A key made for the calendar is
+            // not handed a hundred tools it would be refused on, which is the
+            // list a model then has to choose from on every turn; the rest are
+            // still named, with the scope each needs, by `polaris_tools`.
+            return ok(id, {
+                tools: tools.filter((tool) => callerMayUse(tool, caller)).map(describeTool)
+            });
         case "tools/call":
             return callTool(id, params ?? {}, tools, caller);
         default:
@@ -336,11 +348,10 @@ async function callTool(
 
     // Scope before shape. A caller who may not use the tool at all should not
     // learn its argument names by being told which of them they got wrong.
-    const needs = toolScopes(tool);
-    if (needs.length > 0 && !needs.some((scope) => caller.scopes.includes(scope))) {
+    if (!callerMayUse(tool, caller)) {
         return toolFailure(
             id,
-            `This connection cannot ${tool.name}. It needs the ${needs[0]} scope.`
+            `This connection cannot ${tool.name}. It needs the ${toolScopes(tool)[0]} scope.`
         );
     }
 

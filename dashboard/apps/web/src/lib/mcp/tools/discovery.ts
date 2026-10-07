@@ -6,9 +6,12 @@
  * tool acts on it (`lib/mcp/search.ts`). `polaris_tools` finds a tool: the
  * catalogue grouped by category, narrowed by what the model is trying to do.
  *
- * `tools/list` stays complete either way. Hiding tools until they are asked
- * for would rely on clients acting on `tools/list_changed`, which not every
- * assistant does; these only make a long list easier to choose from.
+ * `tools/list` holds every tool the connection's scopes reach, and does not
+ * change while it is connected. Hiding tools until they are asked for would
+ * rely on clients acting on `tools/list_changed`, which not every assistant
+ * does; these only make a long list easier to choose from. `polaris_tools`
+ * also names the ones the connection lacks a scope for, so a model can say
+ * which scope to grant rather than that the thing cannot be done.
  *
  * Neither needs a scope of its own. Each answers only what the caller's
  * scopes already reach: a provider the caller may not use is never asked, and
@@ -47,7 +50,7 @@ const searchTool: McpTool<z.infer<typeof searchInput>> = {
     title: "Search everything",
     description:
         // i18n-ignore read by the calling model, not shown to a person
-        "Find anything this connection can reach - devices, cameras, rooms, routines, game servers, events, tasks, notes, files, mail, apps - by name, kind or place, in any language. Returns each match with its app, kind, id, and the tools to call next. Use it first when unsure where something lives.",
+        "Find anything this connection can reach - devices, cameras, rooms, routines, game servers, events, alarms, timers, tasks, notes, files, mail, apps - by name, kind or place, in any language. Returns each match with its app, kind, id, and the tools to call next. Use it first when unsure where something lives.",
     input: searchInput,
     category: "polaris",
     scope: null,
