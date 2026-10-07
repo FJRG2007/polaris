@@ -64,12 +64,13 @@ async function experienceOf(
     server: ServerContainer,
     name: string
 ): Promise<stash.Experience | null> {
-    const levels = stash.readExperienceCount(
-        stripFormatting(await server.say([stash.readLevels(name)]))
-    );
-    const points = stash.readExperienceCount(
-        stripFormatting(await server.say([stash.readPoints(name)]))
-    );
+    // Both asked at once: one trip, where the server is shared (`pace.coalescing`).
+    const [levels = null, points = null] = (
+        await Promise.all([
+            server.say([stash.readLevels(name)]),
+            server.say([stash.readPoints(name)])
+        ])
+    ).map((said) => stash.readExperienceCount(stripFormatting(said)));
     return levels === null || points === null ? null : { levels, points };
 }
 
@@ -170,16 +171,21 @@ export async function stashIn(
         stash: current,
         refused: { why, items: [...new Set(items.map((item) => item.id))] }
     });
-    let reading = await read();
+    // The bag, their experience and - whatever the event does to them, they
+    // leave with these - their health and hunger as they come in: asked all at
+    // once, so they ride in one trip (`pace.coalescing`).
+    const [first, experience, vitalsRead] = await Promise.all([
+        read(),
+        existing ? null : experienceOf(server, name),
+        existing ? null : vitalsOf(server, name)
+    ]);
+    let reading = first;
     if (!reading.answered || reading.unreadable > 0) return refuse("unread");
     let theirs = reading.items.filter((item) => !stash.isKit(item));
     const untakeable = theirs.filter((item) => !stash.takeable(item));
     if (untakeable.length > 0) return refuse("untakeable", untakeable);
-    const experience = existing ? null : await experienceOf(server, name);
     const hasExperience = experience !== null && (experience.levels > 0 || experience.points > 0);
-    // Their health and hunger as they come in: whatever the event does to
-    // them, they leave with these.
-    const vitals = existing ? null : ((await vitalsOf(server, name))?.vitals ?? null);
+    const vitals = vitalsRead?.vitals ?? null;
     if (theirs.length === 0 && !hasExperience && !vitals) return { stash: existing, refused: null };
 
     // The database copy: every stack written down whole, under the slot it is

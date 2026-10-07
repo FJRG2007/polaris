@@ -51,6 +51,7 @@ import type { GameKey } from "../../../../messages";
 import * as stageService from "./kinds/stage-service";
 import * as snowballPackService from "./kinds/snowball-pack-service";
 import * as arenaService from "./kinds/arena-service";
+import * as pace from "./kinds/pace";
 import * as stashService from "./kinds/stash-service";
 import * as search from "./place-search";
 import * as hillService from "./kinds/hill-service";
@@ -291,6 +292,8 @@ const SERVER_PROPERTIES = "/data/server.properties";
 interface Loop {
     readonly ownerId: string;
     readonly timer: ReturnType<typeof setInterval>;
+    /** The run's last write, which the next one waits for (`persist`). */
+    saving?: Promise<void>;
     /** The boss bar's clock, a second at a time, apart from the tick. */
     clock: ReturnType<typeof setInterval> | null;
     /** Parkour and a team duel: the quick look, far oftener than the tick -
@@ -1036,7 +1039,21 @@ async function serverFor(installedAppId: string, loop: Loop): Promise<ServerCont
     return loop.link.server.running ? loop.link.server : null;
 }
 
-async function persist(installedAppId: string, loop: Loop): Promise<void> {
+/**
+ * The run written down as it is now. One write at a time: players seen to side
+ * by side (`pace.coalescing`) each save as they go, and two writes of the same
+ * row at once would only race each other - each waits for the one before, then
+ * writes the run as it is by then.
+ */
+function persist(installedAppId: string, loop: Loop): Promise<void> {
+    const write = (loop.saving ?? Promise.resolve())
+        .catch(() => undefined)
+        .then(() => writeRun(installedAppId, loop));
+    loop.saving = write;
+    return write;
+}
+
+async function writeRun(installedAppId: string, loop: Loop): Promise<void> {
     const run = loop.run;
     await updateEventState(installedAppId, (state) =>
         state.run && state.run.id === run.id
@@ -1073,8 +1090,21 @@ async function tick(installedAppId: string, loop: Loop): Promise<void> {
     await hearPlayers(installedAppId, loop, server);
     if (run.cancelled) return finish(installedAppId, loop, server, "cancelled", "Called off");
 
-    if (run.phase === "countdown") return countdown(installedAppId, loop, server, now);
+    if (run.phase === "countdown") {
+        await countdown(installedAppId, loop, server, now);
+        // Begun: its first step straight away, not a tick later.
+        if (loop.run.phase !== "running" || loop.finishing || loop.run.cancelled) return;
+    }
+    return running(installedAppId, loop, server, Date.now());
+}
 
+/** One tick of a run that has begun. */
+async function running(
+    installedAppId: string,
+    loop: Loop,
+    server: ServerContainer,
+    now: number
+): Promise<void> {
     if (now - loop.lastSample >= SAMPLE_EVERY_MS) {
         loop.lastSample = now;
         const seen = await playing.lookAt(installedAppId, server);
@@ -1210,6 +1240,10 @@ async function countdown(
             );
         }
         await server.sayAll(lines);
+        // The start on its second, not up to a tick after it.
+        const until = loop.run.startsAt - Date.now();
+        if (until < tickMsOf(preset.kind))
+            setTimeout(() => kick(installedAppId, loop), Math.max(0, until)).unref?.();
         return;
     }
     await begin(installedAppId, loop, server, now);
@@ -1394,12 +1428,29 @@ function isRace(preset: catalog.EventPreset): boolean {
 }
 
 /** The start: the scoreboard up, the world changed where the event changes it. */
+/**
+ * Every rule and time of day a start may read before it changes it: asked in
+ * one trip the first time any is (`pace.prefetching`), rather than a trip each.
+ */
+const BEGIN_READS = [
+    ...new Set([
+        ...commands.GRIEF_RULES,
+        ...commands.FROZEN_RULES.flat(),
+        ...commands.DAY_RULES.flat(),
+        ...duel.KEEP_INVENTORY,
+        ...duel.NATURAL_REGENERATION
+    ])
+]
+    .map((rule) => commands.readRule(rule))
+    .concat([commands.READ_DAYTIME, commands.READ_DAY_TIMELINE]);
+
 async function begin(
     installedAppId: string,
     loop: Loop,
-    server: ServerContainer,
+    asked: ServerContainer,
     now: number
 ): Promise<void> {
+    const server = pace.prefetching(asked, BEGIN_READS);
     const { preset } = loop.run;
     const language = loop.language;
     const seconds = (loop.run.endsAt - now) / 1000;
@@ -4106,6 +4157,7 @@ async function finish(
     let placed: plan.Placed[] = [];
     let disqualified = new Set<string>();
     const pending: stored.PendingReward[] = [];
+    let owedLines: stored.OwedLines[] = [];
     const delivered: stored.DeliveredPrize[] = [];
     const lines: string[] = [];
     /** A parkour's or spleef's blocks and players, until they are all put back. */
@@ -4418,6 +4470,17 @@ async function finish(
                 arenaLeftover = arenaService.leftoverOf(run, run.gamerules);
             await cleanUpLater(loop.ownerId, installedAppId, run);
         }
+        // What the end said to each of them, kept for whoever was not on to hear it.
+        if (server)
+            owedLines = await arenaService
+                .owedAtEnd(server, run, Date.now() + stored.PENDING_KEPT_MS)
+                .catch((error: unknown) => {
+                    console.warn(
+                        "polaris: reading who missed an event's end failed",
+                        String(error)
+                    );
+                    return [];
+                });
     } catch (error) {
         console.warn("polaris: finishing an event failed", installedAppId, String(error));
         if (arenaLeftover === undefined && catalog.playsInArena(preset))
@@ -4456,6 +4519,7 @@ async function finish(
         ),
         lastKind: preset.kind,
         pending: stored.livePending([...state.pending, ...pending], Date.now()),
+        owedLines: stored.withOwedLines(state.owedLines, owedLines, Date.now()),
         stageLeftovers: stage.withLeftover(state.stageLeftovers, stageLeftover),
         arenaLeftovers: arenaLeftover
             ? [...state.arenaLeftovers, arenaLeftover]
@@ -5094,8 +5158,16 @@ async function sweepOne(
     if (!loops.has(installedAppId))
         await refreshPackIdle(ownerId, installedAppId, settings.presets);
     const pending = stored.livePending(state.pending, now);
+    const owedLines = stored.withOwedLines(state.owedLines, [], now);
+    // Owed lines nobody came back for in time are let go of.
+    if (owedLines.length !== state.owedLines.length)
+        await updateEventState(installedAppId, (current) => ({
+            ...current,
+            owedLines: stored.withOwedLines(current.owedLines, [], now)
+        }));
     const wantsPlayers =
         pending.length > 0 ||
+        owedLines.length > 0 ||
         settings.settings.random.enabled ||
         settings.schedules.some((entry) => entry.enabled);
     if (!wantsPlayers) return false;
@@ -5114,6 +5186,8 @@ async function sweepOne(
         return false;
     }
     if (pending.length > 0 && seen.size > 0) await deliverPending(ownerId, installedAppId, seen);
+    if (owedLines.length > 0 && seen.size > 0)
+        await deliverOwedLines(ownerId, installedAppId, seen);
     const active = plan.activePlayers(seen, settings.settings.afkMinutes, now).length;
     const activeFor = (preset: catalog.EventPreset) =>
         plan.playersFor(preset, seen, settings.settings.afkMinutes, now).length;
@@ -5295,6 +5369,53 @@ async function skip(
 }
 
 /** Prizes handed to whoever is owed one and is on now. */
+/**
+ * The lines an event's end still owes whoever is on again (`stored.OwedLines`),
+ * once nothing of theirs is still held: all of them in one trip, then
+ * forgotten - with whatever has run out of time meanwhile.
+ */
+async function deliverOwedLines(
+    ownerId: string,
+    installedAppId: string,
+    seen: ReadonlyMap<string, plan.Seen>
+): Promise<void> {
+    const row = await readRow(installedAppId);
+    if (!row) return;
+    const state = stored.readEventState(row.config);
+    const now = Date.now();
+    const held = stored.heldNames(state);
+    const due = stored
+        .withOwedLines(state.owedLines, [], now)
+        .filter(
+            (one) =>
+                catalog.PLAYER_NAME.test(one.player) &&
+                seen.has(one.player.toLowerCase()) &&
+                !held.has(one.player.toLowerCase())
+        );
+    if (due.length > 0) {
+        const sent = await withServerContainer(ownerId, installedAppId, async (server) => {
+            if (!server.running) return false;
+            await server.sayAll(due.flatMap((one) => one.lines));
+            return true;
+        });
+        if (!sent) return;
+    }
+    await updateEventState(installedAppId, (current) => ({
+        ...current,
+        owedLines: stored
+            .withOwedLines(current.owedLines, [], now)
+            .filter(
+                (one) =>
+                    !due.some(
+                        (sent) =>
+                            sent.player.toLowerCase() === one.player.toLowerCase() &&
+                            sent.reason === one.reason &&
+                            sent.until === one.until
+                    )
+            )
+    }));
+}
+
 async function deliverPending(
     ownerId: string,
     installedAppId: string,

@@ -95,12 +95,74 @@ describe("the ring played with fists only", () => {
         expect(hill.ringAt(settings({ rounds: 1 }), total, 61_000).pause).toBe(false);
     });
 
-    it("scores only whoever stands in it alone", () => {
+    it("scores everybody in it, and three times over whoever is in it alone", () => {
         expect(hill.scoreLines({ x: 10, y: 70, z: -4 }, 3, 4)).toEqual([
             "scoreboard objectives add pe_kin dummy",
             "execute in minecraft:overworld positioned 10.5 70 -3.5 store result score #inside pe_kin if entity @a[tag=pe_arena,distance=..3,gamemode=!spectator]",
-            "execute if score #inside pe_kin matches 1 in minecraft:overworld positioned 10.5 70 -3.5 as @a[tag=pe_arena,distance=..3,gamemode=!spectator] run scoreboard players add @s pe_score 4"
+            "execute in minecraft:overworld positioned 10.5 70 -3.5 as @a[tag=pe_arena,distance=..3,gamemode=!spectator] run scoreboard players add @s pe_score 4",
+            "execute if score #inside pe_kin matches 1 in minecraft:overworld positioned 10.5 70 -3.5 as @a[tag=pe_arena,distance=..3,gamemode=!spectator] run scoreboard players add @s pe_score 8"
         ]);
+    });
+
+    it("scores one, two or thirty in the ring with the same lines, each of them", () => {
+        // The game's own reading of the lines, for `inRing` players in the ring.
+        const scored = (inRing: number, seconds: number) => {
+            const scores = new Map<string, number>();
+            const names = Array.from({ length: inRing }, (_, index) => `P${index}`);
+            for (const line of hill.scoreLines({ x: 0, y: 64, z: 0 }, 4, seconds)) {
+                const add = / as @a\[[^\]]+\] run scoreboard players add @s pe_score (\d+)$/.exec(
+                    line
+                );
+                if (!add) continue;
+                if (line.includes("matches 1 ") && inRing !== 1) continue;
+                for (const name of names)
+                    scores.set(name, (scores.get(name) ?? 0) + Number(add[1]));
+            }
+            return { lines: hill.scoreLines({ x: 0, y: 64, z: 0 }, 4, seconds).length, scores };
+        };
+        expect(scored(1, 2).scores.get("P0")).toBe(6);
+        for (const many of [2, 30]) {
+            const { lines, scores } = scored(many, 2);
+            expect(lines).toBe(4);
+            expect(scores.size).toBe(many);
+            for (const score of scores.values()) expect(score).toBe(2);
+        }
+        // A sprint's seconds come doubled, alone or not.
+        expect(scored(1, 4).scores.get("P0")).toBe(12);
+    });
+
+    it("starts everybody inside the whole ring, two blocks in from its edge", () => {
+        const place = { x: 100, y: 70, z: -20 };
+        for (const count of [1, 2, 7, 16]) {
+            for (const spot of hill.startSpots(place, 8, count)) {
+                const far = Math.hypot(spot.x - place.x, spot.z - place.z);
+                expect(far).toBeLessThanOrEqual(8 - hill.START_MARGIN + 0.5);
+            }
+        }
+        // The smallest ring: everybody in its middle.
+        expect(hill.startSpots(place, 2, 3).every((spot) => spot.x === 100 && spot.z === -20)).toBe(
+            true
+        );
+    });
+
+    it("neither shrinks nor moves before the grace after Go, or after a round's pause", () => {
+        const total = 5 * 60_000;
+        const set = settings({ rounds: 3, shrinks: true, moves: true });
+        const grace = hill.GRACE_SECONDS * 1000;
+        for (let ms = 0; ms < grace; ms += 250) {
+            const ring = hill.ringAt(set, total, ms);
+            expect([ring.radius, ring.dx, ring.dz]).toEqual([8, 0, 0]);
+        }
+        const second = hill.roundMs(total, 3) + hill.RING_PAUSE_SECONDS * 1000;
+        for (let ms = 0; ms < grace; ms += 250) {
+            const ring = hill.ringAt(set, total, second + ms);
+            expect([ring.round, ring.radius, ring.dx, ring.dz]).toEqual([2, 8, 0, 0]);
+        }
+        // And still at its least by the sprint.
+        const length = hill.roundMs(total, 3);
+        const sprint = hill.ringAt(set, total, length - 1_000);
+        expect(sprint.sprint).toBe(true);
+        expect(sprint.radius).toBe(hill.leastRadius(8, set.players));
     });
 
     it("is drawn again only on the platform's own floor", () => {
@@ -264,26 +326,26 @@ describe("the ring's rules", () => {
 
     it("say only what the ring does this game", () => {
         expect(ring({ rounds: 3, shrinks: true, moves: true })).toBe(
-            "Hold the ring alone: two in it and neither scores. It shrinks and moves, and the end of each round counts double."
+            "Hold the ring: in it you score, and alone, triple. It shrinks and moves, and the end of each round counts double."
         );
         expect(ring({ rounds: 3, shrinks: false, moves: true })).toContain(" It moves, and ");
         expect(ring({ rounds: 3, shrinks: true, moves: false })).toContain(" It shrinks, and ");
         expect(ring({ rounds: 3, shrinks: false, moves: false })).toBe(
-            "Hold the ring alone: two in it and neither scores. The end of each round counts double."
+            "Hold the ring: in it you score, and alone, triple. The end of each round counts double."
         );
     });
 
     it("speak of one end when there is one round", () => {
         expect(ring({ rounds: 1, shrinks: false, moves: false })).toBe(
-            "Hold the ring alone: two in it and neither scores. The end counts double."
+            "Hold the ring: in it you score, and alone, triple. The end counts double."
         );
         expect(messages.rules("king-of-the-hill", "es", { ring: true, rounds: 1 })).toBe(
-            "Aguanta en el ring a solas: si hay dos dentro, nadie suma. El final puntúa doble."
+            "Aguanta en el ring: dentro sumas, y a solas, el triple. El final puntúa doble."
         );
     });
 
-    it("count time alone on the event's own score", () => {
-        expect(hill.scoreLines({ x: 0, y: 64, z: 0 }, 3, 1).at(-1)).toContain("add @s pe_score 1");
+    it("count time in it on the event's own score", () => {
+        expect(hill.scoreLines({ x: 0, y: 64, z: 0 }, 3, 1).at(-2)).toContain("add @s pe_score 1");
         expect(hill.INSIDE_SCORE).toBe("pe_kin");
     });
 });

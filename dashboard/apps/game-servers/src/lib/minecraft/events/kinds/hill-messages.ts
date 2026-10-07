@@ -32,8 +32,8 @@ export function goTitle(language: Language): string {
 
 export function goSubtitle(language: Language): string {
     return language === "es"
-        ? "&fSolo cuenta el tiempo a solas en el ring"
-        : "&fOnly time alone in the ring counts";
+        ? "&fEn el ring sumas; a solas, el triple"
+        : "&fIn the ring you score; alone, triple";
 }
 
 export function roundTitle(round: number, rounds: number, language: Language): string {
@@ -58,11 +58,11 @@ export function sprintSubtitle(language: Language): string {
     return language === "es" ? "&fHasta el final de la ronda" : "&fUntil the round ends";
 }
 
-/** In the ring with somebody else: nobody scores until one is out. */
+/** In the ring with somebody else: scoring, but a third of what alone does. */
 export function contested(language: Language): string {
     return language === "es"
-        ? "&cRing disputado: &fecha a los demás para sumar"
-        : "&cRing contested: &fpush the others out to score";
+        ? "&eRing compartido: &fa solas sumas el triple"
+        : "&eRing shared: &fpush them out to score triple";
 }
 
 export function nextRound(language: Language): string {

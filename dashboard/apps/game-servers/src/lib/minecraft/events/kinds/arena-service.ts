@@ -40,6 +40,7 @@ import * as hits from "./hits";
 import * as hillService from "./hill-service";
 import * as hitsService from "./hits-service";
 import * as stashService from "./stash-service";
+import * as pace from "./pace";
 import * as commands from "../commands";
 import * as speech from "../../speech";
 import * as written from "../messages";
@@ -62,12 +63,6 @@ const tooFew = (joined: number, needed: number) => `Only ${joined} joined; it ne
 const PLACE_DISTANCE = 32;
 /** How long an arena's chunks are waited for before its site is given up. */
 const LOAD_WAIT_MS = 10_000;
-/**
- * How many teardown fills go in one trip. A fill's answer is one short line, so
- * the 16 KiB a trip hands back is never the limit; the trip's time is, since
- * each fill is a console call of its own inside it.
- */
-const FILLS_PER_TRIP = 25;
 
 /** What one run keeps in memory between ticks: nothing that must survive a restart. */
 interface Memory {
@@ -150,14 +145,21 @@ export async function arenaTick(ctx: KindContext, lines: string[]): Promise<stri
     // Nothing hostile reaches it once it stands - a phantom least of all.
     if (ctx.run.arena) lines.push(...commands.hostilesOut(ctx.run.arena.box));
     if (ctx.run.readyAt === null) {
-        if (!ctx.run.enrolled) await enroll(ctx, lines);
-        else if (!ctx.run.arena) {
-            if (gameOf(ctx.run.preset.kind)?.hits) await hitsService.ensure(ctx);
-            await raise(ctx);
+        // One step after another in the same tick while the next one has
+        // nothing to wait for (`pace.STEPS_AT_ONCE`): enrolled, the arena up,
+        // everybody brought in and the first look at whether they are there
+        // follow at once rather than a tick apart. What has to wait - the place
+        // searched, the chunks loading, somebody not there yet - ends the tick
+        // as it always did, and the countdown still runs its whole three seconds.
+        for (let step = 0; step < pace.STEPS_AT_ONCE; step += 1) {
+            const before = readyStepOf(ctx.run);
+            await readyStep(ctx, lines);
+            const after = readyStepOf(ctx.run);
+            // Arriving looks once, at once, and then waits for whoever is not in yet.
+            if (ctx.run.readyAt !== null || after === before) break;
+            // The site only just held: its chunks get a moment to load first.
+            if (after === "site") await pace.pause(pace.LOAD_PAUSE_MS);
         }
-        // Nothing counts until everybody brought in is there (`arrival`).
-        else if (arrival.isOpen(ctx.run.id)) await arrivalTick(ctx, lines);
-        else await bringIn(ctx);
         return null;
     }
     const game = gameOf(ctx.run.preset.kind);
@@ -167,6 +169,27 @@ export async function arenaTick(ctx: KindContext, lines: string[]): Promise<stri
         await hillService.fightTick(ctx, ctx.tickSeconds, lines);
     else await buildTick(ctx, lines);
     return null;
+}
+
+/** Where an arena is on its way to being ready: the step `readyStep` takes next. */
+function readyStepOf(
+    run: stored.EventRun
+): "enrolling" | "placing" | "placed" | "site" | "bringing" | "arriving" {
+    if (!run.enrolled) return "enrolling";
+    if (!run.arena) return run.site ? "site" : run.place ? "placed" : "placing";
+    return arrival.isOpen(run.id) ? "arriving" : "bringing";
+}
+
+/** One step towards "Go!". */
+async function readyStep(ctx: KindContext, lines: string[]): Promise<void> {
+    if (!ctx.run.enrolled) await enroll(ctx, lines);
+    else if (!ctx.run.arena) {
+        if (gameOf(ctx.run.preset.kind)?.hits) await hitsService.ensure(ctx);
+        await raise(ctx);
+    }
+    // Nothing counts until everybody brought in is there (`arrival`).
+    else if (arrival.isOpen(ctx.run.id)) await arrivalTick(ctx, lines);
+    else await bringIn(ctx);
 }
 
 /** Who takes part: who joined, is on, and is not still owed a trip back. */
@@ -305,12 +328,17 @@ async function raise(ctx: KindContext): Promise<void> {
     const marker = game?.decorate ? (run.marker ?? (await kitMarker(ctx))) : run.marker;
     ctx.run = { ...ctx.run, arena: built, marker, game: game?.built?.(run) ?? ctx.run.game };
     await ctx.persist();
-    await ctx.server.sayAll([
-        ...fills.flatMap((one) =>
+    // A paced trip at a time (`pace.buildPacer`): a big arena is never one
+    // trip that holds the server's tick for as long as all of it takes.
+    const building = pace.buildPacer();
+    await pace.inTrips(
+        fills.flatMap((one) =>
             arena.slices(one.box).map((piece) => arena.fillKeep(piece, one.block))
         ),
-        commands.CLEAR_MARK
-    ]);
+        building,
+        (trip) => ctx.server.sayAll(trip)
+    );
+    await ctx.server.sayAll([commands.CLEAR_MARK]);
     // A protected area refuses blocks without a word: what was asked for has
     // to be there, or it comes down again and another place is tried.
     const floor = fills.at(-1)!;
@@ -457,12 +485,12 @@ async function bringIn(ctx: KindContext): Promise<void> {
     // next, a big server watched its players arrive a few at a time. Whatever
     // somebody picks up while the others are put away is caught by the last
     // look below, as anything picked up on the way in always was.
-    for (const one of [...ctx.run.entrants]) await stashOne(ctx, one);
+    await stashAll(ctx, false);
     // Those kept out are no longer entrants: everybody left goes in.
     await ctx.server.sayAll(ctx.run.entrants.flatMap(linesIn));
     // And once in, a last look: whatever turned up on them on the way is put
     // away with the rest; anybody it cannot be taken from is sent back out.
-    for (const one of [...ctx.run.entrants]) await stashOne(ctx, one, true);
+    await stashAll(ctx, true);
     // Too few left once those kept out are: called off, and everybody brought
     // in sent back with their things.
     const needed = catalog.joinersNeeded(run.preset);
@@ -476,7 +504,7 @@ async function bringIn(ctx: KindContext): Promise<void> {
     )
         throw new TooFew(ONE_SIDED);
     // The clock, the kit and "Go!" wait for everybody to be in.
-    arrival.open(ctx.run.id, ctx.now);
+    arrival.open(ctx.run.id, Date.now());
 }
 
 /** Where each entrant starts, by name in lower case: a duel's side, a build
@@ -630,35 +658,69 @@ function goLines(run: stored.EventRun, language: speech.Speech, offhand: boolean
 }
 
 /**
- * One player's own things put away before they are brought in and handed the
- * kit (`stash`), written into the run as it is kept - or, `inside`, what turned
- * up on them on the way in put away with the rest. From 1.17, which has `item`;
- * before it, the kit goes beside what they carry, as it always has. Answers
- * whether they are in: somebody whose things cannot all be put away is kept
- * out - told why, sent back where they were if they had been brought in, and
- * handed back whatever was taken.
+ * Every entrant's own things put away before they are brought in and handed
+ * the kit (`stash`), written into the run as they are kept - or, `inside`, what
+ * turned up on them on the way in put away with the rest. From 1.17, which has
+ * `item`; before it, the kit goes beside what they carry, as it always has.
+ *
+ * Side by side, their reads and writes sharing trips (`pace.coalescing`): one
+ * trip a step for everybody rather than one each. Whoever cannot have all of
+ * it put away is then kept out (`keptOut`) one at a time, in order, as before:
+ * sending somebody back changes the run in ways that must not cross.
  */
-async function stashOne(ctx: KindContext, one: stored.Entrant, inside = false): Promise<boolean> {
-    if (!one.away || (!inside && one.stash)) return true;
-    if (!(await ctx.atLeast([1, 17]))) return true;
-    // Written into the run as it is kept, and as it is given back.
-    const keep = async (kept: stored.Entrant["stash"]) => {
+async function stashAll(ctx: KindContext, inside: boolean): Promise<void> {
+    const entrants = [...ctx.run.entrants];
+    const shared = pace.coalescing(ctx.server);
+    const settled = await Promise.allSettled(
+        entrants.map((one) => stashFor(ctx, one, inside, shared))
+    );
+    const failed = settled.find((outcome) => outcome.status === "rejected");
+    if (failed) throw failed.reason;
+    for (const [at, one] of entrants.entries()) {
+        const outcome = settled[at]!;
+        const result = outcome.status === "fulfilled" ? outcome.value : null;
+        if (result?.refused) await keptOut(ctx, one, inside, result.refused);
+    }
+}
+
+/** What putting `one`'s things away came to; null for nobody to put away. */
+async function stashFor(
+    ctx: KindContext,
+    one: stored.Entrant,
+    inside: boolean,
+    server: ServerContainer = ctx.server
+): Promise<stashService.StashResult | null> {
+    if (!one.away || (!inside && one.stash)) return null;
+    if (!(await ctx.atLeast([1, 17]))) return null;
+    const keep = keeper(ctx, one.name);
+    return stashService.stashIn(server, ctx.stashOwner, one.name, keep, inside ? one.stash : null);
+}
+
+/** `name`'s stash written into the run as it is kept, and as it is given back. */
+function keeper(ctx: KindContext, name: string) {
+    return async (kept: stored.Entrant["stash"]) => {
         ctx.run = {
             ...ctx.run,
             entrants: ctx.run.entrants.map((each) =>
-                each.name === one.name ? { ...each, stash: kept } : each
+                each.name === name ? { ...each, stash: kept } : each
             )
         };
         await ctx.persist();
     };
-    const result = await stashService.stashIn(
-        ctx.server,
-        ctx.stashOwner,
-        one.name,
-        keep,
-        inside ? one.stash : null
-    );
-    if (!result.refused) return true;
+}
+
+/**
+ * Somebody whose things could not all be put away (`refused`): told why, sent
+ * back where they were if they had been brought in, and handed back whatever
+ * was taken. Answers false: they are not in.
+ */
+async function keptOut(
+    ctx: KindContext,
+    one: stored.Entrant,
+    inside: boolean,
+    refused: NonNullable<stashService.StashResult["refused"]>
+): Promise<boolean> {
+    const keep = keeper(ctx, one.name);
     let entrant = ctx.run.entrants.find((each) => each.name === one.name) ?? one;
     ctx.run = {
         ...ctx.run,
@@ -666,7 +728,7 @@ async function stashOne(ctx: KindContext, one: stored.Entrant, inside = false): 
             ctx.server,
             ctx.run.keptOut,
             one.name,
-            result.refused,
+            refused,
             ctx.language
         )
     };
@@ -1094,6 +1156,25 @@ export function endLines(run: stored.EventRun): string[] {
     return gameOf(run.preset.kind)?.endLines?.(run) ?? [];
 }
 
+/**
+ * What the end owes each entrant who is not on now (`ArenaGame.owedLines`),
+ * kept for `until`. One read of who is on, and only for a kind that owes any.
+ */
+export async function owedAtEnd(
+    server: ServerContainer,
+    run: stored.EventRun,
+    until: number
+): Promise<stored.OwedLines[]> {
+    const owe = gameOf(run.preset.kind)?.owedLines;
+    if (!owe || run.entrants.length === 0) return [];
+    const online = new Set(
+        commands.readWhere(await server.say([commands.WHERE])).map((one) => lower(one.name))
+    );
+    return run.entrants
+        .filter((one) => !online.has(lower(one.name)))
+        .flatMap((one) => owe(run, one.name).map((owed) => ({ player: one.name, ...owed, until })));
+}
+
 /** Whether a kind sends lines between ticks (`quickLines`). */
 export function quickens(preset: catalog.EventPreset): boolean {
     return Boolean(gameOf(preset.kind)?.quickLines);
@@ -1180,11 +1261,17 @@ export async function closeArena(
         }
         // Sent home already, by an end that stopped before it gave everything
         // back: not moved again, only given what they are still owed.
-        const say = (line: string) => server.say([line]);
+        // Everybody's reads and writes below share trips (`pace.coalescing`).
+        const shared = pace.coalescing(server);
+        const say = (line: string) => shared.say([line]);
         const back = new Set<number>();
-        for (const { at, one } of owed)
-            if (one.tagged && (await commands.alreadyBack(say, one.name, arena.IN_ARENA)))
-                back.add(at);
+        const wereBack = await Promise.all(
+            owed.map(
+                async ({ one }) =>
+                    one.tagged && (await commands.alreadyBack(say, one.name, arena.IN_ARENA))
+            )
+        );
+        for (const [index, { at }] of owed.entries()) if (wereBack[index]) back.add(at);
         const going = owed.filter(({ at }) => !back.has(at));
         // The kit off and unable to fall to their death, then everybody home
         // at once - one trip, never one player after another - with their own
@@ -1216,35 +1303,55 @@ export async function closeArena(
         if (settled.length > 0) await server.sayAll(settled);
         // Their own things back only once they are home and down: nothing is
         // given back to a player who could still fall with it. Everybody is
-        // home by now, so each one's wait overlaps everybody else's.
-        for (const { at, one: entrant } of owed) {
-            if (!back.has(at) && !home.has(at)) continue;
-            let one = entrant;
-            const down = await stashService.settle(server, one.name, (name) =>
-                stage.fallProof(name, 5)
-            );
-            let given = true;
-            if (one.stash) {
-                if (!down) given = false;
-                else {
-                    const how = await stashService.giveBack(
-                        server,
-                        one.name,
-                        one.stash,
-                        async (kept) => {
-                            one = { ...one, stash: kept };
-                        }
-                    );
-                    given = how === "done" || how === "failed";
+        // home by now, and they are seen to side by side: each one's wait
+        // overlaps everybody else's, and their reads and writes share trips.
+        const seenTo = await Promise.allSettled(
+            owed.map(async ({ at, one: entrant }) => {
+                if (!back.has(at) && !home.has(at)) return null;
+                let one = entrant;
+                const down = await stashService.settle(shared, one.name, (name) =>
+                    stage.fallProof(name, 5)
+                );
+                let given = true;
+                if (one.stash) {
+                    if (!down) given = false;
+                    else {
+                        const how = await stashService.giveBack(
+                            shared,
+                            one.name,
+                            one.stash,
+                            async (kept) => {
+                                one = { ...one, stash: kept };
+                            }
+                        );
+                        given = how === "done" || how === "failed";
+                    }
                 }
+                if (given && language && home.has(at))
+                    await shared.say([
+                        arena.tellTo(
+                            one.name,
+                            messages.tag(language) + messages.takenBack(language)
+                        )
+                    ]);
+                return { one, given };
+            })
+        );
+        // Whoever was seen to is written off as before; one that failed half
+        // way is still owed everything, in what this answers.
+        let failed: unknown = null;
+        for (const [index, { at }] of owed.entries()) {
+            const outcome = seenTo[index]!;
+            if (outcome.status === "rejected") {
+                failed ??= outcome.reason;
+                continue;
             }
-            if (!given) remaining.push(one);
-            else if (language && home.has(at))
-                await server.say([
-                    arena.tellTo(one.name, messages.tag(language) + messages.takenBack(language))
-                ]);
+            const done = outcome.value;
+            if (!done) continue;
+            if (!done.given) remaining.push(done.one);
             handled.add(at);
         }
+        if (failed !== null) throw failed;
         // The rules it held - keepInventory among them - put back only once
         // everybody who could be sent home is home and down.
         const owedRules = Object.entries(rules)
@@ -1268,18 +1375,22 @@ export async function closeArena(
             let whole = true;
             // Every kind of block in every slice of the box: hundreds of fills
             // for a SkyWars arena. Asked one at a time they held the podium back
-            // for many seconds after the winner was known, so they go a few
-            // dozen to a trip, in order (`sayEach`); a fill whose answer did not
-            // come back is asked again on its own, never taken for done. A trip
+            // for many seconds after the winner was known, so they go a paced
+            // trip at a time (`pace.teardownPacer`), in order (`sayEach`); a
+            // fill whose answer did not come back is asked again on its own,
+            // never taken for done. A trip
             // that failed outright may still be running in the container, so
             // nothing is asked over it: the arena is tried again later.
             const lines = arena.teardown(left.arena);
-            for (let start = 0; start < lines.length; start += FILLS_PER_TRIP) {
-                const trip = lines.slice(start, start + FILLS_PER_TRIP);
+            const pacing = pace.teardownPacer();
+            for (let start = 0; start < lines.length; ) {
+                const trip = pacing.take(lines.slice(start), pace.fillVolume);
+                start += trip.length;
                 let replies: (string | null)[] = [];
                 if (server.sayEach) {
                     try {
-                        replies = await server.sayEach(trip.map((line) => [line]));
+                        const sayEach = server.sayEach;
+                        replies = await pacing.timed(() => sayEach(trip.map((line) => [line])));
                     } catch (error) {
                         console.warn(
                             "polaris: an arena's teardown trip failed",

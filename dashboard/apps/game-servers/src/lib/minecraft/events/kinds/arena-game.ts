@@ -140,6 +140,12 @@ export interface ArenaGame {
     resultLines(run: stored.EventRun, language: speech.Speech): string[];
     /** Its teams and counts removed, with the rest of the event's own. */
     endLines?(run: stored.EventRun): string[];
+    /**
+     * What of the end is one player's own and must still reach them if they
+     * were not on when it ended (`stored.OwedLines`): sent when they are next
+     * seen. Empty for nothing owed.
+     */
+    owedLines?(run: stored.EventRun, name: string): { reason: string; lines: string[] }[];
     /** What is left lying in its box once everybody is out: arrows, say. */
     closeLines?(box: stored.Box): string[];
 }

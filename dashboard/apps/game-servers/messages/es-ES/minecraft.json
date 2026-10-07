@@ -1663,7 +1663,7 @@
             },
             "king-of-the-hill": {
                 "label": "Rey del ring",
-                "summary": "Quien se apunta sube a un ring flotante, solo con los puños y sin poder morir. Solo cuenta el tiempo a solas dentro, así que hay que echar a los demás; en cada ronda se encoge y se mueve, y quien va primero lleva corona.",
+                "summary": "Quien se apunta sube a un ring flotante, solo con los puños y sin poder morir. El tiempo dentro suma, y el triple a solas, así que echar a los demás compensa; en cada ronda se encoge y se mueve, y quien va primero lleva corona.",
                 "unit": "segundos"
             },
             "treasure-hunt": {

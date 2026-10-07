@@ -147,6 +147,25 @@ export function entrySpots(place: Point, radius: number, count: number): Spot[] 
     });
 }
 
+/** How far inside the ring's edge everybody starts. */
+export const START_MARGIN = 2;
+
+/**
+ * Where each player starts a round, "Go!" included: evenly round a circle
+ * `START_MARGIN` inside the ring that is in force then - whole, in the middle -
+ * facing the middle. Inside it, never on its edge: nobody starts a round out
+ * of the ring, or one step from being out of it.
+ */
+export function startSpots(place: Point, radius: number, count: number): Spot[] {
+    const ring = Math.max(0, radius - START_MARGIN);
+    return Array.from({ length: Math.max(1, count) }, (_unused, index) => {
+        const angle = (index / Math.max(1, count)) * Math.PI * 2;
+        const x = place.x + Math.round(Math.cos(angle) * ring);
+        const z = place.z + Math.round(Math.sin(angle) * ring);
+        return { x, y: place.y, z, yaw: ring === 0 ? 0 : yawTowards({ x, z }, place) };
+    });
+}
+
 /**
  * Into the hill at a spot: on the ground under the air over it where the server
  * can say where that is (1.19.4 and later), and at the circle's own height
@@ -286,6 +305,13 @@ export const SPRINT_SECONDS = 20;
 /** The breath between rounds, everybody back on their spot. */
 export const RING_PAUSE_SECONDS = 6;
 
+/**
+ * After "Go!" - and after each round's pause - the ring stays whole and still
+ * this long before it first shrinks or moves: time to find your feet, never a
+ * ring that closes as the round starts.
+ */
+export const GRACE_SECONDS = 5;
+
 export const ROUNDS = { least: 1, most: 5 } as const;
 
 /**
@@ -338,7 +364,11 @@ export function ringAt(settings: RingSettings, totalMs: number, elapsedMs: numbe
     const playMs = Math.max(1, length - pauseMs);
     const played = Math.max(0, into - pauseMs);
     const sprintMs = Math.min(SPRINT_SECONDS * 1000, playMs / 3);
-    const shrinkMs = playMs - sprintMs;
+    // Whole and still for the grace first; it then shrinks to its least by
+    // the time the sprint starts, as it always did.
+    const graceMs = Math.min(GRACE_SECONDS * 1000, (playMs - sprintMs) / 2);
+    const shrinkMs = Math.max(1, playMs - sprintMs - graceMs);
+    const moving = Math.max(0, played - graceMs);
     const least = settings.shrinks
         ? leastRadius(settings.radius, settings.players)
         : settings.radius;
@@ -354,7 +384,7 @@ export function ringAt(settings: RingSettings, totalMs: number, elapsedMs: numbe
     if (settings.moves && !pause) {
         const random = seeded(`${settings.seed}-ring-${round}`);
         let target: { x: number; z: number } | null = null;
-        const moves = Math.floor(played / (MOVE_SECONDS * 1000));
+        const moves = Math.floor(moving / (MOVE_SECONDS * 1000));
         for (let step = 1; step <= moves; step += 1) {
             // The room to drift grows as the ring shrinks; it never shrinks.
             const room = settings.radius - radiusAt(step * MOVE_SECONDS * 1000) + DRIFT;
@@ -370,7 +400,14 @@ export function ringAt(settings: RingSettings, totalMs: number, elapsedMs: numbe
             else if (az !== 0) dz += Math.sign(az);
         }
     }
-    return { round, pause, sprint: !pause && played >= shrinkMs, dx, dz, radius: radiusAt(played) };
+    return {
+        round,
+        pause,
+        sprint: !pause && played >= graceMs + shrinkMs,
+        dx,
+        dz,
+        radius: radiusAt(moving)
+    };
 }
 
 /** A whole-block point no farther than `room` from the middle. */
@@ -395,10 +432,14 @@ export function ringCenter(place: Point, ring: Pick<Ring, "dx" | "dz">): Point {
 export const INSIDE_SCORE = HILL_INSIDE;
 const INSIDE_HOLDER = "#inside";
 
+/** How many times the time counts for somebody alone in the ring. */
+export const ALONE_TIMES = 3;
+
 /**
- * Time in the ring, for whoever stands in it alone: two in it and neither
- * scores, so the other has to be pushed out. Counted inside the game, in the
- * same tick it is seen. `seconds` is already doubled in a sprint.
+ * Time in the ring, for everybody in it - and `ALONE_TIMES` as much for
+ * somebody in it alone, so pushing the others out still pays. Counted inside
+ * the game, in the same tick it is seen, in the same three lines however many
+ * play. `seconds` is already doubled in a sprint.
  */
 export function scoreLines(center: Point, radius: number, seconds: number): string[] {
     const inRing = `@a[tag=${IN_ARENA},distance=..${radius},gamemode=!spectator]`;
@@ -406,7 +447,8 @@ export function scoreLines(center: Point, radius: number, seconds: number): stri
     return [
         `scoreboard objectives add ${INSIDE_SCORE} dummy`,
         `execute ${at} store result score ${INSIDE_HOLDER} ${INSIDE_SCORE} if entity ${inRing}`,
-        `execute if score ${INSIDE_HOLDER} ${INSIDE_SCORE} matches 1 ${at} as ${inRing} run scoreboard players add @s ${SCORE} ${seconds}`
+        `execute ${at} as ${inRing} run scoreboard players add @s ${SCORE} ${seconds}`,
+        `execute if score ${INSIDE_HOLDER} ${INSIDE_SCORE} matches 1 ${at} as ${inRing} run scoreboard players add @s ${SCORE} ${seconds * (ALONE_TIMES - 1)}`
     ];
 }
 

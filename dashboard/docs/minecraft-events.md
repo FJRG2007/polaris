@@ -250,8 +250,10 @@ left out.
 - **The ring** (`hill.ringAt`) is worked out from the run's id and the time
   since "Go!" alone, so a restart puts it back where it was:
     - The game is split into `rounds` (1-5, three by default). Each starts with
-      the ring whole, in the middle, everybody back on their spot; from the
-      second on, `RING_PAUSE_SECONDS` of nothing counted first.
+      the ring whole, in the middle, everybody on their own start spot
+      `hill.START_MARGIN` inside its edge (`hill.startSpots`); from the second
+      on, `RING_PAUSE_SECONDS` of nothing counted first. It neither shrinks
+      nor moves for `GRACE_SECONDS` after "Go!" or after the pause.
     - It shrinks a block at a time (`shrinks`) to `hill.leastRadius`: enough
       ground for `ROOM_EACH` blocks a player, never under `LEAST_RADIUS` (2),
       never over its own radius. Two players fight over a ring of two, sixteen
@@ -261,8 +263,9 @@ left out.
       the run's id, never past `MARGIN - 1` beyond its first edge, so it stays
       on the platform's own floor.
     - The last `SPRINT_SECONDS` of a round (at most a third of it) count double.
-    - Only time alone in it counts (`hill.scoreLines`, counted in the game in
-      the same tick): two in it and neither scores.
+    - Time in it counts for everybody in it, and `hill.ALONE_TIMES` (three)
+      times over for whoever is in it alone (`hill.scoreLines`, counted in the
+      game in the same tick, the same four lines however many play).
     - The one alone at the top glows and wears a golden helmet marked as the
       event's kit (from 1.17, where their head was emptied on the way in), taken
       back from whoever falls behind and at the end with the rest.
@@ -1127,9 +1130,11 @@ One entry per bug: what a player saw, why, and the rule that keeps it gone.
 - **Hide and seek is won by a minimap radar.** Each entrant is sent Xaero's
   Minimap fair-play code at Go, again when they come back on the server, and
   the reset code at the end (`hs.RADAR_OFF`, `hs.RADAR_RESET`). Its limit:
-  only Xaero's maps read it - any other minimap still shows players - and an
-  entrant off the server at the end is not sent the reset. Not yet tried with
-  a live client.
+  only Xaero's maps read it - any other minimap still shows players. An
+  entrant off the server at the end is owed the reset (`state.owedLines`,
+  `ArenaGame.owedLines`): sent when they are next seen and nothing of theirs
+  is held, one per player and reason, dropped after `PENDING_KEPT_MS`, at most
+  `OWED_LINES_MAX` on a server. Not yet tried with a live client.
 - **Dropper racers kicked with "Flying is not enabled" partway down.** Vanilla
   allows 80 ticks airborne before it calls it flying, and Slow Falling does not
   lengthen that. Racers fall with a lighter `gravity` attribute for the run
@@ -1157,3 +1162,56 @@ One entry per bug: what a player saw, why, and the rule that keeps it gone.
   player): a stage tick or an arena end never waits on it. Somebody who logs
   off mid-drain keeps what it reached. Restored once and never by a retry from
   the panel. A peaceful world refills food on its own; not exact there.
+- **Every step of an event waited for the next tick.** Measured on a live
+  server, the game answers 200 commands in 15 ms; the time went on the trip
+  into the container (about 60 ms from the host, more through hostd) and on
+  the event loop's tick of 2 s, one step a tick: the join closed, then a tick
+  later the start, a tick later the enrolment, the place, the site, the build,
+  everybody brought in, the first look - 18 s from the join closing to the
+  countdown for a two-player duel, 19 s for a dropper that also built its
+  shaft one box a trip. The rules (`kinds/pace.ts`):
+    - A step with nothing to wait for runs straight after the one before, in
+      the same tick (`pace.STEPS_AT_ONCE`): the start follows the join window
+      on its second, the first step follows the start, enrolled -> placed ->
+      site held -> built -> brought in -> the first look at whether they are
+      in. What really waits - the place searched, chunks slow to load, somebody
+      not in yet, the 3-2-1 countdown, a fall settling, a stash's settle - still
+      waits as before. Chunks just held get `LOAD_PAUSE_MS` (250 ms) in the
+      tick before they are counted, and the ticks they always had after that.
+    - What several players each need goes in shared trips
+      (`pace.coalescing`): everybody's stash, give-back and health and hunger
+      restore run side by side, their plain reads of one player through
+      `sayEach`, their lines in one `sayAll`. A step costs about the same trips
+      for 1 player or 30 (12 players' stash: 84 trips -> 4; give-back with the
+      health restore: 60 -> 5). Only reads that answer the same through
+      `sayEach` are shared (`PLAIN_READ`): nothing split by language, no paged
+      read of `@a`, no `forceload`. A trip is kept to 12 KB of commands;
+      answers past the 16 KiB a trip hands back are asked again together.
+    - Block work is paced so no trip holds the server's main thread long: a
+      build places at most one full `fill` (32,768 blocks) a trip to start
+      with, two at most; a teardown scans eight fills' worth, 25 at most
+      (`pace.buildPacer`, `pace.teardownPacer`). A trip that took more than
+      `SLOW_TRIP_MS` longer than the quickest halves the next - a modded server
+      with a slow tick gets smaller trips without reporting its tick - and a
+      quick one doubles it again. A stage's boxes come down several to a trip
+      only once every chunk under them answers loaded (`pace.allLoaded`), so a
+      box that would not come out can never be passed by the ones after it.
+    - Arenas are built where they always were, near the players, and every
+      command is one each supported server accepts: nothing needs the Polaris
+      mod or a data pack.
+      Faster still needs code inside the server, and a restart to load it: a
+      Polaris mod command, or a data-pack function walking a storage list with a
+      macro (1.20.2+), would run a whole batch - every stash, every entry, every
+      give-back, an inventory swap in memory - in one server tick and one trip.
+      Not done: it would not reach a server without the mod or the pack.
+- **King of the ring scored nobody once it got busy.** Only a player alone in
+  the ring scored (`matches 1`), so with many in it nobody was ever ranked.
+  Everybody in it scores now, and the one alone in it three times as much
+  (`hill.ALONE_TIMES`), still in four lines however many play.
+- **King of the ring started players outside the ring, and it closed as the
+  round began.** Everybody started a block outside the edge, and the ring
+  took its first step the moment "Go!" or a round's pause ended - on a short
+  round, seconds later. Players now start `hill.START_MARGIN` inside the
+  whole ring (`hill.startSpots`); knocked off, they come back at the edge as
+  before. Nothing shrinks or moves for `hill.GRACE_SECONDS` after "Go!" and
+  after each pause, and the ring is still at its smallest by the sprint.

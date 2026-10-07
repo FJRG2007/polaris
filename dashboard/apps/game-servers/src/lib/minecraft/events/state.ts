@@ -353,6 +353,21 @@ const pendingSchema = z.object({
 export type PendingReward = z.infer<typeof pendingSchema>;
 
 /**
+ * Lines an event's end owes one player who was not on when it ended - a
+ * minimap's radar given back after hide and seek - sent when they are next
+ * seen, and dropped once `until` has passed. One per player and reason.
+ */
+const owedLinesSchema = z.object({
+    player: z.string(),
+    /** What they put right, so a second end owing the same replaces the first. */
+    reason: z.string(),
+    lines: z.array(z.string()),
+    until: z.number()
+});
+
+export type OwedLines = z.infer<typeof owedLinesSchema>;
+
+/**
  * An arena an event has ended with and not yet been able to take down, because
  * somebody who was in it is not online to be taken back: logging in, they are
  * in it, enclosed and safe, rather than in the air where it was. The sweep puts
@@ -379,6 +394,8 @@ export const eventStateSchema = z.object({
     run: runSchema.nullable().default(null),
     history: z.array(historySchema).default([]),
     pending: z.array(pendingSchema).default([]),
+    /** Lines owed to players who were not on when an event ended. */
+    owedLines: z.array(owedLinesSchema).default([]),
     /** When the next automatic event may come. Null until the draw first runs. */
     nextRandomAt: z.number().nullable().default(null),
     /** Why the one that was due has not started, for the screen. */
@@ -417,10 +434,27 @@ export const PENDING_KEPT_MS = 14 * 24 * 60 * 60 * 1000;
 /** How many prizes may wait at once, so a server nobody plays cannot grow it forever. */
 export const PENDING_MAX = 200;
 
+/** How many players may be owed lines at once, the oldest let go first. */
+export const OWED_LINES_MAX = 200;
+
+/** Owed lines still in time, `added` replacing any owed the same player for the same reason. */
+export function withOwedLines(
+    owed: readonly OwedLines[],
+    added: readonly OwedLines[],
+    now: number
+): OwedLines[] {
+    const key = (one: OwedLines) => `${one.player.toLowerCase()} ${one.reason}`;
+    const replaced = new Set(added.map(key));
+    return [...owed.filter((one) => !replaced.has(key(one))), ...added]
+        .filter((one) => one.until > now)
+        .slice(-OWED_LINES_MAX);
+}
+
 export const EMPTY_EVENT_STATE: EventState = {
     run: null,
     history: [],
     pending: [],
+    owedLines: [],
     nextRandomAt: null,
     waiting: null,
     short: false,

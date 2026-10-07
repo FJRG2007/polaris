@@ -1663,7 +1663,7 @@
             },
             "king-of-the-hill": {
                 "label": "King of the ring",
-                "summary": "Who joins is brought to a ring floating in the air, fists only, where nobody can die. Only time alone in the ring counts, so the others have to be pushed out; over each round it shrinks and moves, and the one ahead wears a crown.",
+                "summary": "Who joins is brought to a ring floating in the air, fists only, where nobody can die. Time in the ring scores, and three times as much alone in it, so pushing the others out pays; over each round it shrinks and moves, and the one ahead wears a crown.",
                 "unit": "seconds"
             },
             "treasure-hunt": {
