@@ -38,6 +38,7 @@ final class EventBatch {
     private static final int PLACE_WEIGHT = 4096;
     /** The share of a 50 ms tick the batches may take, all of them together. */
     private static final long TICK_BUDGET_NANOS = 15_000_000L;
+    private static final int BATCH_PERMISSION = 2;
     private static final int FINISHED_KEPT = 64;
 
     private static final class Job {
@@ -153,7 +154,7 @@ final class EventBatch {
     private static void step(MinecraftServer server, Job job, long start) {
         long began = System.nanoTime();
         FailureEar ear = new FailureEar();
-        CommandSourceStack source = server.createCommandSourceStack().withSource(ear);
+        CommandSourceStack source = server.createCommandSourceStack().withSource(ear).withPermission(BATCH_PERMISSION);
         long blocks = 0;
         int ran = 0;
         while (!job.pending.isEmpty()) {

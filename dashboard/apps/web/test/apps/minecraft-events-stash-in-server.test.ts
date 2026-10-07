@@ -15,7 +15,8 @@ vi.mock("@polaris/db", () => ({
         eventInventoryStash: {
             create: async () => {
                 throw new Error("the mod path writes no database copy");
-            }
+            },
+            findUnique: async () => null
         }
     }
 }));
@@ -109,6 +110,25 @@ describe("giving back in the server", () => {
         expect(await giveBack(server, "Ana", kept(["a"]), async () => undefined)).toBe("offline");
         answer = () => "Unknown or incomplete command";
         expect(await giveBack(server, "Ana", kept(["a"]), async () => undefined)).toBe("later");
+    });
+
+    it("keeps a key whose file the mod could not read, for later", async () => {
+        answer = () => '{"ok":false,"why":"unreadable"}';
+        const saves: (Stash | null)[] = [];
+        expect(await giveBack(server, "Ana", kept(["a"]), async (left) => void saves.push(left))).toBe("later");
+        expect(saves).toEqual([]);
+    });
+
+    it("gives back what was kept the plain way next to the mod's keys", async () => {
+        answer = (command) =>
+            String(command).startsWith("polaris stash restore")
+                ? '{"ok":true,"restored":true,"slotted":1,"moved":0,"dropped":0}'
+                : "";
+        const saves: (Stash | null)[] = [];
+        const mixed = { ...kept(["a"]), record: "row-1" } as Stash;
+        expect(await giveBack(server, "Ana", mixed, async (left) => void saves.push(left))).toBe("offline");
+        expect(said[0]).toBe("polaris stash restore Ana a");
+        expect(saves).toEqual([{ ...mixed, mod: [] }]);
     });
 
     it("counts a key given back already as done", async () => {

@@ -101,7 +101,7 @@ final class EventStash {
             CompoundTag kept = read(file);
             reply.addProperty("ok", kept != null);
             reply.addProperty("already", true);
-            if (kept == null) reply.addProperty("why", "missing");
+            if (kept == null) reply.addProperty("why", Files.exists(file) ? "unreadable" : "missing");
             else describe(reply, kept);
             return reply;
         }
@@ -187,8 +187,9 @@ final class EventStash {
         }
         // The mark and a renamed file: given back before a crash undid it.
         Path source = Files.exists(file) ? file : restored;
+        if (!Files.exists(source)) return refuse(reply, "missing");
         CompoundTag kept = read(source);
-        if (kept == null) return refuse(reply, "missing");
+        if (kept == null) return refuse(reply, "unreadable");
 
         HolderLookup.Provider registries = server.registryAccess();
         Inventory inventory = player.getInventory();

@@ -541,7 +541,20 @@ export async function giveBack(
     save: (left: stash.Stash | null) => Promise<void>,
     wait: (ms: number) => Promise<unknown> = pause
 ): Promise<GiveBack> {
-    if (kept.mod.length > 0) return giveBackInServer(server, name, kept, save);
+    if (kept.mod.length > 0) {
+        const rest: stash.Stash = { ...kept, mod: [] };
+        const plain =
+            rest.record !== null ||
+            rest.kept.length > 0 ||
+            rest.barrels.length > 0 ||
+            rest.casing.length > 0 ||
+            rest.experience !== null ||
+            rest.vitals !== null;
+        if (!plain) return giveBackInServer(server, name, kept, save);
+        const inside = await giveBackInServer(server, name, kept, (left) => save(left ?? rest));
+        if (inside !== "done") return inside;
+        kept = rest;
+    }
     const current = await readLiveInventory(askerOf(server), name);
     if (!current.answered) return "offline";
     const copy = await copyOf(kept.record);
