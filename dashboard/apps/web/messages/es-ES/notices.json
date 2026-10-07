@@ -291,5 +291,14 @@
         "movedTitle": "{name} cambió de dirección",
         "movedBody": "{name} pasó de {from} a {to} en tu red, y Polaris lo sigue ahí. Para que no vuelva a cambiar, reserva {to} para el dispositivo {mac} en los ajustes DHCP del router.",
         "movedBodyNoMac": "{name} pasó de {from} a {to} en tu red, y Polaris lo sigue ahí. Para que no vuelva a cambiar, reserva {to} para él en los ajustes DHCP del router."
+    },
+    "volume": {
+        "downTitle": "{service} no puede leer sus volúmenes NAS",
+        "unreachableBody": "Polaris no llega a {storage}, donde están los volúmenes de {service} ({volumes}). El servicio sigue en marcha, pero no puede leer ni escribir esos archivos. Comprueba que el dispositivo está encendido y conectado: Polaris lo reconecta solo en cuanto responda.",
+        "detachedBody": "Los volúmenes de {service} ({volumes}) no responden dentro del servicio, aunque {storage} sí responde, y reiniciarlo no los ha recuperado. Vuelve a desplegar el servicio; si también falla, su registro de despliegue dice por qué.",
+        "backTitle": "{service} vuelve a leer sus volúmenes NAS",
+        "backBody": "Los volúmenes de {service} ({volumes}) en {storage} vuelven a responder.",
+        "reconnectedTitle": "{service} se reconectó a sus volúmenes NAS",
+        "reconnectedBody": "La conexión con {storage} se había caído, así que {service} no podía leer sus volúmenes ({volumes}). Polaris la ha restablecido y ha reiniciado el servicio."
     }
 }

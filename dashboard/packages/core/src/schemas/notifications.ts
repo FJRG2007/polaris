@@ -179,6 +179,24 @@ export const NOTIFICATION_EVENTS: readonly NotificationEventInfo[] = [
         defaults: { inapp: true, email: false }
     },
     {
+        id: "volume.down",
+        group: "deploy",
+        label: "A service lost its NAS volumes",
+        description: "The storage a service keeps its volumes on stopped answering, and Polaris could not reconnect it.",
+        level: "danger",
+        // Mail on, like a domain that stopped serving: the service keeps running,
+        // so nothing on screen turns red, and the first to notice is its users.
+        defaults: { inapp: true, email: true }
+    },
+    {
+        id: "volume.up",
+        group: "deploy",
+        label: "A service has its NAS volumes back",
+        description: "A service's volumes answer again, or Polaris reconnected them and restarted it.",
+        level: "success",
+        defaults: { inapp: true, email: false }
+    },
+    {
         id: "billing.budget",
         group: "deploy",
         label: "An organization's budget is running out",

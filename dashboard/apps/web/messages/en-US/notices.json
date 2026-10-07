@@ -291,5 +291,14 @@
         "movedTitle": "{name} moved to a new address",
         "movedBody": "{name} moved from {from} to {to} on your network, and Polaris follows it there now. So it does not move again, reserve {to} for the device {mac} in your router's DHCP settings.",
         "movedBodyNoMac": "{name} moved from {from} to {to} on your network, and Polaris follows it there now. So it does not move again, reserve {to} for it in your router's DHCP settings."
+    },
+    "volume": {
+        "downTitle": "{service} cannot read its NAS volumes",
+        "unreachableBody": "Polaris cannot reach {storage}, where the volumes of {service} live ({volumes}). The service is still running, but cannot read or write those files. Check that the device is on and connected: Polaris reconnects it on its own as soon as it answers.",
+        "detachedBody": "The volumes of {service} ({volumes}) do not answer inside the service, although {storage} does, and restarting the service did not bring them back. Redeploy the service; if that fails too, its deploy log says why.",
+        "backTitle": "{service} can read its NAS volumes again",
+        "backBody": "The volumes of {service} ({volumes}) on {storage} answer again.",
+        "reconnectedTitle": "{service} was reconnected to its NAS volumes",
+        "reconnectedBody": "The connection to {storage} had dropped, so {service} could not read its volumes ({volumes}). Polaris reconnected it and restarted the service."
     }
 }
