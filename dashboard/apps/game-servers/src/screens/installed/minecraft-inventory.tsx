@@ -465,7 +465,7 @@ function StackDetails({ item, where }: { item: InventoryItem | null; where: stri
                 {lines.length > 0 && (
                     <ul className="min-h-0 flex-1 overflow-y-auto">
                         {lines.map((line) => (
-                            <li key={line} className="truncate text-muted-foreground" title={line}>
+                            <li key={line} className="break-words text-muted-foreground">
                                 {line}
                             </li>
                         ))}
