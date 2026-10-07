@@ -465,6 +465,43 @@ dialog.pdfSlick-dialog .dialogButton {
 }
 
 /*
+ * The enchantment glint on an inventory stack: a violet light sliding across
+ * the item, as the game draws it. The tile is twice the slot and moves by one
+ * tile, so the loop has no seam. Still, as a tint, for anybody who asked the
+ * system for less motion.
+ */
+@keyframes polaris-glint {
+    from {
+        background-position: 0% 0%;
+    }
+    to {
+        background-position: -200% -200%;
+    }
+}
+
+.item-glint {
+    background-image: linear-gradient(
+        135deg,
+        transparent 0%,
+        rgb(167 139 250 / 0.55) 25%,
+        transparent 50%,
+        rgb(192 132 252 / 0.45) 75%,
+        transparent 100%
+    );
+    background-size: 200% 200%;
+    mix-blend-mode: screen;
+    animation: polaris-glint 3.5s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .item-glint {
+        animation: none;
+        background-image: none;
+        background-color: rgb(167 139 250 / 0.22);
+    }
+}
+
+/*
  * Colours walking across a name.
  *
  * The gradient is tiled at twice the width of the text and moved by exactly one
