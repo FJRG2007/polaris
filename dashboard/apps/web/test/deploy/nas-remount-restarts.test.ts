@@ -56,6 +56,8 @@ vi.mock("@/lib/deploy/runtime", async (load) => ({
     ...(await load<typeof import("@/lib/deploy/runtime")>()),
     getPorts: vi.fn(async () => ports)
 }));
+const notifyVolumeHealth = vi.fn(async () => undefined);
+vi.mock("@/lib/notifications/volume-events", () => ({ notifyVolumeHealth }));
 vi.mock("@/lib/storage-service", () => ({
     resolveMountTarget: vi.fn(async (id: string) => ({ id, kind: "smb", source: "//nas/share" }))
 }));
@@ -68,6 +70,7 @@ beforeEach(() => {
     restarted.length = 0;
     findMany.mockClear();
     ensureMount.mockClear();
+    notifyVolumeHealth.mockClear();
 });
 
 describe("a share mounted again", () => {
@@ -75,6 +78,12 @@ describe("a share mounted again", () => {
         rows = [app("a"), app("b")];
         await restartAppsOnShare("share-1", null);
         expect(restarted).toHaveLength(2);
+        // Each one's owner hears that its files were unreadable until now.
+        expect(notifyVolumeHealth).toHaveBeenCalledTimes(2);
+        expect(notifyVolumeHealth).toHaveBeenCalledWith(
+            expect.objectContaining({ applicationId: "a" }),
+            "reconnected"
+        );
         const [args] = findMany.mock.calls[0] as [{ where: Record<string, unknown> }];
         expect(args.where).toMatchObject({
             desiredState: "running",
@@ -98,7 +107,7 @@ describe("a share mounted again", () => {
     it("keeps going when one service cannot be restarted", async () => {
         rows = [app("a"), app("b")];
         ports.container.mockRejectedValueOnce(new Error("no such container"));
-        await expect(restartAppsOnShare("share-1", null)).resolves.toBeUndefined();
+        await expect(restartAppsOnShare("share-1", null)).resolves.toEqual(["b"]);
         expect(restarted).toHaveLength(1);
     });
 });

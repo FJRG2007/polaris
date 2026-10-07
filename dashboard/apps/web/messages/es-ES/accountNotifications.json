@@ -211,6 +211,14 @@
             "label": "Un dominio vuelve a funcionar",
             "description": "Un dominio que había dejado de responder vuelve a estar accesible."
         },
+        "volumeDown": {
+            "label": "Un servicio perdió sus volúmenes NAS",
+            "description": "El almacenamiento donde un servicio guarda sus volúmenes dejó de responder y Polaris no pudo reconectarlo."
+        },
+        "volumeUp": {
+            "label": "Un servicio recuperó sus volúmenes NAS",
+            "description": "Los volúmenes de un servicio vuelven a responder, o Polaris los reconectó y reinició el servicio."
+        },
         "billingBudget": {
             "label": "Se está acabando el presupuesto de una organización",
             "description": "Lo que ha gastado este mes una organización que gestionas ha llegado al 80 % de su presupuesto o lo ha superado."

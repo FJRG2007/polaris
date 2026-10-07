@@ -82,6 +82,8 @@ import {
     githubTokenForOwner
 } from "./github-access";
 import * as deployReleases from "./deploy/releases";
+import { forgetVolumeNotice } from "./deploy/volume-watch";
+import { notifyVolumeHealth } from "./notifications/volume-events";
 import {
     appEdgeConfigSchema,
     applicationDefaultWafPresets,
@@ -1957,13 +1959,16 @@ function restartingOnRemount(
  * whoever re-creates the mount (a deploy, Drive, the boot reconcile) calls this.
  *
  * `except` is the app a deploy is bringing up right now, whose new container binds
- * the fresh mount anyway. Best-effort: failures are logged, never thrown.
+ * the fresh mount anyway. Each service restarted is told to its owner and
+ * followers. Best-effort: failures are logged, never thrown. Resolves to the ids
+ * of the services it restarted.
  */
 export async function restartAppsOnShare(
     connectionId: string,
     machine: string | null,
     except?: string
-): Promise<void> {
+): Promise<string[]> {
+    const restarted: string[] = [];
     const apps = await prisma.application
         .findMany({
             where: {
@@ -1980,7 +1985,11 @@ export async function restartAppsOnShare(
                 id: true,
                 slug: true,
                 target: true,
-                environment: { select: { project: { select: { ownerId: true, slug: true } } } }
+                environment: { select: { project: { select: { ownerId: true, slug: true } } } },
+                volumes: {
+                    where: { kind: "nas", connectionId },
+                    select: { name: true, connection: { select: { name: true } } }
+                }
             }
         })
         .catch((error) => {
@@ -2005,6 +2014,19 @@ export async function restartAppsOnShare(
             ).name;
             await ports.container(container, "restart");
             console.log(`polaris: share ${connectionId} was mounted again, restarted ${app.slug}`);
+            restarted.push(app.id);
+            forgetVolumeNotice(app.id);
+            // Its files were unreadable until now, which the owner hears about
+            // even though Polaris mended it: a service that could not read its
+            // volumes for a while may have failed somebody in the meantime.
+            await notifyVolumeHealth(
+                {
+                    applicationId: app.id,
+                    storage: app.volumes[0]?.connection?.name ?? connectionId,
+                    volumes: app.volumes.map((volume) => volume.name)
+                },
+                "reconnected"
+            );
         } catch (error) {
             console.error(
                 `polaris: could not restart ${app.slug} onto share ${connectionId}:`,
@@ -2014,6 +2036,7 @@ export async function restartAppsOnShare(
             await ports.dispose().catch(() => undefined);
         }
     }
+    return restarted;
 }
 
 // --- deployment lifecycle (restart / disable / remove) ----------------------

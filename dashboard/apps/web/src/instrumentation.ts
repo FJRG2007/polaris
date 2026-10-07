@@ -130,6 +130,13 @@ export async function register(): Promise<void> {
         console.error("polaris: initial NAS mount reconcile failed:", error)
     );
 
+    // And keep them attached afterwards: a NAS that drops or changes address
+    // takes a running service's volumes with it, and the service keeps running
+    // with every file answering "Host is down". The watcher mends what it can and
+    // tells the service's owner what it cannot.
+    const { startVolumeWatcher } = await import("./lib/deploy/volume-watch");
+    startVolumeWatcher();
+
     // Mint (once) an internal CA + leaf for the LAN hostnames and hand the leaf to
     // Traefik as its default certificate, so polaris.local can be trusted HTTPS
     // once the operator installs the root. Best-effort: a failure keeps the
