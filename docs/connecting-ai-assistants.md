@@ -438,22 +438,22 @@ assistant is told both and asked for the one it means; it never picks.
 
 Offered only while their app is installed:
 
-| Tool                                    | Permission                        | Kind                   |
-| --------------------------------------- | --------------------------------- | ---------------------- |
-| `calendar_upcoming`                     | `calendar.read` or `calendar.use` | read                   |
-| `calendar_calendars`, `calendar_events` | `calendar.read`                   | read                   |
-| `calendar_create`                       | `calendar.manage`                 | adds                   |
-| `calendar_update`                       | `calendar.manage`                 | changes                |
-| `calendar_delete`                       | `calendar.manage`                 | changes (to the trash) |
-| `clock_list`                            | `calendar.read`                   | read                   |
-| `clock_timer_start`                     | `calendar.manage`                 | adds                   |
-| `clock_alarm_set`, `clock_alarm_change`, `clock_timer_change` | `calendar.manage` | changes                |
-| `places_devices`                        | `places.read`                     | read                   |
-| `places_device_control`                 | `places.control`                  | changes                |
-| `places_routines`                       | `places.routines`                 | read                   |
-| `places_routine_run`                    | `places.routines`                 | adds (a run)           |
-| `games_servers`, `games_server_status`  | `gameservers.read`                | read                   |
-| `games_server_power`, `games_console`   | `gameservers.manage`              | changes                |
+| Tool                                                          | Permission                        | Kind                   |
+| ------------------------------------------------------------- | --------------------------------- | ---------------------- |
+| `calendar_upcoming`                                           | `calendar.read` or `calendar.use` | read                   |
+| `calendar_calendars`, `calendar_events`                       | `calendar.read`                   | read                   |
+| `calendar_create`                                             | `calendar.manage`                 | adds                   |
+| `calendar_update`                                             | `calendar.manage`                 | changes                |
+| `calendar_delete`                                             | `calendar.manage`                 | changes (to the trash) |
+| `clock_list`                                                  | `calendar.read`                   | read                   |
+| `clock_timer_start`                                           | `calendar.manage`                 | adds                   |
+| `clock_alarm_set`, `clock_alarm_change`, `clock_timer_change` | `calendar.manage`                 | changes                |
+| `places_devices`                                              | `places.read`                     | read                   |
+| `places_device_control`                                       | `places.control`                  | changes                |
+| `places_routines`                                             | `places.routines`                 | read                   |
+| `places_routine_run`                                          | `places.routines`                 | adds (a run)           |
+| `games_servers`, `games_server_status`                        | `gameservers.read`                | read                   |
+| `games_server_power`, `games_console`                         | `gameservers.manage`              | changes                |
 
 Each tool applies the same rules as the app's own screens: a calendar shared
 with you read-only stays read-only, a device somebody lent you is the only one

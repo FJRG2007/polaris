@@ -305,9 +305,11 @@ const createInput = z.object({
     timeZone,
     location: z.string().trim().max(1000).default("").describe("Where it is."),
     description: z.string().max(20_000).default("").describe("Notes on it."),
-    reminders: reminders.optional().describe(
-        "Minutes before the start to be reminded, e.g. [10, 60]. Absent uses the calendar's usual reminders; [] sets none."
-    )
+    reminders: reminders
+        .optional()
+        .describe(
+            "Minutes before the start to be reminded, e.g. [10, 60]. Absent uses the calendar's usual reminders; [] sets none."
+        )
 });
 
 const createTool = () =>
