@@ -374,12 +374,13 @@ async function announceCheck(
         // Named for the service, so a repository holding several gets a line
         // each rather than one they take turns overwriting.
         const name = `Polaris - ${info.label}`;
-        const target = where ?? live;
-        // A commit status first, when there is somewhere for its Details to go:
+        // A commit status first, when Polaris has somewhere for its Details to go:
         // a check run's Details opens GitHub's page for the run, a status's opens
         // the target itself. An App without the Commit statuses permission gets
-        // the check run, as before.
-        if (target) {
+        // the check run, as before. Decided on the panel link alone, which is the
+        // same for every state of one deploy, so its row never changes kind
+        // between queued and done and leaves the first one spinning.
+        if (where) {
             const stated = await publishCommitStatus({
                 owner: info.owner,
                 repo: info.repo,
@@ -387,7 +388,7 @@ async function announceCheck(
                 context: name,
                 state: commitState(status, conclusion),
                 description: summary,
-                targetUrl: target,
+                targetUrl: where,
                 token: info.token
             });
             if (stated.status === 201) return;
@@ -400,7 +401,7 @@ async function announceCheck(
             status,
             conclusion,
             summary,
-            detailsUrl: target,
+            detailsUrl: where ?? live,
             token: info.token
         });
         // Only an App may write one, and only where it is installed. The
