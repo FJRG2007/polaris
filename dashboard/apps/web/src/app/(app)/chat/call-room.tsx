@@ -1015,8 +1015,14 @@ export function CallRoom({
                         // Scrolling sideways rather than shrinking further: eight
                         // faces on a phone, each a twelfth of a strip, are eight
                         // grey squares.
+                        //
+                        // As wide as its faces and centred under the screen,
+                        // never wider than the panel. Centred with the box, not
+                        // with justify-content: a centred track list that
+                        // overflows hangs off both ends, and the left one
+                        // cannot be scrolled to.
                         staged
-                            ? "h-[6.25rem] shrink-0 auto-cols-[9rem] grid-flow-col overflow-x-auto"
+                            ? "h-[6.25rem] w-max max-w-full shrink-0 self-center auto-cols-[9rem] grid-flow-col overflow-x-auto"
                             : cn("flex-1", columns)
                     )}
                 >
