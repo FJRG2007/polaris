@@ -103,7 +103,9 @@ describe("the preferences card", () => {
         const sounds = screen.getByRole("switch", { name: "Seasonal sounds" });
         act(() => fireEvent.click(sounds));
         expect(save).toHaveBeenCalledWith({ sounds: true });
-        await waitFor(() => expect(screen.getByRole("alert").textContent).toContain("could not be saved"));
+        await waitFor(() =>
+            expect(screen.getByRole("alert").textContent).toContain("could not be saved")
+        );
         expect(sounds.getAttribute("aria-checked")).toBe("false");
     });
 

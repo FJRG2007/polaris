@@ -242,7 +242,10 @@ export const SOUNDS: Record<CallSound, readonly Note[]> = {
  * `seasonal-sounds` checks that it does. What changes is the notes and the
  * wave: that is what makes a season recognisable in the first half-second.
  */
-function ringOf(notes: readonly [number, number, number], extra: Partial<Note> = {}): readonly Note[] {
+function ringOf(
+    notes: readonly [number, number, number],
+    extra: Partial<Note> = {}
+): readonly Note[] {
     const [a, b, c] = notes;
     return [
         { from: a, at: 0, seconds: 1, gain: RING_GAIN, bell: true, ...extra },

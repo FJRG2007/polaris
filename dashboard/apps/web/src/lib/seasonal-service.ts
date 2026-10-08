@@ -16,7 +16,9 @@ import { getSetting, setSetting } from "@/lib/setting-store";
 const SETTING_KEY = "seasonal.enabled";
 
 /** Whether the operator lets seasons show at all on this deployment. */
-export const seasonsAllowed = cache(async (): Promise<boolean> => (await getSetting(SETTING_KEY)) !== "off");
+export const seasonsAllowed = cache(
+    async (): Promise<boolean> => (await getSetting(SETTING_KEY)) !== "off"
+);
 
 export async function setSeasonsAllowed(allowed: boolean): Promise<void> {
     await setSetting(SETTING_KEY, allowed ? null : "off");

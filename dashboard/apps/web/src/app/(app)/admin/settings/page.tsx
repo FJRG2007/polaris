@@ -42,7 +42,10 @@ export default async function SettingsPage() {
         // Narrow page: centre the column in the content area, header included, and
         // keep it at the top so it does not shift as the update card grows.
         <div className="mx-auto flex w-full max-w-2xl flex-col">
-            <PageHeader title={t("settings.page.title")} description={t("settings.page.description")} />
+            <PageHeader
+                title={t("settings.page.title")}
+                description={t("settings.page.description")}
+            />
             {/* The update this page shows is one the reader now knows about. */}
             <SeenOnVisit screen="/admin/settings" />
             <SettingsView
