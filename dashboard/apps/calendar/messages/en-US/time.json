@@ -154,8 +154,8 @@
             "title": "In your world clock"
         },
         "indicator": {
-            "timer": "{name}: {left} left. Open timers",
-            "stopwatch": "Stopwatch at {reading}. Open stopwatch"
+            "timerEnds": "{name}: ends at {time}. Open the timers",
+            "stopwatchRunning": "Stopwatch running. Open stopwatch"
         },
         "ring": {
             "stop": "Stop",

@@ -10,10 +10,17 @@
  * snooze or add a minute - whatever screen is open. One tab per browser rings
  * a given ring; the server rings it for everybody else (the bell, the desktop
  * app, whatever routes the person set up) when no tab stopped it first.
+ *
+ * The pill counts every second; what it says on hover does not. A browser
+ * hides a tooltip whose text changes and shows it again, so a label carrying
+ * the countdown blinked once a second and could not be read. The hover says
+ * what does not move - the timer's name and when it ends - and the count stays
+ * in the pill.
  */
 
 import Link from "next/link";
 import { useEffect, type ReactElement } from "react";
+import { hostUi } from "@polaris/app-host/client";
 import { useCalendarT } from "../i18n";
 import { Timer, Watch } from "lucide-react";
 import * as model from "../../lib/clock/model";
@@ -23,6 +30,8 @@ import { useClock, useServerNow } from "./store";
 
 export function TimeIndicator() {
     const t = useCalendarT();
+    const locale = hostUi.i18nProvider.useLocale();
+    const format = hostUi.displayFormat.useDisplayFormat();
     const clock = useClock();
     const snapshot = clock.snapshot;
     const running = snapshot?.timers.filter((timer) => timer.endsAt !== null) ?? [];
@@ -49,7 +58,12 @@ export function TimeIndicator() {
             (soonest.pomodoro
                 ? t(`time.focus.phase.${soonest.pomodoro.phase}`)
                 : t("time.timers.untitled", { length: lengthText(soonest.durationMs, t) }));
-        const label = t("time.indicator.timer", { name, left: model.formatCountdown(left) });
+        const ends = new Intl.DateTimeFormat(locale, {
+            hour: "numeric",
+            minute: "2-digit",
+            hour12: format.preferences.clock === "12h"
+        }).format(new Date(soonest.endsAt!));
+        const label = t("time.indicator.timerEnds", { name, time: ends });
         pill = (
             <Link
                 href="/calendar/time?tab=timers"
@@ -68,7 +82,7 @@ export function TimeIndicator() {
         );
     } else if (watchRunning && snapshot) {
         const reading = model.formatClockMs(model.stopwatchElapsed(snapshot.stopwatch, now));
-        const label = t("time.indicator.stopwatch", { reading });
+        const label = t("time.indicator.stopwatchRunning");
         pill = (
             <Link
                 href="/calendar/time?tab=stopwatch"

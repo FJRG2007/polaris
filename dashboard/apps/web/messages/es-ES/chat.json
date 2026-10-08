@@ -380,7 +380,6 @@
         "createALink": "Crear enlace",
         "anybodyWithItCanAsk": "Quien lo tenga puede pedir entrar y espera hasta que alguien de aquí le deje pasar. Deja de funcionar cuando acaba la llamada.",
         "forSomebodyWithNoAccount": "Para alguien sin cuenta aquí. Pide entrar y espera hasta que alguien de aquí le deje pasar.",
-        "stopRecordingAt": "Parar grabación ({time})",
         "recordedBy": "{name} está grabando esta llamada.",
         "wantsToJoin": "<who>{name}</who><rest> quiere entrar</rest>",
         "letIn": "Dejar pasar a {name}",
