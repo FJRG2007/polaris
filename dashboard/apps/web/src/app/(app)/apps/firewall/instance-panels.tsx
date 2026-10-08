@@ -23,7 +23,7 @@ import { localizeJail } from "./waf-words";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useDisplayFormat } from "@/components/display-format";
 import type { WafAnomalySettings } from "@/lib/waf-anomaly-service";
-import { useCallback, useEffect, useState, useTransition } from "react";
+import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import type { WafAnomaly, WafJail, WafTrafficSummary } from "@polaris/core";
 import {
     Activity,
@@ -94,6 +94,7 @@ export function FirewallInstancePanels({
 }: {
     callerIp?: string | null;
 }) {
+    const t = useTranslations("firewall");
     const [hours, setHours] = useState(24);
     const [data, setData] = useState<Overview | null>(null);
     const [failure, setFailure] = useState<string | null>(null);
@@ -111,13 +112,21 @@ export function FirewallInstancePanels({
 
     useEffect(() => load(hours), [hours, load]);
 
+    // The overview as it is on screen, outside React, so a change can be applied
+    // and confirmed without running its request inside a state updater - which
+    // StrictMode runs twice, sending every change twice.
+    const current = useRef<Overview | null>(null);
+    current.current = data;
+
     const mutate = useCallback<Mutate>(
         (patch, run) => {
-            setData((current) => {
-                if (!current) return current;
-                const previous = current;
-                setFailure(null);
-                void run().then((result) => {
+            const previous = current.current;
+            if (!previous) return;
+            setFailure(null);
+            setData(patch(previous));
+            void run()
+                .catch(() => ({ error: t("errors.settingsSave") }))
+                .then((result) => {
                     if (result.error) {
                         // Put back exactly what was there. Rolling back to a refetch
                         // instead would also undo anything else changed meanwhile.
@@ -129,10 +138,8 @@ export function FirewallInstancePanels({
                     // of a feed - catch up with the change that was just made.
                     load(hours);
                 });
-                return patch(current);
-            });
         },
-        [hours, load]
+        [hours, load, t]
     );
 
     /**
@@ -306,7 +313,11 @@ function TrafficPanel({
                     <>
                         <div className="flex flex-wrap gap-6">
                             <Stat label={t("panels.requests")} value={grouped(traffic.total)} />
-                            <Stat label={t("panels.blocked")} value={grouped(traffic.blocked)} tone="danger" />
+                            <Stat
+                                label={t("panels.blocked")}
+                                value={grouped(traffic.blocked)}
+                                tone="danger"
+                            />
                             <Stat
                                 label={t("panels.shareBlocked")}
                                 value={
@@ -449,9 +460,7 @@ function AnomaliesPanel({
                 ) : null}
             </CardHeader>
             <CardBody className="flex flex-col gap-3">
-                <p className="text-xs text-muted-foreground">
-                    {t("anomalies.intro")}
-                </p>
+                <p className="text-xs text-muted-foreground">{t("anomalies.intro")}</p>
 
                 {loading ? (
                     <Skeleton className="h-20 w-full" />
@@ -542,7 +551,9 @@ function AnomaliesPanel({
                         <div className="flex items-start justify-between gap-3">
                             <div className="min-w-0">
                                 <div className="text-sm">{t("anomalies.auto")}</div>
-                                <p className="mt-0.5 text-xs text-muted-foreground">{t("anomalies.autoHint")}</p>
+                                <p className="mt-0.5 text-xs text-muted-foreground">
+                                    {t("anomalies.autoHint")}
+                                </p>
                             </div>
                             <Switch
                                 checked={settings.autoBlock}
@@ -632,10 +643,18 @@ function BansPanel({
                         <table className="w-full min-w-[36rem] text-sm">
                             <thead>
                                 <tr className="text-left text-xs text-muted-foreground">
-                                    <th className="px-2 pb-2 font-medium">{t("bans.columns.address")}</th>
-                                    <th className="px-2 pb-2 font-medium">{t("bans.columns.why")}</th>
-                                    <th className="px-2 pb-2 font-medium">{t("bans.columns.until")}</th>
-                                    <th className="px-2 pb-2 font-medium sr-only">{t("list.columns.actions")}</th>
+                                    <th className="px-2 pb-2 font-medium">
+                                        {t("bans.columns.address")}
+                                    </th>
+                                    <th className="px-2 pb-2 font-medium">
+                                        {t("bans.columns.why")}
+                                    </th>
+                                    <th className="px-2 pb-2 font-medium">
+                                        {t("bans.columns.until")}
+                                    </th>
+                                    <th className="px-2 pb-2 font-medium sr-only">
+                                        {t("list.columns.actions")}
+                                    </th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -663,7 +682,9 @@ function BansPanel({
                                             {ban.until ? (
                                                 format.dateTime(ban.until)
                                             ) : (
-                                                <Badge variant="danger">{t("bans.untilLifted")}</Badge>
+                                                <Badge variant="danger">
+                                                    {t("bans.untilLifted")}
+                                                </Badge>
                                             )}
                                         </td>
                                         <td className="px-2 py-2 text-right">
@@ -755,63 +776,67 @@ function JailsPanel({
                 ) : null}
             </CardHeader>
             <CardBody className="flex flex-col gap-3">
-                <p className="text-xs text-muted-foreground">
-                    {t("jails.intro")}
-                </p>
+                <p className="text-xs text-muted-foreground">{t("jails.intro")}</p>
                 {loading ? (
                     <Skeleton className="h-32 w-full" />
                 ) : (
-                    current.map((stored) => localizeJail(stored, t)).map((jail) => (
-                        <div
-                            key={jail.id}
-                            className="flex flex-col gap-2 rounded-md border border-border px-3 py-2.5"
-                        >
-                            <div className="flex items-start justify-between gap-3">
-                                <div className="min-w-0">
-                                    <div className="text-sm">{jail.label}</div>
-                                    <p className="mt-0.5 text-xs text-muted-foreground">
-                                        {jail.description}
-                                    </p>
+                    current
+                        .map((stored) => localizeJail(stored, t))
+                        .map((jail) => (
+                            <div
+                                key={jail.id}
+                                className="flex flex-col gap-2 rounded-md border border-border px-3 py-2.5"
+                            >
+                                <div className="flex items-start justify-between gap-3">
+                                    <div className="min-w-0">
+                                        <div className="text-sm">{jail.label}</div>
+                                        <p className="mt-0.5 text-xs text-muted-foreground">
+                                            {jail.description}
+                                        </p>
+                                    </div>
+                                    <Switch
+                                        checked={jail.enabled}
+                                        onChange={(on) => update(jail.id, { enabled: on })}
+                                        aria-label={jail.label}
+                                    />
                                 </div>
-                                <Switch
-                                    checked={jail.enabled}
-                                    onChange={(on) => update(jail.id, { enabled: on })}
-                                    aria-label={jail.label}
-                                />
+                                {jail.enabled ? (
+                                    <div className="flex flex-wrap gap-3">
+                                        <NumberField
+                                            label={
+                                                jail.counts === "hostnames"
+                                                    ? t("jails.hostnames")
+                                                    : t("panels.requests")
+                                            }
+                                            value={jail.maxRetry}
+                                            min={1}
+                                            max={1000}
+                                            onChange={(value) =>
+                                                update(jail.id, { maxRetry: value })
+                                            }
+                                        />
+                                        <NumberField
+                                            label={t("jails.within")}
+                                            value={Math.round(jail.findTimeSec / 60)}
+                                            min={1}
+                                            max={1440}
+                                            onChange={(value) =>
+                                                update(jail.id, { findTimeSec: value * 60 })
+                                            }
+                                        />
+                                        <NumberField
+                                            label={t("panels.banFor")}
+                                            value={Math.round(jail.banTimeSec / 60)}
+                                            min={1}
+                                            max={43200}
+                                            onChange={(value) =>
+                                                update(jail.id, { banTimeSec: value * 60 })
+                                            }
+                                        />
+                                    </div>
+                                ) : null}
                             </div>
-                            {jail.enabled ? (
-                                <div className="flex flex-wrap gap-3">
-                                    <NumberField
-                                        label={
-                                            jail.counts === "hostnames" ? t("jails.hostnames") : t("panels.requests")
-                                        }
-                                        value={jail.maxRetry}
-                                        min={1}
-                                        max={1000}
-                                        onChange={(value) => update(jail.id, { maxRetry: value })}
-                                    />
-                                    <NumberField
-                                        label={t("jails.within")}
-                                        value={Math.round(jail.findTimeSec / 60)}
-                                        min={1}
-                                        max={1440}
-                                        onChange={(value) =>
-                                            update(jail.id, { findTimeSec: value * 60 })
-                                        }
-                                    />
-                                    <NumberField
-                                        label={t("panels.banFor")}
-                                        value={Math.round(jail.banTimeSec / 60)}
-                                        min={1}
-                                        max={43200}
-                                        onChange={(value) =>
-                                            update(jail.id, { banTimeSec: value * 60 })
-                                        }
-                                    />
-                                </div>
-                            ) : null}
-                        </div>
-                    ))
+                        ))
                 )}
                 {error ? <p className="text-xs text-danger">{error}</p> : null}
             </CardBody>
@@ -925,9 +950,7 @@ function TrustedPanel({
                 ) : null}
             </CardHeader>
             <CardBody className="flex flex-col gap-3">
-                <p className="text-xs text-muted-foreground">
-                    {t("trusted.intro")}
-                </p>
+                <p className="text-xs text-muted-foreground">{t("trusted.intro")}</p>
                 {loading ? (
                     <Skeleton className="h-16 w-full" />
                 ) : (
@@ -1033,9 +1056,7 @@ function BanReason({
         <div
             className={`mb-4 flex flex-col gap-1 rounded-md border p-3 ${active ? "border-danger-edge bg-danger-soft" : "border-border"}`}
         >
-            <p className="text-sm font-medium">
-                {active ? t("ban.blocked") : t("ban.wasBlocked")}
-            </p>
+            <p className="text-sm font-medium">{active ? t("ban.blocked") : t("ban.wasBlocked")}</p>
             <p className="text-sm text-muted-foreground">
                 {ban.note ?? t("ban.noReason")}{" "}
                 {ban.until === null
@@ -1124,7 +1145,11 @@ function AddressDialog({
                     <div className="flex flex-col gap-4">
                         <div className="flex flex-wrap gap-6">
                             <Stat label={t("panels.requests")} value={grouped(activity.total)} />
-                            <Stat label={t("panels.blocked")} value={grouped(activity.blocked)} tone="danger" />
+                            <Stat
+                                label={t("panels.blocked")}
+                                value={grouped(activity.blocked)}
+                                tone="danger"
+                            />
                             {activity.firstSeen ? (
                                 <Stat
                                     label={t("address.firstSeen")}
@@ -1210,10 +1235,18 @@ function AddressDialog({
                             <table className="w-full min-w-[34rem] text-xs">
                                 <thead className="sticky top-0 bg-card">
                                     <tr className="text-left text-muted-foreground">
-                                        <th className="px-2 py-1.5 font-medium">{t("address.columns.when")}</th>
-                                        <th className="px-2 py-1.5 font-medium">{t("address.columns.method")}</th>
-                                        <th className="px-2 py-1.5 font-medium">{t("address.columns.status")}</th>
-                                        <th className="px-2 py-1.5 font-medium">{t("address.columns.path")}</th>
+                                        <th className="px-2 py-1.5 font-medium">
+                                            {t("address.columns.when")}
+                                        </th>
+                                        <th className="px-2 py-1.5 font-medium">
+                                            {t("address.columns.method")}
+                                        </th>
+                                        <th className="px-2 py-1.5 font-medium">
+                                            {t("address.columns.status")}
+                                        </th>
+                                        <th className="px-2 py-1.5 font-medium">
+                                            {t("address.columns.path")}
+                                        </th>
                                     </tr>
                                 </thead>
                                 <tbody>
