@@ -1652,7 +1652,8 @@ async function spleefTick(
         lines.push(tntRun.primedOut(volume));
     } else if (current.armed && variant === "decay" && loop.snowballPack !== true) {
         // No pack: the snow is taken on each look instead, slower.
-        lines.push(...spleef.decayLines(floor, stage.IN_ARENA));
+        const rings = current.goAt === null ? 0 : spleef.shrunk(now - current.goAt);
+        lines.push(...spleef.decayLines(floor, stage.IN_ARENA, rings));
     } else if (current.armed && variant === "snowballs" && Math.floor(now / 1000) % 10 < 2) {
         // Topped up every ten seconds or so: nobody runs out for long.
         const { items } = await tools.flavour();

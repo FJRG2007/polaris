@@ -197,15 +197,17 @@ export function warnBoxes(arena: Arena): Box[] {
 /**
  * One look of the decay game: the red snow of the last look gone, and the snow
  * under each player still in it turned red - only inside the arena's own
- * floors, only where it is still the arena's snow.
+ * floors, only where it is still the arena's snow. With `rings` closed in, the
+ * red ring the floors close in to next is left for `shrinkLines` to take.
  */
-export function decayLines(arena: Arena, inArena: string): string[] {
+export function decayLines(arena: Arena, inArena: string, rings = 0): string[] {
     const r = arena.size;
     const { x, z } = arena.center;
+    const s = rings > 0 ? r - rings - 1 : r;
     return [
-        ...(arena.floors ?? [arena.floor]).map(
+        ...(s < 0 ? [] : (arena.floors ?? [arena.floor])).map(
             (at) =>
-                `execute in minecraft:overworld run fill ${x - r} ${at} ${z - r} ${x + r} ${at} ${z + r} minecraft:air replace ${WARN}`
+                `execute in minecraft:overworld run fill ${x - s} ${at} ${z - s} ${x + s} ${at} ${z + s} minecraft:air replace ${WARN}`
         ),
         `execute in minecraft:overworld as @a[tag=${inArena}] at @s if block ~ ~-1 ~ ${FLOOR} if entity @s[x=${x - r},dx=${2 * r},z=${z - r},dz=${2 * r},y=${arena.floors?.at(-1) ?? arena.floor},dy=${arena.floor - (arena.floors?.at(-1) ?? arena.floor) + 2}] run setblock ~ ~-1 ~ ${WARN}`
     ];

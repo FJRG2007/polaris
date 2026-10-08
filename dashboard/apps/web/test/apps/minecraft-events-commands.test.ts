@@ -2390,6 +2390,18 @@ describe("a spleef floor", () => {
         const step = fresh();
         for (const rings of [1, 2, 3]) apply(step, spleef.shrinkLines(floor, rings));
         expect([...late]).toEqual([...step]);
+        // A decay look over RCON never takes the red ring ahead of its time.
+        const sweeps = (rings: number) =>
+            spleef.decayLines(floor, "in", rings).filter((line) => line.includes(" run fill "));
+        for (let rings = 1; rings <= size + 1; rings += 1) {
+            const shrunk = fresh();
+            apply(shrunk, spleef.shrinkLines(floor, rings));
+            const decayed = fresh();
+            apply(decayed, spleef.shrinkLines(floor, rings));
+            apply(decayed, sweeps(rings));
+            expect([...decayed], `${rings} rings`).toEqual([...shrunk]);
+        }
+        expect(sweeps(0)).toHaveLength(floor.floors.length);
         // Every floor closes in.
         for (const each of floor.floors)
             expect(spleef.shrinkLines(floor, 1).some((line) => line.includes(` ${each} `))).toBe(true);
