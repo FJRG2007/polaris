@@ -34,6 +34,8 @@ import {
 import { getTranslations } from "@/lib/i18n/request";
 import { findAccountsAsAdmin, findPeople, SHORTEST_SEARCH } from "@/lib/people-search";
 import { like } from "@/lib/rich-text/mention-service";
+import { discoverableBy } from "@/lib/privacy-service";
+import { blockedBetween } from "@/lib/blocks";
 import type { NamespaceKey } from "@/lib/i18n/types";
 
 type FirewallKey = NamespaceKey<"firewall">;
@@ -176,6 +178,7 @@ export async function setWafRuleAction(
     if (OPERATOR_SCOPES.has(input.scopeType)) await requirePermission("system.manage");
     try {
         const { scopeType, scopeId, ...rule } = input;
+        if (!(await withinReach(user, scopeType, scopeId, rule))) return { error: await say("errors.outOfReach") };
         await setWafRule(user.id, scopeType, scopeId, rule);
         await recordAudit({
             actorId: user.id,
@@ -198,6 +201,56 @@ export async function setWafRuleAction(
             error: await failure(caught, "errors.save")
         };
     }
+}
+
+/**
+ * Whether every entry a save adds is one the caller could have picked.
+ *
+ * The picker only offers a non-administrator their own roles and groups and the
+ * people they could find anywhere else in Polaris, and the saved rule is what
+ * `listWafPrincipalsAction` later names. Without this check an id typed into the
+ * request would come back with that person's, role's or group's name - so a new
+ * entry has to pass the same reach the picker applies. Entries the stored rule
+ * already holds stay as they are, whoever added them.
+ */
+async function withinReach(
+    user: { id: string; isAdmin: boolean },
+    scopeType: WafScopeType,
+    scopeId: string,
+    rule: Partial<Pick<WafScopeRule, "loginAllowPrincipals" | "loginDenyPrincipals">>
+): Promise<boolean> {
+    if (user.isAdmin) return true;
+    const sent = [...(rule.loginAllowPrincipals ?? []), ...(rule.loginDenyPrincipals ?? [])].map((grant) => grant.ref);
+    if (sent.length === 0) return true;
+    const stored = await getWafRule(user.id, scopeType, scopeId);
+    const kept = new Set([...stored.loginAllowPrincipals, ...stored.loginDenyPrincipals].map((grant) => grant.ref));
+    const added = [...new Set(sent.filter((ref) => !kept.has(ref)))];
+    if (added.length === 0) return true;
+    const roleIds = idsOf(added, "role");
+    const groupIds = idsOf(added, "group");
+    const userIds = idsOf(added, "user").filter((id) => id !== user.id);
+    // An entry that is not a well-formed id of a known kind is nothing the picker offered.
+    if (roleIds.length + groupIds.length + idsOf(added, "user").length !== added.length) return false;
+    const [roles, groups, findable, blocked] = await Promise.all([
+        roleIds.length
+            ? prisma.userRole.findMany({ where: { userId: user.id, roleId: { in: roleIds } }, select: { roleId: true } })
+            : [],
+        groupIds.length
+            ? prisma.groupMember.findMany({
+                  where: { userId: user.id, groupId: { in: groupIds } },
+                  select: { groupId: true }
+              })
+            : [],
+        userIds.length ? discoverableBy({ id: user.id, isAdmin: false }, userIds) : new Set<string>(),
+        userIds.length ? blockedBetween(user.id, userIds) : new Set<string>()
+    ]);
+    const heldRoles = new Set(roles.map((row) => row.roleId));
+    const heldGroups = new Set(groups.map((row) => row.groupId));
+    return (
+        roleIds.every((id) => heldRoles.has(id)) &&
+        groupIds.every((id) => heldGroups.has(id)) &&
+        userIds.every((id) => findable.has(id) && !blocked.has(id))
+    );
 }
 
 /** What one rule matches over the recent log, keyed as the caller asked for it. */

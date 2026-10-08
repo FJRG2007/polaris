@@ -519,7 +519,8 @@
         "tor": "No se pudo cambiar el ajuste de Tor",
         "anomalyInvalid": "Esos ajustes de anomalías no son válidos",
         "settingsSave": "No se pudieron guardar los ajustes",
-        "block": "No se pudo bloquear esa dirección"
+        "block": "No se pudo bloquear esa dirección",
+        "outOfReach": "La regla nombra a alguien que no puedes elegir"
     },
     "panels": {
         "whatDoing": "Qué ha estado haciendo {ip}",

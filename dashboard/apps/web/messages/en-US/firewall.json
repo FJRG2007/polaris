@@ -519,7 +519,8 @@
         "tor": "Could not change the Tor setting",
         "anomalyInvalid": "Those anomaly settings are not valid",
         "settingsSave": "Could not save the settings",
-        "block": "Could not block that address"
+        "block": "Could not block that address",
+        "outOfReach": "That rule names someone you cannot pick here"
     },
     "panels": {
         "whatDoing": "What {ip} has been doing",

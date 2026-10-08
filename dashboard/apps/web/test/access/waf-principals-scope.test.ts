@@ -17,6 +17,10 @@ const OTHER = "00000000-0000-7000-8000-0000000000f0";
 const GROUP = "00000000-0000-7000-8000-0000000000a1";
 
 let caller: { id: string; isAdmin: boolean } = ADMIN;
+/** The roles and groups the customer holds, and the people they can find. */
+let held: string[] = [];
+let findable: string[] = [];
+let blocked: string[] = [];
 let asked: { model: string; args: { where?: Record<string, unknown>; take?: number } }[] = [];
 
 function model(name: string, rows: Record<string, unknown>[]) {
@@ -38,6 +42,14 @@ vi.mock("@polaris/db", () => ({
     prisma: {
         role: model("role", [{ id: "00000000-0000-7000-8000-0000000000b1", name: "Staff" }]),
         group: model("group", [{ id: GROUP, name: "Customers of Acme" }]),
+        userRole: {
+            findMany: async (args: { where: { userId: string; roleId: { in: string[] } } }) =>
+                args.where.roleId.in.filter((id) => held.includes(`role:${id}`)).map((roleId) => ({ roleId }))
+        },
+        groupMember: {
+            findMany: async (args: { where: { userId: string; groupId: { in: string[] } } }) =>
+                args.where.groupId.in.filter((id) => held.includes(`group:${id}`)).map((groupId) => ({ groupId }))
+        },
         user: model("user", [
             { id: OTHER, name: "Other Customer", email: "other@example.com" },
             { id: CUSTOMER.id, name: "Me", email: "me@example.com" }
@@ -68,17 +80,28 @@ const getWafRule = vi.fn(async (_owner: string, _type: string, _id: string) => (
     loginAllowPrincipals: stored.map((ref) => ({ ref })),
     loginDenyPrincipals: []
 }));
-vi.mock("@/lib/waf-service", () => ({ getWafRule }));
+const setWafRule = vi.fn(async () => undefined);
+vi.mock("@/lib/waf-service", () => ({ getWafRule, setWafRule }));
+vi.mock("@/lib/privacy-service", () => ({
+    discoverableBy: async (_viewer: unknown, ids: string[]) => new Set(ids.filter((id) => findable.includes(id)))
+}));
+vi.mock("@/lib/blocks", () => ({
+    blockedBetween: async (_id: string, ids: string[]) => new Set(ids.filter((id) => blocked.includes(id)))
+}));
 vi.mock("@/lib/waf-anomaly-service", () => ({}));
 
-const { listWafPrincipalsAction, findWafPeopleAction } = await import("../../src/app/(app)/apps/firewall/actions");
+const { listWafPrincipalsAction, findWafPeopleAction, setWafRuleAction } = await import("../../src/app/(app)/apps/firewall/actions");
 
 const SCOPE = { scopeType: "project" as const, scopeId: "00000000-0000-7000-8000-0000000000e1" };
 
 beforeEach(() => {
     asked = [];
     stored = [];
+    held = [];
+    findable = [];
+    blocked = [];
     getWafRule.mockClear();
+    setWafRule.mockClear();
     findPeople.mockClear();
     findAccountsAsAdmin.mockClear();
 });
@@ -168,5 +191,68 @@ describe("finding a person to name", () => {
         expect(findPeople).not.toHaveBeenCalled();
         expect(findAccountsAsAdmin).toHaveBeenCalledWith("other", 20);
         expect(results).toEqual([{ id: OTHER, name: "Other Customer" }]);
+    });
+});
+
+describe("saving who a rule names", () => {
+    const ROLE = "00000000-0000-7000-8000-0000000000b1";
+    function save(admitted: string[], refused: string[] = []) {
+        return setWafRuleAction({
+            ...SCOPE,
+            ipAllowlist: [],
+            ipDenylist: [],
+            requireLogin: true,
+            loginAllowPrincipals: admitted.map((ref) => ({ ref })),
+            loginDenyPrincipals: refused.map((ref) => ({ ref })),
+            browserIntegrity: false,
+            sqlInjectionProtection: false,
+            xssProtection: false,
+            emailObfuscation: false,
+            frameProtection: false,
+            frameAncestors: [],
+            presets: [],
+            rules: []
+        });
+    }
+
+    it("saves the roles, groups and people the customer could pick", async () => {
+        caller = CUSTOMER;
+        held = [`role:${ROLE}`, `group:${GROUP}`];
+        findable = [OTHER];
+        expect(await save([`role:${ROLE}`, `group:${GROUP}`, `user:${CUSTOMER.id}`], [`user:${OTHER}`])).toEqual({});
+        expect(setWafRule).toHaveBeenCalledTimes(1);
+    });
+
+    it.each([
+        ["a role they do not hold", `role:00000000-0000-7000-8000-0000000000b2`],
+        ["a group they are not in", `group:00000000-0000-7000-8000-0000000000a2`],
+        ["a person they cannot find", `user:${OTHER}`],
+        ["something that is not an id", "user:not-an-id"]
+    ])("refuses %s, and saves nothing", async (_what, ref) => {
+        caller = CUSTOMER;
+        expect(await save([], [ref])).toEqual({ error: "errors.outOfReach" });
+        expect(setWafRule).not.toHaveBeenCalled();
+    });
+
+    it("refuses a person either side has blocked", async () => {
+        caller = CUSTOMER;
+        findable = [OTHER];
+        blocked = [OTHER];
+        expect((await save([`user:${OTHER}`])).error).toBe("errors.outOfReach");
+        expect(setWafRule).not.toHaveBeenCalled();
+    });
+
+    it("keeps what the stored rule already names, whoever added it", async () => {
+        caller = CUSTOMER;
+        stored = [`user:${OTHER}`, `group:00000000-0000-7000-8000-0000000000a2`];
+        expect(await save(stored)).toEqual({});
+        expect(setWafRule).toHaveBeenCalledTimes(1);
+    });
+
+    it("lets an administrator name anybody", async () => {
+        caller = ADMIN;
+        expect(await save([`user:${OTHER}`, `role:00000000-0000-7000-8000-0000000000b2`])).toEqual({});
+        expect(getWafRule).not.toHaveBeenCalled();
+        expect(setWafRule).toHaveBeenCalledTimes(1);
     });
 });
