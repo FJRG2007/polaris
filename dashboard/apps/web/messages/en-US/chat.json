@@ -341,8 +341,8 @@
         "undeafen": "Undeafen",
         "deafen": "Deafen",
         "aModeratorDeafenedYou": "A moderator deafened you",
-        "youCannotHearAnybodyAnd": "You cannot hear anybody, and nobody can hear you (F10)",
-        "silenceEverybodyAndYourselfWith": "Silence everybody, and yourself with them (F10)",
+        "youCannotHearAnybodyAnd": "You cannot hear anybody, and nobody can hear you",
+        "silenceEverybodyAndYourselfWith": "Silence everybody, and yourself with them",
         "lowerYourHand": "Lower your hand",
         "raiseYourHand": "Raise your hand",
         "leaveTheCall": "Leave the call",
@@ -746,7 +746,6 @@
         "reportThisMessage": "Report this message",
         "edit": "Edit",
         "delete": "Delete",
-        "del": "Del",
         "pin": "Pin",
         "unpin": "Unpin"
     },
@@ -1006,13 +1005,9 @@
         "mute": "Mute",
         "unmute": "Unmute",
         "aModeratorMutedYou": "A moderator muted you",
-        "muteF9": "Mute (F9)",
-        "unmuteF9": "Unmute (F9)",
         "undeafen": "Undeafen",
         "deafen": "Deafen",
         "aModeratorDeafenedYou": "A moderator deafened you",
-        "undeafenF10": "Undeafen (F10)",
-        "deafenF10": "Deafen (F10)",
         "leaveTheCall": "Leave the call"
     },
     "schedule": {

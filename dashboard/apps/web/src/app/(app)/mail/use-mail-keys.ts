@@ -3,10 +3,10 @@
 /**
  * The keyboard, for the people who never touch the mouse in a mail client.
  *
- * Which key does what is data now - `mail-keys` in @polaris/core - so a person
- * can move a shortcut from the settings screen and this hook simply reads the
- * map it is handed. The defaults are still the letters every mail client has
- * used since the first webmail that had any.
+ * Which key does what is data - the `mail.*` entries of the shortcuts table every
+ * app shares - so a person can move a shortcut from the settings screen and this
+ * hook simply asks which action a press is. The defaults are still the letters
+ * every mail client has used since the first webmail that had any.
  *
  * Two rules make them safe to have on.
  *
@@ -22,9 +22,7 @@
  */
 
 import * as core from "@polaris/core";
-import { useEffect, useMemo, useRef } from "react";
-import type { NamespaceTranslator } from "@/lib/i18n/types";
-import { mailCommandLabel, mailKeyName } from "./option-label";
+import { useShortcuts, type ShortcutHandler } from "@polaris/ui";
 
 /** What a screen can be asked to do from the keyboard. Anything a screen does
  *  not pass is simply not bound. */
@@ -32,9 +30,7 @@ export type MailKeyActions = {
     readonly [command in Exclude<core.MailKeyCommand, "back">]?: () => void;
 } & {
     readonly back?: () => void;
-    /** Pick every conversation on screen. The one binding here that takes a
-     *  modifier, because it is the one everybody already presses - and so the
-     *  one that is not on the settings screen. */
+    /** Pick every conversation on screen. */
     readonly selectAll?: () => void;
     /** Let go of the selection. Tried before `back`, so Escape means "never
      *  mind" about the nearest thing first. */
@@ -49,78 +45,29 @@ function typing(target: EventTarget | null): boolean {
     return tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT";
 }
 
-/** Every default, held once so a screen that passes no keymap is not a new map
- *  on every render. */
-const DEFAULT_KEYMAP: core.MailKeymap = {};
-
-export function useMailKeys(actions: MailKeyActions, keymap: core.MailKeymap = DEFAULT_KEYMAP): void {
-    // Held in a ref so a screen can close over fresh state without the listener
-    // being torn down and rebound on every render.
-    const held = useRef(actions);
-    held.current = actions;
-    const resolved = useMemo(() => core.resolveMailKeymap(keymap), [keymap]);
-    const keys = useRef(resolved);
-    keys.current = resolved;
-
-    useEffect(() => {
-        function onKey(event: KeyboardEvent): void {
-            if (event.defaultPrevented || typing(event.target)) return;
-
-            const now = held.current;
-            const run = (action: (() => void) | undefined): void => {
-                if (!action) return;
-                event.preventDefault();
-                action();
-            };
-
-            // Select-all is the one thing here that is a modifier chord, because
-            // it is the chord every list in every file manager has. Handled
-            // before the bail below, which exists to leave the browser's own
-            // chords alone.
-            if ((event.metaKey || event.ctrlKey) && !event.altKey && event.key.toLowerCase() === "a") {
-                return run(now.selectAll);
-            }
-            if (event.metaKey || event.ctrlKey || event.altKey) return;
-
-            const command = keys.current.get(event.key);
-            if (!command) return;
-            if (command === "back") {
-                // Escape undoes the nearest thing first: a selection if there is
-                // one, and only then the conversation being read.
-                if (now.clearSelection?.()) {
-                    event.preventDefault();
-                    return;
-                }
-                return run(now.back);
-            }
-            return run(now[command]);
-        }
-
-        window.addEventListener("keydown", onKey);
-        return () => window.removeEventListener("keydown", onKey);
-    }, []);
-}
-
 /**
- * What the help sheet lists, in the order it reads them, for the keyboard this
- * person actually has - a moved shortcut is shown where it now is. Built from
- * the same table the hook reads, so the two cannot drift.
+ * Bind a screen's actions to the keys this person has for them - the shared
+ * table's `mail.*` entries (see `shortcuts` in @polaris/core), which is also
+ * where a key moved in Mail's settings before that table existed now lives.
  */
-export function mailShortcuts(
-    t: NamespaceTranslator<"mail">,
-    keymap: core.MailKeymap
-): readonly { keys: string; what: string }[] {
-    const rows = core.MAIL_KEY_COMMANDS.map((command) => {
-        const definition = core.MAIL_KEY_DEFINITIONS[command];
-        const keys = [core.mailKeyFor(command, keymap), ...definition.fixed]
-            .filter(Boolean)
-            .map((key) => mailKeyName(t, core.mailKeyLabel(key)))
-            .join(t("keys.or"));
-        return { keys, what: mailCommandLabel(t, command) };
-    });
-    return [
-        ...rows,
-        { keys: "Mod+a", what: t("keys.selectAll") },
-        { keys: t("keys.shiftClick"), what: t("keys.selectRun") }
-    ];
+export function useMailKeys(actions: MailKeyActions): void {
+    const run = (action: (() => void) | undefined): ShortcutHandler => () => {
+        if (!action) return false;
+        action();
+    };
+    const handlers: Record<string, ShortcutHandler | undefined> = {
+        "mail.selectAll": run(actions.selectAll),
+        // Escape undoes the nearest thing first: a selection if there is one,
+        // and only then the conversation being read.
+        "mail.back": () => {
+            if (actions.clearSelection?.()) return;
+            if (!actions.back) return false;
+            actions.back();
+        }
+    };
+    for (const command of core.MAIL_KEY_COMMANDS) {
+        if (command === "back") continue;
+        handlers[`mail.${command}`] = run(actions[command]);
+    }
+    useShortcuts(handlers, { when: (event) => !typing(event.target) });
 }

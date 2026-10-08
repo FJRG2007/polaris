@@ -21,6 +21,7 @@
  */
 
 import type { SelectMode } from "./shared";
+import { useShortcuts } from "@polaris/ui";
 import { keyboardIsBusy } from "@/lib/keyboard";
 import { useCallback, useEffect, useRef, useState } from "react";
 
@@ -80,56 +81,39 @@ export function useRowCursor(
         if (at !== null && !ordered.includes(at)) setAt(null);
     }, [ordered, at]);
 
-    useEffect(() => {
-        function move(delta: number): void {
-            const { ordered: rows, at: current } = latest.current;
-            const taskId = nextCursor(rows, current, delta);
-            if (!taskId) return;
-            setAt(taskId);
-            elements.current.get(taskId)?.scrollIntoView({ block: "nearest" });
-        }
+    function move(delta: number): void {
+        const { ordered: rows, at: current } = latest.current;
+        const taskId = nextCursor(rows, current, delta);
+        if (!taskId) return;
+        setAt(taskId);
+        elements.current.get(taskId)?.scrollIntoView({ block: "nearest" });
+    }
 
-        function onKeyDown(event: KeyboardEvent): void {
-            if (keyboardIsBusy(event)) return;
-            // A modifier means the press belongs to the browser or to a
-            // selection gesture, not to this.
-            if (event.metaKey || event.ctrlKey || event.altKey) return;
-
-            const { at: current, ordered: rows, handlers: on } = latest.current;
-            const key = event.key;
-
-            if (key === "ArrowDown" || key === "j") {
-                event.preventDefault();
-                move(1);
-                return;
-            }
-            if (key === "ArrowUp" || key === "k") {
-                event.preventDefault();
-                move(-1);
-                return;
-            }
-            if (current === null) return;
-
-            if (key === "Enter") {
-                event.preventDefault();
+    // Which key does each is the shared table's `tasks.rows.*`.
+    useShortcuts(
+        {
+            "tasks.rows.next": () => move(1),
+            "tasks.rows.previous": () => move(-1),
+            "tasks.rows.open": () => {
+                const { at: current, handlers: on } = latest.current;
+                if (current === null) return false;
                 on.onOpen(current);
-                return;
-            }
-            if (key === "x" || key === "X") {
-                event.preventDefault();
+            },
+            "tasks.rows.select": () => {
+                const { at: current, ordered: rows, handlers: on } = latest.current;
+                if (current === null) return false;
                 on.onSelect(current, "toggle", rows);
-                return;
-            }
-            if (key === "Escape") {
-                // Not preventDefault: Escape also closes whatever else is open,
-                // and swallowing it here would strand a panel behind the list.
+            },
+            // Answers false even when it did something: Escape also closes
+            // whatever else is open, and taking it here would strand a panel
+            // behind the list.
+            "tasks.rows.leave": () => {
                 setAt(null);
+                return false;
             }
-        }
-
-        window.addEventListener("keydown", onKeyDown);
-        return () => window.removeEventListener("keydown", onKeyDown);
-    }, []);
+        },
+        { when: (event) => !keyboardIsBusy(event) }
+    );
 
     return { at, register, moveTo: setAt };
 }

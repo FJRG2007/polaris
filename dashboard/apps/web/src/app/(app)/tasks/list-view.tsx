@@ -50,6 +50,7 @@ import {
     SegmentedControl,
     Select,
     cn,
+    useShortcuts,
     useToast
 } from "@polaris/ui";
 import { readViewPreferences, viewScopeKey, writeViewPreferences } from "./view-preferences";
@@ -838,82 +839,55 @@ export function ListScreen({
 
     /**
      * The screen's own keys: N starts a task, Escape drops the selection, Delete
-     * takes the selected ones away.
+     * takes the selected ones away, and the clipboard three. Which key does each
+     * is the shared table's `tasks.*` (moved in Keyboard shortcuts).
      *
      * They listen on the window so they work wherever the focus sits on the
      * board, and stand down whenever something else owns the keyboard - a field
      * being typed in, an open dialog, an open menu - which is the same rule the
      * file explorer follows and the reason a task named "New plan" can be typed
-     * at all.
-     *
-     * Re-bound when what the handler reads changes rather than on every render,
-     * which is the same thing while somebody is pressing keys and is not while
-     * they are editing: a screen that swaps its window listener on each tick of
-     * a checkbox is doing that work for nothing.
+     * at all. A handler answering false leaves the press to the browser.
      */
-    useEffect(() => {
-        function onKeyDown(event: KeyboardEvent) {
-            if (keyboardIsBusy(event)) return;
-            if (event.key === "Escape") {
-                if (selection.size === 0) return;
-                event.preventDefault();
+    useShortcuts(
+        {
+            "tasks.clearSelection": () => {
+                if (selection.size === 0) return false;
                 clearSelection();
-                return;
-            }
-            // The clipboard three, read the way every list of things reads them:
-            // select everything on screen, copy what is selected, paste it where
-            // you are now. `keyboardIsBusy` has already stood these down while a
-            // field or a dialog has the keyboard, so copying text out of a task
-            // name still works.
-            if ((event.ctrlKey || event.metaKey) && !event.altKey && !event.shiftKey) {
-                const pressed = event.key.toLowerCase();
-                if (pressed === "a" && visible.length > 0) {
-                    event.preventDefault();
-                    hold(new Set(visible.map((task) => task.id)));
-                    setAnchor(null);
-                    return;
-                }
-                if (pressed === "c" && selected.length > 0) {
-                    event.preventDefault();
-                    copySelection(selected);
-                    return;
-                }
-                if (pressed === "v" && context.canEdit && createTarget) {
-                    // Nothing copied is not an error and not a swallowed key: the
-                    // browser keeps the press, which is what somebody pasting into
-                    // this screen from elsewhere would expect.
-                    if (!readTaskClipboard()) return;
-                    event.preventDefault();
-                    void pasteClipboard();
-                    return;
-                }
-                return;
-            }
-            // Any other modifier means the press belongs to the browser or to an
-            // editing shortcut (Ctrl+N opens a window), never to this one.
-            if (event.altKey || event.shiftKey) return;
+            },
+            // Select everything on screen, copy what is selected, paste it where
+            // you are now - copying text out of a task name still works, since a
+            // field has the keyboard then.
+            "tasks.selectAll": () => {
+                if (visible.length === 0) return false;
+                hold(new Set(visible.map((task) => task.id)));
+                setAnchor(null);
+            },
+            "tasks.copy": () => {
+                if (selected.length === 0) return false;
+                copySelection(selected);
+            },
+            // Nothing copied is not an error and not a swallowed key: the browser
+            // keeps the press, which is what somebody pasting into this screen
+            // from elsewhere would expect.
+            "tasks.paste": () => {
+                if (!context.canEdit || !createTarget || !readTaskClipboard()) return false;
+                void pasteClipboard();
+            },
             // What the bin in the selection bar does, and what the menu's Delete
             // does: it opens the confirmation rather than deleting. A key that
             // removed work on a single press would be the one gesture on this
-            // screen with no undo, reachable by leaning on a keyboard - and it is
-            // several tasks at once, which is worse.
-            if (event.key === "Delete" && selected.length > 0 && context.canEdit) {
-                event.preventDefault();
+            // screen with no undo, reachable by leaning on a keyboard.
+            "tasks.delete": () => {
+                if (selected.length === 0 || !context.canEdit) return false;
                 setDeleting(selected);
-                return;
+            },
+            "tasks.new": () => {
+                if (!context.canEdit || !createTarget) return false;
+                setCreating({ name: "", dueDate: null });
             }
-            if (event.key.toLowerCase() !== "n" || !context.canEdit || !createTarget) return;
-            event.preventDefault();
-            setCreating({ name: "", dueDate: null });
-        }
-        window.addEventListener("keydown", onKeyDown);
-        return () => window.removeEventListener("keydown", onKeyDown);
-        // `clearSelection` only ever calls setState, which React keeps stable, so
-        // what the handler actually reads is the list below. `visible` and
-        // `selected` are memoized, so this re-binds when the rows or the
-        // selection change rather than on every render.
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [selection.size, visible, selected, context.canEdit, createTarget]);
+        },
+        { when: (event) => !keyboardIsBusy(event) }
+    );
 
     /**
      * Whether this screen may change the columns at all.

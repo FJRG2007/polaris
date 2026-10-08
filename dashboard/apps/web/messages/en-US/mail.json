@@ -450,15 +450,7 @@
         "discard": "Throw this draft away"
     },
     "keys": {
-        "down": "Down",
-        "up": "Up",
-        "or": " or ",
-        "selectAll": "Select everything shown",
-        "shiftClick": "Shift+click",
-        "selectRun": "Select a run of conversations",
-        "delete": "Delete",
-        "backspace": "Backspace",
-        "enter": "Enter"
+        "selectAll": "Select everything shown"
     },
     "commands": {
         "compose": "Write a message",
@@ -756,7 +748,6 @@
         "emptyBody": "Every message in it is deleted on the mail server, including older ones that are not on this screen. Nothing here can bring them back.",
         "emptyConfirm": "Empty it",
         "emptied": "{name} is empty.",
-        "everyKey": "Every one of these has a button on screen as well.",
         "select": "Select the conversation {subject}",
         "selectUntitled": "Select the conversation with no subject",
         "stopFrom": "Stop these emails from {name}",
@@ -784,8 +775,6 @@
         "order": "Order",
         "sortInbox": "Sort the inbox",
         "all": "All",
-        "keyboard": "Keyboard",
-        "changeKeys": "Change them",
         "important": "Important",
         "pinned": "Pinned to the top",
         "pinnedShort": "Pinned",

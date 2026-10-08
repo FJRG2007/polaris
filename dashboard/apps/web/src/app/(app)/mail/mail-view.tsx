@@ -38,7 +38,8 @@ import type { MailAction } from "@/lib/mailbox/messages";
 import { RelativeTime } from "@/components/relative-time";
 import type { NamespaceTranslator } from "@/lib/i18n/types";
 import { mailRefusalText } from "@/lib/mailbox/refusal-text";
-import { mailShortcuts, useMailKeys } from "./use-mail-keys";
+import { useMailKeys } from "./use-mail-keys";
+import { ShortcutsDialog } from "@/components/shortcuts/shortcuts-dialog";
 import { goShallow, mailAddress, plainClick } from "./address";
 import { useDisplayFormat } from "@/components/display-format";
 import { useTranslations } from "@/components/i18n/i18n-provider";
@@ -105,10 +106,6 @@ import {
     Checkbox,
     cn,
     ConfirmDeleteDialog,
-    Dialog,
-    DialogContent,
-    DialogHeader,
-    DialogTitle,
     DropdownMenu,
     DropdownMenuContent,
     DropdownMenuItem,
@@ -1188,10 +1185,7 @@ export function MailView({
                       setAnchor("");
                       return true;
                   }
-              },
-        // The keyboard this person set up, including the help sheet's own key,
-        // which is why that is a command in the map rather than a listener here.
-        preferences.keys
+              }
     );
 
     const label = useCallback(
@@ -1688,7 +1682,6 @@ export function MailView({
                                         onAnswer={answer}
                                         onBlock={block}
                                         onConversation={setConversation}
-                                        keymap={preferences.keys}
                                     >
                                         <ThreadRow
                                             thread={shown(thread)}
@@ -1734,9 +1727,7 @@ export function MailView({
                 </div>
             </section>
 
-            {helpOpen ? (
-                <ShortcutSheet keymap={preferences.keys} onClose={() => setHelpOpen(false)} />
-            ) : null}
+            <ShortcutsDialog app="mail" open={helpOpen} onOpenChange={setHelpOpen} />
 
             {blocking ? (
                 <ConfirmDeleteDialog
@@ -2261,36 +2252,6 @@ function TabButton({
 /** How `/` finds the search box, and which elements own a key press rather than
  *  the screen. Named because two places read each. */
 const SEARCH_BOX = "input[data-mail-search]";
-
-/** What the keys do, for the keyboard this person set up. Reached with its own
- *  key and from nowhere else - it is a reminder for people who already use
- *  them, not a feature anybody has to find. Moving one is in settings. */
-function ShortcutSheet({ keymap, onClose }: { keymap: core.MailKeymap; onClose: () => void }) {
-    const t = useTranslations("mail");
-    return (
-        <Dialog open onOpenChange={(next) => (next ? undefined : onClose())}>
-            <DialogContent>
-                <DialogHeader>
-                    <DialogTitle>{t("list.keyboard")}</DialogTitle>
-                </DialogHeader>
-                <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 text-[13px]">
-                    {mailShortcuts(t, keymap).map((entry) => (
-                        <div key={entry.what} className="contents">
-                            <dt className="font-mono text-[12px] text-foreground">{entry.keys}</dt>
-                            <dd className="text-muted-foreground">{entry.what}</dd>
-                        </div>
-                    ))}
-                </dl>
-                <p className="mt-2 text-[12px] text-foreground-subtle">
-                    {t("list.everyKey")}{" "}
-                    <Link href="/mail/settings/shortcuts" className="underline" onClick={onClose}>
-                        {t("list.changeKeys")}
-                    </Link>
-                </p>
-            </DialogContent>
-        </Dialog>
-    );
-}
 
 /**
  * What a row says about itself besides who and what: important, pinned, muted.

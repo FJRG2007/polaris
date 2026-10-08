@@ -450,15 +450,7 @@
         "discard": "Descartar este borrador"
     },
     "keys": {
-        "down": "Abajo",
-        "up": "Arriba",
-        "or": " o ",
-        "selectAll": "Seleccionar todo lo que se ve",
-        "shiftClick": "Mayús+clic",
-        "selectRun": "Seleccionar varias conversaciones",
-        "delete": "Supr",
-        "backspace": "Retroceso",
-        "enter": "Intro"
+        "selectAll": "Seleccionar todo lo que se ve"
     },
     "commands": {
         "compose": "Escribir un mensaje",
@@ -756,7 +748,6 @@
         "emptyBody": "Se eliminan del servidor de correo todos sus mensajes, incluidos los más antiguos que no están en esta pantalla. Nada de aquí puede recuperarlos.",
         "emptyConfirm": "Vaciarla",
         "emptied": "{name} está vacía.",
-        "everyKey": "Cada uno tiene también un botón en pantalla.",
         "select": "Seleccionar la conversación {subject}",
         "selectUntitled": "Seleccionar la conversación sin asunto",
         "stopFrom": "Dejar de recibir estos correos de {name}",
@@ -784,8 +775,6 @@
         "order": "Orden",
         "sortInbox": "Ordenar Recibidos",
         "all": "Todos",
-        "keyboard": "Teclado",
-        "changeKeys": "Cambiarlos",
         "important": "Importante",
         "pinned": "Fijado arriba",
         "pinnedShort": "Fijado",

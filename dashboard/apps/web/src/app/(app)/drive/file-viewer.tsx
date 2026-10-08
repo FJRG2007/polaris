@@ -33,7 +33,14 @@ import type { KeyboardEvent as ReactKeyboardEvent } from "react";
 import type { ViewerTarget, ViewerUrlFor } from "./viewer/types";
 import { startDownload, useDownloadsPending } from "@/lib/drive/downloads";
 import { ChevronLeft, ChevronRight, Download, Loader2, Share2 } from "lucide-react";
-import { Button, Dialog, DialogContent, DialogHeader, DialogTitle } from "@polaris/ui";
+import {
+    Button,
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+    shortcutPressed
+} from "@polaris/ui";
 
 export type { ViewerTarget, ViewerUrlFor, ViewerKind } from "./viewer/types";
 export { isViewable, viewerKind } from "./viewer/kind";
@@ -181,10 +188,10 @@ export function FileViewer({
                 className="flex max-h-[90vh] w-full max-w-6xl flex-col gap-0 overflow-hidden p-0"
                 onKeyDown={(event) => {
                     if (!stepping || keyBelongsToTarget(event)) return;
-                    if (event.key === "ArrowLeft" && canBack) {
+                    if (canBack && shortcutPressed(event, "viewer.previousFile")) {
                         event.preventDefault();
                         stepping.onStep(-1);
-                    } else if (event.key === "ArrowRight" && canForward) {
+                    } else if (canForward && shortcutPressed(event, "viewer.nextFile")) {
                         event.preventDefault();
                         stepping.onStep(1);
                     }

@@ -142,7 +142,8 @@ import {
     DropdownMenuLabel,
     DropdownMenuSeparator,
     DropdownMenuTrigger,
-    cn
+    cn,
+    useShortcutHint
 } from "@polaris/ui";
 
 /**
@@ -205,6 +206,11 @@ export function CallRoom({
     mayInvite?: boolean;
 }) {
     const t = useTranslations("chat");
+    const ts = useTranslations("shortcuts");
+    // The key in force for deafening, named in its control's title.
+    const deafenKey = useShortcutHint("chat.toggleDeafen");
+    const withKey = (label: string) =>
+        deafenKey ? ts("withKey", { action: label, keys: deafenKey }) : label;
     const [inviting, setInviting] = useState(false);
     const [asking, setAsking] = useState(false);
 
@@ -1207,8 +1213,8 @@ export function CallRoom({
                         call.moderation.serverDeafened
                             ? t("callRoom.aModeratorDeafenedYou")
                             : call.deafened
-                              ? t("callRoom.youCannotHearAnybodyAnd")
-                              : t("callRoom.silenceEverybodyAndYourselfWith")
+                              ? withKey(t("callRoom.youCannotHearAnybodyAnd"))
+                              : withKey(t("callRoom.silenceEverybodyAndYourselfWith"))
                     }
                     icon={
                         call.deafened ? (

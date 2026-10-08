@@ -29,7 +29,7 @@ import { SelectionZipMenu } from "./selection-zip-menu";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { RelativeTime } from "@/components/relative-time";
 import { drawsItsOwnFrame, thumbnailKind } from "@/lib/drive-thumbnail-kind";
-import { matchShortcut, SHORTCUT_HINTS } from "./shortcuts";
+import { matchShortcut, SHORTCUT_IDS } from "./shortcuts";
 import { activityKey, prefetchListing } from "./listing-cache";
 import { startDownload, useDownloadsPending } from "@/lib/drive/downloads";
 import { useDisplayFormat } from "@/components/display-format";
@@ -84,7 +84,10 @@ import {
     ContextMenuSeparator,
     ContextMenuSubContent,
     ContextMenuSubTrigger,
-    MenuShortcut
+    ShortcutHint,
+    shortcutBindings,
+    shortcutPressed,
+    useShortcutHint
 } from "@polaris/ui";
 import {
     ArrowDown,
@@ -441,6 +444,10 @@ export function FilesView({
     /** Connection-level actions (Access, Open console) rendered in the toolbar, left of the panel. */
     headerActions?: ReactNode;
 }) {
+    // The keys in force for the toolbar's titles - the shared table's, so a key
+    // moved in Keyboard shortcuts is the one a title names.
+    const newFolderKey = useShortcutHint(SHORTCUT_IDS["new-folder"]);
+    const requestFilesKey = useShortcutHint(SHORTCUT_IDS["request-files"]);
     const format = useDisplayFormat();
     const t = useTranslations("drive");
     const tc = useTranslations("common");
@@ -704,31 +711,33 @@ export function FilesView({
      * that mean it - F2, and Rename in the context menu.
      */
 
-    /** Keyboard: F2 renames, Enter opens, Delete removes, Ctrl+C/X/V copy/cut/paste. */
+    /** Keyboard: F2 renames, Enter opens, Delete removes, Ctrl+C/X/V copy/cut/paste
+     *  - by default; the shared table's `drive.*` decides. The arrows, Home and
+     *  End move through the list, which is the list's own and does not move. */
     function onListKeyDown(event: KeyboardEvent) {
         if (renaming) return;
-        const mod = event.ctrlKey || event.metaKey;
-        const key = event.key.toLowerCase();
-        if (event.key === "Escape" && selectedEntries.length > 0) {
+        const pressed = (id: string) => shortcutPressed(event, id);
+        const one = selectedEntries.length === 1 ? selectedEntries[0] : undefined;
+        if (pressed("drive.clearSelection") && selectedEntries.length > 0) {
             event.preventDefault();
             setSelected(new Set());
             cursorRef.current = null;
-        } else if (mod && key === "c" && selectedEntries.length > 0) {
+        } else if (pressed("drive.copy") && selectedEntries.length > 0) {
             event.preventDefault();
             setClipboard({ entries: selectedEntries, mode: "copy" });
-        } else if (mod && key === "x" && selectedEntries.length > 0) {
+        } else if (pressed("drive.cut") && selectedEntries.length > 0) {
             event.preventDefault();
             setClipboard({ entries: selectedEntries, mode: "cut" });
-        } else if (mod && key === "v" && clipboard) {
+        } else if (pressed("drive.paste") && clipboard) {
             event.preventDefault();
             paste();
-        } else if (event.key === "F2" && selectedEntries.length === 1 && selectedEntries[0]) {
+        } else if (pressed("general.rename") && one) {
             event.preventDefault();
-            startRename(selectedEntries[0]);
-        } else if (event.key === "Enter" && selectedEntries.length === 1 && selectedEntries[0]) {
+            startRename(one);
+        } else if (pressed("drive.open") && one) {
             event.preventDefault();
-            openEntry(selectedEntries[0]);
-        } else if (event.key === "Delete" && selectedEntries.length > 0) {
+            openEntry(one);
+        } else if (pressed("drive.delete") && selectedEntries.length > 0) {
             event.preventDefault();
             (onDelete ?? onDeletePermanent)(selectedEntries);
         } else if (event.key === "ArrowDown") {
@@ -749,7 +758,7 @@ export function FilesView({
         } else if (event.key === "End") {
             event.preventDefault();
             moveCursor(visible.length, event.shiftKey);
-        } else if (mod && key === "a") {
+        } else if (pressed("drive.selectAll")) {
             event.preventDefault();
             setSelected(new Set(selectable.map((entry) => entry.path)));
         }
@@ -816,7 +825,7 @@ export function FilesView({
         function onShortcut(event: globalThis.KeyboardEvent) {
             if (renaming || viewerTarget || pendingFolder) return;
             if (keyboardIsBusy(event)) return;
-            const shortcut = matchShortcut(event);
+            const shortcut = matchShortcut(event, shortcutBindings());
             if (!shortcut) return;
             if (shortcut === "new-folder" || shortcut === "new-file") {
                 if (pending) return;
@@ -1223,7 +1232,7 @@ export function FilesView({
                         <Pencil className="size-4" />
                         {t("filesView.menu.rename")}
                         {/* i18n-ignore: a key on the keyboard */}
-                        <MenuShortcut>F2</MenuShortcut>
+                        <ShortcutHint id="general.rename" />
                     </ContextMenuItem>
                 )}
                 <ContextMenuItem onSelect={() => setClipboard({ entries: targets, mode: "copy" })}>
@@ -1231,14 +1240,14 @@ export function FilesView({
                     {many
                         ? t("filesView.menu.copyMany", { count: targets.length })
                         : t("filesView.menu.copy")}
-                    <MenuShortcut keys="Mod+C" />
+                    <ShortcutHint id="drive.copy" />
                 </ContextMenuItem>
                 <ContextMenuItem onSelect={() => setClipboard({ entries: targets, mode: "cut" })}>
                     <Scissors className="size-4" />
                     {many
                         ? t("filesView.menu.cutMany", { count: targets.length })
                         : t("filesView.menu.cut")}
-                    <MenuShortcut keys="Mod+X" />
+                    <ShortcutHint id="drive.cut" />
                 </ContextMenuItem>
                 {abilities.write ? (
                     <>
@@ -1344,7 +1353,7 @@ export function FilesView({
                                     <ContextMenuItem onSelect={() => onDelete(targets)}>
                                         <Trash2 className="size-4" />
                                         {t("filesView.menu.trash")}
-                                        <MenuShortcut>{t("filesView.menu.deleteKey")}</MenuShortcut>
+                                        <ShortcutHint id="drive.delete" />
                                     </ContextMenuItem>
                                 ) : null}
                                 <ContextMenuItem
@@ -1356,7 +1365,7 @@ export function FilesView({
                                         ? t("filesView.menu.deletePermanently")
                                         : t("filesView.menu.delete")}
                                     {onDelete ? null : (
-                                        <MenuShortcut>{t("filesView.menu.deleteKey")}</MenuShortcut>
+                                        <ShortcutHint id="drive.delete" />
                                     )}
                                 </ContextMenuItem>
                                 {!many && entry.kind === "dir" ? (
@@ -1883,9 +1892,11 @@ export function FilesView({
                                     onRequestFiles(path, segments[segments.length - 1] ?? "")
                                 }
                                 disabled={pending}
-                                title={t("filesView.toolbar.requestFilesHint", {
-                                    shortcut: SHORTCUT_HINTS["request-files"]
-                                })}
+                                title={
+                                    requestFilesKey
+                                        ? t("filesView.toolbar.requestFilesHint", { shortcut: requestFilesKey })
+                                        : t("filesView.toolbar.requestFiles")
+                                }
                                 aria-label={t("filesView.toolbar.requestFiles")}
                             >
                                 <Inbox className="size-4" />
@@ -1900,9 +1911,11 @@ export function FilesView({
                                 variant="ghost"
                                 onClick={onNewFolder}
                                 disabled={pending}
-                                title={t("filesView.toolbar.newFolderHint", {
-                                    shortcut: SHORTCUT_HINTS["new-folder"]
-                                })}
+                                title={
+                                    newFolderKey
+                                        ? t("filesView.toolbar.newFolderHint", { shortcut: newFolderKey })
+                                        : t("filesView.toolbar.newFolder")
+                                }
                                 aria-label={t("filesView.toolbar.newFolder")}
                             >
                                 <FolderPlus className="size-4" />
@@ -1936,12 +1949,12 @@ export function FilesView({
                                 <DropdownMenuItem onSelect={() => fileInput.current?.click()}>
                                     <Upload className="size-4" />
                                     {t("filesView.toolbar.uploadFiles")}
-                                    <MenuShortcut>{SHORTCUT_HINTS["upload-files"]}</MenuShortcut>
+                                    <ShortcutHint id={SHORTCUT_IDS["upload-files"]} />
                                 </DropdownMenuItem>
                                 <DropdownMenuItem onSelect={() => void pickFolder()}>
                                     <FolderUp className="size-4" />
                                     {t("filesView.toolbar.uploadFolder")}
-                                    <MenuShortcut>{SHORTCUT_HINTS["upload-folder"]}</MenuShortcut>
+                                    <ShortcutHint id={SHORTCUT_IDS["upload-folder"]} />
                                 </DropdownMenuItem>
                             </DropdownMenuContent>
                         </DropdownMenu>
@@ -2910,23 +2923,23 @@ export function FilesView({
                         <ContextMenuItem onSelect={onNewFolder}>
                             <FolderPlus className="size-4" />
                             {t("filesView.menu.newFolder")}
-                            <MenuShortcut>{SHORTCUT_HINTS["new-folder"]}</MenuShortcut>
+                            <ShortcutHint id={SHORTCUT_IDS["new-folder"]} />
                         </ContextMenuItem>
                         <ContextMenuItem onSelect={onNewFile}>
                             <FilePlus className="size-4" />
                             {t("filesView.menu.newFile")}
-                            <MenuShortcut>{SHORTCUT_HINTS["new-file"]}</MenuShortcut>
+                            <ShortcutHint id={SHORTCUT_IDS["new-file"]} />
                         </ContextMenuItem>
                         <ContextMenuSeparator />
                         <ContextMenuItem onSelect={() => fileInput.current?.click()}>
                             <Upload className="size-4" />
                             {t("filesView.menu.uploadFiles")}
-                            <MenuShortcut>{SHORTCUT_HINTS["upload-files"]}</MenuShortcut>
+                            <ShortcutHint id={SHORTCUT_IDS["upload-files"]} />
                         </ContextMenuItem>
                         <ContextMenuItem onSelect={() => void pickFolder()}>
                             <FolderUp className="size-4" />
                             {t("filesView.menu.uploadFolder")}
-                            <MenuShortcut>{SHORTCUT_HINTS["upload-folder"]}</MenuShortcut>
+                            <ShortcutHint id={SHORTCUT_IDS["upload-folder"]} />
                         </ContextMenuItem>
                         {onSharePeopleFolder ? (
                             <ContextMenuItem onSelect={onSharePeopleFolder}>
@@ -2946,7 +2959,7 @@ export function FilesView({
                             >
                                 <Inbox className="size-4" />
                                 {t("filesView.menu.requestHere")}
-                                <MenuShortcut>{SHORTCUT_HINTS["request-files"]}</MenuShortcut>
+                                <ShortcutHint id={SHORTCUT_IDS["request-files"]} />
                             </ContextMenuItem>
                         ) : null}
                         {clipboard ? (

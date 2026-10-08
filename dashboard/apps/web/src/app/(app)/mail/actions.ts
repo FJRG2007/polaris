@@ -25,6 +25,7 @@ import * as spam from "@/lib/mailbox/spam";
 import { revalidatePath } from "next/cache";
 import * as rules from "@/lib/mailbox/rules";
 import * as prefs from "@/lib/mailbox/prefs";
+import * as shortcuts from "@/lib/shortcuts-service";
 import * as labels from "@/lib/mailbox/labels";
 import * as compose from "@/lib/mailbox/compose";
 import * as reading from "@/lib/mailbox/reading";
@@ -681,6 +682,10 @@ export async function setMailPreferencesAction(input: unknown) {
  * The whole keyboard at once, and refused whole when two commands would share a
  * key - the message names both, so the screen can say which binding is in the
  * way rather than storing one that would archive when somebody meant to mute.
+ *
+ * Kept for a tab loaded before every app shared one table of shortcuts: Mail's
+ * keys live in that table now (`shortcuts-service`), so this writes them there,
+ * leaving every other app's keys as they are.
  */
 export async function setMailKeysAction(input: unknown) {
     const userId = await actorId();
@@ -693,8 +698,16 @@ export async function setMailKeysAction(input: unknown) {
         };
     }
     try {
-        const current = await prefs.readMailPreferences(userId);
-        await prefs.saveMailPreferences(userId, { ...current, keys: parsed.data });
+        const current = await shortcuts.getShortcutOverrides(userId);
+        const others = Object.fromEntries(
+            Object.entries(current).filter(([id]) => !id.startsWith("mail."))
+        );
+        const next = { ...others, ...core.overridesFromMailKeymap(parsed.data) };
+        // Saving cleans a set whose keys collide down to none at all, which
+        // would put back every app's keys and still answer that it saved.
+        if (core.shortcutConflicts(core.resolveShortcuts(next)).length > 0)
+            return { error: await errorText("errors.shortcutsSave") };
+        await shortcuts.saveShortcutOverrides(userId, next);
         refresh();
         return { keys: parsed.data };
     } catch (caught) {

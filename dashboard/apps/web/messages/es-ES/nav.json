@@ -290,7 +290,8 @@
         "Work": "Trabajo",
         "Home": "Hogar",
         "Infrastructure": "Infraestructura",
-        "Games": "Juegos"
+        "Games": "Juegos",
+        "Keyboard shortcuts": "Atajos de teclado"
     },
     "errors": {
         "favoritesNotSaved": "No se han podido guardar esos favoritos.",

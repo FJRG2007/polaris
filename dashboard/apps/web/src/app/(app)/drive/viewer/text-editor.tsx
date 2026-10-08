@@ -12,7 +12,7 @@
  * over a textarea would only be a second one to keep in step.
  */
 
-import { Button } from "@polaris/ui";
+import { Button, shortcutPressed } from "@polaris/ui";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { FindBar } from "./find-bar";
 import type { ViewerTarget } from "./types";
@@ -86,7 +86,7 @@ export function PlainTextEditor({
         <div
             className="flex max-h-[80vh] flex-col"
             onKeyDown={(event) => {
-                if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "f") {
+                if (shortcutPressed(event, "viewer.find")) {
                     // Taken from the browser's own find, which searches the page
                     // around this file rather than the file - and a viewer that
                     // scrolls inside a box is exactly where that goes wrong.

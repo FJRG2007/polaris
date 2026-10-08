@@ -60,7 +60,7 @@ export default async function GuestMeetingPage({ params }: { params: Promise<{ t
     }
 
     return (
-        <Messages namespaces={["chat"]}>
+        <Messages namespaces={["chat", "shortcuts"]}>
             <GuestCall
                 token={token}
                 title={meeting.title}

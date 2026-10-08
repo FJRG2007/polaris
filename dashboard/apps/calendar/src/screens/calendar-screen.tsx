@@ -48,7 +48,8 @@ import {
     DropdownMenuTrigger,
     EmptyState,
     Skeleton,
-    useToast
+    useToast,
+    shortcutPressed
 } from "@polaris/ui";
 import * as time from "./time";
 import { useCalendarT } from "./i18n";
@@ -1341,8 +1342,7 @@ export function CalendarScreen({ path }: { path: string[] }) {
     copyRef.current = { selected, copyOccurrence };
     useEffect(() => {
         const listener = (event: KeyboardEvent) => {
-            if (!(event.ctrlKey || event.metaKey) || event.altKey || event.defaultPrevented) return;
-            if (event.key.toLowerCase() !== "c") return;
+            if (event.defaultPrevented || !shortcutPressed(event, "calendar.copy")) return;
             const { selected, copyOccurrence } = copyRef.current;
             const item = selected?.item;
             if (item?.kind !== "event" || item.occurrence.busyOnly) return;

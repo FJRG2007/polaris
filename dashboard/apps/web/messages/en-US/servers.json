@@ -30,7 +30,6 @@
         "rename": "Rename",
         "copyAddress": "Copy address",
         "whereItLives": "Where it lives",
-        "deleteKey": "Del",
         "empty": "Add a server to reach it from Containers (Docker), Drive (SFTP) and a shell here.",
         "reachTitle": "Reach this machine",
         "reachBody": "Run this on the machine Polaris runs on to give it a shell, its files, and a login to run jobs under.",

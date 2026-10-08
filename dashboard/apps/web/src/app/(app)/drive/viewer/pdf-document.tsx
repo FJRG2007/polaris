@@ -17,6 +17,7 @@
  */
 
 import { Loader2 } from "lucide-react";
+import { shortcutPressed } from "@polaris/ui";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { PdfTools } from "./pdf-tools";
 import { ViewerError } from "./status";
@@ -120,7 +121,7 @@ export default function PdfDocument({
     // viewer focus, and the dialog around it keeps hold of it.
     useEffect(() => {
         function onKeyDown(event: KeyboardEvent) {
-            if (event.key !== "f" || !(event.ctrlKey || event.metaKey)) return;
+            if (!shortcutPressed(event, "viewer.find")) return;
             const frame = frameRef.current;
             if (!frame) return;
             if (!frame.contains(document.activeElement) && !frame.matches(":hover")) return;

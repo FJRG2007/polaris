@@ -119,7 +119,6 @@
             "permissions": "Permissions & lock",
             "delete": "Delete",
             "trash": "Move to Trash",
-            "deleteKey": "Del",
             "deletePermanently": "Delete permanently",
             "emptyToTrash": "Empty folder to Trash",
             "emptyPermanently": "Empty folder permanently",

@@ -77,9 +77,16 @@ const PC_NAMES: Record<string, string> = {
  * out uppercase - `Mod+c` and `Mod+C` are the same press and should read the
  * same - and anything longer keeps the shape it was given, so `F2` stays `F2`.
  */
-export function formatShortcut(spec: string, apple: boolean): string {
+export function formatShortcut(
+    spec: string,
+    apple: boolean,
+    /** The reader's own words for a named key on a PC keyboard, by its lowercase
+     *  name - a Spanish keyboard says "Supr" where an English one says "Del".
+     *  A Mac prints glyphs, which need no translating. */
+    localNames?: Readonly<Record<string, string>>
+): string {
     const modifierNames = apple ? APPLE_KEYS : PC_KEYS;
-    const keyNames = apple ? APPLE_NAMES : PC_NAMES;
+    const keyNames = apple ? APPLE_NAMES : { ...PC_NAMES, ...localNames };
 
     // Modifiers are taken off the front while they are recognised, and whatever
     // is left is the key - rejoined, so `Mod++` and `Mod+-` survive without the

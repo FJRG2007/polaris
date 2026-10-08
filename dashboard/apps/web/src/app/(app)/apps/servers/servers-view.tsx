@@ -61,8 +61,9 @@ import {
     DialogTitle,
     Input,
     keepFocusOnClose,
-    MenuShortcut,
-    useDeferredFocus
+    useDeferredFocus,
+    ShortcutHint,
+    shortcutPressed
 } from "@polaris/ui";
 
 /** How often reachability is re-checked. A server going down is worth noticing
@@ -115,8 +116,9 @@ export function ServersView({
     // while somebody is typing, or while a dialog is in front of the table.
     useEffect(() => {
         function onKeyDown(event: KeyboardEvent): void {
-            if (event.defaultPrevented || event.altKey || event.ctrlKey || event.metaKey) return;
-            if (event.key !== "F2" && event.key !== "Delete") return;
+            if (event.defaultPrevented) return;
+            const rename = shortcutPressed(event, "general.rename");
+            if (!rename && !shortcutPressed(event, "general.delete")) return;
             const target = event.target as HTMLElement | null;
             if (
                 target?.closest(
@@ -127,7 +129,7 @@ export function ServersView({
             }
             const row = servers.find((server) => server.id === (hovered.current ?? selected));
             if (!row) return;
-            if (event.key === "F2") {
+            if (rename) {
                 event.preventDefault();
                 setRenameError(null);
                 setRenaming(row.id);
@@ -508,7 +510,7 @@ export function ServersView({
                                             }}
                                         >
                                             <Pencil className="size-4" /> {t("list.rename")}
-                                            <MenuShortcut>F2</MenuShortcut>{/* i18n-ignore key name */}
+                                            <ShortcutHint id="general.rename" />
                                         </ContextMenuItem>
                                         <ContextMenuItem
                                             onSelect={() =>
@@ -534,7 +536,7 @@ export function ServersView({
                                                 >
                                                     <Trash2 className="size-4" />
                                                     {server.kind === "local" ? t("list.giveUpLogin") : t("list.remove")}
-                                                    <MenuShortcut>{t("list.deleteKey")}</MenuShortcut>
+                                                    <ShortcutHint id="general.delete" />
                                                 </ContextMenuItem>
                                             </>
                                         ) : null}

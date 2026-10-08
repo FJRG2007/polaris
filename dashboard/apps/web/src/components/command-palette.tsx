@@ -28,7 +28,17 @@ import { usePathname, useRouter } from "next/navigation";
 import type { SearchHit } from "@/lib/search/lookup-service";
 import { commandSuggestions, detectCommand } from "@/lib/search/parse";
 import { OPEN_SEARCH_EVENT, requestedScope } from "@/lib/search/open-search";
-import { Dialog, DialogContent, DialogTitle, Input, SegmentedControl, cn } from "@polaris/ui";
+import {
+    Dialog,
+    DialogContent,
+    DialogTitle,
+    Input,
+    SegmentedControl,
+    cn,
+    shortcutPressed,
+    useShortcutBindings,
+    useShortcutHint
+} from "@polaris/ui";
 import {
     CHAT_SCOPE_FILTERS,
     scopeWords,
@@ -139,6 +149,18 @@ function fromKey(key: string): string[] {
     return key ? key.split(",") : [];
 }
 
+/** A binding as `aria-keyshortcuts` writes it: Mod is Control on one keyboard
+ *  and Meta on another, so it is both. */
+function ariaShortcut(binding: string): string {
+    const parts = core
+        .bindingParts(binding)
+        .map((part) => (part.length === 1 ? part.toUpperCase() : part));
+    if (!parts.includes("Mod")) return parts.join("+");
+    return ["Control", "Meta"]
+        .map((modifier) => parts.map((part) => (part === "Mod" ? modifier : part)).join("+"))
+        .join(" ");
+}
+
 export function CommandPalette({
     isAdmin = false,
     appIds,
@@ -171,28 +193,19 @@ export function CommandPalette({
     const [searching, setSearching] = useState(false);
     const [failure, setFailure] = useState<string | null>(null);
     const [recent, setRecent] = useState<core.RecentSearch[]>([]);
-    const [hint, setHint] = useState("Ctrl K");
+    // The key in force, as this keyboard prints it - corrected after mount, since
+    // only the browser knows whether it has a command key.
+    const hint = useShortcutHint("general.commandPalette");
+    const binding = core.keysOf(useShortcutBindings(), "general.commandPalette")[0];
     const listRef = useRef<HTMLDivElement>(null);
     const fieldRef = useRef<HTMLInputElement>(null);
     // Set when a result is opened, so closing does not also file the query that
     // found it - the destination is the better memory of the two.
     const openedRef = useRef(false);
 
-    // The modifier is whatever the user's keyboard actually uses, but only the
-    // browser knows - so the label is corrected after mount rather than guessed
-    // during render, which would not survive hydration.
-    useEffect(() => {
-        if (/Mac|iPhone|iPad|iPod/.test(navigator.userAgent)) setHint("Cmd K");
-    }, []);
-
     useEffect(() => {
         function onKeyDown(event: KeyboardEvent) {
-            if (
-                event.key.toLowerCase() !== "k" ||
-                !(event.metaKey || event.ctrlKey) ||
-                event.altKey
-            )
-                return;
+            if (!shortcutPressed(event, "general.commandPalette")) return;
             // Browsers put Ctrl+K on the address bar; the dashboard claims it here.
             event.preventDefault();
             // Inside Chat it is Chat's quick switcher, as it is in every chat app;
@@ -657,9 +670,9 @@ export function CommandPalette({
                     presetRef.current = null;
                     setOpen(true);
                 }}
-                title={t("search.buttonTitle", { hint })}
+                title={hint ? t("search.buttonTitle", { hint }) : t("search.label")}
                 aria-label={t("search.label")}
-                aria-keyshortcuts="Control+K Meta+K"
+                aria-keyshortcuts={binding ? ariaShortcut(binding) : undefined}
                 // Below lg the header is already carrying the switcher and a page's
                 // own controls, so the field collapses to its icon rather than
                 // squeezing them.
@@ -669,9 +682,11 @@ export function CommandPalette({
                 <span className="hidden flex-1 truncate text-left text-sm lg:block">
                     {t("search.button")}
                 </span>
-                <kbd className="hidden shrink-0 rounded border border-border px-1.5 py-0.5 font-mono text-[0.625rem] leading-none lg:block">
-                    {hint}
-                </kbd>
+                {hint ? (
+                    <kbd className="hidden shrink-0 rounded border border-border px-1.5 py-0.5 font-mono text-[0.625rem] leading-none lg:block">
+                        {hint}
+                    </kbd>
+                ) : null}
             </button>
 
             <Dialog open={open} onOpenChange={onOpenChange}>

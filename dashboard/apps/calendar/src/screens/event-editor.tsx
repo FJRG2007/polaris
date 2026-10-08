@@ -66,7 +66,8 @@ import {
     Select,
     Skeleton,
     Textarea,
-    useToast
+    useToast,
+    shortcutBindings
 } from "@polaris/ui";
 
 export type EditorTarget =
@@ -301,7 +302,7 @@ export function EventEditor({
     };
 
     const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
-        const shortcut = editorShortcutFor(event);
+        const shortcut = editorShortcutFor(event, shortcutBindings());
         if (!shortcut) return;
         event.preventDefault();
         if (shortcut === "save") void save();

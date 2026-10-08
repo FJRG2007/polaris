@@ -30,7 +30,6 @@
         "rename": "Renombrar",
         "copyAddress": "Copiar dirección",
         "whereItLives": "Dónde está",
-        "deleteKey": "Supr",
         "empty": "Añade un servidor para usarlo desde Contenedores (Docker), Drive (SFTP) y una terminal aquí.",
         "reachTitle": "Acceder a esta máquina",
         "reachBody": "Ejecuta esto en la máquina donde corre Polaris para darle una terminal, sus archivos y un usuario con el que ejecutar tareas.",

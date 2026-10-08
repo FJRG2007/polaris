@@ -35,7 +35,8 @@ import {
     ContextMenuContent,
     ContextMenuTrigger,
     ContextMenuSeparator,
-    ConfirmDeleteDialog
+    ConfirmDeleteDialog,
+    shortcutPressed
 } from "@polaris/ui";
 import { hostUi } from "@polaris/app-host/client";
 import { usePlacesT } from "../use-places-t";
@@ -153,10 +154,10 @@ export function PeopleView({ canManage }: { canManage: boolean }) {
         const list = people ?? [];
         const index = list.findIndex((person) => person.id === focused);
         const current = list[index];
-        if (event.key === "F2" && current && canManage) {
+        if (shortcutPressed(event, "general.rename") && current && canManage) {
             event.preventDefault();
             startRename(current);
-        } else if (event.key === "Delete" && current && canManage) {
+        } else if (shortcutPressed(event, "general.delete") && current && canManage) {
             event.preventDefault();
             setRemoving(current);
         } else if (event.key === "ArrowDown" || event.key === "ArrowUp") {

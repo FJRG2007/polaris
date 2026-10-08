@@ -113,9 +113,10 @@ const EAGER = [
 
 const CLIENT = readFileSync(join(SRC, "components/app-host/client.tsx"), "utf8");
 
-/** Each piece loaded when it is first drawn rather than imported at the top. */
+/** Each piece loaded when it is first drawn rather than imported at the top -
+ *  the formatter may break the line after the arrow. */
 const drawnLater = new Set(
-    [...CLIENT.matchAll(/^const (\w+) = dynamic\(\s*\(\) => import\("[^"]+"/gm)].map(
+    [...CLIENT.matchAll(/^const (\w+) = dynamic\(\s*\(\) =>\s*import\("[^"]+"/gm)].map(
         (match) => match[1] ?? ""
     )
 );

@@ -15,22 +15,17 @@ import type { GoogleEvent } from "@/lib/google-calendar/events-client";
 export const CALENDAR_SCOPES = ["day", "week", "month", "year", "schedule", "fourDays"] as const;
 export type CalendarScope = (typeof CALENDAR_SCOPES)[number];
 
-/** The key that switches to each scope - Google Calendar's own, so a hand that
+/** The shortcut that switches to each scope. Its keys are Google Calendar's
+ *  own by default (see `tasks.calendar.*` in the shared table), so a hand that
  *  learned them there does not have to learn a second set here. */
-export const SCOPE_KEYS: Record<CalendarScope, string> = {
-    day: "D",
-    week: "W",
-    month: "M",
-    year: "Y",
-    schedule: "A",
-    fourDays: "X"
+export const SCOPE_SHORTCUTS: Record<CalendarScope, string> = {
+    day: "tasks.calendar.day",
+    week: "tasks.calendar.week",
+    month: "tasks.calendar.month",
+    year: "tasks.calendar.year",
+    schedule: "tasks.calendar.schedule",
+    fourDays: "tasks.calendar.fourDays"
 };
-
-/** The scope a bare key press asks for, or null when it asks for none. */
-export function scopeForKey(key: string): CalendarScope | null {
-    const pressed = key.toUpperCase();
-    return CALENDAR_SCOPES.find((scope) => SCOPE_KEYS[scope] === pressed) ?? null;
-}
 
 /** How far a schedule reaches, and how far one press of next moves it. */
 export const SCHEDULE_DAYS = 28;

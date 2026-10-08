@@ -141,6 +141,12 @@ model User {
     // waiting clears on the Update screen, a report on Safety - until something
     // new arrives. Null is the default, which is yes. See `badge-seen.ts`.
     badgesClearOnVisit Boolean?
+    // The keyboard shortcuts this account moved, as stringified JSON: action id ->
+    // the keys it answers to (see `shortcuts` in @polaris/core). Only the ones
+    // it changed; null is none, and then the keys Mail kept on its own before
+    // every app shared one table are carried over. One device may lay its own
+    // changes over these - those live in that browser, not here.
+    shortcuts     String?
     // Owned by the better-auth two-factor plugin; flipped on once the user has
     // verified their authenticator, and back off when they disable it.
     twoFactorEnabled Boolean @default(false)

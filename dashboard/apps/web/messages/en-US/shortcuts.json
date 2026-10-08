@@ -1,0 +1,222 @@
+{
+    "title": "Keyboard shortcuts",
+    "description": "Change what a key does in any app. Your keys follow your account to every device.",
+    "search": "Search shortcuts",
+    "allApps": "All apps",
+    "noMatch": "No shortcut matches {query}",
+    "or": "or",
+    "none": "None",
+    "add": "Add a key for {action}",
+    "pressFor": "Press the new keys for {action}, or Escape to cancel",
+    "press": "Press keys",
+    "remove": "Remove {keys} from {action}",
+    "reset": "Reset {action}",
+    "resetAll": "Reset all",
+    "resetAllConfirm": "Put every shortcut back on its default keys?",
+    "resetAllHint": "Your account's changes are cleared, and this device's too.",
+    "fixedHint": "Always, cannot be changed",
+    "deviceOnly": "This device only",
+    "deviceOnlyHint": "Keys you change now apply in this browser only, on top of your account's.",
+    "onDevice": "Changed on this device",
+    "moved": "Changed",
+    "cancel": "Cancel",
+    "open": "Keyboard shortcuts",
+    "withKey": "{action} ({keys})",
+    "voiceLink": "Push-to-talk is set per device in Devices.",
+    "keys": {
+        "delete": "Del",
+        "backspace": "Backspace",
+        "enter": "Enter",
+        "escape": "Esc",
+        "space": "Space"
+    },
+    "errors": {
+        "notSaved": "Your shortcuts could not be saved. Try again in a moment.",
+        "reserved": "{keys} belongs to the browser or to moving between controls. Pick another.",
+        "clash": "{keys} already does {action} here.",
+        "tooMany": "An action can hold up to {count} keys.",
+        "deviceNotSaved": "This browser would not keep the change. It applies until you close the tab."
+    },
+    "actions": {
+        "general": {
+            "commandPalette": "Search Polaris",
+            "rename": "Rename the selected item",
+            "delete": "Delete the selected item"
+        },
+        "mail": {
+            "compose": "Write a message",
+            "reply": "Reply to the message",
+            "replyAll": "Reply to everybody",
+            "forward": "Forward",
+            "archive": "Archive",
+            "trash": "Move to the trash",
+            "junk": "Report as spam",
+            "star": "Star or unstar",
+            "important": "Mark important or not",
+            "pin": "Pin to the top or unpin",
+            "mute": "Mute or unmute",
+            "markUnread": "Mark unread",
+            "next": "Next conversation",
+            "previous": "Previous conversation",
+            "open": "Open the one you are on",
+            "back": "Back to the list",
+            "selectAll": "Select every conversation",
+            "search": "Search",
+            "refresh": "Check for new mail",
+            "help": "Keyboard shortcuts"
+        },
+        "tasks": {
+            "new": "New task",
+            "delete": "Delete the selected tasks",
+            "selectAll": "Select every task",
+            "copy": "Copy the selected tasks",
+            "paste": "Paste tasks",
+            "clearSelection": "Clear the selection",
+            "rows": {
+                "next": "Go to the next task",
+                "previous": "Go to the previous task",
+                "open": "Open the task you are on",
+                "select": "Select the task you are on",
+                "leave": "Leave the list"
+            },
+            "calendar": {
+                "day": "Day",
+                "week": "Week",
+                "month": "Month",
+                "year": "Year",
+                "schedule": "Schedule",
+                "fourDays": "4 days",
+                "today": "Today",
+                "next": "Go to the next period",
+                "previous": "Go to the previous period"
+            }
+        },
+        "calendar": {
+            "previous": "Go to the previous period",
+            "next": "Go to the next period",
+            "today": "Today",
+            "goTo": "Go to a date",
+            "view": {
+                "day": "Day view",
+                "week": "Week view",
+                "month": "Month view",
+                "year": "Year view",
+                "list": "List view",
+                "days": "Custom view"
+            },
+            "create": "New event",
+            "open": "Open selected event",
+            "delete": "Delete selected event",
+            "undo": "Undo last change",
+            "copy": "Copy the selected event",
+            "paste": "Paste on the focused day",
+            "search": "Search",
+            "refresh": "Refresh",
+            "settings": "Settings",
+            "addCalendar": "Create a calendar",
+            "help": "Keyboard shortcuts",
+            "close": "Close",
+            "grid": {
+                "menu": "Open the menu",
+                "moveFocus": "Move between days",
+                "createHere": "New event on the focused day"
+            },
+            "editor": {
+                "save": "Save, in the editor",
+                "delete": "Delete, in the editor",
+                "duplicate": "Duplicate, in the editor"
+            },
+            "stopwatch": {
+                "startStop": "Start or stop",
+                "lap": "Lap",
+                "reset": "Reset"
+            }
+        },
+        "drive": {
+            "newFolder": "New folder",
+            "newFile": "Create a file",
+            "uploadFiles": "Upload files",
+            "uploadFolder": "Upload a folder",
+            "requestFiles": "Request files",
+            "selectAll": "Select everything",
+            "copy": "Copy",
+            "cut": "Cut",
+            "paste": "Paste",
+            "open": "Open",
+            "delete": "Delete",
+            "clearSelection": "Clear the selection"
+        },
+        "viewer": {
+            "find": "Find",
+            "previousFile": "Go to the previous file",
+            "nextFile": "Go to the next file",
+            "previousSlide": "Go to the previous slide",
+            "nextSlide": "Go to the next slide",
+            "zoomIn": "Zoom in",
+            "zoomOut": "Zoom out"
+        },
+        "chat": {
+            "reply": "Reply to the message",
+            "edit": "Edit your message",
+            "delete": "Delete the message",
+            "copy": "Copy the message",
+            "toggleMic": "Mute or unmute",
+            "toggleDeafen": "Deafen or undeafen"
+        },
+        "places": {
+            "clips": {
+                "selectAll": "Select every clip",
+                "delete": "Delete the selected clips",
+                "open": "Play the clip",
+                "clearSelection": "Clear the selection"
+            }
+        },
+        "databases": {
+            "run": "Run the query"
+        },
+        "vault": {
+            "copyPassword": "Copy the password",
+            "copyUsername": "Copy the username",
+            "edit": "Edit the entry",
+            "delete": "Delete the entry"
+        }
+    },
+    "groups": {
+        "general": "General",
+        "mailWrite": "Writing",
+        "mailActions": "Acting on mail",
+        "mailMove": "Moving around",
+        "tasksList": "Lists",
+        "tasksRows": "Rows",
+        "tasksCalendar": "Calendar",
+        "calendarMove": "Moving around",
+        "calendarViews": "Views",
+        "calendarEvents": "Events",
+        "calendarApp": "The app",
+        "calendarGrid": "The grid",
+        "calendarEditor": "The event editor",
+        "calendarClock": "Stopwatch",
+        "driveCreate": "Adding",
+        "driveFiles": "Files",
+        "viewerRead": "Reading",
+        "viewerSlides": "Presentations",
+        "viewerPictures": "Pictures",
+        "chatMessages": "Messages",
+        "chatCalls": "Calls",
+        "placesClips": "Clips",
+        "databasesQuery": "Queries",
+        "vaultItems": "Entries"
+    },
+    "apps": {
+        "general": "Everywhere",
+        "mail": "Mail",
+        "tasks": "Tasks",
+        "calendar": "Calendar",
+        "drive": "Drive",
+        "viewer": "Viewers",
+        "chat": "Chat",
+        "places": "Places",
+        "databases": "Databases",
+        "vault": "Vault"
+    }
+}

@@ -20,7 +20,6 @@
         "export": "Export as Markdown",
         "rename": "Rename",
         "people": "Who can reach this",
-        "deleteKey": "Del",
         "emptyShelf": "Nothing here yet.",
         "openNamed": "Open {name}",
         "closeNamed": "Close {name}",

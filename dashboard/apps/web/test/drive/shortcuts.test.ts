@@ -6,7 +6,8 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { matchShortcut, SHORTCUT_HINTS } from "../../src/app/(app)/drive/shortcuts";
+import { resolveShortcuts, shortcutDefinition } from "@polaris/core";
+import { matchShortcut, SHORTCUT_IDS } from "../../src/app/(app)/drive/shortcuts";
 
 describe("matchShortcut", () => {
     it("maps the create and upload keys", () => {
@@ -34,7 +35,13 @@ describe("matchShortcut", () => {
         }
     });
 
-    it("names every action in the menu hints", () => {
+    it("follows a key somebody moved", () => {
+        const moved = resolveShortcuts({ "drive.newFolder": ["Shift+n"] });
+        expect(matchShortcut({ key: "n" }, moved)).toBeNull();
+        expect(matchShortcut({ key: "N", shiftKey: true }, moved)).toBe("new-folder");
+    });
+
+    it("names a shared shortcut for every action, for the menu hints", () => {
         const actions = [
             "new-folder",
             "new-file",
@@ -42,6 +49,6 @@ describe("matchShortcut", () => {
             "upload-folder",
             "request-files"
         ] as const;
-        for (const action of actions) expect(SHORTCUT_HINTS[action]).toBeTruthy();
+        for (const action of actions) expect(shortcutDefinition(SHORTCUT_IDS[action])).toBeTruthy();
     });
 });
