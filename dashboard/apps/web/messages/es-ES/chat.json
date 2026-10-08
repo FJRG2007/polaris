@@ -175,7 +175,14 @@
         "stillWaiting": "Todavía esperas a que te dejen pasar",
         "notInThatCall": "Fuera de la llamada",
         "fileGone": "Ese archivo ya no está",
-        "attachmentGone": "Este archivo no está en el almacenamiento donde Polaris guarda las subidas. Se escribió y ya no está."
+        "attachmentGone": "Este archivo no está en el almacenamiento donde Polaris guarda las subidas. Se escribió y ya no está.",
+        "pinNotAllowed": "Aquí no puedes fijar mensajes",
+        "tooManyPins": "Esta conversación ya tiene {max} fijados. Quita uno primero.",
+        "ageRestricted": "Este canal es solo para adultos. Confirma que eres mayor de edad para leerlo.",
+        "inviteChannelNotOpen": "Un enlace solo puede llevar a un canal público y abierto de este espacio.",
+        "tooManyWebhooks": "Un canal admite hasta {count} webhooks.",
+        "webhookGone": "Ese webhook ya no existe.",
+        "webhookName": "Ponle al webhook un nombre de hasta 80 caracteres."
     },
     "media": {
         "refused": {
@@ -456,9 +463,9 @@
         "show": "Mostrar",
         "thisMessageWasDeleted": "Este mensaje se borró.",
         "seeWhatItSaidBefore": "Ver lo que decía antes",
-        "removeFromSaved": "Quitar de guardados",
-        "saveThisMessage": "Guardar este mensaje",
-        "save": "Guardar",
+        "removeFromSaved": "No destacar",
+        "saveThisMessage": "Destacar este mensaje",
+        "save": "Destacar",
         "reply": "Responde",
         "replyOrPressR": "Responder - o pulsa R",
         "replyInAThread": "Responder en un hilo",
@@ -491,7 +498,11 @@
             "sent": "Enviado",
             "delivered": "Entregado",
             "read": "Leído"
-        }
+        },
+        "starred": "Destacado",
+        "pinnedHere": "Fijado",
+        "app": "APP",
+        "webhookHint": "Lo publicó una app mediante un webhook, no una persona"
     },
     "composer": {
         "replyingTo": "Respondiendo a",
@@ -545,7 +556,7 @@
         "newChannel": "Nuevo canal",
         "newCategory": "Nueva categoría",
         "findOrStartAConversation": "Buscar o iniciar conversación",
-        "savedMessages": "Mensajes guardados",
+        "savedMessages": "Mensajes destacados",
         "meetings": "Reuniones",
         "nobodyYet": "Aún no hay nadie.",
         "newChannelHere": "Nuevo canal aquí",
@@ -570,7 +581,8 @@
         "addTo": "Añadir a {name}",
         "moreFor": "Más de {name}",
         "placesTaken": "{places} plazas ocupadas",
-        "of": " de "
+        "of": " de ",
+        "editChannelNamed": "Editar {name}"
     },
     "channelView": {
         "thisConversationIsNotYours": "Esta conversación no es tuya para abrirla.",
@@ -630,7 +642,10 @@
         "whatThisGroupIsCalled": "Cómo se llama el grupo",
         "cancel": "Cancelar",
         "save": "Guardar",
-        "everyMessageInItGoes": "Todos sus mensajes se van con él. Si lo archivas, se pueden seguir leyendo."
+        "everyMessageInItGoes": "Todos sus mensajes se van con él. Si lo archivas, se pueden seguir leyendo.",
+        "pinnedMessages": "Mensajes fijados",
+        "starredMessages": "Mensajes destacados",
+        "channelSettings": "Ajustes del canal"
     },
     "meetingNotice": {
         "invitedTitle": "{name} te ha invitado a {meeting}",
@@ -720,8 +735,8 @@
         "replyPrivately": "Mensaje privado",
         "forward": "Reenviar",
         "replyInAThread": "Responder en un hilo",
-        "removeFromSaved": "Quitar de guardados",
-        "save": "Guardar",
+        "removeFromSaved": "No destacar",
+        "save": "Destacar",
         "markUnreadFromHere": "No leído desde aquí",
         "copyMessageLink": "Copiar enlace",
         "copyText": "Copiar texto",
@@ -731,7 +746,9 @@
         "reportThisMessage": "Denunciar mensaje",
         "edit": "Editar",
         "delete": "Borrar",
-        "del": "Supr"
+        "del": "Supr",
+        "pin": "Fijar",
+        "unpin": "No fijar"
     },
     "poll": {
         "createAPoll": "Crear encuesta",
@@ -812,7 +829,88 @@
         "save": "Guardar",
         "everyMessageInItGoes": "Todos sus mensajes se van con él. Si lo archivas, se pueden seguir leyendo.",
         "deleteChannel": "Borrar canal",
-        "limitHint": "Hasta {max}. Vacío o 0 es sin límite."
+        "limitHint": "Hasta {max}. Vacío o 0 es sin límite.",
+        "sections": {
+            "overview": "Resumen",
+            "permissions": "Permisos",
+            "invites": "Invitaciones",
+            "integrations": "Integraciones",
+            "label": "Secciones de ajustes del canal"
+        },
+        "textChannel": "Canal de texto",
+        "voiceChannel": "Canal de voz",
+        "close": "Cerrar ajustes",
+        "back": "Volver",
+        "topic": "Tema del canal",
+        "topicPlaceholder": "Explica a todos para qué es este canal",
+        "count": "{count}/{max}",
+        "storedAs": "Se guarda como #{name}",
+        "slowmode": "Modo lento",
+        "slowmodeHint": "Cuánto esperan los miembros entre mensajes. Quien modera el canal no tiene que esperar.",
+        "content": "Contenido",
+        "modes": {
+            "default": "Normal",
+            "spoiler": "Todo spoiler",
+            "age": "Solo adultos"
+        },
+        "modeHints": {
+            "default": "Las fotos, los vídeos y los enlaces se ven tal como se enviaron.",
+            "spoiler": "Cada foto, vídeo y enlace aparece tapado, y se ve al pulsarlo.",
+            "age": "Quien lo abra confirma antes que es mayor de edad, una vez por canal."
+        },
+        "archiveTitle": "Archivar canal",
+        "archiveHint": "Todo sigue legible y ya no se puede escribir nada nuevo.",
+        "reopenTitle": "Reabrir canal",
+        "unsaved": "Tienes cambios sin guardar",
+        "reset": "Deshacer",
+        "saveChanges": "Guardar cambios",
+        "saved": "Guardado",
+        "notAllowedTitle": "No puedes cambiar este canal",
+        "notAllowedHint": "Solo quien lo gestiona puede abrir sus ajustes.",
+        "backToChannel": "Volver al canal",
+        "private": "Canal privado",
+        "privateHint": "Solo lo ven y lo leen las personas, equipos y roles que añadas.",
+        "publicNote": "Todo el que esté en el espacio puede ver y leer este canal.",
+        "privacySpaceAdminOnly": "Solo los administradores del espacio pueden cambiarlo.",
+        "whoCanReach": "Quién puede entrar",
+        "whoCanReachHint": "Aquí aparece la gente de un canal privado una vez guardado.",
+        "addPeople": "Añadir gente",
+        "removePerson": "Quitar a {name}",
+        "you": "(tú)",
+        "nobodyYet": "Aún no se ha añadido a nadie.",
+        "invitesHint": "Quien siga uno de estos entra en el espacio y llega a este canal.",
+        "invitesPrivate": "Entrar en el espacio no abre un canal privado, así que un enlace no puede traer aquí. Añade a la gente en Permisos.",
+        "openPermissions": "Abrir Permisos",
+        "createLink": "Crear enlace",
+        "noInvites": "Aún no hay enlaces a este canal",
+        "columns": {
+            "inviter": "Creado por",
+            "code": "Código",
+            "uses": "Usos",
+            "expires": "Caduca"
+        },
+        "revokeCode": "Revocar {code}",
+        "copyLink": "Copiar enlace {code}",
+        "copied": "Copiado",
+        "webhooks": "Webhooks",
+        "webhooksHint": "Deja que un script, un monitor u otro servicio publique en este canal. Lo que ya publica en un webhook de Discord funciona con el mismo cuerpo.",
+        "newWebhook": "Nuevo webhook",
+        "defaultWebhookName": "Webhook",
+        "webhookName": "Nombre",
+        "copyUrl": "Copiar URL",
+        "urlOnce": "Copia esta dirección ahora. Solo se muestra una vez; crea otra si la pierdes.",
+        "newUrl": "Nueva URL",
+        "newUrlTitle": "¿Crear otra dirección?",
+        "newUrlHint": "La dirección antigua deja de funcionar al instante. Lo que la use necesitará la nueva.",
+        "deleteWebhook": "Eliminar webhook",
+        "deleteWebhookHint": "Lo que publique en su dirección deja de llegar a este canal. Lo ya publicado se queda.",
+        "noWebhooks": "Aún no hay webhooks",
+        "lastUsed": "Usado {when}",
+        "neverUsed": "Sin usar",
+        "madeBy": "Creado por {name}",
+        "rename": "Renombrar",
+        "webhookActions": "Acciones de {name}",
+        "esc": "Esc"
     },
     "callMenus": {
         "volume": "Volumen",
@@ -1152,7 +1250,8 @@
         "openIt": "Abrir",
         "thisInvitationHasRunOut": "Esta invitación se ha agotado. Pide otra a quien te la envió.",
         "invitedBy": "{name} te ha invitado.",
-        "join": "Entrar en {name}"
+        "join": "Entrar en {name}",
+        "opensOn": "Abre en #{name}"
     },
     "editHistory": {
         "editHistory": "Historial",
@@ -1225,10 +1324,18 @@
     },
     "saved": {
         "backToConversations": "Volver a conversaciones",
-        "saved": "Guardado",
-        "nothingSaved": "Nada guardado.",
-        "hoverAMessageAndPress": "Pasa por encima de un mensaje y pulsa la estrella para guardarlo. Solo lo ves tú.",
-        "removeFromSaved": "Quitar de guardados"
+        "saved": "Mensajes destacados",
+        "nothingSaved": "Sin mensajes destacados",
+        "hoverAMessageAndPress": "Destaca un mensaje desde su menú para encontrarlo aquí. Solo tú ves tus destacados.",
+        "removeFromSaved": "No destacar",
+        "allConversations": "Todas",
+        "onlyIn": "En {name}",
+        "unstarAll": "Quitar destacados",
+        "unstarAllTitle": "¿Quitar todos los destacados?",
+        "unstarAllBody": "Los mensajes siguen donde están. Solo se quitan tus estrellas.",
+        "unstarAllHere": "¿Quitar los destacados de {name}?",
+        "cancel": "Cancelar",
+        "openInConversation": "Abrir en la conversación"
     },
     "elsewhere": {
         "thatCallCouldNotBe": "No se pudo llegar a esa llamada.",
@@ -1291,7 +1398,7 @@
     "spoiler": {
         "showTheHiddenText": "Mostrar el texto oculto",
         "spoiler": "Spoiler",
-        "showThis": "Mostrar {kind, select, picture {esta imagen} video {este vídeo} file {este archivo} text {este texto} content {este contenido} other {{kind}}}"
+        "showThis": "Mostrar {kind, select, picture {esta imagen} video {este vídeo} file {este archivo} text {este texto} content {este contenido} link {este enlace} other {{kind}}}"
     },
     "noAudio": {
         "yourMicrophoneHasNotPicked": "Tu micrófono lleva un rato sin captar nada. Comprueba que no esté silenciado en el propio equipo y que esté elegido el correcto en Cuenta > Dispositivos.",
@@ -1349,7 +1456,13 @@
     },
     "linkCard": {
         "play": "Reproducir en {provider}, aquí",
-        "playHint": "Se reproduce aquí. {provider} te ve en cuanto lo pulsas."
+        "playHint": "Se reproduce aquí. {provider} te ve en cuanto lo pulsas.",
+        "freeToPlay": "Gratis",
+        "comingSoon": "Próximamente",
+        "comingOn": "Sale {date}",
+        "released": "Salió {date}",
+        "wasPrice": "Antes {price}",
+        "runsOn": "Plataformas"
     },
     "gameLink": {
         "server": "servidor de {game} {name}",
@@ -1419,5 +1532,34 @@
         "title": "¿Dejar de ser amigos de {name}?",
         "description": "Pierde lo que muestras a tus amigos y conserva todo lo demás. Cualquiera de los dos puede volver a pedirlo.",
         "confirm": "Quitar amigo"
+    },
+    "pins": {
+        "pinFor": "¿Fijar este mensaje?",
+        "pinForBody": "Todos aquí lo ven sobre la conversación. Puedes quitarlo cuando quieras.",
+        "day": "24 horas",
+        "week": "7 días",
+        "month": "30 días",
+        "forever": "Hasta quitarlo",
+        "pin": "Fijar",
+        "cancel": "Cancelar",
+        "pinned": "Mensaje fijado",
+        "pinnedCount": "Fijado {at} de {count}",
+        "showAll": "Todos los fijados",
+        "title": "Mensajes fijados",
+        "none": "Sin mensajes fijados",
+        "noneBody": "Fija un mensaje desde su menú para mostrarlo a todos sobre la conversación.",
+        "jump": "Ir",
+        "jumpTo": "Ir al mensaje",
+        "unpin": "No fijar",
+        "byOn": "Fijado por {name}",
+        "until": "Hasta {date}",
+        "attachment": "Adjunto",
+        "deleted": "Mensaje eliminado"
+    },
+    "ageGate": {
+        "title": "Canal solo para adultos",
+        "description": "#{name} está marcado con contenido para adultos. Continúa solo si tienes al menos 18 años.",
+        "goBack": "Volver",
+        "continue": "Continuar"
     }
 }

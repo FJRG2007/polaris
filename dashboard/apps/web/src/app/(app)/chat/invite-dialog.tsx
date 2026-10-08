@@ -20,7 +20,7 @@ import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { NamespaceKey } from "@/lib/i18n/types";
 
 /** How long an invitation lasts, by its length in minutes. */
-const INVITE_DURATION_KEYS: Readonly<Record<number, NamespaceKey<"chat">>> = {
+export const INVITE_DURATION_KEYS: Readonly<Record<number, NamespaceKey<"chat">>> = {
     30: "invite.durations.m30",
     60: "invite.durations.h1",
     360: "invite.durations.h6",
@@ -127,14 +127,22 @@ export function InviteDialog({
                         <span className="text-sm font-medium">{t("invite.aLink")}</span>
                         <div className="flex flex-wrap items-end gap-2">
                             <label className="flex min-w-32 flex-1 flex-col gap-1">
-                                <span className="text-xs text-muted-foreground">{t("invite.expiresAfter")}</span>
+                                <span className="text-xs text-muted-foreground">
+                                    {t("invite.expiresAfter")}
+                                </span>
                                 <Select
                                     value={expires}
                                     onValueChange={setExpires}
                                     options={[...core.INVITE_DURATIONS, core.INVITE_FOREVER].map(
                                         (minutes) => ({
                                             value: String(minutes),
-                                            label: minutes === core.INVITE_FOREVER ? t("invite.durations.never") : t(INVITE_DURATION_KEYS[minutes] ?? "invite.durations.never")
+                                            label:
+                                                minutes === core.INVITE_FOREVER
+                                                    ? t("invite.durations.never")
+                                                    : t(
+                                                          INVITE_DURATION_KEYS[minutes] ??
+                                                              "invite.durations.never"
+                                                      )
                                         })
                                     )}
                                 />
@@ -149,7 +157,10 @@ export function InviteDialog({
                                     options={[core.INVITE_UNLIMITED, ...core.INVITE_USE_LIMITS].map(
                                         (limit) => ({
                                             value: String(limit),
-                                            label: limit === core.INVITE_UNLIMITED ? t("invite.uses.unlimited") : t("invite.uses.count", { count: limit })
+                                            label:
+                                                limit === core.INVITE_UNLIMITED
+                                                    ? t("invite.uses.unlimited")
+                                                    : t("invite.uses.count", { count: limit })
                                         })
                                     )}
                                 />
@@ -180,7 +191,9 @@ export function InviteDialog({
                                             ? t("invite.used", { count: invite.uses })
                                             : `${invite.uses}/${invite.maxUses}`}
                                         {invite.expiresAt
-                                            ? t("invite.until", { date: format.dateTime(invite.expiresAt) })
+                                            ? t("invite.until", {
+                                                  date: format.dateTime(invite.expiresAt)
+                                              })
                                             : t("invite.noEnd")}
                                     </span>
                                     <button
@@ -221,7 +234,9 @@ export function InviteDialog({
                     )}
 
                     <div className="flex flex-col gap-2 border-t border-border pt-4">
-                        <span className="text-sm font-medium">{t("invite.orSendItToSomebody")}</span>
+                        <span className="text-sm font-medium">
+                            {t("invite.orSendItToSomebody")}
+                        </span>
                         <PeoplePicker
                             label={t("invite.whoToSendItTo")}
                             picked={[]}

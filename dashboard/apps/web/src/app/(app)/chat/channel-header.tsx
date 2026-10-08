@@ -45,9 +45,11 @@ import {
     MoreHorizontal,
     Pencil,
     Phone,
+    Pin,
     PhoneOff,
     Search,
     Settings2,
+    Star,
     Trash2,
     UserPlus,
     UserRound,
@@ -88,6 +90,7 @@ export function ChannelHeader({
     call,
     onStartCall,
     onSearch,
+    onPins,
     onMembers
 }: {
     channel: ChatChannelView;
@@ -105,6 +108,8 @@ export function ChannelHeader({
     /** Absent where there is nothing to search - a voice room holds no
      *  messages, and a button that does nothing is worse than no button. */
     onSearch?: () => void;
+    /** Open the list of every message pinned here - Discord's pin button. */
+    onPins?: () => void;
     /** Show or hide who is in here. Absent in a one-to-one conversation, where
      *  the roster is the two people already named at the top. */
     onMembers?: () => void;
@@ -242,8 +247,16 @@ export function ChannelHeader({
                             // A conversation between two people has no roster:
                             // the panel is the other person, and the control
                             // says so rather than offering to list two names.
-                            aria-label={channel.kind === "dm" ? t("channelHeader.profile") : t("channelHeader.whoIsInHere")}
-                            title={channel.kind === "dm" ? t("channelHeader.profile") : t("channelHeader.whoIsInHere")}
+                            aria-label={
+                                channel.kind === "dm"
+                                    ? t("channelHeader.profile")
+                                    : t("channelHeader.whoIsInHere")
+                            }
+                            title={
+                                channel.kind === "dm"
+                                    ? t("channelHeader.profile")
+                                    : t("channelHeader.whoIsInHere")
+                            }
                             className="rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                         >
                             {channel.kind === "dm" ? (
@@ -262,6 +275,17 @@ export function ChannelHeader({
                             className="rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                         >
                             <Search className="size-4" />
+                        </button>
+                    )}
+                    {onPins && (
+                        <button
+                            type="button"
+                            onClick={onPins}
+                            aria-label={t("channelHeader.pinnedMessages")}
+                            title={t("channelHeader.pinnedMessages")}
+                            className="rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                        >
+                            <Pin className="size-4" />
                         </button>
                     )}
                     {/* An account that may not be in calls is not shown the way
@@ -356,6 +380,14 @@ export function ChannelHeader({
                                 <Link2 className="size-3.5" />
                                 {t("channelHeader.copyLink")}
                             </DropdownMenuItem>
+                            {/* This conversation's part of the reader's own
+                                starred list, as WhatsApp's chat info offers it. */}
+                            <DropdownMenuItem asChild>
+                                <Link href={`/chat/saved?c=${channel.id}`}>
+                                    <Star className="size-3.5" />
+                                    {t("channelHeader.starredMessages")}
+                                </Link>
+                            </DropdownMenuItem>
                             <DropdownMenuSeparator />
                             <MuteOptions
                                 channel={channel}
@@ -428,8 +460,19 @@ export function ChannelHeader({
                                     </DropdownMenuItem>
                                 </>
                             )}
-                            {named && (
+                            {/* Only for whoever runs it: archiving, deleting
+                                and the settings page are all refused anybody
+                                else, so nobody else is offered them. */}
+                            {named && channel.mayAdminister && (
                                 <>
+                                    {/* Everything about the room on its own page,
+                                        Discord's Edit Channel. */}
+                                    <DropdownMenuItem asChild>
+                                        <Link href={`/chat/c/${channel.id}/settings`}>
+                                            <Settings2 className="size-3.5" />
+                                            {t("channelHeader.channelSettings")}
+                                        </Link>
+                                    </DropdownMenuItem>
                                     <DropdownMenuItem
                                         onSelect={() =>
                                             void act(() =>
@@ -440,7 +483,9 @@ export function ChannelHeader({
                                             )
                                         }
                                     >
-                                        {channel.archived ? t("channelHeader.reopenChannel") : t("channelHeader.archiveChannel")}
+                                        {channel.archived
+                                            ? t("channelHeader.reopenChannel")
+                                            : t("channelHeader.archiveChannel")}
                                     </DropdownMenuItem>
                                     <DropdownMenuSeparator />
                                     <DropdownMenuItem

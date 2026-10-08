@@ -37,7 +37,15 @@ import { NicknameDialog } from "./nickname-dialog";
 import { useAppUrl } from "@/components/app-url";
 import { useOpenDirect } from "./use-open-direct";
 import { MemberMenu, type MenuPerson } from "./member-menu";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+    createContext,
+    useCallback,
+    useContext,
+    useEffect,
+    useMemo,
+    useRef,
+    useState
+} from "react";
 import { recentEmoji, rememberEmoji } from "./recents";
 import { embedFor } from "@/lib/chat/embeds";
 import { LinkCard } from "./link-card";
@@ -54,6 +62,7 @@ import { isPlayable, isVoiceMessage } from "./voice-recorder";
 import { AttachmentViewer, previewableAs, type ViewedFile } from "./attachment-viewer";
 import { usePersonPress } from "@/components/person-press";
 import { NoticeText } from "./notice-line";
+import { useSwipeReply } from "./swipe-reply";
 
 /**
  * A file on a message that is not a picture, a recording or a clip.
@@ -165,11 +174,21 @@ import {
     MessageSquare,
     Paperclip,
     Pencil,
+    Pin,
     SmilePlus,
     Star,
     Trash2,
-    Volume2
+    Volume2,
+    Webhook
 } from "lucide-react";
+
+/**
+ * Whether every picture, video and link card in this conversation starts
+ * covered - a channel whose settings say its content is spoilers. A context
+ * rather than a prop down every message, because only the attachment and the
+ * card read it.
+ */
+const CoverMedia = createContext(false);
 
 /** How close together two messages have to be to share a header. Long enough
  *  that a paused sentence stays one block, short enough that coming back an hour
@@ -206,6 +225,9 @@ function quickEmoji(recent: readonly string[]): string[] {
 
 export interface MessageListProps {
     messages: readonly ChatMessageView[];
+    /** Cover every picture, video and link card until it is pressed - the
+     *  channel's content setting, not the sender's. */
+    coverMedia?: boolean;
     viewerId: string;
     /** False in an archived conversation: everything is still readable, nothing
      *  is actionable. */
@@ -216,6 +238,12 @@ export interface MessageListProps {
     onOpenThread?: (message: ChatMessageView) => void;
     onReact: (messageId: string, emoji: string) => void;
     onStar: (message: ChatMessageView) => void;
+    /** The messages pinned for everybody here, to mark them and to offer Unpin
+     *  rather than Pin. Absent inside a thread, where nothing is pinned. */
+    pinnedIds?: ReadonlySet<string>;
+    /** Pin or unpin for everybody. Absent where this reader may not, and then
+     *  the item is not drawn. */
+    onPin?: (message: ChatMessageView, pinned: boolean) => void;
     /** Pick the conversation up again from a message. Absent inside a thread,
      *  whose unread is counted separately from the channel's. */
     onMarkUnread?: (message: ChatMessageView) => void;
@@ -264,13 +292,16 @@ export function MessageList({
     onOpenThread,
     onReact,
     onStar,
+    pinnedIds,
+    onPin,
     onMarkUnread,
     onReply,
     onReplyPrivately,
     onForward,
     onEdit,
     onDelete,
-    onMention
+    onMention,
+    coverMedia = false
 }: MessageListProps) {
     useMessageKeys({ messages, viewerId, canPost, canModerate, onReply, onEdit, onDelete });
     const { refresh } = useChat();
@@ -369,113 +400,117 @@ export function MessageList({
     }, [asked]);
 
     return (
-        <ol className="flex flex-col">
-            {messages.map((message, index) => {
-                const previous = index > 0 ? messages[index - 1] : undefined;
-                const newDay = !previous || !sameDay(previous.createdAt, message.createdAt);
-                const grouped = sharesBlock(previous, message);
+        <CoverMedia.Provider value={coverMedia}>
+            <ol className="flex flex-col">
+                {messages.map((message, index) => {
+                    const previous = index > 0 ? messages[index - 1] : undefined;
+                    const newDay = !previous || !sameDay(previous.createdAt, message.createdAt);
+                    const grouped = sharesBlock(previous, message);
 
-                return (
-                    <li
-                        key={message.id}
-                        // Addressable, so a search result can be scrolled to.
-                        id={`message-${message.id}`}
-                        className={cn(
-                            "transition-colors duration-500",
-                            // Only the person named sees this. To everybody else
-                            // it is an ordinary message with an ordinary mention
-                            // in it, which is exactly what it is to them - and a
-                            // room where every mention of anybody was highlighted
-                            // for everybody would be a room of highlights.
-                            message.mentionsYou && "border-l-2 border-warning bg-warning-soft",
-                            message.id === highlightId && "bg-primary/10"
-                        )}
-                    >
-                        {newDay && <DaySeparator iso={message.createdAt} />}
-                        <Message
-                            quick={quick}
-                            message={message}
-                            grouped={grouped}
-                            // The ticks go under the last message of a block and
-                            // nowhere else. Somebody who has read the newest of
-                            // five messages in a row has read the other four,
-                            // and five ticks say that five times.
-                            lastOfBlock={!sharesBlock(message, messages[index + 1])}
-                            mine={message.authorId === viewerId}
-                            viewerId={viewerId}
-                            onMention={onMention}
-                            onNickname={setNaming}
-                            onError={say}
-                            onOpenImage={setViewing}
-                            onOpenFile={setReading}
-                            onReport={(target) => setReporting(target.id)}
-                            onExplain={setExplaining}
-                            canPost={canPost}
-                            canModerate={canModerate}
-                            onOpenThread={onOpenThread}
-                            onReact={react}
-                            onStar={onStar}
-                            onMarkUnread={onMarkUnread}
-                            inVoice={inVoice}
-                            onJumpTo={onJumpTo}
-                            onReply={onReply}
-                            onReplyPrivately={onReplyPrivately}
-                            onForward={onForward}
-                            onEdit={onEdit}
-                            onDelete={onDelete}
-                        />
-                    </li>
-                );
-            })}
+                    return (
+                        <li
+                            key={message.id}
+                            // Addressable, so a search result can be scrolled to.
+                            id={`message-${message.id}`}
+                            className={cn(
+                                "transition-colors duration-500",
+                                // Only the person named sees this. To everybody else
+                                // it is an ordinary message with an ordinary mention
+                                // in it, which is exactly what it is to them - and a
+                                // room where every mention of anybody was highlighted
+                                // for everybody would be a room of highlights.
+                                message.mentionsYou && "border-l-2 border-warning bg-warning-soft",
+                                message.id === highlightId && "bg-primary/10"
+                            )}
+                        >
+                            {newDay && <DaySeparator iso={message.createdAt} />}
+                            <Message
+                                quick={quick}
+                                message={message}
+                                grouped={grouped}
+                                // The ticks go under the last message of a block and
+                                // nowhere else. Somebody who has read the newest of
+                                // five messages in a row has read the other four,
+                                // and five ticks say that five times.
+                                lastOfBlock={!sharesBlock(message, messages[index + 1])}
+                                mine={message.authorId === viewerId}
+                                viewerId={viewerId}
+                                onMention={onMention}
+                                onNickname={setNaming}
+                                onError={say}
+                                onOpenImage={setViewing}
+                                onOpenFile={setReading}
+                                onReport={(target) => setReporting(target.id)}
+                                onExplain={setExplaining}
+                                canPost={canPost}
+                                canModerate={canModerate}
+                                onOpenThread={onOpenThread}
+                                onReact={react}
+                                onStar={onStar}
+                                pinned={pinnedIds?.has(message.id) ?? false}
+                                onPin={onPin}
+                                onMarkUnread={onMarkUnread}
+                                inVoice={inVoice}
+                                onJumpTo={onJumpTo}
+                                onReply={onReply}
+                                onReplyPrivately={onReplyPrivately}
+                                onForward={onForward}
+                                onEdit={onEdit}
+                                onDelete={onDelete}
+                            />
+                        </li>
+                    );
+                })}
 
-            <AttachmentViewer file={reading} onClose={() => setReading(null)} />
+                <AttachmentViewer file={reading} onClose={() => setReading(null)} />
 
-            <ImageViewer
-                image={viewing}
-                onClose={() => setViewing(null)}
-                // Absent inside a thread, where forwarding is left to the
-                // channel: the viewer draws no Forward item rather than one
-                // that does nothing.
-                onForward={
-                    onForward &&
-                    ((messageId) => {
-                        const found = messages.find((entry) => entry.id === messageId);
-                        if (!found) return;
+                <ImageViewer
+                    image={viewing}
+                    onClose={() => setViewing(null)}
+                    // Absent inside a thread, where forwarding is left to the
+                    // channel: the viewer draws no Forward item rather than one
+                    // that does nothing.
+                    onForward={
+                        onForward &&
+                        ((messageId) => {
+                            const found = messages.find((entry) => entry.id === messageId);
+                            if (!found) return;
+                            setViewing(null);
+                            onForward(found);
+                        })
+                    }
+                    onReport={(messageId) => {
                         setViewing(null);
-                        onForward(found);
-                    })
-                }
-                onReport={(messageId) => {
-                    setViewing(null);
-                    setReporting(messageId);
-                }}
-            />
-            <ReportDialog
-                messageId={reporting}
-                body={messages.find((entry) => entry.id === reporting)?.body ?? ""}
-                // Whoever wrote it, so blocking them is one press once the
-                // report has gone. Null for a message whose author has left,
-                // and then the offer is not made rather than made and refused.
-                author={(() => {
-                    const said = messages.find((entry) => entry.id === reporting);
-                    return said?.authorId && said.authorName
-                        ? { id: said.authorId, name: said.authorName }
-                        : null;
-                })()}
-                open={reporting !== null}
-                onOpenChange={(next) => !next && setReporting(null)}
-            />
-            <MessageInfoDialog
-                message={explaining}
-                onOpenChange={(next) => !next && setExplaining(null)}
-            />
-            <NicknameDialog
-                open={naming !== null}
-                person={naming ? { id: naming.userId, name: naming.name } : null}
-                onOpenChange={(open) => !open && setNaming(null)}
-                onSaved={refresh}
-            />
-        </ol>
+                        setReporting(messageId);
+                    }}
+                />
+                <ReportDialog
+                    messageId={reporting}
+                    body={messages.find((entry) => entry.id === reporting)?.body ?? ""}
+                    // Whoever wrote it, so blocking them is one press once the
+                    // report has gone. Null for a message whose author has left,
+                    // and then the offer is not made rather than made and refused.
+                    author={(() => {
+                        const said = messages.find((entry) => entry.id === reporting);
+                        return said?.authorId && said.authorName
+                            ? { id: said.authorId, name: said.authorName }
+                            : null;
+                    })()}
+                    open={reporting !== null}
+                    onOpenChange={(next) => !next && setReporting(null)}
+                />
+                <MessageInfoDialog
+                    message={explaining}
+                    onOpenChange={(next) => !next && setExplaining(null)}
+                />
+                <NicknameDialog
+                    open={naming !== null}
+                    person={naming ? { id: naming.userId, name: naming.name } : null}
+                    onOpenChange={(open) => !open && setNaming(null)}
+                    onSaved={refresh}
+                />
+            </ol>
+        </CoverMedia.Provider>
     );
 }
 
@@ -649,6 +684,8 @@ function Message({
     onOpenThread,
     onReact,
     onStar,
+    pinned,
+    onPin,
     onMarkUnread,
     inVoice,
     onJumpTo,
@@ -677,6 +714,8 @@ function Message({
     onOpenThread?: (message: ChatMessageView) => void;
     onReact: (messageId: string, emoji: string) => void;
     onStar: (message: ChatMessageView) => void;
+    pinned: boolean;
+    onPin?: (message: ChatMessageView, pinned: boolean) => void;
     onMarkUnread?: (message: ChatMessageView) => void;
     /** Who is in each voice room this page of messages points at, gathered once
      *  by the list. Empty until the answer arrives, which draws a card saying
@@ -736,6 +775,14 @@ function Message({
      *  so the name and the face can both ask about them without narrowing it
      *  again in two places. */
     const writer = message.authorId && !mine ? message.authorId : null;
+    /** Swiping the line to the right answers it, on a phone - the same reply the
+     *  menu and the hover bar offer, so only where those offer it. */
+    const swipe = useSwipeReply(
+        onReply && canPost && !message.deleted && message.kind !== "system"
+            ? () => onReply(message)
+            : undefined
+    );
+    const coverAll = useContext(CoverMedia);
 
     // Something Polaris said rather than somebody: joined, left, was added.
     // Indented to where message text starts rather than to the avatar gutter,
@@ -771,448 +818,529 @@ function Message({
     }
 
     return (
-        <MessageMenu
-            actions={{
-                message,
-                mine,
-                canPost,
-                canModerate,
-                onReply,
-                onReplyPrivately,
-                onForward,
-                onOpenThread,
-                onStar,
-                onMarkUnread,
-                onEdit: rewrite,
-                onDelete,
-                onReport,
-                onExplain
-            }}
-        >
-            {/* `data-state` arrives from the right-click menu's trigger, which this
+        // Clipped sideways only, so a line pulled to the right never gives the
+        // conversation a horizontal scrollbar while the hover bar, which sits
+        // half above the row, is still drawn whole.
+        <div className="relative overflow-x-clip">
+            {swipe.enabled && (
+                <span
+                    ref={swipe.cue}
+                    aria-hidden
+                    data-armed="false"
+                    className="pointer-events-none absolute left-4 top-1/2 flex size-7 -translate-y-1/2 items-center justify-center rounded-full bg-muted text-muted-foreground opacity-0 data-[armed=true]:bg-primary data-[armed=true]:text-primary-foreground"
+                >
+                    <CornerUpLeft className="size-4" />
+                </span>
+            )}
+            <MessageMenu
+                actions={{
+                    message,
+                    mine,
+                    canPost,
+                    canModerate,
+                    onReply,
+                    onReplyPrivately,
+                    onForward,
+                    onOpenThread,
+                    onStar,
+                    pinned,
+                    onPin,
+                    onMarkUnread,
+                    onEdit: rewrite,
+                    onDelete,
+                    onReport,
+                    onExplain
+                }}
+            >
+                {/* `data-state` arrives from the right-click menu's trigger, which this
             is. A menu opened over a dense list has to say which line it is about
             - the pointer has left the row to reach the menu, so the hover that
             told you is gone by the time you are reading the options. It is lit
             harder than a hover for the same reason: one row is picked out, and
             the pointer is somewhere else. */}
-            <div
-                className={cn(
-                    "group relative flex gap-2 px-4 transition-colors hover:bg-card-hover/60 data-[state=open]:bg-card-hover",
-                    grouped ? "py-0.5" : "pb-0.5 pt-3"
-                )}
-            >
-                <span className="w-8 shrink-0">
-                    {grouped ? (
-                        <span
-                            className="hidden pt-1 text-[0.625rem] leading-4 text-foreground-subtle group-hover:block group-data-[state=open]:block"
-                            title={format.dateTime(message.createdAt)}
-                        >
-                            {format.time(message.createdAt)}
-                        </span>
-                    ) : message.authorId ? (
-                        // Right-clicking a face asks about the person, the way it
-                        // does in the roster. Pressing it still opens their photo,
-                        // which is what a face has always done here.
-                        <Writer
-                            person={{ userId: message.authorId, name: author }}
-                            channelId={message.channelId}
-                            viewerId={viewerId}
-                            onMention={onMention}
-                            onNickname={onNickname}
-                            onError={onError}
-                        >
-                            {press ? (
-                                // The face opens the card, like the name beside
-                                // it. The photo is one press further, on the
-                                // card's own face.
-                                <button
-                                    type="button"
-                                    aria-label={t("messageList.viewProfile", { name: author })}
-                                    title={author}
-                                    onClick={(event) =>
-                                        press(
-                                            { id: message.authorId!, name: author },
-                                            event.currentTarget
-                                        )
-                                    }
-                                    className="inline-flex rounded-full"
-                                >
-                                    <Avatar
-                                        decorated
-                                        person={{ id: message.authorId, name: author }}
-                                        size={28}
-                                    />
-                                </button>
-                            ) : (
-                                <span className="inline-flex">
-                                    <Avatar
-                                        openable
-                                        decorated
-                                        person={{ id: message.authorId, name: author }}
-                                        size={28}
-                                    />
-                                </span>
-                            )}
-                        </Writer>
-                    ) : (
-                        <span className="inline-flex size-7 items-center justify-center rounded-full bg-muted text-[0.625rem] text-muted-foreground">
-                            ?
-                        </span>
+                <div
+                    ref={swipe.line}
+                    {...swipe.handlers}
+                    className={cn(
+                        "group relative flex gap-2 px-4 transition-colors hover:bg-card-hover/60 data-[state=open]:bg-card-hover",
+                        grouped ? "py-0.5" : "pb-0.5 pt-3",
+                        swipe.enabled && "touch-pan-y touch-pinch-zoom"
                     )}
-                </span>
-
-                <div className="min-w-0 flex-1 pb-0.5">
-                    {!grouped && (
-                        <p className="flex items-baseline gap-2">
-                            {press && message.authorId ? (
-                                <Writer
-                                    person={{ userId: message.authorId, name: author }}
-                                    channelId={message.channelId}
-                                    viewerId={viewerId}
-                                    onMention={onMention}
-                                    onNickname={onNickname}
-                                    onError={onError}
+                >
+                    <span className="w-8 shrink-0">
+                        {grouped ? (
+                            <>
+                                <span
+                                    className="hidden pt-1 text-[0.625rem] leading-4 text-foreground-subtle group-hover:block group-data-[state=open]:block"
+                                    title={format.dateTime(message.createdAt)}
                                 >
-                                    {/* Your own name too: the card is how anybody
-                                        sees what they look like to everybody else. */}
+                                    {format.time(message.createdAt)}
+                                </span>
+                                {/* Without a header there is nowhere else to say it, so
+                                the marks sit in the gutter until the hover takes
+                                it for the time. */}
+                                {(pinned || message.starred) && (
+                                    <span className="flex items-center gap-0.5 pt-1 group-hover:hidden group-data-[state=open]:hidden">
+                                        <Marks pinned={pinned} starred={message.starred} />
+                                    </span>
+                                )}
+                            </>
+                        ) : message.authorId ? (
+                            // Right-clicking a face asks about the person, the way it
+                            // does in the roster. Pressing it still opens their photo,
+                            // which is what a face has always done here.
+                            <Writer
+                                person={{ userId: message.authorId, name: author }}
+                                channelId={message.channelId}
+                                viewerId={viewerId}
+                                onMention={onMention}
+                                onNickname={onNickname}
+                                onError={onError}
+                            >
+                                {press ? (
+                                    // The face opens the card, like the name beside
+                                    // it. The photo is one press further, on the
+                                    // card's own face.
                                     <button
                                         type="button"
-                                        title={t("messageList.viewProfile", { name: author })}
+                                        aria-label={t("messageList.viewProfile", { name: author })}
+                                        title={author}
                                         onClick={(event) =>
                                             press(
                                                 { id: message.authorId!, name: author },
                                                 event.currentTarget
                                             )
                                         }
-                                        className="rounded text-left text-sm font-medium underline-offset-2 hover:underline focus-visible:underline"
+                                        className="inline-flex rounded-full"
                                     >
-                                        <PersonName id={message.authorId} name={author} />
+                                        <Avatar
+                                            decorated
+                                            person={{ id: message.authorId, name: author }}
+                                            size={28}
+                                        />
                                     </button>
-                                </Writer>
-                            ) : writer ? (
-                                <Writer
-                                    person={{ userId: writer, name: author }}
-                                    channelId={message.channelId}
-                                    viewerId={viewerId}
-                                    onMention={onMention}
-                                    onNickname={onNickname}
-                                    onError={onError}
-                                >
-                                    {/* Underlined on the hover and nothing else:
+                                ) : (
+                                    <span className="inline-flex">
+                                        <Avatar
+                                            openable
+                                            decorated
+                                            person={{ id: message.authorId, name: author }}
+                                            size={28}
+                                        />
+                                    </span>
+                                )}
+                            </Writer>
+                        ) : message.fromWebhook ? (
+                            <span
+                                className="inline-flex size-7 items-center justify-center rounded-full bg-primary/15 text-primary"
+                                aria-hidden="true"
+                            >
+                                <Webhook className="size-4 shrink-0" />
+                            </span>
+                        ) : (
+                            <span className="inline-flex size-7 items-center justify-center rounded-full bg-muted text-[0.625rem] text-muted-foreground">
+                                ?
+                            </span>
+                        )}
+                    </span>
+
+                    <div className="min-w-0 flex-1 pb-0.5">
+                        {!grouped && (
+                            <p className="flex items-baseline gap-2">
+                                {press && message.authorId ? (
+                                    <Writer
+                                        person={{ userId: message.authorId, name: author }}
+                                        channelId={message.channelId}
+                                        viewerId={viewerId}
+                                        onMention={onMention}
+                                        onNickname={onNickname}
+                                        onError={onError}
+                                    >
+                                        {/* Your own name too: the card is how anybody
+                                        sees what they look like to everybody else. */}
+                                        <button
+                                            type="button"
+                                            title={t("messageList.viewProfile", { name: author })}
+                                            onClick={(event) =>
+                                                press(
+                                                    { id: message.authorId!, name: author },
+                                                    event.currentTarget
+                                                )
+                                            }
+                                            className="rounded text-left text-sm font-medium underline-offset-2 hover:underline focus-visible:underline"
+                                        >
+                                            <PersonName id={message.authorId} name={author} />
+                                        </button>
+                                    </Writer>
+                                ) : writer ? (
+                                    <Writer
+                                        person={{ userId: writer, name: author }}
+                                        channelId={message.channelId}
+                                        viewerId={viewerId}
+                                        onMention={onMention}
+                                        onNickname={onNickname}
+                                        onError={onError}
+                                    >
+                                        {/* Underlined on the hover and nothing else:
                                         a name that grows a background or a border
                                         moves every line under it by a pixel, and a
                                         conversation that shifts as the pointer
                                         crosses it is unreadable. */}
-                                    <button
-                                        type="button"
-                                        disabled={direct.busy}
-                                        title={t("messageList.messageNamed", { name: author })}
-                                        onClick={() => void direct.open(writer)}
-                                        className="rounded text-left text-sm font-medium underline-offset-2 hover:underline focus-visible:underline"
-                                    >
+                                        <button
+                                            type="button"
+                                            disabled={direct.busy}
+                                            title={t("messageList.messageNamed", { name: author })}
+                                            onClick={() => void direct.open(writer)}
+                                            className="rounded text-left text-sm font-medium underline-offset-2 hover:underline focus-visible:underline"
+                                        >
+                                            <PersonName id={message.authorId} name={author} />
+                                        </button>
+                                    </Writer>
+                                ) : (
+                                    <span className="text-sm font-medium">
                                         <PersonName id={message.authorId} name={author} />
-                                    </button>
-                                </Writer>
-                            ) : (
-                                <span className="text-sm font-medium">
-                                    <PersonName id={message.authorId} name={author} />
-                                </span>
-                            )}
-                            <MessageTime
-                                iso={message.createdAt}
-                                className="whitespace-nowrap text-[0.6875rem] text-foreground-subtle"
-                            />
-                        </p>
-                    )}
+                                    </span>
+                                )}
+                                {/* Not a person: something outside Polaris posting
+                                through one of the channel's webhooks, under a name
+                                it chose. Discord's APP tag says the same. */}
+                                {message.fromWebhook && (
+                                    <span
+                                        className="shrink-0 self-center rounded bg-primary px-1 text-[0.625rem] font-semibold uppercase leading-4 text-primary-foreground"
+                                        title={t("messageList.webhookHint")}
+                                    >
+                                        {t("messageList.app")}
+                                    </span>
+                                )}
+                                <MessageTime
+                                    iso={message.createdAt}
+                                    className="whitespace-nowrap text-[0.6875rem] text-foreground-subtle"
+                                />
+                                <Marks pinned={pinned} starred={message.starred} />
+                            </p>
+                        )}
 
-                    {message.quote && (
-                        <QuoteLine
-                            quote={message.quote}
-                            here={message.channelId}
-                            onJumpTo={onJumpTo}
-                        />
-                    )}
-
-                    {message.deleted ? (
-                        <p className="text-sm italic text-foreground-subtle">
-                            {t("messageList.thisMessageWasDeleted")}
-                        </p>
-                    ) : (
-                        <div className="text-sm">
-                            <RichText
-                                value={message.body}
-                                origin={baseUrl}
-                                references={referenced(message)}
+                        {message.quote && (
+                            <QuoteLine
+                                quote={message.quote}
+                                here={message.channelId}
+                                onJumpTo={onJumpTo}
                             />
-                            {/* Under the last message of a block only. Five ticks
+                        )}
+
+                        {message.deleted ? (
+                            <p className="text-sm italic text-foreground-subtle">
+                                {t("messageList.thisMessageWasDeleted")}
+                            </p>
+                        ) : (
+                            <div className="text-sm">
+                                <RichText
+                                    value={message.body}
+                                    origin={baseUrl}
+                                    references={referenced(message)}
+                                />
+                                {/* Under the last message of a block only. Five ticks
                             down a run of five messages say the same thing five
                             times, and seeing the newest is seeing the rest. */}
-                            {message.receipt && lastOfBlock && (
-                                <Ticks
-                                    receipt={message.receipt}
-                                    onOpen={() => onExplain(message)}
+                                {message.receipt && lastOfBlock && (
+                                    <Ticks
+                                        receipt={message.receipt}
+                                        onOpen={() => onExplain(message)}
+                                    />
+                                )}
+                                {message.edited && (
+                                    // A button, not a label: "(edited)" that cannot be
+                                    // opened asks the room to take the change on trust.
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowingHistory(true)}
+                                        title={t("messageList.seeWhatItSaidBefore")}
+                                        className="ml-1 rounded text-[0.6875rem] text-foreground-subtle underline decoration-dotted underline-offset-2 transition-colors hover:text-foreground"
+                                    >
+                                        (edited)
+                                    </button>
+                                )}
+                            </div>
+                        )}
+
+                        {/* Under the question rather than in place of it: the
+                        message body IS the question, so the card carries only
+                        the answers and what has become of them. */}
+                        {message.poll && !message.deleted && (
+                            <PollCard
+                                message={message}
+                                poll={message.poll}
+                                canPost={canPost}
+                                // Whoever asked it, and whoever moderates the room.
+                                // The two reasons to stop one early are different:
+                                // the asker has their answer, and the moderator has
+                                // a poll that should not be running.
+                                canEnd={mine || canModerate}
+                                onError={onError}
+                            />
+                        )}
+
+                        <Spoiler kind="link" covered={coverAll}>
+                            <LinkArea message={message} />
+                        </Spoiler>
+                        <ReferenceCards message={message} inRoom={inVoice} onJumpTo={onJumpTo} />
+
+                        {message.attachments.length > 0 && (
+                            <ul className="mt-1 flex flex-col gap-1">
+                                {message.attachments.map((file) => (
+                                    <li key={file.id}>
+                                        {/* Covered where the sender said so. The
+                                        file is drawn underneath either way, so
+                                        uncovering it is the cover coming off
+                                        rather than a second load. */}
+                                        <Spoiler
+                                            kind={
+                                                file.inline
+                                                    ? "picture"
+                                                    : isWatchable(file.contentType)
+                                                      ? "video"
+                                                      : "file"
+                                            }
+                                            className={
+                                                file.spoiler || coverAll ? undefined : "contents"
+                                            }
+                                            covered={file.spoiler || coverAll}
+                                        >
+                                            {file.inline ? (
+                                                <KeepableImage
+                                                    href={`/api/chat/attachments/${file.id}`}
+                                                    alt={file.name}
+                                                    source={`attachment:${file.id}`}
+                                                    name={file.name}
+                                                    onOpen={() =>
+                                                        onOpenImage({
+                                                            url: `/api/chat/attachments/${file.id}`,
+                                                            name: file.name,
+                                                            messageId: message.id,
+                                                            forwardable: message.forwardable
+                                                        })
+                                                    }
+                                                />
+                                            ) : isPlayable(file.contentType) ? (
+                                                <VoiceNote
+                                                    href={`/api/chat/attachments/${file.id}`}
+                                                    name={file.name}
+                                                    recorded={isVoiceMessage(
+                                                        file.name,
+                                                        file.contentType
+                                                    )}
+                                                    waveform={file.waveform}
+                                                    durationMs={file.durationMs}
+                                                />
+                                            ) : isWatchable(file.contentType) ? (
+                                                // Watched where it was sent, and not a
+                                                // byte of it fetched until somebody
+                                                // presses play: a room with four clips
+                                                // in it would otherwise pull four files
+                                                // off the disk to draw the text above
+                                                // them. See `VideoPreview`.
+                                                <VideoPreview
+                                                    name={file.name}
+                                                    size={file.size}
+                                                    src={`/api/chat/attachments/${file.id}`}
+                                                    // A frame of the video itself, taken
+                                                    // by the browser that sent it. A few
+                                                    // kilobytes, and the difference
+                                                    // between a list of black rectangles
+                                                    // and a list somebody can read.
+                                                    poster={
+                                                        file.hasPoster
+                                                            ? `/api/chat/attachments/${file.id}?poster=1`
+                                                            : undefined
+                                                    }
+                                                    download={`/api/chat/attachments/${file.id}?download=1`}
+                                                />
+                                            ) : (
+                                                <SentFile
+                                                    file={file}
+                                                    at={message.createdAt}
+                                                    onOpen={onOpenFile}
+                                                />
+                                            )}
+                                        </Spoiler>
+                                    </li>
+                                ))}
+                            </ul>
+                        )}
+
+                        {message.reactions.length > 0 && (
+                            <ul className="mt-1 flex flex-wrap gap-1">
+                                {message.reactions.map((reaction) => (
+                                    <li key={reaction.emoji}>
+                                        <button
+                                            type="button"
+                                            disabled={!canPost}
+                                            onClick={() => onReact(message.id, reaction.emoji)}
+                                            aria-pressed={reaction.mine}
+                                            className={cn(
+                                                "flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-xs transition-colors disabled:opacity-60",
+                                                reaction.mine
+                                                    ? "border-primary/60 bg-primary/15 text-foreground"
+                                                    : "border-border bg-muted text-muted-foreground hover:border-border-strong"
+                                            )}
+                                        >
+                                            <span>{reaction.emoji}</span>
+                                            <span>{reaction.count}</span>
+                                        </button>
+                                    </li>
+                                ))}
+                            </ul>
+                        )}
+
+                        {message.replyCount > 0 && onOpenThread && (
+                            <button
+                                type="button"
+                                onClick={() => onOpenThread(message)}
+                                className="mt-1 flex items-center gap-1.5 rounded px-1 py-0.5 text-xs font-medium text-primary transition-colors hover:bg-muted"
+                            >
+                                <MessageSquare className="size-3" />
+                                {t("messageList.replies", { count: message.replyCount })}
+                                {message.lastReplyAt && (
+                                    <span className="font-normal text-muted-foreground">
+                                        <RelativeTime iso={message.lastReplyAt} />
+                                    </span>
+                                )}
+                            </button>
+                        )}
+                    </div>
+
+                    {canPost && !message.deleted && (
+                        <div className="absolute right-3 top-0 hidden -translate-y-1/2 items-center gap-0.5 rounded-md border border-border bg-elevated p-0.5 shadow-popover group-focus-within:flex group-hover:flex group-data-[state=open]:flex">
+                            {quick.map((emoji) => (
+                                <button
+                                    key={emoji}
+                                    type="button"
+                                    aria-label={t("messageList.reactWith", { emoji })}
+                                    title={t("messageList.reactWith", { emoji })}
+                                    onClick={() => onReact(message.id, emoji)}
+                                    className="rounded px-1 py-0.5 text-sm transition-colors hover:bg-muted"
+                                >
+                                    {emoji}
+                                </button>
+                            ))}
+                            {/* The reactions are one kind of thing and everything to
+                            the right of this is another. Without the rule they
+                            read as one row of seven controls where three of them
+                            happen to be pictures. */}
+                            <span aria-hidden className="mx-0.5 h-4 w-px shrink-0 bg-border" />
+                            <button
+                                type="button"
+                                aria-label={
+                                    message.starred
+                                        ? t("messageList.removeFromSaved")
+                                        : t("messageList.saveThisMessage")
+                                }
+                                title={
+                                    message.starred
+                                        ? t("messageList.removeFromSaved")
+                                        : t("messageList.save")
+                                }
+                                onClick={() => onStar(message)}
+                                className={cn(
+                                    "rounded p-1 transition-colors hover:bg-muted",
+                                    message.starred
+                                        ? "text-primary"
+                                        : "text-muted-foreground hover:text-foreground"
+                                )}
+                            >
+                                <Star
+                                    className={cn("size-3.5", message.starred && "fill-current")}
                                 />
-                            )}
-                            {message.edited && (
-                                // A button, not a label: "(edited)" that cannot be
-                                // opened asks the room to take the change on trust.
+                            </button>
+                            {onReply && (
                                 <button
                                     type="button"
-                                    onClick={() => setShowingHistory(true)}
-                                    title={t("messageList.seeWhatItSaidBefore")}
-                                    className="ml-1 rounded text-[0.6875rem] text-foreground-subtle underline decoration-dotted underline-offset-2 transition-colors hover:text-foreground"
+                                    aria-label={t("messageList.reply")}
+                                    title={t("messageList.replyOrPressR")}
+                                    onClick={() => onReply(message)}
+                                    className="rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                                 >
-                                    (edited)
+                                    <CornerUpLeft className="size-3.5" />
                                 </button>
+                            )}
+                            {onOpenThread && (
+                                <button
+                                    type="button"
+                                    aria-label={t("messageList.replyInAThread")}
+                                    title={t("messageList.replyInAThread")}
+                                    onClick={() => onOpenThread(message)}
+                                    className="rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                                >
+                                    <MessageSquare className="size-3.5" />
+                                </button>
+                            )}
+                            {(mine || canModerate) && (
+                                <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                        <button
+                                            type="button"
+                                            aria-label={t("messageList.moreForThisMessage")}
+                                            className="rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                                        >
+                                            <SmilePlus className="size-3.5 rotate-90" />
+                                        </button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent
+                                        align="end"
+                                        onCloseAutoFocus={keepFocusOnClose}
+                                    >
+                                        {mine && rewrite && (
+                                            <DropdownMenuItem onSelect={() => rewrite(message)}>
+                                                <Pencil className="size-3.5" />
+                                                {t("messageList.edit")}
+                                            </DropdownMenuItem>
+                                        )}
+                                        <DropdownMenuItem
+                                            variant="danger"
+                                            onSelect={() => onDelete(message)}
+                                        >
+                                            <Trash2 className="size-3.5" />
+                                            {t("messageList.delete")}
+                                        </DropdownMenuItem>
+                                    </DropdownMenuContent>
+                                </DropdownMenu>
                             )}
                         </div>
                     )}
 
-                    {/* Under the question rather than in place of it: the
-                        message body IS the question, so the card carries only
-                        the answers and what has become of them. */}
-                    {message.poll && !message.deleted && (
-                        <PollCard
-                            message={message}
-                            poll={message.poll}
-                            canPost={canPost}
-                            // Whoever asked it, and whoever moderates the room.
-                            // The two reasons to stop one early are different:
-                            // the asker has their answer, and the moderator has
-                            // a poll that should not be running.
-                            canEnd={mine || canModerate}
-                            onError={onError}
-                        />
-                    )}
-
-                    <LinkArea message={message} />
-                    <ReferenceCards message={message} inRoom={inVoice} onJumpTo={onJumpTo} />
-
-                    {message.attachments.length > 0 && (
-                        <ul className="mt-1 flex flex-col gap-1">
-                            {message.attachments.map((file) => (
-                                <li key={file.id}>
-                                    {/* Covered where the sender said so. The
-                                        file is drawn underneath either way, so
-                                        uncovering it is the cover coming off
-                                        rather than a second load. */}
-                                    <Spoiler
-                                        kind={
-                                            file.inline
-                                                ? "picture"
-                                                : isWatchable(file.contentType)
-                                                  ? "video"
-                                                  : "file"
-                                        }
-                                        className={file.spoiler ? undefined : "contents"}
-                                        covered={file.spoiler}
-                                    >
-                                        {file.inline ? (
-                                            <KeepableImage
-                                                href={`/api/chat/attachments/${file.id}`}
-                                                alt={file.name}
-                                                source={`attachment:${file.id}`}
-                                                name={file.name}
-                                                onOpen={() =>
-                                                    onOpenImage({
-                                                        url: `/api/chat/attachments/${file.id}`,
-                                                        name: file.name,
-                                                        messageId: message.id,
-                                                        forwardable: message.forwardable
-                                                    })
-                                                }
-                                            />
-                                        ) : isPlayable(file.contentType) ? (
-                                            <VoiceNote
-                                                href={`/api/chat/attachments/${file.id}`}
-                                                name={file.name}
-                                                recorded={isVoiceMessage(
-                                                    file.name,
-                                                    file.contentType
-                                                )}
-                                                waveform={file.waveform}
-                                                durationMs={file.durationMs}
-                                            />
-                                        ) : isWatchable(file.contentType) ? (
-                                            // Watched where it was sent, and not a
-                                            // byte of it fetched until somebody
-                                            // presses play: a room with four clips
-                                            // in it would otherwise pull four files
-                                            // off the disk to draw the text above
-                                            // them. See `VideoPreview`.
-                                            <VideoPreview
-                                                name={file.name}
-                                                size={file.size}
-                                                src={`/api/chat/attachments/${file.id}`}
-                                                // A frame of the video itself, taken
-                                                // by the browser that sent it. A few
-                                                // kilobytes, and the difference
-                                                // between a list of black rectangles
-                                                // and a list somebody can read.
-                                                poster={
-                                                    file.hasPoster
-                                                        ? `/api/chat/attachments/${file.id}?poster=1`
-                                                        : undefined
-                                                }
-                                                download={`/api/chat/attachments/${file.id}?download=1`}
-                                            />
-                                        ) : (
-                                            <SentFile
-                                                file={file}
-                                                at={message.createdAt}
-                                                onOpen={onOpenFile}
-                                            />
-                                        )}
-                                    </Spoiler>
-                                </li>
-                            ))}
-                        </ul>
-                    )}
-
-                    {message.reactions.length > 0 && (
-                        <ul className="mt-1 flex flex-wrap gap-1">
-                            {message.reactions.map((reaction) => (
-                                <li key={reaction.emoji}>
-                                    <button
-                                        type="button"
-                                        disabled={!canPost}
-                                        onClick={() => onReact(message.id, reaction.emoji)}
-                                        aria-pressed={reaction.mine}
-                                        className={cn(
-                                            "flex items-center gap-1 rounded-full border px-1.5 py-0.5 text-xs transition-colors disabled:opacity-60",
-                                            reaction.mine
-                                                ? "border-primary/60 bg-primary/15 text-foreground"
-                                                : "border-border bg-muted text-muted-foreground hover:border-border-strong"
-                                        )}
-                                    >
-                                        <span>{reaction.emoji}</span>
-                                        <span>{reaction.count}</span>
-                                    </button>
-                                </li>
-                            ))}
-                        </ul>
-                    )}
-
-                    {message.replyCount > 0 && onOpenThread && (
-                        <button
-                            type="button"
-                            onClick={() => onOpenThread(message)}
-                            className="mt-1 flex items-center gap-1.5 rounded px-1 py-0.5 text-xs font-medium text-primary transition-colors hover:bg-muted"
-                        >
-                            <MessageSquare className="size-3" />
-                            {t("messageList.replies", { count: message.replyCount })}
-                            {message.lastReplyAt && (
-                                <span className="font-normal text-muted-foreground">
-                                    <RelativeTime iso={message.lastReplyAt} />
-                                </span>
-                            )}
-                        </button>
-                    )}
+                    <EditHistoryDialog
+                        message={showingHistory ? message : null}
+                        onOpenChange={(open) => setShowingHistory(open)}
+                    />
                 </div>
+            </MessageMenu>
+        </div>
+    );
+}
 
-                {canPost && !message.deleted && (
-                    <div className="absolute right-3 top-0 hidden -translate-y-1/2 items-center gap-0.5 rounded-md border border-border bg-elevated p-0.5 shadow-popover group-focus-within:flex group-hover:flex group-data-[state=open]:flex">
-                        {quick.map((emoji) => (
-                            <button
-                                key={emoji}
-                                type="button"
-                                aria-label={t("messageList.reactWith", { emoji })}
-                                title={t("messageList.reactWith", { emoji })}
-                                onClick={() => onReact(message.id, emoji)}
-                                className="rounded px-1 py-0.5 text-sm transition-colors hover:bg-muted"
-                            >
-                                {emoji}
-                            </button>
-                        ))}
-                        {/* The reactions are one kind of thing and everything to
-                            the right of this is another. Without the rule they
-                            read as one row of seven controls where three of them
-                            happen to be pictures. */}
-                        <span aria-hidden className="mx-0.5 h-4 w-px shrink-0 bg-border" />
-                        <button
-                            type="button"
-                            aria-label={
-                                message.starred
-                                    ? t("messageList.removeFromSaved")
-                                    : t("messageList.saveThisMessage")
-                            }
-                            title={
-                                message.starred
-                                    ? t("messageList.removeFromSaved")
-                                    : t("messageList.save")
-                            }
-                            onClick={() => onStar(message)}
-                            className={cn(
-                                "rounded p-1 transition-colors hover:bg-muted",
-                                message.starred
-                                    ? "text-primary"
-                                    : "text-muted-foreground hover:text-foreground"
-                            )}
-                        >
-                            <Star className={cn("size-3.5", message.starred && "fill-current")} />
-                        </button>
-                        {onReply && (
-                            <button
-                                type="button"
-                                aria-label={t("messageList.reply")}
-                                title={t("messageList.replyOrPressR")}
-                                onClick={() => onReply(message)}
-                                className="rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                            >
-                                <CornerUpLeft className="size-3.5" />
-                            </button>
-                        )}
-                        {onOpenThread && (
-                            <button
-                                type="button"
-                                aria-label={t("messageList.replyInAThread")}
-                                title={t("messageList.replyInAThread")}
-                                onClick={() => onOpenThread(message)}
-                                className="rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                            >
-                                <MessageSquare className="size-3.5" />
-                            </button>
-                        )}
-                        {(mine || canModerate) && (
-                            <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                    <button
-                                        type="button"
-                                        aria-label={t("messageList.moreForThisMessage")}
-                                        className="rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                                    >
-                                        <SmilePlus className="size-3.5 rotate-90" />
-                                    </button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent
-                                    align="end"
-                                    onCloseAutoFocus={keepFocusOnClose}
-                                >
-                                    {mine && rewrite && (
-                                        <DropdownMenuItem onSelect={() => rewrite(message)}>
-                                            <Pencil className="size-3.5" />
-                                            {t("messageList.edit")}
-                                        </DropdownMenuItem>
-                                    )}
-                                    <DropdownMenuItem
-                                        variant="danger"
-                                        onSelect={() => onDelete(message)}
-                                    >
-                                        <Trash2 className="size-3.5" />
-                                        {t("messageList.delete")}
-                                    </DropdownMenuItem>
-                                </DropdownMenuContent>
-                            </DropdownMenu>
-                        )}
-                    </div>
-                )}
-
-                <EditHistoryDialog
-                    message={showingHistory ? message : null}
-                    onOpenChange={(open) => setShowingHistory(open)}
-                />
-            </div>
-        </MessageMenu>
+/**
+ * Whether a message is pinned for the room and whether this reader starred it:
+ * the two small marks WhatsApp draws beside a message's time. The pin is
+ * everybody's; the star only ever shows to the reader who set it.
+ */
+function Marks({ pinned, starred }: { pinned: boolean; starred: boolean }) {
+    const t = useTranslations("chat");
+    if (!pinned && !starred) return null;
+    return (
+        <span className="inline-flex shrink-0 items-center gap-0.5 self-center text-foreground-subtle">
+            {pinned && (
+                <span title={t("messageList.pinnedHere")} className="inline-flex">
+                    <Pin className="size-3" aria-hidden />
+                    <span className="sr-only">{t("messageList.pinnedHere")}</span>
+                </span>
+            )}
+            {starred && (
+                <span title={t("messageList.starred")} className="inline-flex">
+                    <Star className="size-3 fill-current" aria-hidden />
+                    <span className="sr-only">{t("messageList.starred")}</span>
+                </span>
+            )}
+        </span>
     );
 }
 
@@ -1740,7 +1868,8 @@ function LinkArea({ message }: { message: ChatMessageView }) {
                     accent: null,
                     siteName: hostOf(message.link),
                     hasImage: false,
-                    description: ""
+                    description: "",
+                    steam: null
                 }}
             />
         );

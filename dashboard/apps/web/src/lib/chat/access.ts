@@ -496,6 +496,35 @@ export function picturesAllowed(
 }
 
 /**
+ * Whether this reader may pin a message for everybody in a conversation.
+ *
+ * WhatsApp's rule for the conversations it has, Discord's for the ones it has:
+ * either person in a direct message; in a group, the owner, and everybody else
+ * when the owner lets the group change how it looks (the same switch WhatsApp's
+ * "Edit group settings" is); in a space's channel, whoever runs it - Discord
+ * keeps pinning to the people who manage messages.
+ *
+ * One function, asked by the screen to decide what to offer and by the service
+ * to decide what to allow, so the two cannot drift apart.
+ */
+export function pinsAllowed(
+    channel: {
+        readonly kind: string;
+        readonly ownerId: string | null;
+        readonly createdById?: string | null;
+        readonly membersMayEdit: boolean;
+        readonly mayModerate: boolean;
+    },
+    actorId: string
+): boolean {
+    if (channel.kind === "dm") return true;
+    if (channel.kind === "group") {
+        return groupOwnerId(channel) === actorId || channel.membersMayEdit;
+    }
+    return channel.mayModerate;
+}
+
+/**
  * Whether this reader may add people to a conversation.
  *
  * A channel is run by whoever administers its space. A group by its owner, and by

@@ -47,7 +47,7 @@ import { ChannelHeader } from "./channel-header";
 import { DirectProfile } from "./direct-profile";
 import { ForwardDialog } from "./forward-dialog";
 import { CALL_CHAT_PANE } from "./use-chat-pane";
-import { useChatStream } from "./use-chat-stream";
+import { useChatStream, type ChatFrame } from "./use-chat-stream";
 import { useVoiceSettings } from "./voice-settings";
 import { useCloseOnEscape } from "./close-on-escape";
 import type { RecordedSound } from "./voice-recorder";
@@ -88,6 +88,8 @@ import {
     useToast
 } from "@polaris/ui";
 import { PersonCardProvider } from "./person-card";
+import { PinLengthDialog, PinnedBar, PinsDialog, usePins } from "./pins-ui";
+import { AgeGate } from "./age-gate";
 
 /** How close to the bottom still counts as "following along". A few pixels of
  *  slack, because a trackpad rarely lands exactly on zero. */
@@ -940,6 +942,10 @@ export function ChannelView({
         );
     }, [channelId, viewerId]);
 
+    /** Where the pins hear about this conversation's frames - see `usePins`,
+     *  which is set up further down and fills this in. */
+    const pinFrames = useRef<(frame: ChatFrame) => void>(() => {});
+
     useChatStream(
         useCallback(
             (frame) => {
@@ -947,6 +953,7 @@ export function ChannelView({
                     void catchUp();
                     checkCall();
                 }
+                pinFrames.current(frame);
                 // Somebody caught up in here. Their own screens take a count
                 // down; this one moves the ticks under its own messages, which
                 // used to sit on "sent" until the conversation was reopened.
@@ -1267,6 +1274,39 @@ export function ChannelView({
         // had just opened on purpose.
         if (catchUpMark(firstPass.current)) firstPass.current = false;
     }, [messages, catchUpMark]);
+
+    /** The room's pins, the message being given a length, and the list. */
+    const pins = usePins(channelId);
+    /** The channel whose age gate was answered in this tab - see `gated`. */
+    const [ageConfirmedHere, setAgeConfirmedHere] = useState<string | null>(null);
+    pinFrames.current = pins.onFrame;
+    const [pinning, setPinning] = useState<ChatMessageView | null>(null);
+    const [pinsOpen, setPinsOpen] = useState(false);
+
+    /**
+     * Pin a message for everybody, or take its pin off.
+     *
+     * Pinning asks how long first; unpinning does not, the way WhatsApp does it.
+     * The unpin is taken off the bar at once and put back if the server refuses.
+     */
+    const pinOrUnpin = useCallback(
+        async (message: ChatMessageView, pinned: boolean) => {
+            if (!pinned) {
+                setPinning(message);
+                return;
+            }
+            const before = pins.pins;
+            pins.setPins(
+                (current) => current?.filter((entry) => entry.message.id !== message.id) ?? current
+            );
+            const result = await runAction(() => actions.unpinAction(message.id), setError);
+            if (!result || result.error) {
+                pins.setPins(before);
+                if (result?.error) setError(result.error);
+            }
+        },
+        [pins.pins, pins.setPins]
+    );
 
     /**
      * Keep a message, or stop keeping it.
@@ -1857,6 +1897,7 @@ export function ChannelView({
                 ) : (
                     <MessageList
                         messages={shown}
+                        coverMedia={channel?.contentMode === "spoiler"}
                         viewerId={viewerId}
                         canPost={canPost}
                         canModerate={canModerate}
@@ -1864,6 +1905,8 @@ export function ChannelView({
                         onOpenThread={setThread}
                         onReact={react}
                         onStar={star}
+                        pinnedIds={pins.ids}
+                        onPin={channel?.mayPin ? pinOrUnpin : undefined}
                         onMarkUnread={markUnread}
                         onJumpTo={jumpHere}
                         onReply={reply}
@@ -2105,6 +2148,34 @@ export function ChannelView({
         </>
     );
 
+    /**
+     * An age-restricted channel this reader has not said they are old enough
+     * for: the gate stands where the conversation would, and the server hands
+     * over no message until it is answered. Held locally once answered, so the
+     * conversation opens at once rather than when the rail catches up.
+     */
+    const gated =
+        channel !== null &&
+        channel.spaceId !== null &&
+        channel.contentMode === "age" &&
+        !channel.ageConfirmed &&
+        ageConfirmedHere !== channelId;
+    const shownConversation = gated ? (
+        <AgeGate
+            channelId={channelId}
+            channelName={channel.name}
+            onConfirmed={() => {
+                setAgeConfirmedHere(channelId);
+                setError("");
+                refresh();
+                void load();
+                void pins.reload();
+            }}
+        />
+    ) : (
+        conversation
+    );
+
     /** Start the call here, or walk into the one already running. */
     async function startCall(withVideo: boolean): Promise<void> {
         // Through `runAction`, which is the difference between a button that
@@ -2143,11 +2214,14 @@ export function ChannelView({
                     call={live}
                     onStartCall={startCall}
                     onSearch={() => setSearching((current) => !current)}
+                    onPins={() => setPinsOpen(true)}
                     // In a conversation with a roster this opens it; in a
                     // one-to-one it opens the other person, which is what the
                     // column beside a direct message is for.
                     onMembers={members.toggle}
                 />
+
+                <PinnedBar pins={pins.pins} onJump={jumpHere} onShowAll={() => setPinsOpen(true)} />
 
                 {/* A voice channel is a room AND a record: the one place a
                     group is most likely to want to drop a link used to be the
@@ -2306,7 +2380,7 @@ export function ChannelView({
                     not taken down, behind an expanded call: what somebody was
                     typing is still there when it shrinks again. */}
                 {!voiceRoom && (
-                    <div className={expanded ? "hidden" : "contents"}>{conversation}</div>
+                    <div className={expanded ? "hidden" : "contents"}>{shownConversation}</div>
                 )}
             </div>
 
@@ -2321,7 +2395,7 @@ export function ChannelView({
                     label={t("channelView.voiceChannelChatWidth")}
                     className="border-t border-border lg:border-l lg:border-t-0"
                 >
-                    {conversation}
+                    {shownConversation}
                 </SidePane>
             )}
 
@@ -2379,6 +2453,26 @@ export function ChannelView({
                     onChanged={() => void catchUp()}
                 />
             )}
+
+            <PinLengthDialog
+                message={pinning}
+                onOpenChange={(open) => !open && setPinning(null)}
+                onPinned={() => void pins.reload()}
+            />
+
+            <PinsDialog
+                open={pinsOpen}
+                onOpenChange={setPinsOpen}
+                pins={pins.pins}
+                mayPin={channel.mayPin}
+                onJump={jumpHere}
+                onUnpinned={(messageId) =>
+                    pins.setPins(
+                        (current) =>
+                            current?.filter((entry) => entry.message.id !== messageId) ?? current
+                    )
+                }
+            />
 
             <ForwardDialog
                 message={forwarding}

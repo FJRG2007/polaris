@@ -57,8 +57,10 @@ const channel = (id: string, name: string, unread: number) => ({
     pinned: false,
     mutedUntil: null,
     mayAdminister: access !== "member",
+    mayChangePrivacy: access !== "member",
     mayModerate: access !== "member",
     mayPicture: false,
+    mayPin: false,
     ownerId: null,
     membersMayEdit: false,
     membersMayInvite: true,
@@ -67,6 +69,8 @@ const channel = (id: string, name: string, unread: number) => ({
     mayMentionRoom: true,
     slowmode: 0,
     userLimit: 0,
+    contentMode: "default",
+    ageConfirmed: true,
     others: [],
     gameLinks: []
 });
@@ -119,6 +123,21 @@ beforeEach(() => {
 });
 
 afterEach(cleanup);
+
+describe("the gear on a channel's row", () => {
+    it("opens the channel's settings page for whoever runs it", () => {
+        render(<ChatSidebar />, { wrapper: MessagesWrapper });
+        const gear = screen.getByRole("link", { name: "Edit general" });
+        expect(gear.getAttribute("href")).toBe("/chat/c/c1/settings");
+    });
+
+    it("is not there for a member", () => {
+        access = "member";
+        chatState = buildChat();
+        render(<ChatSidebar />, { wrapper: MessagesWrapper });
+        expect(screen.queryByRole("link", { name: "Edit general" })).toBeNull();
+    });
+});
 
 describe("right-clicking a channel", () => {
     it("offers an administrator the whole menu", () => {

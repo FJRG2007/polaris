@@ -175,7 +175,14 @@
         "stillWaiting": "You are still waiting to be let in",
         "notInThatCall": "Not in that call",
         "fileGone": "That file is no longer there",
-        "attachmentGone": "This file is not on the storage Polaris keeps uploads on. It was written and is no longer there."
+        "attachmentGone": "This file is not on the storage Polaris keeps uploads on. It was written and is no longer there.",
+        "pinNotAllowed": "You cannot pin messages here",
+        "tooManyPins": "This conversation already has {max} pins. Unpin one first.",
+        "ageRestricted": "This channel is age-restricted. Confirm you are an adult to read it.",
+        "inviteChannelNotOpen": "A link can only open on a public channel of this space that is still open.",
+        "tooManyWebhooks": "A channel holds up to {count} webhooks.",
+        "webhookGone": "That webhook no longer exists.",
+        "webhookName": "Give the webhook a name of up to 80 characters."
     },
     "media": {
         "refused": {
@@ -456,9 +463,9 @@
         "show": "Show",
         "thisMessageWasDeleted": "This message was deleted.",
         "seeWhatItSaidBefore": "See what it said before",
-        "removeFromSaved": "Remove from saved",
-        "saveThisMessage": "Save this message",
-        "save": "Save",
+        "removeFromSaved": "Remove star",
+        "saveThisMessage": "Star this message",
+        "save": "Add star",
         "reply": "Reply",
         "replyOrPressR": "Reply - or press R",
         "replyInAThread": "Reply in a thread",
@@ -491,7 +498,11 @@
             "sent": "Sent",
             "delivered": "Delivered",
             "read": "Read"
-        }
+        },
+        "starred": "Starred",
+        "pinnedHere": "Pinned",
+        "app": "APP",
+        "webhookHint": "Posted by an app through a webhook, not by a person"
     },
     "composer": {
         "replyingTo": "Replying to",
@@ -545,7 +556,7 @@
         "newChannel": "New channel",
         "newCategory": "New category",
         "findOrStartAConversation": "Find or start a conversation",
-        "savedMessages": "Saved messages",
+        "savedMessages": "Starred messages",
         "meetings": "Meetings",
         "nobodyYet": "Nobody yet.",
         "newChannelHere": "New channel here",
@@ -570,7 +581,8 @@
         "addTo": "Add to {name}",
         "moreFor": "More for {name}",
         "placesTaken": "{places} places taken",
-        "of": " of "
+        "of": " of ",
+        "editChannelNamed": "Edit {name}"
     },
     "channelView": {
         "thisConversationIsNotYours": "This conversation is not yours to open.",
@@ -630,7 +642,10 @@
         "whatThisGroupIsCalled": "What this group is called",
         "cancel": "Cancel",
         "save": "Save",
-        "everyMessageInItGoes": "Every message in it goes with it. Archiving keeps them readable instead."
+        "everyMessageInItGoes": "Every message in it goes with it. Archiving keeps them readable instead.",
+        "pinnedMessages": "Pinned messages",
+        "starredMessages": "Starred messages",
+        "channelSettings": "Channel settings"
     },
     "meetingNotice": {
         "invitedTitle": "{name} invited you to {meeting}",
@@ -720,8 +735,8 @@
         "replyPrivately": "Reply privately",
         "forward": "Forward",
         "replyInAThread": "Reply in a thread",
-        "removeFromSaved": "Remove from saved",
-        "save": "Save",
+        "removeFromSaved": "Remove star",
+        "save": "Add star",
         "markUnreadFromHere": "Mark unread from here",
         "copyMessageLink": "Copy message link",
         "copyText": "Copy text",
@@ -731,7 +746,9 @@
         "reportThisMessage": "Report this message",
         "edit": "Edit",
         "delete": "Delete",
-        "del": "Del"
+        "del": "Del",
+        "pin": "Pin",
+        "unpin": "Unpin"
     },
     "poll": {
         "createAPoll": "Create a poll",
@@ -812,7 +829,88 @@
         "save": "Save",
         "everyMessageInItGoes": "Every message in it goes with it. Archiving keeps them readable instead.",
         "deleteChannel": "Delete channel",
-        "limitHint": "Up to {max}. Empty or 0 is no limit."
+        "limitHint": "Up to {max}. Empty or 0 is no limit.",
+        "sections": {
+            "overview": "Overview",
+            "permissions": "Permissions",
+            "invites": "Invite links",
+            "integrations": "Integrations",
+            "label": "Channel settings sections"
+        },
+        "textChannel": "Text channel",
+        "voiceChannel": "Voice channel",
+        "close": "Close settings",
+        "back": "Back",
+        "topic": "Channel topic",
+        "topicPlaceholder": "Let everyone know how to use this channel",
+        "count": "{count}/{max}",
+        "storedAs": "Saved as #{name}",
+        "slowmode": "Slowmode",
+        "slowmodeHint": "How long members wait between messages. Whoever moderates the channel is not held by it.",
+        "content": "Content",
+        "modes": {
+            "default": "Normal",
+            "spoiler": "All spoilers",
+            "age": "Age-restricted"
+        },
+        "modeHints": {
+            "default": "Pictures, videos and link cards show as they were sent.",
+            "spoiler": "Every picture, video and link card starts covered, and a press shows it.",
+            "age": "Anyone opening it confirms they are an adult first, once per channel."
+        },
+        "archiveTitle": "Archive channel",
+        "archiveHint": "Keeps every message readable and stops anything new being said.",
+        "reopenTitle": "Reopen channel",
+        "unsaved": "You have unsaved changes",
+        "reset": "Reset",
+        "saveChanges": "Save changes",
+        "saved": "Saved",
+        "notAllowedTitle": "You cannot change this channel",
+        "notAllowedHint": "Only whoever runs it can open its settings.",
+        "backToChannel": "Back to the channel",
+        "private": "Private channel",
+        "privateHint": "Only the people, teams and roles you add can see it or read it.",
+        "publicNote": "Everybody in the space can see this channel and read it.",
+        "privacySpaceAdminOnly": "Only the space's admins can change this.",
+        "whoCanReach": "Who can reach it",
+        "whoCanReachHint": "Saved private channels list the people in them here.",
+        "addPeople": "Add people",
+        "removePerson": "Remove {name}",
+        "you": "(you)",
+        "nobodyYet": "Nobody has been added yet.",
+        "invitesHint": "Whoever follows one of these joins the space and lands in this channel.",
+        "invitesPrivate": "Joining the space does not open a private channel, so a link cannot lead here. Add people under Permissions instead.",
+        "openPermissions": "Open Permissions",
+        "createLink": "Create link",
+        "noInvites": "No links to this channel yet",
+        "columns": {
+            "inviter": "Made by",
+            "code": "Code",
+            "uses": "Uses",
+            "expires": "Expires"
+        },
+        "revokeCode": "Revoke {code}",
+        "copyLink": "Copy link {code}",
+        "copied": "Copied",
+        "webhooks": "Webhooks",
+        "webhooksHint": "Let a script, a monitor or another service post into this channel. Anything that posts to a Discord webhook works with the same body.",
+        "newWebhook": "New webhook",
+        "defaultWebhookName": "Webhook",
+        "webhookName": "Name",
+        "copyUrl": "Copy URL",
+        "urlOnce": "Copy this address now. It is shown once; make a new one if it is lost.",
+        "newUrl": "New URL",
+        "newUrlTitle": "Make a new address?",
+        "newUrlHint": "The old address stops working at once. Anything using it needs the new one.",
+        "deleteWebhook": "Delete webhook",
+        "deleteWebhookHint": "Anything posting to its address stops reaching this channel. What it already posted stays.",
+        "noWebhooks": "No webhooks yet",
+        "lastUsed": "Last used {when}",
+        "neverUsed": "Never used",
+        "madeBy": "Made by {name}",
+        "rename": "Rename",
+        "webhookActions": "Actions for {name}",
+        "esc": "Esc"
     },
     "callMenus": {
         "volume": "Volume",
@@ -1152,7 +1250,8 @@
         "openIt": "Open it",
         "thisInvitationHasRunOut": "This invitation has run out. Ask whoever sent it for another.",
         "invitedBy": "{name} invited you.",
-        "join": "Join {name}"
+        "join": "Join {name}",
+        "opensOn": "Opens on #{name}"
     },
     "editHistory": {
         "editHistory": "Edit history",
@@ -1225,10 +1324,18 @@
     },
     "saved": {
         "backToConversations": "Back to conversations",
-        "saved": "Saved",
-        "nothingSaved": "Nothing saved.",
-        "hoverAMessageAndPress": "Hover a message and press the star to keep it. Only you see this.",
-        "removeFromSaved": "Remove from saved"
+        "saved": "Starred messages",
+        "nothingSaved": "No starred messages",
+        "hoverAMessageAndPress": "Star a message from its menu to find it here later. Only you see your stars.",
+        "removeFromSaved": "Remove star",
+        "allConversations": "All conversations",
+        "onlyIn": "In {name}",
+        "unstarAll": "Remove all stars",
+        "unstarAllTitle": "Unstar every message?",
+        "unstarAllBody": "The messages stay where they are. Only your stars go.",
+        "unstarAllHere": "Unstar every message in {name}?",
+        "cancel": "Cancel",
+        "openInConversation": "Open in the conversation"
     },
     "elsewhere": {
         "thatCallCouldNotBe": "That call could not be reached.",
@@ -1291,7 +1398,7 @@
     "spoiler": {
         "showTheHiddenText": "Show the hidden text",
         "spoiler": "Spoiler",
-        "showThis": "Show this {kind, select, picture {picture} video {video} file {file} text {text} content {content} other {{kind}}}"
+        "showThis": "Show this {kind, select, picture {picture} video {video} file {file} text {text} content {content} link {link} other {{kind}}}"
     },
     "noAudio": {
         "yourMicrophoneHasNotPicked": "Your microphone has not picked anything up for a while. Check that it is not muted on the machine itself, and that the right one is chosen under Account > Devices.",
@@ -1349,7 +1456,13 @@
     },
     "linkCard": {
         "play": "Play this on {provider}, here",
-        "playHint": "Plays here. {provider} sees you once you press it."
+        "playHint": "Plays here. {provider} sees you once you press it.",
+        "freeToPlay": "Free to play",
+        "comingSoon": "Coming soon",
+        "comingOn": "Coming {date}",
+        "released": "Released {date}",
+        "wasPrice": "Was {price}",
+        "runsOn": "Platforms"
     },
     "gameLink": {
         "server": "the {game} server {name}",
@@ -1419,5 +1532,34 @@
         "title": "Stop being friends with {name}?",
         "description": "They lose what you show your friends and keep everything else. Either of you can ask again.",
         "confirm": "Remove friend"
+    },
+    "pins": {
+        "pinFor": "Pin this message?",
+        "pinForBody": "Everybody here sees it above the conversation. You can unpin it at any time.",
+        "day": "24 hours",
+        "week": "7 days",
+        "month": "30 days",
+        "forever": "Until unpinned",
+        "pin": "Pin",
+        "cancel": "Cancel",
+        "pinned": "Pinned message",
+        "pinnedCount": "Pinned message {at} of {count}",
+        "showAll": "All pinned messages",
+        "title": "Pinned messages",
+        "none": "No pinned messages",
+        "noneBody": "Pin a message from its menu to keep it above the conversation for everybody.",
+        "jump": "Jump",
+        "jumpTo": "Go to the message",
+        "unpin": "Unpin",
+        "byOn": "Pinned by {name}",
+        "until": "Until {date}",
+        "attachment": "Attachment",
+        "deleted": "Deleted message"
+    },
+    "ageGate": {
+        "title": "Age-restricted channel",
+        "description": "#{name} is marked as holding adult content. Continue only if you are at least 18.",
+        "goBack": "Go back",
+        "continue": "Continue"
     }
 }

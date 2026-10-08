@@ -11,31 +11,75 @@
  * Not grouped and not searchable. Both would be right for a list of two hundred
  * and this one is a handful by construction - people star what they mean to come
  * back to, and what they come back to they unstar.
+ *
+ * Like WhatsApp's starred list it can be narrowed to one conversation - the
+ * conversation's own menu opens it that way, `?c=<channelId>` - and pressing a
+ * message opens the conversation at that message rather than at its end. "Unstar
+ * all" clears the list (or that conversation's part of it) after asking.
  */
 
 import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useChat } from "../chat-context";
 import { Avatar } from "@/components/avatar";
-import { EmptyState, Skeleton } from "@polaris/ui";
+import { Button, ConfirmDeleteDialog, EmptyState, Select, Skeleton } from "@polaris/ui";
 import { PersonName } from "@/components/person-name";
-import { starAction, starredAction } from "../actions";
-import { useCallback, useEffect, useState } from "react";
+import { starAction, starredAction, unstarAllAction } from "../actions";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { MessageTime } from "@/components/message-time";
 import type { ChatMessageView } from "@/lib/chat/messages";
 import { RichText } from "@/components/rich-text/rich-text";
 import { ArrowLeft, Hash, Star, Users } from "lucide-react";
 
+/** The filter's value for "every conversation". Radix refuses an empty item. */
+const EVERYWHERE = "all";
+
 export function SavedView() {
     const t = useTranslations("chat");
+    const router = useRouter();
+    const params = useSearchParams();
     const { channels } = useChat();
+    const only = params.get("c");
     const [messages, setMessages] = useState<readonly ChatMessageView[] | null>(null);
+    const [clearing, setClearing] = useState(false);
+    const [busy, setBusy] = useState(false);
+    const onlyChannel = only ? channels.find((entry) => entry.id === only) : undefined;
 
     const load = useCallback(() => {
-        void starredAction().then((result) => setMessages(result.messages));
-    }, []);
+        setMessages(null);
+        void starredAction(only ?? undefined).then((result) => setMessages(result.messages));
+    }, [only]);
 
     useEffect(load, [load]);
+
+    /** The conversations the list can be narrowed to: every one this reader
+     *  has, by name. The one in the address is kept even before the rail has
+     *  loaded, so the filter never reads blank. */
+    const choices = useMemo(
+        () => [
+            { value: EVERYWHERE, label: t("saved.allConversations") },
+            ...channels
+                .filter((entry) => entry.id !== only)
+                .map((entry) => ({ value: entry.id, label: entry.name })),
+            ...(only ? [{ value: only, label: onlyChannel?.name ?? "" }] : [])
+        ],
+        [channels, only, onlyChannel?.name, t]
+    );
+
+    const clearAll = async () => {
+        setBusy(true);
+        const before = messages;
+        setMessages([]);
+        try {
+            await unstarAllAction(only ?? undefined);
+            setClearing(false);
+        } catch {
+            setMessages(before);
+        } finally {
+            setBusy(false);
+        }
+    };
 
     return (
         <div className="flex min-h-0 flex-1 flex-col">
@@ -48,7 +92,28 @@ export function SavedView() {
                     <ArrowLeft className="size-4" />
                 </Link>
                 <Star className="size-4 shrink-0 text-primary" />
-                <span className="text-sm font-semibold">{t("saved.saved")}</span>
+                <span className="min-w-0 truncate text-sm font-semibold">{t("saved.saved")}</span>
+                <span className="ml-auto flex min-w-0 items-center gap-2">
+                    <Select
+                        value={only ?? EVERYWHERE}
+                        onValueChange={(value) =>
+                            router.replace(
+                                value === EVERYWHERE ? "/chat/saved" : `/chat/saved?c=${value}`
+                            )
+                        }
+                        aria-label={t("saved.allConversations")}
+                        options={choices}
+                        className="h-8 w-40 min-w-0 max-w-[45vw]"
+                    />
+                    <Button
+                        size="sm"
+                        variant="ghost"
+                        disabled={!messages || messages.length === 0}
+                        onClick={() => setClearing(true)}
+                    >
+                        {t("saved.unstarAll")}
+                    </Button>
+                </span>
             </div>
 
             <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-3">
@@ -139,15 +204,40 @@ export function SavedView() {
                                             </button>
                                         </span>
                                     </div>
-                                    <div className="mt-1 text-sm">
+                                    {/* The message itself opens the conversation at
+                                        it, which is what a star is kept for. */}
+                                    <Link
+                                        href={`/chat/c/${message.channelId}/${message.id}`}
+                                        title={t("saved.openInConversation")}
+                                        className="mt-1 block rounded text-sm transition-colors hover:bg-card-hover"
+                                    >
                                         <RichText value={message.body} />
-                                    </div>
+                                    </Link>
                                 </li>
                             );
                         })}
                     </ul>
                 )}
             </div>
+
+            <ConfirmDeleteDialog
+                open={clearing}
+                onOpenChange={setClearing}
+                requireTyping={false}
+                name=""
+                kind=""
+                title={t("saved.unstarAll")}
+                question={
+                    only
+                        ? t("saved.unstarAllHere", { name: onlyChannel?.name ?? "" })
+                        : t("saved.unstarAllTitle")
+                }
+                description={t("saved.unstarAllBody")}
+                confirmLabel={t("saved.unstarAll")}
+                pending={busy}
+                onConfirm={() => void clearAll()}
+                strings={{ cancel: t("saved.cancel") }}
+            />
         </div>
     );
 }

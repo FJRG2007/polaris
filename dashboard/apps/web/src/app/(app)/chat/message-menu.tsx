@@ -42,6 +42,8 @@ import {
     MessageCircleReply,
     MessageSquare,
     Pencil,
+    Pin,
+    PinOff,
     Star,
     Trash2
 } from "lucide-react";
@@ -81,6 +83,11 @@ export interface MessageActions {
     readonly onEdit?: (message: ChatMessageView) => void;
     readonly onOpenThread?: (message: ChatMessageView) => void;
     readonly onStar: (message: ChatMessageView) => void;
+    /** Whether the room has this one pinned, which turns Pin into Unpin. */
+    readonly pinned?: boolean;
+    /** Pin it for everybody, or take the pin off. Absent where this reader may
+     *  not - see `pinsAllowed` - and inside a thread. */
+    readonly onPin?: (message: ChatMessageView, pinned: boolean) => void;
     /**
      * Pick the conversation up again from here.
      *
@@ -246,7 +253,9 @@ export function MessageMenu({
                     <>
                         <ContextMenuItem onSelect={() => void copyText(link.copy)}>
                             <Link2 className="size-3.5" />
-                            {link.kind === "email" ? t("messageMenu.copyEmailAddress") : t("messageMenu.copyLink")}
+                            {link.kind === "email"
+                                ? t("messageMenu.copyEmailAddress")
+                                : t("messageMenu.copyLink")}
                         </ContextMenuItem>
                         {/* The address as the browser has it, not the one that
                             gets copied: a page inside Polaris opens on this
@@ -256,7 +265,9 @@ export function MessageMenu({
                             onSelect={() => window.open(link.open, "_blank", "noopener,noreferrer")}
                         >
                             <ExternalLink className="size-3.5" />
-                            {link.kind === "email" ? t("messageMenu.sendAnEmail") : t("messageMenu.openLink")}
+                            {link.kind === "email"
+                                ? t("messageMenu.sendAnEmail")
+                                : t("messageMenu.openLink")}
                         </ContextMenuItem>
                         <ContextMenuSeparator />
                     </>
@@ -302,10 +313,25 @@ export function MessageMenu({
                     </>
                 )}
 
+                {/* Two different things, side by side the way WhatsApp puts them:
+                    the star is this reader's own bookmark, the pin is the
+                    room's. */}
                 <ContextMenuItem onSelect={() => actions.onStar(message)}>
                     <Star className="size-3.5" />
                     {message.starred ? t("messageMenu.removeFromSaved") : t("messageMenu.save")}
                 </ContextMenuItem>
+                {actions.onPin && !message.deleted && message.kind !== "system" && (
+                    <ContextMenuItem
+                        onSelect={() => actions.onPin?.(message, Boolean(actions.pinned))}
+                    >
+                        {actions.pinned ? (
+                            <PinOff className="size-3.5" />
+                        ) : (
+                            <Pin className="size-3.5" />
+                        )}
+                        {actions.pinned ? t("messageMenu.unpin") : t("messageMenu.pin")}
+                    </ContextMenuItem>
+                )}
                 {actions.onMarkUnread && !mine && !message.deleted && (
                     <ContextMenuItem onSelect={() => actions.onMarkUnread?.(message)}>
                         <Mail className="size-3.5" />
@@ -359,7 +385,9 @@ export function MessageMenu({
                                 {/* Named only when there is more than one, since
                                     a voice message has no name worth reading. */}
                                 <span className="min-w-0 truncate">
-                                    {recordings.length === 1 ? t("messageMenu.downloadTheAudio") : file.name}
+                                    {recordings.length === 1
+                                        ? t("messageMenu.downloadTheAudio")
+                                        : file.name}
                                 </span>
                             </ContextMenuSubTrigger>
                             {/* A format rather than a file, because what was

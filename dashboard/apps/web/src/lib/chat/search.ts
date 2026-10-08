@@ -17,6 +17,7 @@
 import { prisma } from "@polaris/db";
 import * as core from "@polaris/core";
 import { reachableChannelIds } from "./access";
+import { ageClearedWhere } from "./age-gate";
 import { decorateMessages, type ChatMessageView } from "./messages";
 
 /** One result, with enough about where it was said to be worth clicking. */
@@ -49,6 +50,10 @@ export async function searchMessages(
         where: {
             channelId: { in: within },
             deletedAt: null,
+            // Not out of an age-restricted channel this reader has not said
+            // they are old enough for: search would otherwise be the way round
+            // the gate.
+            ...ageClearedWhere(actor.id),
             // System lines - "somebody joined", "a call started" - are noise in a
             // search for something a person said.
             kind: "text",

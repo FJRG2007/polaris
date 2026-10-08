@@ -47,8 +47,18 @@ export interface ChatChange {
      *  read - somebody caught up here. Two screens act on it and nobody else:
      *      their own other devices, which have an unread count to take down, and
      *      the person they were reading, whose ticks have just moved. Addressed
-     *      through `audience`, because who may know is a setting. */
-    readonly kind: "posted" | "channels" | "typing" | "call" | "appearance" | "read" | "activity";
+     *      through `audience`, because who may know is a setting.
+     *  pins - a message was pinned or unpinned here; the bar above the
+     *      conversation reads its pins again. */
+    readonly kind:
+        | "posted"
+        | "channels"
+        | "typing"
+        | "call"
+        | "appearance"
+        | "read"
+        | "activity"
+        | "pins";
     /** Only on `read`: the mark moved BACKWARDS - somebody put a conversation
      *  back to unread. The same fact changing, so it is the same frame, but the
      *  opposite instruction for anything that withdraws a notice about it. */

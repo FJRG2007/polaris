@@ -30,6 +30,7 @@ import {
     channelAccess,
     messageable,
     picturesAllowed,
+    pinsAllowed,
     invitesAllowed,
     roomMentionsAllowed,
     reachableSpaceIds,
@@ -98,6 +99,10 @@ export interface ChatChannelView {
      *  whether the screen offers them anything only a moderator may do. Always
      *  false in a direct message, where everybody in one is equal in it. */
     readonly mayAdminister: boolean;
+    /** Whether this reader may open or close the channel - the space's people,
+     *  not the channel's, since it decides who in the space reaches it. Only
+     *  decides what the screen offers; saving asks the same question again. */
+    readonly mayChangePrivacy: boolean;
     /** Whether this reader may take somebody else's message out of it. The same
      *  as administering it, plus the person whose group it is - a group has no
      *  administrators, so without this nobody could do anything about what is
@@ -107,6 +112,10 @@ export interface ChatChannelView {
      *  channel, whoever started it for a group. Only decides what the screen
      *  offers; the route that stores the bytes asks the same question again. */
     readonly mayPicture: boolean;
+    /** Whether this reader may pin a message here for everybody - see
+     *  `pinsAllowed`. Only decides what the screen offers; pinning asks the same
+     *  question again. */
+    readonly mayPin: boolean;
     /** Who runs a group, so the screen can offer them the things only they may
      *  do. Null for everything that is not a group. */
     readonly ownerId: string | null;
@@ -130,6 +139,12 @@ export interface ChatChannelView {
     /** How many people a voice channel holds at once. Zero is no limit, and is
      *  what every other kind of conversation reads. */
     readonly userLimit: number;
+    /** What its pictures are before anybody looks - see `CHAT_CONTENT_MODES`.
+     *  Always `default` for a direct message or a group. */
+    readonly contentMode: core.ChatContentMode;
+    /** Whether this reader has said they are an adult here. Only read when the
+     *  channel is age-restricted; true everywhere else, so nothing gates. */
+    readonly ageConfirmed: boolean;
     /** The other people in a direct message, for the avatars beside it. Empty
      *  for a named channel, where the name is the whole label. */
     readonly others: readonly { id: string; name: string }[];
@@ -686,7 +701,8 @@ export async function listChannels(
                 mutedUntil: true,
                 notifyLevel: true,
                 pinnedAt: true,
-                role: true
+                role: true,
+                timeoutUntil: true
             }
         }),
         administeredSpaceIds(actor)
@@ -712,6 +728,7 @@ export async function listChannels(
             topic: true,
             private: true,
             archived: true,
+            space: { select: { archived: true } },
             lastMessageAt: true,
             ownerId: true,
             createdById: true,
@@ -720,6 +737,7 @@ export async function listChannels(
             membersMayMention: true,
             slowmode: true,
             userLimit: true,
+            contentMode: true,
             // Only where somebody reads them: a direct message or a group is
             // named after, and drawn with, the people in it. A channel in a
             // space is neither - its `others` is always empty - and a public
@@ -742,6 +760,22 @@ export async function listChannels(
     // over reachable spaces would not do.
     const channels = await onOpenShelf(actor, found);
     if (channels.length === 0) return [];
+
+    // Which age-restricted rooms this reader has already said yes to. Asked only
+    // when the rail has one, which is nearly never.
+    const gated = channels
+        .filter((channel) => channel.spaceId && channel.contentMode === "age")
+        .map((channel) => channel.id);
+    const confirmed = new Set(
+        gated.length
+            ? (
+                  await prisma.chatAgeConfirmation.findMany({
+                      where: { userId: actor.id, channelId: { in: gated } },
+                      select: { channelId: true }
+                  })
+              ).map((row) => row.channelId)
+            : []
+    );
 
     // Four reads that depend on nothing but the rows above, asked together
     // rather than one after another.
@@ -787,6 +821,16 @@ export async function listChannels(
             channel.spaceId &&
                 (administered.has(channel.spaceId) || mine.get(channel.id)?.role === "admin")
         );
+        const mayModerate =
+            mayAdminister || (channel.kind === "group" && groupOwnerId(channel) === actor.id);
+        // The same rule `channelAccess` posts by: a live room, and no timeout in
+        // force unless this reader runs it. Pinning asks it first.
+        const timedOut =
+            !mayAdminister &&
+            membership?.timeoutUntil !== null &&
+            membership?.timeoutUntil !== undefined &&
+            membership.timeoutUntil.getTime() > Date.now();
+        const mayPost = !channel.archived && !channel.space?.archived && !timedOut;
         return {
             id: channel.id,
             spaceId: channel.spaceId,
@@ -807,15 +851,16 @@ export async function listChannels(
             notifyLevel: channelNotifyOf(membership?.notifyLevel),
             pinned: membership?.pinnedAt !== null && membership?.pinnedAt !== undefined,
             mayAdminister,
+            mayChangePrivacy: Boolean(channel.spaceId && administered.has(channel.spaceId)),
             // The one standing a group confers: its owner may take a message
             // out of it. Not `mayAdminister`, which would also hand them the
             // channel controls a group does not have.
-            mayModerate:
-                mayAdminister || (channel.kind === "group" && groupOwnerId(channel) === actor.id),
+            mayModerate,
             // Whether the screen offers this reader the picture control. The
             // same predicate the route enforces with, asked here so the rule
             // has one implementation rather than two that drift.
             mayPicture: picturesAllowed({ ...channel, mayAdminister }, actor.id),
+            mayPin: mayPost && pinsAllowed({ ...channel, mayModerate }, actor.id),
             ownerId: groupOwnerId(channel),
             membersMayEdit: channel.membersMayEdit,
             membersMayInvite: channel.membersMayInvite,
@@ -824,11 +869,22 @@ export async function listChannels(
             mayMentionRoom: roomMentionsAllowed(channel, actor.id),
             slowmode: channel.slowmode,
             userLimit: channel.kind === "voice" ? channel.userLimit : 0,
+            contentMode: channel.spaceId ? contentModeOf(channel.contentMode) : "default",
+            ageConfirmed:
+                !channel.spaceId || channel.contentMode !== "age" || confirmed.has(channel.id),
             others: channel.spaceId ? [] : others,
             blocked: channel.kind === "dm" && others.some((other) => shut.has(other.id)),
             gameLinks: linked.get(channel.id) ?? []
         };
     });
+}
+
+/** A stored content mode, or `default` for anything this version does not
+ *  know - a row is older than the screen reading it, and newer ones exist. */
+function contentModeOf(stored: string | null | undefined): core.ChatContentMode {
+    return (core.CHAT_CONTENT_MODES as readonly string[]).includes(stored ?? "")
+        ? (stored as core.ChatContentMode)
+        : "default";
 }
 
 /** A stored channel level, or `inherit` for anything the column holds that this
@@ -997,6 +1053,7 @@ export async function duplicateChannel(
             private: true,
             slowmode: true,
             userLimit: true,
+            contentMode: true,
             order: true,
             members: { select: { userId: true, role: true } }
         }
@@ -1037,6 +1094,7 @@ export async function duplicateChannel(
                 kind: source.kind,
                 slowmode: source.slowmode,
                 userLimit: source.userLimit,
+                contentMode: source.contentMode,
                 order,
                 createdById: actor.id,
                 ...(members.length > 0
@@ -1163,16 +1221,44 @@ export async function updateChannel(
     if (input.userLimit !== undefined && access.kind !== "voice") {
         throw new ChatAccessError({ key: "errors.limitVoiceOnly" });
     }
+    // Opening a private room shows its history to the whole space, and closing
+    // one decides who in the space may reach it - both the space's call, the
+    // same standing creating a private channel asks for. Running the room alone
+    // is not enough.
+    const current =
+        input.private !== undefined
+            ? await prisma.chatChannel.findUnique({
+                  where: { id: input.channelId },
+                  select: { private: true }
+              })
+            : null;
+    const privacyChanges = current !== null && current.private !== input.private;
+    if (privacyChanges) await requireSpace(actor, access.spaceId, "admin");
 
-    await prisma.chatChannel.update({
-        where: { id: input.channelId },
-        data: {
-            ...(input.name !== undefined ? { name: input.name } : {}),
-            ...(input.topic !== undefined ? { topic: input.topic } : {}),
-            ...(input.archived !== undefined ? { archived: input.archived } : {}),
-            ...(input.categoryId !== undefined ? { categoryId: input.categoryId } : {}),
-            ...(input.slowmode !== undefined ? { slowmode: input.slowmode } : {}),
-            ...(input.userLimit !== undefined ? { userLimit: input.userLimit } : {})
+    await prisma.$transaction(async (tx) => {
+        await tx.chatChannel.update({
+            where: { id: input.channelId },
+            data: {
+                ...(input.name !== undefined ? { name: input.name } : {}),
+                ...(input.topic !== undefined ? { topic: input.topic } : {}),
+                ...(input.archived !== undefined ? { archived: input.archived } : {}),
+                ...(input.categoryId !== undefined ? { categoryId: input.categoryId } : {}),
+                ...(input.slowmode !== undefined ? { slowmode: input.slowmode } : {}),
+                ...(input.userLimit !== undefined ? { userLimit: input.userLimit } : {}),
+                ...(input.private !== undefined ? { private: input.private } : {}),
+                ...(input.contentMode !== undefined ? { contentMode: input.contentMode } : {})
+            }
+        });
+        // A private channel is reached by its member rows alone, so whoever
+        // closes it keeps a row of their own - the same as creating one private.
+        // Without it, an administrator of the space who had never posted here
+        // would lock themselves out of the room they just closed.
+        if (input.private && privacyChanges) {
+            await tx.chatChannelMember.upsert({
+                where: { channelId_userId: { channelId: input.channelId, userId: actor.id } },
+                update: { role: "admin" },
+                create: { channelId: input.channelId, userId: actor.id, role: "admin" }
+            });
         }
     });
     publishChatChange({ channelId: input.channelId, kind: "channels", actorId: actor.id });
