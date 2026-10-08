@@ -860,7 +860,6 @@ function Message({
             the pointer is somewhere else. */}
                 <div
                     ref={swipe.line}
-                    {...swipe.handlers}
                     className={cn(
                         "group relative flex gap-2 px-4 transition-colors hover:bg-card-hover/60 data-[state=open]:bg-card-hover",
                         grouped ? "py-0.5" : "pb-0.5 pt-3",

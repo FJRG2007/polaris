@@ -10,23 +10,35 @@
  * either way the message springs back to where it was.
  *
  * Only for a finger. A mouse already has the hover bar and the right-click menu,
- * and a drag with a mouse is how text gets selected. The gesture also has to
- * share the screen with three things a finger does far more often, and loses to
- * each of them:
+ * and a drag with a mouse is how text gets selected - so this listens to touch
+ * events and nothing else.
+ *
+ * The gesture shares the screen with three things a finger does far more often:
  *
  * - **Scrolling.** The row is `touch-action: pan-y`, so the browser keeps the
- *   vertical scroll to itself, and nothing here moves until the first few pixels
- *   say which way the finger is going. Mostly up or down is a scroll, and this
- *   lets go of the gesture for the rest of it (the axis lock).
+ *   vertical scroll to itself and never claims a sideways move. Nothing here
+ *   moves until the finger has gone `DECIDE_AT` pixels; then a move clearly to
+ *   the right (`dx > |dy| * LOCK_RATIO`) locks the gesture to this row, and from
+ *   there every move is claimed (`preventDefault`), so the list cannot start
+ *   scrolling under a swipe and the browser cannot cancel it half way. A move
+ *   that is mostly vertical lets go for the rest of the touch, and a touch the
+ *   browser is already scrolling (its moves can no longer be claimed) never
+ *   becomes a swipe.
  * - **The long press.** A press that does not move is the context menu's. The
- *   menu's own timer is cancelled by the first move, so a swipe never opens it
- *   and a long press never swipes.
+ *   menu's own timer is cancelled by the first move, and a menu that tries to
+ *   open during a swipe is refused.
  * - **Selecting text, and scrolling sideways inside a message.** A press that
  *   lands while text is selected, or inside a code block or table wider than the
  *   message, is left alone.
  *
+ * Every way a touch can end - lifted, cancelled by the system, a second finger,
+ * the list scrolling, the tab hidden, the row unmounted - goes back to idle and
+ * springs the line back, so one interrupted swipe can never leave the next one
+ * stuck. The rules live in `createSwipe`, a plain state machine with no DOM in
+ * it, which is what the tests drive.
+ *
  * Moves are written straight to the element's style rather than through React
- * state: a re-render per pointer move on a list of two hundred messages is a
+ * state: a re-render per touch move on a list of two hundred messages is a
  * gesture that stutters.
  */
 
@@ -35,6 +47,9 @@ import { useCallback, useEffect, useRef } from "react";
 /** How far the finger has to travel before the gesture decides which way it is
  *  going. Under this it is a tap or the start of a long press. */
 export const DECIDE_AT = 10;
+
+/** How much more sideways than vertical a move has to be to count as a swipe. */
+export const LOCK_RATIO = 1.5;
 
 /** How far a drag has to go to count as a reply. WhatsApp's is about a fifth of
  *  a phone's width. */
@@ -45,7 +60,10 @@ export const REPLY_AT = 64;
 export const MAX_PULL = 96;
 
 /** How long the spring back takes. */
-const SETTLE_MS = 180;
+const SETTLE_MS = 220;
+
+/** A spring with a touch of overshoot, for the line going home. */
+const SPRING = "cubic-bezier(0.34, 1.4, 0.64, 1)";
 
 /** Where the line sits for a finger that has travelled `dx`: one to one up to
  *  the threshold, then damped towards `MAX_PULL`, and never to the left. */
@@ -59,18 +77,130 @@ export function pullFor(dx: number): number {
 
 /** Which way a press that has moved this far is going: still undecided, a swipe
  *  to the right, or anything else (a scroll, a swipe left), which this leaves to
- *  the browser. */
+ *  the browser. A diagonal that is neither stays undecided a little longer, so a
+ *  finger that wobbles as it lands is not written off. */
 export function axisOf(dx: number, dy: number): "undecided" | "reply" | "other" {
+    const ax = Math.abs(dx);
+    const ay = Math.abs(dy);
     if (Math.hypot(dx, dy) < DECIDE_AT) return "undecided";
-    return dx > 0 && Math.abs(dx) > Math.abs(dy) * 1.2 ? "reply" : "other";
+    if (dx > 0 && ax > ay * LOCK_RATIO) return "reply";
+    if (dx <= 0 || ay >= ax || Math.hypot(dx, dy) >= DECIDE_AT * 3) return "other";
+    return "undecided";
 }
 
-/** Whether this browser is driven by a finger. Asked when the press starts
- *  rather than once, so a tablet with a keyboard dock attached answers right. */
-function coarse(): boolean {
-    return typeof window !== "undefined" && typeof window.matchMedia === "function"
-        ? window.matchMedia("(pointer: coarse)").matches
-        : false;
+/** One finger on the screen, as the machine sees it. */
+export interface TouchPoint {
+    readonly id: number;
+    readonly x: number;
+    readonly y: number;
+}
+
+/** What the machine asks of the screen. */
+export interface SwipeOutput {
+    /** Put the line `pull` pixels to the right; `armed` once past the line;
+     *  `settle` when it is going home rather than following the finger. */
+    readonly draw: (pull: number, armed: boolean, settle: boolean) => void;
+    /** The phone's tick, once, when the drag crosses the line. */
+    readonly tick: () => void;
+    /** The reply itself. */
+    readonly reply: () => void;
+}
+
+export type SwipePhase = "idle" | "pending" | "swiping";
+
+/**
+ * The gesture as a state machine: idle -> pending (a finger is down, direction
+ * unknown) -> swiping (locked to this row) -> idle. Every input returns whether
+ * the browser's default for that event has to be stopped.
+ */
+export function createSwipe(output: SwipeOutput) {
+    let phase: SwipePhase = "idle";
+    let id = -1;
+    let startX = 0;
+    let startY = 0;
+    let armed = false;
+    let pulled = false;
+
+    /** Back to idle from anywhere, the line sent home if it had moved. */
+    const reset = (): void => {
+        const moved = pulled;
+        phase = "idle";
+        id = -1;
+        armed = false;
+        pulled = false;
+        if (moved) output.draw(0, false, true);
+    };
+
+    return {
+        get phase(): SwipePhase {
+            return phase;
+        },
+
+        /** A finger landed. `touches` is every finger on the screen now. */
+        start(touches: readonly TouchPoint[]): boolean {
+            if (touches.length !== 1) {
+                // A second finger is a pinch or an accident, never a reply.
+                reset();
+                return false;
+            }
+            reset();
+            const [point] = touches;
+            phase = "pending";
+            id = point!.id;
+            startX = point!.x;
+            startY = point!.y;
+            return false;
+        },
+
+        /** The finger moved. `cancelable` is false once the browser has taken the
+         *  touch for a scroll, and a touch it has taken is never a swipe. */
+        move(touches: readonly TouchPoint[], cancelable: boolean): boolean {
+            if (phase === "idle") return false;
+            if (touches.length !== 1) {
+                reset();
+                return false;
+            }
+            const point = touches.find((touch) => touch.id === id);
+            if (!point) {
+                reset();
+                return false;
+            }
+            const dx = point.x - startX;
+            const dy = point.y - startY;
+            if (phase === "pending") {
+                const axis = axisOf(dx, dy);
+                if (axis === "undecided") return false;
+                if (axis === "other" || !cancelable) {
+                    reset();
+                    return false;
+                }
+                phase = "swiping";
+            }
+            const pull = pullFor(dx);
+            const now = pull >= REPLY_AT;
+            if (now && !armed) output.tick();
+            armed = now;
+            pulled = true;
+            output.draw(pull, armed, false);
+            return true;
+        },
+
+        /** The finger lifted. Replies if it was past the line. */
+        end(): boolean {
+            const swiped = phase === "swiping";
+            const fire = swiped && armed;
+            reset();
+            if (fire) output.reply();
+            // A swipe's lift is not also a tap on whatever it started on.
+            return swiped;
+        },
+
+        /** The system took the touch away, or something else ended it: the list
+         *  scrolled, the tab was hidden, the row went away. Never replies. */
+        cancel(): void {
+            reset();
+        }
+    };
 }
 
 /** Whether the press landed somewhere that scrolls sideways on its own - a long
@@ -105,167 +235,126 @@ function tick(): void {
     }
 }
 
-interface Gesture {
-    readonly pointerId: number;
-    readonly startX: number;
-    readonly startY: number;
-    axis: "undecided" | "reply" | "other";
-    armed: boolean;
+function points(list: TouchList): TouchPoint[] {
+    return Array.from(list, (touch) => ({
+        id: touch.identifier,
+        x: touch.clientX,
+        y: touch.clientY
+    }));
 }
 
 /**
  * The swipe, for one message row.
  *
  * `line` is what moves (the row's content) and `cue` is the arrow behind it.
- * Returns the handlers to spread on the row; with no `onReply` the row is left
- * exactly as it was.
+ * With no `onReply` the row is left exactly as it was.
  */
 export function useSwipeReply(onReply: (() => void) | undefined) {
     const line = useRef<HTMLDivElement | null>(null);
     const cue = useRef<HTMLSpanElement | null>(null);
-    const gesture = useRef<Gesture | null>(null);
-    /** Set once a swipe has moved, so the click the browser may send at the end
-     *  of it does not also press whatever the finger started on. */
-    const swallowClick = useRef(false);
     const latest = useRef(onReply);
     latest.current = onReply;
+    const enabled = Boolean(onReply);
 
-    const draw = useCallback((pull: number, armed: boolean, animate: boolean) => {
+    const draw = useCallback((pull: number, armed: boolean, settle: boolean) => {
         const moving = line.current;
         const arrow = cue.current;
         if (moving) {
-            moving.style.transition = animate ? `transform ${SETTLE_MS}ms ease-out` : "none";
+            moving.style.transition = settle ? `transform ${SETTLE_MS}ms ${SPRING}` : "none";
             moving.style.transform = pull === 0 ? "" : `translateX(${pull}px)`;
         }
         if (arrow) {
             const shown = Math.min(1, pull / REPLY_AT);
-            arrow.style.transition = animate
+            arrow.style.transition = settle
                 ? `opacity ${SETTLE_MS}ms ease-out, transform ${SETTLE_MS}ms ease-out`
-                : "none";
+                : "transform 120ms ease-out";
             arrow.style.opacity = String(shown);
-            arrow.style.transform = `translateY(-50%) scale(${0.6 + 0.4 * shown})`;
+            arrow.style.transform = `translateY(-50%) scale(${0.5 + 0.5 * shown + (armed ? 0.15 : 0)})`;
             arrow.dataset.armed = armed ? "true" : "false";
         }
     }, []);
 
-    const settle = useCallback(() => {
-        gesture.current = null;
-        draw(0, false, true);
-    }, [draw]);
+    const machine = useRef<ReturnType<typeof createSwipe> | null>(null);
+    if (!machine.current) {
+        machine.current = createSwipe({ draw, tick, reply: () => latest.current?.() });
+    }
 
-    // A row that loses its reply mid-swipe (the message was deleted under the
-    // finger) springs back rather than staying pulled out.
     useEffect(() => {
-        if (!onReply && gesture.current) settle();
-    }, [onReply, settle]);
+        const row = line.current;
+        const swipe = machine.current;
+        if (!enabled || !row || !swipe) return;
 
-    const onPointerDown = useCallback((event: React.PointerEvent<HTMLElement>) => {
-        if (!latest.current || event.pointerType !== "touch" || !event.isPrimary) return;
-        if (!coarse()) return;
-        const row = event.currentTarget;
-        const target = event.target as Element | null;
-        if (selecting(row) || inSideScroller(target, row)) return;
-        // Somewhere a finger already means something else: a field, a player,
-        // a slider. Buttons and links are fine - a tap still presses them.
-        if (
-            target?.closest(
-                "input, textarea, [contenteditable='true'], iframe, video, audio, [role='slider']"
-            )
-        ) {
-            return;
-        }
-        swallowClick.current = false;
-        gesture.current = {
-            pointerId: event.pointerId,
-            startX: event.clientX,
-            startY: event.clientY,
-            axis: "undecided",
-            armed: false
-        };
-    }, []);
-
-    const onPointerMove = useCallback(
-        (event: React.PointerEvent<HTMLElement>) => {
-            const current = gesture.current;
-            if (!current || event.pointerId !== current.pointerId) return;
-            const dx = event.clientX - current.startX;
-            const dy = event.clientY - current.startY;
-            if (current.axis === "undecided") {
-                current.axis = axisOf(dx, dy);
-                if (current.axis === "other") {
-                    gesture.current = null;
-                    return;
-                }
-                if (current.axis === "undecided") return;
-                // Decided: this is a swipe. Keep the finger's moves coming here
-                // even when it leaves the row.
-                swallowClick.current = true;
-                try {
-                    event.currentTarget.setPointerCapture(event.pointerId);
-                } catch {
-                    // Capture is a nicety; without it a drag off the row ends it.
-                }
+        const onStart = (event: TouchEvent) => {
+            const target = event.target as Element | null;
+            if (
+                event.touches.length === 1 &&
+                (selecting(row) ||
+                    inSideScroller(target, row) ||
+                    // Somewhere a finger already means something else: a field, a
+                    // player, a slider. Buttons and links are fine - a tap still
+                    // presses them.
+                    target?.closest(
+                        "input, textarea, [contenteditable='true'], iframe, video, audio, [role='slider']"
+                    ))
+            ) {
+                swipe.cancel();
+                return;
             }
-            const pull = pullFor(dx);
-            const armed = pull >= REPLY_AT;
-            if (armed && !current.armed) tick();
-            current.armed = armed;
-            draw(pull, armed, false);
-        },
-        [draw]
-    );
+            swipe.start(points(event.touches));
+        };
+        const onMove = (event: TouchEvent) => {
+            if (swipe.move(points(event.touches), event.cancelable) && event.cancelable) {
+                event.preventDefault();
+            }
+        };
+        const onEnd = (event: TouchEvent) => {
+            // A finger lifted while another stays down ends it too.
+            if (event.touches.length > 0) {
+                swipe.cancel();
+                return;
+            }
+            if (swipe.end() && event.cancelable) event.preventDefault();
+        };
+        const onCancel = () => swipe.cancel();
+        /** The list scrolled under a press still deciding: the browser has the
+         *  touch. Under a swipe the list cannot scroll, so anything that does
+         *  scroll it (a new message arriving) ends the swipe. */
+        const onScroll = (event: Event) => {
+            if (swipe.phase === "idle") return;
+            const scroller = event.target;
+            if (scroller instanceof Node && scroller !== row && !scroller.contains(row)) return;
+            swipe.cancel();
+        };
+        const onHidden = () => swipe.cancel();
+        /** The long press's menu, which a swipe under way must not open. */
+        const onContextMenu = (event: Event) => {
+            if (swipe.phase !== "swiping") return;
+            event.preventDefault();
+            event.stopPropagation();
+        };
 
-    const finish = useCallback(
-        (event: React.PointerEvent<HTMLElement>, cancelled: boolean) => {
-            const current = gesture.current;
-            if (!current || event.pointerId !== current.pointerId) return;
-            const reply = !cancelled && current.axis === "reply" && current.armed;
-            const moved = current.axis === "reply";
-            gesture.current = null;
-            if (moved) draw(0, false, true);
-            if (reply) latest.current?.();
-        },
-        [draw]
-    );
+        row.addEventListener("touchstart", onStart, { passive: true });
+        row.addEventListener("touchmove", onMove, { passive: false });
+        row.addEventListener("touchend", onEnd, { passive: false });
+        row.addEventListener("touchcancel", onCancel);
+        row.addEventListener("contextmenu", onContextMenu, true);
+        document.addEventListener("scroll", onScroll, { capture: true, passive: true });
+        window.addEventListener("blur", onHidden);
+        document.addEventListener("visibilitychange", onHidden);
+        return () => {
+            row.removeEventListener("touchstart", onStart);
+            row.removeEventListener("touchmove", onMove);
+            row.removeEventListener("touchend", onEnd);
+            row.removeEventListener("touchcancel", onCancel);
+            row.removeEventListener("contextmenu", onContextMenu, true);
+            document.removeEventListener("scroll", onScroll, { capture: true });
+            window.removeEventListener("blur", onHidden);
+            document.removeEventListener("visibilitychange", onHidden);
+            // A row that loses its reply mid-swipe (the message was deleted under
+            // the finger) springs back rather than staying pulled out.
+            swipe.cancel();
+        };
+    }, [enabled]);
 
-    const onPointerUp = useCallback(
-        (event: React.PointerEvent<HTMLElement>) => finish(event, false),
-        [finish]
-    );
-    const onPointerCancel = useCallback(
-        (event: React.PointerEvent<HTMLElement>) => finish(event, true),
-        [finish]
-    );
-
-    /** Capture-phase, so the press a swipe ended on is not also a tap on the
-     *  link or button under it. */
-    const onClickCapture = useCallback((event: React.MouseEvent<HTMLElement>) => {
-        if (!swallowClick.current) return;
-        swallowClick.current = false;
-        event.preventDefault();
-        event.stopPropagation();
-    }, []);
-
-    /** The long press's menu, which a swipe under way must not open. */
-    const onContextMenuCapture = useCallback((event: React.MouseEvent<HTMLElement>) => {
-        if (gesture.current?.axis !== "reply") return;
-        event.preventDefault();
-        event.stopPropagation();
-    }, []);
-
-    return {
-        line,
-        cue,
-        enabled: Boolean(onReply),
-        handlers: onReply
-            ? {
-                  onPointerDown,
-                  onPointerMove,
-                  onPointerUp,
-                  onPointerCancel,
-                  onClickCapture,
-                  onContextMenuCapture
-              }
-            : {}
-    };
+    return { line, cue, enabled };
 }
