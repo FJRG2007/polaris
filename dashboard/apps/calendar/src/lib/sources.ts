@@ -321,7 +321,12 @@ export async function refreshOpenSources(
             userId: user.id,
             kind: { in: LIVE_KINDS },
             AND: [
-                { OR: [{ lastSyncAt: null }, { lastSyncAt: { lt: new Date(now.getTime() - ageMs) } }] },
+                {
+                    OR: [
+                        { lastSyncAt: null },
+                        { lastSyncAt: { lt: new Date(now.getTime() - ageMs) } }
+                    ]
+                },
                 { OR: [{ status: "ok" }, { nextSyncAt: { lte: now } }] }
             ]
         },

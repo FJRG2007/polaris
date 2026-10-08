@@ -521,7 +521,9 @@ export default function GridView(props: GridViewProps) {
                     // month or the year is a line on the page, and so is every
                     // row of the schedule - in the calendar's own colour.
                     const type = arg.view.type;
-                    const chip = type.startsWith("timeGrid") || (arg.event.allDay && !type.startsWith("list"));
+                    const chip =
+                        type.startsWith("timeGrid") ||
+                        (arg.event.allDay && !type.startsWith("list"));
                     return (
                         <span className="pc-task-chip flex min-w-0 items-center gap-1 overflow-hidden px-0.5">
                             <TaskMark
@@ -529,18 +531,26 @@ export default function GridView(props: GridViewProps) {
                                 color={
                                     chip
                                         ? arg.event.textColor || "currentColor"
-                                        : arg.event.borderColor || arg.event.backgroundColor || "currentColor"
+                                        : arg.event.borderColor ||
+                                          arg.event.backgroundColor ||
+                                          "currentColor"
                                 }
-                                markColor={chip ? arg.event.backgroundColor || undefined : undefined}
+                                markColor={
+                                    chip ? arg.event.backgroundColor || undefined : undefined
+                                }
                                 size={12}
                                 onToggle={(task) => propsRef.current.onTaskToggle(task)}
                             />
                             {arg.timeText ? (
-                                <span className="fc-event-time shrink-0 tabular-nums">{arg.timeText}</span>
+                                <span className="fc-event-time shrink-0 tabular-nums">
+                                    {arg.timeText}
+                                </span>
                             ) : null}
                             {/* The grid's own title class, so a done task is struck
                                 through and a past one greyed like any event. */}
-                            <span className="fc-event-title min-w-0 truncate">{arg.event.title}</span>
+                            <span className="fc-event-title min-w-0 truncate">
+                                {arg.event.title}
+                            </span>
                         </span>
                     );
                 }}
