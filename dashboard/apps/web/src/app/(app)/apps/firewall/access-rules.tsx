@@ -16,7 +16,7 @@ import { PageHeader, Section } from "./page-parts";
 import { ChipList, validAddress } from "./chip-list";
 import type { WafPrincipalGrant } from "@polaris/core";
 import { Ban, ShieldCheck, TriangleAlert } from "lucide-react";
-import { LoginPrincipals, type LoginPrincipalsPatch } from "./login-principals";
+import { LoginPrincipals, type LoginPrincipalsPatch, type WafPrincipalScope } from "./login-principals";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 
 export function AddressRulesPage({
@@ -137,6 +137,7 @@ export function AddressRulesPage({
 }
 
 export function LoginRulePage({
+    scope,
     required,
     requiredAbove = false,
     admitted,
@@ -145,6 +146,7 @@ export function LoginRulePage({
     onBack,
     onChange
 }: {
+    scope: WafPrincipalScope;
     required: boolean;
     /** A scope above this one already demands a login. It unions downward, so this
      *  scope cannot waive it and the switch must not pretend otherwise. */
@@ -191,7 +193,7 @@ export function LoginRulePage({
                 people rather than to everybody. */}
             {on ? (
                 <Section title={t("login.admits")} hint={t("login.admitsHint")}>
-                    <LoginPrincipals admitted={admitted} refused={refused} disabled={disabled} onChange={onChange} />
+                    <LoginPrincipals scope={scope} admitted={admitted} refused={refused} disabled={disabled} onChange={onChange} />
                 </Section>
             ) : null}
         </div>

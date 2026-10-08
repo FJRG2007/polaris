@@ -65,6 +65,10 @@ vi.mock("@polaris/db", () => ({
     }
 }));
 vi.mock("@/lib/session-directory", () => ({ describeOrigin: () => "" }));
+let provider = "postgresql";
+vi.mock("@/lib/rich-text/mention-service", () => ({
+    like: (term: string) => (provider === "sqlite" ? { contains: term } : { contains: term, mode: "insensitive" })
+}));
 vi.mock("@/lib/notifications/dispatch", () => ({ notify: async () => undefined }));
 vi.mock("@/lib/notifications/session-events", () => ({ notifySessionsClosed: async () => undefined }));
 vi.mock("@/lib/session-guard", () => ({ revokeSessionsRefusedByRules: async () => undefined }));
@@ -119,6 +123,18 @@ describe("a page of the directory", () => {
         expect(where).toContain('"contains":"ana","mode":"insensitive"');
         expect(where).toContain('"roles"');
         expect(where).toContain('"groups"');
+    });
+
+    it("searches without a case mode the database underneath would refuse", async () => {
+        provider = "sqlite";
+        try {
+            await listUserDirectoryPage({ query: "ana" });
+        } finally {
+            provider = "postgresql";
+        }
+        const where = JSON.stringify(asked[0]?.where);
+        expect(where).toContain('"contains":"ana"');
+        expect(where).not.toContain('"mode"');
     });
 
     it("counts somebody limited by a group or by a list an administrator set", async () => {

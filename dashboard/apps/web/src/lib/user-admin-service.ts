@@ -18,6 +18,7 @@ import { z } from "zod";
 import { prisma, VISIBLE_USER, type Prisma } from "@polaris/db";
 import { after, decodeCursor, MAX_PAGE, pageOf, pageSize, type Page } from "@/lib/pagination/cursor";
 import { DIRECTORY_FILTERS, type DirectoryFilter } from "@/lib/user-directory-filters";
+import { like } from "@/lib/rich-text/mention-service";
 import { discardAvatars } from "@/lib/avatar-service";
 import { discardPersonalDrive } from "@/lib/personal-drive";
 import { revokeSessionsRefusedByRules } from "@/lib/session-guard";
@@ -182,7 +183,7 @@ function directoryWhere(filter: DirectoryFilter, query: string): Prisma.UserWher
         });
     const needle = query.trim();
     if (needle) {
-        const contains = { contains: needle, mode: "insensitive" as const };
+        const contains = like(needle);
         where.push({
             OR: [
                 { name: contains },

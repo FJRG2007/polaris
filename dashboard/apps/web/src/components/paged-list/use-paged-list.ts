@@ -8,6 +8,9 @@
  * the one before ended on. Changing what the list is narrowed by - a search, a
  * cut - starts it again from the top, and an answer that arrives for a question
  * nobody is asking any more is dropped rather than painted over the current one.
+ * When the request for a new search fails, the rows of the old one go with it -
+ * they answer a question nobody is asking - and `retry` asks the failed request
+ * again rather than the next page of a list no longer on screen.
  *
  * `refresh` reads again everything already on screen, in one request, for the
  * moments a list has to catch up with a change: an action taken on a row, or a
@@ -45,6 +48,16 @@ export interface PagedList<T> {
     readonly loadMore: () => void;
     /** Read again what is on screen. */
     readonly refresh: () => Promise<void>;
+    /** Ask again for whatever failed last. */
+    readonly retry: () => void;
+}
+
+interface Request {
+    readonly cursor: string | null;
+    readonly replace: boolean;
+    readonly limit?: number;
+    /** A new question: what was on screen no longer answers it. */
+    readonly restart: boolean;
 }
 
 export function usePagedList<T, P>({
@@ -74,21 +87,32 @@ export function usePagedList<T, P>({
     const latest = useRef({ params, load, next, items, loading });
     latest.current = { params, load, next, items, loading };
 
-    const ask = useCallback(async (cursor: string | null, replace: boolean, limit?: number) => {
+    const failed = useRef<Request | null>(null);
+
+    const ask = useCallback(async (request: Request) => {
+        const { cursor, replace, limit, restart } = request;
         const asked = generation.current;
+        const fail = (reason: string): void => {
+            failed.current = request;
+            setError(reason);
+            if (!restart) return;
+            setItems([]);
+            setNext(null);
+        };
         setLoading(true);
         setError(null);
         try {
             const page = await latest.current.load(cursor, latest.current.params, limit);
             if (asked !== generation.current) return;
             if ("error" in page) {
-                setError(page.error);
+                fail(page.error);
                 return;
             }
+            failed.current = null;
             setItems((held) => (replace ? page.items : [...held, ...page.items]));
             setNext(page.next);
         } catch {
-            if (asked === generation.current) setError("failed");
+            if (asked === generation.current) fail("failed");
         } finally {
             if (asked === generation.current) setLoading(false);
         }
@@ -100,19 +124,27 @@ export function usePagedList<T, P>({
         if (paramsKey === shownKey.current) return;
         shownKey.current = paramsKey;
         generation.current += 1;
-        void ask(null, true);
+        failed.current = null;
+        void ask({ cursor: null, replace: true, restart: true });
     }, [paramsKey, ask]);
 
     const loadMore = useCallback(() => {
         const { next: cursor, loading: busy } = latest.current;
         if (!cursor || busy) return;
-        void ask(cursor, false);
+        void ask({ cursor, replace: false, restart: false });
     }, [ask]);
 
     const refresh = useCallback(async () => {
         generation.current += 1;
         const shown = Math.min(REFRESH_MAX, Math.max(latest.current.items.length, 1));
-        await ask(null, true, shown);
+        await ask({ cursor: null, replace: true, limit: shown, restart: false });
+    }, [ask]);
+
+    const retry = useCallback(() => {
+        const request = failed.current;
+        if (!request || latest.current.loading) return;
+        if (request.replace) generation.current += 1;
+        void ask(request);
     }, [ask]);
 
     // The server drew the screen again. What it handed down is the top of the
@@ -124,5 +156,5 @@ export function usePagedList<T, P>({
         void refresh();
     }, [first, refresh]);
 
-    return { items, hasMore: next !== null, loading, error, loadMore, refresh };
+    return { items, hasMore: next !== null, loading, error, loadMore, refresh, retry };
 }

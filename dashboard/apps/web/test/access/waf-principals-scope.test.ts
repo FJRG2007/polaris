@@ -5,7 +5,8 @@
  * who can deploy is offered the roles and groups they are in and nobody else's,
  * finds people only the way they could anywhere else in Polaris, and never
  * receives the instance's list of accounts. An administrator still finds anybody.
- * Entries a rule already names keep their names, whoever wrote them.
+ * Entries a rule already names keep their names, whoever wrote them, and only
+ * the entries the stored rule holds - never ids the request sends.
  */
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -62,13 +63,22 @@ vi.mock("@/lib/address-accounts", () => ({ accountsAtAddress: async () => [] }))
 vi.mock("@/lib/waf-ssh-service", () => ({ liftHostBlocks: async () => undefined }));
 vi.mock("@/lib/waf-ban-service", () => ({ getWafJails: async () => [], setWafJails: async () => undefined }));
 vi.mock("@/lib/waf-analytics-service", () => ({}));
-vi.mock("@/lib/waf-service", () => ({}));
+let stored: string[] = [];
+const getWafRule = vi.fn(async (_owner: string, _type: string, _id: string) => ({
+    loginAllowPrincipals: stored.map((ref) => ({ ref })),
+    loginDenyPrincipals: []
+}));
+vi.mock("@/lib/waf-service", () => ({ getWafRule }));
 vi.mock("@/lib/waf-anomaly-service", () => ({}));
 
 const { listWafPrincipalsAction, findWafPeopleAction } = await import("../../src/app/(app)/apps/firewall/actions");
 
+const SCOPE = { scopeType: "project" as const, scopeId: "00000000-0000-7000-8000-0000000000e1" };
+
 beforeEach(() => {
     asked = [];
+    stored = [];
+    getWafRule.mockClear();
     findPeople.mockClear();
     findAccountsAsAdmin.mockClear();
 });
@@ -100,17 +110,39 @@ describe("the roles and groups a rule can name", () => {
 
     it("names who the rule already names, without a stranger's email", async () => {
         caller = CUSTOMER;
-        const { principals } = await listWafPrincipalsAction([`user:${OTHER}`, `user:${CUSTOMER.id}`, "user:not-an-id"]);
+        stored = [`user:${OTHER}`, `user:${CUSTOMER.id}`, "user:not-an-id"];
+        const { principals } = await listWafPrincipalsAction(SCOPE);
+        expect(getWafRule).toHaveBeenCalledWith(CUSTOMER.id, SCOPE.scopeType, SCOPE.scopeId);
         const other = principals?.find((option) => option.ref === `user:${OTHER}`);
         expect(other?.label).toBe("Other Customer");
         expect(other?.sublabel).toBeUndefined();
         expect(principals?.find((option) => option.ref === `user:${CUSTOMER.id}`)?.sublabel).toBe("me@example.com");
     });
 
-    it("refuses a list of names longer than any rule", async () => {
+    it("names nobody the stored rule does not, whatever the request carries", async () => {
+        caller = CUSTOMER;
+        const sent = [`user:${OTHER}`, `group:${GROUP}`] as unknown as typeof SCOPE;
+        expect((await listWafPrincipalsAction(sent)).error).toBeTruthy();
+        const { principals } = await listWafPrincipalsAction(SCOPE);
+        expect(principals?.some((option) => option.ref === `user:${OTHER}`)).toBe(false);
+        expect(asked.filter((query) => query.model === "user")).toEqual([
+            { model: "user", args: expect.objectContaining({ where: { id: { in: [] } } }) }
+        ]);
+    });
+
+    it("names nobody for a rule the caller cannot read", async () => {
+        caller = CUSTOMER;
+        getWafRule.mockRejectedValueOnce(new Error("Project not found"));
+        const { principals, error } = await listWafPrincipalsAction(SCOPE);
+        expect(principals).toBeUndefined();
+        expect(error).toBeTruthy();
+        expect(asked.filter((query) => query.model === "user")).toHaveLength(0);
+    });
+
+    it("refuses a rule naming more than any rule should", async () => {
         caller = ADMIN;
-        const many = Array.from({ length: 201 }, (_, index) => `user:${index}`);
-        expect((await listWafPrincipalsAction(many)).error).toBeTruthy();
+        stored = Array.from({ length: 201 }, (_, index) => `user:${index}`);
+        expect((await listWafPrincipalsAction(SCOPE)).error).toBeTruthy();
     });
 });
 

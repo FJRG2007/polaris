@@ -381,7 +381,14 @@ export function UsersAdmin({
                                     {list.loading
                                         ? t("users.directory.loading")
                                         : list.error
-                                          ? t("users.directory.loadFailed")
+                                          ? (
+                                                <span className="inline-flex items-center gap-2">
+                                                    {t("users.directory.loadFailed")}
+                                                    <Button size="sm" variant="ghost" onClick={list.retry}>
+                                                        {t("users.directory.retry")}
+                                                    </Button>
+                                                </span>
+                                            )
                                           : narrowed
                                             ? t("users.directory.noMatch")
                                             : t("users.directory.empty")}
@@ -405,7 +412,7 @@ export function UsersAdmin({
                                             {list.error ? (
                                                 <span className="inline-flex items-center gap-2">
                                                     {t("users.directory.loadFailed")}
-                                                    <Button size="sm" variant="ghost" onClick={list.loadMore}>
+                                                    <Button size="sm" variant="ghost" onClick={list.retry}>
                                                         {t("users.directory.retry")}
                                                     </Button>
                                                 </span>

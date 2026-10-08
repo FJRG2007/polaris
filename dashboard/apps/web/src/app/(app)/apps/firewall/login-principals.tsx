@@ -29,7 +29,7 @@ import { Input, Select, Skeleton } from "@polaris/ui";
 import { useDisplayFormat } from "@/components/display-format";
 import { PeoplePicker, type PickedPerson } from "@/components/people-picker";
 import { findWafPeopleAction, listWafPrincipalsAction, type WafPrincipalOption } from "./actions";
-import { wafPrincipalGrantSchema, type WafPrincipalGrant } from "@polaris/core";
+import { wafPrincipalGrantSchema, type WafPrincipalGrant, type WafScopeType } from "@polaris/core";
 import { ArrowUpRight, CalendarClock, Shield, TriangleAlert, User, UserMinus, Users, X } from "lucide-react";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { NamespaceKey, NamespaceTranslator } from "@/lib/i18n/types";
@@ -49,11 +49,14 @@ let cached: {
     promise: Promise<{ principals?: WafPrincipalOption[]; error?: string }>;
 } | null = null;
 
-function loadPrincipals(named: string[]): Promise<{ principals?: WafPrincipalOption[]; error?: string }> {
+function loadPrincipals(
+    scope: WafPrincipalScope,
+    named: string[]
+): Promise<{ principals?: WafPrincipalOption[]; error?: string }> {
     const now = Date.now();
-    const key = [...named].sort().join(",");
+    const key = `${scope.scopeType}:${scope.scopeId}|${[...named].sort().join(",")}`;
     if (cached && cached.key === key && now - cached.at < CACHE_TTL_MS) return cached.promise;
-    const promise = listWafPrincipalsAction(named).then((result) => {
+    const promise = listWafPrincipalsAction(scope).then((result) => {
         // A failed read must not be remembered, or a transient error would be the
         // answer for the next minute.
         if (result.error) cached = null;
@@ -61,6 +64,12 @@ function loadPrincipals(named: string[]): Promise<{ principals?: WafPrincipalOpt
     });
     cached = { at: now, key, promise };
     return promise;
+}
+
+/** The rule whose entries are being named. */
+export interface WafPrincipalScope {
+    scopeType: WafScopeType;
+    scopeId: string;
 }
 
 /** The people search, in the shape the picker asks for. */
@@ -98,11 +107,13 @@ export interface LoginPrincipalsPatch {
 }
 
 export function LoginPrincipals({
+    scope,
     admitted,
     refused,
     disabled,
     onChange
 }: {
+    scope: WafPrincipalScope;
     admitted: WafPrincipalGrant[];
     refused: WafPrincipalGrant[];
     disabled?: boolean;
@@ -115,9 +126,10 @@ export function LoginPrincipals({
     // Read once for what the rule names when the panel opens. Somebody picked after
     // that is already known by name - the search found them - so it is not asked again.
     const [named] = useState(() => [...admitted, ...refused].map((grant) => grant.ref));
+    const { scopeType, scopeId } = scope;
     useEffect(() => {
         let active = true;
-        void loadPrincipals(named).then((result) => {
+        void loadPrincipals({ scopeType, scopeId }, named).then((result) => {
             if (!active) return;
             setOptions((held) => mergeOptions(result.principals ?? [], held ?? []));
             setError(result.error ?? null);
@@ -125,7 +137,7 @@ export function LoginPrincipals({
         return () => {
             active = false;
         };
-    }, [named]);
+    }, [scopeType, scopeId, named]);
 
     const learn = (option: WafPrincipalOption): void =>
         setOptions((held) => mergeOptions(held ?? [], [option]));

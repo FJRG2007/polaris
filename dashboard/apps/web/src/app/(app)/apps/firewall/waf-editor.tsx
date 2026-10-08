@@ -429,6 +429,7 @@ export function WafEditor({
     if (view.kind === "login") {
         return (
             <LoginRulePage
+                scope={{ scopeType, scopeId }}
                 required={saved.requireLogin}
                 requiredAbove={inherited?.requireLogin ?? false}
                 admitted={saved.loginAllowPrincipals}

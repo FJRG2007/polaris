@@ -97,6 +97,48 @@ describe("usePagedList", () => {
         expect(result.current.items).toEqual(["a"]);
         expect(result.current.hasMore).toBe(true);
     });
+
+    it("drops the old search's rows when the new one fails, and retries the new one", async () => {
+        let failing = true;
+        const load = vi.fn(async (cursor: string | null, params: Params) =>
+            params.query === "an" && failing ? { error: "nope" } : { items: [`${params.query}:${cursor}`], next: null }
+        );
+        const first: ListPage<string> = { items: ["a", "b"], next: "p2" };
+        const { result, rerender } = renderHook(({ query }) =>
+            usePagedList<string, Params>({ first, params: { query }, initialParams: { query: "" }, load }), {
+            initialProps: { query: "" }
+        });
+        rerender({ query: "an" });
+        await waitFor(() => expect(result.current.error).toBe("nope"));
+        expect(result.current.items).toEqual([]);
+        expect(result.current.hasMore).toBe(false);
+        act(() => result.current.loadMore());
+        expect(load).toHaveBeenCalledTimes(1);
+        failing = false;
+        act(() => result.current.retry());
+        await waitFor(() => expect(result.current.items).toEqual(["an:null"]));
+        expect(result.current.error).toBeNull();
+        expect(load.mock.calls.map((call) => [call[0], call[1].query])).toEqual([
+            [null, "an"],
+            [null, "an"]
+        ]);
+    });
+
+    it("retries a failed next page from the cursor it failed on", async () => {
+        let failing = true;
+        const load = vi.fn(async (cursor: string | null) =>
+            failing ? { error: "nope" } : { items: [`after-${cursor}`], next: null }
+        );
+        const first: ListPage<string> = { items: ["a"], next: "p2" };
+        const { result } = renderHook(() =>
+            usePagedList<string, Params>({ first, params: { query: "" }, initialParams: { query: "" }, load })
+        );
+        act(() => result.current.loadMore());
+        await waitFor(() => expect(result.current.error).toBe("nope"));
+        failing = false;
+        act(() => result.current.retry());
+        await waitFor(() => expect(result.current.items).toEqual(["a", "after-p2"]));
+    });
 });
 
 describe("VirtualTableBody", () => {

@@ -285,6 +285,11 @@ const namedRefsSchema = z.array(z.string().trim().min(1).max(80)).max(MAX_NAMED)
 
 const principalSearchSchema = z.string().trim().max(120);
 
+const scopeSchema = z.object({
+    scopeType: z.enum(core.WAF_SCOPE_TYPES),
+    scopeId: z.string().max(80)
+});
+
 /** The ids of one kind among stored refs, as uuids - anything else names nobody. */
 function idsOf(refs: readonly string[], type: WafPrincipalType): string[] {
     const ids = refs
@@ -306,19 +311,30 @@ function idsOf(refs: readonly string[], type: WafPrincipalType): string[] {
  * used to return was every account's name and email address, to anybody who could
  * deploy.
  *
- * `named` are the refs already stored in the rule on screen. Those are resolved
- * whoever they are, because the rule is the caller's to edit and an entry they
- * cannot read is one they cannot remove; a person outside the caller's reach is
- * named without their email address.
+ * `scope` is the rule on screen. The entries stored in it are resolved whoever
+ * they are, because the rule is the caller's to edit and an entry they cannot
+ * read is one they cannot remove; a person outside the caller's reach is named
+ * without their email address. They are read from the stored rule, after the
+ * same ownership check that guards reading it, and never taken from the
+ * request - ids sent by the browser would name anybody on the instance.
  */
-export async function listWafPrincipalsAction(named: string[] = []): Promise<{
+export async function listWafPrincipalsAction(scope?: {
+    scopeType: WafScopeType;
+    scopeId: string;
+}): Promise<{
     principals?: WafPrincipalOption[];
     error?: string;
 }> {
     const user = await requirePermission("deploy.manage");
-    const refs = namedRefsSchema.safeParse(named);
-    if (!refs.success) return { error: await say("errors.directory") };
+    const where = scopeSchema.optional().safeParse(scope);
+    if (!where.success) return { error: await say("errors.directory") };
+    if (where.data && OPERATOR_SCOPES.has(where.data.scopeType)) await requirePermission("system.manage");
     try {
+        const stored = where.data ? await getWafRule(user.id, where.data.scopeType, where.data.scopeId) : null;
+        const refs = namedRefsSchema.safeParse(
+            stored ? [...stored.loginAllowPrincipals, ...stored.loginDenyPrincipals].map((grant) => grant.ref) : []
+        );
+        if (!refs.success) return { error: await say("errors.directory") };
         const mine = user.isAdmin ? {} : { members: { some: { userId: user.id } } };
         const [roles, groups, namedRoles, namedGroups, namedUsers] = await Promise.all([
             prisma.role.findMany({

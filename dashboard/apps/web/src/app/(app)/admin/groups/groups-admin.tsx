@@ -431,7 +431,7 @@ function GroupDialog({
                     ) : roster.error ? (
                         <p className="flex items-center justify-center gap-2 py-2 text-xs text-muted-foreground">
                             {t("users.directory.loadFailed")}
-                            <Button size="sm" variant="ghost" onClick={roster.loadMore}>
+                            <Button size="sm" variant="ghost" onClick={roster.retry}>
                                 {t("users.directory.retry")}
                             </Button>
                         </p>
