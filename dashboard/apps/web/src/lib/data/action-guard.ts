@@ -11,6 +11,7 @@
 
 import { dataText } from "./words";
 import { DataConnectionError } from "./connections";
+import { driverRefusal } from "./driver-refusal";
 import { DataRequestError, ReadOnlyError } from "./driver";
 import { unstable_rethrow } from "next/navigation";
 import { getTranslations } from "@/lib/i18n/request";
@@ -34,6 +35,10 @@ export async function guardData<T>(
         if (spoken) return { error: dataText(t, (caught as Error).message) };
         if (spokenToo(caught)) return { error: dataText(t, (caught as Error).message) };
         console.error("databases: an action failed", caught);
+        // A database turning the connection away is the reader's to fix - a wrong
+        // password, a wrong name - and is said by its code, never its text.
+        const refused = driverRefusal(caught);
+        if (refused) return { error: dataText(t, refused) };
         return { error: t("refusals.generic") };
     }
 }

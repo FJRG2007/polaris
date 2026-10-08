@@ -10,6 +10,7 @@
  */
 
 import type { NamespaceKey, NamespaceTranslator } from "@/lib/i18n/types";
+import { DRIVER_REFUSALS } from "./driver-refusal";
 
 type Words = NamespaceTranslator<"databases">;
 type Key = NamespaceKey<"databases">;
@@ -121,6 +122,18 @@ const EXACT: Readonly<Record<string, Key>> = {
     "That table has no columns to read.": "refusals.noColumns",
     "No such column to order by.": "refusals.noOrderColumn",
     "That key is not there any more.": "refusals.keyGone",
+    // A database turning a connection away (driver-refusal.ts).
+    [DRIVER_REFUSALS.credentials]: "refusals.driverCredentials",
+    [DRIVER_REFUSALS.notAllowed]: "refusals.driverNotAllowed",
+    [DRIVER_REFUSALS.noDatabase]: "refusals.driverNoDatabase",
+    [DRIVER_REFUSALS.noAccess]: "refusals.driverNoAccess",
+    [DRIVER_REFUSALS.tooMany]: "refusals.driverTooMany",
+    [DRIVER_REFUSALS.starting]: "refusals.driverStarting",
+    [DRIVER_REFUSALS.refused]: "refusals.driverRefused",
+    [DRIVER_REFUSALS.timeout]: "refusals.driverTimeout",
+    [DRIVER_REFUSALS.unknownHost]: "refusals.driverUnknownHost",
+    [DRIVER_REFUSALS.closed]: "refusals.driverClosed",
+    [DRIVER_REFUSALS.noTls]: "refusals.driverNoTls",
     "That did not work. Nothing was changed.": "refusals.generic",
     "Postgres only records this with the pg_stat_statements extension installed. Ask whoever runs this database to add it.":
         "insights.noPgStatStatements",
