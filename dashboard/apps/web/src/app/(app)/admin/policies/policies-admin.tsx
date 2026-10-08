@@ -12,6 +12,7 @@ import { useRouter } from "next/navigation";
 import { ChevronDown, Plus, Trash2, X } from "lucide-react";
 import { Badge, Button, Card, CardBody, CardHeader, CardTitle, Input, Select } from "@polaris/ui";
 import { JsonEditor, JsonView, prettyJson } from "@/components/json-view";
+import { PeoplePicker } from "@/components/people-picker";
 import type { NamespaceTranslator } from "@/lib/i18n/types";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import {
@@ -19,6 +20,7 @@ import {
     createPolicyAction,
     deletePolicyAction,
     detachPolicyAction,
+    findPolicyPeopleAction,
     updatePolicyAction
 } from "./actions";
 
@@ -313,6 +315,23 @@ function PolicyCard({
                         {t("policies.card.attach")}
                     </Button>
                 </div>
+                {/* People are found by name rather than listed - a deployment's
+                    directory is no select. Picking one attaches at once, as the
+                    chips above detach at once. */}
+                <PeoplePicker
+                    picked={[]}
+                    label={t("policies.card.attachPerson")}
+                    exclude={policy.attachments
+                        .filter((attachment) => attachment.principalType === "user")
+                        .map((attachment) => attachment.principalId)}
+                    search={findPolicyPeopleAction}
+                    onChange={(picked) => {
+                        if (disabled) return;
+                        for (const person of picked) {
+                            onMutate(() => attachPolicyAction(policy.id, "user", person.id));
+                        }
+                    }}
+                />
 
                 {open ? (
                     <div className="flex flex-col gap-3 border-t border-border pt-3">

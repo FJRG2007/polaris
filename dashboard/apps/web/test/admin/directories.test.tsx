@@ -18,7 +18,15 @@ vi.mock("@/app/(app)/admin/groups/actions", () => ({
     addGroupMemberAction: async () => undefined,
     createGroupAction: async () => ({}),
     deleteGroupAction: async () => undefined,
-    removeGroupMemberAction: async () => undefined
+    removeGroupMemberAction: async () => undefined,
+    listGroupMembersAction: async () => ({ items: [], next: null }),
+    findGroupsByMemberAction: async () => ({ ids: [] }),
+    findGroupCandidatesAction: async () => ({ results: [] })
+}));
+
+vi.mock("@/app/(app)/admin/organizations/actions", () => ({
+    listOrgDirectoryAction: async () => ({ items: [], next: null }),
+    saveOrganizationPolicyAction: async () => ({})
 }));
 
 const { GroupsAdmin } = await import("@/app/(app)/admin/groups/groups-admin");
@@ -33,11 +41,11 @@ describe("the groups directory", () => {
                     name: "Operations",
                     description: "Runs the boxes",
                     isSystem: false,
-                    members: [{ id: "u1", name: "Ada Lovelace", email: "ada@example.com" }]
+                    memberCount: 1,
+                    members: { items: [{ id: "u1", name: "Ada Lovelace", email: "ada@example.com" }], next: null }
                 },
-                { id: "g2", name: "Everyone", description: null, isSystem: true, members: [] }
+                { id: "g2", name: "Everyone", description: null, isSystem: true, memberCount: 0, members: { items: [], next: null } }
             ]}
-            users={[{ id: "u2", name: "Alan Turing", email: "alan@example.com" }]}
         />)
     );
 
@@ -50,6 +58,24 @@ describe("the groups directory", () => {
 
     it("says how many people are in one without opening it", () => {
         expect(markup).toContain("1 person");
+    });
+
+    it("counts the whole roster when only its first page arrived", () => {
+        const big = renderToStaticMarkup(
+            withMessages(<GroupsAdmin
+                groups={[
+                    {
+                        id: "g3",
+                        name: "Customers",
+                        description: null,
+                        isSystem: false,
+                        memberCount: 4000,
+                        members: { items: [{ id: "u1", name: "Ada Lovelace", email: "ada@example.com" }], next: "u1" }
+                    }
+                ]}
+            />)
+        );
+        expect(big).toContain("4,000 people");
     });
 
     it("marks the group nobody may delete", () => {
@@ -67,17 +93,20 @@ describe("the organizations directory", () => {
         withMessages(<OrganizationsAdmin
             initial={{ creation: "anyone", maxPerUser: 0, maxMembers: 0, maxTeams: 0 }}
             save={async () => ({})}
-            orgs={[
-                {
-                    id: "o1",
-                    slug: "acme",
-                    name: "Acme",
-                    ownerName: "Ada Lovelace",
-                    memberCount: 4,
-                    teamCount: 2,
-                    spaceCount: 1
-                }
-            ]}
+            first={{
+                items: [
+                    {
+                        id: "o1",
+                        slug: "acme",
+                        name: "Acme",
+                        ownerName: "Ada Lovelace",
+                        memberCount: 4,
+                        teamCount: 2,
+                        spaceCount: 1
+                    }
+                ],
+                next: "more"
+            }}
         />)
     );
 
@@ -89,6 +118,10 @@ describe("the organizations directory", () => {
         expect(markup).toContain("@acme");
         expect(markup).toContain("Ada Lovelace");
         expect(markup).toContain(">4<");
+    });
+
+    it("offers the next page without pushing the policy away", () => {
+        expect(markup).toContain("Show more organizations");
     });
 
     it("still asks who may create one", () => {

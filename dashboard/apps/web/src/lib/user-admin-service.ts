@@ -14,7 +14,10 @@
  */
 
 import { recordAudit } from "@/lib/audit-service";
-import { prisma, VISIBLE_USER } from "@polaris/db";
+import { z } from "zod";
+import { prisma, VISIBLE_USER, type Prisma } from "@polaris/db";
+import { after, decodeCursor, MAX_PAGE, pageOf, pageSize, type Page } from "@/lib/pagination/cursor";
+import { DIRECTORY_FILTERS, type DirectoryFilter } from "@/lib/user-directory-filters";
 import { discardAvatars } from "@/lib/avatar-service";
 import { discardPersonalDrive } from "@/lib/personal-drive";
 import { revokeSessionsRefusedByRules } from "@/lib/session-guard";
@@ -91,9 +94,16 @@ const DIRECTORY_SELECT = {
     }
 } as const;
 
-/** The rows the list reads, and the shape the mapper below is written against. */
-function readDirectoryRows() {
-    return prisma.user.findMany({ orderBy: { createdAt: "asc" }, select: DIRECTORY_SELECT });
+/** The rows the list reads, and the shape the mapper below is written against.
+ *  Oldest first, the id breaking ties, which is also the order a page resumes
+ *  in - see `pagination/cursor`. */
+function readDirectoryRows(where: Prisma.UserWhereInput = {}, take?: number) {
+    return prisma.user.findMany({
+        where,
+        orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+        select: DIRECTORY_SELECT,
+        ...(take === undefined ? {} : { take })
+    });
 }
 
 type DirectoryRow = Awaited<ReturnType<typeof readDirectoryRows>>[number];
@@ -130,9 +140,82 @@ function toDirectoryUser(row: DirectoryRow): DirectoryUser {
     };
 }
 
-/** Everyone, with what the directory needs to describe them. */
-export async function listUserDirectory(): Promise<DirectoryUser[]> {
-    return (await readDirectoryRows()).map(toDirectoryUser);
+export const directoryQuerySchema = z.object({
+    cursor: z.string().max(200).nullish(),
+    query: z.string().trim().max(200).default(""),
+    filter: z.enum(DIRECTORY_FILTERS).default("all"),
+    limit: z.number().int().min(1).max(MAX_PAGE).optional()
+});
+
+export type DirectoryQuery = z.input<typeof directoryQuerySchema>;
+
+/** How many people a page of the directory holds. Enough to fill a tall screen
+ *  twice, so the next page is asked for well before anybody reaches the end. */
+export const DIRECTORY_PAGE = 50;
+
+/** A limit an administrator imposed, which a stored empty list is not - the
+ *  columns default to "[]" and are written back that way when cleared. */
+const NO_LIST = "[]";
+
+/** What a cut and a search mean, as a query - so the database narrows the
+ *  directory rather than the page, and a page is always full. */
+function directoryWhere(filter: DirectoryFilter, query: string): Prisma.UserWhereInput {
+    const where: Prisma.UserWhereInput[] = [];
+    if (filter === "admins") where.push({ isAdmin: true });
+    if (filter === "banned") where.push({ bannedAt: { not: null } });
+    if (filter === "limited")
+        where.push({
+            OR: [
+                { accessGroupBindings: { some: { enforced: true } } },
+                {
+                    security: {
+                        is: {
+                            OR: [
+                                { adminCidrs: { not: NO_LIST } },
+                                { adminCountries: { not: NO_LIST } },
+                                { adminContinents: { not: NO_LIST } }
+                            ]
+                        }
+                    }
+                }
+            ]
+        });
+    const needle = query.trim();
+    if (needle) {
+        const contains = { contains: needle, mode: "insensitive" as const };
+        where.push({
+            OR: [
+                { name: contains },
+                { email: contains },
+                { username: contains },
+                { company: contains },
+                { roles: { some: { role: { name: contains } } } },
+                { groups: { some: { group: { name: contains } } } }
+            ]
+        });
+    }
+    return where.length === 0 ? {} : { AND: where };
+}
+
+/**
+ * One page of the directory, narrowed by a cut and a search, and where the next
+ * one starts.
+ *
+ * Narrowed in the database: the directory used to read every account there is
+ * and filter them on screen, which is a page that grows with the instance until
+ * it is the slowest thing in it.
+ */
+export async function listUserDirectoryPage(input: DirectoryQuery = {}): Promise<Page<DirectoryUser>> {
+    const parsed = directoryQuerySchema.parse(input);
+    const size = pageSize(parsed.limit, DIRECTORY_PAGE);
+    const keyset = decodeCursor(parsed.cursor);
+    const filtered = directoryWhere(parsed.filter, parsed.query);
+    const rows = await readDirectoryRows(
+        keyset ? { AND: [filtered, after("createdAt", keyset)] } : filtered,
+        size + 1
+    );
+    const page = pageOf(rows, size, (row) => ({ at: row.createdAt, id: row.id }));
+    return { items: page.items.map(toDirectoryUser), next: page.next };
 }
 
 /** One account, described exactly as the directory describes it. Null when there

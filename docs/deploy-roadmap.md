@@ -181,6 +181,91 @@ Reference clones live in `references/repos/` (coolify, dokploy, openship) - giti
 
 ---
 
+## 12. Scale-out for a customer leaving Vercel (assessed 2026-10-08)
+
+What a team moving a production app off Vercel expects, against what Deploy does
+today. Checked against the code, not the UI copy.
+
+### What exists
+
+- **Copies of a service** - up to `REPLICAS_MAX` (10), on the one server the
+  service is deployed to (`packages/core/src/scaling.ts`). The edge balances over
+  them with health checks and optional sticky sessions.
+- **Autoscaling** - a once-a-minute loop (`lib/deploy/autoscaler.ts`, job
+  `service-autoscale`, under the cron lease) holds an average CPU and optionally
+  requests per copy between a min and max; up after 3 readings, down after 10,
+  idle straight to the minimum, 5-minute cooldown. Compose runtime only: swarm
+  tasks are not read. Streaks live in memory and reset on restart.
+- **Who may run copies** - not a service with a volume, one deployed from its own
+  compose file, or one that keeps previous releases (`singleCopyReason`).
+- **Zero-downtime deploys** - swarm start-first with rollback; compose starts the
+  new release beside the old one and switches the edge after it is healthy and
+  listening, with the exceptions listed in section 6.
+- **Edge** - Traefik per server (per-server edge, so the control plane is not in
+  the request path); CDN only through a Cloudflare-proxied record, purged after a
+  deploy.
+- **Polaris itself** - one compose project: one dashboard container, one
+  Postgres, one Traefik, hostd. The cron scheduler already takes a database
+  lease, but live updates (Chat, Tasks) ride an in-process bus, so a second
+  dashboard container would not see the first one's events.
+
+### Gaps
+
+| # | Gap | Why a Vercel customer needs it | Prio |
+|---|-----|--------------------------------|------|
+| G1 | Copies of one service on several servers | One machine is still one failure and one ceiling; Vercel runs functions across a fleet | P0 |
+| G2 | Load-balanced entry across servers | With G1, a domain has to reach copies on more than one machine and survive one of them going away | P0 |
+| G3 | Autoscaling past one machine, and on swarm | The loop only adds copies on the same host and skips swarm | P1 |
+| G4 | Faster scale-up signal | One-minute polling and 3 readings is 3+ minutes to react; a launch spike is over by then | P1 |
+| G5 | Zero-downtime for every service | Published ports, owner compose files, label-only server edges and volumes still restart in place | P1 |
+| G6 | Edge caching that does not need Cloudflare | Vercel caches static assets and ISR pages at its edge; here only a Cloudflare-proxied record caches | P1 |
+| G7 | Per-customer quotas (copies, services, servers) | A hosting company granting `games.manage` / `deploy.manage` cannot cap what one customer creates (see the tenancy audit) | P1 |
+| G8 | Polaris in more than one container | An update or crash of the one dashboard container stops the control plane; needs a cross-process event transport and sticky or stateless sessions | P2 |
+| G9 | Preview environments per pull request with their own copies and scale-to-zero | Vercel's default workflow | P2 |
+| G10 | Request-level metrics (p95 latency, error rate) as scaling signals | CPU and request count miss slow-but-idle services | P2 |
+
+### Phased plan
+
+Estimates are agent wall-clock for a change of this shape, including tests, not
+calendar time.
+
+1. **Phase 1 - one machine, done properly** (about 1 day)
+   - G4: read the edge's access log incrementally every 15 s instead of a
+     one-minute window; keep the decision pure in `autoscaleStep`.
+   - G3 (swarm half): read swarm task stats by service label and scale with
+     `docker service scale`.
+   - G5: zero-downtime for a published port by moving the port onto the edge
+     (TCP router) so the container no longer owns it.
+   - G7: a quota row per user/org (max services, copies, servers), enforced in
+     the create/scale actions and shown in the UI from the same check.
+2. **Phase 2 - several machines** (about 2-3 days)
+   - G1: a service may name a pool of servers rather than one target; copies are
+     placed round-robin with a spread constraint; the release is built once and
+     pulled on each server from the registry.
+   - G2: the per-server edges each route to their local copies, and the domain's
+     DNS gets one record per server (Cloudflare or Domain Connect, both already
+     integrated), health-checked so a dead server's record is withdrawn; an
+     optional paid load balancer is a later option, not a requirement.
+   - G3 (multi-host half): the autoscaler adds a copy on the least-loaded server
+     of the pool.
+3. **Phase 3 - edge caching** (about 1 day)
+   - G6: Traefik has no HTTP cache, so put a cache in front of chosen routes
+     (a Souin-style middleware or a small Varnish/nginx sidecar per server edge),
+     honouring the app's `Cache-Control`, purged on deploy like the Cloudflare
+     path is today.
+4. **Phase 4 - Polaris itself** (about 2 days)
+   - G8: replace the in-process bus behind Chat and Tasks with Postgres
+     `LISTEN/NOTIFY` (no new dependency), make the autoscaler's streaks
+     persistent, and allow `web` to run with more than one replica behind the
+     existing Traefik.
+5. **Later** - G9 and G10 once the above exist; each is roughly a day.
+
+Nothing here was built in this pass: none of the gaps is both small and
+self-contained enough to land without its phase (a faster signal without the
+incremental log reader would only re-read the whole log more often).
+
+---
+
 ## Suggested order
 
 1. Zero-downtime for services with a published port.

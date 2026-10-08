@@ -547,9 +547,14 @@ export interface InviteListItem {
     createdAt: string;
 }
 
+/** The most pending invitations the people screen lists - the newest. One
+ *  that is older than this many others has long expired. */
+export const INVITES_LISTED = 200;
+
 export async function listInvites(): Promise<InviteListItem[]> {
     const rows = await prisma.invite.findMany({
         where: { acceptedAt: null },
+        take: INVITES_LISTED,
         select: {
             id: true,
             email: true,

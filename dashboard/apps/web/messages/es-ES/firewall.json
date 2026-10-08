@@ -432,8 +432,10 @@
         "refusedAdd": "Añadir a quien rechaza este acceso",
         "manage": "Gestionar roles y grupos",
         "loading": "Cargando a quién se puede elegir",
-        "allNamed": "Ya están todos nombrados",
-        "addPlaceholder": "Añade un rol, grupo o persona...",
+        "allNamed": "No quedan roles ni grupos",
+        "addPlaceholder": "Añade un rol o grupo...",
+        "findAdmitted": "Busca a quien admite este acceso",
+        "findRefused": "Busca a quien rechaza este acceso",
         "option": "{name} ({kind})",
         "types": {
             "user": "usuario",

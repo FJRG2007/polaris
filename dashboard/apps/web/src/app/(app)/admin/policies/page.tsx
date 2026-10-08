@@ -3,6 +3,9 @@
  * an admin author policies and bind them to users, groups, or roles. A policy is
  * a JSON document of allow/deny statements resolved by the @polaris/core engine;
  * the page resolves attachment ids to human labels so the bindings read clearly.
+ *
+ * Only the people a policy is attached to are read - by id - never the whole
+ * directory: somebody to attach is found by name.
  */
 
 import { prisma } from "@polaris/db";
@@ -16,7 +19,7 @@ export const dynamic = "force-dynamic";
 export default async function PoliciesAdminPage() {
     await requireAdmin();
     const t = await getTranslations("admin");
-    const [policies, users, groups, roles] = await Promise.all([
+    const [policies, groups, roles] = await Promise.all([
         prisma.policy.findMany({
             orderBy: { name: "asc" },
             select: {
@@ -28,10 +31,22 @@ export default async function PoliciesAdminPage() {
                 attachments: { select: { principalType: true, principalId: true } }
             }
         }),
-        prisma.user.findMany({ select: { id: true, name: true, email: true }, orderBy: { name: "asc" } }),
         prisma.group.findMany({ select: { id: true, name: true }, orderBy: { name: "asc" } }),
         prisma.role.findMany({ select: { id: true, name: true }, orderBy: { name: "asc" } })
     ]);
+
+    const attachedUserIds = [
+        ...new Set(
+            policies.flatMap((policy) =>
+                policy.attachments
+                    .filter((attachment) => attachment.principalType === "user")
+                    .map((attachment) => attachment.principalId)
+            )
+        )
+    ];
+    const users = attachedUserIds.length
+        ? await prisma.user.findMany({ where: { id: { in: attachedUserIds } }, select: { id: true, name: true } })
+        : [];
 
     // A lookup so an attachment (type + id) can be shown as a readable label.
     const label = new Map<string, string>();
@@ -54,8 +69,7 @@ export default async function PoliciesAdminPage() {
 
     const principals: PrincipalOption[] = [
         ...roles.map((role) => ({ type: "role" as const, id: role.id, label: t("policies.principal.role", { name: role.name }) })),
-        ...groups.map((group) => ({ type: "group" as const, id: group.id, label: t("policies.principal.group", { name: group.name }) })),
-        ...users.map((user) => ({ type: "user" as const, id: user.id, label: `${user.name} (${user.email})` }))
+        ...groups.map((group) => ({ type: "group" as const, id: group.id, label: t("policies.principal.group", { name: group.name }) }))
     ];
 
     return (

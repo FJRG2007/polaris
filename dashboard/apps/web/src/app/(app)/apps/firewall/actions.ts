@@ -32,6 +32,8 @@ import {
     type WafAnomalySettings
 } from "@/lib/waf-anomaly-service";
 import { getTranslations } from "@/lib/i18n/request";
+import { findAccountsAsAdmin, findPeople, SHORTEST_SEARCH } from "@/lib/people-search";
+import { like } from "@/lib/rich-text/mention-service";
 import type { NamespaceKey } from "@/lib/i18n/types";
 
 type FirewallKey = NamespaceKey<"firewall">;
@@ -273,55 +275,129 @@ export interface WafPrincipalOption {
     readonly sublabel?: string;
 }
 
+/** The most stored refs one read resolves - well past any rule anybody writes. */
+const MAX_NAMED = 200;
+
+/** How many people one search offers. */
+const PEOPLE_FOUND = 20;
+
+const namedRefsSchema = z.array(z.string().trim().min(1).max(80)).max(MAX_NAMED);
+
+const principalSearchSchema = z.string().trim().max(120);
+
+/** The ids of one kind among stored refs, as uuids - anything else names nobody. */
+function idsOf(refs: readonly string[], type: WafPrincipalType): string[] {
+    const ids = refs
+        .filter((ref) => ref.startsWith(`${type}:`))
+        .map((ref) => ref.slice(type.length + 1));
+    return ids.filter((id) => z.string().uuid().safeParse(id).success);
+}
+
 /**
- * Who a require-login rule can be narrowed to: every user, group and role on the
- * instance.
+ * The roles and groups a require-login rule can be narrowed to, and the names of
+ * whoever the rule being edited already names.
  *
- * Its own round trip rather than part of the rule, because most scopes never require a
- * login and the ones that do usually admit everybody - so loading the directory with
- * the firewall would make every operator pay for the few who narrow it.
+ * Scoped to the caller. An instance administrator is offered every role and group;
+ * anybody else holding `deploy.manage` - a customer of a hosting company running
+ * their own services on it - is offered the roles and groups they are in, and
+ * nothing that would tell them who else the instance serves. People are never
+ * listed here: they are found by name with `findWafPeopleAction`, which is bounded
+ * and honours each person's own say over who can find them. The directory this
+ * used to return was every account's name and email address, to anybody who could
+ * deploy.
  *
- * Gated on `deploy.manage` like the rule itself and nothing stricter: naming who may
- * reach a service is part of configuring it, and the list is names and email addresses
- * of colleagues on the same instance rather than anything the caller could not already
- * see. It is a read - who exists - and never a write to any of them.
+ * `named` are the refs already stored in the rule on screen. Those are resolved
+ * whoever they are, because the rule is the caller's to edit and an entry they
+ * cannot read is one they cannot remove; a person outside the caller's reach is
+ * named without their email address.
  */
-export async function listWafPrincipalsAction(): Promise<{
+export async function listWafPrincipalsAction(named: string[] = []): Promise<{
     principals?: WafPrincipalOption[];
     error?: string;
 }> {
-    await requirePermission("deploy.manage");
+    const user = await requirePermission("deploy.manage");
+    const refs = namedRefsSchema.safeParse(named);
+    if (!refs.success) return { error: await say("errors.directory") };
     try {
-        const [users, groups, roles] = await Promise.all([
-            prisma.user.findMany({
-                select: { id: true, name: true, email: true },
-                orderBy: { name: "asc" }
+        const mine = user.isAdmin ? {} : { members: { some: { userId: user.id } } };
+        const [roles, groups, namedRoles, namedGroups, namedUsers] = await Promise.all([
+            prisma.role.findMany({
+                where: user.isAdmin ? {} : { users: { some: { userId: user.id } } },
+                select: { id: true, name: true },
+                orderBy: { name: "asc" },
+                take: MAX_NAMED
             }),
-            prisma.group.findMany({ select: { id: true, name: true }, orderBy: { name: "asc" } }),
-            prisma.role.findMany({ select: { id: true, name: true }, orderBy: { name: "asc" } })
+            prisma.group.findMany({
+                where: mine,
+                select: { id: true, name: true },
+                orderBy: { name: "asc" },
+                take: MAX_NAMED
+            }),
+            prisma.role.findMany({
+                where: { id: { in: idsOf(refs.data, "role") } },
+                select: { id: true, name: true }
+            }),
+            prisma.group.findMany({
+                where: { id: { in: idsOf(refs.data, "group") } },
+                select: { id: true, name: true }
+            }),
+            prisma.user.findMany({
+                where: { id: { in: idsOf(refs.data, "user") } },
+                select: { id: true, name: true, email: true }
+            })
         ]);
-        return {
-            principals: [
-                // Roles and groups first: naming one is how an operator writes a rule
-                // that keeps meaning what they meant after the next person joins.
-                ...roles.map((role) => ({
-                    ref: `role:${role.id}`,
-                    type: "role" as const,
-                    label: role.name
-                })),
-                ...groups.map((group) => ({
-                    ref: `group:${group.id}`,
-                    type: "group" as const,
-                    label: group.name
-                })),
-                ...users.map((user) => ({
-                    ref: `user:${user.id}`,
-                    type: "user" as const,
-                    label: user.name,
-                    sublabel: user.email
-                }))
-            ]
-        };
+        const offered = new Map<string, WafPrincipalOption>();
+        // Roles and groups first: naming one is how an operator writes a rule that
+        // keeps meaning what they meant after the next person joins.
+        for (const role of [...roles, ...namedRoles]) {
+            offered.set(`role:${role.id}`, { ref: `role:${role.id}`, type: "role", label: role.name });
+        }
+        for (const group of [...groups, ...namedGroups]) {
+            offered.set(`group:${group.id}`, { ref: `group:${group.id}`, type: "group", label: group.name });
+        }
+        for (const person of namedUsers) {
+            offered.set(`user:${person.id}`, {
+                ref: `user:${person.id}`,
+                type: "user",
+                label: person.name,
+                sublabel: user.isAdmin || person.id === user.id ? person.email : undefined
+            });
+        }
+        return { principals: [...offered.values()] };
+    } catch (caught) {
+        return { error: await failure(caught, "errors.directory") };
+    }
+}
+
+/**
+ * People a require-login rule can name, found by what was typed.
+ *
+ * An administrator finds anybody on the instance, by name, email or username,
+ * since they can already read the whole directory. Anybody else finds whoever
+ * they could find anywhere else in Polaris - the same search the share dialogs
+ * use, which leaves out people who chose not to be found and people either side
+ * has blocked - and themselves. Either way it is a page of matches, never a list
+ * of everybody.
+ */
+export async function findWafPeopleAction(query: string): Promise<{
+    results?: { id: string; name: string }[];
+    error?: string;
+}> {
+    const user = await requirePermission("deploy.manage");
+    const parsed = principalSearchSchema.safeParse(query);
+    if (!parsed.success || parsed.data.length < SHORTEST_SEARCH) return { results: [] };
+    const term = parsed.data;
+    try {
+        if (user.isAdmin) return { results: await findAccountsAsAdmin(term, PEOPLE_FOUND) };
+        const contains = like(term);
+        const [found, self] = await Promise.all([
+            findPeople({ id: user.id }, term, { reachableOnly: false, limit: PEOPLE_FOUND }),
+            prisma.user.findFirst({
+                where: { id: user.id, OR: [{ name: contains }, { email: contains }, { username: contains }] },
+                select: { id: true, name: true }
+            })
+        ]);
+        return { results: self ? [self, ...found.people] : found.people };
     } catch (caught) {
         return { error: await failure(caught, "errors.directory") };
     }

@@ -368,6 +368,10 @@ model User {
     clockAlarms          ClockAlarm[]
     clockTimers          ClockTimer[]
     clockStopwatch       ClockStopwatch?
+
+    // The people directory reads accounts a page at a time, oldest first, and
+    // resumes after the last one it showed - see `pagination/cursor`.
+    @@index([createdAt, id])
 }
 
 // What somebody last searched for, so the panel opens on their own work.
@@ -1087,6 +1091,7 @@ model Invite {
 
     @@index([email])
     @@index([orgId])
+    @@index([acceptedAt, createdAt])
 }
 
 // ---------------------------------------------------------------------------
@@ -5799,6 +5804,7 @@ model Organization {
     transfers DriveTransfer[]
 
     @@index([ownerId])
+    @@index([createdAt, id])
 }
 
 // One organization's photo, kept exactly as an account's is: the bytes live on

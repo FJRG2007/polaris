@@ -432,8 +432,10 @@
         "refusedAdd": "Add someone this login refuses",
         "manage": "Manage roles and groups",
         "loading": "Loading who there is to choose from",
-        "allNamed": "Everyone is already named",
-        "addPlaceholder": "Add a role, group or person...",
+        "allNamed": "No more roles or groups to add",
+        "addPlaceholder": "Add a role or group...",
+        "findAdmitted": "Find a person this login admits",
+        "findRefused": "Find a person this login refuses",
         "option": "{name} ({kind})",
         "types": {
             "user": "user",

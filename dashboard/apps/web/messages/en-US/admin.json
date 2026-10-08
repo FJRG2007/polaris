@@ -1017,9 +1017,8 @@
             "removeTitle": "Remove from the group",
             "removeLabel": "Remove {member} from {group}",
             "addLabel": "Add somebody to this group",
-            "addPlaceholder": "Add a member...",
-            "add": "Add",
-            "everybodyIn": "Everybody on this deployment is already in it.",
+            "alreadyIn": "Already in this group",
+            "showMore": "Show {count} more",
             "delete": "Delete group",
             "done": "Done"
         }
@@ -1915,6 +1914,7 @@
         }
     },
     "organizations": {
+        "showMore": "Show more organizations",
         "page": {
             "title": "Organizations",
             "description": "Work owned by a group rather than by one person. Turn them off entirely, restrict who can start one, or cap how large they get."
@@ -2109,7 +2109,8 @@
             "attachedTo": "Attached to:",
             "nobody": "nobody",
             "detach": "Detach {label}",
-            "attachPlaceholder": "Attach to...",
+            "attachPlaceholder": "Attach to a role or group...",
+            "attachPerson": "Attach to a person",
             "attach": "Attach",
             "description": "Description",
             "document": "{name} document",
@@ -2608,7 +2609,11 @@
             },
             "online": "Online",
             "never": "Never",
-            "country": " - {country}"
+            "country": " - {country}",
+            "loading": "Loading people...",
+            "loadingMore": "Loading more people...",
+            "loadFailed": "The list could not be loaded. Try again in a moment.",
+            "retry": "Try again"
         },
         "menu": {
             "openRecord": "Open their record",

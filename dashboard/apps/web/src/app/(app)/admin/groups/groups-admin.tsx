@@ -13,6 +13,10 @@
  *
  * Membership is the thing an operator actually comes here to change, so the row
  * shows who is in the group and opens on the dialog that changes it.
+ *
+ * A roster arrives a page at a time and the rest is read as the dialog scrolls;
+ * somebody to add is found by name rather than picked from a list of every
+ * account, which on a deployment serving thousands was a select nobody could open.
  */
 
 import { searchItems, type SearchField } from "@polaris/core/search-text";
@@ -21,11 +25,17 @@ import { Avatar, AvatarStack } from "@/components/avatar";
 import { Plus, Search, Trash2, UserPlus, Users, X } from "lucide-react";
 import { PersonName, PersonRow } from "@/components/person-name";
 import { useTranslations } from "@/components/i18n/i18n-provider";
-import { useMemo, useState, useTransition, type FormEvent } from "react";
+import { useEffect, useMemo, useState, useTransition, type FormEvent, type UIEvent } from "react";
+import type { Page } from "@/lib/pagination/cursor";
+import { PeoplePicker } from "@/components/people-picker";
+import { usePagedList } from "@/components/paged-list/use-paged-list";
 import {
     addGroupMemberAction,
     createGroupAction,
     deleteGroupAction,
+    findGroupCandidatesAction,
+    findGroupsByMemberAction,
+    listGroupMembersAction,
     removeGroupMemberAction
 } from "./actions";
 import {
@@ -39,7 +49,6 @@ import {
     DialogHeader,
     DialogTitle,
     Input,
-    Select,
     cn
 } from "@polaris/ui";
 
@@ -53,17 +62,26 @@ export interface GroupRow {
     name: string;
     description: string | null;
     isSystem: boolean;
-    members: UserOption[];
+    /** How many are in it, all told. */
+    memberCount: number;
+    /** The first page of who is in it. */
+    members: Page<UserOption>;
 }
 
 const GROUP_FIELDS: readonly SearchField<GroupRow>[] = [
     { text: (group) => group.name },
     { text: (group) => group.description },
-    { text: (group) => group.members.map((member) => member.name) },
-    { text: (group) => group.members.map((member) => member.email) }
+    { text: (group) => group.members.items.map((member) => member.name) },
+    { text: (group) => group.members.items.map((member) => member.email) }
 ];
 
-export function GroupsAdmin({ groups, users }: { groups: GroupRow[]; users: UserOption[] }) {
+/** How long typing settles before the server is asked who is in what. */
+const SEARCH_SETTLE_MS = 300;
+
+/** How close to the bottom of a roster, in pixels, the next page is asked for. */
+const NEAR_END_PX = 160;
+
+export function GroupsAdmin({ groups }: { groups: GroupRow[] }) {
     const t = useTranslations("admin");
     const router = useRouter();
     const [pending, startTransition] = useTransition();
@@ -78,10 +96,30 @@ export function GroupsAdmin({ groups, users }: { groups: GroupRow[]; users: User
     const open = groups.find((group) => group.id === openId) ?? null;
 
     // By the group's name, what it is for, or who is in it: somebody looking for
-    // the group a person is in types that person's name. Over the rows already on
-    // the page - a deployment's groups are a short list, and asking the server
-    // would be slower than reading it.
-    const shown = useMemo(() => searchItems(groups, query, GROUP_FIELDS), [groups, query]);
+    // the group a person is in types that person's name. Names and descriptions
+    // are matched over the rows already on the page - a deployment's groups are a
+    // short list - and members by the server, since only a page of each roster is
+    // here.
+    const [byMember, setByMember] = useState<{ query: string; ids: Set<string> }>({ query: "", ids: new Set() });
+    useEffect(() => {
+        const term = query.trim();
+        if (term.length < 2) return;
+        let active = true;
+        const timer = setTimeout(() => {
+            void findGroupsByMemberAction(term).then((found) => {
+                if (active) setByMember({ query: term, ids: new Set(found.ids) });
+            });
+        }, SEARCH_SETTLE_MS);
+        return () => {
+            active = false;
+            clearTimeout(timer);
+        };
+    }, [query]);
+    const shown = useMemo(() => {
+        const local = new Set(searchItems(groups, query, GROUP_FIELDS).map((group) => group.id));
+        const members = byMember.query === query.trim() ? byMember.ids : new Set<string>();
+        return groups.filter((group) => local.has(group.id) || members.has(group.id));
+    }, [groups, query, byMember]);
 
     function mutate(run: () => Promise<unknown>) {
         startTransition(async () => {
@@ -113,7 +151,7 @@ export function GroupsAdmin({ groups, users }: { groups: GroupRow[]; users: User
                 <table className="w-full text-sm">
                     <thead className="bg-surface/60 text-left text-xs text-muted-foreground">
                         <tr>
-                            <th className="px-3 py-2 font-medium">{t("groups.table.group")}</th>
+                            <th className="w-full max-w-0 px-3 py-2 font-medium">{t("groups.table.group")}</th>
                             <th className="hidden px-3 py-2 font-medium sm:table-cell">
                                 {t("groups.table.members")}
                             </th>
@@ -150,7 +188,7 @@ export function GroupsAdmin({ groups, users }: { groups: GroupRow[]; users: User
                                     }}
                                     className="cursor-pointer border-t border-border hover:bg-card-hover"
                                 >
-                                    <td className="px-3 py-2">
+                                    <td className="w-full max-w-0 px-3 py-2">
                                         <div className="flex items-center gap-3">
                                             <span className="flex size-9 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
                                                 <Users className="size-4" />
@@ -169,16 +207,16 @@ export function GroupsAdmin({ groups, users }: { groups: GroupRow[]; users: User
                                         </div>
                                     </td>
                                     <td className="hidden px-3 py-2 sm:table-cell">
-                                        {group.members.length === 0 ? (
+                                        {group.memberCount === 0 ? (
                                             <span className="text-xs text-muted-foreground">
                                                 {t("groups.nobodyYet")}
                                             </span>
                                         ) : (
-                                            <AvatarStack people={group.members} />
+                                            <AvatarStack people={group.members.items} total={group.memberCount} />
                                         )}
                                     </td>
                                     <td className="hidden whitespace-nowrap px-3 py-2 text-xs text-muted-foreground lg:table-cell">
-                                        {t("groups.peopleCount", { count: group.members.length })}
+                                        {t("groups.peopleCount", { count: group.memberCount })}
                                     </td>
                                 </tr>
                             ))
@@ -192,7 +230,6 @@ export function GroupsAdmin({ groups, users }: { groups: GroupRow[]; users: User
             {open ? (
                 <GroupDialog
                     group={open}
-                    users={users}
                     disabled={pending}
                     onMutate={mutate}
                     onDelete={() => {
@@ -298,26 +335,38 @@ function NewGroupDialog({ onClose }: { onClose: () => void }) {
     );
 }
 
+/** A page of a roster, as the dialog asks for one. */
+function loadMembers(cursor: string | null, params: { groupId: string }, limit?: number) {
+    return listGroupMembersAction(params.groupId, cursor, limit);
+}
+
 /** One group, opened: who is in it, who can be added, and the way out of it. */
 function GroupDialog({
     group,
-    users,
     disabled,
     onMutate,
     onDelete,
     onClose
 }: {
     group: GroupRow;
-    users: UserOption[];
     disabled: boolean;
     onMutate: (run: () => Promise<unknown>) => void;
     onDelete: () => void;
     onClose: () => void;
 }) {
     const t = useTranslations("admin");
-    const [add, setAdd] = useState("");
-    const memberIds = new Set(group.members.map((member) => member.id));
-    const candidates = users.filter((user) => !memberIds.has(user.id));
+    // The row's first page is this list's first page; a membership change redraws
+    // the screen, which hands down a new one and reads again what is scrolled to.
+    const roster = usePagedList({
+        first: group.members,
+        params: { groupId: group.id },
+        initialParams: { groupId: group.id },
+        load: loadMembers
+    });
+    const onScroll = (event: UIEvent<HTMLDivElement>) => {
+        const box = event.currentTarget;
+        if (box.scrollHeight - box.scrollTop - box.clientHeight < NEAR_END_PX) roster.loadMore();
+    };
 
     return (
         <Dialog open onOpenChange={(next) => !next && onClose()}>
@@ -336,13 +385,13 @@ function GroupDialog({
                     </DialogDescription>
                 </DialogHeader>
 
-                <div className="flex flex-col gap-1">
-                    {group.members.length === 0 ? (
+                <div className="-mx-1 flex max-h-80 flex-col gap-1 overflow-y-auto overscroll-contain px-1" onScroll={onScroll}>
+                    {roster.items.length === 0 ? (
                         <p className="py-2 text-sm text-muted-foreground">
                             {t("groups.dialog.noMembers")}
                         </p>
                     ) : (
-                        group.members.map((member) => (
+                        roster.items.map((member) => (
                             <PersonRow
                                 key={member.id}
                                 personId={member.id}
@@ -375,39 +424,40 @@ function GroupDialog({
                             </PersonRow>
                         ))
                     )}
+                    {roster.loading && roster.items.length > 0 ? (
+                        <p className="py-2 text-center text-xs text-muted-foreground">
+                            {t("users.directory.loadingMore")}
+                        </p>
+                    ) : roster.error ? (
+                        <p className="flex items-center justify-center gap-2 py-2 text-xs text-muted-foreground">
+                            {t("users.directory.loadFailed")}
+                            <Button size="sm" variant="ghost" onClick={roster.loadMore}>
+                                {t("users.directory.retry")}
+                            </Button>
+                        </p>
+                    ) : roster.hasMore ? (
+                        <Button size="sm" variant="ghost" className="self-center" onClick={roster.loadMore}>
+                            {t("groups.dialog.showMore", { count: group.memberCount - roster.items.length })}
+                        </Button>
+                    ) : null}
                 </div>
 
-                {candidates.length > 0 ? (
-                    <div className="mt-3 flex items-center gap-2">
-                        <Select
-                            className="flex-1"
-                            value={add}
-                            onValueChange={setAdd}
-                            aria-label={t("groups.dialog.addLabel")}
-                            placeholder={t("groups.dialog.addPlaceholder")}
-                            options={candidates.map((user) => ({
-                                value: user.id,
-                                label: `${user.name} (${user.email})`
-                            }))}
-                        />
-                        <Button
-                            variant="secondary"
-                            disabled={disabled || !add}
-                            onClick={() => {
-                                if (!add) return;
-                                onMutate(() => addGroupMemberAction(group.id, add));
-                                setAdd("");
+                <div className="mt-3 flex items-center gap-2">
+                    <UserPlus className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+                    <div className="min-w-0 flex-1">
+                        <PeoplePicker
+                            picked={[]}
+                            label={t("groups.dialog.addLabel")}
+                            search={(query) => findGroupCandidatesAction(group.id, query)}
+                            onChange={(picked) => {
+                                if (disabled) return;
+                                for (const person of picked) {
+                                    onMutate(() => addGroupMemberAction(group.id, person.id));
+                                }
                             }}
-                        >
-                            <UserPlus className="size-4" />
-                            {t("groups.dialog.add")}
-                        </Button>
+                        />
                     </div>
-                ) : (
-                    <p className="mt-3 text-xs text-muted-foreground">
-                        {t("groups.dialog.everybodyIn")}
-                    </p>
-                )}
+                </div>
 
                 <DialogFooter className={cn(!group.isSystem && "justify-between")}>
                     {!group.isSystem ? (

@@ -3,16 +3,17 @@
 /**
  * The organizations on this deployment, and the policy they live under.
  *
- * The list is a directory in the same shape as the people one: a search over
- * what is already on the page, one row each, and the row opens the organization
- * itself. It used to be a stack of lines in a card underneath the settings,
- * which put the deployment's actual contents last and made a deployment with
- * twenty organizations unreadable.
+ * The list is a directory in the same shape as the people one: a search the
+ * server answers, one row each, read a page at a time as it scrolls and drawn a
+ * screenful at a time, and the row opens the organization itself. A hosting
+ * company that gives every customer an organization has thousands.
  *
  * The policy sits below it for the same reason it does on the people page: an
  * operator arrives to see what exists far more often than to change what may
  * exist, and the setting is read against the list rather than the other way
- * round.
+ * round. That is also why the next page is asked for with a button rather than
+ * by scrolling: a list that grows whenever its end comes into view would push
+ * the form away every time somebody scrolled down to it.
  *
  * Turning creation off is the one setting people expect to be destructive and it
  * is not, so the form says so: existing organizations keep working, and the list
@@ -24,56 +25,65 @@
  */
 
 import * as core from "@polaris/core";
-import { useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { runAction } from "@/lib/run-action";
 import { OrgAvatar } from "@/components/avatar";
 import { Building2, Search } from "lucide-react";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { Button, Card, CardBody, CardHeader, CardTitle, Input, Select } from "@polaris/ui";
+import type { Page } from "@/lib/pagination/cursor";
+import type { OrgDirectoryRow } from "@/lib/org-directory";
+import { usePagedList } from "@/components/paged-list/use-paged-list";
+import { VirtualTableBody } from "@/components/paged-list/virtual-table-body";
+import { listOrgDirectoryAction } from "./actions";
 
-interface OrgRow {
-    id: string;
-    slug: string;
-    name: string;
-    ownerName: string;
-    memberCount: number;
-    teamCount: number;
-    spaceCount: number;
-}
+type OrgRow = OrgDirectoryRow;
 
 export function OrganizationsAdmin({
     initial,
-    orgs,
+    first,
     save
 }: {
     initial: core.OrganizationPolicy;
-    orgs: OrgRow[];
+    /** The top of the list, unnarrowed, as the server rendered it. */
+    first: Page<OrgRow>;
     save: (input: unknown) => Promise<{ error?: string }>;
 }) {
     return (
         <div className="flex flex-col gap-4">
-            <OrganizationList orgs={orgs} />
+            <OrganizationList first={first} />
             <OrganizationPolicyForm initial={initial} save={save} />
         </div>
     );
 }
 
-const ORG_FIELDS: readonly core.SearchField<OrgRow>[] = [
-    { text: (org) => org.name },
-    { text: (org) => org.slug },
-    { text: (org) => org.ownerName }
-];
+/** How long typing settles before the server is asked. */
+const SEARCH_SETTLE_MS = 300;
+
+/** A row's height before it is measured: the avatar and two lines. */
+const ROW_ESTIMATE = 57;
+
+const UNNARROWED = { query: "" };
+
+function loadOrgs(cursor: string | null, params: { query: string }, limit?: number) {
+    return listOrgDirectoryAction({ cursor, query: params.query, limit });
+}
 
 /** What is living on this deployment right now. */
-function OrganizationList({ orgs }: { orgs: OrgRow[] }) {
+function OrganizationList({ first }: { first: Page<OrgRow> }) {
     const t = useTranslations("admin");
     const router = useRouter();
     const [query, setQuery] = useState("");
+    const [search, setSearch] = useState("");
 
-    // Over the rows already here, by name, handle or owner - an owner's name is
-    // worth finding by either half of it.
-    const shown = useMemo(() => core.searchItems(orgs, query, ORG_FIELDS), [orgs, query]);
+    // By name, handle or owner, asked of the server once typing settles.
+    useEffect(() => {
+        const timer = setTimeout(() => setSearch(query.trim()), SEARCH_SETTLE_MS);
+        return () => clearTimeout(timer);
+    }, [query]);
+    const list = usePagedList({ first, params: { query: search }, initialParams: UNNARROWED, load: loadOrgs });
+    const shown = list.items;
 
     // An administrator is answered as the owner of every organization, so the
     // row opens the real thing rather than a read-only copy of half of it.
@@ -96,7 +106,7 @@ function OrganizationList({ orgs }: { orgs: OrgRow[] }) {
                 <table className="w-full text-sm">
                     <thead className="bg-surface/60 text-left text-xs text-muted-foreground">
                         <tr>
-                            <th className="px-3 py-2 font-medium">
+                            <th className="w-full max-w-0 px-3 py-2 font-medium">
                                 {t("organizations.table.organization")}
                             </th>
                             <th className="hidden px-3 py-2 font-medium sm:table-cell">
@@ -113,27 +123,63 @@ function OrganizationList({ orgs }: { orgs: OrgRow[] }) {
                             </th>
                         </tr>
                     </thead>
-                    <tbody>
-                        {shown.length === 0 ? (
+                    {shown.length === 0 ? (
+                        <tbody>
                             <tr>
                                 <td
                                     colSpan={5}
                                     className="px-3 py-8 text-center text-muted-foreground"
                                 >
-                                    {orgs.length === 0 ? (
+                                    {list.loading ? (
+                                        t("users.directory.loading")
+                                    ) : list.error ? (
+                                        t("users.directory.loadFailed")
+                                    ) : search ? (
+                                        t("organizations.empty.noMatch")
+                                    ) : (
                                         <span className="flex items-center justify-center gap-2">
                                             <Building2 className="size-4 shrink-0" />
                                             {t("organizations.empty.none")}
                                         </span>
-                                    ) : (
-                                        t("organizations.empty.noMatch")
                                     )}
                                 </td>
                             </tr>
-                        ) : (
-                            shown.map((org) => (
+                        </tbody>
+                    ) : (
+                        <VirtualTableBody
+                            items={shown}
+                            estimate={ROW_ESTIMATE}
+                            colSpan={5}
+                            getKey={(org) => org.id}
+                            footer={
+                                list.loading || list.error || list.hasMore ? (
+                                    <tr className="border-t border-border">
+                                        <td
+                                            colSpan={5}
+                                            className="px-3 py-3 text-center text-xs text-muted-foreground"
+                                        >
+                                            {list.error ? (
+                                                <span className="inline-flex items-center gap-2">
+                                                    {t("users.directory.loadFailed")}
+                                                    <Button size="sm" variant="ghost" onClick={list.loadMore}>
+                                                        {t("users.directory.retry")}
+                                                    </Button>
+                                                </span>
+                                            ) : list.loading ? (
+                                                t("users.directory.loadingMore")
+                                            ) : (
+                                                <Button size="sm" variant="ghost" onClick={list.loadMore}>
+                                                    {t("organizations.showMore")}
+                                                </Button>
+                                            )}
+                                        </td>
+                                    </tr>
+                                ) : null
+                            }
+                            renderRow={(org, row) => (
                                 <tr
                                     key={org.id}
+                                    {...row}
                                     tabIndex={0}
                                     role="button"
                                     aria-label={t("organizations.open", { name: org.name })}
@@ -146,7 +192,7 @@ function OrganizationList({ orgs }: { orgs: OrgRow[] }) {
                                     }}
                                     className="cursor-pointer border-t border-border hover:bg-card-hover"
                                 >
-                                    <td className="px-3 py-2">
+                                    <td className="w-full max-w-0 px-3 py-2">
                                         <div className="flex items-center gap-3">
                                             <OrgAvatar org={org} size={36} />
                                             <div className="min-w-0">
@@ -177,9 +223,9 @@ function OrganizationList({ orgs }: { orgs: OrgRow[] }) {
                                         {org.spaceCount}
                                     </td>
                                 </tr>
-                            ))
-                        )}
-                    </tbody>
+                            )}
+                        />
+                    )}
                 </table>
             </div>
         </div>

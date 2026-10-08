@@ -5,9 +5,12 @@
  * decides on - who they are, what they may do, whether they are locked out, and
  * when they were last here - and a dialog behind each one for everything else.
  *
- * Search and the filters run over the rows already on the page: an instance's
- * whole staff is a small list, and asking the server again for a substring would
- * be slower than reading it.
+ * Read a page at a time, and narrowed by the database: a search or a cut asks
+ * the server again from the top, and the next page is asked for as the end
+ * comes into view. Only the rows on screen are drawn. It used to read every
+ * account and filter them here, which is a screen that grows with the instance
+ * until it is the slowest one in it - the directory of a host with ten thousand
+ * customers took the whole of that to paint.
  *
  * A right-click on a row carries what an operator came here to do - open the
  * record, walk into the account, shut it, remove it - because the alternative is
@@ -25,17 +28,22 @@ import { RecoveryRequests } from "./recovery-requests";
 import { useConfirm } from "@/components/confirm-dialog";
 import { RelativeTime } from "@/components/relative-time";
 import type { InviteListItem } from "@/lib/invite-service";
+import type { Page } from "@/lib/pagination/cursor";
 import type { DirectoryUser } from "@/lib/user-admin-service";
+import { usePagedList } from "@/components/paged-list/use-paged-list";
+import { VirtualTableBody } from "@/components/paged-list/virtual-table-body";
+import { DIRECTORY_FILTERS, type DirectoryFilter } from "@/lib/user-directory-filters";
 import { viewAsUserAction } from "@/app/(app)/view-as-actions";
 import { useDisplayFormat } from "@/components/display-format";
 import { PersonName, PersonRow } from "@/components/person-name";
 import { useTranslations } from "@/components/i18n/i18n-provider";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { isOnline, OnlineDot, useNow } from "@/components/presence";
 import type { AccessGroupOption } from "@/components/access-rules-editor";
 import type { RecoveryRequestView } from "@/lib/account-recovery-service";
 import {
     deleteUserAction,
+    listUserDirectoryAction,
     revokeInviteAction,
     setContactVerifiedAction,
     unbanUserAction
@@ -68,10 +76,24 @@ import {
     cn
 } from "@polaris/ui";
 
-/** The cuts an operator reaches for; anything finer is what search is for. */
-const FILTERS = ["all", "admins", "limited", "banned"] as const;
+/** How long typing settles before the search asks the server. */
+const SEARCH_SETTLE_MS = 300;
 
-type Filter = (typeof FILTERS)[number];
+/** A row's height before it is measured: the avatar and two lines. */
+const ROW_ESTIMATE = 57;
+
+/** What the list is narrowed by. */
+interface DirectoryParams {
+    readonly query: string;
+    readonly filter: DirectoryFilter;
+}
+
+const UNNARROWED: DirectoryParams = { query: "", filter: "all" };
+
+/** A page, as the list asks for one. */
+function loadDirectory(cursor: string | null, params: DirectoryParams, limit?: number) {
+    return listUserDirectoryAction({ cursor, query: params.query, filter: params.filter, limit });
+}
 
 function hasLimits(user: DirectoryUser): boolean {
     const { enforced } = user;
@@ -84,7 +106,7 @@ function hasLimits(user: DirectoryUser): boolean {
 }
 
 export function UsersAdmin({
-    users,
+    first,
     invites,
     recoveries,
     groups,
@@ -93,7 +115,8 @@ export function UsersAdmin({
     viewerId,
     openUserId
 }: {
-    users: DirectoryUser[];
+    /** The top of the directory, unnarrowed, as the server rendered it. */
+    first: Page<DirectoryUser>;
     invites: InviteListItem[];
     recoveries: RecoveryRequestView[];
     groups: AccessGroupOption[];
@@ -110,7 +133,8 @@ export function UsersAdmin({
     const now = useNow();
     const format = useDisplayFormat();
     const [query, setQuery] = useState("");
-    const [filter, setFilter] = useState<Filter>("all");
+    const [search, setSearch] = useState("");
+    const [filter, setFilter] = useState<DirectoryFilter>("all");
     const [inviting, setInviting] = useState(false);
     const [confirm, confirmElement] = useConfirm();
     /** Who is being shut out. Held here rather than in the row's own menu: the
@@ -216,29 +240,97 @@ export function UsersAdmin({
         [confirm, router, t]
     );
 
-    const shown = useMemo(() => {
-        const needle = query.trim().toLowerCase();
-        return users.filter((user) => {
-            if (filter === "admins" && !user.isAdmin) return false;
-            if (filter === "banned" && !user.banned) return false;
-            if (filter === "limited" && !hasLimits(user)) return false;
-            if (!needle) return true;
-            return [
-                user.name,
-                user.email,
-                user.username,
-                user.company,
-                ...user.roles,
-                ...user.groups
-            ]
-                .filter((value): value is string => Boolean(value))
-                .some((value) => value.toLowerCase().includes(needle));
-        });
-    }, [users, query, filter]);
+    // Typing settles before the server is asked, so a name is one request
+    // rather than one per letter.
+    useEffect(() => {
+        const timer = setTimeout(() => setSearch(query.trim()), SEARCH_SETTLE_MS);
+        return () => clearTimeout(timer);
+    }, [query]);
+
+    const list = usePagedList({
+        first,
+        params: { query: search, filter },
+        initialParams: UNNARROWED,
+        load: loadDirectory
+    });
+    const shown = list.items;
+    const narrowed = search !== "" || filter !== "all";
 
     return (
         <div className="flex flex-col gap-4">
             <RecoveryRequests requests={recoveries} />
+            {error && (
+                <p role="alert" className="text-sm text-danger">
+                    {error}
+                </p>
+            )}
+
+            {/* Above the directory, which loads more as it is scrolled and so has
+                no end to put anything under. Absent when there is nothing to say. */}
+            {invites.length > 0 || !canSendMail ? (
+                <Card>
+                    <CardBody className="flex flex-col gap-3">
+                        <div>
+                            <h2 className="text-sm font-medium">{t("users.invites.title")}</h2>
+                            <p className="text-xs text-muted-foreground">{t("users.invites.hint")}</p>
+                        </div>
+                        {invites.length === 0 ? (
+                            <p className="text-sm text-muted-foreground">{t("users.invites.none")}</p>
+                        ) : (
+                            invites.map((invite) => (
+                                <div
+                                    key={invite.id}
+                                    className="flex items-center justify-between gap-3 border-t border-border pt-3 first:border-t-0 first:pt-0"
+                                >
+                                    <div className="min-w-0">
+                                        <p className="flex flex-wrap items-center gap-1.5 text-sm">
+                                            <span className="truncate">{invite.email}</span>
+                                            <Badge>{t(`users.methods.${invite.method}`)}</Badge>
+                                            {invite.role ? <Badge>{invite.role}</Badge> : null}
+                                            {invite.needsPassword ? (
+                                                <Badge variant="warning">{t("users.invites.oneTimePassword")}</Badge>
+                                            ) : null}
+                                            {invite.restricted ? (
+                                                <Badge variant="warning">{t("users.invites.limited")}</Badge>
+                                            ) : null}
+                                        </p>
+                                        <p className="text-xs text-muted-foreground">
+                                            {invite.sentAt
+                                                ? t("users.invites.expiresEmailed", {
+                                                      expires: format.dateTime(invite.expiresAt),
+                                                      sent: format.dateTime(invite.sentAt)
+                                                  })
+                                                : t("users.invites.expires", {
+                                                      expires: format.dateTime(invite.expiresAt)
+                                                  })}
+                                        </p>
+                                    </div>
+                                    <Button
+                                        size="icon"
+                                        variant="ghost"
+                                        aria-label={t("users.invites.revokeLabel", { email: invite.email })}
+                                        title={t("users.invites.revoke")}
+                                        onClick={() =>
+                                            void revokeInviteAction(invite.id).then(() =>
+                                                router.refresh()
+                                            )
+                                        }
+                                    >
+                                        <Trash2 className="size-4" />
+                                    </Button>
+                                </div>
+                            ))
+                        )}
+                        {!canSendMail ? (
+                            <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                                <Mail className="size-3.5" />
+                                {t("users.invites.noMail")}
+                            </p>
+                        ) : null}
+                    </CardBody>
+                </Card>
+            ) : null}
+
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
                 <div className="relative flex-1">
                     <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
@@ -254,8 +346,8 @@ export function UsersAdmin({
                     className="sm:w-48"
                     aria-label={t("users.directory.filterLabel")}
                     value={filter}
-                    onValueChange={(value) => setFilter(value as Filter)}
-                    options={FILTERS.map((value) => ({ value, label: t(`users.filters.${value}`) }))}
+                    onValueChange={(value) => setFilter(value as DirectoryFilter)}
+                    options={DIRECTORY_FILTERS.map((value) => ({ value, label: t(`users.filters.${value}`) }))}
                 />
                 <Button onClick={() => setInviting(true)}>
                     <UserPlus className="size-4" />
@@ -267,7 +359,7 @@ export function UsersAdmin({
                 <table className="w-full text-sm">
                     <thead className="bg-surface/60 text-left text-xs text-muted-foreground">
                         <tr>
-                            <th className="px-3 py-2 font-medium">{t("users.directory.columns.person")}</th>
+                            <th className="w-full max-w-0 px-3 py-2 font-medium">{t("users.directory.columns.person")}</th>
                             <th className="hidden px-3 py-2 font-medium sm:table-cell">
                                 {t("users.directory.columns.access")}
                             </th>
@@ -279,23 +371,56 @@ export function UsersAdmin({
                             </th>
                         </tr>
                     </thead>
-                    <tbody>
-                        {shown.length === 0 ? (
+                    {shown.length === 0 ? (
+                        <tbody>
                             <tr>
                                 <td
                                     colSpan={4}
                                     className="px-3 py-8 text-center text-muted-foreground"
                                 >
-                                    {users.length === 0
-                                        ? t("users.directory.empty")
-                                        : t("users.directory.noMatch")}
+                                    {list.loading
+                                        ? t("users.directory.loading")
+                                        : list.error
+                                          ? t("users.directory.loadFailed")
+                                          : narrowed
+                                            ? t("users.directory.noMatch")
+                                            : t("users.directory.empty")}
                                 </td>
                             </tr>
-                        ) : (
-                            shown.map((user) => (
+                        </tbody>
+                    ) : (
+                        <VirtualTableBody
+                            items={shown}
+                            estimate={ROW_ESTIMATE}
+                            colSpan={4}
+                            getKey={(user) => user.id}
+                            onNearEnd={list.loadMore}
+                            footer={
+                                list.loading || list.error ? (
+                                    <tr className="border-t border-border">
+                                        <td
+                                            colSpan={4}
+                                            className="px-3 py-3 text-center text-xs text-muted-foreground"
+                                        >
+                                            {list.error ? (
+                                                <span className="inline-flex items-center gap-2">
+                                                    {t("users.directory.loadFailed")}
+                                                    <Button size="sm" variant="ghost" onClick={list.loadMore}>
+                                                        {t("users.directory.retry")}
+                                                    </Button>
+                                                </span>
+                                            ) : (
+                                                t("users.directory.loadingMore")
+                                            )}
+                                        </td>
+                                    </tr>
+                                ) : null
+                            }
+                            renderRow={(user, row) => (
                                 <ContextMenu key={user.id}>
                                     <ContextMenuTrigger asChild>
                                 <tr
+                                    {...row}
                                     tabIndex={0}
                                     role="button"
                                     aria-label={t("users.directory.open", { name: user.name })}
@@ -311,7 +436,7 @@ export function UsersAdmin({
                                         user.banned && "opacity-60"
                                     )}
                                 >
-                                    <td className="px-3 py-2">
+                                    <td className="w-full max-w-0 px-3 py-2">
                                         {/* The plate goes on this rather than on
                                             the row: a table row painted edge to
                                             edge is a band across the whole
@@ -322,10 +447,12 @@ export function UsersAdmin({
                                         >
                                             <Avatar person={user} size={36} />
                                             <div className="min-w-0">
-                                                <p className="flex items-center gap-1.5 truncate font-medium">
-                                                    <PersonName id={user.id} name={user.name} />
+                                                <p className="flex items-center gap-1.5 font-medium" title={user.name}>
+                                                    <span className="min-w-0 truncate">
+                                                        <PersonName id={user.id} name={user.name} />
+                                                    </span>
                                                     {user.id === viewerId ? (
-                                                        <span className="text-xs text-muted-foreground">
+                                                        <span className="shrink-0 text-xs text-muted-foreground">
                                                             {t("users.directory.you")}
                                                         </span>
                                                     ) : null}
@@ -474,79 +601,11 @@ export function UsersAdmin({
                                         )}
                                     </ContextMenuContent>
                                 </ContextMenu>
-                            ))
-                        )}
-                    </tbody>
+                            )}
+                        />
+                    )}
                 </table>
             </div>
-
-            <Card>
-                <CardBody className="flex flex-col gap-3">
-                    <div>
-                        <h2 className="text-sm font-medium">{t("users.invites.title")}</h2>
-                        <p className="text-xs text-muted-foreground">{t("users.invites.hint")}</p>
-                    </div>
-                    {invites.length === 0 ? (
-                        <p className="text-sm text-muted-foreground">{t("users.invites.none")}</p>
-                    ) : (
-                        invites.map((invite) => (
-                            <div
-                                key={invite.id}
-                                className="flex items-center justify-between gap-3 border-t border-border pt-3 first:border-t-0 first:pt-0"
-                            >
-                                <div className="min-w-0">
-                                    <p className="flex flex-wrap items-center gap-1.5 text-sm">
-                                        <span className="truncate">{invite.email}</span>
-                                        <Badge>{t(`users.methods.${invite.method}`)}</Badge>
-                                        {invite.role ? <Badge>{invite.role}</Badge> : null}
-                                        {invite.needsPassword ? (
-                                            <Badge variant="warning">{t("users.invites.oneTimePassword")}</Badge>
-                                        ) : null}
-                                        {invite.restricted ? (
-                                            <Badge variant="warning">{t("users.invites.limited")}</Badge>
-                                        ) : null}
-                                    </p>
-                                    <p className="text-xs text-muted-foreground">
-                                        {invite.sentAt
-                                            ? t("users.invites.expiresEmailed", {
-                                                  expires: format.dateTime(invite.expiresAt),
-                                                  sent: format.dateTime(invite.sentAt)
-                                              })
-                                            : t("users.invites.expires", {
-                                                  expires: format.dateTime(invite.expiresAt)
-                                              })}
-                                    </p>
-                                </div>
-                                <Button
-                                    size="icon"
-                                    variant="ghost"
-                                    aria-label={t("users.invites.revokeLabel", { email: invite.email })}
-                                    title={t("users.invites.revoke")}
-                                    onClick={() =>
-                                        void revokeInviteAction(invite.id).then(() =>
-                                            router.refresh()
-                                        )
-                                    }
-                                >
-                                    <Trash2 className="size-4" />
-                                </Button>
-                            </div>
-                        ))
-                    )}
-                    {!canSendMail ? (
-                        <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                            <Mail className="size-3.5" />
-                            {t("users.invites.noMail")}
-                        </p>
-                    ) : null}
-                </CardBody>
-            </Card>
-
-            {error && (
-                <p role="alert" className="text-sm text-danger">
-                    {error}
-                </p>
-            )}
 
             <SuspendDialog
                 person={suspending}

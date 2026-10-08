@@ -18,7 +18,10 @@ vi.mock("@/app/(app)/admin/groups/actions", () => ({
     addGroupMemberAction: async () => undefined,
     createGroupAction: async () => ({}),
     deleteGroupAction: async () => undefined,
-    removeGroupMemberAction: async () => undefined
+    removeGroupMemberAction: async () => undefined,
+    listGroupMembersAction: async () => ({ items: [], next: null }),
+    findGroupsByMemberAction: async () => ({ ids: [] }),
+    findGroupCandidatesAction: async () => ({ results: [] })
 }));
 vi.mock("@/app/(app)/admin/roles/actions", () => ({
     createRoleAction: async () => ({}),
@@ -26,6 +29,11 @@ vi.mock("@/app/(app)/admin/roles/actions", () => ({
     setRolePermissionsAction: async () => ({})
 }));
 vi.mock("@/app/(app)/view-as-actions", () => ({ viewAsRoleAction: async () => ({}) }));
+
+vi.mock("@/app/(app)/admin/organizations/actions", () => ({
+    listOrgDirectoryAction: async () => ({ items: [], next: null }),
+    saveOrganizationPolicyAction: async () => ({})
+}));
 
 const { GroupsAdmin } = await import("@/app/(app)/admin/groups/groups-admin");
 const { RolesAdmin } = await import("@/app/(app)/admin/roles/roles-admin");
@@ -41,13 +49,16 @@ describe("the groups directory in Spanish", () => {
                         name: "Operations",
                         description: null,
                         isSystem: true,
-                        members: [
-                            { id: "u1", name: "Ada Lovelace", email: "ada@example.com" },
-                            { id: "u2", name: "Alan Turing", email: "alan@example.com" }
-                        ]
+                        memberCount: 2,
+                        members: {
+                            items: [
+                                { id: "u1", name: "Ada Lovelace", email: "ada@example.com" },
+                                { id: "u2", name: "Alan Turing", email: "alan@example.com" }
+                            ],
+                            next: null
+                        }
                     }
                 ]}
-                users={[]}
             />,
             "es-ES"
         )
@@ -113,7 +124,7 @@ describe("the organizations directory in Spanish", () => {
                     invitesPerHour: 20
                 }}
                 save={async () => ({})}
-                orgs={[]}
+                first={{ items: [], next: null }}
             />,
             "es-ES"
         )

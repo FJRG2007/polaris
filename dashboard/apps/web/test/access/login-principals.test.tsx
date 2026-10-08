@@ -16,6 +16,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { withMessages } from "../setup/i18n";
 
 vi.mock("../../src/app/(app)/apps/firewall/actions", () => ({
+    findWafPeopleAction: async () => ({ results: [] }),
     listWafPrincipalsAction: async () => ({
         principals: [
             { ref: "group:ops", type: "group", label: "Operations" },
