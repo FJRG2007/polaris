@@ -29,12 +29,16 @@ const RULE = {
 };
 
 /** Saves that have not answered yet, answered by the test. */
-let pending: Array<{ sent: Record<string, unknown>; answer: (result: { error?: string }) => void }> = [];
+let pending: Array<{
+    sent: Record<string, unknown>;
+    answer: (result: { error?: string }) => void;
+    fail: (reason: Error) => void;
+}> = [];
 let held: typeof RULE = RULE;
 
 const setWafRuleAction = vi.fn(
     (sent: Record<string, unknown>) =>
-        new Promise<{ error?: string }>((answer) => pending.push({ sent, answer }))
+        new Promise<{ error?: string }>((answer, fail) => pending.push({ sent, answer, fail }))
 );
 const getWafRuleAction = vi.fn(async () => ({ rule: held, inherited: null, tor: null }));
 
@@ -96,5 +100,16 @@ describe("a firewall switch", () => {
         pending[0]!.answer({ error: "Saving the firewall failed." });
         await waitFor(() => expect(email.getAttribute("aria-checked")).toBe("true"));
         expect(await screen.findByText("Saving the firewall failed.")).toBeTruthy();
+    });
+
+    it("goes back to what the server holds when the save never answers", async () => {
+        const { email, framing } = await open();
+        fireEvent.click(email);
+        fireEvent.click(framing);
+        pending[0]!.fail(new Error("Failed to fetch"));
+        await waitFor(() => expect(email.getAttribute("aria-checked")).toBe("true"));
+        expect(framing.getAttribute("aria-checked")).toBe("true");
+        expect(await screen.findByText("Could not save the firewall rule")).toBeTruthy();
+        expect(setWafRuleAction).toHaveBeenCalledOnce();
     });
 });

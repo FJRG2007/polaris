@@ -270,10 +270,12 @@ export function WafEditor({
         try {
             while (onScreen.current && onScreen.current !== confirmed.current) {
                 const sent = onScreen.current;
-                const result = await setWafRuleAction({ scopeType, scopeId, ...sent });
+                const result = await setWafRuleAction({ scopeType, scopeId, ...sent }).catch(() => ({
+                    error: t("errors.save")
+                }));
                 if (result.error) {
-                    const fresh = await getWafRuleAction({ scopeType, scopeId });
-                    const held = fresh.rule ?? confirmed.current;
+                    const fresh = await getWafRuleAction({ scopeType, scopeId }).catch(() => null);
+                    const held = fresh?.rule ?? confirmed.current;
                     confirmed.current = held;
                     onScreen.current = held;
                     setSaved(held);
@@ -285,7 +287,7 @@ export function WafEditor({
         } finally {
             sending.current = false;
         }
-    }, [scopeType, scopeId]);
+    }, [scopeType, scopeId, t]);
 
     /** Apply a change to what is on screen at once, then save it in the background.
      *  The switch moves under the finger; only a refusal moves it back. */
@@ -320,17 +322,18 @@ export function WafEditor({
             setError(null);
             setTor({ count: 0, fetchedAt: null, error: null, ...previous, enabled: on });
             void setTorBlockedAction(on)
+                .catch(() => ({ error: t("errors.tor") }))
                 .then(async (result) => {
                     if (result.error) {
                         setTor(previous);
                         setError(result.error);
                         return;
                     }
-                    const fresh = await getWafRuleAction({ scopeType, scopeId });
-                    if (fresh.tor) setTor(fresh.tor);
+                    const fresh = await getWafRuleAction({ scopeType, scopeId }).catch(() => null);
+                    if (fresh?.tor) setTor(fresh.tor);
                 });
         },
-        [tor, scopeType, scopeId]
+        [tor, scopeType, scopeId, t]
     );
 
     if (!saved) return <LoadingShape />;

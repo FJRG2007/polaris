@@ -94,6 +94,7 @@ export function FirewallInstancePanels({
 }: {
     callerIp?: string | null;
 }) {
+    const t = useTranslations("firewall");
     const [hours, setHours] = useState(24);
     const [data, setData] = useState<Overview | null>(null);
     const [failure, setFailure] = useState<string | null>(null);
@@ -123,20 +124,22 @@ export function FirewallInstancePanels({
             if (!previous) return;
             setFailure(null);
             setData(patch(previous));
-            void run().then((result) => {
-                if (result.error) {
-                    // Put back exactly what was there. Rolling back to a refetch
-                    // instead would also undo anything else changed meanwhile.
-                    setData(previous);
-                    setFailure(result.error);
-                    return;
-                }
-                // Re-read so the figures the server derives - ban counts, the size
-                // of a feed - catch up with the change that was just made.
-                load(hours);
-            });
+            void run()
+                .catch(() => ({ error: t("errors.settingsSave") }))
+                .then((result) => {
+                    if (result.error) {
+                        // Put back exactly what was there. Rolling back to a refetch
+                        // instead would also undo anything else changed meanwhile.
+                        setData(previous);
+                        setFailure(result.error);
+                        return;
+                    }
+                    // Re-read so the figures the server derives - ban counts, the size
+                    // of a feed - catch up with the change that was just made.
+                    load(hours);
+                });
         },
-        [hours, load]
+        [hours, load, t]
     );
 
     /**
