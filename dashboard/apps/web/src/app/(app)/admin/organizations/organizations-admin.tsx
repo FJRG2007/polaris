@@ -82,7 +82,12 @@ function OrganizationList({ first }: { first: Page<OrgRow> }) {
         const timer = setTimeout(() => setSearch(query.trim()), SEARCH_SETTLE_MS);
         return () => clearTimeout(timer);
     }, [query]);
-    const list = usePagedList({ first, params: { query: search }, initialParams: UNNARROWED, load: loadOrgs });
+    const list = usePagedList({
+        first,
+        params: { query: search },
+        initialParams: UNNARROWED,
+        load: loadOrgs
+    });
     const shown = list.items;
 
     // An administrator is answered as the owner of every organization, so the
@@ -166,14 +171,22 @@ function OrganizationList({ first }: { first: Page<OrgRow> }) {
                                             {list.error ? (
                                                 <span className="inline-flex items-center gap-2">
                                                     {t("users.directory.loadFailed")}
-                                                    <Button size="sm" variant="ghost" onClick={list.retry}>
+                                                    <Button
+                                                        size="sm"
+                                                        variant="ghost"
+                                                        onClick={list.retry}
+                                                    >
                                                         {t("users.directory.retry")}
                                                     </Button>
                                                 </span>
                                             ) : list.loading ? (
                                                 t("users.directory.loadingMore")
                                             ) : (
-                                                <Button size="sm" variant="ghost" onClick={list.loadMore}>
+                                                <Button
+                                                    size="sm"
+                                                    variant="ghost"
+                                                    onClick={list.loadMore}
+                                                >
                                                     {t("organizations.showMore")}
                                                 </Button>
                                             )}

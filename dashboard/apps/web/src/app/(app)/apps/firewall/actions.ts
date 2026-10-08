@@ -328,11 +328,18 @@ export async function listWafPrincipalsAction(scope?: {
     const user = await requirePermission("deploy.manage");
     const where = scopeSchema.optional().safeParse(scope);
     if (!where.success) return { error: await say("errors.directory") };
-    if (where.data && OPERATOR_SCOPES.has(where.data.scopeType)) await requirePermission("system.manage");
+    if (where.data && OPERATOR_SCOPES.has(where.data.scopeType))
+        await requirePermission("system.manage");
     try {
-        const stored = where.data ? await getWafRule(user.id, where.data.scopeType, where.data.scopeId) : null;
+        const stored = where.data
+            ? await getWafRule(user.id, where.data.scopeType, where.data.scopeId)
+            : null;
         const refs = namedRefsSchema.safeParse(
-            stored ? [...stored.loginAllowPrincipals, ...stored.loginDenyPrincipals].map((grant) => grant.ref) : []
+            stored
+                ? [...stored.loginAllowPrincipals, ...stored.loginDenyPrincipals].map(
+                      (grant) => grant.ref
+                  )
+                : []
         );
         if (!refs.success) return { error: await say("errors.directory") };
         const mine = user.isAdmin ? {} : { members: { some: { userId: user.id } } };
@@ -366,10 +373,18 @@ export async function listWafPrincipalsAction(scope?: {
         // Roles and groups first: naming one is how an operator writes a rule that
         // keeps meaning what they meant after the next person joins.
         for (const role of [...roles, ...namedRoles]) {
-            offered.set(`role:${role.id}`, { ref: `role:${role.id}`, type: "role", label: role.name });
+            offered.set(`role:${role.id}`, {
+                ref: `role:${role.id}`,
+                type: "role",
+                label: role.name
+            });
         }
         for (const group of [...groups, ...namedGroups]) {
-            offered.set(`group:${group.id}`, { ref: `group:${group.id}`, type: "group", label: group.name });
+            offered.set(`group:${group.id}`, {
+                ref: `group:${group.id}`,
+                type: "group",
+                label: group.name
+            });
         }
         for (const person of namedUsers) {
             offered.set(`user:${person.id}`, {
@@ -409,7 +424,10 @@ export async function findWafPeopleAction(query: string): Promise<{
         const [found, self] = await Promise.all([
             findPeople({ id: user.id }, term, { reachableOnly: false, limit: PEOPLE_FOUND }),
             prisma.user.findFirst({
-                where: { id: user.id, OR: [{ name: contains }, { email: contains }, { username: contains }] },
+                where: {
+                    id: user.id,
+                    OR: [{ name: contains }, { email: contains }, { username: contains }]
+                },
                 select: { id: true, name: true }
             })
         ]);

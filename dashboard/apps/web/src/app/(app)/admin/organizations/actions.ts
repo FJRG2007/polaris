@@ -36,7 +36,9 @@ export async function saveOrganizationPolicyAction(input: unknown): Promise<{ er
 }
 
 /** A page of the organizations list, narrowed by what was typed. */
-export async function listOrgDirectoryAction(input: OrgDirectoryQuery): Promise<Page<OrgDirectoryRow> | { error: string }> {
+export async function listOrgDirectoryAction(
+    input: OrgDirectoryQuery
+): Promise<Page<OrgDirectoryRow> | { error: string }> {
     await requireAdmin();
     const parsed = orgDirectoryQuerySchema.safeParse(input);
     const t = await getTranslations("admin");

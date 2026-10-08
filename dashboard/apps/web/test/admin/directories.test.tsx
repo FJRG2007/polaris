@@ -34,19 +34,31 @@ const { OrganizationsAdmin } = await import("@/app/(app)/admin/organizations/org
 
 describe("the groups directory", () => {
     const markup = renderToStaticMarkup(
-        withMessages(<GroupsAdmin
-            groups={[
-                {
-                    id: "g1",
-                    name: "Operations",
-                    description: "Runs the boxes",
-                    isSystem: false,
-                    memberCount: 1,
-                    members: { items: [{ id: "u1", name: "Ada Lovelace", email: "ada@example.com" }], next: null }
-                },
-                { id: "g2", name: "Everyone", description: null, isSystem: true, memberCount: 0, members: { items: [], next: null } }
-            ]}
-        />)
+        withMessages(
+            <GroupsAdmin
+                groups={[
+                    {
+                        id: "g1",
+                        name: "Operations",
+                        description: "Runs the boxes",
+                        isSystem: false,
+                        memberCount: 1,
+                        members: {
+                            items: [{ id: "u1", name: "Ada Lovelace", email: "ada@example.com" }],
+                            next: null
+                        }
+                    },
+                    {
+                        id: "g2",
+                        name: "Everyone",
+                        description: null,
+                        isSystem: true,
+                        memberCount: 0,
+                        members: { items: [], next: null }
+                    }
+                ]}
+            />
+        )
     );
 
     it("puts each group in a row of one table", () => {
@@ -62,18 +74,25 @@ describe("the groups directory", () => {
 
     it("counts the whole roster when only its first page arrived", () => {
         const big = renderToStaticMarkup(
-            withMessages(<GroupsAdmin
-                groups={[
-                    {
-                        id: "g3",
-                        name: "Customers",
-                        description: null,
-                        isSystem: false,
-                        memberCount: 4000,
-                        members: { items: [{ id: "u1", name: "Ada Lovelace", email: "ada@example.com" }], next: "u1" }
-                    }
-                ]}
-            />)
+            withMessages(
+                <GroupsAdmin
+                    groups={[
+                        {
+                            id: "g3",
+                            name: "Customers",
+                            description: null,
+                            isSystem: false,
+                            memberCount: 4000,
+                            members: {
+                                items: [
+                                    { id: "u1", name: "Ada Lovelace", email: "ada@example.com" }
+                                ],
+                                next: "u1"
+                            }
+                        }
+                    ]}
+                />
+            )
         );
         expect(big).toContain("4,000 people");
     });
@@ -90,24 +109,26 @@ describe("the groups directory", () => {
 
 describe("the organizations directory", () => {
     const markup = renderToStaticMarkup(
-        withMessages(<OrganizationsAdmin
-            initial={{ creation: "anyone", maxPerUser: 0, maxMembers: 0, maxTeams: 0 }}
-            save={async () => ({})}
-            first={{
-                items: [
-                    {
-                        id: "o1",
-                        slug: "acme",
-                        name: "Acme",
-                        ownerName: "Ada Lovelace",
-                        memberCount: 4,
-                        teamCount: 2,
-                        spaceCount: 1
-                    }
-                ],
-                next: "more"
-            }}
-        />)
+        withMessages(
+            <OrganizationsAdmin
+                initial={{ creation: "anyone", maxPerUser: 0, maxMembers: 0, maxTeams: 0 }}
+                save={async () => ({})}
+                first={{
+                    items: [
+                        {
+                            id: "o1",
+                            slug: "acme",
+                            name: "Acme",
+                            ownerName: "Ada Lovelace",
+                            memberCount: 4,
+                            teamCount: 2,
+                            spaceCount: 1
+                        }
+                    ],
+                    next: "more"
+                }}
+            />
+        )
     );
 
     it("lists what exists before the policy about it", () => {

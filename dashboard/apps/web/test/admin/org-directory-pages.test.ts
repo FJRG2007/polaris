@@ -24,9 +24,15 @@ let asked: { where: Record<string, unknown>; take: number; orderBy: unknown }[] 
 vi.mock("@polaris/db", () => ({
     prisma: {
         organization: {
-            findMany: async (query: { where: { AND?: Record<string, unknown>[] }; take: number; orderBy: unknown }) => {
+            findMany: async (query: {
+                where: { AND?: Record<string, unknown>[] };
+                take: number;
+                orderBy: unknown;
+            }) => {
                 asked.push(query);
-                const keyset = query.where.AND?.[1] as { OR: [{ createdAt: { gt: Date } }] } | undefined;
+                const keyset = query.where.AND?.[1] as
+                    | { OR: [{ createdAt: { gt: Date } }] }
+                    | undefined;
                 const from = keyset?.OR[0].createdAt.gt;
                 return orgs.filter((org) => !from || org.createdAt > from).slice(0, query.take);
             }

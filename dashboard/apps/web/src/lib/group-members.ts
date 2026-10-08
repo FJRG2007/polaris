@@ -56,7 +56,10 @@ export const GROUP_PREVIEW = 20;
  *  whether there is another. */
 export function firstMembers(rows: readonly { user: GroupMemberView }[]): Page<GroupMemberView> {
     const items = rows.slice(0, GROUP_PREVIEW).map((row) => row.user);
-    return { items, next: rows.length > GROUP_PREVIEW ? (items[items.length - 1]?.id ?? null) : null };
+    return {
+        items,
+        next: rows.length > GROUP_PREVIEW ? (items[items.length - 1]?.id ?? null) : null
+    };
 }
 
 /** The groups somebody in them is called, for a search by a member's name. */
@@ -86,5 +89,9 @@ export async function findGroupCandidates(
         orderBy: [{ name: "asc" }, { id: "asc" }],
         take: CANDIDATES
     });
-    return found.map((person) => ({ id: person.id, name: person.name, member: person.groups.length > 0 }));
+    return found.map((person) => ({
+        id: person.id,
+        name: person.name,
+        member: person.groups.length > 0
+    }));
 }

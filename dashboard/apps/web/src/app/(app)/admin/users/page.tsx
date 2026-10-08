@@ -57,10 +57,7 @@ export default async function UsersAdminPage({
 
     return (
         <>
-            <PageHeader
-                title={t("users.page.title")}
-                description={t("users.page.description")}
-            />
+            <PageHeader title={t("users.page.title")} description={t("users.page.description")} />
             <UsersAdmin
                 first={users}
                 invites={invites}

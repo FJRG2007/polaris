@@ -133,7 +133,9 @@ describe("the organizations directory in Spanish", () => {
     it("asks the policy questions in Spanish", () => {
         expect(markup).toContain("Quién puede crear una organización");
         expect(markup).toContain("Solo los administradores pueden, y ellos añaden a las personas.");
-        expect(markup).toContain("Las organizaciones solo invitan a personas que ya tienen cuenta.");
+        expect(markup).toContain(
+            "Las organizaciones solo invitan a personas que ya tienen cuenta."
+        );
         expect(markup).toContain("Sin límite.");
         expect(markup).toContain("Incluye al propietario.");
         expect(markup).not.toContain("Who can create an organization");

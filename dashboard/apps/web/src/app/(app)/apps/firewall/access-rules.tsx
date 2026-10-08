@@ -16,7 +16,11 @@ import { PageHeader, Section } from "./page-parts";
 import { ChipList, validAddress } from "./chip-list";
 import type { WafPrincipalGrant } from "@polaris/core";
 import { Ban, ShieldCheck, TriangleAlert } from "lucide-react";
-import { LoginPrincipals, type LoginPrincipalsPatch, type WafPrincipalScope } from "./login-principals";
+import {
+    LoginPrincipals,
+    type LoginPrincipalsPatch,
+    type WafPrincipalScope
+} from "./login-principals";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 
 export function AddressRulesPage({
@@ -63,10 +67,15 @@ export function AddressRulesPage({
                 <div className="grid gap-5 md:grid-cols-2">
                     <div className="flex flex-col gap-2">
                         <div className="flex items-center gap-2 text-sm font-medium">
-                            <ShieldCheck className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+                            <ShieldCheck
+                                className="size-4 shrink-0 text-muted-foreground"
+                                aria-hidden="true"
+                            />
                             {t("addresses.allowed")}
                         </div>
-                        <p className="text-xs text-muted-foreground">{t("addresses.allowedHint")}</p>
+                        <p className="text-xs text-muted-foreground">
+                            {t("addresses.allowedHint")}
+                        </p>
                         <ChipList
                             entries={allow}
                             disabled={disabled}
@@ -87,10 +96,15 @@ export function AddressRulesPage({
                     </div>
                     <div className="flex flex-col gap-2">
                         <div className="flex items-center gap-2 text-sm font-medium">
-                            <Ban className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+                            <Ban
+                                className="size-4 shrink-0 text-muted-foreground"
+                                aria-hidden="true"
+                            />
                             {t("addresses.blocked")}
                         </div>
-                        <p className="text-xs text-muted-foreground">{t("addresses.blockedHint")}</p>
+                        <p className="text-xs text-muted-foreground">
+                            {t("addresses.blockedHint")}
+                        </p>
                         <ChipList
                             entries={deny}
                             accent="deny"
@@ -103,7 +117,11 @@ export function AddressRulesPage({
                     </div>
                 </div>
 
-                {overlap ? <p className="text-xs text-danger">{t("addresses.overlap", { address: overlap })}</p> : null}
+                {overlap ? (
+                    <p className="text-xs text-danger">
+                        {t("addresses.overlap", { address: overlap })}
+                    </p>
+                ) : null}
                 {wouldLockOut ? (
                     <p className="flex items-start gap-1.5 rounded-md border border-warning-edge bg-warning-soft px-3 py-2 text-xs text-warning-ink">
                         <TriangleAlert className="mt-0.5 size-3 shrink-0" aria-hidden="true" />
@@ -166,7 +184,9 @@ export function LoginRulePage({
             <Section title={t("managedPage.whatItDoes")}>
                 <p className="text-sm text-muted-foreground">{t("login.what")}</p>
                 <p className="text-xs text-muted-foreground">
-                    <span className="font-medium text-foreground">{t("managedPage.acrossScopes")}</span>{" "}
+                    <span className="font-medium text-foreground">
+                        {t("managedPage.acrossScopes")}
+                    </span>{" "}
                     {t("login.across")}
                 </p>
             </Section>
@@ -179,12 +199,12 @@ export function LoginRulePage({
                         onChange={(next) => onChange({ requireLogin: next })}
                         aria-label={on ? t("login.stopRequiring") : t("login.require")}
                     />
-                    <span className="text-sm">{on ? t("login.required") : t("login.notRequired")}</span>
+                    <span className="text-sm">
+                        {on ? t("login.required") : t("login.notRequired")}
+                    </span>
                 </div>
                 {requiredAbove ? (
-                    <p className="text-xs text-muted-foreground">
-                        {t("login.aboveNote")}
-                    </p>
+                    <p className="text-xs text-muted-foreground">{t("login.aboveNote")}</p>
                 ) : null}
             </Section>
 
@@ -193,7 +213,13 @@ export function LoginRulePage({
                 people rather than to everybody. */}
             {on ? (
                 <Section title={t("login.admits")} hint={t("login.admitsHint")}>
-                    <LoginPrincipals scope={scope} admitted={admitted} refused={refused} disabled={disabled} onChange={onChange} />
+                    <LoginPrincipals
+                        scope={scope}
+                        admitted={admitted}
+                        refused={refused}
+                        disabled={disabled}
+                        onChange={onChange}
+                    />
                 </Section>
             ) : null}
         </div>

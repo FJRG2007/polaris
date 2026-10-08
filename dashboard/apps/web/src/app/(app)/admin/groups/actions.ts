@@ -17,14 +17,25 @@ import {
     type GroupMemberView
 } from "@/lib/group-members";
 
-export async function createGroupAction(name: string, description?: string): Promise<{ error?: string }> {
+export async function createGroupAction(
+    name: string,
+    description?: string
+): Promise<{ error?: string }> {
     const admin = await requireAdmin();
     try {
         const { id } = await createGroup(name, description);
-        await recordAudit({ actorId: admin.id, action: "group.create", targetType: "group", targetId: id, metadata: { name } });
+        await recordAudit({
+            actorId: admin.id,
+            action: "group.create",
+            targetType: "group",
+            targetId: id,
+            metadata: { name }
+        });
     } catch (caught) {
         const t = await getTranslations("admin");
-        return { error: caught instanceof Error ? caught.message : t("groups.errors.createFailed") };
+        return {
+            error: caught instanceof Error ? caught.message : t("groups.errors.createFailed")
+        };
     }
     revalidatePath("/admin/groups");
     return {};
@@ -36,7 +47,12 @@ export async function deleteGroupAction(id: string): Promise<void> {
     // Whoever was in it, which the cascade has just taken away - see
     // `access-live` for why nobody is named.
     publishAccessChange();
-    await recordAudit({ actorId: admin.id, action: "group.delete", targetType: "group", targetId: id });
+    await recordAudit({
+        actorId: admin.id,
+        action: "group.delete",
+        targetType: "group",
+        targetId: id
+    });
     revalidatePath("/admin/groups");
 }
 
@@ -44,7 +60,13 @@ export async function addGroupMemberAction(groupId: string, userId: string): Pro
     const admin = await requireAdmin();
     await addGroupMember(groupId, userId);
     publishAccessChange({ userIds: [userId] });
-    await recordAudit({ actorId: admin.id, action: "group.member.add", targetType: "group", targetId: groupId, metadata: { userId } });
+    await recordAudit({
+        actorId: admin.id,
+        action: "group.member.add",
+        targetType: "group",
+        targetId: groupId,
+        metadata: { userId }
+    });
     revalidatePath("/admin/groups");
 }
 
@@ -52,7 +74,13 @@ export async function removeGroupMemberAction(groupId: string, userId: string): 
     const admin = await requireAdmin();
     await removeGroupMember(groupId, userId);
     publishAccessChange({ userIds: [userId] });
-    await recordAudit({ actorId: admin.id, action: "group.member.remove", targetType: "group", targetId: groupId, metadata: { userId } });
+    await recordAudit({
+        actorId: admin.id,
+        action: "group.member.remove",
+        targetType: "group",
+        targetId: groupId,
+        metadata: { userId }
+    });
     revalidatePath("/admin/groups");
 }
 

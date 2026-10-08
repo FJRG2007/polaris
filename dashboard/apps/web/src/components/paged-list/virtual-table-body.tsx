@@ -97,7 +97,10 @@ export function VirtualTableBody<T>({
                 </tr>
             ) : null}
             {rows.map((row) =>
-                renderRow(items[row.index]!, { ref: virtualizer.measureElement, "data-index": row.index })
+                renderRow(items[row.index]!, {
+                    ref: virtualizer.measureElement,
+                    "data-index": row.index
+                })
             )}
             {below > 0 ? (
                 <tr aria-hidden="true">

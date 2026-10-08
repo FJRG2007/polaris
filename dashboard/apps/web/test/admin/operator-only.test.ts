@@ -37,11 +37,15 @@ function exported(source: string): Array<{ name: string; body: string }> {
     const starts = [...source.matchAll(/export (?:async )?function (\w+)\(/g)];
     return starts.map((match, index) => ({
         name: match[1]!,
-        body: source.slice(match.index! + match[0].length, starts[index + 1]?.index ?? source.length)
+        body: source.slice(
+            match.index! + match[0].length,
+            starts[index + 1]?.index ?? source.length
+        )
     }));
 }
 
-const label = (path: string) => relative(resolve(__dirname, "../../.."), path).replaceAll("\\", "/");
+const label = (path: string) =>
+    relative(resolve(__dirname, "../../.."), path).replaceAll("\\", "/");
 
 describe("management", () => {
     const admin = join(WEB, "(app)", "admin");
@@ -103,13 +107,19 @@ describe("game servers", () => {
     ]);
 
     it("asks about the server named in every action on one", () => {
-        const actions = files(join(GAMES, "screens"), (path) => /-actions\.ts$|[\\/]actions\.ts$/.test(path));
+        const actions = files(join(GAMES, "screens"), (path) =>
+            /-actions\.ts$|[\\/]actions\.ts$/.test(path)
+        );
         expect(actions.length).toBeGreaterThan(10);
         const open: string[] = [];
         for (const path of actions) {
             for (const action of exported(readFileSync(path, "utf8"))) {
                 if (ASKS_ELSEWHERE.has(action.name)) continue;
-                if (!/\brequire(GameServer|GameServerOwner|Permission|PermissionAny)\(/.test(action.body))
+                if (
+                    !/\brequire(GameServer|GameServerOwner|Permission|PermissionAny)\(/.test(
+                        action.body
+                    )
+                )
                     open.push(`${label(path)}: ${action.name}`);
             }
         }
@@ -120,7 +130,10 @@ describe("game servers", () => {
         // Every list of servers a customer can reach is narrowed to the ids they
         // hold, rather than read for the whole instance and filtered on screen.
         for (const route of ["route.ts", "live/route.ts", "stream/route.ts"]) {
-            const source = readFileSync(join(GAMES, "routes", "api", "apps", "games", route), "utf8");
+            const source = readFileSync(
+                join(GAMES, "routes", "api", "apps", "games", route),
+                "utf8"
+            );
             expect(source, route).toMatch(/reachableInstallIds\(user, "games\.read"\)/);
         }
     });

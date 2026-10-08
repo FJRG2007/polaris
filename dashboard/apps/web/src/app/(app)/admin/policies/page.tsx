@@ -45,14 +45,19 @@ export default async function PoliciesAdminPage() {
         )
     ];
     const users = attachedUserIds.length
-        ? await prisma.user.findMany({ where: { id: { in: attachedUserIds } }, select: { id: true, name: true } })
+        ? await prisma.user.findMany({
+              where: { id: { in: attachedUserIds } },
+              select: { id: true, name: true }
+          })
         : [];
 
     // A lookup so an attachment (type + id) can be shown as a readable label.
     const label = new Map<string, string>();
     for (const user of users) label.set(`user:${user.id}`, user.name);
-    for (const group of groups) label.set(`group:${group.id}`, t("policies.principal.group", { name: group.name }));
-    for (const role of roles) label.set(`role:${role.id}`, t("policies.principal.role", { name: role.name }));
+    for (const group of groups)
+        label.set(`group:${group.id}`, t("policies.principal.group", { name: group.name }));
+    for (const role of roles)
+        label.set(`role:${role.id}`, t("policies.principal.role", { name: role.name }));
 
     const rows: PolicyRow[] = policies.map((policy) => ({
         id: policy.id,
@@ -63,13 +68,23 @@ export default async function PoliciesAdminPage() {
         attachments: policy.attachments.map((attachment) => ({
             principalType: attachment.principalType as PrincipalOption["type"],
             principalId: attachment.principalId,
-            label: label.get(`${attachment.principalType}:${attachment.principalId}`) ?? attachment.principalId
+            label:
+                label.get(`${attachment.principalType}:${attachment.principalId}`) ??
+                attachment.principalId
         }))
     }));
 
     const principals: PrincipalOption[] = [
-        ...roles.map((role) => ({ type: "role" as const, id: role.id, label: t("policies.principal.role", { name: role.name }) })),
-        ...groups.map((group) => ({ type: "group" as const, id: group.id, label: t("policies.principal.group", { name: group.name }) }))
+        ...roles.map((role) => ({
+            type: "role" as const,
+            id: role.id,
+            label: t("policies.principal.role", { name: role.name })
+        })),
+        ...groups.map((group) => ({
+            type: "group" as const,
+            id: group.id,
+            label: t("policies.principal.group", { name: group.name })
+        }))
     ];
 
     return (

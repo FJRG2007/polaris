@@ -263,9 +263,13 @@ function PolicyCard({
             </CardHeader>
             <CardBody className="flex flex-col gap-3">
                 <div className="flex flex-wrap items-center gap-1.5">
-                    <span className="text-xs text-muted-foreground">{t("policies.card.attachedTo")}</span>
+                    <span className="text-xs text-muted-foreground">
+                        {t("policies.card.attachedTo")}
+                    </span>
                     {policy.attachments.length === 0 ? (
-                        <span className="text-xs text-muted-foreground">{t("policies.card.nobody")}</span>
+                        <span className="text-xs text-muted-foreground">
+                            {t("policies.card.nobody")}
+                        </span>
                     ) : (
                         policy.attachments.map((attachment) => (
                             <span
@@ -275,7 +279,9 @@ function PolicyCard({
                                 {attachment.label}
                                 <button
                                     type="button"
-                                    aria-label={t("policies.card.detach", { label: attachment.label })}
+                                    aria-label={t("policies.card.detach", {
+                                        label: attachment.label
+                                    })}
                                     disabled={disabled}
                                     onClick={() =>
                                         onMutate(() =>
@@ -356,13 +362,21 @@ function PolicyCard({
                                 />
                                 {error ? <p className="text-sm text-danger">{error}</p> : null}
                                 <div>
-                                    <Button size="sm" disabled={disabled || unchanged} onClick={onSave}>
+                                    <Button
+                                        size="sm"
+                                        disabled={disabled || unchanged}
+                                        onClick={onSave}
+                                    >
                                         {t("policies.card.save")}
                                     </Button>
                                 </div>
                             </>
                         ) : (
-                            <JsonView value={document} label={t("policies.card.document", { name: policy.name })} className="max-h-96" />
+                            <JsonView
+                                value={document}
+                                label={t("policies.card.document", { name: policy.name })}
+                                className="max-h-96"
+                            />
                         )}
                     </div>
                 ) : null}

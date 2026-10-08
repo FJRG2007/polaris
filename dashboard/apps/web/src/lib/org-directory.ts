@@ -10,7 +10,14 @@
 import { z } from "zod";
 import { prisma, type Prisma } from "@polaris/db";
 import { like } from "@/lib/rich-text/mention-service";
-import { after, decodeCursor, MAX_PAGE, pageOf, pageSize, type Page } from "@/lib/pagination/cursor";
+import {
+    after,
+    decodeCursor,
+    MAX_PAGE,
+    pageOf,
+    pageSize,
+    type Page
+} from "@/lib/pagination/cursor";
 
 export interface OrgDirectoryRow {
     readonly id: string;
@@ -46,7 +53,9 @@ function orgWhere(query: string): Prisma.OrganizationWhereInput {
     };
 }
 
-export async function listOrgDirectoryPage(input: OrgDirectoryQuery = {}): Promise<Page<OrgDirectoryRow>> {
+export async function listOrgDirectoryPage(
+    input: OrgDirectoryQuery = {}
+): Promise<Page<OrgDirectoryRow>> {
     const parsed = orgDirectoryQuerySchema.parse(input);
     const size = pageSize(parsed.limit, ORG_PAGE);
     const keyset = decodeCursor(parsed.cursor);
