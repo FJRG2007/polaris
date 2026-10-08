@@ -38,7 +38,6 @@ the Polaris fleet:
 | `POLARIS_HOSTD_SOCKET` | `/run/polaris/hostd.sock` | Unix socket path (mode 0660). Parent dir is created; a stale socket is unlinked on start. |
 | `POLARIS_HOSTD_ADDR` | _(unset)_ | Optional TCP fallback, e.g. `127.0.0.1:16081`. Bound only when set. |
 | `POLARIS_HOSTD_TOKEN_FILE` | `/run/polaris/hostd.token` | Where the per-run bearer token is written (mode 0600). |
-| `POLARIS_HOSTD_ROOT` | `/` | Allowlist root for `/v1/fs/*`. Paths canonicalizing outside it are rejected. |
 | `POLARIS_HOSTD_MOUNT_ROOT` | `/mnt/polaris` | Allowlist root for mount targets. |
 | `POLARIS_HOSTD_DOCKER_SOCKET` | `/var/run/docker.sock` | Docker Engine socket the `/v1/docker` proxy forwards to. Only this daemon touches it. |
 | `POLARIS_HOSTD_AUTOUPDATE` | `true` | Set to `false` to report auto-update as unavailable and refuse `/v1/update`. |
@@ -55,10 +54,7 @@ All paths are prefixed `/v1`.
 
 | Method | Path | Description |
 |---|---|---|
-| `GET` | `/v1/health` | `{ version, capabilities: { hostFilesystem, nativeMounts, docker, deploy, privateNetworks, privateNames, kubernetes, systemd, autoUpdate } }`. Capabilities are probed from the host on each call. |
-| `GET` | `/v1/fs/<path>` | Stream a file. Honours `Range: bytes=start-end` -> `206 Partial Content`. |
-| `PUT` | `/v1/fs/<path>` | Write the request body to the file (parent dirs created). Body is streamed to disk. |
-| `DELETE` | `/v1/fs/<path>` | Remove the file. |
+| `GET` | `/v1/health` | `{ version, capabilities: { hostFilesystem, nativeMounts, docker, deploy, privateNetworks, privateNames, kubernetes, systemd, autoUpdate } }`. Capabilities are probed from the host on each call. `hostFilesystem` is always `false`: there is no raw host-file API (it was removed; it could reach the whole disk and nothing used it), and the key stays for dashboards that require it. |
 | `POST` | `/v1/mounts` | Body `{ id, kind: "smb"\|"nfs", source, target, options? }`. Mounts under the mount root. `201` with `{ id, mountpoint }`. |
 | `DELETE` | `/v1/mounts/<id>` | Unmount the target created for `<id>`. |
 | `POST` | `/v1/update` | Run the operator-configured update command (`POLARIS_HOSTD_UPDATE_CMD`) detached. `202` `{ status: "started" }`. `403` if auto-update is disabled; `501` if no command is configured. No request input reaches the command. |
@@ -70,8 +66,8 @@ safe, generic message (internal error detail is never leaked).
 
 ### Security properties
 
-- **Path confinement** - `/v1/fs/*` and mount targets are resolved against their
-  allowlist root with two defenses: lexical rejection of `..`/NUL/absolute
+- **Path confinement** - mount targets and deploy paths are resolved against
+  their allowlist root with two defenses: lexical rejection of `..`/NUL/absolute
   components, then canonicalization of the deepest existing ancestor checked to
   remain under the canonical root (which also defeats symlink escapes). Escapes
   -> `403`.

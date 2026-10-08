@@ -61,9 +61,8 @@ fn main() {
         .status();
 
     eprintln!(
-        "polaris-hostd {} starting (root={}, mount_root={}, deploy_root={})",
+        "polaris-hostd {} starting (mount_root={}, deploy_root={})",
         env!("CARGO_PKG_VERSION"),
-        config.root.display(),
         config.mount_root.display(),
         config.deploy_root.display(),
     );

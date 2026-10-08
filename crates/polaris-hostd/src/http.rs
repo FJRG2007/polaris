@@ -6,8 +6,7 @@
 //! header parsing, a percent-decoded target, `Range` support, and a response
 //! whose body may be either an in-memory buffer or a streamed file.
 
-use std::fs::File;
-use std::io::{self, BufRead, Read, Seek, SeekFrom, Write};
+use std::io::{self, BufRead, Read, Write};
 
 /// Maximum size of the request head (request line + headers). Bounds the memory
 /// a single connection can force us to buffer before auth is even checked.
@@ -15,7 +14,7 @@ const MAX_HEAD_BYTES: usize = 64 * 1024;
 
 pub struct Request {
     pub method: String,
-    /// Percent-decoded path, e.g. `/v1/fs/etc/hosts`. Query string stripped.
+    /// Percent-decoded path, e.g. `/v1/docker/containers/json`. Query string stripped.
     pub path: String,
     pub headers: Vec<(String, String)>,
     pub content_length: u64,
@@ -125,39 +124,12 @@ pub fn percent_decode(input: &str) -> String {
     String::from_utf8_lossy(&out).into_owned()
 }
 
-/// A parsed `Range: bytes=start-end` header (single range only).
-pub struct ByteRange {
-    pub start: u64,
-    /// Inclusive end, if the client bounded it.
-    pub end: Option<u64>,
-}
-
-/// Parse a single-range `Range` header value. Returns `None` if absent or not a
-/// form we support (multi-ranges and suffix ranges are declined, not errored).
-pub fn parse_range(value: &str) -> Option<ByteRange> {
-    let spec = value.trim().strip_prefix("bytes=")?;
-    if spec.contains(',') {
-        return None;
-    }
-    let (start, end) = spec.split_once('-')?;
-    let start: u64 = start.trim().parse().ok()?;
-    let end = end.trim();
-    let end = if end.is_empty() {
-        None
-    } else {
-        Some(end.parse().ok()?)
-    };
-    Some(ByteRange { start, end })
-}
-
-/// Response body: an in-memory buffer, a file seeked to the start offset (of
-/// which exactly `len` bytes are sent), or an open-ended reader streamed to the
+/// Response body: an in-memory buffer, or an open-ended reader streamed to the
 /// client until EOF. A `Stream` body has no known length, so it is framed by
 /// connection close (no `Content-Length`) - used for live build/deploy/log output
 /// whose size is not known up front.
 pub enum Body {
     Bytes(Vec<u8>),
-    File { file: File, len: u64 },
     Stream(Box<dyn Read + Send>),
 }
 
@@ -199,10 +171,6 @@ impl Response {
         Self::new(status, reason, Body::Bytes(Vec::new()))
     }
 
-    pub fn file(status: u16, reason: &'static str, file: File, len: u64) -> Self {
-        Self::new(status, reason, Body::File { file, len })
-    }
-
     /// A response whose body is streamed from `reader` until EOF, framed by
     /// connection close. The client reads to the end of the connection.
     pub fn stream(status: u16, reason: &'static str, reader: Box<dyn Read + Send>) -> Self {
@@ -236,7 +204,6 @@ impl Response {
     pub fn write_to<W: Write>(mut self, w: &mut W) -> io::Result<()> {
         let content_length = match &self.body {
             Body::Bytes(b) => Some(b.len() as u64),
-            Body::File { len, .. } => Some(*len),
             Body::Stream(_) => None,
         };
         let mut head = format!("HTTP/1.1 {} {}\r\n", self.status, self.reason);
@@ -252,19 +219,6 @@ impl Response {
 
         match &mut self.body {
             Body::Bytes(b) => w.write_all(b)?,
-            Body::File { file, len } => {
-                let mut remaining = *len;
-                let mut buf = [0u8; 64 * 1024];
-                while remaining > 0 {
-                    let want = remaining.min(buf.len() as u64) as usize;
-                    let n = file.read(&mut buf[..want])?;
-                    if n == 0 {
-                        break;
-                    }
-                    w.write_all(&buf[..n])?;
-                    remaining -= n as u64;
-                }
-            }
             Body::Stream(reader) => {
                 let mut buf = [0u8; 64 * 1024];
                 loop {
@@ -283,25 +237,6 @@ impl Response {
     }
 }
 
-/// Open `path` for a ranged read, seeking to `range.start` and returning the
-/// prepared file plus the number of bytes to send and the total file size.
-pub fn open_ranged(path: &std::path::Path, range: &ByteRange) -> io::Result<(File, u64, u64)> {
-    let mut file = File::open(path)?;
-    let total = file.metadata()?.len();
-    let start = range.start.min(total);
-    let end = match range.end {
-        Some(e) => e.min(total.saturating_sub(1)),
-        None => total.saturating_sub(1),
-    };
-    let len = if total == 0 || end < start {
-        0
-    } else {
-        end - start + 1
-    };
-    file.seek(SeekFrom::Start(start))?;
-    Ok((file, len, total))
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -316,24 +251,12 @@ mod tests {
     }
 
     #[test]
-    fn parse_range_forms() {
-        let r = parse_range("bytes=0-99").unwrap();
-        assert_eq!(r.start, 0);
-        assert_eq!(r.end, Some(99));
-        let r = parse_range("bytes=100-").unwrap();
-        assert_eq!(r.start, 100);
-        assert_eq!(r.end, None);
-        assert!(parse_range("bytes=0-1,2-3").is_none());
-        assert!(parse_range("items=0-1").is_none());
-    }
-
-    #[test]
     fn read_request_parses_head() {
-        let raw = b"PUT /v1/fs/a%20b HTTP/1.1\r\nHost: x\r\nContent-Length: 5\r\nAuthorization: Bearer abc\r\n\r\nhello";
+        let raw = b"PUT /v1/files/a%20b HTTP/1.1\r\nHost: x\r\nContent-Length: 5\r\nAuthorization: Bearer abc\r\n\r\nhello";
         let mut cursor = std::io::Cursor::new(&raw[..]);
         let req = read_request(&mut cursor).unwrap().unwrap();
         assert_eq!(req.method, "PUT");
-        assert_eq!(req.path, "/v1/fs/a b");
+        assert_eq!(req.path, "/v1/files/a b");
         assert_eq!(req.content_length, 5);
         assert_eq!(req.bearer_token(), Some("abc"));
         // The body remains available on the reader for streaming.

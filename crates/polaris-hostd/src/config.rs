@@ -11,7 +11,6 @@ use std::path::PathBuf;
 /// never survives a reboot (the daemon recreates it, and the token, on start).
 const DEFAULT_SOCKET: &str = "/run/polaris/hostd.sock";
 const DEFAULT_TOKEN_FILE: &str = "/run/polaris/hostd.token";
-const DEFAULT_ROOT: &str = "/";
 const DEFAULT_MOUNT_ROOT: &str = "/mnt/polaris";
 const DEFAULT_DOCKER_SOCKET: &str = "/var/run/docker.sock";
 const DEFAULT_DEPLOY_ROOT: &str = "/var/lib/polaris/deploy";
@@ -27,9 +26,6 @@ pub struct Config {
     pub tcp_addr: Option<String>,
     /// Where the freshly generated bearer token is written (mode 0600).
     pub token_file: PathBuf,
-    /// Allowlist root for the `/v1/fs/*` endpoints. Paths canonicalizing
-    /// outside this are rejected with 403.
-    pub root: PathBuf,
     /// Allowlist root for mount targets. Targets outside it are rejected.
     pub mount_root: PathBuf,
     /// Docker Engine API socket the `/v1/docker` proxy forwards to. The web
@@ -65,9 +61,6 @@ impl Config {
             token_file: env("POLARIS_HOSTD_TOKEN_FILE")
                 .map(PathBuf::from)
                 .unwrap_or_else(|| PathBuf::from(DEFAULT_TOKEN_FILE)),
-            root: env("POLARIS_HOSTD_ROOT")
-                .map(PathBuf::from)
-                .unwrap_or_else(|| PathBuf::from(DEFAULT_ROOT)),
             mount_root: env("POLARIS_HOSTD_MOUNT_ROOT")
                 .map(PathBuf::from)
                 .unwrap_or_else(|| PathBuf::from(DEFAULT_MOUNT_ROOT)),
