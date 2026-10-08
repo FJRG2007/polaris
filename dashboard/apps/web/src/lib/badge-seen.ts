@@ -25,6 +25,25 @@ export const BADGE_SCREENS = {
 export type BadgeScreen = keyof typeof BADGE_SCREENS;
 export type BadgeKey = (typeof BADGE_SCREENS)[BadgeScreen];
 
+/**
+ * What somebody said they have seen from the app menu, by the Management entry
+ * it was said about.
+ *
+ * Kept apart from the visit marks above because it is a different act: a visit
+ * clears the badge only for an account that lets it (`badgesClearOnVisit`),
+ * while pressing "mark seen" is the account saying so in as many words, and is
+ * honoured whichever way that switch is set. The same table and the same kind
+ * of mark - the build for the update, a moment for a queue - so a newer build or
+ * a newer report counts again exactly as it does after a visit.
+ */
+export const DISMISSED_KEYS = {
+    reports: "dismissed.admin.reports",
+    cases: "dismissed.admin.cases",
+    update: "dismissed.admin.update"
+} as const;
+
+export type DismissedKey = (typeof DISMISSED_KEYS)[keyof typeof DISMISSED_KEYS];
+
 export function isBadgeScreen(value: unknown): value is BadgeScreen {
     return typeof value === "string" && Object.hasOwn(BADGE_SCREENS, value);
 }
@@ -34,22 +53,34 @@ export function clearsOnVisit(stored: boolean | null | undefined): boolean {
     return stored ?? true;
 }
 
-/** What one account has seen, when opening a screen clears its badge; null when
- *  the account keeps badges until the work is done. */
-export async function seenMarks(
-    userId: string
-): Promise<ReadonlyMap<BadgeKey, string> | null> {
+/** Every mark one account keeps: what its visits saw - null when the account
+ *  keeps badges until the work is done - and what it marked seen from the menu,
+ *  which counts either way. One read of each table. */
+export async function badgeMarks(userId: string): Promise<{
+    readonly seen: ReadonlyMap<string, string> | null;
+    readonly dismissed: ReadonlyMap<string, string>;
+}> {
     const [user, rows] = await Promise.all([
         prisma.user.findUnique({ where: { id: userId }, select: { badgesClearOnVisit: true } }),
         prisma.userBadgeSeen.findMany({ where: { userId }, select: { key: true, mark: true } })
     ]);
-    if (!clearsOnVisit(user?.badgesClearOnVisit)) return null;
-    return new Map(rows.map((row) => [row.key as BadgeKey, row.mark]));
+    const all = new Map(rows.map((row) => [row.key, row.mark]));
+    return { seen: clearsOnVisit(user?.badgesClearOnVisit) ? all : null, dismissed: all };
+}
+
+/** What one account has seen, when opening a screen clears its badge; null when
+ *  the account keeps badges until the work is done. */
+export async function seenMarks(userId: string): Promise<ReadonlyMap<string, string> | null> {
+    return (await badgeMarks(userId)).seen;
 }
 
 /** Record that an account has seen what a screen's badge is about. `mark` is
  *  the announced build for the update, and now for a queue. */
-export async function markSeen(userId: string, key: BadgeKey, mark: string): Promise<void> {
+export async function markSeen(
+    userId: string,
+    key: BadgeKey | DismissedKey,
+    mark: string
+): Promise<void> {
     await prisma.userBadgeSeen.upsert({
         where: { userId_key: { userId, key } },
         update: { mark },

@@ -123,6 +123,7 @@ export function AppSwitcher({
     open,
     onOpenChange,
     footer,
+    below,
     strings = ENGLISH
 }: {
     apps: readonly PolarisApp[];
@@ -164,6 +165,10 @@ export function AppSwitcher({
     onOpenChange?: (open: boolean) => void;
     /** Options of the caller's own under the grid (menu items). */
     footer?: ReactNode;
+    /** What the caller lists between the grid and the options - what each app
+     *  has waiting, for one. Menu items, walked by the arrow keys like the rest;
+     *  put away while a search narrows the grid, which is a question about apps. */
+    below?: ReactNode;
     /** The switcher's own words, in the reader's language. English by default. */
     strings?: AppSwitcherStrings;
 }) {
@@ -308,7 +313,7 @@ export function AppSwitcher({
                 event.key === "ArrowUp"
                     ? gridStep(root, drawn, drawn[drawn.length - 1]?.id ?? "", "End")
                     : event.key === "ArrowDown"
-                      ? firstFooterItem(root)
+                      ? firstBelowItem(root)
                       : undefined;
             if (next === undefined) return;
             event.preventDefault();
@@ -436,6 +441,7 @@ export function AppSwitcher({
                         <ChevronDown className="!size-3.5" aria-hidden="true" />
                     </DropdownMenuItem>
                 ) : null}
+                {below && !searching ? <div data-launcher-below="">{below}</div> : null}
                 {footer ? (
                     <div
                         data-launcher-footer=""
@@ -459,9 +465,19 @@ function firstFooterItem(root: HTMLElement) {
     );
 }
 
-/** What comes after the last row: More while there is more, else the options. */
+/** The first item of what the caller lists under the grid, else the first
+ *  option. */
+function firstBelowItem(root: HTMLElement) {
+    return (
+        root.querySelector<HTMLElement>("[data-launcher-below] [role=menuitem]:not([data-disabled])") ??
+        firstFooterItem(root)
+    );
+}
+
+/** What comes after the last row: More while there is more, else what is listed
+ *  under the grid, else the options. */
 function belowGrid(root: HTMLElement) {
-    return root.querySelector<HTMLElement>(`[${MORE}]`) ?? firstFooterItem(root);
+    return root.querySelector<HTMLElement>(`[${MORE}]`) ?? firstBelowItem(root);
 }
 
 /**

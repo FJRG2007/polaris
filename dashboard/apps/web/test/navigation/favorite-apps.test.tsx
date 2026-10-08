@@ -28,6 +28,9 @@ vi.mock("next/navigation", () => ({ usePathname: () => "/home" }));
 vi.mock("@/app/(app)/app-launcher-actions", () => ({
     saveFavoriteAppsAction: (input: unknown) => save(input)
 }));
+vi.mock("@/app/(app)/launcher-waiting-actions", () => ({
+    markLauncherReadAction: async () => ({})
+}));
 vi.mock("@polaris/ui", async (original) => ({
     ...(await original<typeof import("@polaris/ui")>()),
     useToast: () => ({ show })

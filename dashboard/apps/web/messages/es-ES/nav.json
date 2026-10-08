@@ -302,5 +302,23 @@
         "adminOnlyRole": "Solo un administrador puede previsualizar un rol.",
         "unknownRole": "Rol desconocido.",
         "nothingToLeave": "No hay nada que abandonar."
+    },
+    "waitingList": {
+        "title": "Pendiente en tus apps",
+        "markRead": "Marcar {item} como leído",
+        "markSeen": "Marcar {item} como visto",
+        "markAllRead": "Marcar todo leído en {app}",
+        "markAllSeen": "Marcar todo visto en {app}",
+        "unknownSender": "Remitente oculto",
+        "noSubject": "(sin asunto)",
+        "admin": {
+            "reports": "{count, plural, one {# mensaje denunciado} other {# mensajes denunciados}}",
+            "cases": "{count, plural, one {# caso de seguridad} other {# casos de seguridad}}",
+            "update": "Hay una actualización lista",
+            "apis": "{count, plural, one {# API de Google apagada} other {# APIs de Google apagadas}}"
+        },
+        "errors": {
+            "notMarked": "No se pudo marcar. Inténtalo de nuevo en un momento."
+        }
     }
 }

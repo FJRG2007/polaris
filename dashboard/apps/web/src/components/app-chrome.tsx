@@ -63,6 +63,7 @@ import { PresenceReporter } from "@/components/notifications/presence-reporter";
 import { DesktopGameReporter } from "@/components/desktop-game-reporter";
 import { ChatUnreadProvider } from "@/components/chat-unread";
 import { MailUnreadProvider } from "@/components/mail-unread";
+import { AppUnreadDriftProvider } from "@/components/app-unread";
 import { adminWaiting as countAdminWaiting } from "@/lib/admin-waiting";
 import { AdminWaitingProvider, NO_ADMIN_WAITING } from "@/components/admin-waiting";
 import { NotificationFavicon } from "@/components/notifications/notification-favicon";
@@ -200,6 +201,7 @@ export async function AppChrome({ user, children }: { user: SessionUser; childre
                                         initial={adminWaiting}
                                         enabled={user.isAdmin}
                                     >
+                                        <AppUnreadDriftProvider>
                                         <NotificationsProvider initial={notifications}>
                                             <ToastProvider>
                                                 {/* The favorites, shared by the app menu
@@ -413,6 +415,7 @@ export async function AppChrome({ user, children }: { user: SessionUser; childre
                                                 </FavoriteAppsProvider>
                                             </ToastProvider>
                                         </NotificationsProvider>
+                                        </AppUnreadDriftProvider>
                                     </AdminWaitingProvider>
                                 </MailUnreadProvider>
                             </ChatUnreadProvider>
