@@ -148,11 +148,7 @@ export function SeasonalBadge() {
     const Icon = SEASON_ICONS[season];
     return (
         <span title={t(`season.${season}`)} className="flex shrink-0 items-center">
-            <Icon
-                aria-hidden="true"
-                className="size-3.5 text-[hsl(var(--season-a))]"
-                strokeWidth={2}
-            />
+            <Icon aria-hidden="true" className="size-3.5 text-[hsl(var(--season-a))]" strokeWidth={2} />
         </span>
     );
 }

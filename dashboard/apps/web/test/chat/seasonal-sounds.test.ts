@@ -34,8 +34,7 @@ describe.each(SEASONS)("the %s pack", (season) => {
     it("keeps its message blip as quiet as the ordinary one", () => {
         const message = SEASONAL_SOUNDS[season].message ?? [];
         expect(message.length).toBeGreaterThan(1);
-        for (const note of message)
-            expect(note.gain ?? DEFAULT_GAIN).toBeLessThanOrEqual(DEFAULT_GAIN);
+        for (const note of message) expect(note.gain ?? DEFAULT_GAIN).toBeLessThanOrEqual(DEFAULT_GAIN);
     });
 
     it("leaves the sounds a call is followed by alone", () => {

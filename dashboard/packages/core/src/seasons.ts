@@ -60,10 +60,7 @@ let lunar: Intl.DateTimeFormat | null | undefined;
 function lunarDate(date: Date): { month: string; day: number } | null {
     if (lunar === undefined) {
         try {
-            lunar = new Intl.DateTimeFormat("en-u-ca-chinese", {
-                month: "numeric",
-                day: "numeric"
-            });
+            lunar = new Intl.DateTimeFormat("en-u-ca-chinese", { month: "numeric", day: "numeric" });
             // A runtime without the calendar falls back to the Gregorian one silently.
             if (lunar.resolvedOptions().calendar !== "chinese") lunar = null;
         } catch {
@@ -91,8 +88,7 @@ export function seasonOn(date: Date): Season | null {
     const month = date.getMonth() + 1;
     const day = date.getDate();
     if ((month === 12 && day === 31) || (month === 1 && day === 1)) return "newYear";
-    if (within(month, day, [12, 19], [12, 31]) || within(month, day, [1, 1], [1, 3]))
-        return "winter";
+    if (within(month, day, [12, 19], [12, 31]) || within(month, day, [1, 1], [1, 3])) return "winter";
     if (within(month, day, [10, 20], [11, 3])) return "halloween";
     // The lunar new year never falls before 21 January or after 20 February, so
     // the calendar is only asked about those weeks and the rest of the year

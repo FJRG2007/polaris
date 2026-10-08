@@ -4,13 +4,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import {
-    nextSeason,
-    parseSeasonalPrefs,
-    SEASONAL_DEFAULTS,
-    seasonLastDay,
-    seasonOn
-} from "../src/seasons.js";
+import { nextSeason, parseSeasonalPrefs, SEASONAL_DEFAULTS, seasonLastDay, seasonOn } from "../src/seasons.js";
 
 const on = (year: number, month: number, day: number) => new Date(year, month - 1, day, 12);
 

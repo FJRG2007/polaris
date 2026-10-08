@@ -21,13 +21,7 @@ import { useTranslations } from "@/components/i18n/i18n-provider";
 import { Button, Card, CardBody, CardHeader, CardTitle, Switch } from "@polaris/ui";
 import { saveSeasonalAction } from "@/app/(app)/account/preferences/seasonal-actions";
 
-export function SeasonalCard({
-    allowed,
-    initial
-}: {
-    allowed: boolean;
-    initial: core.SeasonalChoice;
-}) {
+export function SeasonalCard({ allowed, initial }: { allowed: boolean; initial: core.SeasonalChoice }) {
     const t = useTranslations("account");
     const format = useDisplayFormat();
     const offId = useId();
@@ -82,10 +76,7 @@ export function SeasonalCard({
                 <p className="flex min-h-5 min-w-0 items-center gap-2 text-sm">
                     {Icon && shown ? (
                         <>
-                            <Icon
-                                aria-hidden="true"
-                                className="size-4 shrink-0 text-muted-foreground"
-                            />
+                            <Icon aria-hidden="true" className="size-4 shrink-0 text-muted-foreground" />
                             <span className="min-w-0">
                                 {today && lastDay
                                     ? t("seasonal.onUntil", {
@@ -131,12 +122,8 @@ export function SeasonalCard({
                                 size="sm"
                                 variant="ghost"
                                 onClick={preview}
-                                aria-label={t("seasonal.preview", {
-                                    season: t(`seasonal.names.${shown}`)
-                                })}
-                                title={t("seasonal.preview", {
-                                    season: t(`seasonal.names.${shown}`)
-                                })}
+                                aria-label={t("seasonal.preview", { season: t(`seasonal.names.${shown}`) })}
+                                title={t("seasonal.preview", { season: t(`seasonal.names.${shown}`) })}
                             >
                                 <Play aria-hidden="true" className="size-3.5" />
                             </Button>
