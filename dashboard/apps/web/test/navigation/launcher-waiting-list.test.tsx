@@ -61,23 +61,58 @@ const ANSWER: LauncherWaiting = {
             app: "chat",
             total: 7,
             items: [
-                { id: "c1", title: "Ada", detail: "", href: "/chat/c/c1", count: 5, dismissable: true },
-                { id: "c2", title: "Ops", detail: "", href: "/chat/c/c2", count: 2, dismissable: true }
+                {
+                    id: "c1",
+                    title: "Ada",
+                    detail: "",
+                    href: "/chat/c/c1",
+                    count: 5,
+                    dismissable: true
+                },
+                {
+                    id: "c2",
+                    title: "Ops",
+                    detail: "",
+                    href: "/chat/c/c2",
+                    count: 2,
+                    dismissable: true
+                }
             ]
         },
         {
             app: "mail",
             total: 2,
             items: [
-                { id: "t1", title: "Grace", detail: "Invoice", href: "/mail/t/t1", count: 2, dismissable: true }
+                {
+                    id: "t1",
+                    title: "Grace",
+                    detail: "Invoice",
+                    href: "/mail/t/t1",
+                    count: 2,
+                    dismissable: true
+                }
             ]
         },
         {
             app: "admin",
             total: 4,
             items: [
-                { id: "reports", title: "", detail: "", href: "/admin/safety", count: 3, dismissable: true },
-                { id: "apis", title: "", detail: "", href: "/admin/integrations", count: 1, dismissable: false }
+                {
+                    id: "reports",
+                    title: "",
+                    detail: "",
+                    href: "/admin/safety",
+                    count: 3,
+                    dismissable: true
+                },
+                {
+                    id: "apis",
+                    title: "",
+                    detail: "",
+                    href: "/admin/integrations",
+                    count: 1,
+                    dismissable: false
+                }
             ]
         }
     ]
@@ -128,7 +163,9 @@ describe("the waiting list in the app menu", () => {
         expect(within(list).getByText("1 Google API is off")).toBeTruthy();
         // A fault is never dismissed: the APIs entry has no mark of its own.
         expect(within(list).queryByRole("menuitem", { name: /Mark 1 Google API/ })).toBeNull();
-        expect(within(list).getByRole("menuitem", { name: "Mark 3 reported messages seen" })).toBeTruthy();
+        expect(
+            within(list).getByRole("menuitem", { name: "Mark 3 reported messages seen" })
+        ).toBeTruthy();
     });
 
     it("marks one entry read at once, badge included, and keeps the menu open", async () => {

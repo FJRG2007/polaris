@@ -22,16 +22,44 @@ const waiting: LauncherWaiting = {
             app: "chat",
             total: 7,
             items: [
-                { id: "a", title: "Ada", detail: "", href: "/chat/c/a", count: 5, dismissable: true },
-                { id: "b", title: "Ops", detail: "", href: "/chat/c/b", count: 2, dismissable: true }
+                {
+                    id: "a",
+                    title: "Ada",
+                    detail: "",
+                    href: "/chat/c/a",
+                    count: 5,
+                    dismissable: true
+                },
+                {
+                    id: "b",
+                    title: "Ops",
+                    detail: "",
+                    href: "/chat/c/b",
+                    count: 2,
+                    dismissable: true
+                }
             ]
         },
         {
             app: "admin",
             total: 4,
             items: [
-                { id: "reports", title: "", detail: "", href: "/admin/safety", count: 3, dismissable: true },
-                { id: "apis", title: "", detail: "", href: "/admin/integrations", count: 1, dismissable: false }
+                {
+                    id: "reports",
+                    title: "",
+                    detail: "",
+                    href: "/admin/safety",
+                    count: 3,
+                    dismissable: true
+                },
+                {
+                    id: "apis",
+                    title: "",
+                    detail: "",
+                    href: "/admin/integrations",
+                    count: 1,
+                    dismissable: false
+                }
             ]
         }
     ]
@@ -70,10 +98,16 @@ describe("marking a whole app read", () => {
 
 describe("the shapes both ends check", () => {
     it("accepts an entry or an app, and nothing else", () => {
-        expect(markLauncherReadSchema.safeParse({ scope: "item", app: "mail", id: "t1" }).success).toBe(true);
+        expect(
+            markLauncherReadSchema.safeParse({ scope: "item", app: "mail", id: "t1" }).success
+        ).toBe(true);
         expect(markLauncherReadSchema.safeParse({ scope: "app", app: "admin" }).success).toBe(true);
-        expect(markLauncherReadSchema.safeParse({ scope: "item", app: "mail" }).success).toBe(false);
-        expect(markLauncherReadSchema.safeParse({ scope: "app", app: "drive" }).success).toBe(false);
+        expect(markLauncherReadSchema.safeParse({ scope: "item", app: "mail" }).success).toBe(
+            false
+        );
+        expect(markLauncherReadSchema.safeParse({ scope: "app", app: "drive" }).success).toBe(
+            false
+        );
     });
 
     it("cuts text to what an entry carries, never through a character", () => {

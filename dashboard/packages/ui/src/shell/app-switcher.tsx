@@ -469,8 +469,9 @@ function firstFooterItem(root: HTMLElement) {
  *  option. */
 function firstBelowItem(root: HTMLElement) {
     return (
-        root.querySelector<HTMLElement>("[data-launcher-below] [role=menuitem]:not([data-disabled])") ??
-        firstFooterItem(root)
+        root.querySelector<HTMLElement>(
+            "[data-launcher-below] [role=menuitem]:not([data-disabled])"
+        ) ?? firstFooterItem(root)
     );
 }
 

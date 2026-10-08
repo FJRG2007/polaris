@@ -21,9 +21,17 @@ let subject = "  ";
 vi.mock("@polaris/db", () => ({
     prisma: {
         mailMessage: {
-            groupBy: async () => [{ threadId: "t1", _count: { _all: 2 }, _max: { sentAt: new Date() } }],
+            groupBy: async () => [
+                { threadId: "t1", _count: { _all: 2 }, _max: { sentAt: new Date() } }
+            ],
             count: async () => 9,
-            findMany: async ({ select, where }: { select: Record<string, true>; where: { threadId?: unknown } }) => {
+            findMany: async ({
+                select,
+                where
+            }: {
+                select: Record<string, true>;
+                where: { threadId?: unknown };
+            }) => {
                 if (select.subject)
                     return [
                         {
@@ -57,12 +65,20 @@ vi.mock("@/lib/chat/messages", () => ({
     }
 }));
 vi.mock("@/lib/mailbox/messages", () => ({
-    actOnMessages: async (_user: string, ids: string[], _action: string, options?: { scope?: string }) => {
+    actOnMessages: async (
+        _user: string,
+        ids: string[],
+        _action: string,
+        options?: { scope?: string }
+    ) => {
         mailRead.push({ ids, scope: options?.scope });
         return ids.length;
     }
 }));
-vi.mock("@/lib/mailbox/shelf", () => ({ mailShelfFor: async () => null, isEveryShelf: () => false }));
+vi.mock("@/lib/mailbox/shelf", () => ({
+    mailShelfFor: async () => null,
+    isEveryShelf: () => false
+}));
 vi.mock("@/lib/admin-waiting", () => ({
     adminWaiting: async () => ({ reports: 2, cases: 0, update: true, apis: 1, total: 4 }),
     dismissAdminWaiting: async (_user: string, ids: string[]) => {
@@ -105,7 +121,9 @@ describe("what the menu lists", () => {
     it("cuts a subject too long for the menu rather than failing the answer", async () => {
         subject = "x".repeat(LAUNCHER_TEXT_MAX + 50);
         const groups = await launcherWaiting("ada", { chat: true, mail: true, admin: true });
-        expect(groups.find((group) => group.app === "mail")?.items[0]?.detail).toHaveLength(LAUNCHER_TEXT_MAX);
+        expect(groups.find((group) => group.app === "mail")?.items[0]?.detail).toHaveLength(
+            LAUNCHER_TEXT_MAX
+        );
         expect(launcherWaitingSchema.safeParse({ groups }).success).toBe(true);
     });
 
