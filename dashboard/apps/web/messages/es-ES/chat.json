@@ -1457,12 +1457,12 @@
     "linkCard": {
         "play": "Reproducir en {provider}, aquí",
         "playHint": "Se reproduce aquí. {provider} te ve en cuanto lo pulsas.",
-        "freeToPlay": "Gratis",
         "comingSoon": "Próximamente",
-        "comingOn": "Sale {date}",
-        "released": "Salió {date}",
+        "release": "Lanzamiento",
         "wasPrice": "Antes {price}",
-        "runsOn": "Plataformas"
+        "price": "Precio",
+        "recommendations": "Recomendaciones",
+        "free": "Gratis"
     },
     "gameLink": {
         "server": "servidor de {game} {name}",

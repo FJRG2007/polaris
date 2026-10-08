@@ -33,6 +33,7 @@ const ON_SALE = {
                 final_formatted: "17,99€"
             },
             platforms: { windows: true, mac: true, linux: false },
+            recommendations: { total: 766235 },
             release_date: { coming_soon: false, date: "9 Dec, 2020" }
         }
     }
@@ -123,6 +124,7 @@ describe("reading Steam's answer", () => {
         expect(found?.details.free).toBe(false);
         expect(found?.details.releaseDate).toBe("9 Dec, 2020");
         expect(found?.details.platforms).toEqual({ windows: true, mac: true, linux: false });
+        expect(found?.details.recommendations).toBe(766235);
     });
 
     it("says free to play and carries no price", () => {
@@ -130,6 +132,8 @@ describe("reading Steam's answer", () => {
         expect(found?.details.free).toBe(true);
         expect(found?.details.price).toBeNull();
         expect(found?.details.platforms.linux).toBe(true);
+        // Not every answer carries a count.
+        expect(found?.details.recommendations).toBeNull();
     });
 
     it("has no old price when nothing is on sale", () => {
@@ -188,5 +192,13 @@ describe("what is stored", () => {
         expect(storedSteamDetails(null)).toBeNull();
         expect(storedSteamDetails("{")).toBeNull();
         expect(storedSteamDetails(JSON.stringify({ kind: "steam" }))).toBeNull();
+    });
+
+    it("reads a card stored before the count was kept", () => {
+        const { recommendations: _dropped, ...older } = readSteamAnswer(
+            "1091500",
+            ON_SALE
+        )!.details;
+        expect(storedSteamDetails(JSON.stringify(older))).toEqual(older);
     });
 });
