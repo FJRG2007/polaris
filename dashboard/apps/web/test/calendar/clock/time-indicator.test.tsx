@@ -74,7 +74,7 @@ describe("the running-timer pill", () => {
         act(() => void vi.advanceTimersByTime(3000));
         expect(pill.textContent).toContain("04:57");
         expect(pill.getAttribute("title")).toBe(hover);
-        expect(pill.getAttribute("aria-label")).toBe(hover);
+        expect(screen.getByRole("link", { name: /04:57/ })).toBe(pill);
     });
 
     it("keeps the same hover text while the stopwatch runs", () => {
@@ -84,6 +84,7 @@ describe("the running-timer pill", () => {
         const hover = pill.getAttribute("title");
         act(() => void vi.advanceTimersByTime(2000));
         expect(pill.textContent).toContain("00:12");
+        expect(screen.getByRole("link", { name: /00:12/ })).toBe(pill);
         expect(pill.getAttribute("title")).toBe(hover);
     });
 });

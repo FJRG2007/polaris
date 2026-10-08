@@ -68,7 +68,6 @@ export function TimeIndicator() {
             <Link
                 href="/calendar/time?tab=timers"
                 className="flex h-9 items-center gap-1.5 rounded-md border border-border bg-surface px-2 text-[0.8125rem] font-medium tabular-nums text-foreground transition-colors hover:bg-muted"
-                aria-label={label}
                 title={label}
             >
                 <Timer aria-hidden className="size-4 shrink-0 text-primary" />
@@ -87,7 +86,6 @@ export function TimeIndicator() {
             <Link
                 href="/calendar/time?tab=stopwatch"
                 className="flex h-9 items-center gap-1.5 rounded-md border border-border bg-surface px-2 text-[0.8125rem] font-medium tabular-nums text-foreground transition-colors hover:bg-muted"
-                aria-label={label}
                 title={label}
             >
                 <Watch aria-hidden className="size-4 shrink-0 text-primary" />
