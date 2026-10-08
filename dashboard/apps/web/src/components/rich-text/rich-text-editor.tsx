@@ -24,6 +24,7 @@ import { runAction } from "@/lib/run-action";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { SelectionToolbar } from "./toolbar";
 import type { JSONContent } from "@tiptap/core";
+import { afterComposition } from "./composed-shortcuts";
 import { mentionExtension, popupOpen } from "./suggestion";
 import { EditorMenu, type ListAction } from "./editor-menu";
 import { useCallback, useEffect, useMemo, useRef } from "react";
@@ -332,7 +333,9 @@ export function RichTextEditor({
                 if (popupOpen(view.state)) return false;
 
                 const send = (): boolean => {
-                    handlers.current.onSubmit?.(md.docToMarkdown(editorRef.current?.getJSON()));
+                    afterComposition(view, () =>
+                        handlers.current.onSubmit?.(md.docToMarkdown(editorRef.current?.getJSON()))
+                    );
                     return true;
                 };
                 // The one key that always sends, which is how you get out of a

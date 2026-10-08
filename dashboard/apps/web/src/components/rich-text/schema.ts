@@ -15,6 +15,7 @@ import { chipClass, chipLabel } from "./chip";
 import { Placeholder } from "@tiptap/extensions";
 import { mergeAttributes, Node } from "@tiptap/core";
 import { EditorCodeBlock } from "./editor-code-block";
+import { ComposedShortcuts } from "./composed-shortcuts";
 import { MARKDOWN_BLOCK, REFERENCE } from "./markdown";
 import { TaskItem, TaskList } from "@tiptap/extension-list";
 
@@ -140,6 +141,7 @@ export function baseExtensions(
         TaskItem.configure({ nested: true, HTMLAttributes: { class: "flex items-start gap-2" } }),
         Image,
         Reference,
-        MarkdownBlock
+        MarkdownBlock,
+        ComposedShortcuts
     ];
 }
