@@ -5,11 +5,11 @@
  * guessed.
  */
 
-import { prisma } from "@polaris/db";
 import { PageHeader } from "@polaris/ui";
 import { requireAdmin } from "@/lib/session";
 import { getTranslations } from "@/lib/i18n/request";
 import { organizationPolicy } from "@/lib/orgs/policy";
+import { listOrgDirectoryPage } from "@/lib/org-directory";
 import { saveOrganizationPolicyAction } from "./actions";
 import { OrganizationsAdmin } from "./organizations-admin";
 
@@ -20,16 +20,7 @@ export default async function OrganizationsAdminPage() {
 
     const [policy, orgs, t] = await Promise.all([
         organizationPolicy(),
-        prisma.organization.findMany({
-            orderBy: { name: "asc" },
-            select: {
-                id: true,
-                slug: true,
-                name: true,
-                owner: { select: { name: true } },
-                _count: { select: { members: true, teams: true, spaces: true } }
-            }
-        }),
+        listOrgDirectoryPage(),
         getTranslations("admin")
     ]);
 
@@ -44,17 +35,7 @@ export default async function OrganizationsAdminPage() {
             <OrganizationsAdmin
                 initial={policy}
                 save={saveOrganizationPolicyAction}
-                orgs={orgs.map((org) => ({
-                    id: org.id,
-                    slug: org.slug,
-                    name: org.name,
-                    ownerName: org.owner.name,
-                    // The owner is not a member row, so the roster is one longer
-                    // than the table says.
-                    memberCount: org._count.members + 1,
-                    teamCount: org._count.teams,
-                    spaceCount: org._count.spaces
-                }))}
+                first={orgs}
             />
         </>
     );

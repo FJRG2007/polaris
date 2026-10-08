@@ -22,7 +22,8 @@ vi.mock("@/components/avatar", () => ({ Avatar: () => null }));
 // The screen's own server modules: importing them for real drags in the auth stack
 // and its environment, none of which this is about.
 vi.mock("../../src/app/(app)/admin/users/actions", () => ({
-    revokeInviteAction: async () => ({})
+    revokeInviteAction: async () => ({}),
+    listUserDirectoryAction: async () => ({ items: [], next: null })
 }));
 vi.mock("../../src/app/(app)/admin/users/invite-dialog", () => ({ InviteDialog: () => null }));
 // The row menu can walk into somebody's account, which is a server action and
@@ -65,7 +66,7 @@ function markup(users: DirectoryUser[]): string {
     return renderToStaticMarkup(
         withMessages(
             <UsersAdmin
-                users={users}
+                first={{ items: users, next: null }}
                 invites={[]}
                 recoveries={[]}
                 groups={[]}

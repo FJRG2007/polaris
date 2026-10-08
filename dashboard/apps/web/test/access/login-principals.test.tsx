@@ -16,6 +16,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { withMessages } from "../setup/i18n";
 
 vi.mock("../../src/app/(app)/apps/firewall/actions", () => ({
+    findWafPeopleAction: async () => ({ results: [] }),
     listWafPrincipalsAction: async () => ({
         principals: [
             { ref: "group:ops", type: "group", label: "Operations" },
@@ -28,9 +29,11 @@ vi.mock("../../src/app/(app)/apps/firewall/actions", () => ({
 const { LoginPrincipals } = await import("../../src/app/(app)/apps/firewall/login-principals");
 const { LoginRulePage } = await import("../../src/app/(app)/apps/firewall/access-rules");
 
+const SCOPE = { scopeType: "project" as const, scopeId: "00000000-0000-7000-8000-0000000000e1" };
+
 function render(admitted: WafPrincipalGrant[], refused: WafPrincipalGrant[]): string {
     return renderToStaticMarkup(withMessages(
-        <LoginPrincipals admitted={admitted} refused={refused} onChange={() => {}} />
+        <LoginPrincipals scope={SCOPE} admitted={admitted} refused={refused} onChange={() => {}} />
     ));
 }
 
@@ -68,6 +71,7 @@ describe("the require-login page, when a broader scope already demands one", () 
     function page(required: boolean, requiredAbove: boolean): string {
         return renderToStaticMarkup(withMessages(
             <LoginRulePage
+                scope={SCOPE}
                 required={required}
                 requiredAbove={requiredAbove}
                 admitted={[]}

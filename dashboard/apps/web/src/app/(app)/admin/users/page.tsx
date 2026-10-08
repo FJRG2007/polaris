@@ -14,7 +14,7 @@ import { profilesArePublic } from "@/lib/profile-service";
 import { defaultFollowerAudience } from "@/lib/privacy-service";
 import { usernameCooldownDays, USERNAME_COOLDOWN_KEY } from "@polaris/core";
 import { listRecoveryRequests } from "@/lib/account-recovery-service";
-import { listImposableGroups, listUserDirectory } from "@/lib/user-admin-service";
+import { listImposableGroups, listUserDirectoryPage } from "@/lib/user-admin-service";
 
 export const dynamic = "force-dynamic";
 
@@ -41,7 +41,7 @@ export default async function UsersAdminPage({
         publicProfiles,
         followerDefault
     ] = await Promise.all([
-        listUserDirectory(),
+        listUserDirectoryPage(),
         listInvites(),
         listRecoveryRequests(),
         listImposableGroups(admin.id),
@@ -62,7 +62,7 @@ export default async function UsersAdminPage({
                 description={t("users.page.description")}
             />
             <UsersAdmin
-                users={users}
+                first={users}
                 invites={invites}
                 recoveries={recoveries}
                 groups={groups.map((group) => ({ id: group.id, name: group.name }))}

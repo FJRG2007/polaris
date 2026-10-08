@@ -432,8 +432,10 @@
         "refusedAdd": "Añadir a quien rechaza este acceso",
         "manage": "Gestionar roles y grupos",
         "loading": "Cargando a quién se puede elegir",
-        "allNamed": "Ya están todos nombrados",
-        "addPlaceholder": "Añade un rol, grupo o persona...",
+        "allNamed": "No quedan roles ni grupos",
+        "addPlaceholder": "Añade un rol o grupo...",
+        "findAdmitted": "Busca a quien admite este acceso",
+        "findRefused": "Busca a quien rechaza este acceso",
         "option": "{name} ({kind})",
         "types": {
             "user": "usuario",
@@ -517,7 +519,8 @@
         "tor": "No se pudo cambiar el ajuste de Tor",
         "anomalyInvalid": "Esos ajustes de anomalías no son válidos",
         "settingsSave": "No se pudieron guardar los ajustes",
-        "block": "No se pudo bloquear esa dirección"
+        "block": "No se pudo bloquear esa dirección",
+        "outOfReach": "La regla nombra a alguien que no puedes elegir"
     },
     "panels": {
         "whatDoing": "Qué ha estado haciendo {ip}",

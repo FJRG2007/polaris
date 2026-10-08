@@ -7,7 +7,9 @@
  * an invalid policy is never stored.
  */
 
+import { z } from "zod";
 import { revalidatePath } from "next/cache";
+import { findAccountsAsAdmin } from "@/lib/people-search";
 import {
     attachPolicy,
     createPolicy,
@@ -109,4 +111,11 @@ export async function detachPolicyAction(
     publishAccessChange(principalType === "user" ? { userIds: [principalId] } : {});
     await recordAudit({ actorId: admin.id, action: "policy.detach", targetType: "policy", targetId: policyId, metadata: { principalType, principalId } });
     revalidatePath("/admin/policies");
+}
+
+/** People a policy can be attached to, found by what was typed. */
+export async function findPolicyPeopleAction(query: string): Promise<{ results: { id: string; name: string }[] }> {
+    await requireAdmin();
+    const term = z.string().trim().max(120).safeParse(query);
+    return { results: term.success ? await findAccountsAsAdmin(term.data) : [] };
 }

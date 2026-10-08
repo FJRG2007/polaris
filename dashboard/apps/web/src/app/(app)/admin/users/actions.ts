@@ -31,6 +31,13 @@ import { decideRecoveryRequest } from "@/lib/account-recovery-service";
 import { listCliSessions, type CliSessionView } from "@/lib/cli/sessions";
 import { listUserSessions, type SessionView } from "@/lib/session-directory";
 import { createInvite, revokeInvite, type CreatedInvite } from "@/lib/invite-service";
+import type { Page } from "@/lib/pagination/cursor";
+import {
+    directoryQuerySchema,
+    listUserDirectoryPage,
+    type DirectoryQuery,
+    type DirectoryUser
+} from "@/lib/user-admin-service";
 import {
     banUser,
     deleteUser,
@@ -359,4 +366,23 @@ export async function setSharingPolicyAction(input: unknown): Promise<{ error?: 
     });
     revalidatePath("/admin/users");
     return {};
+}
+
+/**
+ * A page of the people directory, narrowed by the cut and the search the list is
+ * showing. What the list asks for as somebody scrolls towards its end, and again
+ * from the top whenever the cut or the search changes.
+ */
+export async function listUserDirectoryAction(
+    input: DirectoryQuery
+): Promise<Page<DirectoryUser> | { error: string }> {
+    await requireAdmin();
+    const parsed = directoryQuerySchema.safeParse(input);
+    if (!parsed.success) return { error: (await getTranslations("admin"))("users.directory.loadFailed") };
+    try {
+        return await listUserDirectoryPage(parsed.data);
+    } catch (caught) {
+        console.error("[users] directory page failed", caught);
+        return { error: (await getTranslations("admin"))("users.directory.loadFailed") };
+    }
 }

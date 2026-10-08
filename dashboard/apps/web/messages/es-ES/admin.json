@@ -1017,9 +1017,8 @@
             "removeTitle": "Quitar del grupo",
             "removeLabel": "Quitar a {member} de {group}",
             "addLabel": "Añadir a alguien a este grupo",
-            "addPlaceholder": "Añadir un miembro...",
-            "add": "Añadir",
-            "everybodyIn": "Todas las personas de esta instancia ya están en el grupo.",
+            "alreadyIn": "Ya está en este grupo",
+            "showMore": "Mostrar {count} más",
             "delete": "Eliminar grupo",
             "done": "Listo"
         }
@@ -1915,6 +1914,7 @@
         }
     },
     "organizations": {
+        "showMore": "Mostrar más organizaciones",
         "page": {
             "title": "Organizaciones",
             "description": "Trabajo que pertenece a un grupo y no a una sola persona. Desactívalas del todo, limita quién puede crearlas o cuánto pueden crecer."
@@ -2109,7 +2109,8 @@
             "attachedTo": "Asignada a:",
             "nobody": "nadie",
             "detach": "Quitar {label}",
-            "attachPlaceholder": "Asignar a...",
+            "attachPlaceholder": "Asignar a un rol o grupo...",
+            "attachPerson": "Asignar a una persona",
             "attach": "Asignar",
             "description": "Descripción",
             "document": "Documento de {name}",
@@ -2608,7 +2609,11 @@
             },
             "online": "En línea",
             "never": "Nunca",
-            "country": " - {country}"
+            "country": " - {country}",
+            "loading": "Cargando personas...",
+            "loadingMore": "Cargando más personas...",
+            "loadFailed": "No se pudo cargar la lista. Inténtalo de nuevo en un momento.",
+            "retry": "Reintentar"
         },
         "menu": {
             "openRecord": "Abrir su ficha",

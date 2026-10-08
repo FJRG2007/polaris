@@ -14,6 +14,10 @@
  * is right until somebody joins or leaves; a rule written about the group they are in
  * keeps being right, and that is the one an operator should fall into writing.
  *
+ * People are found by name rather than listed: the list was every account on the
+ * instance, which is both a directory nobody agreed to be in and a select that grows
+ * with the instance until it cannot be opened.
+ *
  * Each entry can carry a window - access that starts later, lapses, or both. It is
  * evaluated at the edge on every request, so an expiry takes effect when it says it
  * does rather than whenever the visitor's session happens to end.
@@ -23,34 +27,55 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Input, Select, Skeleton } from "@polaris/ui";
 import { useDisplayFormat } from "@/components/display-format";
-import { listWafPrincipalsAction, type WafPrincipalOption } from "./actions";
-import { wafPrincipalGrantSchema, type WafPrincipalGrant } from "@polaris/core";
+import { PeoplePicker, type PickedPerson } from "@/components/people-picker";
+import { findWafPeopleAction, listWafPrincipalsAction, type WafPrincipalOption } from "./actions";
+import { wafPrincipalGrantSchema, type WafPrincipalGrant, type WafScopeType } from "@polaris/core";
 import { ArrowUpRight, CalendarClock, Shield, TriangleAlert, User, UserMinus, Users, X } from "lucide-react";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { NamespaceKey, NamespaceTranslator } from "@/lib/i18n/types";
 
 /**
- * The directory, shared across mounts for a short while.
+ * The roles, groups and named entries, shared across mounts for a short while.
  *
  * Toggling the switch off and on remounts this, and so does moving between scopes -
  * neither of which changes who works here. One in-flight promise is reused rather than
- * refetched, and the answer is kept briefly so an operator narrowing several scopes in
- * a row pays for the read once.
+ * refetched for the same entries, and the answer is kept briefly so an operator
+ * narrowing several scopes in a row pays for the read once.
  */
 const CACHE_TTL_MS = 60_000;
-let cached: { at: number; promise: Promise<{ principals?: WafPrincipalOption[]; error?: string }> } | null = null;
+let cached: {
+    at: number;
+    key: string;
+    promise: Promise<{ principals?: WafPrincipalOption[]; error?: string }>;
+} | null = null;
 
-function loadPrincipals(): Promise<{ principals?: WafPrincipalOption[]; error?: string }> {
+function loadPrincipals(
+    scope: WafPrincipalScope,
+    named: string[]
+): Promise<{ principals?: WafPrincipalOption[]; error?: string }> {
     const now = Date.now();
-    if (cached && now - cached.at < CACHE_TTL_MS) return cached.promise;
-    const promise = listWafPrincipalsAction().then((result) => {
+    const key = `${scope.scopeType}:${scope.scopeId}|${[...named].sort().join(",")}`;
+    if (cached && cached.key === key && now - cached.at < CACHE_TTL_MS) return cached.promise;
+    const promise = listWafPrincipalsAction(scope).then((result) => {
         // A failed read must not be remembered, or a transient error would be the
         // answer for the next minute.
         if (result.error) cached = null;
         return result;
     });
-    cached = { at: now, promise };
+    cached = { at: now, key, promise };
     return promise;
+}
+
+/** The rule whose entries are being named. */
+export interface WafPrincipalScope {
+    scopeType: WafScopeType;
+    scopeId: string;
+}
+
+/** The people search, in the shape the picker asks for. */
+async function findPeople(query: string): Promise<{ results?: PickedPerson[] }> {
+    const found = await findWafPeopleAction(query);
+    return { results: found.results ?? [] };
 }
 
 const ICONS: Record<string, React.ReactNode> = {
@@ -82,11 +107,13 @@ export interface LoginPrincipalsPatch {
 }
 
 export function LoginPrincipals({
+    scope,
     admitted,
     refused,
     disabled,
     onChange
 }: {
+    scope: WafPrincipalScope;
     admitted: WafPrincipalGrant[];
     refused: WafPrincipalGrant[];
     disabled?: boolean;
@@ -96,17 +123,24 @@ export function LoginPrincipals({
     const [options, setOptions] = useState<WafPrincipalOption[] | null>(null);
     const [error, setError] = useState<string | null>(null);
 
+    // Read once for what the rule names when the panel opens. Somebody picked after
+    // that is already known by name - the search found them - so it is not asked again.
+    const [named] = useState(() => [...admitted, ...refused].map((grant) => grant.ref));
+    const { scopeType, scopeId } = scope;
     useEffect(() => {
         let active = true;
-        void loadPrincipals().then((result) => {
+        void loadPrincipals({ scopeType, scopeId }, named).then((result) => {
             if (!active) return;
-            setOptions(result.principals ?? []);
+            setOptions((held) => mergeOptions(result.principals ?? [], held ?? []));
             setError(result.error ?? null);
         });
         return () => {
             active = false;
         };
-    }, []);
+    }, [scopeType, scopeId, named]);
+
+    const learn = (option: WafPrincipalOption): void =>
+        setOptions((held) => mergeOptions(held ?? [], [option]));
 
     return (
         <div className="flex flex-col gap-4">
@@ -121,6 +155,8 @@ export function LoginPrincipals({
                 taken={refused}
                 options={options}
                 disabled={disabled}
+                findLabel={t("principals.findAdmitted")}
+                onFound={learn}
                 onChange={(loginAllowPrincipals) => onChange({ loginAllowPrincipals })}
             />
 
@@ -133,6 +169,8 @@ export function LoginPrincipals({
                 taken={admitted}
                 options={options}
                 disabled={disabled}
+                findLabel={t("principals.findRefused")}
+                onFound={learn}
                 tone="danger"
                 onChange={(loginDenyPrincipals) => onChange({ loginDenyPrincipals })}
             />
@@ -150,6 +188,13 @@ export function LoginPrincipals({
     );
 }
 
+/** Options with the later ones added, each ref once. */
+function mergeOptions(base: WafPrincipalOption[], more: WafPrincipalOption[]): WafPrincipalOption[] {
+    const merged = new Map(base.map((option) => [option.ref, option]));
+    for (const option of more) if (!merged.has(option.ref)) merged.set(option.ref, option);
+    return [...merged.values()];
+}
+
 /** One list of named principals with the window each is granted in. */
 function GrantList({
     title,
@@ -160,6 +205,8 @@ function GrantList({
     taken,
     options,
     disabled,
+    findLabel,
+    onFound,
     tone,
     onChange
 }: {
@@ -172,6 +219,10 @@ function GrantList({
     taken: WafPrincipalGrant[];
     options: WafPrincipalOption[] | null;
     disabled?: boolean;
+    /** What the people search is called, for a screen reader. */
+    findLabel: string;
+    /** Somebody the search found and this list now names, so their name is known. */
+    onFound: (option: WafPrincipalOption) => void;
     tone?: "danger";
     onChange: (next: WafPrincipalGrant[]) => void;
 }) {
@@ -181,7 +232,9 @@ function GrantList({
     const [scheduling, setScheduling] = useState<string | null>(null);
     const known = new Map((options ?? []).map((option) => [option.ref, option]));
     const spoken = new Set([...grants, ...taken].map((grant) => grant.ref));
-    const remaining = (options ?? []).filter((option) => !spoken.has(option.ref));
+    // People are found by the search below, never listed here.
+    const remaining = (options ?? []).filter((option) => option.type !== "user" && !spoken.has(option.ref));
+    const spokenPeople = [...spoken].filter((ref) => ref.startsWith("user:")).map((ref) => ref.slice(5));
 
     return (
         <div className="flex flex-col gap-2">
@@ -243,6 +296,25 @@ function GrantList({
                         })
                     }))}
                 />
+            )}
+
+            {disabled ? null : (
+                <div className="max-w-xs">
+                    <PeoplePicker
+                        picked={[]}
+                        exclude={spokenPeople}
+                        label={findLabel}
+                        search={findPeople}
+                        onChange={(picked) => {
+                            const added = picked.filter((person) => !spoken.has(`user:${person.id}`));
+                            if (added.length === 0) return;
+                            for (const person of added) {
+                                onFound({ ref: `user:${person.id}`, type: "user", label: person.name });
+                            }
+                            onChange([...grants, ...added.map((person) => ({ ref: `user:${person.id}` }))]);
+                        }}
+                    />
+                </div>
             )}
         </div>
     );

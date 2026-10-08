@@ -47,6 +47,7 @@ vi.mock("../../src/app/(app)/apps/firewall/actions", () => ({
     setWafRuleAction,
     getWafRuleMatchesAction: async () => ({ matches: {} }),
     setTorBlockedAction: async () => ({}),
+    findWafPeopleAction: async () => ({ results: [] }),
     listWafPrincipalsAction: async () => ({ principals: [] })
 }));
 

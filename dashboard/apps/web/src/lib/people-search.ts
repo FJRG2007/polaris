@@ -105,3 +105,27 @@ export async function findPeople(
         withheld: candidates.length - people.length
     };
 }
+
+/**
+ * Accounts an instance administrator is looking for, by name, email or username.
+ *
+ * Not the search above: an administrator already reads the whole directory, so
+ * nobody's own say over who can find them applies here, and banned or disabled
+ * accounts are found too - they are what a rule or a policy is often written
+ * about. It is still a page of matches rather than a list of everybody. Only for
+ * callers that have checked the caller is an administrator.
+ */
+export async function findAccountsAsAdmin(
+    query: string,
+    limit = 20
+): Promise<{ id: string; name: string }[]> {
+    const term = query.trim();
+    if (term.length < SHORTEST_SEARCH) return [];
+    const contains = like(term);
+    return prisma.user.findMany({
+        where: { OR: [{ name: contains }, { email: contains }, { username: contains }] },
+        select: { id: true, name: true },
+        orderBy: [{ name: "asc" }, { id: "asc" }],
+        take: Math.min(Math.max(limit, 1), 50)
+    });
+}
