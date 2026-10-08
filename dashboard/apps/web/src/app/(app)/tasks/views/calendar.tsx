@@ -429,16 +429,15 @@ function MonthGrid({
 
     // Every cell is the same height - the rows share the grid's - so measuring
     // one list says how many lines each of them holds.
-    const measured = useRef<HTMLUListElement>(null);
+    const [measured, setMeasured] = useState<HTMLUListElement | null>(null);
     const [listHeight, setListHeight] = useState(0);
     useEffect(() => {
-        const list = measured.current;
-        if (!list || typeof ResizeObserver === "undefined") return;
-        const observer = new ResizeObserver(() => setListHeight(list.clientHeight));
-        observer.observe(list);
-        setListHeight(list.clientHeight);
+        if (!measured || typeof ResizeObserver === "undefined") return;
+        const observer = new ResizeObserver(() => setListHeight(measured.clientHeight));
+        observer.observe(measured);
+        setListHeight(measured.clientHeight);
         return () => observer.disconnect();
-    }, [days.length]);
+    }, [measured]);
 
     return (
         // Sized to what is left of the viewport rather than to its contents: the
@@ -525,7 +524,7 @@ function MonthGrid({
                             </div>
 
                             <ul
-                                ref={position === 0 ? measured : undefined}
+                                ref={position === 0 ? setMeasured : undefined}
                                 className="hidden min-h-0 flex-1 flex-col gap-0.5 overflow-hidden sm:flex"
                             >
                                 {entries.slice(0, shown).map((entry) => (
@@ -638,20 +637,10 @@ function YearGrid({
 
     // How much is on each day of the year, counted once rather than by asking
     // every one of 365 days to search every entry.
-    const counts = useMemo(() => {
-        const found = new Map<string, number>();
-        const first = days[0] as Date;
-        const last = days[days.length - 1] as Date;
-        for (const entry of entries) {
-            let cursor = core.startOfDay(entry.start < first ? first : entry.start);
-            const end = entry.end && entry.end > entry.start ? entry.end : entry.start;
-            for (; cursor <= end && cursor <= last; cursor = core.addDays(cursor, 1)) {
-                const key = cursor.toDateString();
-                found.set(key, (found.get(key) ?? 0) + 1);
-            }
-        }
-        return found;
-    }, [days, entries]);
+    const counts = useMemo(
+        () => layout.countByDay(entries, days[0] as Date, days[days.length - 1] as Date),
+        [days, entries]
+    );
 
     return (
         <div className="h-[calc(100dvh-19rem)] min-h-[26rem] overflow-y-auto overscroll-contain rounded-lg border border-border p-3">

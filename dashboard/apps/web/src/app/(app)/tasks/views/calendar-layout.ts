@@ -323,6 +323,20 @@ export function entriesOnDay(entries: readonly CalendarEntry[], day: Date): Cale
         );
 }
 
+/** How many entries fall on each day from `first` to `last`, keyed by
+ *  `toDateString()`, counted on the same days `coversDay` places them. */
+export function countByDay(entries: readonly CalendarEntry[], first: Date, last: Date): Map<string, number> {
+    const found = new Map<string, number>();
+    for (const entry of entries) {
+        let cursor = core.startOfDay(entry.start < first ? first : entry.start);
+        for (; cursor <= last && coversDay(entry, cursor); cursor = core.addDays(cursor, 1)) {
+            const key = cursor.toDateString();
+            found.set(key, (found.get(key) ?? 0) + 1);
+        }
+    }
+    return found;
+}
+
 /** Minutes from midnight, which is what positions a block in an hour grid. */
 export function minutesInto(date: Date): number {
     return date.getHours() * 60 + date.getMinutes();

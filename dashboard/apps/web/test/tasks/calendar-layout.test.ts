@@ -137,6 +137,28 @@ describe("what lands on a day", () => {
         expect(layout.coversDay(entry, new Date(2026, 7, 9))).toBe(false);
     });
 
+    it("counts a day in the year on the same days the other views place an entry", () => {
+        const entries = [
+            layout.googleEntry(event({ id: "one", start: "2026-08-05", end: "2026-08-06", allDay: true })),
+            layout.googleEntry(event({ id: "three", start: "2026-08-05", end: "2026-08-08", allDay: true })),
+            layout.googleEntry(
+                event({
+                    id: "midnight",
+                    start: new Date(2026, 7, 9, 22, 0).toISOString(),
+                    end: new Date(2026, 7, 10, 0, 0).toISOString()
+                })
+            )
+        ];
+        const counts = layout.countByDay(entries, new Date(2026, 0, 1), new Date(2026, 11, 31));
+        for (const day of [4, 5, 6, 7, 8, 9, 10]) {
+            const date = new Date(2026, 7, day);
+            const placed = entries.filter((entry) => layout.coversDay(entry, date)).length;
+            expect(counts.get(date.toDateString()) ?? 0, `Aug ${day}`).toBe(placed);
+        }
+        expect(counts.get(new Date(2026, 7, 8).toDateString())).toBeUndefined();
+        expect(counts.get(new Date(2026, 7, 10).toDateString())).toBeUndefined();
+    });
+
     it("lists a day with the all-day items first and the rest in clock order", () => {
         const entries = [
             layout.googleEntry(event({ id: "late", start: new Date(2026, 7, 5, 16, 0).toISOString() })),
