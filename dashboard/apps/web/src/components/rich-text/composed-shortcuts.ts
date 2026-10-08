@@ -1,35 +1,107 @@
 /**
- * Markdown shortcuts that also work from a dead key.
+ * Markdown shortcuts that work however the closing character arrived.
  *
  * On a Spanish keyboard - and French, German, Portuguese and others - the
- * backtick, the tilde and the caret are dead keys: pressing one opens a
- * composition, and the next key commits it. Text that arrives that way never
- * reaches the editor as a typed character, so the rule that turns `this` into
- * code never sees the closing backtick. The editor's own retry runs too early,
- * while the composition is still being closed, and gives up. The message was
- * then stored with its backticks escaped and drawn as literal text - the one
- * place a Spanish keyboard and an English one disagreed about what was sent.
+ * backtick and the tilde are dead keys. Depending on the system and the browser
+ * the character they produce arrives as a composition, as a plain insertion the
+ * editor's own rules never get to see, or late, after the rule has already
+ * looked. Each of those left `this` with its backticks in the text: the message
+ * was stored with them escaped and drawn as literal text, while the same words
+ * pasted, or typed on an English keyboard, came out as code.
  *
- * So once a composition has really ended, the character it committed is offered
- * to the input rules again, exactly as if it had been typed there. Where it sits
- * is followed through whatever is typed in the meantime, so a fast next key does
- * not lose it, and nothing happens when no rule wants it.
+ * So the shortcut is settled from the document rather than from the key event.
+ * Whenever a character is typed that closes `code` or ~~strike~~, and the text
+ * before it opens the same pair, the pair becomes the mark - exactly what the
+ * rule does when it does see the key. A composition is left alone while it is
+ * open and settled once it has really ended. Pasting, undoing and loading a
+ * document are not typing and are never rewritten.
  */
 
 import { Extension } from "@tiptap/core";
+import type { MarkType } from "@tiptap/pm/model";
 import type { EditorView } from "@tiptap/pm/view";
-import { Plugin, PluginKey } from "@tiptap/pm/state";
-
-/** The characters a Markdown shortcut can end on and a dead key can produce. */
-const CLOSERS = new Set(["`", "~", "^"]);
+import { Plugin, PluginKey, type EditorState, type Transaction } from "@tiptap/pm/state";
 
 /** How often to look for the composition to have finished closing, and for how
  *  long. ProseMirror ends it on a short timer of its own after the event. */
 const POLL_MS = 25;
 const MAX_POLLS = 8;
 
-/** Where the last composition ended, mapped through every edit since, or null. */
-const composedKey = new PluginKey<number | null>("composedShortcuts");
+/** Stands in for a chip or a line break inside the text that is matched, so a
+ *  pair can never reach across one. */
+const LEAF = "￼";
+
+/** The pairs settled here: the closing text that triggers each, and what must
+ *  come before it in the same paragraph. Both mirror the editor's own rules. */
+const PAIRS: ReadonlyArray<{ mark: string; close: string; before: RegExp }> = [
+    { mark: "code", close: "`", before: /(?:^|[^`])(`([^`￼]*[^`\s￼][^`￼]*)`)$/ },
+    { mark: "strike", close: "~~", before: /(?:^|\s)(~~([^~￼]*[^~\s￼][^~￼]*)~~)$/ }
+];
+
+/** Where the last composition ended, followed through every edit since; a
+ *  transaction carrying a list of positions asks for those to be settled. */
+const settleKey = new PluginKey<number | null>("composedShortcuts");
+
+/** Transactions that are not somebody typing. */
+function typed(tr: Transaction): boolean {
+    if (!tr.docChanged) return false;
+    if (tr.getMeta("composition") !== undefined) return false;
+    if (tr.getMeta("history$") !== undefined) return false;
+    const event = tr.getMeta("uiEvent") as string | undefined;
+    return event !== "paste" && event !== "drop" && !tr.getMeta("paste");
+}
+
+/** Where, in the final document, a character or two was just put. */
+function typedEnds(transactions: readonly Transaction[]): number[] {
+    const ends: number[] = [];
+    transactions.forEach((tr, index) => {
+        const requested = tr.getMeta(settleKey) as number[] | number | null | undefined;
+        if (Array.isArray(requested)) ends.push(...requested.map((at) => mapOn(transactions, index + 1, at)));
+        if (!typed(tr)) return;
+        tr.steps.forEach((step, stepIndex) => {
+            step.getMap().forEach((_from, _to, start, end) => {
+                const size = end - start;
+                if (size < 1 || size > 2) return;
+                const inTr = tr.mapping.slice(stepIndex + 1).map(end, -1);
+                ends.push(mapOn(transactions, index + 1, inTr));
+            });
+        });
+    });
+    return ends;
+}
+
+function mapOn(transactions: readonly Transaction[], from: number, at: number): number {
+    return transactions.slice(from).reduce((pos, tr) => tr.mapping.map(pos, -1), at);
+}
+
+/** The transaction that turns a pair closed at `end` into its mark, if one is. */
+function settleAt(state: EditorState, end: number): Transaction | null {
+    const { doc } = state;
+    if (end < 1 || end > doc.content.size) return null;
+    const $end = doc.resolve(end);
+    const block = $end.parent;
+    if (!block.isTextblock || block.type.spec.code) return null;
+    const text = doc.textBetween($end.start(), end, undefined, LEAF);
+
+    for (const pair of PAIRS) {
+        if (!text.endsWith(pair.close)) continue;
+        const type: MarkType | undefined = state.schema.marks[pair.mark];
+        const found = pair.before.exec(text);
+        const closed = found?.[1];
+        if (!type || !closed) continue;
+        const from = end - closed.length;
+        // Already formatted - a pair inside code is its content, not a shortcut.
+        if (doc.rangeHasMark(from, end, state.schema.marks.code ?? type)) continue;
+        const width = pair.close.length;
+        const tr = state.tr
+            .delete(end - width, end)
+            .delete(from, from + width)
+            .addMark(from, end - 2 * width, type.create())
+            .removeStoredMark(type);
+        return tr;
+    }
+    return null;
+}
 
 function offerComposed(view: EditorView, attempt = 0): void {
     if (view.isDestroyed) return;
@@ -40,25 +112,29 @@ function offerComposed(view: EditorView, attempt = 0): void {
     flushComposed(view);
 }
 
-/** Apply what the last composition left, once the editor has closed it. */
+/**
+ * Settle what a composition left, once it has closed.
+ *
+ * Where it ended was noted when it ended, but the browser may only put the
+ * committed text in after that - one character, or two when the dead key was
+ * followed by one it does not combine with - and somebody typing fast has moved
+ * the caret on by then. So the noted place, the few after it, and the caret are
+ * all looked at; only a pair actually closed at one of them changes anything.
+ */
 function flushComposed(view: EditorView): void {
     if (view.isDestroyed) return;
-    const at = composedKey.getState(view.state);
-    if (at === null || at === undefined || at < 1) return;
-    view.dispatch(view.state.tr.setMeta(composedKey, null));
-    const committed = view.state.doc.textBetween(at - 1, at);
-    if (!CLOSERS.has(committed)) return;
-    view.someProp("handleTextInput", (handle) =>
-        handle(view, at - 1, at, committed, () => view.state.tr)
-    );
+    const at = settleKey.getState(view.state);
+    const head = view.state.selection.head;
+    const near = at === null || at === undefined ? [] : [at, at + 1, at + 2];
+    view.dispatch(view.state.tr.setMeta(settleKey, [...near, head, head - 1]));
 }
 
 /**
  * Run `then` once the last composition is closed and its shortcut applied.
  *
  * Sending goes through this, so Enter pressed straight after a dead key sends
- * `this` as code instead of beating the retry and sending the backticks. With
- * no composition in the way - nearly always - it runs at once.
+ * `this` as code instead of beating the settling and sending the backticks.
+ * With no composition in the way - nearly always - it runs at once.
  */
 export function afterComposition(view: EditorView, then: () => void, attempt = 0): void {
     if (view.composing && attempt < MAX_POLLS) {
@@ -75,21 +151,27 @@ export const ComposedShortcuts = Extension.create({
     addProseMirrorPlugins() {
         return [
             new Plugin<number | null>({
-                key: composedKey,
+                key: settleKey,
                 state: {
                     init: () => null,
                     apply(tr, value) {
-                        const set = tr.getMeta(composedKey) as number | null | undefined;
-                        if (set !== undefined) return set;
+                        const meta = tr.getMeta(settleKey) as number[] | number | null | undefined;
+                        if (Array.isArray(meta)) return null;
+                        if (meta !== undefined) return meta;
                         return value === null ? null : tr.mapping.map(value, -1);
                     }
+                },
+                appendTransaction(transactions, _old, state) {
+                    for (const end of typedEnds(transactions)) {
+                        const tr = settleAt(state, end);
+                        if (tr) return tr;
+                    }
+                    return null;
                 },
                 props: {
                     handleDOMEvents: {
                         compositionend: (view) => {
-                            view.dispatch(
-                                view.state.tr.setMeta(composedKey, view.state.selection.from)
-                            );
+                            view.dispatch(view.state.tr.setMeta(settleKey, view.state.selection.from));
                             window.setTimeout(() => offerComposed(view), 0);
                             return false;
                         }

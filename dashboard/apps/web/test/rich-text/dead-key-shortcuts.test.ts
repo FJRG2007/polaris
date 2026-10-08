@@ -45,6 +45,14 @@ describe("a shortcut closed by a dead key", () => {
         expect(current.getHTML()).toContain("<code>test</code>");
     });
 
+    it("still finds it when more was typed before the composition closed", async () => {
+        const current = typedThroughComposition("run `test`");
+        current.view.dispatch(current.state.tr.insertText(" "));
+        current.view.dispatch(current.state.tr.insertText("n"));
+        await settle();
+        expect(md.docToMarkdown(current.getJSON())).toBe("run `test` n");
+    });
+
     it("turns ~~this~~ into a strike the same way", async () => {
         const current = typedThroughComposition("a ~~gone~~");
         await settle();
@@ -77,5 +85,63 @@ describe("a shortcut closed by a dead key", () => {
         let sent = false;
         afterComposition(editor.view, () => (sent = true));
         expect(sent).toBe(true);
+    });
+});
+
+/** Characters landing one at a time without the editor's rules seeing them -
+ *  how a dead key's character arrives on some systems and browsers. */
+function insertedPlainly(text: string, into?: Editor): Editor {
+    const current = into ?? new Editor({ element: document.createElement("div"), extensions: baseExtensions("") });
+    editor = current;
+    for (const char of text) current.view.dispatch(current.state.tr.insertText(char));
+    return current;
+}
+
+describe("a shortcut whose closing character the rules never saw", () => {
+    it("turns `this` into code as soon as it is closed", () => {
+        const current = insertedPlainly("`test`");
+        expect(current.getHTML()).toContain("<code>test</code>");
+        expect(md.docToMarkdown(current.getJSON())).toBe("`test`");
+    });
+
+    it("keeps writing outside the code after it", () => {
+        const current = insertedPlainly("run `npm i` now");
+        expect(md.docToMarkdown(current.getJSON())).toBe("run `npm i` now");
+    });
+
+    it("turns ~~this~~ into a strike", () => {
+        const current = insertedPlainly("a ~~gone~~");
+        expect(current.getHTML()).toContain("<s>gone</s>");
+    });
+
+    it("leaves a lone backtick, an empty pair and a spaced pair alone", () => {
+        for (const text of ["use `", "``", "` `"]) {
+            const current = insertedPlainly(text);
+            expect(current.getHTML()).not.toContain("<code>");
+            current.destroy();
+        }
+    });
+
+    it("does not rewrite text that was loaded rather than typed", () => {
+        editor = new Editor({ element: document.createElement("div"), extensions: baseExtensions("") });
+        editor.commands.insertContent("kept `as typed`");
+        expect(editor.getHTML()).not.toContain("<code>");
+    });
+
+    it("does not redo a shortcut that was undone", () => {
+        const current = insertedPlainly("`x`");
+        expect(current.getHTML()).toContain("<code>x</code>");
+        current.commands.undo();
+        current.commands.redo();
+        current.commands.undo();
+        expect(current.getHTML()).not.toContain("<code>x</code>");
+    });
+
+    it("leaves backticks inside a code block as they are", () => {
+        editor = new Editor({ element: document.createElement("div"), extensions: baseExtensions("") });
+        editor.commands.setCodeBlock();
+        insertedPlainly("`a`", editor);
+        expect(md.docToMarkdown(editor.getJSON())).toContain("`a`");
+        expect(editor.getHTML()).not.toContain("<code>a</code>");
     });
 });
