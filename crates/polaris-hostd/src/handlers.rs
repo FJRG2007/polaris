@@ -15,7 +15,7 @@ use serde::Deserialize;
 use crate::config::Config;
 use crate::deploy::{self, DeploySpec};
 use crate::docker;
-use crate::http::{self, Request, Response};
+use crate::http::{Request, Response};
 use crate::networks;
 use crate::security::{self, PathError};
 
@@ -55,7 +55,10 @@ fn capabilities(config: &Config) -> serde_json::Value {
     let kubernetes = std::env::var("KUBECONFIG").is_ok_and(|v| !v.is_empty())
         || path_exists("/var/run/secrets/kubernetes.io");
     serde_json::json!({
-        "hostFilesystem": true,
+        // The raw host-file API is gone (nothing used it, and it could reach
+        // the whole disk). The key stays because a dashboard requires it to
+        // read this answer at all.
+        "hostFilesystem": false,
         "nativeMounts": true,
         "docker": config.docker_socket.exists(),
         "deploy": config.docker_socket.exists(),
@@ -259,7 +262,6 @@ pub fn dispatch<R: Read>(state: &AppState, req: &Request, body: &mut R) -> Respo
         ("POST", "/v1/deploy/volume/wipe") => deploy_volume_wipe(req, body),
         ("POST", "/v1/deploy/networks/reconcile") => deploy_networks_reconcile(state, req, body),
         ("POST", "/v1/deploy/networks/cut") => deploy_networks_cut(state, req, body),
-        _ if path.starts_with("/v1/fs/") => fs_handler(state, req, body),
         ("DELETE", _) if path.starts_with("/v1/mounts/") => {
             mount_delete(state, &path["/v1/mounts/".len()..])
         }
@@ -1268,70 +1270,6 @@ fn path_error_response(err: PathError) -> Response {
     }
 }
 
-fn fs_handler<R: Read>(state: &AppState, req: &Request, body: &mut R) -> Response {
-    let requested = &req.path["/v1/fs/".len()..];
-    let resolved = match security::resolve_within(&state.config.root, requested) {
-        Ok(p) => p,
-        Err(e) => return path_error_response(e),
-    };
-
-    match req.method.as_str() {
-        "GET" => fs_get(&resolved, req),
-        "PUT" => fs_put(&resolved, req, body),
-        "DELETE" => match std::fs::remove_file(&resolved) {
-            Ok(()) => Response::empty(204, "No Content"),
-            Err(e) if e.kind() == std::io::ErrorKind::NotFound => Response::not_found(),
-            Err(_) => Response::server_error(),
-        },
-        _ => Response::text(405, "Method Not Allowed", "unsupported method for /v1/fs"),
-    }
-}
-
-fn fs_get(resolved: &std::path::Path, req: &Request) -> Response {
-    // A Range request yields a 206 partial; otherwise the whole file streams.
-    if let Some(range) = req.header("range").and_then(http::parse_range) {
-        match http::open_ranged(resolved, &range) {
-            Ok((file, len, total)) => {
-                let start = range.start.min(total);
-                let end = start + len.saturating_sub(1);
-                Response::file(206, "Partial Content", file, len)
-                    .with_header("Content-Range", format!("bytes {start}-{end}/{total}"))
-                    .with_header("Accept-Ranges", "bytes")
-            }
-            Err(e) if e.kind() == std::io::ErrorKind::NotFound => Response::not_found(),
-            Err(_) => Response::server_error(),
-        }
-    } else {
-        match std::fs::File::open(resolved) {
-            Ok(file) => {
-                let len = file.metadata().map(|m| m.len()).unwrap_or(0);
-                Response::file(200, "OK", file, len).with_header("Accept-Ranges", "bytes")
-            }
-            Err(e) if e.kind() == std::io::ErrorKind::NotFound => Response::not_found(),
-            Err(_) => Response::server_error(),
-        }
-    }
-}
-
-fn fs_put<R: Read>(resolved: &std::path::Path, req: &Request, body: &mut R) -> Response {
-    if let Some(parent) = resolved.parent() {
-        if std::fs::create_dir_all(parent).is_err() {
-            return Response::server_error();
-        }
-    }
-    let mut file = match std::fs::File::create(resolved) {
-        Ok(f) => f,
-        Err(_) => return Response::server_error(),
-    };
-    // Stream exactly the declared body length from the connection to disk; the
-    // reader is already bounded to Content-Length by the caller.
-    let mut limited = body.take(req.content_length);
-    match std::io::copy(&mut limited, &mut file) {
-        Ok(_) => Response::empty(201, "Created"),
-        Err(_) => Response::server_error(),
-    }
-}
-
 /// Read a control body into memory, refusing anything over the cap.
 fn read_control_body<R: Read>(req: &Request, body: &mut R) -> Result<Vec<u8>, Response> {
     if req.content_length > MAX_CONTROL_BODY {
@@ -1928,7 +1866,7 @@ mod tests {
         let mut config = Config::from_env();
         config.auto_update = false;
         let caps = capabilities(&config);
-        assert_eq!(caps["hostFilesystem"], true);
+        assert_eq!(caps["hostFilesystem"], false);
         assert_eq!(caps["nativeMounts"], true);
         assert_eq!(caps["autoUpdate"], false);
         // Presence-based flags are booleans regardless of host.

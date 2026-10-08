@@ -11,10 +11,6 @@ use std::path::PathBuf;
 /// never survives a reboot (the daemon recreates it, and the token, on start).
 const DEFAULT_SOCKET: &str = "/run/polaris/hostd.sock";
 const DEFAULT_TOKEN_FILE: &str = "/run/polaris/hostd.token";
-/// Safe default for `/v1/fs/*`: a host-side allowlist root that is not the whole
-/// filesystem. `root=/` is deliberately refused as an insecure default because it
-/// would make the host filesystem API effectively equivalent to root access.
-const DEFAULT_ROOT: &str = "/var/lib/polaris";
 const DEFAULT_MOUNT_ROOT: &str = "/mnt/polaris";
 const DEFAULT_DOCKER_SOCKET: &str = "/var/run/docker.sock";
 const DEFAULT_DEPLOY_ROOT: &str = "/var/lib/polaris/deploy";
@@ -30,9 +26,6 @@ pub struct Config {
     pub tcp_addr: Option<String>,
     /// Where the freshly generated bearer token is written (mode 0600).
     pub token_file: PathBuf,
-    /// Allowlist root for the `/v1/fs/*` endpoints. Paths canonicalizing
-    /// outside this are rejected with 403.
-    pub root: PathBuf,
     /// Allowlist root for mount targets. Targets outside it are rejected.
     pub mount_root: PathBuf,
     /// Docker Engine API socket the `/v1/docker` proxy forwards to. The web
@@ -58,28 +51,8 @@ fn env(key: &str) -> Option<String> {
     std::env::var(key).ok().filter(|v| !v.is_empty())
 }
 
-fn sanitize_path(key: &str, value: String, fallback: &str) -> PathBuf {
-    let path = PathBuf::from(value);
-    if path == PathBuf::from("/") {
-        eprintln!(
-            "polaris-hostd: rejecting insecure {key}=/{}, defaulting to {}",
-            "",
-            fallback
-        );
-        return PathBuf::from(fallback);
-    }
-    path
-}
-
 impl Config {
     pub fn from_env() -> Self {
-        let root = env("POLARIS_HOSTD_ROOT")
-            .map(|v| sanitize_path("POLARIS_HOSTD_ROOT", v, DEFAULT_ROOT))
-            .unwrap_or_else(|| PathBuf::from(DEFAULT_ROOT));
-        let mount_root = env("POLARIS_HOSTD_MOUNT_ROOT")
-            .map(|v| sanitize_path("POLARIS_HOSTD_MOUNT_ROOT", v, DEFAULT_MOUNT_ROOT))
-            .unwrap_or_else(|| PathBuf::from(DEFAULT_MOUNT_ROOT));
-
         Self {
             socket: env("POLARIS_HOSTD_SOCKET")
                 .map(PathBuf::from)
@@ -88,8 +61,9 @@ impl Config {
             token_file: env("POLARIS_HOSTD_TOKEN_FILE")
                 .map(PathBuf::from)
                 .unwrap_or_else(|| PathBuf::from(DEFAULT_TOKEN_FILE)),
-            root,
-            mount_root,
+            mount_root: env("POLARIS_HOSTD_MOUNT_ROOT")
+                .map(PathBuf::from)
+                .unwrap_or_else(|| PathBuf::from(DEFAULT_MOUNT_ROOT)),
             docker_socket: env("POLARIS_HOSTD_DOCKER_SOCKET")
                 .map(PathBuf::from)
                 .unwrap_or_else(|| PathBuf::from(DEFAULT_DOCKER_SOCKET)),
