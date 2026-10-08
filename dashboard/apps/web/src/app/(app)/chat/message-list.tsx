@@ -54,6 +54,7 @@ import { isPlayable, isVoiceMessage } from "./voice-recorder";
 import { AttachmentViewer, previewableAs, type ViewedFile } from "./attachment-viewer";
 import { usePersonPress } from "@/components/person-press";
 import { NoticeText } from "./notice-line";
+import { useSwipeReply } from "./swipe-reply";
 
 /**
  * A file on a message that is not a picture, a recording or a clip.
@@ -737,6 +738,14 @@ function Message({
      *  again in two places. */
     const writer = message.authorId && !mine ? message.authorId : null;
 
+    /** Swiping the line to the right answers it, on a phone - the same reply the
+     *  menu and the hover bar offer, so only where those offer it. */
+    const swipe = useSwipeReply(
+        onReply && canPost && !message.deleted && message.kind !== "system"
+            ? () => onReply(message)
+            : undefined
+    );
+
     // Something Polaris said rather than somebody: joined, left, was added.
     // Indented to where message text starts rather than to the avatar gutter,
     // so a room reads as one column of sentences with the occasional quiet one
@@ -771,6 +780,20 @@ function Message({
     }
 
     return (
+        // Clipped sideways only, so a line pulled to the right never gives the
+        // conversation a horizontal scrollbar while the hover bar, which sits
+        // half above the row, is still drawn whole.
+        <div className="relative overflow-x-clip">
+            {swipe.enabled && (
+                <span
+                    ref={swipe.cue}
+                    aria-hidden
+                    data-armed="false"
+                    className="pointer-events-none absolute left-4 top-1/2 flex size-7 -translate-y-1/2 items-center justify-center rounded-full bg-muted text-muted-foreground opacity-0 data-[armed=true]:bg-primary data-[armed=true]:text-primary-foreground"
+                >
+                    <CornerUpLeft className="size-4" />
+                </span>
+            )}
         <MessageMenu
             actions={{
                 message,
@@ -796,9 +819,12 @@ function Message({
             harder than a hover for the same reason: one row is picked out, and
             the pointer is somewhere else. */}
             <div
+                ref={swipe.line}
+                {...swipe.handlers}
                 className={cn(
                     "group relative flex gap-2 px-4 transition-colors hover:bg-card-hover/60 data-[state=open]:bg-card-hover",
-                    grouped ? "py-0.5" : "pb-0.5 pt-3"
+                    grouped ? "py-0.5" : "pb-0.5 pt-3",
+                    swipe.enabled && "touch-pan-y touch-pinch-zoom"
                 )}
             >
                 <span className="w-8 shrink-0">
@@ -1213,6 +1239,7 @@ function Message({
                 />
             </div>
         </MessageMenu>
+        </div>
     );
 }
 
