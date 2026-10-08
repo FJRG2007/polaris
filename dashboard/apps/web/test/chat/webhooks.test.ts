@@ -24,7 +24,10 @@ interface Hook {
 const db = vi.hoisted(() => ({
     hooks: [] as Hook[],
     messages: [] as Array<Record<string, unknown>>,
-    access: { spaceId: "s1", mayAdminister: true } as { spaceId: string | null; mayAdminister: boolean },
+    access: { spaceId: "s1", mayAdminister: true } as {
+        spaceId: string | null;
+        mayAdminister: boolean;
+    },
     channel: { archived: false, space: { archived: false } } as {
         archived: boolean;
         space: { archived: boolean } | null;
@@ -45,7 +48,13 @@ vi.mock("@polaris/db", () => {
             db.hooks.filter((hook) => hook.channelId === where.channelId),
         count: async ({ where }: { where: { channelId: string } }) =>
             db.hooks.filter((hook) => hook.channelId === where.channelId).length,
-        create: async ({ data, select }: { data: Omit<Hook, "id" | "createdAt" | "lastUsedAt">; select?: Record<string, unknown> }) => {
+        create: async ({
+            data,
+            select
+        }: {
+            data: Omit<Hook, "id" | "createdAt" | "lastUsedAt">;
+            select?: Record<string, unknown>;
+        }) => {
             db.next += 1;
             const hook: Hook = {
                 id: `0190a000-0000-7000-8000-${String(db.next).padStart(12, "0")}`,
@@ -56,11 +65,25 @@ vi.mock("@polaris/db", () => {
             db.hooks.push(hook);
             return pick(hook, select);
         },
-        findUnique: async ({ where, select }: { where: { id: string }; select?: Record<string, unknown> }) => {
+        findUnique: async ({
+            where,
+            select
+        }: {
+            where: { id: string };
+            select?: Record<string, unknown>;
+        }) => {
             const hook = db.hooks.find((entry) => entry.id === where.id);
             return hook ? pick(hook, select) : null;
         },
-        update: async ({ where, data, select }: { where: { id: string }; data: Partial<Hook>; select?: Record<string, unknown> }) => {
+        update: async ({
+            where,
+            data,
+            select
+        }: {
+            where: { id: string };
+            data: Partial<Hook>;
+            select?: Record<string, unknown>;
+        }) => {
             const hook = db.hooks.find((entry) => entry.id === where.id)!;
             Object.assign(hook, data);
             return pick(hook, select);
@@ -77,7 +100,11 @@ vi.mock("@polaris/db", () => {
     const tx = {
         chatMessage: {
             create: async ({ data }: { data: Record<string, unknown> }) => {
-                const message = { id: `m${db.messages.length + 1}`, createdAt: new Date(), ...data };
+                const message = {
+                    id: `m${db.messages.length + 1}`,
+                    createdAt: new Date(),
+                    ...data
+                };
                 db.messages.push(message);
                 return message;
             }
@@ -139,7 +166,9 @@ describe("making one", () => {
 
     it("is refused to somebody who does not run the channel, and outside a space", async () => {
         db.access = { spaceId: "s1", mayAdminister: false };
-        await expect(webhooks.createWebhook(ME, { channelId: CHANNEL, name: "CI" })).rejects.toThrow();
+        await expect(
+            webhooks.createWebhook(ME, { channelId: CHANNEL, name: "CI" })
+        ).rejects.toThrow();
         db.access = { spaceId: null, mayAdminister: true };
         await expect(webhooks.listWebhooks(ME, CHANNEL)).rejects.toThrow();
         expect(db.hooks).toEqual([]);
@@ -149,7 +178,9 @@ describe("making one", () => {
         for (let index = 0; index < core.MAX_CHAT_WEBHOOKS; index += 1) {
             await webhooks.createWebhook(ME, { channelId: CHANNEL, name: `hook ${index}` });
         }
-        await expect(webhooks.createWebhook(ME, { channelId: CHANNEL, name: "one more" })).rejects.toThrow();
+        await expect(
+            webhooks.createWebhook(ME, { channelId: CHANNEL, name: "one more" })
+        ).rejects.toThrow();
     });
 });
 
@@ -160,8 +191,12 @@ describe("the address", () => {
             channelId: CHANNEL,
             name: "CI"
         });
-        expect(await webhooks.webhookFor(made.webhook.id, `${made.token.slice(0, -1)}A`)).toBeNull();
-        expect(await webhooks.webhookFor("0190a000-0000-7000-8000-00000000ffff", made.token)).toBeNull();
+        expect(
+            await webhooks.webhookFor(made.webhook.id, `${made.token.slice(0, -1)}A`)
+        ).toBeNull();
+        expect(
+            await webhooks.webhookFor("0190a000-0000-7000-8000-00000000ffff", made.token)
+        ).toBeNull();
         expect(await webhooks.webhookFor("not-an-id", made.token)).toBeNull();
         expect(await webhooks.webhookFor(made.webhook.id, "short")).toBeNull();
     });
@@ -211,11 +246,14 @@ describe("Discord's body", () => {
     it("takes content and username, ignores the rest, and refuses an empty message", () => {
         const schema = core.chatWebhookExecuteSchema;
         expect(
-            schema.safeParse({ content: "hi", username: "Bot", embeds: [], avatar_url: "x" }).success
+            schema.safeParse({ content: "hi", username: "Bot", embeds: [], avatar_url: "x" })
+                .success
         ).toBe(true);
         expect(schema.safeParse({ content: "   " }).success).toBe(false);
         expect(schema.safeParse({ username: "Bot" }).success).toBe(false);
-        expect(schema.safeParse({ content: "x".repeat(core.MAX_CHAT_MESSAGE + 1) }).success).toBe(false);
+        expect(schema.safeParse({ content: "x".repeat(core.MAX_CHAT_MESSAGE + 1) }).success).toBe(
+            false
+        );
         expect(schema.safeParse({ content: "hi", username: "x".repeat(81) }).success).toBe(false);
     });
 });

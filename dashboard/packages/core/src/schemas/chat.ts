@@ -375,7 +375,6 @@ export const chatChannelUpdateSchema = z.object({
     userLimit: chatVoiceUserLimitSchema.optional()
 });
 
-
 export type ChatChannelUpdateInput = z.infer<typeof chatChannelUpdateSchema>;
 
 /**

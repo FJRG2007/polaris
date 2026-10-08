@@ -124,6 +124,11 @@ describe("describing it", () => {
         const response = await route.GET(new Request("https://polaris.test/x"), {
             params: Promise.resolve({ id: HOOK.id, token: "tok" })
         });
-        expect(await response.json()).toEqual({ id: HOOK.id, type: 1, name: "CI", channel_id: "c1" });
+        expect(await response.json()).toEqual({
+            id: HOOK.id,
+            type: 1,
+            name: "CI",
+            channel_id: "c1"
+        });
     });
 });

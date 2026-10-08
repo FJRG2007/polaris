@@ -44,7 +44,11 @@ export interface SteamDetails {
     readonly comingSoon: boolean;
     /** As Steam writes it in the language asked for. */
     readonly releaseDate: string;
-    readonly platforms: { readonly windows: boolean; readonly mac: boolean; readonly linux: boolean };
+    readonly platforms: {
+        readonly windows: boolean;
+        readonly mac: boolean;
+        readonly linux: boolean;
+    };
 }
 
 /** How long a Steam card is trusted. Prices move with sales, which start and
@@ -188,7 +192,8 @@ export function readSteamAnswer(appId: string, payload: unknown): SteamDescribed
                   discount
               }
             : null;
-    const image = data.header_image && /^https:\/\//i.test(data.header_image) ? data.header_image : null;
+    const image =
+        data.header_image && /^https:\/\//i.test(data.header_image) ? data.header_image : null;
 
     return {
         title: data.name.slice(0, 200),
@@ -243,7 +248,7 @@ export function storedSteamDetails(value: string | null | undefined): SteamDetai
  *  are drawn as text, so the escapes are undone here rather than shown. */
 function decodeEntities(value: string): string {
     return value
-        .replace(/&quot;/g, "\"")
+        .replace(/&quot;/g, '"')
         .replace(/&#0?39;/g, "'")
         .replace(/&lt;/g, "<")
         .replace(/&gt;/g, ">")

@@ -84,7 +84,12 @@ beforeEach(() => {
 });
 
 describe("who may pin", () => {
-    const base = { ownerId: "owner", createdById: "owner", membersMayEdit: false, mayModerate: false };
+    const base = {
+        ownerId: "owner",
+        createdById: "owner",
+        membersMayEdit: false,
+        mayModerate: false
+    };
 
     it("either person in a direct message", () => {
         expect(pinsAllowed({ ...base, kind: "dm" }, "anyone")).toBe(true);
@@ -114,9 +119,15 @@ describe("how long a pin lasts", () => {
     });
 
     it("accepts only those four, for a message id", () => {
-        expect(pinInputSchema.safeParse({ messageId: MESSAGE_ID, duration: "week" }).success).toBe(true);
-        expect(pinInputSchema.safeParse({ messageId: MESSAGE_ID, duration: "year" }).success).toBe(false);
-        expect(pinInputSchema.safeParse({ messageId: "not-an-id", duration: "day" }).success).toBe(false);
+        expect(pinInputSchema.safeParse({ messageId: MESSAGE_ID, duration: "week" }).success).toBe(
+            true
+        );
+        expect(pinInputSchema.safeParse({ messageId: MESSAGE_ID, duration: "year" }).success).toBe(
+            false
+        );
+        expect(pinInputSchema.safeParse({ messageId: "not-an-id", duration: "day" }).success).toBe(
+            false
+        );
     });
 });
 
@@ -166,7 +177,11 @@ describe("pinning", () => {
         expect(db.updates).toEqual([]);
         db.message = { ...db.message, pinnedAt: new Date() };
         await unpin(ME, MESSAGE_ID);
-        expect(db.updates[0]?.data).toEqual({ pinnedAt: null, pinnedById: null, pinExpiresAt: null });
+        expect(db.updates[0]?.data).toEqual({
+            pinnedAt: null,
+            pinnedById: null,
+            pinExpiresAt: null
+        });
         expect(db.published.map((change) => change.kind)).toEqual(["pins"]);
     });
 });

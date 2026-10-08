@@ -80,7 +80,9 @@ export function InvitesSection({ channel }: { channel: ChatChannelView }) {
     if (channel.private) {
         return (
             <div className="flex flex-col items-start gap-3 rounded-lg border border-border px-3 py-3">
-                <p className="text-sm text-muted-foreground">{t("channelSettings.invitesPrivate")}</p>
+                <p className="text-sm text-muted-foreground">
+                    {t("channelSettings.invitesPrivate")}
+                </p>
                 <Button asChild size="sm" variant="secondary">
                     <Link href={`/chat/c/${channel.id}/settings/permissions`}>
                         {t("channelSettings.openPermissions")}
@@ -130,7 +132,9 @@ export function InvitesSection({ channel }: { channel: ChatChannelView }) {
 
             <div className="flex flex-wrap items-end gap-2">
                 <label className="flex min-w-32 flex-1 flex-col gap-1">
-                    <span className="text-xs text-muted-foreground">{t("invite.expiresAfter")}</span>
+                    <span className="text-xs text-muted-foreground">
+                        {t("invite.expiresAfter")}
+                    </span>
                     <Select
                         value={expires}
                         onValueChange={setExpires}
@@ -142,18 +146,22 @@ export function InvitesSection({ channel }: { channel: ChatChannelView }) {
                     />
                 </label>
                 <label className="flex min-w-32 flex-1 flex-col gap-1">
-                    <span className="text-xs text-muted-foreground">{t("invite.numberOfUses")}</span>
+                    <span className="text-xs text-muted-foreground">
+                        {t("invite.numberOfUses")}
+                    </span>
                     <Select
                         value={uses}
                         onValueChange={setUses}
                         aria-label={t("invite.numberOfUses")}
-                        options={[core.INVITE_UNLIMITED, ...core.INVITE_USE_LIMITS].map((limit) => ({
-                            value: String(limit),
-                            label:
-                                limit === core.INVITE_UNLIMITED
-                                    ? t("invite.uses.unlimited")
-                                    : t("invite.uses.count", { count: limit })
-                        }))}
+                        options={[core.INVITE_UNLIMITED, ...core.INVITE_USE_LIMITS].map(
+                            (limit) => ({
+                                value: String(limit),
+                                label:
+                                    limit === core.INVITE_UNLIMITED
+                                        ? t("invite.uses.unlimited")
+                                        : t("invite.uses.count", { count: limit })
+                            })
+                        )}
                     />
                 </label>
                 <Button size="sm" disabled={busy} onClick={() => void create()}>
@@ -213,7 +221,9 @@ export function InvitesSection({ channel }: { channel: ChatChannelView }) {
                                     <button
                                         type="button"
                                         onClick={() => void copy(invite.id, linkFor(invite.code))}
-                                        aria-label={t("channelSettings.copyLink", { code: invite.code })}
+                                        aria-label={t("channelSettings.copyLink", {
+                                            code: invite.code
+                                        })}
                                         title={t("channelSettings.copyLink", { code: invite.code })}
                                         className="flex size-7 items-center justify-center rounded text-muted-foreground hover:bg-card-hover hover:text-foreground"
                                     >
@@ -226,8 +236,12 @@ export function InvitesSection({ channel }: { channel: ChatChannelView }) {
                                     <button
                                         type="button"
                                         onClick={() => void revoke(invite)}
-                                        aria-label={t("channelSettings.revokeCode", { code: invite.code })}
-                                        title={t("channelSettings.revokeCode", { code: invite.code })}
+                                        aria-label={t("channelSettings.revokeCode", {
+                                            code: invite.code
+                                        })}
+                                        title={t("channelSettings.revokeCode", {
+                                            code: invite.code
+                                        })}
                                         className="flex size-7 items-center justify-center rounded text-muted-foreground hover:bg-danger-soft hover:text-danger"
                                     >
                                         <X className="size-3.5 shrink-0" />
@@ -325,14 +339,20 @@ export function WebhooksSection({ channel }: { channel: ChatChannelView }) {
             <div className="flex flex-wrap items-start gap-3">
                 <div className="min-w-0 flex-1">
                     <h2 className="text-sm font-semibold">{t("channelSettings.webhooks")}</h2>
-                    <p className="text-sm text-muted-foreground">{t("channelSettings.webhooksHint")}</p>
+                    <p className="text-sm text-muted-foreground">
+                        {t("channelSettings.webhooksHint")}
+                    </p>
                 </div>
                 <Button
                     size="sm"
                     disabled={busy || (hooks?.length ?? 0) >= core.MAX_CHAT_WEBHOOKS}
                     onClick={() => void create()}
                 >
-                    {busy ? <Loader2 className="size-4 animate-spin" /> : <Webhook className="size-4" />}
+                    {busy ? (
+                        <Loader2 className="size-4 animate-spin" />
+                    ) : (
+                        <Webhook className="size-4" />
+                    )}
                     {t("channelSettings.newWebhook")}
                 </Button>
             </div>
@@ -347,7 +367,10 @@ export function WebhooksSection({ channel }: { channel: ChatChannelView }) {
             ) : (
                 <ul className="flex flex-col gap-2">
                     {hooks.map((hook) => (
-                        <li key={hook.id} className="flex flex-col gap-2 rounded-lg border border-border px-3 py-3">
+                        <li
+                            key={hook.id}
+                            className="flex flex-col gap-2 rounded-lg border border-border px-3 py-3"
+                        >
                             <div className="flex flex-wrap items-center gap-2">
                                 <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary/15 text-primary">
                                     <Webhook className="size-4 shrink-0" />
@@ -367,7 +390,10 @@ export function WebhooksSection({ channel }: { channel: ChatChannelView }) {
                                             aria-label={t("channelSettings.webhookName")}
                                             aria-invalid={renaming.name.trim() ? undefined : true}
                                             onChange={(event) =>
-                                                setRenaming({ id: hook.id, name: event.target.value })
+                                                setRenaming({
+                                                    id: hook.id,
+                                                    name: event.target.value
+                                                })
                                             }
                                             onKeyDown={(event) => {
                                                 if (event.key === "Escape") {
@@ -376,19 +402,28 @@ export function WebhooksSection({ channel }: { channel: ChatChannelView }) {
                                                 }
                                             }}
                                         />
-                                        <Button type="submit" size="sm" disabled={!renaming.name.trim()}>
+                                        <Button
+                                            type="submit"
+                                            size="sm"
+                                            disabled={!renaming.name.trim()}
+                                        >
                                             {t("channelSettings.save")}
                                         </Button>
                                     </form>
                                 ) : (
                                     <div className="min-w-0 flex-1">
-                                        <p className="truncate text-sm font-medium" title={hook.name}>
+                                        <p
+                                            className="truncate text-sm font-medium"
+                                            title={hook.name}
+                                        >
                                             {hook.name}
                                         </p>
                                         <p className="truncate text-xs text-muted-foreground">
                                             {[
                                                 hook.createdBy
-                                                    ? t("channelSettings.madeBy", { name: hook.createdBy })
+                                                    ? t("channelSettings.madeBy", {
+                                                          name: hook.createdBy
+                                                      })
                                                     : null,
                                                 hook.lastUsedAt
                                                     ? t("channelSettings.lastUsed", {
@@ -405,11 +440,15 @@ export function WebhooksSection({ channel }: { channel: ChatChannelView }) {
                                     <span
                                         className="flex shrink-0 items-center gap-1"
                                         role="group"
-                                        aria-label={t("channelSettings.webhookActions", { name: hook.name })}
+                                        aria-label={t("channelSettings.webhookActions", {
+                                            name: hook.name
+                                        })}
                                     >
                                         <IconButton
                                             label={t("channelSettings.rename")}
-                                            onClick={() => setRenaming({ id: hook.id, name: hook.name })}
+                                            onClick={() =>
+                                                setRenaming({ id: hook.id, name: hook.name })
+                                            }
                                         >
                                             <Pencil className="size-3.5 shrink-0" />
                                         </IconButton>
@@ -432,9 +471,14 @@ export function WebhooksSection({ channel }: { channel: ChatChannelView }) {
 
                             {revealed?.id === hook.id && (
                                 <div className="flex flex-col gap-1.5 rounded-md border border-warning-edge bg-warning-soft px-2.5 py-2">
-                                    <p className="text-xs text-warning-ink">{t("channelSettings.urlOnce")}</p>
+                                    <p className="text-xs text-warning-ink">
+                                        {t("channelSettings.urlOnce")}
+                                    </p>
                                     <div className="flex items-center gap-2">
-                                        <code className="min-w-0 flex-1 truncate font-mono text-xs" title={revealed.url}>
+                                        <code
+                                            className="min-w-0 flex-1 truncate font-mono text-xs"
+                                            title={revealed.url}
+                                        >
                                             {revealed.url}
                                         </code>
                                         <Button
@@ -477,7 +521,10 @@ export function WebhooksSection({ channel }: { channel: ChatChannelView }) {
                 onConfirm={async () => {
                     const hook = replacing;
                     if (!hook) return;
-                    const result = await runAction(() => actions.resetWebhookAction(hook.id), setError);
+                    const result = await runAction(
+                        () => actions.resetWebhookAction(hook.id),
+                        setError
+                    );
                     setReplacing(null);
                     if (!result || result.error || !result.created) {
                         if (result?.error) setError(result.error);
@@ -500,7 +547,10 @@ export function WebhooksSection({ channel }: { channel: ChatChannelView }) {
                     const before = hooks;
                     setHooks((current) => (current ?? []).filter((entry) => entry.id !== hook.id));
                     setDeleting(null);
-                    const result = await runAction(() => actions.deleteWebhookAction(hook.id), setError);
+                    const result = await runAction(
+                        () => actions.deleteWebhookAction(hook.id),
+                        setError
+                    );
                     if (!result || result.error) {
                         setHooks(before);
                         if (result?.error) setError(result.error);
@@ -533,7 +583,9 @@ function IconButton({
             title={label}
             className={cn(
                 "flex size-8 items-center justify-center rounded text-muted-foreground",
-                danger ? "hover:bg-danger-soft hover:text-danger" : "hover:bg-card-hover hover:text-foreground"
+                danger
+                    ? "hover:bg-danger-soft hover:text-danger"
+                    : "hover:bg-card-hover hover:text-foreground"
             )}
         >
             {children}

@@ -122,7 +122,10 @@ function SteamCard({
                 <span className="truncate text-[0.6875rem] text-muted-foreground">
                     {[preview.siteName || "Steam", preview.author].filter(Boolean).join(" - ")}
                 </span>
-                <span className="truncate text-sm font-medium text-foreground" title={preview.title}>
+                <span
+                    className="truncate text-sm font-medium text-foreground"
+                    title={preview.title}
+                >
                     {preview.title || preview.url}
                 </span>
                 {preview.description && (
@@ -167,7 +170,10 @@ function SteamCard({
                 ) : null}
                 {release && <span className="text-muted-foreground">{release}</span>}
                 {systems.length > 0 && (
-                    <span className="flex flex-wrap items-center gap-1" aria-label={t("linkCard.runsOn")}>
+                    <span
+                        className="flex flex-wrap items-center gap-1"
+                        aria-label={t("linkCard.runsOn")}
+                    >
                         {systems.map((name) => (
                             <span
                                 key={name}

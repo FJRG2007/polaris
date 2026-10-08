@@ -198,7 +198,8 @@ export async function readChannelAction(
     // The conversation still comes back with a refusal, so the screen can say
     // what the refusal is about - an age-restricted channel's gate needs its
     // name and its setting to draw.
-    if (result.error) return described ? { error: result.error, channel: described } : { error: result.error };
+    if (result.error)
+        return described ? { error: result.error, channel: described } : { error: result.error };
     return described === undefined
         ? { page: result.value }
         : { page: result.value, channel: described };
@@ -708,7 +709,8 @@ export async function pinsAction(
 ): Promise<{ pins?: readonly pins.ChatPinView[]; error?: string }> {
     const me = await actor();
     const parsed = z.string().uuid().safeParse(channelId);
-    if (!parsed.success) return { error: (await getTranslations("chat"))("errors.notInConversation") };
+    if (!parsed.success)
+        return { error: (await getTranslations("chat"))("errors.notInConversation") };
     const result = await guard(() => pins.pinsIn(me, parsed.data));
     return result.error ? { error: result.error } : { pins: result.value };
 }
@@ -1434,7 +1436,8 @@ export async function acceptInviteAction(
 export async function confirmAgeAction(channelId: unknown): Promise<{ error?: string }> {
     const me = await actor();
     const parsed = z.string().uuid().safeParse(channelId);
-    if (!parsed.success) return { error: (await getTranslations("chat"))("errors.notInConversation") };
+    if (!parsed.success)
+        return { error: (await getTranslations("chat"))("errors.notInConversation") };
     return guard(() => confirmAge(me, parsed.data));
 }
 

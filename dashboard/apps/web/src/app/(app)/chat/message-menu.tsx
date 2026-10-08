@@ -253,7 +253,9 @@ export function MessageMenu({
                     <>
                         <ContextMenuItem onSelect={() => void copyText(link.copy)}>
                             <Link2 className="size-3.5" />
-                            {link.kind === "email" ? t("messageMenu.copyEmailAddress") : t("messageMenu.copyLink")}
+                            {link.kind === "email"
+                                ? t("messageMenu.copyEmailAddress")
+                                : t("messageMenu.copyLink")}
                         </ContextMenuItem>
                         {/* The address as the browser has it, not the one that
                             gets copied: a page inside Polaris opens on this
@@ -263,7 +265,9 @@ export function MessageMenu({
                             onSelect={() => window.open(link.open, "_blank", "noopener,noreferrer")}
                         >
                             <ExternalLink className="size-3.5" />
-                            {link.kind === "email" ? t("messageMenu.sendAnEmail") : t("messageMenu.openLink")}
+                            {link.kind === "email"
+                                ? t("messageMenu.sendAnEmail")
+                                : t("messageMenu.openLink")}
                         </ContextMenuItem>
                         <ContextMenuSeparator />
                     </>
@@ -381,7 +385,9 @@ export function MessageMenu({
                                 {/* Named only when there is more than one, since
                                     a voice message has no name worth reading. */}
                                 <span className="min-w-0 truncate">
-                                    {recordings.length === 1 ? t("messageMenu.downloadTheAudio") : file.name}
+                                    {recordings.length === 1
+                                        ? t("messageMenu.downloadTheAudio")
+                                        : file.name}
                                 </span>
                             </ContextMenuSubTrigger>
                             {/* A format rather than a file, because what was

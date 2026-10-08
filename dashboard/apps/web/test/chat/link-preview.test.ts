@@ -705,7 +705,8 @@ describe("a Steam store link", () => {
                         name: "Hades",
                         is_free: false,
                         short_description: "Defy the god of the dead.",
-                        header_image: "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1145360/header.jpg",
+                        header_image:
+                            "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1145360/header.jpg",
                         developers: ["Supergiant Games"],
                         price_overview: {
                             discount_percent: 75,

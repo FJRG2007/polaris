@@ -2221,11 +2221,7 @@ export function ChannelView({
                     onMembers={members.toggle}
                 />
 
-                <PinnedBar
-                    pins={pins.pins}
-                    onJump={jumpHere}
-                    onShowAll={() => setPinsOpen(true)}
-                />
+                <PinnedBar pins={pins.pins} onJump={jumpHere} onShowAll={() => setPinsOpen(true)} />
 
                 {/* A voice channel is a room AND a record: the one place a
                     group is most likely to want to drop a link used to be the

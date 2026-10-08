@@ -372,7 +372,9 @@ describe("a Steam game", () => {
 
     it("shows the sale: the cut, the old price struck through, and the new one", () => {
         const { container } = render(
-            <LinkCard preview={game({ price: { final: "6,12€", initial: "24,50€", discount: 75 } })} />,
+            <LinkCard
+                preview={game({ price: { final: "6,12€", initial: "24,50€", discount: 75 } })}
+            />,
             { wrapper: MessagesWrapper }
         );
         expect(screen.getByText("-75%")).toBeTruthy();
@@ -385,8 +387,12 @@ describe("a Steam game", () => {
         expect(screen.getByText("Steam - Supergiant Games")).toBeTruthy();
         // The whole card opens the store page, and the picture is Polaris' copy.
         const card = container.querySelector("a[data-card='steam']");
-        expect(card?.getAttribute("href")).toBe("https://store.steampowered.com/app/1145360/Hades/");
-        expect(container.querySelector("img")?.getAttribute("src")).toBe("/api/chat/links/p1/image");
+        expect(card?.getAttribute("href")).toBe(
+            "https://store.steampowered.com/app/1145360/Hades/"
+        );
+        expect(container.querySelector("img")?.getAttribute("src")).toBe(
+            "/api/chat/links/p1/image"
+        );
     });
 
     it("says free to play instead of a price", () => {
@@ -395,9 +401,12 @@ describe("a Steam game", () => {
     });
 
     it("shows a full price on its own", () => {
-        render(<LinkCard preview={game({ price: { final: "59,99€", initial: "", discount: 0 } })} />, {
-            wrapper: MessagesWrapper
-        });
+        render(
+            <LinkCard preview={game({ price: { final: "59,99€", initial: "", discount: 0 } })} />,
+            {
+                wrapper: MessagesWrapper
+            }
+        );
         expect(screen.getByText("59,99€")).toBeTruthy();
         expect(screen.queryByText(/%$/)).toBeNull();
     });

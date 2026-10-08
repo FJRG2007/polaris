@@ -247,8 +247,16 @@ export function ChannelHeader({
                             // A conversation between two people has no roster:
                             // the panel is the other person, and the control
                             // says so rather than offering to list two names.
-                            aria-label={channel.kind === "dm" ? t("channelHeader.profile") : t("channelHeader.whoIsInHere")}
-                            title={channel.kind === "dm" ? t("channelHeader.profile") : t("channelHeader.whoIsInHere")}
+                            aria-label={
+                                channel.kind === "dm"
+                                    ? t("channelHeader.profile")
+                                    : t("channelHeader.whoIsInHere")
+                            }
+                            title={
+                                channel.kind === "dm"
+                                    ? t("channelHeader.profile")
+                                    : t("channelHeader.whoIsInHere")
+                            }
                             className="rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                         >
                             {channel.kind === "dm" ? (
@@ -475,7 +483,9 @@ export function ChannelHeader({
                                             )
                                         }
                                     >
-                                        {channel.archived ? t("channelHeader.reopenChannel") : t("channelHeader.archiveChannel")}
+                                        {channel.archived
+                                            ? t("channelHeader.reopenChannel")
+                                            : t("channelHeader.archiveChannel")}
                                     </DropdownMenuItem>
                                     <DropdownMenuSeparator />
                                     <DropdownMenuItem

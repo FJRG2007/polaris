@@ -40,7 +40,6 @@ export interface ChatWebhookSecret {
     readonly token: string;
 }
 
-
 /** The webhooks on one channel, oldest first. Whoever runs the channel. */
 export async function listWebhooks(
     actor: ChatActor,
@@ -94,7 +93,10 @@ export async function renameWebhook(
 }
 
 /** A new secret, which stops the old address working at once. */
-export async function resetWebhook(actor: ChatActor, webhookId: string): Promise<ChatWebhookSecret> {
+export async function resetWebhook(
+    actor: ChatActor,
+    webhookId: string
+): Promise<ChatWebhookSecret> {
     const found = await ownedWebhook(actor, webhookId);
     const token = newToken();
     const row = await prisma.chatWebhook.update({
@@ -238,7 +240,10 @@ async function viewsOf(
         ...new Set(rows.map((row) => row.createdById).filter((id): id is string => id !== null))
     ];
     const people = ids.length
-        ? await prisma.user.findMany({ where: { id: { in: ids } }, select: { id: true, name: true } })
+        ? await prisma.user.findMany({
+              where: { id: { in: ids } },
+              select: { id: true, name: true }
+          })
         : [];
     const names = new Map(people.map((person) => [person.id, person.name]));
     return rows.map((row) => ({

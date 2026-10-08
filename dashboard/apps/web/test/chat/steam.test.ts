@@ -8,12 +8,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import {
-    readSteamAnswer,
-    steamAppOf,
-    steamDetailsUrl,
-    storedSteamDetails
-} from "@/lib/chat/steam";
+import { readSteamAnswer, steamAppOf, steamDetailsUrl, storedSteamDetails } from "@/lib/chat/steam";
 
 const ON_SALE = {
     "1091500": {
@@ -50,8 +45,10 @@ const FREE = {
             type: "game",
             name: "Dota 2",
             is_free: true,
-            short_description: "Every day, millions of players worldwide enter battle as one of over a hundred Dota heroes.",
-            header_image: "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/570/header.jpg",
+            short_description:
+                "Every day, millions of players worldwide enter battle as one of over a hundred Dota heroes.",
+            header_image:
+                "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/570/header.jpg",
             developers: ["Valve"],
             platforms: { windows: true, mac: true, linux: true },
             release_date: { coming_soon: false, date: "9 Jul, 2013" }
@@ -67,7 +64,8 @@ const FULL_PRICE = {
             name: "Black Myth: Wukong",
             is_free: false,
             short_description: "Black Myth: Wukong is an action RPG rooted in Chinese mythology.",
-            header_image: "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/2358720/header.jpg",
+            header_image:
+                "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/2358720/header.jpg",
             developers: ["Game Science"],
             price_overview: {
                 currency: "EUR",
@@ -85,7 +83,9 @@ const FULL_PRICE = {
 
 describe("which links are a Steam game", () => {
     it("takes a store app page, with or without its slug", () => {
-        expect(steamAppOf("https://store.steampowered.com/app/1091500/Cyberpunk_2077/")).toBe("1091500");
+        expect(steamAppOf("https://store.steampowered.com/app/1091500/Cyberpunk_2077/")).toBe(
+            "1091500"
+        );
         expect(steamAppOf("https://store.steampowered.com/app/570")).toBe("570");
         expect(steamAppOf("http://STORE.steampowered.com/app/570/?snr=1_7_15")).toBe("570");
         expect(steamAppOf("https://store.steampowered.com/agecheck/app/1091500/")).toBe("1091500");
@@ -159,16 +159,22 @@ describe("reading Steam's answer", () => {
 
     it("refuses a picture that is not https", () => {
         const found = readSteamAnswer("570", {
-            "570": { success: true, data: { name: "Dota 2", header_image: "http://example.com/a.jpg" } }
+            "570": {
+                success: true,
+                data: { name: "Dota 2", header_image: "http://example.com/a.jpg" }
+            }
         });
         expect(found?.imageUrl).toBeNull();
     });
 
     it("undoes the HTML escapes in the description", () => {
         const found = readSteamAnswer("570", {
-            "570": { success: true, data: { name: "X", short_description: "Tom &amp; Jerry&#39;s &quot;game&quot;" } }
+            "570": {
+                success: true,
+                data: { name: "X", short_description: "Tom &amp; Jerry&#39;s &quot;game&quot;" }
+            }
         });
-        expect(found?.description).toBe("Tom & Jerry's \"game\"");
+        expect(found?.description).toBe('Tom & Jerry\'s "game"');
     });
 });
 

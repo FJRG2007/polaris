@@ -89,7 +89,9 @@ export async function pin(actor: ChatActor, input: PinInput): Promise<void> {
         message.pinnedAt !== null &&
         (message.pinExpiresAt === null || message.pinExpiresAt.getTime() > now.getTime());
     if (!already) {
-        const count = await prisma.chatMessage.count({ where: pinnedWhere(message.channelId, now) });
+        const count = await prisma.chatMessage.count({
+            where: pinnedWhere(message.channelId, now)
+        });
         if (count >= MAX_PINS) {
             throw new ChatAccessError({ key: "errors.tooManyPins", params: { max: MAX_PINS } });
         }

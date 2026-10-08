@@ -233,10 +233,12 @@ export async function acceptInvite(
             space: { select: { archived: true } }
         }
     });
-    if (!invite || invite.space.archived) throw new ChatAccessError({ key: "errors.invitationGone" });
+    if (!invite || invite.space.archived)
+        throw new ChatAccessError({ key: "errors.invitationGone" });
     // Made private since the link was shared: joining no longer opens it, so the
     // link lands on the space instead of on a room that would refuse them.
-    const landing = invite.channelId && invite.channel && !invite.channel.private ? invite.channelId : null;
+    const landing =
+        invite.channelId && invite.channel && !invite.channel.private ? invite.channelId : null;
     if (!core.inviteUsable(invite)) throw new ChatAccessError({ key: "errors.invitationExpired" });
 
     const already = await prisma.chatSpaceMember.findUnique({
