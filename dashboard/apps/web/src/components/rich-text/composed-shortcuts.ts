@@ -15,6 +15,12 @@
  * rule does when it does see the key. A composition is left alone while it is
  * open and settled once it has really ended. Pasting, undoing and loading a
  * document are not typing and are never rewritten.
+ *
+ * A pair is also settled when it is written the other way round: pressing the
+ * dead key twice gives both backticks at once, so the natural thing is to step
+ * back between them and type the word - which never types a closing character
+ * at all. Typing inside a pair, or typing its opening in front of one already
+ * closed, turns it into the mark too, and the caret stays inside it.
  */
 
 import { Extension } from "@tiptap/core";
@@ -32,12 +38,21 @@ const MAX_POLLS = 8;
  *  pair can never reach across one. */
 const LEAF = "￼";
 
-/** The pairs settled here: the closing text that triggers each, and what must
- *  come before it in the same paragraph. Both mirror the editor's own rules. */
-const PAIRS: ReadonlyArray<{ mark: string; close: string; before: RegExp }> = [
-    { mark: "code", close: "`", before: /(?:^|[^`])(`([^`￼]*[^`\s￼][^`￼]*)`)$/ },
-    { mark: "strike", close: "~~", before: /(?:^|\s)(~~([^~￼]*[^~\s￼][^~￼]*)~~)$/ }
+/** The pairs settled here: the text that opens and closes each, and whether its
+ *  opening needs a space or the start of the line before it. Both mirror the
+ *  editor's own rules. */
+const PAIRS: ReadonlyArray<{ mark: string; token: string; spaceBefore: boolean }> = [
+    { mark: "code", token: "`", spaceBefore: false },
+    { mark: "strike", token: "~~", spaceBefore: true }
 ];
+
+/** Where a typed range sits, and whether only a pair closed exactly at its end
+ *  counts - what a settle after a composition asks for. */
+interface Typed {
+    readonly from: number;
+    readonly to: number;
+    readonly closingOnly: boolean;
+}
 
 /** Where the last composition ended, followed through every edit since; a
  *  transaction carrying a list of positions asks for those to be settled. */
@@ -69,56 +84,119 @@ function undoesInputRule(state: EditorState, tr: Transaction): boolean {
 }
 
 /** Where, in the final document, a character or two was just put. */
-function typedEnds(transactions: readonly Transaction[], before: EditorState): number[] {
-    const ends: number[] = [];
+function typedRanges(transactions: readonly Transaction[], before: EditorState): Typed[] {
+    const ranges: Typed[] = [];
     transactions.forEach((tr, index) => {
         const requested = tr.getMeta(settleKey) as number[] | number | null | undefined;
         if (Array.isArray(requested))
-            ends.push(...requested.map((at) => mapOn(transactions, index + 1, at)));
+            for (const at of requested) {
+                const mapped = mapOn(transactions, index + 1, at);
+                ranges.push({ from: mapped, to: mapped, closingOnly: true });
+            }
         if (!typed(tr) || (index === 0 && undoesInputRule(before, tr))) return;
         tr.steps.forEach((step, stepIndex) => {
             step.getMap().forEach((_from, _to, start, end) => {
                 const size = end - start;
                 if (size < 1 || size > 2) return;
-                const inTr = tr.mapping.slice(stepIndex + 1).map(end, -1);
-                ends.push(mapOn(transactions, index + 1, inTr));
+                const rest = tr.mapping.slice(stepIndex + 1);
+                ranges.push({
+                    from: mapOn(transactions, index + 1, rest.map(start, 1)),
+                    to: mapOn(transactions, index + 1, rest.map(end, -1)),
+                    closingOnly: false
+                });
             });
         });
     });
-    return ends;
+    return ranges;
 }
 
 function mapOn(transactions: readonly Transaction[], from: number, at: number): number {
     return transactions.slice(from).reduce((pos, tr) => tr.mapping.map(pos, -1), at);
 }
 
-/** The transaction that turns a pair closed at `end` into its mark, if one is. */
-function settleAt(state: EditorState, end: number): Transaction | null {
+/** Where `token` stands on its own in `text` - not part of a longer run of its
+ *  character, which is a different piece of Markdown. */
+function loneTokens(text: string, token: string): number[] {
+    const char = token[0]!;
+    const found: number[] = [];
+    for (let at = text.indexOf(token); at !== -1; at = text.indexOf(token, at + 1))
+        if (text[at - 1] !== char && text[at + token.length] !== char) found.push(at);
+    return found;
+}
+
+/**
+ * The pair, as offsets of its opening and closing token, that the text typed at
+ * `typed` closes, sits inside, or opens - in that order of preference.
+ */
+function pairAround(
+    text: string,
+    pair: (typeof PAIRS)[number],
+    typed: Typed
+): { open: number; close: number; closed: boolean } | null {
+    const width = pair.token.length;
+    const tokens = loneTokens(text, pair.token);
+    const valid = (open: number, close: number): boolean => {
+        if (open < 0 || close <= open) return false;
+        const inner = text.slice(open + width, close);
+        if (inner.includes(pair.token[0]!) || inner.includes(LEAF) || !/\S/.test(inner))
+            return false;
+        return !pair.spaceBefore || open === 0 || /\s/.test(text[open - 1]!);
+    };
+    const before = (at: number) => tokens.filter((token) => token + width <= at).at(-1) ?? -1;
+    const after = (at: number) => tokens.find((token) => token >= at) ?? -1;
+    const endsToken = tokens.includes(typed.to - width);
+
+    // Closed by what was typed: the nearest opening before it.
+    if (endsToken) {
+        const close = typed.to - width;
+        const open = before(close);
+        if (valid(open, close)) return { open, close, closed: true };
+    }
+    if (typed.closingOnly || typed.to <= typed.from) return null;
+    // Typed between the two halves of a pair.
+    const open = before(typed.from);
+    const close = after(typed.to);
+    if (valid(open, close)) return { open, close, closed: false };
+    // Typed the opening in front of a pair already closed.
+    if (endsToken) {
+        const opening = typed.to - width;
+        const closing = after(typed.to);
+        if (valid(opening, closing)) return { open: opening, close: closing, closed: false };
+    }
+    return null;
+}
+
+/** The transaction that turns the pair typed at `typed` into its mark, if one is. */
+function settleAt(state: EditorState, typed: Typed): Transaction | null {
     const { doc } = state;
-    if (end < 1 || end > doc.content.size) return null;
-    const $end = doc.resolve(end);
+    if (typed.to < 1 || typed.to > doc.content.size || typed.from > typed.to) return null;
+    const $end = doc.resolve(typed.to);
     const block = $end.parent;
     if (!block.isTextblock || block.type.spec.code) return null;
-    const text = doc.textBetween($end.start(), end, undefined, LEAF);
+    const start = $end.start();
+    if (typed.from < start) return null;
+    const text = doc.textBetween(start, $end.end(), undefined, LEAF);
+    const local: Typed = { ...typed, from: typed.from - start, to: typed.to - start };
 
     for (const pair of PAIRS) {
-        if (!text.endsWith(pair.close)) continue;
         const type: MarkType | undefined = state.schema.marks[pair.mark];
-        const found = pair.before.exec(text);
-        const closed = found?.[1];
-        if (!type || !closed) continue;
-        const from = end - closed.length;
+        const found = type ? pairAround(text, pair, local) : null;
+        if (!type || !found) continue;
+        const width = pair.token.length;
+        const from = start + found.open;
+        const end = start + found.close + width;
         // Already formatted - a pair inside code is its content, not a shortcut.
         if (doc.rangeHasMark(from, end, state.schema.marks.code ?? type)) continue;
-        const width = pair.close.length;
         const tr = state.tr
             .delete(end - width, end)
             .delete(from, from + width)
-            .addMark(from, end - 2 * width, type.create())
-            .removeStoredMark(type);
+            .addMark(from, end - 2 * width, type.create());
+        // Typed inside the pair, the caret is in the mark and stays there.
+        if (!found.closed) return tr;
+        tr.removeStoredMark(type);
         const rules = state.plugins.find((plugin) => plugin.spec.isInputRules);
         if (rules)
-            tr.setMeta(rules, { transform: tr, from: end - width, to: end, text: pair.close });
+            tr.setMeta(rules, { transform: tr, from: end - width, to: end, text: pair.token });
         return tr;
     }
     return null;
@@ -183,8 +261,8 @@ export const ComposedShortcuts = Extension.create({
                     }
                 },
                 appendTransaction(transactions, old, state) {
-                    for (const end of typedEnds(transactions, old)) {
-                        const tr = settleAt(state, end);
+                    for (const range of typedRanges(transactions, old)) {
+                        const tr = settleAt(state, range);
                         if (tr) return tr;
                     }
                     return null;
