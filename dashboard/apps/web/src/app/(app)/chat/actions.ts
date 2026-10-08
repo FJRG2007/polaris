@@ -24,6 +24,7 @@ import * as saved from "@/lib/chat/saved-media";
 import * as chat from "@/lib/chat/chat-service";
 import * as messages from "@/lib/chat/messages";
 import * as polls from "@/lib/chat/polls";
+import * as pins from "@/lib/chat/pins";
 import { allChatRules } from "@/lib/chat/rules";
 import { requirePermission } from "@/lib/session";
 import { getLocale, getTranslations } from "@/lib/i18n/request";
@@ -679,10 +680,49 @@ export async function starAction(messageId: string): Promise<{ on?: boolean; err
     return result.error ? { error: result.error } : { on: result.value };
 }
 
-/** Everything this reader kept, for the Saved screen. */
-export async function starredAction(): Promise<{ messages: readonly ChatMessageView[] }> {
+/** Pin a message for everybody in its conversation, for as long as was asked.
+ *  The shape is checked here; who may pin is the service's question. */
+export async function pinAction(input: unknown): Promise<{ error?: string }> {
     const me = await actor();
-    return { messages: await messages.starred(me) };
+    const parsed = pins.pinInputSchema.safeParse(input);
+    if (!parsed.success) return { error: (await getTranslations("chat"))("errors.pinNotAllowed") };
+    return guard(() => pins.pin(me, parsed.data));
+}
+
+/** Take a pin off a message. */
+export async function unpinAction(messageId: unknown): Promise<{ error?: string }> {
+    const me = await actor();
+    const parsed = z.string().uuid().safeParse(messageId);
+    if (!parsed.success) return { error: (await getTranslations("chat"))("errors.messageGone") };
+    return guard(() => pins.unpin(me, parsed.data));
+}
+
+/** Every pin in a conversation, newest first, for the bar and the list. */
+export async function pinsAction(
+    channelId: unknown
+): Promise<{ pins?: readonly pins.ChatPinView[]; error?: string }> {
+    const me = await actor();
+    const parsed = z.string().uuid().safeParse(channelId);
+    if (!parsed.success) return { error: (await getTranslations("chat"))("errors.notInConversation") };
+    const result = await guard(() => pins.pinsIn(me, parsed.data));
+    return result.error ? { error: result.error } : { pins: result.value };
+}
+
+/** Everything this reader kept, for the Starred screen - all of it, or one
+ *  conversation's. */
+export async function starredAction(
+    channelId?: unknown
+): Promise<{ messages: readonly ChatMessageView[] }> {
+    const me = await actor();
+    const only = z.string().uuid().safeParse(channelId);
+    return { messages: await messages.starred(me, 100, only.success ? only.data : null) };
+}
+
+/** Take every star off, or every one in one conversation. */
+export async function unstarAllAction(channelId?: unknown): Promise<{ count: number }> {
+    const me = await actor();
+    const only = z.string().uuid().safeParse(channelId);
+    return { count: await messages.unstarAll(me, only.success ? only.data : null) };
 }
 
 export async function markReadAction(input: unknown): Promise<{ error?: string }> {

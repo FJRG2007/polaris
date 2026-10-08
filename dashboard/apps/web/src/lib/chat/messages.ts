@@ -972,7 +972,15 @@ export async function remove(
             await tx.chatPoll.deleteMany({ where: { messageId } });
             await tx.chatMessage.update({
                 where: { id: messageId },
-                data: { deletedAt: new Date(), body: "" }
+                // A pin on a line that no longer says anything is a bar above
+                // the conversation pointing at nothing.
+                data: {
+                    deletedAt: new Date(),
+                    body: "",
+                    pinnedAt: null,
+                    pinnedById: null,
+                    pinExpiresAt: null
+                }
             });
         });
     } else {
@@ -1450,9 +1458,15 @@ export async function star(actor: ChatActor, messageId: string): Promise<boolean
  * star: somebody removed from a private channel keeps their bookmarks as rows,
  * and this is where they stop being readable.
  */
-export async function starred(actor: ChatActor, limit = 100): Promise<ChatMessageView[]> {
+export async function starred(
+    actor: ChatActor,
+    limit = 100,
+    /** Only the ones from this conversation - WhatsApp's starred list for one
+     *  chat, reached from that chat. */
+    channelId: string | null = null
+): Promise<ChatMessageView[]> {
     const stars = await prisma.chatStar.findMany({
-        where: { userId: actor.id },
+        where: { userId: actor.id, ...(channelId ? { message: { channelId } } : {}) },
         orderBy: { createdAt: "desc" },
         take: limit,
         select: { message: { select: MESSAGE_SELECT } }
@@ -1464,6 +1478,18 @@ export async function starred(actor: ChatActor, limit = 100): Promise<ChatMessag
         .map((entry) => entry.message)
         .filter((row) => reachable.has(row.channelId) && row.deletedAt === null);
     return decorateMessages(actor, rows);
+}
+
+/**
+ * Take every star this reader set off, or every one in one conversation. Only
+ * their own rows: nothing about it is visible to anybody else, so nothing else
+ * needs checking. Returns how many went.
+ */
+export async function unstarAll(actor: ChatActor, channelId: string | null = null): Promise<number> {
+    const result = await prisma.chatStar.deleteMany({
+        where: { userId: actor.id, ...(channelId ? { message: { channelId } } : {}) }
+    });
+    return result.count;
 }
 
 /** Say that somebody is composing, and which way. Nothing is stored: it is true
@@ -1484,7 +1510,7 @@ export async function announceTyping(
     });
 }
 
-const MESSAGE_SELECT = {
+export const MESSAGE_SELECT = {
     id: true,
     channelId: true,
     authorId: true,

@@ -42,6 +42,8 @@ import {
     MessageCircleReply,
     MessageSquare,
     Pencil,
+    Pin,
+    PinOff,
     Star,
     Trash2
 } from "lucide-react";
@@ -81,6 +83,11 @@ export interface MessageActions {
     readonly onEdit?: (message: ChatMessageView) => void;
     readonly onOpenThread?: (message: ChatMessageView) => void;
     readonly onStar: (message: ChatMessageView) => void;
+    /** Whether the room has this one pinned, which turns Pin into Unpin. */
+    readonly pinned?: boolean;
+    /** Pin it for everybody, or take the pin off. Absent where this reader may
+     *  not - see `pinsAllowed` - and inside a thread. */
+    readonly onPin?: (message: ChatMessageView, pinned: boolean) => void;
     /**
      * Pick the conversation up again from here.
      *
@@ -302,10 +309,25 @@ export function MessageMenu({
                     </>
                 )}
 
+                {/* Two different things, side by side the way WhatsApp puts them:
+                    the star is this reader's own bookmark, the pin is the
+                    room's. */}
                 <ContextMenuItem onSelect={() => actions.onStar(message)}>
                     <Star className="size-3.5" />
                     {message.starred ? t("messageMenu.removeFromSaved") : t("messageMenu.save")}
                 </ContextMenuItem>
+                {actions.onPin && !message.deleted && message.kind !== "system" && (
+                    <ContextMenuItem
+                        onSelect={() => actions.onPin?.(message, Boolean(actions.pinned))}
+                    >
+                        {actions.pinned ? (
+                            <PinOff className="size-3.5" />
+                        ) : (
+                            <Pin className="size-3.5" />
+                        )}
+                        {actions.pinned ? t("messageMenu.unpin") : t("messageMenu.pin")}
+                    </ContextMenuItem>
+                )}
                 {actions.onMarkUnread && !mine && !message.deleted && (
                     <ContextMenuItem onSelect={() => actions.onMarkUnread?.(message)}>
                         <Mail className="size-3.5" />

@@ -47,7 +47,7 @@ import { ChannelHeader } from "./channel-header";
 import { DirectProfile } from "./direct-profile";
 import { ForwardDialog } from "./forward-dialog";
 import { CALL_CHAT_PANE } from "./use-chat-pane";
-import { useChatStream } from "./use-chat-stream";
+import { useChatStream, type ChatFrame } from "./use-chat-stream";
 import { useVoiceSettings } from "./voice-settings";
 import { useCloseOnEscape } from "./close-on-escape";
 import type { RecordedSound } from "./voice-recorder";
@@ -88,6 +88,7 @@ import {
     useToast
 } from "@polaris/ui";
 import { PersonCardProvider } from "./person-card";
+import { PinLengthDialog, PinnedBar, PinsDialog, usePins } from "./pins-ui";
 
 /** How close to the bottom still counts as "following along". A few pixels of
  *  slack, because a trackpad rarely lands exactly on zero. */
@@ -940,6 +941,10 @@ export function ChannelView({
         );
     }, [channelId, viewerId]);
 
+    /** Where the pins hear about this conversation's frames - see `usePins`,
+     *  which is set up further down and fills this in. */
+    const pinFrames = useRef<(frame: ChatFrame) => void>(() => {});
+
     useChatStream(
         useCallback(
             (frame) => {
@@ -947,6 +952,7 @@ export function ChannelView({
                     void catchUp();
                     checkCall();
                 }
+                pinFrames.current(frame);
                 // Somebody caught up in here. Their own screens take a count
                 // down; this one moves the ticks under its own messages, which
                 // used to sit on "sent" until the conversation was reopened.
@@ -1267,6 +1273,37 @@ export function ChannelView({
         // had just opened on purpose.
         if (catchUpMark(firstPass.current)) firstPass.current = false;
     }, [messages, catchUpMark]);
+
+    /** The room's pins, the message being given a length, and the list. */
+    const pins = usePins(channelId);
+    pinFrames.current = pins.onFrame;
+    const [pinning, setPinning] = useState<ChatMessageView | null>(null);
+    const [pinsOpen, setPinsOpen] = useState(false);
+
+    /**
+     * Pin a message for everybody, or take its pin off.
+     *
+     * Pinning asks how long first; unpinning does not, the way WhatsApp does it.
+     * The unpin is taken off the bar at once and put back if the server refuses.
+     */
+    const pinOrUnpin = useCallback(
+        async (message: ChatMessageView, pinned: boolean) => {
+            if (!pinned) {
+                setPinning(message);
+                return;
+            }
+            const before = pins.pins;
+            pins.setPins(
+                (current) => current?.filter((entry) => entry.message.id !== message.id) ?? current
+            );
+            const result = await runAction(() => actions.unpinAction(message.id), setError);
+            if (!result || result.error) {
+                pins.setPins(before);
+                if (result?.error) setError(result.error);
+            }
+        },
+        [pins.pins, pins.setPins]
+    );
 
     /**
      * Keep a message, or stop keeping it.
@@ -1864,6 +1901,8 @@ export function ChannelView({
                         onOpenThread={setThread}
                         onReact={react}
                         onStar={star}
+                        pinnedIds={pins.ids}
+                        onPin={channel?.mayPin ? pinOrUnpin : undefined}
                         onMarkUnread={markUnread}
                         onJumpTo={jumpHere}
                         onReply={reply}
@@ -2143,10 +2182,17 @@ export function ChannelView({
                     call={live}
                     onStartCall={startCall}
                     onSearch={() => setSearching((current) => !current)}
+                    onPins={() => setPinsOpen(true)}
                     // In a conversation with a roster this opens it; in a
                     // one-to-one it opens the other person, which is what the
                     // column beside a direct message is for.
                     onMembers={members.toggle}
+                />
+
+                <PinnedBar
+                    pins={pins.pins}
+                    onJump={jumpHere}
+                    onShowAll={() => setPinsOpen(true)}
                 />
 
                 {/* A voice channel is a room AND a record: the one place a
@@ -2379,6 +2425,26 @@ export function ChannelView({
                     onChanged={() => void catchUp()}
                 />
             )}
+
+            <PinLengthDialog
+                message={pinning}
+                onOpenChange={(open) => !open && setPinning(null)}
+                onPinned={() => void pins.reload()}
+            />
+
+            <PinsDialog
+                open={pinsOpen}
+                onOpenChange={setPinsOpen}
+                pins={pins.pins}
+                mayPin={channel.mayPin}
+                onJump={jumpHere}
+                onUnpinned={(messageId) =>
+                    pins.setPins(
+                        (current) =>
+                            current?.filter((entry) => entry.message.id !== messageId) ?? current
+                    )
+                }
+            />
 
             <ForwardDialog
                 message={forwarding}

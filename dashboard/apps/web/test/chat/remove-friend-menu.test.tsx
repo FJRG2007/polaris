@@ -60,6 +60,7 @@ const dm = {
     mayAdminister: false,
     mayModerate: false,
     mayPicture: false,
+    mayPin: false,
     ownerId: null,
     membersMayEdit: false,
     membersMayInvite: false,

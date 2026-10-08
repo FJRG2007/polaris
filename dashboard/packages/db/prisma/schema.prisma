@@ -8649,6 +8649,15 @@ model ChatMessage {
     // it did not happen, or happened before Polaris recorded it.
     deliveredAt DateTime?
     readAt      DateTime?
+    // Pinned for everybody in the conversation: when, by whom, and until when.
+    // Unlike a star, which is one reader's bookmark (`ChatStar`), a pin is the
+    // room's - everybody sees it above the conversation. Null `pinExpiresAt` is
+    // pinned until somebody unpins it; a pin past its expiry is read as no pin,
+    // so nothing has to run to take it down. `pinnedById` is not a foreign key,
+    // for the reason `authorId` is not one.
+    pinnedAt     DateTime?
+    pinnedById   String?   @db.Uuid
+    pinExpiresAt DateTime?
     createdAt   DateTime  @default(now())
 
     channel     ChatChannel      @relation(fields: [channelId], references: [id], onDelete: Cascade)
@@ -8669,6 +8678,8 @@ model ChatMessage {
     @@index([channelId, parentId, createdAt])
     @@index([parentId, createdAt])
     @@index([replyToId])
+    // The pins of one conversation, newest first, without reading its messages.
+    @@index([channelId, pinnedAt])
 }
 
 // What one person calls another.

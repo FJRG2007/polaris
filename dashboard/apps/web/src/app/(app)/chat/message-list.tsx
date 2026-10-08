@@ -166,6 +166,7 @@ import {
     MessageSquare,
     Paperclip,
     Pencil,
+    Pin,
     SmilePlus,
     Star,
     Trash2,
@@ -217,6 +218,12 @@ export interface MessageListProps {
     onOpenThread?: (message: ChatMessageView) => void;
     onReact: (messageId: string, emoji: string) => void;
     onStar: (message: ChatMessageView) => void;
+    /** The messages pinned for everybody here, to mark them and to offer Unpin
+     *  rather than Pin. Absent inside a thread, where nothing is pinned. */
+    pinnedIds?: ReadonlySet<string>;
+    /** Pin or unpin for everybody. Absent where this reader may not, and then
+     *  the item is not drawn. */
+    onPin?: (message: ChatMessageView, pinned: boolean) => void;
     /** Pick the conversation up again from a message. Absent inside a thread,
      *  whose unread is counted separately from the channel's. */
     onMarkUnread?: (message: ChatMessageView) => void;
@@ -265,6 +272,8 @@ export function MessageList({
     onOpenThread,
     onReact,
     onStar,
+    pinnedIds,
+    onPin,
     onMarkUnread,
     onReply,
     onReplyPrivately,
@@ -416,6 +425,8 @@ export function MessageList({
                             onOpenThread={onOpenThread}
                             onReact={react}
                             onStar={onStar}
+                            pinned={pinnedIds?.has(message.id) ?? false}
+                            onPin={onPin}
                             onMarkUnread={onMarkUnread}
                             inVoice={inVoice}
                             onJumpTo={onJumpTo}
@@ -650,6 +661,8 @@ function Message({
     onOpenThread,
     onReact,
     onStar,
+    pinned,
+    onPin,
     onMarkUnread,
     inVoice,
     onJumpTo,
@@ -678,6 +691,8 @@ function Message({
     onOpenThread?: (message: ChatMessageView) => void;
     onReact: (messageId: string, emoji: string) => void;
     onStar: (message: ChatMessageView) => void;
+    pinned: boolean;
+    onPin?: (message: ChatMessageView, pinned: boolean) => void;
     onMarkUnread?: (message: ChatMessageView) => void;
     /** Who is in each voice room this page of messages points at, gathered once
      *  by the list. Empty until the answer arrives, which draws a card saying
@@ -737,7 +752,6 @@ function Message({
      *  so the name and the face can both ask about them without narrowing it
      *  again in two places. */
     const writer = message.authorId && !mine ? message.authorId : null;
-
     /** Swiping the line to the right answers it, on a phone - the same reply the
      *  menu and the hover bar offer, so only where those offer it. */
     const swipe = useSwipeReply(
@@ -805,6 +819,8 @@ function Message({
                 onForward,
                 onOpenThread,
                 onStar,
+                pinned,
+                onPin,
                 onMarkUnread,
                 onEdit: rewrite,
                 onDelete,
@@ -829,12 +845,22 @@ function Message({
             >
                 <span className="w-8 shrink-0">
                     {grouped ? (
-                        <span
-                            className="hidden pt-1 text-[0.625rem] leading-4 text-foreground-subtle group-hover:block group-data-[state=open]:block"
-                            title={format.dateTime(message.createdAt)}
-                        >
-                            {format.time(message.createdAt)}
-                        </span>
+                        <>
+                            <span
+                                className="hidden pt-1 text-[0.625rem] leading-4 text-foreground-subtle group-hover:block group-data-[state=open]:block"
+                                title={format.dateTime(message.createdAt)}
+                            >
+                                {format.time(message.createdAt)}
+                            </span>
+                            {/* Without a header there is nowhere else to say it, so
+                                the marks sit in the gutter until the hover takes
+                                it for the time. */}
+                            {(pinned || message.starred) && (
+                                <span className="flex items-center gap-0.5 pt-1 group-hover:hidden group-data-[state=open]:hidden">
+                                    <Marks pinned={pinned} starred={message.starred} />
+                                </span>
+                            )}
+                        </>
                     ) : message.authorId ? (
                         // Right-clicking a face asks about the person, the way it
                         // does in the roster. Pressing it still opens their photo,
@@ -948,6 +974,7 @@ function Message({
                                 iso={message.createdAt}
                                 className="whitespace-nowrap text-[0.6875rem] text-foreground-subtle"
                             />
+                            <Marks pinned={pinned} starred={message.starred} />
                         </p>
                     )}
 
@@ -1240,6 +1267,32 @@ function Message({
             </div>
         </MessageMenu>
         </div>
+    );
+}
+
+/**
+ * Whether a message is pinned for the room and whether this reader starred it:
+ * the two small marks WhatsApp draws beside a message's time. The pin is
+ * everybody's; the star only ever shows to the reader who set it.
+ */
+function Marks({ pinned, starred }: { pinned: boolean; starred: boolean }) {
+    const t = useTranslations("chat");
+    if (!pinned && !starred) return null;
+    return (
+        <span className="inline-flex shrink-0 items-center gap-0.5 self-center text-foreground-subtle">
+            {pinned && (
+                <span title={t("messageList.pinnedHere")} className="inline-flex">
+                    <Pin className="size-3" aria-hidden />
+                    <span className="sr-only">{t("messageList.pinnedHere")}</span>
+                </span>
+            )}
+            {starred && (
+                <span title={t("messageList.starred")} className="inline-flex">
+                    <Star className="size-3 fill-current" aria-hidden />
+                    <span className="sr-only">{t("messageList.starred")}</span>
+                </span>
+            )}
+        </span>
     );
 }
 

@@ -175,7 +175,9 @@
         "stillWaiting": "You are still waiting to be let in",
         "notInThatCall": "Not in that call",
         "fileGone": "That file is no longer there",
-        "attachmentGone": "This file is not on the storage Polaris keeps uploads on. It was written and is no longer there."
+        "attachmentGone": "This file is not on the storage Polaris keeps uploads on. It was written and is no longer there.",
+        "pinNotAllowed": "You cannot pin messages here",
+        "tooManyPins": "This conversation already has {max} pins. Unpin one first."
     },
     "media": {
         "refused": {
@@ -456,9 +458,9 @@
         "show": "Show",
         "thisMessageWasDeleted": "This message was deleted.",
         "seeWhatItSaidBefore": "See what it said before",
-        "removeFromSaved": "Remove from saved",
-        "saveThisMessage": "Save this message",
-        "save": "Save",
+        "removeFromSaved": "Remove star",
+        "saveThisMessage": "Star this message",
+        "save": "Add star",
         "reply": "Reply",
         "replyOrPressR": "Reply - or press R",
         "replyInAThread": "Reply in a thread",
@@ -491,7 +493,9 @@
             "sent": "Sent",
             "delivered": "Delivered",
             "read": "Read"
-        }
+        },
+        "starred": "Starred",
+        "pinnedHere": "Pinned"
     },
     "composer": {
         "replyingTo": "Replying to",
@@ -545,7 +549,7 @@
         "newChannel": "New channel",
         "newCategory": "New category",
         "findOrStartAConversation": "Find or start a conversation",
-        "savedMessages": "Saved messages",
+        "savedMessages": "Starred messages",
         "meetings": "Meetings",
         "nobodyYet": "Nobody yet.",
         "newChannelHere": "New channel here",
@@ -630,7 +634,9 @@
         "whatThisGroupIsCalled": "What this group is called",
         "cancel": "Cancel",
         "save": "Save",
-        "everyMessageInItGoes": "Every message in it goes with it. Archiving keeps them readable instead."
+        "everyMessageInItGoes": "Every message in it goes with it. Archiving keeps them readable instead.",
+        "pinnedMessages": "Pinned messages",
+        "starredMessages": "Starred messages"
     },
     "meetingNotice": {
         "invitedTitle": "{name} invited you to {meeting}",
@@ -720,8 +726,8 @@
         "replyPrivately": "Reply privately",
         "forward": "Forward",
         "replyInAThread": "Reply in a thread",
-        "removeFromSaved": "Remove from saved",
-        "save": "Save",
+        "removeFromSaved": "Remove star",
+        "save": "Add star",
         "markUnreadFromHere": "Mark unread from here",
         "copyMessageLink": "Copy message link",
         "copyText": "Copy text",
@@ -731,7 +737,9 @@
         "reportThisMessage": "Report this message",
         "edit": "Edit",
         "delete": "Delete",
-        "del": "Del"
+        "del": "Del",
+        "pin": "Pin",
+        "unpin": "Unpin"
     },
     "poll": {
         "createAPoll": "Create a poll",
@@ -1225,10 +1233,18 @@
     },
     "saved": {
         "backToConversations": "Back to conversations",
-        "saved": "Saved",
-        "nothingSaved": "Nothing saved.",
-        "hoverAMessageAndPress": "Hover a message and press the star to keep it. Only you see this.",
-        "removeFromSaved": "Remove from saved"
+        "saved": "Starred messages",
+        "nothingSaved": "No starred messages",
+        "hoverAMessageAndPress": "Star a message from its menu to find it here later. Only you see your stars.",
+        "removeFromSaved": "Remove star",
+        "allConversations": "All conversations",
+        "onlyIn": "In {name}",
+        "unstarAll": "Remove all stars",
+        "unstarAllTitle": "Unstar every message?",
+        "unstarAllBody": "The messages stay where they are. Only your stars go.",
+        "unstarAllHere": "Unstar every message in {name}?",
+        "cancel": "Cancel",
+        "openInConversation": "Open in the conversation"
     },
     "elsewhere": {
         "thatCallCouldNotBe": "That call could not be reached.",
@@ -1425,5 +1441,28 @@
         "title": "Stop being friends with {name}?",
         "description": "They lose what you show your friends and keep everything else. Either of you can ask again.",
         "confirm": "Remove friend"
+    },
+    "pins": {
+        "pinFor": "Pin this message?",
+        "pinForBody": "Everybody here sees it above the conversation. You can unpin it at any time.",
+        "day": "24 hours",
+        "week": "7 days",
+        "month": "30 days",
+        "forever": "Until unpinned",
+        "pin": "Pin",
+        "cancel": "Cancel",
+        "pinned": "Pinned message",
+        "pinnedCount": "Pinned message {at} of {count}",
+        "showAll": "All pinned messages",
+        "title": "Pinned messages",
+        "none": "No pinned messages",
+        "noneBody": "Pin a message from its menu to keep it above the conversation for everybody.",
+        "jump": "Jump",
+        "jumpTo": "Go to the message",
+        "unpin": "Unpin",
+        "byOn": "Pinned by {name}",
+        "until": "Until {date}",
+        "attachment": "Attachment",
+        "deleted": "Deleted message"
     }
 }

@@ -45,9 +45,11 @@ import {
     MoreHorizontal,
     Pencil,
     Phone,
+    Pin,
     PhoneOff,
     Search,
     Settings2,
+    Star,
     Trash2,
     UserPlus,
     UserRound,
@@ -88,6 +90,7 @@ export function ChannelHeader({
     call,
     onStartCall,
     onSearch,
+    onPins,
     onMembers
 }: {
     channel: ChatChannelView;
@@ -105,6 +108,8 @@ export function ChannelHeader({
     /** Absent where there is nothing to search - a voice room holds no
      *  messages, and a button that does nothing is worse than no button. */
     onSearch?: () => void;
+    /** Open the list of every message pinned here - Discord's pin button. */
+    onPins?: () => void;
     /** Show or hide who is in here. Absent in a one-to-one conversation, where
      *  the roster is the two people already named at the top. */
     onMembers?: () => void;
@@ -264,6 +269,17 @@ export function ChannelHeader({
                             <Search className="size-4" />
                         </button>
                     )}
+                    {onPins && (
+                        <button
+                            type="button"
+                            onClick={onPins}
+                            aria-label={t("channelHeader.pinnedMessages")}
+                            title={t("channelHeader.pinnedMessages")}
+                            className="rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                        >
+                            <Pin className="size-4" />
+                        </button>
+                    )}
                     {/* An account that may not be in calls is not shown the way
                         in, and is not told a call is running either: it is a room
                         it cannot enter. */}
@@ -355,6 +371,14 @@ export function ChannelHeader({
                             >
                                 <Link2 className="size-3.5" />
                                 {t("channelHeader.copyLink")}
+                            </DropdownMenuItem>
+                            {/* This conversation's part of the reader's own
+                                starred list, as WhatsApp's chat info offers it. */}
+                            <DropdownMenuItem asChild>
+                                <Link href={`/chat/saved?c=${channel.id}`}>
+                                    <Star className="size-3.5" />
+                                    {t("channelHeader.starredMessages")}
+                                </Link>
                             </DropdownMenuItem>
                             <DropdownMenuSeparator />
                             <MuteOptions

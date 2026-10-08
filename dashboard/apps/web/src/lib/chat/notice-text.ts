@@ -33,7 +33,8 @@ export type ChatNoticeKind =
     | "timedOut"
     | "missedCall"
     | "callStarted"
-    | "callUnanswered";
+    | "callUnanswered"
+    | "pinned";
 
 /** Somebody a notice names. */
 export interface NoticePerson {
@@ -108,6 +109,10 @@ export function noticeBody(
             return `${who} called - no answer`;
         case "callStarted":
             return `${who} started a call`;
+        case "pinned":
+            // The message itself is in the bar above the conversation, which is
+            // where the line points people.
+            return `${who} pinned a message`;
         case "callUnanswered":
             // Follows the line that said the call started, which already names
             // who rang.

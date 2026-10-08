@@ -197,7 +197,15 @@ export async function GET(request: Request): Promise<Response> {
                 // they reloaded. Nor had their other devices seen it. The tab
                 // that sent it asks for what is newer than what it holds, which
                 // the send already brought, so it costs that tab one short read.
-                if (change.actorId === actor.id && change.kind !== "posted") return;
+                // A pin is the same: the tab that pinned redrew, its other
+                // devices did not.
+                if (
+                    change.actorId === actor.id &&
+                    change.kind !== "posted" &&
+                    change.kind !== "pins"
+                ) {
+                    return;
+                }
 
                 // Everything left is about one conversation and names it.
                 const channelId = change.channelId;
@@ -228,6 +236,10 @@ export async function GET(request: Request): Promise<Response> {
                                 ...(change.call.group ? { group: change.call.group } : {})
                             });
                         }
+                        return;
+                    }
+                    if (change.kind === "pins") {
+                        send({ kind: "pins", channelId });
                         return;
                     }
                     if (change.kind === "typing") {

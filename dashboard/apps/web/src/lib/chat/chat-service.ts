@@ -30,6 +30,7 @@ import {
     channelAccess,
     messageable,
     picturesAllowed,
+    pinsAllowed,
     invitesAllowed,
     roomMentionsAllowed,
     reachableSpaceIds,
@@ -107,6 +108,10 @@ export interface ChatChannelView {
      *  channel, whoever started it for a group. Only decides what the screen
      *  offers; the route that stores the bytes asks the same question again. */
     readonly mayPicture: boolean;
+    /** Whether this reader may pin a message here for everybody - see
+     *  `pinsAllowed`. Only decides what the screen offers; pinning asks the same
+     *  question again. */
+    readonly mayPin: boolean;
     /** Who runs a group, so the screen can offer them the things only they may
      *  do. Null for everything that is not a group. */
     readonly ownerId: string | null;
@@ -816,6 +821,17 @@ export async function listChannels(
             // same predicate the route enforces with, asked here so the rule
             // has one implementation rather than two that drift.
             mayPicture: picturesAllowed({ ...channel, mayAdminister }, actor.id),
+            mayPin:
+                !channel.archived &&
+                pinsAllowed(
+                    {
+                        ...channel,
+                        mayModerate:
+                            mayAdminister ||
+                            (channel.kind === "group" && groupOwnerId(channel) === actor.id)
+                    },
+                    actor.id
+                ),
             ownerId: groupOwnerId(channel),
             membersMayEdit: channel.membersMayEdit,
             membersMayInvite: channel.membersMayInvite,
