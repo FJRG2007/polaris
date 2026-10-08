@@ -6234,9 +6234,9 @@ describe("spleef", () => {
         const arenaAt = spleef.arena(floor().options, run.stage!.origin!, run.stage!.origin!.y);
         expect(world.packsOn.has(snowballPack.PACK_ID)).toBe(true);
         for (const line of snowballPack.armLines(arenaAt, true)) expect(world.sent).toContain(line);
-        expect(world.sent.some((line) => line.endsWith(`run setblock ~ ~-1 ~ ${spleef.WARN}`))).toBe(
-            false
-        );
+        expect(
+            world.sent.some((line) => line.endsWith(`run setblock ~ ~-1 ~ ${spleef.WARN}`))
+        ).toBe(false);
         await events.cancelEvent("owner", SERVER);
         await play(4_200);
         expect(

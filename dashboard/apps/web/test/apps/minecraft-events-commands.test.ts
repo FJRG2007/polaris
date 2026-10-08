@@ -2304,13 +2304,17 @@ describe("a spleef floor", () => {
         );
         const bottom = floor.floors.at(-1)!;
         // A snowball game never decays; a decay game is switched to it.
-        expect(snowballPack.armLines(floor)).toContain("scoreboard players set #decay polaris_spleef 0");
+        expect(snowballPack.armLines(floor)).toContain(
+            "scoreboard players set #decay polaris_spleef 0"
+        );
         const lines = snowballPack.armLines(floor, true);
         expect(lines).toContain("scoreboard players set #decay polaris_spleef 1");
         expect(lines.at(-1)).toBe("scoreboard players set #on polaris_spleef 1");
         // A player's feet count from the lowest floor to a jump over the top one.
         expect(lines).toContain(`scoreboard players set #fy1 polaris_spleef ${bottom * 64}`);
-        expect(lines).toContain(`scoreboard players set #fy2 polaris_spleef ${(100 + 3 + 1) * 64 - 1}`);
+        expect(lines).toContain(
+            `scoreboard players set #fy2 polaris_spleef ${(100 + 3 + 1) * 64 - 1}`
+        );
         // Fuses of an earlier game never take this one's snow.
         expect(lines).toContain("kill @e[type=minecraft:armor_stand,tag=polaris_spleef_fuse]");
 
@@ -2342,7 +2346,11 @@ describe("a spleef floor", () => {
 
     it("closes the floors in from the walls, a red ring ahead, until nothing is left", () => {
         const size = 4;
-        const floor = spleef.arena({ place: { mode: "players" }, size, height: 30 }, { x: 10, z: -20 }, 80);
+        const floor = spleef.arena(
+            { place: { mode: "players" }, size, height: 30 },
+            { x: 10, z: -20 },
+            80
+        );
         expect(spleef.shrunk(spleef.SHRINK_AFTER_MS - 1)).toBe(0);
         expect(spleef.shrinkLines(floor, 0)).toEqual([]);
         expect(spleef.shrunk(spleef.SHRINK_AFTER_MS)).toBe(1);
@@ -2353,7 +2361,10 @@ describe("a spleef floor", () => {
         const at = floor.floors[0]!;
         const apply = (grid: Map<string, Cell>, lines: string[]) => {
             for (const line of lines) {
-                const m = /fill (-?\d+) (-?\d+) (-?\d+) (-?\d+) (-?\d+) (-?\d+) (\S+) replace (\S+)$/.exec(line);
+                const m =
+                    /fill (-?\d+) (-?\d+) (-?\d+) (-?\d+) (-?\d+) (-?\d+) (\S+) replace (\S+)$/.exec(
+                        line
+                    );
                 expect(m).not.toBeNull();
                 const [x1, y1, z1, x2, y2, z2] = m!.slice(1, 7).map(Number) as number[];
                 expect(y1).toBe(y2);
@@ -2380,7 +2391,8 @@ describe("a spleef floor", () => {
                 const [x, z] = key.split(",").map(Number) as [number, number];
                 const ring = size - Math.max(Math.abs(x - 10), Math.abs(z + 20));
                 // Ring 0 is against the wall.
-                const want: Cell = rings > size || ring < rings ? "air" : ring === rings ? "red" : "snow";
+                const want: Cell =
+                    rings > size || ring < rings ? "air" : ring === rings ? "red" : "snow";
                 expect(cell, `${rings} rings at ${key}`).toBe(want);
             }
         }
@@ -2404,7 +2416,9 @@ describe("a spleef floor", () => {
         expect(sweeps(0)).toHaveLength(floor.floors.length);
         // Every floor closes in.
         for (const each of floor.floors)
-            expect(spleef.shrinkLines(floor, 1).some((line) => line.includes(` ${each} `))).toBe(true);
+            expect(spleef.shrinkLines(floor, 1).some((line) => line.includes(` ${each} `))).toBe(
+                true
+            );
     });
 
     it("spreads players over the snow, never onto a wall", () => {
