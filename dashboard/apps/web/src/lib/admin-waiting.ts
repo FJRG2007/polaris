@@ -37,7 +37,7 @@ import * as core from "@polaris/core";
 import { loadEnv } from "@polaris/config";
 import { getSetting } from "@/lib/setting-store";
 import { getAutoUpdatePolicy } from "@/lib/update-watcher";
-import { markSeen, seenMarks, type BadgeScreen } from "@/lib/badge-seen";
+import { badgeMarks, DISMISSED_KEYS, markSeen, type BadgeScreen } from "@/lib/badge-seen";
 
 /** The key the update watcher claims once per published build, holding the short
  *  sha it announced and when. Read here rather than re-derived: the two must not
@@ -133,29 +133,70 @@ function seenAt(mark: string | undefined): Date | null {
     return Number.isNaN(at.getTime()) ? null : at;
 }
 
+/** The later of two moments, either of which may be missing. */
+function laterOf(left: Date | null, right: Date | null): Date | null {
+    if (!left) return right;
+    if (!right) return left;
+    return left > right ? left : right;
+}
+
 /**
  * Everything above, in one read, as one administrator's badge.
  *
- * With `userId`, what that account has already seen is left out when it lets
- * opening a screen clear its badge: the build it was shown on the Update
- * screen, and the reports and cases older than its last visit to Safety.
+ * With `userId`, what that account has already seen is left out: what opening
+ * a screen showed it, when it lets a visit clear its badge - the build it was
+ * shown on the Update screen, the reports and cases older than its last visit
+ * to Safety - and what it marked seen from the app menu, whichever way that
+ * switch is set. Reports and cases are marked apart there, so each has its own
+ * moment, and the later of the two marks wins.
  *
  * Best-effort per part: a settings table that will not answer must not take the
  * whole badge - and a badge that is short by one is better than a management
  * screen that will not draw.
  */
 export async function adminWaiting(userId?: string): Promise<AdminWaiting> {
-    const seen = userId ? await seenMarks(userId).catch(() => null) : null;
-    const since = seenAt(seen?.get("admin.safety"));
-    const newer = since ? { createdAt: { gt: since } } : {};
+    const marks = userId ? await badgeMarks(userId).catch(() => null) : null;
+    const visit = seenAt(marks?.seen?.get("admin.safety"));
+    const since = (key: string) => {
+        const at = laterOf(visit, seenAt(marks?.dismissed.get(key)));
+        return at ? { createdAt: { gt: at } } : {};
+    };
     const [reports, cases, build, apis] = await Promise.all([
-        prisma.chatReport.count({ where: { status: "open", ...newer } }).catch(() => 0),
-        prisma.safetyCase.count({ where: { status: "open", ...newer } }).catch(() => 0),
+        prisma.chatReport
+            .count({ where: { status: "open", ...since(DISMISSED_KEYS.reports) } })
+            .catch(() => 0),
+        prisma.safetyCase
+            .count({ where: { status: "open", ...since(DISMISSED_KEYS.cases) } })
+            .catch(() => 0),
         updateWaiting().catch(() => null),
         apisOff().catch(() => 0)
     ]);
-    const update = build !== null && seen?.get("admin.update") !== build;
+    const update =
+        build !== null &&
+        marks?.seen?.get("admin.update") !== build &&
+        marks?.dismissed.get(DISMISSED_KEYS.update) !== build;
     return { reports, cases, update, apis, total: reports + cases + (update ? 1 : 0) + apis };
+}
+
+/**
+ * Somebody marked Management entries seen from the app menu: remember what was
+ * there, so only something newer counts again. An update is marked by the
+ * build it is, a queue by the moment. Switched-off APIs are not marked - a
+ * fault stays counted until it is fixed - and are simply skipped.
+ */
+export async function dismissAdminWaiting(
+    userId: string,
+    entries: readonly ("reports" | "cases" | "update" | "apis")[]
+): Promise<void> {
+    const now = new Date().toISOString();
+    for (const entry of new Set(entries)) {
+        if (entry === "reports" || entry === "cases") {
+            await markSeen(userId, DISMISSED_KEYS[entry], now);
+        } else if (entry === "update") {
+            const build = await announcedBuild();
+            if (build) await markSeen(userId, DISMISSED_KEYS.update, build);
+        }
+    }
 }
 
 /**

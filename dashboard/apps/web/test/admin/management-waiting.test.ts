@@ -113,12 +113,16 @@ describe("the count reaching every badge in Polaris", () => {
         // A report somebody has read and not settled is still a report. Whether
         // opening the queue clears the badge is the reader's setting, asserted in
         // `badge-seen.test.ts`; what is counted is always what is still open.
-        const waiting = await readFile(new URL("lib/admin-waiting.ts", SRC), "utf8");
-        expect(waiting).toContain(
-            'prisma.chatReport.count({ where: { status: "open", ...newer } })'
+        // Folded, so the formatter wrapping a line does not read as a change.
+        const waiting = (await readFile(new URL("lib/admin-waiting.ts", SRC), "utf8")).replace(
+            /\s+/g,
+            ""
         );
         expect(waiting).toContain(
-            'prisma.safetyCase.count({ where: { status: "open", ...newer } })'
+            'prisma.chatReport.count({where:{status:"open",...since(DISMISSED_KEYS.reports)}})'
+        );
+        expect(waiting).toContain(
+            'prisma.safetyCase.count({where:{status:"open",...since(DISMISSED_KEYS.cases)}})'
         );
     });
 

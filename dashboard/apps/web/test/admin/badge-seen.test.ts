@@ -38,7 +38,7 @@ vi.mock("@polaris/db", () => ({
     }
 }));
 
-const { adminWaiting, markScreenSeen } = await import("@/lib/admin-waiting");
+const { adminWaiting, dismissAdminWaiting, markScreenSeen } = await import("@/lib/admin-waiting");
 const { clearsOnVisit, isBadgeScreen } = await import("@/lib/badge-seen");
 
 beforeEach(() => {
@@ -120,5 +120,42 @@ describe("opening a screen", () => {
     it("clears on a visit unless the account said otherwise", () => {
         expect(clearsOnVisit(null)).toBe(true);
         expect(clearsOnVisit(false)).toBe(false);
+    });
+});
+
+describe("marking entries seen from the app menu", () => {
+    it("is honoured even for an account that keeps its badges", async () => {
+        clearOnVisit = false;
+        marks = [
+            { key: "dismissed.admin.update", mark: "new4567" },
+            { key: "dismissed.admin.reports", mark: "2026-09-29T09:00:00.000Z" }
+        ];
+        const waiting = await adminWaiting("ada");
+        expect(countedSince.map((at) => at?.toISOString())).toEqual([
+            "2026-09-29T09:00:00.000Z",
+            undefined
+        ]);
+        expect(waiting).toEqual({ reports: 1, cases: 3, update: false, apis: 0, total: 4 });
+    });
+
+    it("takes the later of a visit and a mark", async () => {
+        marks = [
+            { key: "admin.safety", mark: "2026-09-29T09:00:00.000Z" },
+            { key: "dismissed.admin.cases", mark: "2026-09-30T09:00:00.000Z" }
+        ];
+        await adminWaiting("ada");
+        expect(countedSince.map((at) => at?.toISOString())).toEqual([
+            "2026-09-29T09:00:00.000Z",
+            "2026-09-30T09:00:00.000Z"
+        ]);
+    });
+
+    it("writes the build for the update and a moment for each queue, never the APIs", async () => {
+        await dismissAdminWaiting("ada", ["update", "reports", "apis", "reports"]);
+        expect(written.map((row) => row.key)).toEqual([
+            "dismissed.admin.update",
+            "dismissed.admin.reports"
+        ]);
+        expect(written[0]?.mark).toBe("new4567");
     });
 });

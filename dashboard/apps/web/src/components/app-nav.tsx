@@ -40,6 +40,7 @@ import { anythingWaiting, useAppUnread } from "@/components/app-unread";
 import { launcherOrder, type AppUsage } from "@/lib/app-launcher";
 import { AppSwitcher, DropdownMenuItem, type PolarisApp } from "@polaris/ui";
 import { ArrangeAppsDialog } from "@/components/arrange-apps-dialog";
+import { LauncherWaitingList } from "@/components/launcher-waiting";
 import { useNavLabel } from "@/components/i18n/use-nav-label";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { NamespaceKey } from "@/lib/i18n/types";
@@ -192,6 +193,9 @@ export function AppLauncher({
                     more: t("switcher.more")
                 }}
                 onArrange={arrangeApps}
+                // What each app has waiting, with a way to mark it read without
+                // opening the app - see `launcher-waiting`.
+                below={<LauncherWaitingList open={launcherOpen} apps={apps} />}
                 // Icons only, so the options take one short row under the grid;
                 // the words stay as the accessible name and the hover tooltip.
                 footer={

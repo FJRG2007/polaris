@@ -302,5 +302,23 @@
         "adminOnlyRole": "Only an administrator can preview a role.",
         "unknownRole": "Unknown role.",
         "nothingToLeave": "Nothing to leave."
+    },
+    "waitingList": {
+        "title": "Waiting in your apps",
+        "markRead": "Mark {item} read",
+        "markSeen": "Mark {item} seen",
+        "markAllRead": "Mark all read in {app}",
+        "markAllSeen": "Mark all seen in {app}",
+        "unknownSender": "Unknown sender",
+        "noSubject": "(no subject)",
+        "admin": {
+            "reports": "{count, plural, one {# reported message} other {# reported messages}}",
+            "cases": "{count, plural, one {# safety case} other {# safety cases}}",
+            "update": "An update is ready to install",
+            "apis": "{count, plural, one {# Google API is off} other {# Google APIs are off}}"
+        },
+        "errors": {
+            "notMarked": "That could not be marked. Try again in a moment."
+        }
     }
 }

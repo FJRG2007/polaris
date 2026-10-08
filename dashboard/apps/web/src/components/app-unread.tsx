@@ -18,7 +18,16 @@
  * tab icon by being counted here.
  */
 
-import { useMemo } from "react";
+import {
+    createContext,
+    useCallback,
+    useContext,
+    useEffect,
+    useMemo,
+    useRef,
+    useState,
+    type ReactNode
+} from "react";
 import { useChatUnread } from "@/components/chat-unread";
 import { useMailUnread } from "@/components/mail-unread";
 import { useAdminWaiting } from "@/components/admin-waiting";
@@ -28,14 +37,8 @@ import { useAdminWaiting } from "@/components/admin-waiting";
  *  `?? 0` and be right either way. */
 export type AppUnread = Readonly<Record<string, number>>;
 
-/**
- * The counts, gathered.
- *
- * Both providers already hold their own number and both are above every screen,
- * so this costs nothing beyond the object it builds: no request, no stream, no
- * state of its own.
- */
-export function useAppUnread(): AppUnread {
+/** The counts as the providers hold them, before anything this browser did. */
+function useServerUnread(): AppUnread {
     const chat = useChatUnread();
     const mail = useMailUnread();
     // Management counts work rather than messages - a report nobody has settled,
@@ -47,6 +50,74 @@ export function useAppUnread(): AppUnread {
         () => ({ chat: chat.messages, mail: mail.messages, admin: admin.total }),
         [chat.messages, mail.messages, admin.total]
     );
+}
+
+/**
+ * What this browser has just marked read, before the server has said so.
+ *
+ * The app menu marks entries read where the badge is, and a badge that stays at
+ * its old number until the app's stream has gone round is a mark that looks
+ * like it did nothing. So the menu moves the number at once, by app, and the
+ * overlay goes the moment that app's own count moves - the same overlay Mail's
+ * badge keeps, for the same reason and exactly as long. A mark the server
+ * refused is moved back by the menu.
+ */
+const DriftContext = createContext<{
+    readonly drift: Readonly<Record<string, number>>;
+    readonly nudge: (app: string, by: number) => void;
+}>({ drift: {}, nudge: () => undefined });
+
+/** Moves an app's badge by what this screen has just done. Does nothing
+ *  outside the provider. */
+export function useNudgeAppUnread(): (app: string, by: number) => void {
+    return useContext(DriftContext).nudge;
+}
+
+export function AppUnreadDriftProvider({ children }: { children: ReactNode }) {
+    const server = useServerUnread();
+    const [drift, setDrift] = useState<Record<string, number>>({});
+    const seen = useRef(server);
+    // An app's count moved on the server: whatever was laid over it is either
+    // counted there now, or was never true.
+    useEffect(() => {
+        const before = seen.current;
+        seen.current = server;
+        setDrift((held) => {
+            const moved = Object.keys(held).filter((app) => before[app] !== server[app]);
+            if (moved.length === 0) return held;
+            const next = { ...held };
+            for (const app of moved) delete next[app];
+            return next;
+        });
+    }, [server]);
+    const nudge = useCallback((app: string, by: number) => {
+        if (by === 0) return;
+        setDrift((held) => ({ ...held, [app]: (held[app] ?? 0) + by }));
+    }, []);
+    const value = useMemo(() => ({ drift, nudge }), [drift, nudge]);
+    return <DriftContext.Provider value={value}>{children}</DriftContext.Provider>;
+}
+
+/**
+ * The counts, gathered.
+ *
+ * Both providers already hold their own number and both are above every screen,
+ * so this costs nothing beyond the object it builds: no request, no stream, no
+ * state of its own. What the app menu has just marked read is taken off at
+ * once - see `AppUnreadDriftProvider`.
+ */
+export function useAppUnread(): AppUnread {
+    const server = useServerUnread();
+    const { drift } = useContext(DriftContext);
+    return useMemo(() => {
+        if (Object.keys(drift).length === 0) return server;
+        return Object.fromEntries(
+            Object.entries(server).map(([app, count]) => [
+                app,
+                Math.max(0, count + (drift[app] ?? 0))
+            ])
+        );
+    }, [server, drift]);
 }
 
 /** Whether anything anywhere is waiting, which is the whole question a dot on
