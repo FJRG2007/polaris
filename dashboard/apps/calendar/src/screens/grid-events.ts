@@ -22,6 +22,8 @@ export interface GridOptions {
     readonly now: Date;
     readonly showDeclined: boolean;
     readonly showTasks: boolean;
+    /** Draw tasks already done; drawn when omitted. */
+    readonly showDoneTasks?: boolean;
     readonly dimPast: boolean;
     /** The colour the grid is drawn on (the card, as hex), which a faded or
      *  outlined event is mixed toward; the dark theme's when omitted. */
@@ -226,6 +228,7 @@ export function gridEvents(range: RangeView | null, options: GridOptions): Event
     if (!options.showTasks) return events;
     for (const task of range.tasks) {
         if (!task.due) continue;
+        if (task.done && options.showDoneTasks === false) continue;
         const calendar = task.calendarId ? options.calendars.get(task.calendarId) : undefined;
         if (calendar?.hidden) continue;
         const color = calendar?.color ?? FALLBACK_COLOR;
@@ -243,12 +246,13 @@ export function gridEvents(range: RangeView | null, options: GridOptions): Event
         const day = wallOf(task.due, options.zone).slice(0, 10);
         // A task is due at a moment rather than spanning one: past once that
         // moment has gone, and faded once done whenever it was due.
+        const faded = task.done || (options.dimPast && new Date(task.due) < options.now);
         const paint = paintFor(
             color,
             {
                 response: "accepted",
                 struck: false,
-                past: task.done || (options.dimPast && new Date(task.due) < options.now)
+                past: faded
             },
             options.surface
         );
@@ -260,7 +264,11 @@ export function gridEvents(range: RangeView | null, options: GridOptions): Event
             backgroundColor: paint.fill,
             borderColor: paint.edge,
             textColor: paint.ink,
-            classNames: ["pc-task", ...(task.done ? ["pc-done"] : [])],
+            classNames: [
+                "pc-task",
+                ...(task.done ? ["pc-done"] : []),
+                ...(faded ? ["pc-past"] : [])
+            ],
             editable: false,
             extendedProps: { item: { kind: "task", task } satisfies GridItem, label, stripe: null }
         });

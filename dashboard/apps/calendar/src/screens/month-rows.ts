@@ -7,10 +7,15 @@
  * laid over the cell, as FullCalendar's own "balanced" mode does), and two
  * numbers are read off the drawn grid:
  *
- * - `fit`: how many events one day has room for in an equal share of the
- *   height, with "+N more" under them. The setting's limit is capped by it, so
- *   the weeks fill the view and nothing spills: a limit of 6 on a short window
- *   shows what fits and "+N more", never a week taller than the rest.
+ * - `rows`: how many lines (an event, or the "+N more" link) one day has room
+ *   for in an equal share of the height. The default, "as many as fit", is
+ *   exactly that, the way Google fills a month: every event while they all fit,
+ *   and the link only on a day that has more than its room - it takes the last
+ *   line, never a line that an event could have used.
+ * - `fit`: how many events fit above that link. A number chosen in settings
+ *   is capped by it, so the weeks fill the view and nothing spills: a limit of
+ *   6 on a short window shows what fits and "+N more", never a week taller than
+ *   the rest.
  * - `tallest`: the most room any day's events take. With no limit ("All")
  *   every week is at least that high, so the weeks grow to the busiest day
  *   together and the grid scrolls - every event shown, the weeks still equal.
@@ -22,15 +27,39 @@ export interface MonthRoom {
     /** Events one day has room for above "+N more", or null before any event
      *  is drawn. */
     readonly fit: number | null;
+    /** Lines one day has room for, the link's included, or null before any
+     *  event is drawn. */
+    readonly rows: number | null;
     /** Pixels the busiest day's events reach below the top of its cell. */
     readonly tallest: number;
 }
 
-/** The `dayMaxEvents` the month grid is given: the setting (0 = all), capped by
- *  what an equal share of the height has room for. Never below one. */
+/** Events per day in the month: as many as fit, every one (0), or at most a
+ *  number. */
+export type MonthEvents = "fit" | number;
+
+/** The `dayMaxEvents` the month grid is given for a number from settings (0 =
+ *  all), capped by what an equal share of the height has room for. Never below
+ *  one. */
 export function monthDayLimit(eventLimit: number, fit: number | null): number | false {
     if (eventLimit === 0) return false;
     return fit === null ? eventLimit : Math.max(1, Math.min(eventLimit, fit));
+}
+
+/** FullCalendar's two limits for the month grid. "As many as fit" limits the
+ *  lines, the link's included, so a day whose events all fit shows them all;
+ *  before anything is measured FullCalendar's own reading of the cell stands
+ *  in. A number limits the events, as `monthDayLimit` says. */
+export function monthLimits(
+    setting: MonthEvents,
+    room: MonthRoom | null
+): { dayMaxEvents: number | boolean; dayMaxEventRows: number | boolean } {
+    if (setting === "fit")
+        return {
+            dayMaxEvents: false,
+            dayMaxEventRows: room?.rows == null ? true : Math.max(1, room.rows)
+        };
+    return { dayMaxEvents: monthDayLimit(setting, room?.fit ?? null), dayMaxEventRows: false };
 }
 
 /** Read the month grid under `root`; null when no month grid is drawn there. */
@@ -58,7 +87,7 @@ export function measureMonth(root: ParentNode): MonthRoom | null {
     let line = 0;
     for (const harness of body.querySelectorAll<HTMLElement>(".fc-daygrid-event-harness"))
         line = Math.max(line, Math.round(harness.getBoundingClientRect().height));
-    if (line <= 0) return { fit: null, tallest };
+    if (line <= 0) return { fit: null, rows: null, tallest };
     const share = scroller.clientHeight / weeks;
     // FullCalendar's limit counts events, and draws "+N more" under them: as
     // many events as leave room for that link, and a little air. The link is
@@ -69,5 +98,8 @@ export function measureMonth(root: ParentNode): MonthRoom | null {
     for (const link of body.querySelectorAll<HTMLElement>(".fc-daygrid-more-link"))
         more = Math.max(more, Math.ceil(link.getBoundingClientRect().height) + 2);
     const events = Math.floor((share - eventsTop - Math.max(more, line) - 4) / line);
-    return { fit: Math.max(1, events), tallest };
+    // Every line, the link's too, counted at the taller of the two, so the
+    // link always has room when it takes the last one.
+    const rows = Math.floor((share - eventsTop - 4) / Math.max(more, line));
+    return { fit: Math.max(1, events), rows: Math.max(1, rows), tallest };
 }

@@ -300,6 +300,37 @@ async function ownSource(user: SessionUser, id: string) {
     return row;
 }
 
+/** Kinds pulled while their owner has the calendar open. Each pass asks only
+ *  for what changed since the last (a sync token, a delta link, a ctag), so a
+ *  change made in Google shows here within a minute instead of at the next
+ *  scheduled pull. A feed is the whole file every time and keeps its interval. */
+const LIVE_KINDS = ["google", "microsoft", "caldav"];
+
+/** How old a live source's last pull may be before an open calendar asks again. */
+export const LIVE_PULL_AGE_MS = 60_000;
+
+/** Pull the person's live sources whose last pull is older than `ageMs`,
+ *  answering how many were pulled. One that is failing keeps its back-off. */
+export async function refreshOpenSources(
+    user: SessionUser,
+    ageMs = LIVE_PULL_AGE_MS,
+    now = new Date()
+): Promise<number> {
+    const due = await prisma.calendarSource.findMany({
+        where: {
+            userId: user.id,
+            kind: { in: LIVE_KINDS },
+            AND: [
+                { OR: [{ lastSyncAt: null }, { lastSyncAt: { lt: new Date(now.getTime() - ageMs) } }] },
+                { OR: [{ status: "ok" }, { nextSyncAt: { lte: now } }] }
+            ]
+        },
+        select: { id: true }
+    });
+    await Promise.all(due.map((source) => syncSource(source.id, now)));
+    return due.length;
+}
+
 /** Pull a source now, answering when the pass is done. */
 export async function refreshSource(user: SessionUser, id: string): Promise<SourceView> {
     const source = await ownSource(user, id);

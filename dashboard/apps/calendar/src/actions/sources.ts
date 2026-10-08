@@ -149,6 +149,22 @@ export async function addLinkedAccountAction(
     }));
 }
 
+/** The open calendar asking for its accounts' latest: every minute it is in
+ *  view, and on Refresh (`soon`), which asks again sooner. */
+export async function refreshOpenSourcesAction(soon?: unknown): Promise<Outcome<{ pulled: number }>> {
+    const parsed = z.boolean().optional().safeParse(soon);
+    if (!parsed.success) return invalid(parsed.error.issues);
+    return outcome(async () => ({
+        pulled: await sources.refreshOpenSources(
+            await requireCalendarUser(),
+            parsed.data ? SOON_MS : sources.LIVE_PULL_AGE_MS
+        )
+    }));
+}
+
+/** The least time between two pulls Refresh asks for. */
+const SOON_MS = 10_000;
+
 export async function refreshSourceAction(id: unknown): Promise<Outcome<{ source: SourceView }>> {
     const parsed = schemas.uuidSchema.safeParse(id);
     if (!parsed.success) return invalid(parsed.error.issues);

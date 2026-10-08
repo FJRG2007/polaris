@@ -67,10 +67,15 @@ export function StatusIcon({
     type,
     progress,
     size = 20,
-    className
+    className,
+    markColor = "#fff"
 }: {
     color: string;
     type: core.TaskStatusType;
+    /** The tick or cross drawn on a done or closed disc. White suits every
+     *  status colour; a disc drawn in white ink - a task on a coloured calendar
+     *  chip - needs the chip's colour instead, or it is a plain white dot. */
+    markColor?: string;
     /**
      * How far through the space's stages of work in progress this status sits,
      * from `core.statusProgress`. Ignored by every other kind, and a half turn
@@ -103,7 +108,7 @@ export function StatusIcon({
                                 : "M6.9 6.9l6.2 6.2M13.1 6.9l-6.2 6.2"
                         }
                         fill="none"
-                        stroke="#fff"
+                        stroke={markColor}
                         strokeWidth="2"
                         strokeLinecap="round"
                         strokeLinejoin="round"

@@ -47,8 +47,6 @@ import {
     DropdownMenuItem,
     DropdownMenuTrigger,
     EmptyState,
-    SegmentedControl,
-    Select,
     Skeleton,
     useToast
 } from "@polaris/ui";
@@ -57,6 +55,7 @@ import { useCalendarT } from "./i18n";
 import * as model from "./editor-model";
 import { calendarSlots } from "./slots";
 import { MiniMonth } from "./mini-month";
+import { ViewPicker } from "./view-picker";
 import type { PartStat } from "../engine";
 import { TodoEditor } from "./todo-editor";
 import { TaskCard } from "./task-card";
@@ -72,6 +71,7 @@ import { Sidebar, type SidebarActions } from "./sidebar";
 import { EventCard, NewEventCard } from "./event-popover";
 import { AnchoredPanel, useCardColor, useNow } from "./ui";
 import * as preferenceActions from "../actions/preferences";
+import * as sourceActions from "../actions/sources";
 import { CalendarSearch, type SearchResult } from "./search";
 import { AddCalendarMenu } from "./accounts/add-calendar-menu";
 import { EventEditor, type EditorTarget } from "./event-editor";
@@ -86,7 +86,6 @@ import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } fro
 import type { CalendarSummary, OccurrenceView, RangeView, TaskItemView } from "../lib/wire";
 import {
     DEFAULT_PREFERENCES,
-    VIEWS,
     newEventMinutes,
     type CalendarPreferences,
     type CalendarViewName
@@ -328,6 +327,7 @@ export function CalendarScreen({ path }: { path: string[] }) {
                 now,
                 showDeclined: preferences.showDeclined,
                 showTasks: preferences.showTasks,
+                showDoneTasks: preferences.showDoneTasks,
                 dimPast: preferences.dimPast,
                 surface,
                 calendars: calendarsById,
@@ -340,6 +340,7 @@ export function CalendarScreen({ path }: { path: string[] }) {
             now,
             preferences.showDeclined,
             preferences.showTasks,
+            preferences.showDoneTasks,
             preferences.dimPast,
             surface,
             calendarsById,
@@ -359,6 +360,33 @@ export function CalendarScreen({ path }: { path: string[] }) {
         dropCached("range");
         refreshRange();
     }, [refreshRange]);
+
+    // Linked accounts are pulled while the calendar is in view (see
+    // `refreshOpenSources`) - on opening it, every minute, and on coming back
+    // to the tab - so a change made in Google shows here without waiting for
+    // the scheduled pull. The grid is read again only when something was pulled.
+    const pullAccounts = useCallback(
+        async (soon = false) => {
+            const answer = await unwrap(
+                () => sourceActions.refreshOpenSourcesAction(soon),
+                t("screen.failed")
+            ).catch(() => null);
+            if (answer && answer.pulled > 0) eventsChanged();
+        },
+        [eventsChanged, t]
+    );
+    useEffect(() => {
+        const tick = () => {
+            if (document.visibilityState === "visible") void pullAccounts();
+        };
+        tick();
+        const timer = window.setInterval(tick, 60_000);
+        document.addEventListener("visibilitychange", tick);
+        return () => {
+            window.clearInterval(timer);
+            document.removeEventListener("visibilitychange", tick);
+        };
+    }, [pullAccounts]);
 
     const savePreferences = useCallback(
         async (patch: Partial<CalendarPreferences>) => {
@@ -1375,6 +1403,7 @@ export function CalendarScreen({ path }: { path: string[] }) {
             case "refresh":
                 calendarsRead.refresh();
                 eventsChanged();
+                void pullAccounts(true);
                 return true;
             case "settings":
                 router.push("/calendar/settings");
@@ -1396,10 +1425,6 @@ export function CalendarScreen({ path }: { path: string[] }) {
 
     const label = time.windowLabel(view, anchor, span, locale);
     const todayShown = time.showsToday(view, anchor, span, today);
-    const viewOptions = VIEWS.map((entry) => ({
-        value: entry,
-        label: t(`views.${entry}`, { count: preferences.customDays })
-    }));
     const colorOf = useCallback(
         (calendarId: string, own: string | null) =>
             own ?? calendarsById.get(calendarId)?.color ?? "#7f7f7f",
@@ -1562,20 +1587,12 @@ export function CalendarScreen({ path }: { path: string[] }) {
                         focusSignal={searchSignal}
                         onOpen={openSearchResult}
                     />
-                    <SegmentedControl
-                        className="hidden xl:flex"
-                        size="sm"
-                        aria-label={t("header.view")}
-                        value={view}
-                        onValueChange={chooseView}
-                        options={viewOptions}
-                    />
-                    <Select
-                        className="h-7 w-28 xl:hidden"
-                        aria-label={t("header.view")}
-                        value={view}
-                        onValueChange={(next) => chooseView(next as CalendarViewName)}
-                        options={viewOptions}
+                    <ViewPicker
+                        view={view}
+                        customDays={preferences.customDays}
+                        preferences={preferences}
+                        onView={chooseView}
+                        onToggle={(name) => void savePreferences({ [name]: !preferences[name] })}
                     />
                     <Button
                         size="sm"
@@ -1602,6 +1619,7 @@ export function CalendarScreen({ path }: { path: string[] }) {
                                 onSelect={() => {
                                     calendarsRead.refresh();
                                     eventsChanged();
+                                    void pullAccounts(true);
                                 }}
                             >
                                 <RefreshCw />
@@ -1797,7 +1815,7 @@ export function CalendarScreen({ path }: { path: string[] }) {
                                         scrollToNowSignal={nowSignal}
                                         slotMinutes={preferences.slotMinutes}
                                         dayStart={preferences.dayStart}
-                                        eventLimit={preferences.eventLimit}
+                                        eventLimit={preferences.monthEvents}
                                         businessHours={businessHours}
                                         events={events}
                                         selectedId={selected?.id ?? null}

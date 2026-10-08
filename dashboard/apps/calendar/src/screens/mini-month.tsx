@@ -3,7 +3,7 @@
 /**
  * A small month to jump with: the sidebar's, and the header's date picker.
  * Arrow keys move the day, Page Up/Down the month, Enter opens it. Today is a
- * filled circle, as on the grid; the day chosen is ringed.
+ * filled circle, as on the grid; the day chosen is tinted.
  */
 
 import * as time from "./time";
@@ -156,11 +156,14 @@ export function MiniMonth({
                                             "mx-auto flex size-6 items-center justify-center rounded-full transition-colors duration-fast hover:bg-card-hover",
                                             !inMonth && "text-foreground-subtle",
                                             // Today is filled, as on the grid; the day
-                                            // chosen is ringed, and both when they meet.
+                                            // chosen is tinted, as Google draws it. A
+                                            // ring around today's fill only drew a
+                                            // white edge round the circle.
                                             day === today &&
                                                 "bg-primary font-semibold text-primary-foreground hover:bg-primary",
                                             day === value &&
-                                                "ring-2 ring-inset ring-foreground font-semibold"
+                                                day !== today &&
+                                                "bg-primary/15 font-semibold text-primary hover:bg-primary/25"
                                         )}
                                     >
                                         {Number(day.slice(8))}

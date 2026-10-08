@@ -25,7 +25,7 @@ import * as time from "./time";
 import { GRID_CSS } from "./grid-css";
 import listPlugin from "@fullcalendar/list";
 import { KEYBOARD_CELLS } from "./grid-target";
-import { measureMonth, monthDayLimit, type MonthRoom } from "./month-rows";
+import { measureMonth, monthLimits, type MonthEvents, type MonthRoom } from "./month-rows";
 import FullCalendar from "@fullcalendar/react";
 import dayGridPlugin from "@fullcalendar/daygrid";
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
@@ -98,7 +98,8 @@ export interface GridViewProps {
     readonly scrollToNowSignal: number;
     readonly slotMinutes: number;
     readonly dayStart: string;
-    readonly eventLimit: number;
+    /** Events per day in the month: as many as fit, all (0), or at most a number. */
+    readonly eventLimit: MonthEvents;
     readonly businessHours: { daysOfWeek: number[]; startTime: string; endTime: string }[];
     readonly events: EventInput[];
     readonly selectedId: string | null;
@@ -124,6 +125,10 @@ export interface GridViewProps {
     readonly onTaskDrop: (taskId: string, at: GridMoment) => void;
     readonly onOpenDay: (day: string, view: CalendarViewName) => void;
 }
+
+/** Events the all-day row of a day or week keeps above "+N more" when the
+ *  month's setting is "as many as fit". */
+const ALL_DAY_LINES = 4;
 
 function moment(date: Date, allDay: boolean, zone: string): GridMoment {
     const day = time.gridDay(date);
@@ -330,7 +335,9 @@ export default function GridView(props: GridViewProps) {
                     const next = measureMonth(element);
                     if (!next) return;
                     setRoom((current) =>
-                        current?.fit === next.fit && current.tallest === next.tallest
+                        current?.fit === next.fit &&
+                        current.rows === next.rows &&
+                        current.tallest === next.tallest
                             ? current
                             : next
                     );
@@ -345,7 +352,7 @@ export default function GridView(props: GridViewProps) {
             cancelAnimationFrame(inner);
             observer?.disconnect();
         };
-    }, [month, events, props.eventLimit, props.anchor, props.showWeekends, room?.fit]);
+    }, [month, events, props.eventLimit, props.anchor, props.showWeekends, room?.fit, room?.rows]);
     // Only with no limit: a limit is already capped to what an equal share holds.
     const weekFloor =
         month && room && props.eventLimit === 0
@@ -468,13 +475,19 @@ export default function GridView(props: GridViewProps) {
                         <span className="pc-now-time">{hourFormat.format(arg.date)}</span>
                     ) : null
                 }
-                dayMaxEvents={
-                    month
-                        ? monthDayLimit(props.eventLimit, room?.fit ?? null)
-                        : props.eventLimit === 0
-                          ? false
-                          : props.eventLimit
-                }
+                {...(month
+                    ? monthLimits(props.eventLimit, room)
+                    : {
+                          // The all-day row of a time grid: a number from
+                          // settings, or the four lines it has always kept.
+                          dayMaxEvents:
+                              props.eventLimit === 0
+                                  ? false
+                                  : props.eventLimit === "fit"
+                                    ? ALL_DAY_LINES
+                                    : props.eventLimit,
+                          dayMaxEventRows: false
+                      })}
                 businessHours={props.businessHours.length > 0 ? props.businessHours : false}
                 nowIndicator
                 editable
@@ -503,18 +516,31 @@ export default function GridView(props: GridViewProps) {
                 eventContent={(arg) => {
                     const item = (arg.event.extendedProps as { item?: GridItem }).item;
                     if (item?.kind !== "task") return true;
+                    // On a chip the mark is drawn in the chip's ink with the tick
+                    // in its fill; where there is no chip - a timed task in the
+                    // month or the year is a line on the page, and so is every
+                    // row of the schedule - in the calendar's own colour.
+                    const type = arg.view.type;
+                    const chip = type.startsWith("timeGrid") || (arg.event.allDay && !type.startsWith("list"));
                     return (
                         <span className="pc-task-chip flex min-w-0 items-center gap-1 overflow-hidden px-0.5">
                             <TaskMark
                                 task={item.task}
-                                color={arg.event.textColor || "currentColor"}
+                                color={
+                                    chip
+                                        ? arg.event.textColor || "currentColor"
+                                        : arg.event.borderColor || arg.event.backgroundColor || "currentColor"
+                                }
+                                markColor={chip ? arg.event.backgroundColor || undefined : undefined}
                                 size={12}
                                 onToggle={(task) => propsRef.current.onTaskToggle(task)}
                             />
                             {arg.timeText ? (
-                                <span className="shrink-0 tabular-nums">{arg.timeText}</span>
+                                <span className="fc-event-time shrink-0 tabular-nums">{arg.timeText}</span>
                             ) : null}
-                            <span className="min-w-0 truncate">{arg.event.title}</span>
+                            {/* The grid's own title class, so a done task is struck
+                                through and a past one greyed like any event. */}
+                            <span className="fc-event-title min-w-0 truncate">{arg.event.title}</span>
                         </span>
                     );
                 }}

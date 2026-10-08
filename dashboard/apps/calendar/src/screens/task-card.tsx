@@ -29,17 +29,25 @@ export function TaskMark({
     task,
     color,
     size = 14,
+    markColor,
     onToggle
 }: {
     task: TaskItemView;
     /** What the mark is drawn in where the task has no status colour of its own. */
     color: string;
+    /** The tick on a done mark drawn in `color` (see `StatusIcon`). */
+    markColor?: string;
     size?: number;
     onToggle?: (task: TaskItemView) => void;
 }) {
     const t = useCalendarT();
     const icon = (
-        <StatusIcon color={task.statusColor ?? color} type={task.statusType} size={size} />
+        <StatusIcon
+            color={task.statusColor ?? color}
+            markColor={task.statusColor ? undefined : markColor}
+            type={task.statusType}
+            size={size}
+        />
     );
     if (!onToggle || !task.editable) return icon;
     const label = task.done ? t("todo.markNotDone") : t("todo.markDone");
