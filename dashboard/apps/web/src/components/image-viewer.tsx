@@ -42,7 +42,8 @@ import {
     DropdownMenuItem,
     DropdownMenuSeparator,
     DropdownMenuTrigger,
-    cn
+    cn,
+    shortcutPressed
 } from "@polaris/ui";
 
 /** How far in and out a picture goes. Past four times, a photo is pixels; below
@@ -101,8 +102,8 @@ export function ImageViewer({
                 event.preventDefault();
                 onClose();
             }
-            if (event.key === "+" || event.key === "=") setZoom((current) => step(current, 1));
-            if (event.key === "-") setZoom((current) => step(current, -1));
+            if (shortcutPressed(event, "viewer.zoomIn")) setZoom((current) => step(current, 1));
+            if (shortcutPressed(event, "viewer.zoomOut")) setZoom((current) => step(current, -1));
         };
         window.addEventListener("keydown", onKey);
         return () => window.removeEventListener("keydown", onKey);

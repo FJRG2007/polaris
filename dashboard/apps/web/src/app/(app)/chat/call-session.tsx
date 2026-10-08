@@ -23,7 +23,7 @@ import Link from "next/link";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useCall } from "./use-call";
 import { CallAudio } from "./call-audio";
-import { Button, cn } from "@polaris/ui";
+import { Button, cn, useShortcutHint } from "@polaris/ui";
 import { useCallHotkeys } from "./call-hotkeys";
 import { useCallRecorder } from "./call-recorder";
 import { useChatStream } from "./use-chat-stream";
@@ -203,6 +203,12 @@ export function CallProvider({ viewerId, children }: { viewerId: string; childre
  */
 export function CallBar({ onScreen }: { onScreen: string | null }) {
     const t = useTranslations("chat");
+    const ts = useTranslations("shortcuts");
+    // The keys in force for the two call controls, named in their titles.
+    const micKey = useShortcutHint("chat.toggleMic");
+    const deafenKey = useShortcutHint("chat.toggleDeafen");
+    const withKey = (label: string, keys: string) =>
+        keys ? ts("withKey", { action: label, keys }) : label;
     const { call, session, leave } = useCallHold();
     // The room this bar is about, wherever it is drawn in full: a conversation
     // for a call, the meeting itself for a meeting. Either way the bar is a way
@@ -313,8 +319,8 @@ export function CallBar({ onScreen }: { onScreen: string | null }) {
                         call.moderation.serverMuted || call.moderation.serverDeafened
                             ? t("callSession.aModeratorMutedYou")
                             : call.micOn
-                              ? t("callSession.muteF9")
-                              : t("callSession.unmuteF9")
+                              ? withKey(t("callSession.mute"), micKey)
+                              : withKey(t("callSession.unmute"), micKey)
                     }
                     className={cn(
                         "rounded-full p-1.5 transition-colors hover:bg-muted",
@@ -331,8 +337,8 @@ export function CallBar({ onScreen }: { onScreen: string | null }) {
                         call.moderation.serverDeafened
                             ? t("callSession.aModeratorDeafenedYou")
                             : call.deafened
-                              ? t("callSession.undeafenF10")
-                              : t("callSession.deafenF10")
+                              ? withKey(t("callSession.undeafen"), deafenKey)
+                              : withKey(t("callSession.deafen"), deafenKey)
                     }
                     className={cn(
                         "rounded-full p-1.5 transition-colors hover:bg-muted",

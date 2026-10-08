@@ -534,42 +534,7 @@
         "zones": "Zones and clocks"
     },
     "shortcuts": {
-        "action": "Action",
-        "description": "They never fire while you type in a field.",
-        "keys": "Keys",
-        "labels": {
-            "addCalendar": "Create a calendar",
-            "close": "Close",
-            "copy": "Copy the selected event",
-            "create": "New event",
-            "createHere": "New event on the focused day",
-            "day": "Day view",
-            "days": "Custom view",
-            "delete": "Delete selected event",
-            "deleteEvent": "Delete, in the editor",
-            "duplicate": "Duplicate, in the editor",
-            "goTo": "Go to a date",
-            "help": "This list",
-            "list": "List view",
-            "menu": "Open the menu",
-            "month": "Month view",
-            "moveFocus": "Move between days",
-            "next": "Go to the next period",
-            "open": "Open selected event",
-            "paste": "Paste on the focused day",
-            "previous": "Go to the previous period",
-            "refresh": "Refresh",
-            "save": "Save, in the editor",
-            "search": "Search",
-            "settings": "Settings",
-            "today": "Today",
-            "undo": "Undo last change",
-            "week": "Week view",
-            "year": "Year view"
-        },
-        "off": "Keyboard shortcuts are off. Turn them on in the settings.",
-        "or": "or",
-        "title": "Keyboard shortcuts"
+        "off": "Keyboard shortcuts are off. Turn them on in the settings."
     },
     "sidebar": {
         "add": "Add a calendar",

@@ -10,6 +10,7 @@ import { cn } from "../lib/cn";
 import { FLOATING_MOTION } from "../lib/motion";
 import { ChevronRight } from "lucide-react";
 import { useSettledHover } from "../lib/menu-hover";
+import { useKeyNames } from "../lib/key-names";
 import { applePlatform, formatShortcut } from "../lib/shortcut";
 import { ignoreOpeningPress } from "../lib/menu-press";
 import { keepSearchFocus, redirectMenuFocus } from "../lib/menu-search-focus";
@@ -168,9 +169,10 @@ export function MenuShortcut({
     // The server renders the PC form and this corrects it on the machine that is
     // actually reading, which is the whole of why it is not read during render.
     const apple = useSyncExternalStore(subscribeNothing, applePlatform, () => false);
+    const names = useKeyNames();
     return (
         <span className={cn("ml-auto pl-6 text-[0.6875rem] text-foreground-subtle", className)}>
-            {keys ? formatShortcut(keys, apple) : children}
+            {keys ? formatShortcut(keys, apple, names) : children}
         </span>
     );
 }

@@ -46,7 +46,8 @@ import {
     ContextMenuTrigger,
     ContextMenuSeparator,
     ConfirmDeleteDialog,
-    Select
+    Select,
+    shortcutPressed
 } from "@polaris/ui";
 import { hostUi } from "@polaris/app-host/client";
 import { usePlacesT } from "../use-places-t";
@@ -230,25 +231,26 @@ export function ClipsView({ canManage }: { canManage: boolean }) {
         return [clip];
     };
 
+    // The shared table's `places.clips.*`; the arrows, Home and End are the
+    // list's own.
     const onKeyDown = (event: React.KeyboardEvent) => {
-        const mod = event.ctrlKey || event.metaKey;
-        if (mod && event.key.toLowerCase() === "a") {
+        if (shortcutPressed(event, "places.clips.selectAll")) {
             event.preventDefault();
             setSelected(new Set(keys));
             return;
         }
-        if (event.key === "Escape" && selected.size > 0) {
+        if (shortcutPressed(event, "places.clips.clearSelection") && selected.size > 0) {
             event.preventDefault();
             setSelected(new Set());
             cursor.current = null;
             return;
         }
-        if (event.key === t("clips.delete") && canManage && chosen.length > 0) {
+        if (shortcutPressed(event, "places.clips.delete") && canManage && chosen.length > 0) {
             event.preventDefault();
             setRemoving(chosen);
             return;
         }
-        if (event.key === "Enter" && chosen.length === 1 && chosen[0]) {
+        if (shortcutPressed(event, "places.clips.open") && chosen.length === 1 && chosen[0]) {
             event.preventDefault();
             const only = chosen[0];
             setPlaying((current) => (current === only.id ? null : only.id));

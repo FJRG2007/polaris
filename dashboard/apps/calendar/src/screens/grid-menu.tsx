@@ -48,7 +48,8 @@ import {
     ContextMenuSubContent,
     ContextMenuSubTrigger,
     ContextMenuTrigger,
-    MenuShortcut
+    ShortcutHint,
+    shortcutPressed
 } from "@polaris/ui";
 import * as time from "./time";
 import { ColorDot } from "./ui";
@@ -166,9 +167,10 @@ function focusTakenByPanel(): boolean {
     return active instanceof Element && active.closest('[role="dialog"]') !== null;
 }
 
-/** Whether a key press asks for the context menu. */
-function asksForMenu(event: { key: string; shiftKey: boolean }): boolean {
-    return event.key === "ContextMenu" || (event.key === "F10" && event.shiftKey);
+/** Whether a key press asks for the context menu: the menu key, or Shift+F10 by
+ *  default (the shared table's `calendar.grid.menu`). */
+function asksForMenu(event: KeyboardEvent<HTMLDivElement>): boolean {
+    return shortcutPressed(event, "calendar.grid.menu");
 }
 
 export function GridMenu(props: GridMenuProps) {
@@ -285,14 +287,14 @@ export function GridMenu(props: GridMenuProps) {
             const rect = subject.getBoundingClientRect();
             return propsRef.current.resolve(found, rect, null);
         };
-        if (mod && !event.altKey && event.key.toLowerCase() === "c" && item) {
+        if (item && shortcutPressed(event, "calendar.copy")) {
             const resolved = resolvedHere();
             if (resolved?.kind !== "event" || resolved.occurrence.busyOnly) return;
             event.preventDefault();
             propsRef.current.actions.copy(resolved.occurrence);
             return;
         }
-        if (mod && !event.altKey && event.key.toLowerCase() === "v" && cell) {
+        if (cell && shortcutPressed(event, "calendar.paste")) {
             const resolved = resolvedHere();
             if (resolved?.kind !== "slot" || !propsRef.current.clipboard) return;
             event.preventDefault();
@@ -394,7 +396,7 @@ function MenuBody({
                                 title: clipboard.summary || t("screen.untitled")
                             })}
                         </span>
-                        <MenuShortcut keys="Mod+V" />
+                        <ShortcutHint id="calendar.paste" />
                     </ContextMenuItem>
                 ) : null}
                 {showsOnlyDay(target.day) ? null : (
@@ -469,7 +471,7 @@ function MenuBody({
                 <ContextMenuItem onSelect={() => actions.copy(occurrence)}>
                     <Copy className="size-4" />
                     {t("gridMenu.copy")}
-                    <MenuShortcut keys="Mod+C" />
+                    <ShortcutHint id="calendar.copy" />
                 </ContextMenuItem>
             )}
             {occurrence.editable ? (

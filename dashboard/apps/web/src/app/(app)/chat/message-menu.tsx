@@ -56,9 +56,9 @@ import {
     ContextMenuSubContent,
     ContextMenuSubTrigger,
     ContextMenuTrigger,
-    MenuShortcut,
     keepFocusOnClose,
-    useToast
+    useToast,
+    ShortcutHint
 } from "@polaris/ui";
 
 export interface MessageActions {
@@ -280,7 +280,7 @@ export function MessageMenu({
                                 <CornerUpLeft className="size-3.5" />
                                 {t("messageMenu.reply")}
                                 {/* i18n-ignore: a key on the keyboard */}
-                                <MenuShortcut>R</MenuShortcut>
+                                <ShortcutHint id="chat.reply" />
                             </ContextMenuItem>
                         )}
                         {/* Only where there is somebody to answer and it is not
@@ -356,7 +356,7 @@ export function MessageMenu({
                     <ContextMenuItem onSelect={() => void copyText(plainText(message.body))}>
                         <Copy className="size-3.5" />
                         {t("messageMenu.copyText")}
-                        <MenuShortcut keys="Mod+C" />
+                        <ShortcutHint id="chat.copy" />
                     </ContextMenuItem>
                 )}
                 {/* An ordinary download: the route serves it as an
@@ -457,7 +457,7 @@ export function MessageMenu({
                                 <Pencil className="size-3.5" />
                                 {t("messageMenu.edit")}
                                 {/* i18n-ignore: a key on the keyboard */}
-                                <MenuShortcut>F2</MenuShortcut>
+                                <ShortcutHint id="chat.edit" />
                             </ContextMenuItem>
                         )}
                         <ContextMenuItem
@@ -466,7 +466,7 @@ export function MessageMenu({
                         >
                             <Trash2 className="size-3.5" />
                             {t("messageMenu.delete")}
-                            <MenuShortcut>{t("messageMenu.del")}</MenuShortcut>
+                            <ShortcutHint id="chat.delete" />
                         </ContextMenuItem>
                     </>
                 )}

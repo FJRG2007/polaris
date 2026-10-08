@@ -7,6 +7,7 @@
 
 export { cn } from "./lib/cn";
 export { applePlatform, formatShortcut } from "./lib/shortcut";
+export { KeyNamesProvider, useKeyNames } from "./lib/key-names";
 export { keepFocusOnClose } from "./lib/menu-focus";
 export { useDeferredFocus } from "./lib/use-deferred-focus";
 export {
@@ -99,3 +100,4 @@ export {
     type BoardView
 } from "./lib/board-gestures";
 export { StatusIcon } from "./components/status-icon";
+export * from "./shortcuts/shortcuts";

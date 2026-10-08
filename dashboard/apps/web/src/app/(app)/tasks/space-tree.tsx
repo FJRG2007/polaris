@@ -62,11 +62,12 @@ import {
     DropdownMenuItem,
     DropdownMenuTrigger,
     Input,
-    MenuShortcut,
     Select,
     cn,
     keepFocusOnClose,
-    useDeferredFocus
+    useDeferredFocus,
+    ShortcutHint,
+    shortcutPressed
 } from "@polaris/ui";
 
 const COLLAPSED_KEY = "polaris.tasks.tree.collapsed";
@@ -111,7 +112,8 @@ interface RowAction {
      * live: "Rename (F2)" reads as the name of the action rather than as a key
      * to press, and it followed the label onto the hover button's tooltip, where
      * there is no key at all. Drawn against the right-hand edge of the menu, the
-     * way chat has always drawn one.
+     * way chat has always drawn one. The id of a shared shortcut, so the hint is
+     * whatever key the reader has for it.
      */
     readonly shortcut?: string;
 }
@@ -128,8 +130,10 @@ interface RowAction {
  * A list and a folder are named in a row that appears the moment the menu closes,
  * so the menu has to leave focus in that row rather than take it back.
  */
-/** The key that renames a row, drawn beside the menu item. A key, not a word. */
-const RENAME_SHORTCUT = "F2"; // i18n-ignore
+/** The shared shortcut that renames a row, drawn beside the menu item. */
+const RENAME_SHORTCUT = "general.rename";
+/** And the one that asks to delete it. */
+const DELETE_SHORTCUT = "general.delete";
 
 function CreateButton({ at, onPick }: { at: CreateAt; onPick: (kind: CreateKind) => void }) {
     const t = useTranslations("tasks");
@@ -345,7 +349,7 @@ function TreeRow({
                 else if (where !== null && where !== "into" && onDropAt) onDropAt(where);
             }}
             onKeyDown={(event) => {
-                if (event.key === "F2" && editable) {
+                if (editable && shortcutPressed(event, RENAME_SHORTCUT)) {
                     event.preventDefault();
                     onRenameStart();
                     return;
@@ -354,13 +358,13 @@ function TreeRow({
                 // deletion itself. The key is a faster way to reach the
                 // question, not a way to skip it.
                 //
-                // Backspace as well, which is the same key on a Mac laptop. The
-                // shortcut is drawn from the action rather than written here, so
+                // Backspace as well by default, which is the same key on a Mac
+                // laptop. The shortcut is drawn from the action rather than written here, so
                 // a row that offers no deletion advertises none: a menu that
                 // names a key nothing listens for is worse than a menu with no
                 // key on it at all.
-                if (event.key === "Delete" || event.key === "Backspace") {
-                    const removal = rowActions.find((action) => action.shortcut === "Del");
+                if (shortcutPressed(event, DELETE_SHORTCUT)) {
+                    const removal = rowActions.find((action) => action.shortcut === DELETE_SHORTCUT);
                     if (!removal) return;
                     event.preventDefault();
                     removal.onSelect();
@@ -455,9 +459,7 @@ function TreeRow({
                                 >
                                     <action.Icon className="size-3.5" />
                                     {action.label}
-                                    {action.shortcut ? (
-                                        <MenuShortcut>{action.shortcut}</MenuShortcut>
-                                    ) : null}
+                                    {action.shortcut ? <ShortcutHint id={action.shortcut} /> : null}
                                 </ContextMenuItem>
                             </span>
                         ))}
@@ -947,7 +949,7 @@ function SpaceSection({
                               ? [
                                     {
                                         label: t("tree.deleteList"),
-                                        shortcut: "Del",
+                                        shortcut: DELETE_SHORTCUT,
                                         Icon: Trash2,
                                         danger: true,
                                         onSelect: () =>
@@ -1002,7 +1004,7 @@ function SpaceSection({
                 ? [
                       {
                           label: t("tree.deleteFolder"),
-                          shortcut: "Del",
+                          shortcut: DELETE_SHORTCUT,
                           Icon: Trash2,
                           danger: true,
                           onSelect: () =>
@@ -1147,7 +1149,7 @@ function SpaceSection({
                     <div
                         className="flex items-center gap-1"
                         onKeyDown={(event) => {
-                            if (event.key === "F2" && spaceManageable) {
+                            if (spaceManageable && shortcutPressed(event, RENAME_SHORTCUT)) {
                                 event.preventDefault();
                                 onRenaming(`space:${space.id}`);
                             }
@@ -1234,7 +1236,7 @@ function SpaceSection({
                                 <ContextMenuItem onSelect={() => onRenaming(`space:${space.id}`)}>
                                     <Pencil className="size-3.5" />
                                     {t("tree.renameAction")}
-                                    <MenuShortcut>{RENAME_SHORTCUT}</MenuShortcut>
+                                    <ShortcutHint id={RENAME_SHORTCUT} />
                                 </ContextMenuItem>
                                 <ContextMenuItem asChild>
                                     <Link href={`/tasks/s/${space.id}`}>

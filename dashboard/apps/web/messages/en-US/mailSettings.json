@@ -83,19 +83,7 @@
         "filters": "Each of these is an ordinary filter, so you can open one in <link>Filters</link> to change what happens instead of throwing the mail away."
     },
     "shortcuts": {
-        "oneKey": "Use one key with nothing held down.",
-        "reserved": "That key cannot be used. Enter, Escape, the arrows, Delete and Backspace keep their own jobs.",
-        "clash": "{key} already does \"{command}\". Move that one first.",
-        "saved": "Saved. The new keys work the next time you open a list.",
-        "hint": "Press Change, then the key you want. Keys that already do something else are refused, so nothing ends up doing two things.",
-        "fixed": "Also {keys}, which do not move",
-        "pressFor": "Press a key for {command}, or Escape to cancel",
-        "changeFor": "Change the key for {command}",
-        "press": "Press a key...",
-        "change": "Change",
-        "reset": "Reset",
         "saving": "Saving...",
-        "resetAll": "Put every key back",
         "unsaved": "Not saved yet."
     },
     "junk": {

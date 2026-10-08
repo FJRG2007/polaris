@@ -162,7 +162,8 @@ import {
     DropdownMenuItem,
     DropdownMenuTrigger,
     keepFocusOnClose,
-    useToast
+    useToast,
+    matchShortcut
 } from "@polaris/ui";
 import {
     Check,
@@ -584,33 +585,14 @@ function useMessageKeys({
 
     useEffect(() => {
         const onKey = (event: KeyboardEvent) => {
-            // Copy is the only one that wants a modifier, and the only one that
-            // is refused when the others are held. Worked out first so the plain
-            // keys below can go on rejecting every modifier there is.
-            //
-            // Alt disqualifies it, and that is not tidiness. AltGr is reported as
-            // Ctrl+Alt on Windows, so a layout that puts a character on AltGr+C -
-            // and the person writing this is typing on one - would have that
-            // character swallowed and a message copied instead, every time.
-            //
-            // Shift disqualifies it too, and separately from `holding`: shift
-            // makes the key "C", so Ctrl+Shift+C - which every browser gives to
-            // the developer tools - matched copy. It cannot go into `holding`,
-            // because that is also what stops a plain key firing while a
-            // modifier is down, and Ctrl+Shift+R would then reply.
-            const holding = (event.ctrlKey || event.metaKey) && !event.altKey;
-            const wanted =
-                holding && !event.shiftKey && (event.key === "c" || event.key === "C")
-                    ? "copy"
-                    : holding || event.altKey
-                      ? null
-                      : event.key === "F2"
-                        ? "edit"
-                        : event.key === "Delete"
-                          ? "delete"
-                          : event.key === "r" || event.key === "R"
-                            ? "reply"
-                            : null;
+            // Which key is which is the shared table's `chat.*`. A press matches
+            // only with exactly its modifiers, which is what keeps AltGr+C (Ctrl+Alt
+            // on Windows) typing its character and Ctrl+Shift+C opening the
+            // developer tools instead of copying a message.
+            const matched = matchShortcut(event, ["chat.copy", "chat.edit", "chat.delete", "chat.reply"]);
+            const wanted = matched
+                ? (matched.slice("chat.".length) as "copy" | "edit" | "delete" | "reply")
+                : null;
             if (!wanted) return;
             // Highlighted text is what Ctrl+C is for. The browser's own copy is
             // left to do exactly what the person asked for.

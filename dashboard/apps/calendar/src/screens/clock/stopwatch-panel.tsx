@@ -15,7 +15,13 @@ import { useEffect, useState } from "react";
 import * as model from "../../lib/clock/model";
 import { mutate, type ClockRead } from "./store";
 import * as clockActions from "../../actions/clock";
-import { Button, cn, Skeleton, useToast } from "@polaris/ui";
+import {
+    Button,
+    cn,
+    Skeleton,
+    useToast,
+    shortcutPressed
+} from "@polaris/ui";
 import { Copy, Download, Flag, Pause, Play, RotateCcw } from "lucide-react";
 
 type Change = "start" | "pause" | "reset" | "lap";
@@ -95,7 +101,7 @@ export function StopwatchPanel({ clock }: { clock: ClockRead }) {
     useEffect(() => {
         const onKey = (event: KeyboardEvent) => {
             const target = event.target as HTMLElement | null;
-            if (event.ctrlKey || event.metaKey || event.altKey || event.repeat) return;
+            if (event.repeat) return;
             if (
                 target?.closest(
                     "input, textarea, select, [contenteditable='true'], [role='dialog'], button, [role='menu']"
@@ -103,12 +109,16 @@ export function StopwatchPanel({ clock }: { clock: ClockRead }) {
             )
                 return;
             if (!watch) return;
-            const key = event.key.toLowerCase();
-            if (key === " ") {
+            // The shared table's `calendar.stopwatch.*`: Space, L and R by default.
+            if (shortcutPressed(event, "calendar.stopwatch.startStop")) {
                 event.preventDefault();
                 change(running ? "pause" : "start");
-            } else if (key === "l" && running) change("lap");
-            else if (key === "r" && !running && (watch.elapsedMs > 0 || laps.length > 0))
+            } else if (running && shortcutPressed(event, "calendar.stopwatch.lap")) change("lap");
+            else if (
+                !running &&
+                (watch.elapsedMs > 0 || laps.length > 0) &&
+                shortcutPressed(event, "calendar.stopwatch.reset")
+            )
                 change("reset");
         };
         window.addEventListener("keydown", onKey);

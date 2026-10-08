@@ -534,42 +534,7 @@
         "zones": "Zonas y relojes"
     },
     "shortcuts": {
-        "action": "Acción",
-        "description": "Nunca se activan mientras escribes en un campo.",
-        "keys": "Teclas",
-        "labels": {
-            "addCalendar": "Crear calendario",
-            "close": "Cerrar",
-            "copy": "Copiar el evento elegido",
-            "create": "Nuevo evento",
-            "createHere": "Nuevo evento en el día activo",
-            "day": "Ver día",
-            "days": "Ver a medida",
-            "delete": "Borrar evento elegido",
-            "deleteEvent": "Borrar, en el editor",
-            "duplicate": "Duplicar, en el editor",
-            "goTo": "Ir a una fecha",
-            "help": "Esta lista",
-            "list": "Ver lista",
-            "menu": "Abrir el menú",
-            "month": "Ver mes",
-            "moveFocus": "Moverse entre días",
-            "next": "Periodo siguiente",
-            "open": "Abrir evento elegido",
-            "paste": "Pegar en el día activo",
-            "previous": "Periodo anterior",
-            "refresh": "Actualizar",
-            "save": "Guardar, en el editor",
-            "search": "Buscar",
-            "settings": "Ajustes",
-            "today": "Hoy",
-            "undo": "Deshacer cambio",
-            "week": "Ver semana",
-            "year": "Ver año"
-        },
-        "off": "Los atajos de teclado están desactivados. Actívalos en los ajustes.",
-        "or": "o",
-        "title": "Atajos de teclado"
+        "off": "Los atajos de teclado están desactivados. Actívalos en los ajustes."
     },
     "sidebar": {
         "add": "Añadir calendario",

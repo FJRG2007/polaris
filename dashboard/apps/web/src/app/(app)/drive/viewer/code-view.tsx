@@ -17,7 +17,7 @@
 
 import { useMemo, useState } from "react";
 import { useTranslations } from "@/components/i18n/i18n-provider";
-import { Button } from "@polaris/ui";
+import { Button, shortcutPressed } from "@polaris/ui";
 import { Pencil, Search } from "lucide-react";
 import { FindBar } from "./find-bar";
 import { findMatches, stepMatch } from "./find-in-file";
@@ -81,7 +81,7 @@ export function CodeView({
         <div
             className="flex max-h-[80vh] flex-col bg-surface"
             onKeyDown={(event) => {
-                if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "f") {
+                if (shortcutPressed(event, "viewer.find")) {
                     // Taken from the browser's own find, which searches the page
                     // around this file rather than the file - and a viewer that
                     // scrolls in a box is exactly where that goes wrong.

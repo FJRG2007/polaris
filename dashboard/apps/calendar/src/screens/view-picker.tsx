@@ -7,7 +7,7 @@
  */
 
 import { useCalendarT } from "./i18n";
-import { VIEW_KEYS } from "./shortcuts";
+import { viewKey } from "./shortcuts";
 import { Check, ChevronDown } from "lucide-react";
 import { VIEWS, type CalendarPreferences, type CalendarViewName } from "../lib/preferences";
 import {
@@ -18,7 +18,8 @@ import {
     DropdownMenuItem,
     DropdownMenuSeparator,
     DropdownMenuTrigger,
-    MenuShortcut
+    MenuShortcut,
+    useShortcutBindings
 } from "@polaris/ui";
 
 /** The switches the menu carries, each a setting of its own. */
@@ -39,6 +40,7 @@ export function ViewPicker({
     onToggle: (name: ViewSwitch) => void;
 }) {
     const t = useCalendarT();
+    const bindings = useShortcutBindings();
     const nameOf = (entry: CalendarViewName) => t(`views.${entry}`, { count: customDays });
     // Done tasks are only a choice while tasks are drawn at all.
     const switches = VIEW_SWITCHES.filter(
@@ -53,20 +55,21 @@ export function ViewPicker({
                 </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-60">
-                {VIEWS.map((entry) => (
-                    <DropdownMenuItem
-                        key={entry}
-                        role="menuitemradio"
-                        aria-checked={entry === view}
-                        onSelect={() => onView(entry)}
-                        className={cn(entry === view && "font-medium text-primary")}
-                    >
-                        {nameOf(entry)}
-                        {preferences.keyboardShortcuts ? (
-                            <MenuShortcut>{VIEW_KEYS[entry].toUpperCase()}</MenuShortcut>
-                        ) : null}
-                    </DropdownMenuItem>
-                ))}
+                {VIEWS.map((entry) => {
+                    const key = preferences.keyboardShortcuts ? viewKey(bindings, entry) : null;
+                    return (
+                        <DropdownMenuItem
+                            key={entry}
+                            role="menuitemradio"
+                            aria-checked={entry === view}
+                            onSelect={() => onView(entry)}
+                            className={cn(entry === view && "font-medium text-primary")}
+                        >
+                            {nameOf(entry)}
+                            {key ? <MenuShortcut keys={key} /> : null}
+                        </DropdownMenuItem>
+                    );
+                })}
                 <DropdownMenuSeparator />
                 {switches.map((name) => (
                     <DropdownMenuItem

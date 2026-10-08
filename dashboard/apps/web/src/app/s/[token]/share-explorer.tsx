@@ -87,7 +87,8 @@ import {
     DialogTitle,
     Input,
     Skeleton,
-    cn
+    cn,
+    shortcutPressed
 } from "@polaris/ui";
 
 type SortKey = "name" | "created" | "modified" | "size";
@@ -613,26 +614,35 @@ export function ShareExplorer({
         setRenameTarget(entry);
     }
 
+    /** The explorer's keys, the same shared ones Drive answers to. A public link
+     *  is outside anybody's account, so these are always the defaults. */
     function onListKeyDown(event: KeyboardEvent) {
-        const mod = event.ctrlKey || event.metaKey;
-        if (event.key === "Escape" && selectedEntries.length > 0) {
+        if (shortcutPressed(event, "drive.clearSelection") && selectedEntries.length > 0) {
             event.preventDefault();
             setSelected(new Set());
-        } else if (mod && event.key.toLowerCase() === "a") {
+        } else if (shortcutPressed(event, "drive.selectAll")) {
             event.preventDefault();
             setSelected(new Set(visible.map((entry) => entry.path)));
-        } else if (event.key === "Enter" && selectedEntries.length === 1 && selectedEntries[0]) {
+        } else if (
+            shortcutPressed(event, "drive.open") &&
+            selectedEntries.length === 1 &&
+            selectedEntries[0]
+        ) {
             event.preventDefault();
             openEntry(selectedEntries[0]);
         } else if (
-            event.key === "F2" &&
+            shortcutPressed(event, "general.rename") &&
             allowRename &&
             selectedEntries.length === 1 &&
             selectedEntries[0]
         ) {
             event.preventDefault();
             startRename(selectedEntries[0]);
-        } else if (event.key === "Delete" && allowDelete && selectedEntries.length > 0) {
+        } else if (
+            shortcutPressed(event, "drive.delete") &&
+            allowDelete &&
+            selectedEntries.length > 0
+        ) {
             event.preventDefault();
             setDeleteTargets(selectedEntries);
         }

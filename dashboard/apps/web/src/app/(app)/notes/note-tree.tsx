@@ -37,7 +37,8 @@ import {
     ContextMenuSeparator,
     ContextMenuTrigger,
     Input,
-    MenuShortcut
+    ShortcutHint,
+    shortcutPressed
 } from "@polaris/ui";
 import {
     Archive,
@@ -126,13 +127,13 @@ function rowKeys(
     handlers: { onRename?: () => void; onDelete?: () => void }
 ): void {
     if ((event.target as HTMLElement).tagName === "INPUT") return;
-    if (event.key === "F2" && handlers.onRename) {
+    if (handlers.onRename && shortcutPressed(event, "general.rename")) {
         event.preventDefault();
         event.stopPropagation();
         handlers.onRename();
         return;
     }
-    if (event.key === "Delete" && handlers.onDelete) {
+    if (handlers.onDelete && shortcutPressed(event, "general.delete")) {
         event.preventDefault();
         event.stopPropagation();
         handlers.onDelete();
@@ -719,7 +720,7 @@ function ShelfRow({
                             <Pencil className="size-3.5" />
                             {t("tree.rename")}
                             {/* i18n-ignore: a key on the keyboard */}
-                            <MenuShortcut>F2</MenuShortcut>
+                            <ShortcutHint id="general.rename" />
                         </ContextMenuItem>
                         <ContextMenuItem onSelect={onPeople}>
                             <Users className="size-3.5" />
@@ -729,7 +730,7 @@ function ShelfRow({
                         <ContextMenuItem variant="danger" onSelect={onDelete}>
                             <Trash2 className="size-3.5" />
                             {t("tree.deleteNotebook")}
-                            <MenuShortcut>{t("tree.deleteKey")}</MenuShortcut>
+                            <ShortcutHint id="general.delete" />
                         </ContextMenuItem>
                     </>
                 )}
@@ -947,7 +948,7 @@ function Branch({
                                         <Pencil className="size-3.5" />
                                         {t("tree.rename")}
                                         {/* i18n-ignore: a key on the keyboard */}
-                                        <MenuShortcut>F2</MenuShortcut>
+                                        <ShortcutHint id="general.rename" />
                                     </ContextMenuItem>
                                     <ContextMenuSeparator />
                                     <ContextMenuItem
@@ -963,7 +964,7 @@ function Branch({
                                     >
                                         <Trash2 className="size-3.5" />
                                         {t("tree.deleteFolder")}
-                                        <MenuShortcut>{t("tree.deleteKey")}</MenuShortcut>
+                                        <ShortcutHint id="general.delete" />
                                     </ContextMenuItem>
                                 </ContextMenuContent>
                             )}
@@ -1171,7 +1172,7 @@ function NoteBranch({
                             <Pencil className="size-3.5" />
                             {t("tree.rename")}
                             {/* i18n-ignore: a key on the keyboard */}
-                            <MenuShortcut>F2</MenuShortcut>
+                            <ShortcutHint id="general.rename" />
                         </ContextMenuItem>
                         <ContextMenuItem
                             onSelect={() =>
@@ -1219,7 +1220,7 @@ function NoteBranch({
                         >
                             <Trash2 className="size-3.5" />
                             {t("tree.delete")}
-                            <MenuShortcut>{t("tree.deleteKey")}</MenuShortcut>
+                            <ShortcutHint id="general.delete" />
                         </ContextMenuItem>
                     </ContextMenuContent>
                 )}

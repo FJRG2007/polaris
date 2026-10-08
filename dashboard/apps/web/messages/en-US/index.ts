@@ -39,6 +39,7 @@ import analytics from "./analytics.json";
 import databases from "./databases.json";
 import installed from "./installed.json";
 import reference from "./reference.json";
+import shortcuts from "./shortcuts.json";
 import telemetry from "./telemetry.json";
 import compliance from "./compliance.json";
 import components from "./components.json";
@@ -119,6 +120,7 @@ export default {
     reference,
     runners,
     servers,
+    shortcuts,
     system,
     tasks,
     tasksDetail,

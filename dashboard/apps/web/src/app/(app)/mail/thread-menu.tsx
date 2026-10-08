@@ -39,6 +39,7 @@ import {
     ContextMenuSubTrigger,
     ContextMenuTrigger,
     MenuShortcut,
+    useShortcutBindings,
     useToast
 } from "@polaris/ui";
 import {
@@ -76,14 +77,10 @@ export function ThreadContextMenu({
     onAnswer,
     onBlock,
     onConversation,
-    keymap,
     selection,
     children
 }: {
     thread: MailThreadView;
-    /** The keyboard this person set up, so the hint beside an item is the key
-     *  that actually does it rather than the default. */
-    keymap: core.MailKeymap;
     /** The conversations ticked, as message ids, when this row is one of them
      *  and there is more than one. Null for the ordinary case: a right-click on
      *  a row that is not part of a selection. */
@@ -125,8 +122,12 @@ export function ThreadContextMenu({
     const shown = many > 1 ? many : 1;
     const unread = thread.unreadCount > 0;
     const sender = thread.participants[0]?.address ?? "";
-    const keyFor = (command: core.MailKeyCommand): string =>
-        core.mailKeyLabel(core.mailKeyFor(command, keymap));
+    // The keys in force now, from the table every app shares.
+    const bindings = useShortcutBindings();
+    const keyFor = (command: core.MailKeyCommand): string => {
+        const first = core.keysOf(bindings, `mail.${command}`)[0];
+        return first ?? "";
+    };
 
     async function copy(what: string, said: string): Promise<void> {
         try {

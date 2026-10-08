@@ -54,8 +54,9 @@ import {
     ContextMenuSeparator,
     ContextMenuTrigger,
     Input,
-    MenuShortcut,
-    Select
+    Select,
+    ShortcutHint,
+    shortcutPressed
 } from "@polaris/ui";
 import {
     decryptFolders,
@@ -425,20 +426,19 @@ export function VaultApp() {
      * the same defect as no hint at all, pointing the other way.
      */
     function onRowKey(event: React.KeyboardEvent, item: VaultItem): void {
-        const mod = event.metaKey || event.ctrlKey;
-        if (mod && event.shiftKey && event.key.toLowerCase() === "c") {
+        if (shortcutPressed(event, "vault.copyUsername")) {
             event.preventDefault();
             void copy("username", item.login.username);
-        } else if (mod && event.key.toLowerCase() === "c") {
+        } else if (shortcutPressed(event, "vault.copyPassword")) {
             event.preventDefault();
             void copy("password", item.login.password);
             noteUse(item, "copy");
-        } else if (event.key === "F2" || event.key === "Enter") {
+        } else if (shortcutPressed(event, "vault.edit")) {
             // Enter on a focused button would otherwise fire the click that only
             // selects it, which is the thing the row is already showing.
             event.preventDefault();
             setEditing(item);
-        } else if (event.key === "Delete") {
+        } else if (shortcutPressed(event, "vault.delete")) {
             event.preventDefault();
             void onDelete(item);
         }
@@ -636,7 +636,7 @@ export function VaultApp() {
                                                                 )
                                                                     ? t("app.menu.copyEmail")
                                                                     : t("app.menu.copyUsername")}
-                                                                <MenuShortcut keys="Mod+Shift+C" />
+                                                                <ShortcutHint id="vault.copyUsername" />
                                                             </ContextMenuItem>
                                                             <ContextMenuItem
                                                                 disabled={!item.login.password}
@@ -650,7 +650,7 @@ export function VaultApp() {
                                                             >
                                                                 <Copy className="size-4" />
                                                                 {t("app.menu.copyPassword")}
-                                                                <MenuShortcut keys="Mod+C" />
+                                                                <ShortcutHint id="vault.copyPassword" />
                                                             </ContextMenuItem>
                                                             {item.login.totp ? (
                                                                 <ContextMenuItem
@@ -689,7 +689,7 @@ export function VaultApp() {
                                                     >
                                                         <Pencil className="size-4" />
                                                         {t("app.menu.edit")}
-                                                        <MenuShortcut keys="F2" />
+                                                        <ShortcutHint id="vault.edit" />
                                                     </ContextMenuItem>
                                                     <ContextMenuItem
                                                         onSelect={() =>
@@ -728,7 +728,7 @@ export function VaultApp() {
                                                         {item.deleted
                                                             ? t("app.menu.deleteForGood")
                                                             : t("app.menu.trash")}
-                                                        <MenuShortcut keys="Delete" />
+                                                        <ShortcutHint id="vault.delete" />
                                                     </ContextMenuItem>
                                                 </ContextMenuContent>
                                             </ContextMenu>

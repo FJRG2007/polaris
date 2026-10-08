@@ -341,8 +341,8 @@
         "undeafen": "Oír",
         "deafen": "No oír",
         "aModeratorDeafenedYou": "Un moderador te ensordeció",
-        "youCannotHearAnybodyAnd": "No oyes a nadie y nadie te oye (F10)",
-        "silenceEverybodyAndYourselfWith": "Silenciar a todos, y a ti con ellos (F10)",
+        "youCannotHearAnybodyAnd": "No oyes a nadie y nadie te oye",
+        "silenceEverybodyAndYourselfWith": "Silenciar a todos, y a ti con ellos",
         "lowerYourHand": "Bajar la mano",
         "raiseYourHand": "Levantar la mano",
         "leaveTheCall": "Colgar",
@@ -746,7 +746,6 @@
         "reportThisMessage": "Denunciar mensaje",
         "edit": "Editar",
         "delete": "Borrar",
-        "del": "Supr",
         "pin": "Fijar",
         "unpin": "No fijar"
     },
@@ -1006,13 +1005,9 @@
         "mute": "Callar",
         "unmute": "Hablar",
         "aModeratorMutedYou": "Un moderador te silenció",
-        "muteF9": "Callar (F9)",
-        "unmuteF9": "Hablar (F9)",
         "undeafen": "Oír",
         "deafen": "No oír",
         "aModeratorDeafenedYou": "Un moderador te ensordeció",
-        "undeafenF10": "Oír (F10)",
-        "deafenF10": "No oír (F10)",
         "leaveTheCall": "Colgar"
     },
     "schedule": {

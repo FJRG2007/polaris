@@ -1,7 +1,9 @@
 "use client";
 
 /**
- * The two keys every voice application has: F9 mutes, F10 deafens.
+ * The two keys every voice application has: F9 mutes, F10 deafens - by
+ * default; they are the shared table's `chat.toggleMic` and `chat.toggleDeafen`,
+ * so somebody can move them in Keyboard shortcuts.
  *
  * Bound by whatever holds the call, not by the screen that draws it. They used
  * to be bound by the room, so they worked while the room was on screen and did
@@ -19,20 +21,41 @@
  * composer somebody is writing in.
  */
 
+import * as core from "@polaris/core";
+import { shortcutBindings } from "@polaris/ui";
 import { useEffect, useRef } from "react";
 
-/** Which control a key press is for, or null for any other key. Pure, so the
- *  rule can be asserted without a keyboard. */
-export function callHotkey(event: {
-    readonly key: string;
-    readonly ctrlKey: boolean;
-    readonly metaKey: boolean;
-    readonly altKey: boolean;
-    readonly repeat: boolean;
-}): "mic" | "deafen" | null {
-    if (event.ctrlKey || event.metaKey || event.altKey || event.repeat) return null;
-    if (event.key === "F9") return "mic";
-    if (event.key === "F10") return "deafen";
+/** Which control a key press is for, or null for any other key - against the
+ *  keys in force, or the defaults when none are given. Pure, so the rule can
+ *  be asserted without a keyboard. A held key repeating is not another press. */
+export function callHotkey(
+    event: {
+        readonly key: string;
+        readonly code?: string;
+        readonly ctrlKey: boolean;
+        readonly metaKey: boolean;
+        readonly altKey: boolean;
+        readonly shiftKey?: boolean;
+        readonly repeat: boolean;
+    },
+    bindings: ReadonlyMap<string, readonly string[]> = core.resolveShortcuts()
+): "mic" | "deafen" | null {
+    if (event.repeat) return null;
+    // Read field by field: a DOM event's keys are getters, which a spread drops.
+    const press = {
+        key: event.key,
+        code: event.code,
+        ctrlKey: event.ctrlKey,
+        metaKey: event.metaKey,
+        altKey: event.altKey,
+        shiftKey: event.shiftKey ?? false
+    };
+    const id = core.shortcutMatching(bindings, press, [
+        "chat.toggleMic",
+        "chat.toggleDeafen"
+    ]);
+    if (id === "chat.toggleMic") return "mic";
+    if (id === "chat.toggleDeafen") return "deafen";
     return null;
 }
 
@@ -48,7 +71,7 @@ export function useCallHotkeys(
     useEffect(() => {
         if (!active) return;
         const onKey = (event: KeyboardEvent) => {
-            const which = callHotkey(event);
+            const which = callHotkey(event, shortcutBindings());
             if (!which) return;
             event.preventDefault();
             if (which === "mic") controls.current.toggleMic();

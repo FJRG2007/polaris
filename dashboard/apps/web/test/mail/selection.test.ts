@@ -13,7 +13,7 @@
 import { fileURLToPath } from "node:url";
 import { readFile } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
-import { resolveMailKeymap } from "@polaris/core";
+import { keysOf, resolveMailKeymap, resolveShortcuts } from "@polaris/core";
 import { runBetween } from "@/app/(app)/mail/mail-actions";
 
 const SCREENS = fileURLToPath(new URL("../../src/app/(app)/mail/", import.meta.url));
@@ -51,13 +51,11 @@ describe("the run between two rows", () => {
 describe("the gestures a list owns", () => {
     it("binds select-all and lets go on Escape", async () => {
         const keys = await readFile(`${SCREENS}use-mail-keys.ts`, "utf8");
-        // The one chord here, handled before the bail that leaves the browser's
-        // own chords alone - which is where it used to be swallowed.
-        expect(keys).toContain('event.key.toLowerCase() === "a"');
-        expect(keys).toContain("return run(now.selectAll);");
+        // The one chord here, from the shared table (Mod+A by default).
+        expect(keys).toContain('"mail.selectAll": run(actions.selectAll)');
         // Escape undoes the nearest thing first: the selection, then the
         // conversation being read.
-        expect(keys).toContain("if (now.clearSelection?.())");
+        expect(keys).toContain("if (actions.clearSelection?.()) return;");
     });
 
     it("deletes on the key somebody who has never used a mail client presses", async () => {
@@ -68,8 +66,16 @@ describe("the gestures a list owns", () => {
         expect(keys.get("Backspace")).toBe("trash");
         expect(keys.get("#")).toBe("trash");
         expect(resolveMailKeymap({ trash: "x" }).get("Delete")).toBe("trash");
+        // The hook binds every command through the shared table, where the
+        // same keys are Mail's defaults.
+        expect(keysOf(resolveShortcuts(), "mail.trash")).toEqual(["#", "Delete", "Backspace"]);
+        expect(keysOf(resolveShortcuts({ "mail.trash": ["x"] }), "mail.trash")).toEqual([
+            "x",
+            "Delete",
+            "Backspace"
+        ]);
         const hook = await readFile(`${SCREENS}use-mail-keys.ts`, "utf8");
-        expect(hook).toContain("core.resolveMailKeymap(keymap)");
+        expect(hook).toContain("handlers[`mail.${command}`] = run(actions[command]);");
     });
 
     it("reads the modifier off the click rather than tracking it", async () => {

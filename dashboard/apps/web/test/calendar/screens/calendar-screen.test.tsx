@@ -15,7 +15,7 @@ import { addDays } from "@polaris-app/calendar/src/screens/time";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { CalendarSummary } from "@polaris-app/calendar/src/lib/wire";
 import { shortcutFor } from "@polaris-app/calendar/src/screens/shortcuts";
-import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import {
     DEFAULT_PREFERENCES,
     type CalendarPreferences
@@ -35,6 +35,9 @@ vi.mock("next/link", () => ({
         </a>
     )
 }));
+
+// The shared shortcuts sheet saves through a server action; the help only reads.
+vi.mock("@/app/(app)/shortcut-actions", () => ({ saveShortcutsAction: vi.fn() }));
 
 vi.mock("@polaris-app/calendar/src/screens/grid-view", () => ({
     default: (props: { view: string; anchor: string }) => (
@@ -299,7 +302,9 @@ describe("the calendar screen", () => {
         expect(grid().getAttribute("data-view")).toBe("week");
 
         press("?");
-        expect(await screen.findByRole("dialog", { name: "Keyboard shortcuts" })).toBeDefined();
+        // The shared sheet, on the calendar's own actions.
+        const sheet = await screen.findByRole("dialog", { name: "Keyboard shortcuts" }, { timeout: 5000 });
+        expect(await within(sheet).findByText("Go to the next period")).toBeDefined();
     });
 
     it("ignores every key when shortcuts are switched off", async () => {

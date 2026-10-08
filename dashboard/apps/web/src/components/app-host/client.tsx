@@ -79,6 +79,17 @@ const LogViewer = dynamic(
     { ssr: false }
 );
 
+/** The shared keyboard shortcuts - an app's help and the settings that move its
+ *  keys. Opened from a key or a settings page, so loaded there. */
+const ShortcutsDialog = dynamic(
+    () => import("@/components/shortcuts/shortcuts-dialog").then((module) => module.ShortcutsDialog),
+    { ssr: false }
+);
+const ShortcutSettings = dynamic(
+    () => import("@/components/shortcuts/shortcut-settings").then((module) => module.ShortcutSettings),
+    { ssr: false }
+);
+
 /** A QR encoder, for an app that signs something in by a code scanned with a
  *  phone. Drawn in a connect dialog and nowhere else, so loaded there. */
 const QRCodeSVG = dynamic(() => import("qrcode.react").then((module) => module.QRCodeSVG), {
@@ -128,6 +139,7 @@ export const clientHost = {
     runAction: { runAction },
     sessionScope: { useSessionScope },
     sharedStream: { subscribeSharedStream },
+    shortcuts: { ShortcutSettings, ShortcutsDialog },
     liveRead: { useKeptSnapshot, useLiveRead },
     snapshotCache: { dropSnapshots, readSnapshot, writeSnapshot },
     structuralMerge: { mergeUnchanged },

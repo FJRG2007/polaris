@@ -100,6 +100,7 @@ import {
     Wrench,
     Megaphone,
     PanelRight,
+    Keyboard,
     type LucideIcon
 } from "lucide-react";
 import { GAME_SERVERS_APP_ID } from "@/lib/apps/games-catalog";
@@ -1249,6 +1250,12 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
                 "text size",
                 "accessibility"
             ]
+        },
+        {
+            label: "Keyboard shortcuts", // i18n-ignore
+            href: "/account/shortcuts",
+            icon: Keyboard,
+            keywords: ["keys", "keybindings", "hotkeys", "shortcuts"]
         },
         // Every way of having Polaris somewhere other than a tab. One screen
         // rather than a card under whichever page happened to build each one:

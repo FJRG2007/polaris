@@ -42,7 +42,8 @@ import {
     DialogFooter,
     DialogHeader,
     DialogTitle,
-    SegmentedControl
+    SegmentedControl,
+    shortcutPressed
 } from "@polaris/ui";
 
 /** The highlight.js grammar each format is painted with: a `.env` reads as
@@ -187,7 +188,7 @@ export function VariablesRawDialog({
                 <div
                     className="flex min-w-0 flex-col gap-2"
                     onKeyDown={(event) => {
-                        if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "f") {
+                        if (shortcutPressed(event, "viewer.find")) {
                             // The browser's own find searches the page behind the
                             // dialog, not the text in it.
                             event.preventDefault();

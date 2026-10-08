@@ -30,7 +30,12 @@
 import dynamic from "next/dynamic";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { Loading, ViewerError } from "./status";
-import { Button, cn, ScrollRow } from "@polaris/ui";
+import {
+    Button,
+    cn,
+    ScrollRow,
+    shortcutPressed
+} from "@polaris/ui";
 import type { RenderSlide } from "@polaris/pptx-render";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
@@ -182,8 +187,12 @@ export function PptxView({ src, token }: { src: string; token?: string }) {
         if (!slides || slides.length === 0) return;
         const last = slides.length - 1;
         const onKeyDown = (event: KeyboardEvent): void => {
-            if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
-            const step = event.key === "ArrowRight" ? 1 : -1;
+            const step = shortcutPressed(event, "viewer.nextSlide")
+                ? 1
+                : shortcutPressed(event, "viewer.previousSlide")
+                  ? -1
+                  : 0;
+            if (step === 0) return;
             setIndex((current) => Math.min(Math.max(current + step, 0), last));
         };
         window.addEventListener("keydown", onKeyDown);

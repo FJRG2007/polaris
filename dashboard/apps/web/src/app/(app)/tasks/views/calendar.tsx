@@ -47,7 +47,10 @@ import {
     DropdownMenuLabel,
     DropdownMenuSeparator,
     DropdownMenuTrigger,
-    MenuShortcut
+    MenuShortcut,
+    useShortcutBindings,
+    useShortcutHint,
+    useShortcuts
 } from "@polaris/ui";
 
 type CalendarScope = layout.CalendarScope;
@@ -67,11 +70,6 @@ const HOUR_HEIGHT = 48;
 /** What a day and a week grid open scrolled to, so the working day is on screen
  *  without anybody dragging the scrollbar first. */
 const FIRST_VISIBLE_HOUR = 7;
-
-/** The keys that move through time, Google's own: today, next and previous. */
-const TODAY_KEY = "t";
-const NEXT_KEY = "j";
-const PREVIOUS_KEY = "k";
 
 /** Somewhere a key press belongs to what has focus rather than to the calendar:
  *  a field being typed in, an open menu, a dialog over the screen. */
@@ -158,39 +156,25 @@ export function CalendarView(props: ViewProps) {
         remember(SCOPE_KEY, "day");
     }
 
-    // Google Calendar's keys, on this screen only while the calendar is drawn.
-    // A modifier means the press is somebody else's shortcut, and a press inside
-    // a field, a menu or a dialog belongs to that.
-    const keys = useRef({ chooseScope, setOffset });
-    keys.current = { chooseScope, setOffset };
-    useEffect(() => {
-        function onKeyDown(event: KeyboardEvent) {
-            if (
-                event.defaultPrevented ||
-                event.metaKey ||
-                event.ctrlKey ||
-                event.altKey ||
-                event.shiftKey
-            )
-                return;
-            const target = event.target instanceof HTMLElement ? event.target : null;
-            if (target && (target.isContentEditable || target.closest(KEEPS_ITS_KEYS))) return;
-            const key = event.key.toLowerCase();
-            const next = layout.scopeForKey(key);
-            if (next) {
-                event.preventDefault();
-                keys.current.chooseScope(next);
-            } else if (key === TODAY_KEY) {
-                event.preventDefault();
-                keys.current.setOffset(0);
-            } else if (key === NEXT_KEY || key === PREVIOUS_KEY) {
-                event.preventDefault();
-                keys.current.setOffset((current) => current + (key === NEXT_KEY ? 1 : -1));
+    // Google Calendar's keys by default, on this screen only while the calendar
+    // is drawn. A press inside a field, a menu or a dialog belongs to that.
+    const scopeHandlers: Record<string, () => void> = {};
+    for (const entry of layout.CALENDAR_SCOPES)
+        scopeHandlers[layout.SCOPE_SHORTCUTS[entry]] = () => chooseScope(entry);
+    useShortcuts(
+        {
+            ...scopeHandlers,
+            "tasks.calendar.today": () => setOffset(0),
+            "tasks.calendar.next": () => setOffset((current) => current + 1),
+            "tasks.calendar.previous": () => setOffset((current) => current - 1)
+        },
+        {
+            when: (event) => {
+                const target = event.target instanceof HTMLElement ? event.target : null;
+                return !(target && (target.isContentEditable || target.closest(KEEPS_ITS_KEYS)));
             }
         }
-        window.addEventListener("keydown", onKeyDown);
-        return () => window.removeEventListener("keydown", onKeyDown);
-    }, []);
+    );
 
     const { days, label, monthShown } = useMemo(
         () =>
@@ -236,6 +220,9 @@ export function CalendarView(props: ViewProps) {
     const unit = scope === "fourDays" || scope === "schedule" ? "period" : scope;
     const previousLabel = t("calendar.previous", { scope: unit });
     const nextLabel = t("calendar.next", { scope: unit });
+    const previousKey = useShortcutHint("tasks.calendar.previous");
+    const nextKey = useShortcutHint("tasks.calendar.next");
+    const todayKey = useShortcutHint("tasks.calendar.today");
 
     return (
         <div className="flex min-w-0 flex-col gap-3">
@@ -244,7 +231,7 @@ export function CalendarView(props: ViewProps) {
                     <button
                         type="button"
                         aria-label={previousLabel}
-                        title={`${previousLabel} (${PREVIOUS_KEY.toUpperCase()})`}
+                        title={previousKey ? `${previousLabel} (${previousKey})` : previousLabel}
                         onClick={() => setOffset(offset - 1)}
                         className="rounded-md border border-border p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                     >
@@ -253,7 +240,7 @@ export function CalendarView(props: ViewProps) {
                     <button
                         type="button"
                         aria-label={nextLabel}
-                        title={`${nextLabel} (${NEXT_KEY.toUpperCase()})`}
+                        title={nextKey ? `${nextLabel} (${nextKey})` : nextLabel}
                         onClick={() => setOffset(offset + 1)}
                         className="rounded-md border border-border p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                     >
@@ -268,7 +255,7 @@ export function CalendarView(props: ViewProps) {
                     <Button
                         size="sm"
                         variant="ghost"
-                        title={`${t("calendar.today")} (${TODAY_KEY.toUpperCase()})`}
+                        title={todayKey ? `${t("calendar.today")} (${todayKey})` : t("calendar.today")}
                         onClick={() => setOffset(0)}
                     >
                         {t("calendar.today")}
@@ -367,6 +354,7 @@ function ScopeMenu({
     onToggle: (name: keyof CalendarOptions) => void;
 }) {
     const t = useTranslations("tasksViews");
+    const bindings = useShortcutBindings();
     const switches: { name: keyof CalendarOptions; label: string }[] = [
         { name: "showWeekends", label: t("calendar.showWeekends") },
         { name: "showDeclined", label: t("calendar.showDeclined") },
@@ -388,7 +376,7 @@ function ScopeMenu({
                         className={cn(entry === scope && "font-medium text-primary")}
                     >
                         {t(`calendar.scope.${entry}`)}
-                        <MenuShortcut>{layout.SCOPE_KEYS[entry]}</MenuShortcut>
+                        <MenuShortcut keys={core.keysOf(bindings, layout.SCOPE_SHORTCUTS[entry])[0]} />
                     </DropdownMenuItem>
                 ))}
                 <DropdownMenuSeparator />

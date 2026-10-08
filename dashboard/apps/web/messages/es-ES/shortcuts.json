@@ -1,0 +1,222 @@
+{
+    "title": "Atajos de teclado",
+    "description": "Cambia qué hace una tecla en cualquier app. Tus teclas siguen a tu cuenta en todos tus dispositivos.",
+    "search": "Buscar atajos",
+    "allApps": "Todas",
+    "noMatch": "Ningún atajo coincide con {query}",
+    "or": "o",
+    "none": "Ninguna",
+    "add": "Añadir una tecla a {action}",
+    "pressFor": "Pulsa las teclas nuevas para {action}, o Escape para cancelar",
+    "press": "Pulsa",
+    "remove": "Quitar {keys} de {action}",
+    "reset": "Restablecer {action}",
+    "resetAll": "Restablecer",
+    "resetAllConfirm": "¿Volver a poner todos los atajos en sus teclas de serie?",
+    "resetAllHint": "Se borran los cambios de tu cuenta y los de este dispositivo.",
+    "fixedHint": "Siempre, no se puede cambiar",
+    "deviceOnly": "Solo este equipo",
+    "deviceOnlyHint": "Las teclas que cambies ahora solo valen en este navegador, sobre las de tu cuenta.",
+    "onDevice": "Cambiado en este equipo",
+    "moved": "Cambiado",
+    "cancel": "Cancelar",
+    "open": "Atajos de teclado",
+    "withKey": "{action} ({keys})",
+    "voiceLink": "Pulsar para hablar se elige por equipo en Dispositivos.",
+    "keys": {
+        "delete": "Supr",
+        "backspace": "Retroceso",
+        "enter": "Intro",
+        "escape": "Esc",
+        "space": "Espacio"
+    },
+    "errors": {
+        "notSaved": "No se pudieron guardar tus atajos. Inténtalo de nuevo en un momento.",
+        "reserved": "{keys} es del navegador o sirve para moverse entre controles. Elige otra.",
+        "clash": "{keys} ya hace {action} aquí.",
+        "tooMany": "Una acción puede tener hasta {count} teclas.",
+        "deviceNotSaved": "Este navegador no guardó el cambio. Vale hasta que cierres la pestaña."
+    },
+    "actions": {
+        "general": {
+            "commandPalette": "Buscar en Polaris",
+            "rename": "Renombrar lo elegido",
+            "delete": "Borrar lo elegido"
+        },
+        "mail": {
+            "compose": "Escribir un mensaje",
+            "reply": "Responder al mensaje",
+            "replyAll": "Responder a todos",
+            "forward": "Reenviar",
+            "archive": "Archivar",
+            "trash": "Mover a la papelera",
+            "junk": "Marcar como spam",
+            "star": "Destacar o quitar",
+            "important": "Marcar importante o no",
+            "pin": "Fijar arriba o soltar",
+            "mute": "Silenciar o no",
+            "markUnread": "Poner no leído",
+            "next": "Conversación siguiente",
+            "previous": "Conversación anterior",
+            "open": "Abrir la actual",
+            "back": "Volver a la lista",
+            "selectAll": "Elegir todas",
+            "search": "Buscar",
+            "refresh": "Buscar correo nuevo",
+            "help": "Atajos de teclado"
+        },
+        "tasks": {
+            "new": "Tarea nueva",
+            "delete": "Borrar las elegidas",
+            "selectAll": "Elegir todas",
+            "copy": "Copiar las elegidas",
+            "paste": "Pegar tareas",
+            "clearSelection": "Quitar la selección",
+            "rows": {
+                "next": "Ir a la tarea siguiente",
+                "previous": "Ir a la tarea anterior",
+                "open": "Abrir la tarea actual",
+                "select": "Elegir la tarea actual",
+                "leave": "Salir de la lista"
+            },
+            "calendar": {
+                "day": "Día",
+                "week": "Semana",
+                "month": "Mes",
+                "year": "Año",
+                "schedule": "Agenda",
+                "fourDays": "4 días",
+                "today": "Hoy",
+                "next": "Ir al periodo siguiente",
+                "previous": "Ir al periodo anterior"
+            }
+        },
+        "calendar": {
+            "previous": "Periodo anterior",
+            "next": "Periodo siguiente",
+            "today": "Hoy",
+            "goTo": "Ir a una fecha",
+            "view": {
+                "day": "Ver día",
+                "week": "Ver semana",
+                "month": "Ver mes",
+                "year": "Ver año",
+                "list": "Ver lista",
+                "days": "Ver a medida"
+            },
+            "create": "Nuevo evento",
+            "open": "Abrir evento elegido",
+            "delete": "Borrar evento elegido",
+            "undo": "Deshacer cambio",
+            "copy": "Copiar el evento elegido",
+            "paste": "Pegar en el día activo",
+            "search": "Buscar",
+            "refresh": "Actualizar",
+            "settings": "Ajustes",
+            "addCalendar": "Crear calendario",
+            "help": "Atajos de teclado",
+            "close": "Cerrar",
+            "grid": {
+                "menu": "Abrir el menú",
+                "moveFocus": "Moverse entre días",
+                "createHere": "Nuevo evento en el día activo"
+            },
+            "editor": {
+                "save": "Guardar, en el editor",
+                "delete": "Borrar, en el editor",
+                "duplicate": "Duplicar, en el editor"
+            },
+            "stopwatch": {
+                "startStop": "Iniciar o parar",
+                "lap": "Vuelta",
+                "reset": "A cero"
+            }
+        },
+        "drive": {
+            "newFolder": "Carpeta nueva",
+            "newFile": "Crear archivo",
+            "uploadFiles": "Subir archivos",
+            "uploadFolder": "Subir carpeta",
+            "requestFiles": "Pedir archivos",
+            "selectAll": "Elegir todo",
+            "copy": "Copiar",
+            "cut": "Cortar",
+            "paste": "Pegar",
+            "open": "Abrir",
+            "delete": "Borrar",
+            "clearSelection": "Quitar la selección"
+        },
+        "viewer": {
+            "find": "Buscar",
+            "previousFile": "Ir al archivo anterior",
+            "nextFile": "Ir al archivo siguiente",
+            "previousSlide": "Diapositiva anterior",
+            "nextSlide": "Diapositiva siguiente",
+            "zoomIn": "Acercar",
+            "zoomOut": "Alejar"
+        },
+        "chat": {
+            "reply": "Responder al mensaje",
+            "edit": "Editar tu mensaje",
+            "delete": "Borrar el mensaje",
+            "copy": "Copiar el mensaje",
+            "toggleMic": "Callar o hablar",
+            "toggleDeafen": "Ensordecer o no"
+        },
+        "places": {
+            "clips": {
+                "selectAll": "Elegir todos",
+                "delete": "Borrar los elegidos",
+                "open": "Ver el clip",
+                "clearSelection": "Quitar la selección"
+            }
+        },
+        "databases": {
+            "run": "Ejecutar consulta"
+        },
+        "vault": {
+            "copyPassword": "Copiar la contraseña",
+            "copyUsername": "Copiar el usuario",
+            "edit": "Editar la entrada",
+            "delete": "Borrar la entrada"
+        }
+    },
+    "groups": {
+        "general": "General",
+        "mailWrite": "Escribir",
+        "mailActions": "Gestionar correo",
+        "mailMove": "Moverse",
+        "tasksList": "Listas",
+        "tasksRows": "Filas",
+        "tasksCalendar": "Calendario",
+        "calendarMove": "Moverse",
+        "calendarViews": "Vistas",
+        "calendarEvents": "Eventos",
+        "calendarApp": "La app",
+        "calendarGrid": "Cuadrícula",
+        "calendarEditor": "El editor",
+        "calendarClock": "Cronómetro",
+        "driveCreate": "Añadir",
+        "driveFiles": "Archivos",
+        "viewerRead": "Leer",
+        "viewerSlides": "Presentaciones",
+        "viewerPictures": "Imágenes",
+        "chatMessages": "Mensajes",
+        "chatCalls": "Llamadas",
+        "placesClips": "Clips",
+        "databasesQuery": "Consultas",
+        "vaultItems": "Entradas"
+    },
+    "apps": {
+        "general": "En todas",
+        "mail": "Correo",
+        "tasks": "Tareas",
+        "calendar": "Calendario",
+        "drive": "Drive",
+        "viewer": "Visores",
+        "chat": "Chat",
+        "places": "Lugares",
+        "databases": "Bases",
+        "vault": "Vault"
+    }
+}

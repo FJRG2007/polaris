@@ -79,7 +79,9 @@ import {
     MenuShortcut,
     Select,
     Skeleton,
-    cn
+    cn,
+    shortcutPressed,
+    useShortcutHint
 } from "@polaris/ui";
 
 /** How many rows a page holds. The server clamps it too; this is what is asked
@@ -1398,6 +1400,8 @@ function QueryPanel({
     onStatement: (statement: string) => void;
 }) {
     const t = useTranslations("databases");
+    // The run key in force, printed beside the button.
+    const runKey = useShortcutHint("databases.run");
     const source = useDataSource();
     const [statement, setStatement] = useState(kept);
     const [results, setResults] = useState<QueryResult[] | null>(null);
@@ -1447,7 +1451,7 @@ function QueryPanel({
                 onKeyDown={(event) => {
                     // The shortcut every client has: run it without reaching for
                     // the mouse, and a newline still just makes a newline.
-                    if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
+                    if (shortcutPressed(event, "databases.run")) {
                         event.preventDefault();
                         void run();
                     }
@@ -1470,8 +1474,7 @@ function QueryPanel({
                     )}
                     {t("bench.run")}
                 </Button>
-                {/* i18n-ignore a key chord */}
-                <span className="text-xs text-muted-foreground">Ctrl+Enter</span>
+                {runKey ? <span className="text-xs text-muted-foreground">{runKey}</span> : null}
             </div>
 
             {error && (

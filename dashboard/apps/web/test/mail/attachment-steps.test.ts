@@ -62,8 +62,8 @@ describe("the viewer the steps are drawn in", () => {
         expect(thread).toContain("stepFrom(openable, viewing.path, by)");
         const viewer = await readFile(`${src}app/(app)/drive/file-viewer.tsx`, "utf8");
         // Left and Right, and the count, only when there is more than one file.
-        expect(viewer).toContain('event.key === "ArrowLeft" && canBack');
-        expect(viewer).toContain('event.key === "ArrowRight" && canForward');
+        expect(viewer).toContain('canBack && shortcutPressed(event, "viewer.previousFile")');
+        expect(viewer).toContain('canForward && shortcutPressed(event, "viewer.nextFile")');
         expect(viewer).toContain("{stepping.index + 1} of {stepping.count}");
         expect(viewer).toContain("steps && steps.count > 1 ? steps : null");
     });

@@ -20,6 +20,7 @@ import { AppNav } from "@/components/app-nav";
 import { FavoriteAppsProvider } from "@/components/favorite-apps";
 import { NO_LAUNCHER_PREFS } from "@/lib/app-launcher";
 import { getLauncherPrefs } from "@/lib/app-launcher-service";
+import { getShortcutOverrides } from "@/lib/shortcuts-service";
 import { appBaseUrl } from "@/lib/domain-service";
 import { getCapabilities } from "@polaris/config";
 import { heldSectionPermissions, installedSectionApps, reachableAppNav } from "@/lib/app-access";
@@ -55,7 +56,15 @@ import { openShelfFor, resolveScope, scopeChoices } from "@/lib/workspace-scope"
 import { RouteSkeletonCapture } from "@/components/route-skeleton";
 import { DisplayFormatProvider } from "@/components/display-format";
 import { VisitRecorder } from "@/components/overview/visit-recorder";
-import { AppShell, CapabilityProvider, PolarisMark, ToastProvider } from "@polaris/ui";
+import {
+    AppShell,
+    CapabilityProvider,
+    KeyNamesProvider,
+    PolarisMark,
+    ShortcutsProvider,
+    ToastProvider
+} from "@polaris/ui";
+import { NO_SHORTCUT_OVERRIDES } from "@polaris/core";
 import { TimeZoneReporter } from "@/components/time-zone-reporter";
 import { ServiceWorkerRegistration } from "@/components/installed-app";
 import { getReportedTimeZone, resolveDisplayPreferencesFor } from "@/lib/display-prefs-service";
@@ -126,7 +135,19 @@ export async function AppChrome({ user, children }: { user: SessionUser; childre
         : NO_ADMIN_WAITING;
     // The reader's language, which is not necessarily the account being shown:
     // an administrator viewing as somebody reads the frame in their own.
-    const [locale, t] = await Promise.all([getLocale(), getTranslations("nav")]);
+    const [locale, t, tk] = await Promise.all([
+        getLocale(),
+        getTranslations("nav"),
+        getTranslations("shortcuts")
+    ]);
+    // What this reader's keyboard calls its named keys, for every printed shortcut.
+    const keyNames = {
+        delete: tk("keys.delete"),
+        backspace: tk("keys.backspace"),
+        enter: tk("keys.enter"),
+        escape: tk("keys.escape"),
+        space: tk("keys.space")
+    };
     const [
         notifications,
         display,
@@ -141,6 +162,7 @@ export async function AppChrome({ user, children }: { user: SessionUser; childre
         status,
         soundVolume,
         launcherPrefs,
+        shortcuts,
         chatUnread,
         mailUnread,
         adminWaiting
@@ -164,6 +186,8 @@ export async function AppChrome({ user, children }: { user: SessionUser; childre
         getSoundVolume(user.id).catch(() => DEFAULT_SOUND_VOLUME),
         // The favorites and the order of the app menu. Never worth a failed page.
         getLauncherPrefs(user.id).catch(() => NO_LAUNCHER_PREFS),
+        // The keys this account moved. The defaults are a working keyboard.
+        getShortcutOverrides(user.id).catch(() => NO_SHORTCUT_OVERRIDES),
         chatWaiting,
         mailWaiting,
         adminCount
@@ -212,6 +236,8 @@ export async function AppChrome({ user, children }: { user: SessionUser; childre
                                                     initial={launcherPrefs.favorites}
                                                     initialOrder={launcherPrefs.order}
                                                 >
+                                                    <ShortcutsProvider overrides={shortcuts}>
+                                                    <KeyNamesProvider names={keyNames}>
                                                     {/* Where everybody on screen is, asked once for
                                     the page rather than once per face. Above
                                     everything, because faces are drawn on every
@@ -412,6 +438,8 @@ export async function AppChrome({ user, children }: { user: SessionUser; childre
                                                             </CallHolder>
                                                         </ProfileStyleProvider>
                                                     </PresenceProvider>
+                                                    </KeyNamesProvider>
+                                                    </ShortcutsProvider>
                                                 </FavoriteAppsProvider>
                                             </ToastProvider>
                                         </NotificationsProvider>
@@ -428,5 +456,5 @@ export async function AppChrome({ user, children }: { user: SessionUser; childre
 
     // The frame's own words - the rail, the switcher, the account menu - for
     // every client component in it.
-    return <Messages namespaces={["nav", "chat"]}>{frame}</Messages>;
+    return <Messages namespaces={["nav", "chat", "shortcuts"]}>{frame}</Messages>;
 }

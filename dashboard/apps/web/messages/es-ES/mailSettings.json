@@ -83,19 +83,7 @@
         "filters": "Cada uno es un filtro normal, así que puedes abrirlo en <link>Filtros</link> para cambiar lo que pasa en lugar de tirar el correo."
     },
     "shortcuts": {
-        "oneKey": "Usa una sola tecla sin mantener otra pulsada.",
-        "reserved": "Esa tecla no se puede usar. Intro, Esc, las flechas, Supr y Retroceso conservan su función.",
-        "clash": "{key} ya hace \"{command}\". Cambia esa primero.",
-        "saved": "Guardado. Las teclas nuevas funcionan la próxima vez que abras una lista.",
-        "hint": "Pulsa Cambiar y luego la tecla que quieras. Las teclas que ya hacen otra cosa se rechazan, así que nada acaba haciendo dos cosas.",
-        "fixed": "También {keys}, que no se pueden cambiar",
-        "pressFor": "Pulsa una tecla para {command}, o Esc para cancelar",
-        "changeFor": "Cambiar la tecla de {command}",
-        "press": "Pulsa una tecla...",
-        "change": "Cambiar",
-        "reset": "Restablecer",
         "saving": "Guardando...",
-        "resetAll": "Restablecer todas",
         "unsaved": "Todavía no se ha guardado."
     },
     "junk": {

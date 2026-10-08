@@ -12,7 +12,7 @@ import { describe, expect, it } from "vitest";
 import type { TaskRow } from "@/lib/tasks/facts";
 import * as layout from "@/app/(app)/tasks/views/calendar-layout";
 import type { GoogleEvent } from "@/lib/google-calendar/events-client";
-import { createDisplayFormat, DISPLAY_DEFAULTS, type DisplayFormat } from "@polaris/core";
+import { createDisplayFormat, DISPLAY_DEFAULTS, keysOf, resolveShortcuts, type DisplayFormat } from "@polaris/core";
 
 const FORMAT: DisplayFormat = createDisplayFormat(DISPLAY_DEFAULTS);
 
@@ -222,15 +222,20 @@ describe("things happening at the same time", () => {
 });
 
 describe("the scopes Google offers beside these", () => {
-    it("answers each of Google's keys with its scope, in either case, and nothing else", () => {
-        expect(layout.scopeForKey("d")).toBe("day");
-        expect(layout.scopeForKey("W")).toBe("week");
-        expect(layout.scopeForKey("m")).toBe("month");
-        expect(layout.scopeForKey("y")).toBe("year");
-        expect(layout.scopeForKey("a")).toBe("schedule");
-        expect(layout.scopeForKey("x")).toBe("fourDays");
-        expect(layout.scopeForKey("q")).toBeNull();
-        expect(layout.scopeForKey("Enter")).toBeNull();
+    it("answers each of Google's keys with its scope, and nothing else", () => {
+        const bindings = resolveShortcuts();
+        const scopeOf = (key: string) =>
+            layout.CALENDAR_SCOPES.find((scope) =>
+                keysOf(bindings, layout.SCOPE_SHORTCUTS[scope]).includes(key)
+            ) ?? null;
+        expect(scopeOf("d")).toBe("day");
+        expect(scopeOf("w")).toBe("week");
+        expect(scopeOf("m")).toBe("month");
+        expect(scopeOf("y")).toBe("year");
+        expect(scopeOf("a")).toBe("schedule");
+        expect(scopeOf("x")).toBe("fourDays");
+        expect(scopeOf("q")).toBeNull();
+        expect(scopeOf("Enter")).toBeNull();
     });
 
     it("gives four days from today, paging four at a time", () => {

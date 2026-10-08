@@ -19,7 +19,7 @@
 
 import * as Y from "yjs";
 import { useTranslations } from "@/components/i18n/i18n-provider";
-import { Button, cn } from "@polaris/ui";
+import { Button, cn, shortcutPressed } from "@polaris/ui";
 import * as deck from "@/lib/office/deck";
 import { Copy, Play, Plus, Square, Trash2, Type, X } from "lucide-react";
 import { useOfficeDocument } from "@/app/(app)/office/use-office-document";
@@ -322,10 +322,10 @@ function Present({
             autoFocus
             onKeyDown={(event) => {
                 if (event.key === "Escape") onClose();
-                if (event.key === "ArrowRight" || event.key === " ") {
+                if (shortcutPressed(event, "viewer.nextSlide")) {
                     setAt((one) => Math.min(slides.length - 1, one + 1));
                 }
-                if (event.key === "ArrowLeft") setAt((one) => Math.max(0, one - 1));
+                if (shortcutPressed(event, "viewer.previousSlide")) setAt((one) => Math.max(0, one - 1));
             }}
             className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-black outline-none"
         >

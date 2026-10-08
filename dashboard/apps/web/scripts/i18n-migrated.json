@@ -901,7 +901,6 @@
         "web/src/app/(app)/mail/settings/rules/rules-view.tsx",
         "web/src/app/(app)/mail/settings/settings-nav.tsx",
         "web/src/app/(app)/mail/settings/shortcuts/page.tsx",
-        "web/src/app/(app)/mail/settings/shortcuts/shortcuts-view.tsx",
         "web/src/app/(app)/mail/settings/signature/page.tsx",
         "web/src/app/(app)/mail/settings/signature/signature-view.tsx",
         "web/src/app/(app)/mail/settings/templates/page.tsx",
@@ -1751,6 +1750,9 @@
         "web/src/components/overview/visit-recorder.tsx",
         "web/src/lib/app-launcher.ts",
         "web/src/lib/app-launcher-service.ts",
-        "web/src/lib/app-usage.ts"
+        "web/src/lib/app-usage.ts",
+        "web/src/components/shortcuts/shortcut-settings.tsx",
+        "web/src/components/shortcuts/shortcuts-dialog.tsx",
+        "web/src/app/(app)/account/shortcuts/page.tsx"
     ]
 }
