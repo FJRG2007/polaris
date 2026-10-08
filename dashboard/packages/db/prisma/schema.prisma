@@ -9230,6 +9230,11 @@ model LinkPreview {
     // browser: it is fetched back through Polaris, so reading a message does not
     // announce the reader to a third party.
     imageUrl    String?
+    // What a link of a known kind adds to its card, as JSON text: for a Steam
+    // store link, the price, the release and the systems it runs on. Null for
+    // every other link, and read back through a schema so an older shape draws
+    // the ordinary card.
+    details     String?
     ok          Boolean  @default(false)
     fetchedAt   DateTime @default(now())
 

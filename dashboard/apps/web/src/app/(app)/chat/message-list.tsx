@@ -1767,7 +1767,8 @@ function LinkArea({ message }: { message: ChatMessageView }) {
                     accent: null,
                     siteName: hostOf(message.link),
                     hasImage: false,
-                    description: ""
+                    description: "",
+                    steam: null
                 }}
             />
         );

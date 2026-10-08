@@ -17,6 +17,14 @@ import { prisma } from "@polaris/db";
 import { embedFor, isShareLink, landingOf, oembedFor } from "./embeds";
 import * as core from "@polaris/core";
 import { follow, readAtMost, readCapped, safeUrl, whereLeads } from "@/lib/safe-fetch";
+import {
+    readSteamAnswer,
+    steamAppOf,
+    steamDetailsUrl,
+    storedSteamDetails,
+    STEAM_FRESH_MS,
+    type SteamDetails
+} from "./steam";
 
 /**
  * How much of a page is read before deciding.
@@ -72,6 +80,9 @@ export interface LinkPreviewView {
     /** Whether there is a picture to ask Polaris for. The address itself never
      *  leaves the server. */
     readonly hasImage: boolean;
+    /** What a Steam store link adds to the card - the price, the release, the
+     *  systems - or null for every other link. */
+    readonly steam: SteamDetails | null;
 }
 
 /**
@@ -112,7 +123,8 @@ export async function knownPreviews(urls: readonly string[]): Promise<Map<string
             siteName: true,
             imageUrl: true,
             fetchedAt: true,
-            description: true
+            description: true,
+            details: true
         }
     });
     const now = Date.now();
@@ -132,7 +144,8 @@ export async function knownPreviews(urls: readonly string[]): Promise<Map<string
                           accent: row.accent,
                           siteName: row.siteName,
                           hasImage: row.imageUrl !== null,
-                          description: row.description
+                          description: row.description,
+                          steam: steamAppOf(row.url) ? storedSteamDetails(row.details) : null
                       }
                     : null
             }
@@ -171,9 +184,17 @@ export async function unfurl(
     // asked about again in an hour like any other.
     const share = isShareLink(url.href);
     const target = share ? await landing(url) : null;
-    const found = share && !target ? null : await describe(target ? new URL(target) : url);
+    const steamApp = steamAppOf(url.href);
+    const found = steamApp
+        ? await describeSteam(steamApp)
+        : share && !target
+          ? null
+          : await describe(target ? new URL(target) : url);
     const data = {
         target,
+        // Only a Steam card has any, kept as JSON text and read back through
+        // a schema - see `storedSteamDetails`.
+        details: found?.details ? JSON.stringify(found.details) : null,
         title: found?.title ?? "",
         author: found?.author ?? "",
         accent: found?.accent ?? null,
@@ -305,6 +326,8 @@ async function lookAgainSoon(previewId: string): Promise<void> {
  */
 function trustedFor(row: { ok: boolean; url: string; target: string | null }): number {
     if (!row.ok || (row.target === null && isShareLink(row.url))) return RETRY_MS;
+    // A price is only as good as the last sale it saw.
+    if (steamAppOf(row.url)) return STEAM_FRESH_MS;
     return FRESH_MS;
 }
 
@@ -331,6 +354,50 @@ interface Described {
      *  `<title>` tag and the hostname - rather than what it declares about the
      *  thing (`og:title`, `og:site_name`). */
     guessed?: { title: boolean; siteName: boolean };
+    /** What a Steam store link adds - see `describeSteam`. */
+    details?: SteamDetails;
+}
+
+/**
+ * A Steam store link, asked of Steam's storefront rather than of the page - see
+ * `steam.ts` for why. Priced in the country that matches the instance's
+ * currency and written in its language, read from the operator's display
+ * defaults; an instance that never chose is EUR and English.
+ */
+async function describeSteam(appId: string): Promise<Described | null> {
+    const { currency, language } = await instanceDisplay();
+    const asked = safeUrl(steamDetailsUrl(appId, currency, language));
+    if (!asked) return null;
+    const payload = await readJson(asked, "application/json");
+    const found = readSteamAnswer(appId, payload);
+    if (!found) return null;
+    return {
+        title: found.title,
+        author: found.author,
+        accent: null,
+        siteName: "Steam",
+        imageUrl: found.imageUrl,
+        description: found.description,
+        details: found.details
+    };
+}
+
+/** The instance's currency and language, or the defaults when it has none or
+ *  they cannot be read - a card in euros is better than no card. */
+async function instanceDisplay(): Promise<{ currency: string; language: string }> {
+    try {
+        const { getSetting } = await import("@/lib/setting-store");
+        const chosen = core.parseDisplayPreferences(await getSetting("display.defaults"));
+        return {
+            currency: chosen.currency ?? core.DISPLAY_DEFAULTS.currency,
+            language: chosen.language ?? core.DISPLAY_DEFAULTS.language
+        };
+    } catch {
+        return {
+            currency: core.DISPLAY_DEFAULTS.currency,
+            language: core.DISPLAY_DEFAULTS.language
+        };
+    }
 }
 
 /**

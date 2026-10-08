@@ -1349,7 +1349,13 @@
     },
     "linkCard": {
         "play": "Reproducir en {provider}, aquí",
-        "playHint": "Se reproduce aquí. {provider} te ve en cuanto lo pulsas."
+        "playHint": "Se reproduce aquí. {provider} te ve en cuanto lo pulsas.",
+        "freeToPlay": "Gratis",
+        "comingSoon": "Próximamente",
+        "comingOn": "Sale {date}",
+        "released": "Salió {date}",
+        "wasPrice": "Antes {price}",
+        "runsOn": "Plataformas"
     },
     "gameLink": {
         "server": "servidor de {game} {name}",

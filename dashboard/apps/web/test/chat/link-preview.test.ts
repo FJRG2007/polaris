@@ -66,6 +66,7 @@ interface Stored {
     author: string;
     accent: string | null;
     imageUrl: string | null;
+    details?: string | null;
 }
 
 const stored: Stored[] = [];
@@ -686,5 +687,62 @@ describe("finding the link in the first place", () => {
     it("says nothing when there is nothing", () => {
         expect(firstLink("no links here")).toBeNull();
         expect(firstLink("ftp://example.com")).toBeNull();
+    });
+});
+
+describe("a Steam store link", () => {
+    const API = "https://store.steampowered.com/api/appdetails?appids=1145360&cc=de&l=english";
+
+    it("asks Steam's storefront rather than the page, and keeps the price", async () => {
+        dns.set("store.steampowered.com", ["23.62.99.1"]);
+        responses.set(API, {
+            status: 200,
+            headers: { "content-type": "application/json; charset=utf-8" },
+            body: JSON.stringify({
+                "1145360": {
+                    success: true,
+                    data: {
+                        name: "Hades",
+                        is_free: false,
+                        short_description: "Defy the god of the dead.",
+                        header_image: "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/1145360/header.jpg",
+                        developers: ["Supergiant Games"],
+                        price_overview: {
+                            discount_percent: 75,
+                            initial_formatted: "24,50€",
+                            final_formatted: "6,12€"
+                        },
+                        platforms: { windows: true, mac: true, linux: false },
+                        release_date: { coming_soon: false, date: "17 Sep, 2020" }
+                    }
+                }
+            })
+        });
+        await unfurl("https://store.steampowered.com/app/1145360/Hades/");
+        // The page itself is never fetched: it is an age gate for half the
+        // catalogue and carries no price.
+        expect(fetched).toEqual([API]);
+        const row = stored[0]!;
+        expect(row.ok).toBe(true);
+        expect(row.title).toBe("Hades");
+        expect(row.siteName).toBe("Steam");
+        expect(row.author).toBe("Supergiant Games");
+        expect(JSON.parse(row.details ?? "null")).toMatchObject({
+            kind: "steam",
+            appId: "1145360",
+            price: { final: "6,12€", initial: "24,50€", discount: 75 }
+        });
+    });
+
+    it("stores a failure when Steam does not know the game", async () => {
+        dns.set("store.steampowered.com", ["23.62.99.1"]);
+        responses.set("https://store.steampowered.com/api/appdetails?appids=1&cc=de&l=english", {
+            status: 200,
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ "1": { success: false } })
+        });
+        await unfurl("https://store.steampowered.com/app/1/");
+        expect(stored[0]?.ok).toBe(false);
+        expect(stored[0]?.details ?? null).toBeNull();
     });
 });
