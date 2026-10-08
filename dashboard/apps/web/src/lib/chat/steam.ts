@@ -1,8 +1,8 @@
 /**
- * A Steam store link, described the way Discord's card does it and then some:
- * the game's name, its header picture, the short description, what it costs
- * (and what it cost before a sale), whether it is free, when it came out or that
- * it is still coming, and which systems it runs on.
+ * A Steam store link, described the way Discord's card does it: the game's
+ * name, its short description, what it costs (and what it cost before a sale)
+ * or that it is free, how many people recommend it, and its header picture.
+ * When it came out and which systems it runs on are kept too.
  *
  * The store page itself is no use for this. It sends anybody without a cookie
  * to an age gate for half the catalogue, and its `og:` tags carry a title and a
@@ -49,6 +49,10 @@ export interface SteamDetails {
         readonly mac: boolean;
         readonly linux: boolean;
     };
+    /** How many people recommend it on Steam - the count Discord's card shows
+     *  as "Recommendations". Absent on a card stored before it was read, and
+     *  null for a game nobody has reviewed yet. */
+    readonly recommendations?: number | null;
 }
 
 /** How long a Steam card is trusted. Prices move with sales, which start and
@@ -149,7 +153,8 @@ const appSchema = z.object({
             mac: z.boolean().optional(),
             linux: z.boolean().optional()
         })
-        .optional()
+        .optional(),
+    recommendations: z.object({ total: z.number().int().nonnegative() }).optional()
 });
 
 const answerSchema = z.record(
@@ -211,7 +216,8 @@ export function readSteamAnswer(appId: string, payload: unknown): SteamDescribed
                 windows: data.platforms?.windows === true,
                 mac: data.platforms?.mac === true,
                 linux: data.platforms?.linux === true
-            }
+            },
+            recommendations: data.recommendations?.total ?? null
         }
     };
 }
@@ -231,7 +237,8 @@ const storedSchema = z.object({
         .nullable(),
     comingSoon: z.boolean(),
     releaseDate: z.string().max(80),
-    platforms: z.object({ windows: z.boolean(), mac: z.boolean(), linux: z.boolean() })
+    platforms: z.object({ windows: z.boolean(), mac: z.boolean(), linux: z.boolean() }),
+    recommendations: z.number().int().nonnegative().nullable().optional()
 });
 
 export function storedSteamDetails(value: string | null | undefined): SteamDetails | null {

@@ -12,6 +12,7 @@ import { cn } from "@polaris/ui";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { Play } from "lucide-react";
 import { usableAccent } from "@/lib/chat/accent";
+import { useDisplayFormat } from "@/components/display-format";
 import type { ChatMessageView } from "@/lib/chat/messages";
 import type { SteamDetails } from "@/lib/chat/steam";
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
@@ -82,12 +83,13 @@ export function LinkCard({ preview }: { preview: NonNullable<ChatMessageView["pr
 }
 
 /**
- * A game on Steam: what Discord's card shows for a store link - the store, the
- * game, what it is about and its header picture - plus the three things anybody
- * reading it asks next, which Discord leaves to the click: what it costs now and
- * before the sale, when it is out, and whether it runs on their machine.
+ * A game on Steam, laid out the way Discord's Steam card is: the same card chrome
+ * as every other link here, the store's name, the game as a link, its short
+ * description, then two fields side by side - what it costs (with the sale, when
+ * there is one) and how many people recommend it - and the store's header
+ * picture across the whole card underneath.
  *
- * The whole card opens the store page, like every other link card.
+ * The title and the picture open the store page; the rest is text you can select.
  */
 function SteamCard({
     preview,
@@ -97,95 +99,106 @@ function SteamCard({
     steam: SteamDetails;
 }) {
     const t = useTranslations("chat");
-    const systems = [
-        steam.platforms.windows && "Windows",
-        steam.platforms.mac && "macOS",
-        steam.platforms.linux && "Linux"
-    ].filter((name): name is string => Boolean(name));
-    const release = steam.comingSoon
-        ? steam.releaseDate
-            ? t("linkCard.comingOn", { date: steam.releaseDate })
-            : t("linkCard.comingSoon")
-        : steam.releaseDate
-          ? t("linkCard.released", { date: steam.releaseDate })
-          : "";
+    const format = useDisplayFormat();
+    const accent = usableAccent(preview.accent);
+    const edge = accent ? { borderLeftColor: accent } : undefined;
+
+    const price = steam.free ? (
+        <span>{t("linkCard.free")}</span>
+    ) : steam.price ? (
+        <span className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5">
+            {steam.price.discount > 0 && steam.price.initial && (
+                <span
+                    className="text-foreground-subtle line-through"
+                    aria-label={t("linkCard.wasPrice", { price: steam.price.initial })}
+                >
+                    {steam.price.initial}
+                </span>
+            )}
+            <span>{steam.price.final}</span>
+            {steam.price.discount > 0 && (
+                <span className="rounded bg-success-soft px-1 text-[0.6875rem] font-semibold text-success-ink">
+                    -{steam.price.discount}%
+                </span>
+            )}
+        </span>
+    ) : steam.comingSoon ? (
+        <span>
+            {steam.releaseDate
+                ? t("linkCard.comingOn", { date: steam.releaseDate })
+                : t("linkCard.comingSoon")}
+        </span>
+    ) : null;
+    const recommended =
+        typeof steam.recommendations === "number" && steam.recommendations > 0
+            ? format.number(steam.recommendations, { maximumFractionDigits: 0 })
+            : null;
 
     return (
-        <a
-            href={preview.url}
-            target="_blank"
-            rel="noreferrer noopener"
+        <div
             data-card="steam"
-            className="mt-1 flex max-w-lg flex-col gap-2 rounded-md border border-border border-l-2 border-l-primary bg-card p-2 no-underline transition-colors hover:bg-card-hover"
+            style={edge}
+            className="mt-1 flex max-w-lg flex-col gap-2 rounded-md border border-border border-l-2 border-l-primary bg-card p-3"
         >
-            <span className="flex min-w-0 flex-col gap-0.5">
+            <span className="flex min-w-0 flex-col gap-1">
                 <span className="truncate text-[0.6875rem] text-muted-foreground">
-                    {[preview.siteName || "Steam", preview.author].filter(Boolean).join(" - ")}
+                    {/* i18n-ignore: the store's name */}
+                    {preview.siteName || "Steam"}
                 </span>
-                <span
-                    className="truncate text-sm font-medium text-foreground"
+                <a
+                    href={preview.url}
+                    target="_blank"
+                    rel="noreferrer noopener"
                     title={preview.title}
+                    className="line-clamp-2 break-words text-sm font-semibold text-primary hover:underline"
                 >
                     {preview.title || preview.url}
-                </span>
+                </a>
                 {preview.description && (
-                    <span className="line-clamp-3 text-xs text-muted-foreground">
+                    <span className="line-clamp-4 break-words text-xs text-muted-foreground">
                         {preview.description}
                     </span>
                 )}
             </span>
-            {preview.hasImage && (
-                // The store's header picture is 460x215; the box is reserved at
-                // that ratio so the conversation does not jump when it lands.
-                // eslint-disable-next-line @next/next/no-img-element -- fetched through Polaris, no loader wanted
-                <img
-                    src={`/api/chat/links/${preview.id}/image`}
-                    alt=""
-                    loading="lazy"
-                    className="aspect-[460/215] w-full rounded bg-muted object-cover"
-                />
+            {(price || recommended) && (
+                <dl className="grid grid-cols-2 gap-3 text-xs">
+                    {price && (
+                        <div className="min-w-0">
+                            <dt className="font-semibold text-foreground">{t("linkCard.price")}</dt>
+                            <dd className="mt-0.5 text-foreground">{price}</dd>
+                        </div>
+                    )}
+                    {recommended && (
+                        <div className="min-w-0">
+                            <dt className="truncate font-semibold text-foreground">
+                                {t("linkCard.recommendations")}
+                            </dt>
+                            <dd className="mt-0.5 text-foreground">{recommended}</dd>
+                        </div>
+                    )}
+                </dl>
             )}
-            <span className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs">
-                {steam.free ? (
-                    <span className="rounded border border-success-edge bg-success-soft px-1.5 py-0.5 font-medium text-success-ink">
-                        {t("linkCard.freeToPlay")}
-                    </span>
-                ) : steam.price ? (
-                    <span className="flex items-center gap-1.5">
-                        {steam.price.discount > 0 && (
-                            <span className="rounded border border-success-edge bg-success-soft px-1 py-0.5 font-semibold text-success-ink">
-                                -{steam.price.discount}%
-                            </span>
-                        )}
-                        {steam.price.discount > 0 && steam.price.initial && (
-                            <span
-                                className="text-foreground-subtle line-through"
-                                aria-label={t("linkCard.wasPrice", { price: steam.price.initial })}
-                            >
-                                {steam.price.initial}
-                            </span>
-                        )}
-                        <span className="font-semibold text-foreground">{steam.price.final}</span>
-                    </span>
-                ) : null}
-                {release && <span className="text-muted-foreground">{release}</span>}
-                {systems.length > 0 && (
-                    <span
-                        className="flex flex-wrap items-center gap-1"
-                        aria-label={t("linkCard.runsOn")}
-                    >
-                        {systems.map((name) => (
-                            <span
-                                key={name}
-                                className="rounded border border-border bg-muted px-1 py-px text-[0.6875rem] text-muted-foreground"
-                            >
-                                {name}
-                            </span>
-                        ))}
-                    </span>
-                )}
-            </span>
-        </a>
+            {preview.hasImage && (
+                <a
+                    href={preview.url}
+                    target="_blank"
+                    rel="noreferrer noopener"
+                    tabIndex={-1}
+                    aria-hidden
+                    className="block"
+                >
+                    {/* The store's header picture is 460x215; the box is reserved at
+                        that ratio so the conversation does not jump when it lands. */}
+                    {/* eslint-disable-next-line @next/next/no-img-element -- fetched through Polaris, no loader wanted */}
+                    <img
+                        src={`/api/chat/links/${preview.id}/image`}
+                        alt=""
+                        loading="lazy"
+                        className="aspect-[460/215] w-full rounded-md bg-muted object-cover"
+                    />
+                </a>
+            )}
+        </div>
     );
 }
 

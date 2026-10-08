@@ -370,38 +370,51 @@ describe("a Steam game", () => {
         };
     }
 
-    it("shows the sale: the cut, the old price struck through, and the new one", () => {
+    it("is laid out like Discord's: store, title link, description, two fields, picture", () => {
         const { container } = render(
             <LinkCard
-                preview={game({ price: { final: "6,12€", initial: "24,50€", discount: 75 } })}
+                preview={game({
+                    price: { final: "6,12€", initial: "24,50€", discount: 75 },
+                    recommendations: 66235
+                })}
             />,
             { wrapper: MessagesWrapper }
         );
-        expect(screen.getByText("-75%")).toBeTruthy();
-        expect(screen.getByText("24,50€").className).toContain("line-through");
-        expect(screen.getByText("6,12€")).toBeTruthy();
-        expect(screen.getByText("Released 17 Sep, 2020")).toBeTruthy();
-        expect(screen.getByText("Windows")).toBeTruthy();
-        expect(screen.getByText("macOS")).toBeTruthy();
-        expect(screen.queryByText("Linux")).toBeNull();
-        expect(screen.getByText("Steam - Supergiant Games")).toBeTruthy();
-        // The whole card opens the store page, and the picture is Polaris' copy.
-        const card = container.querySelector("a[data-card='steam']");
-        expect(card?.getAttribute("href")).toBe(
+        const card = container.querySelector("[data-card='steam']")!;
+        expect(card).toBeTruthy();
+        expect(screen.getByText("Steam")).toBeTruthy();
+        // The game's name is the link to the store page, and so is the picture.
+        const title = screen.getByRole("link", { name: "Hades" });
+        expect(title.getAttribute("href")).toBe(
             "https://store.steampowered.com/app/1145360/Hades/"
         );
-        expect(container.querySelector("img")?.getAttribute("src")).toBe(
-            "/api/chat/links/p1/image"
+        const image = container.querySelector("img")!;
+        expect(image.getAttribute("src")).toBe("/api/chat/links/p1/image");
+        expect(image.closest("a")?.getAttribute("href")).toBe(
+            "https://store.steampowered.com/app/1145360/Hades/"
         );
+        // Two fields, side by side, in that order, above the picture.
+        const terms = Array.from(card.querySelectorAll("dt")).map((node) => node.textContent);
+        expect(terms).toEqual(["Price", "Recommendations"]);
+        expect(card.querySelector("dl")?.className).toContain("grid-cols-2");
+        expect(
+            card.querySelector("dl")!.compareDocumentPosition(image) &
+                Node.DOCUMENT_POSITION_FOLLOWING
+        ).toBeTruthy();
+        // The sale: the old price struck through, the new one, the cut.
+        expect(screen.getByText("24,50€").className).toContain("line-through");
+        expect(screen.getByText("6,12€")).toBeTruthy();
+        expect(screen.getByText("-75%")).toBeTruthy();
+        expect(screen.getByText("66,235")).toBeTruthy();
     });
 
-    it("says free to play instead of a price", () => {
+    it("says free instead of a price", () => {
         render(<LinkCard preview={game({ free: true })} />, { wrapper: MessagesWrapper });
-        expect(screen.getByText("Free to play")).toBeTruthy();
+        expect(screen.getByText("Free")).toBeTruthy();
     });
 
-    it("shows a full price on its own", () => {
-        render(
+    it("shows a full price on its own, and no count it does not have", () => {
+        const { container } = render(
             <LinkCard preview={game({ price: { final: "59,99€", initial: "", discount: 0 } })} />,
             {
                 wrapper: MessagesWrapper
@@ -409,6 +422,8 @@ describe("a Steam game", () => {
         );
         expect(screen.getByText("59,99€")).toBeTruthy();
         expect(screen.queryByText(/%$/)).toBeNull();
+        const terms = Array.from(container.querySelectorAll("dt")).map((node) => node.textContent);
+        expect(terms).toEqual(["Price"]);
     });
 
     it("says when a game that is not out yet is coming", () => {
