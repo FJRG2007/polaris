@@ -14,6 +14,12 @@ name: Dashboard CI
 # beside each other, and the run costs the longer of the two instead of the sum.
 # Both still run: nothing is skipped to make this faster.
 #
+# The web app's suite runs in its own jobs, split four ways. It is nine tenths of
+# the test time - about fifteen minutes of 1,500-odd files on one runner, after
+# the typecheck - and it was what every publish waited on, well after the image
+# itself was built. Each shard runs a fixed quarter of the files, so every test
+# still runs on every commit; they simply run on four machines at once.
+#
 # Not on main, and that is the point. The publish workflow calls this one, and both
 # instances share the concurrency group below; with cancellation off on main the
 # called one simply waited for the standalone one to finish and then ran the
@@ -129,7 +135,40 @@ jobs:
       - run: npm run build:packages
       - run: npm run typecheck
       - run: npm run lint --if-present
-      - run: npm run test
+      # Every workspace's tests but the web app's, which the shards below run.
+      - name: Test the packages and the other apps
+        run: |
+          workspaces=$(npm query .workspace | node -e '
+            let raw = "";
+            process.stdin.on("data", (chunk) => (raw += chunk)).on("end", () => {
+              const all = JSON.parse(raw).filter((w) => w.scripts?.test && w.name !== "@polaris/web");
+              console.log(all.map((w) => `-w ${w.name}`).join(" "));
+            });')
+          [ -n "$workspaces" ] || { echo "::error::No workspace with tests was found."; exit 1; }
+          npm run test $workspaces
+          npm run test:scripts
+
+  web-tests:
+    name: web tests (${{ matrix.shard }}/4)
+    runs-on: ubuntu-latest
+    strategy:
+      # One failing quarter should not hide what the other three would report.
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: dashboard/package-lock.json
+
+      - run: npm ci --prefer-offline
+      - run: npm run db:generate
+      - run: npm run build:packages
+      - run: npm run test -w @polaris/web -- --shard=${{ matrix.shard }}/4
 
   # Proof that the app compiles, for branches and pull requests. The publish workflow
   # builds the very same app inside the image it ships, so it asks for this to be
