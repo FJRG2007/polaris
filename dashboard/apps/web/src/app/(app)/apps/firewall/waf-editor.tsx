@@ -270,9 +270,11 @@ export function WafEditor({
         try {
             while (onScreen.current && onScreen.current !== confirmed.current) {
                 const sent = onScreen.current;
-                const result = await setWafRuleAction({ scopeType, scopeId, ...sent }).catch(() => ({
-                    error: t("errors.save")
-                }));
+                const result = await setWafRuleAction({ scopeType, scopeId, ...sent }).catch(
+                    () => ({
+                        error: t("errors.save")
+                    })
+                );
                 if (result.error) {
                     const fresh = await getWafRuleAction({ scopeType, scopeId }).catch(() => null);
                     const held = fresh?.rule ?? confirmed.current;
