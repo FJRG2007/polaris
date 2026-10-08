@@ -19,7 +19,7 @@ import { z } from "zod";
 import * as core from "@polaris/core";
 import { revalidatePath } from "next/cache";
 import { dataText } from "@/lib/data/words";
-import { withDriver } from "@/lib/data/open";
+import { closeSessions, withDriver } from "@/lib/data/open";
 import * as browser from "@/lib/data/browser";
 import { listHosts } from "@/lib/host-service";
 import { requirePermission } from "@/lib/session";
@@ -30,6 +30,7 @@ import { rateLimit } from "@/lib/rate-limit-service";
 import * as connections from "@/lib/data/connections";
 import type { TableDraft } from "@/lib/data/row-edit";
 import { readPrivateKey, SshKeyError } from "@/lib/data/ssh-key";
+import { databaseChoiceSchema } from "@/lib/data/connection-schema";
 import { engineStats, type DatabaseStats } from "@/lib/data/stats";
 import { databaseInsights, type DatabaseInsights } from "@/lib/data/insights";
 import { rowDeleteSchema, rowInsertSchema, tableDraftSchema } from "@/lib/data/row-edit-schema";
@@ -92,6 +93,9 @@ export async function saveConnectionAction(
     if (refused) return { error: refused };
     const result = await guard(() => connections.saveConnection(me.id, input));
     if (result.error) return { error: result.error };
+    // An edit - an address, a password, the read-only switch - must not be
+    // answered by a session opened for what it was before.
+    if (result.value) closeSessions(me.id, result.value);
     revalidatePath(PATH);
     return { id: result.value };
 }
@@ -100,6 +104,7 @@ export async function deleteConnectionAction(id: string): Promise<{ error?: stri
     const me = await actor();
     const result = await guard(() => connections.deleteConnection(me.id, String(id)));
     if (result.error) return { error: result.error };
+    closeSessions(me.id, String(id));
     revalidatePath(PATH);
     return {};
 }
@@ -120,6 +125,22 @@ async function dialAllowed(userId: string): Promise<string | null> {
     if (throttle.ok) return null;
     const t = await getTranslations("databases");
     return t("refusals.tooManyAttempts", { seconds: Math.ceil(throttle.retryAfterMs / 1000) });
+}
+
+/**
+ * How many browsing calls one account may make a minute - the tree, pages of
+ * rows, statements, edits, the live stats. Each reaches somebody's database, so
+ * a script must not be able to hammer one through Polaris; a person clicking
+ * around, with the stats panel polling, stays far under it.
+ */
+const READ_LIMIT = 300;
+
+/** One browsing call counted against the account, or the refusal to give. */
+async function readAllowed(userId: string): Promise<string | null> {
+    const throttle = await rateLimit(`databases-read:${userId}`, READ_LIMIT, DIAL_WINDOW_MS);
+    if (throttle.ok) return null;
+    const t = await getTranslations("databases");
+    return t("refusals.tooManyReads", { seconds: Math.ceil(throttle.retryAfterMs / 1000) });
 }
 
 /** Open it and say what answered, which is the only test worth running. */
@@ -186,6 +207,37 @@ export async function inspectKeyAction(
     }
 }
 
+/** A saved connection's id, as a request carries one. */
+const CONNECTION_GONE = "That connection is not there any more.";
+const connectionIdSchema = z
+    .string({ invalid_type_error: CONNECTION_GONE, required_error: CONNECTION_GONE })
+    .uuid(CONNECTION_GONE);
+
+/**
+ * The public line of the SSH key a saved connection signs in with, for the
+ * reader to put in the server's `authorized_keys`. Never the private key: it is
+ * decrypted and read on this side, and only the public half comes back. Counted
+ * with the key checks, since a key locked with a passphrase costs its KDF here.
+ */
+export async function sshPublicKeyAction(
+    id: unknown
+): Promise<{ publicKey?: string; error?: string }> {
+    const me = await actor();
+    const throttle = await rateLimit(`databases-key:${me.id}`, 30, DIAL_WINDOW_MS);
+    if (!throttle.ok) {
+        const t = await getTranslations("databases");
+        return {
+            error: t("refusals.tooManyAttempts", {
+                seconds: Math.ceil(throttle.retryAfterMs / 1000)
+            })
+        };
+    }
+    const result = await guard(async () =>
+        connections.savedPublicKey(me.id, parsed(connectionIdSchema, id))
+    );
+    return result.error ? { error: result.error } : { publicKey: result.value };
+}
+
 /** The SSH key the server presents now, next to the pinned one. Read without
  *  signing in. */
 export async function checkHostKeyAction(
@@ -210,6 +262,7 @@ export async function trustHostKeyAction(
         connections.trustHostKey(me.id, String(id), String(fingerprint))
     );
     if (result.error) return { error: result.error };
+    closeSessions(me.id, String(id));
     revalidatePath(PATH);
     return { fingerprint: result.value };
 }
@@ -237,13 +290,24 @@ export async function trustCertificateAction(
         connections.trustCertificate(me.id, String(id), String(fingerprint))
     );
     if (result.error) return { error: result.error };
+    closeSessions(me.id, String(id));
     revalidatePath(PATH);
     return {};
 }
 
+/**
+ * Which database a call is for, as the server will open it. Absent or null is
+ * the connection's own; any other name is checked for shape here and then has
+ * to be on the server's own list before it is dialled.
+ */
+function databaseOf(database: unknown): string | null {
+    return parsed(databaseChoiceSchema, database);
+}
+
 export async function browseAction(
     id: string,
-    namespace: string | null
+    namespace: string | null,
+    database?: string | null
 ): Promise<{
     shape?: string;
     namespaces?: DataNamespace[];
@@ -251,10 +315,18 @@ export async function browseAction(
     /** The schema the relations came from, so the screen names the one it is
      *  showing rather than choosing again and disagreeing. */
     namespace?: string | null;
+    /** Every database on the server this connection may open (Postgres). */
+    databases?: string[] | null;
+    /** The one these were read from. */
+    database?: string | null;
     error?: string;
 }> {
     const me = await actor();
-    const result = await guard(() => browser.browse(me.id, String(id), namespace));
+    const refused = await readAllowed(me.id);
+    if (refused) return { error: refused };
+    const result = await guard(async () =>
+        browser.browse(me.id, String(id), namespace, databaseOf(database))
+    );
     return result.error ? { error: result.error } : { ...result.value };
 }
 
@@ -262,19 +334,29 @@ export async function rowsAction(
     id: string,
     namespace: string | null,
     relation: string,
-    query: browser.RowRequest
+    query: browser.RowRequest,
+    database?: string | null
 ): Promise<{ page?: DataPage; columns?: DataColumn[]; error?: string }> {
     const me = await actor();
-    const result = await guard(() => browser.rows(me.id, String(id), namespace, relation, query));
+    const refused = await readAllowed(me.id);
+    if (refused) return { error: refused };
+    const result = await guard(async () =>
+        browser.rows(me.id, String(id), namespace, relation, query, databaseOf(database))
+    );
     return result.error ? { error: result.error } : { page: result.value };
 }
 
 export async function runAction(
     id: string,
-    statement: string
+    statement: string,
+    database?: string | null
 ): Promise<{ results?: QueryResult[]; error?: string }> {
     const me = await actor();
-    const result = await guard(() => browser.run(me.id, String(id), String(statement)));
+    const refused = await readAllowed(me.id);
+    if (refused) return { error: refused };
+    const result = await guard(async () =>
+        browser.run(me.id, String(id), String(statement), databaseOf(database))
+    );
     return result.error ? { error: result.error } : { results: result.value };
 }
 
@@ -295,17 +377,25 @@ export async function updateCellAction(
         column: string;
         value: string | null;
         key: Record<string, unknown>;
-    }
+    },
+    database?: string | null
 ): Promise<{ changed?: number; error?: string }> {
     const me = await actor();
-    const result = await guard(() =>
-        browser.updateCell(me.id, String(id), {
-            namespace: edit.namespace,
-            relation: String(edit.relation),
-            column: String(edit.column),
-            value: edit.value === null ? null : String(edit.value),
-            key: edit.key
-        })
+    const refused = await readAllowed(me.id);
+    if (refused) return { error: refused };
+    const result = await guard(async () =>
+        browser.updateCell(
+            me.id,
+            String(id),
+            {
+                namespace: edit.namespace,
+                relation: String(edit.relation),
+                column: String(edit.column),
+                value: edit.value === null ? null : String(edit.value),
+                key: edit.key
+            },
+            databaseOf(database)
+        )
     );
     return result.error ? { error: result.error } : { changed: result.value?.changed ?? 0 };
 }
@@ -321,30 +411,52 @@ export async function updateCellAction(
  */
 export async function insertRowAction(
     id: string,
-    insert: unknown
+    insert: unknown,
+    database?: string | null
 ): Promise<{ changed?: number; error?: string }> {
     const me = await actor();
+    const refused = await readAllowed(me.id);
+    if (refused) return { error: refused };
     const result = await guard(async () =>
-        browser.insertRow(me.id, String(id), parsed(rowInsertSchema, insert))
+        browser.insertRow(me.id, String(id), parsed(rowInsertSchema, insert), databaseOf(database))
     );
     return result.error ? { error: result.error } : { changed: result.value?.changed ?? 0 };
 }
 
 export async function deleteRowsAction(
     id: string,
-    removal: unknown
+    removal: unknown,
+    database?: string | null
 ): Promise<{ changed?: number; error?: string }> {
     const me = await actor();
+    const refused = await readAllowed(me.id);
+    if (refused) return { error: refused };
     const result = await guard(async () =>
-        browser.deleteRows(me.id, String(id), parsed(rowDeleteSchema, removal))
+        browser.deleteRows(
+            me.id,
+            String(id),
+            parsed(rowDeleteSchema, removal),
+            databaseOf(database)
+        )
     );
     return result.error ? { error: result.error } : { changed: result.value?.changed ?? 0 };
 }
 
-export async function createTableAction(id: string, draft: unknown): Promise<{ error?: string }> {
+export async function createTableAction(
+    id: string,
+    draft: unknown,
+    database?: string | null
+): Promise<{ error?: string }> {
     const me = await actor();
+    const refused = await readAllowed(me.id);
+    if (refused) return { error: refused };
     const result = await guard(async () =>
-        browser.createTable(me.id, String(id), parsed(tableDraftSchema, draft) as TableDraft)
+        browser.createTable(
+            me.id,
+            String(id),
+            parsed(tableDraftSchema, draft) as TableDraft,
+            databaseOf(database)
+        )
     );
     return result.error ? { error: result.error } : {};
 }
@@ -357,6 +469,8 @@ export async function redisValueAction(
     key: string
 ): Promise<{ value?: browser.KeyValueView; error?: string }> {
     const me = await actor();
+    const refused = await readAllowed(me.id);
+    if (refused) return { error: refused };
     const result = await guard(() => browser.keyValue(me.id, String(id), namespace, String(key)));
     return result.error ? { error: result.error } : { value: result.value };
 }
@@ -365,6 +479,8 @@ export async function redisValueAction(
  *  keeps the readings and draws the window. */
 export async function statsAction(id: string): Promise<{ stats?: DatabaseStats; error?: string }> {
     const me = await actor();
+    const refused = await readAllowed(me.id);
+    if (refused) return { error: refused };
     const result = await guard(() => engineStats(me.id, String(id)));
     return result.error ? { error: result.error } : { stats: result.value };
 }
@@ -380,6 +496,8 @@ export async function insightsAction(
     id: string
 ): Promise<{ insights?: DatabaseInsights; error?: string }> {
     const me = await actor();
+    const refused = await readAllowed(me.id);
+    if (refused) return { error: refused };
     const result = await guard(() => databaseInsights(me.id, String(id)));
     return result.error ? { error: result.error } : { insights: result.value };
 }

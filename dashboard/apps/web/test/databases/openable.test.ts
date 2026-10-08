@@ -56,7 +56,9 @@ vi.mock("@/lib/database-service", () => ({
     databaseCredentials: async () => ({ username: "app", password: "app-secret", database: "app" })
 }));
 
-const { addressOf, listManagedOptions, listOpenable, saveConnection } = await import("@/lib/data/connections");
+const { addressOf, listManagedOptions, listOpenable, saveConnection } = await import(
+    "@/lib/data/connections"
+);
 
 /** A database Polaris runs, on the machine Polaris runs on. */
 function managedRow(overrides: Record<string, unknown> = {}) {
@@ -177,6 +179,18 @@ describe("what the browser lists", () => {
 });
 
 describe("resolving an offered id", () => {
+    it("keeps Polaris' own database confined to itself, and a managed one server-wide", async () => {
+        runsTheInstance = true;
+        managed = [managedRow()];
+
+        expect(await addressOf(ALICE, "polaris")).toMatchObject({
+            database: "polaris",
+            readOnly: true,
+            confined: true
+        });
+        expect((await addressOf(ALICE, `managed:${DB}`)).confined).toBeFalsy();
+    });
+
     it("reads a managed database's address and credentials, read-only", async () => {
         managed = [managedRow()];
 
@@ -205,7 +219,10 @@ describe("resolving an offered id", () => {
     it("opens a single Redis as before", async () => {
         managed = [managedRow({ engine: "redis", clusterMasters: null })];
 
-        await expect(addressOf(ALICE, `managed:${DB}`)).resolves.toMatchObject({ engine: "redis", host: "polaris-app-db" });
+        await expect(addressOf(ALICE, `managed:${DB}`)).resolves.toMatchObject({
+            engine: "redis",
+            host: "polaris-app-db"
+        });
     });
 
     it("refuses a managed id this account does not reach", async () => {

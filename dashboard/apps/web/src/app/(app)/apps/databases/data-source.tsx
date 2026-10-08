@@ -46,6 +46,11 @@ export interface DataSource {
         namespaces?: DataNamespace[];
         relations?: DataRelation[];
         namespace?: string | null;
+        /** The databases on the server this connection may switch to, where
+         *  the engine binds a connection to one (Postgres). */
+        databases?: string[] | null;
+        /** The database the rest was read from. */
+        database?: string | null;
     }>;
     rows(
         namespace: string | null,
@@ -62,18 +67,24 @@ export interface DataSource {
     insights(): Reply<{ insights?: DatabaseInsights }>;
 }
 
-/** A saved connection, or one of the two offered without saving. */
-export function connectionSource(connectionId: string): DataSource {
+/**
+ * A saved connection, or one of the two offered without saving - on the
+ * database it names, or on another of its server's when `database` is set.
+ * Every read and write goes to that one, and the server checks it is a database
+ * this account may open before dialling it.
+ */
+export function connectionSource(connectionId: string, database: string | null = null): DataSource {
     return {
-        key: connectionId,
-        browse: (namespace) => actions.browseAction(connectionId, namespace),
+        // Tabs are kept per database: a table open in one is not in another.
+        key: database === null ? connectionId : `${connectionId}#${database}`,
+        browse: (namespace) => actions.browseAction(connectionId, namespace, database),
         rows: (namespace, relation, query) =>
-            actions.rowsAction(connectionId, namespace, relation, query),
-        run: (statement) => actions.runAction(connectionId, statement),
-        updateCell: (edit) => actions.updateCellAction(connectionId, edit),
-        insertRow: (insert) => actions.insertRowAction(connectionId, insert),
-        deleteRows: (removal) => actions.deleteRowsAction(connectionId, removal),
-        createTable: (draft) => actions.createTableAction(connectionId, draft),
+            actions.rowsAction(connectionId, namespace, relation, query, database),
+        run: (statement) => actions.runAction(connectionId, statement, database),
+        updateCell: (edit) => actions.updateCellAction(connectionId, edit, database),
+        insertRow: (insert) => actions.insertRowAction(connectionId, insert, database),
+        deleteRows: (removal) => actions.deleteRowsAction(connectionId, removal, database),
+        createTable: (draft) => actions.createTableAction(connectionId, draft, database),
         redisValue: (namespace, key) => actions.redisValueAction(connectionId, namespace, key),
         stats: () => actions.statsAction(connectionId),
         insights: () => actions.insightsAction(connectionId)

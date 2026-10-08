@@ -19,6 +19,7 @@
 
 import { z } from "zod";
 import { DB_ENGINES } from "@polaris/core";
+import { NO_SUCH_DATABASE } from "./driver";
 
 /** Labels of a hostname, or an address: a whole connection string pasted here
  *  silently produces a host nothing resolves, and a `?` or a `,` would be read
@@ -358,3 +359,20 @@ export function looksPublic(host: string): boolean {
         name
     );
 }
+
+/**
+ * Another database on a connection's server, as a browser asks for one. Null or
+ * absent is the database the connection itself names.
+ *
+ * Only the shape is checked here. Whether it is a database this account may open
+ * is the server's answer - it has to be on the list the server just gave
+ * (`withDriverOn`) - so a name that passes this is still only a request.
+ */
+export const databaseChoiceSchema = z
+    .string()
+    .min(1, NO_SUCH_DATABASE)
+    .max(128, NO_SUCH_DATABASE)
+    .refine((value) => !/\p{Cc}/u.test(value), NO_SUCH_DATABASE)
+    .nullable()
+    .optional()
+    .transform((value) => value ?? null);

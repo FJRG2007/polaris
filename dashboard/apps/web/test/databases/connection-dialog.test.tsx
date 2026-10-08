@@ -17,6 +17,9 @@ import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 
 const saved: unknown[] = [];
+const publicKeyAsks: string[] = [];
+const FIXTURE_PUBLIC_LINE =
+    "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFixturePublicKeyFixturePublicKeyFix";
 const NODE_0 = { id: "22222222-2222-4222-8222-222222222222", name: "node-0", address: "10.0.0.2" };
 let tunnelServers: (typeof NODE_0)[] = [NODE_0];
 
@@ -39,6 +42,10 @@ vi.mock("@/app/(app)/apps/databases/actions", () => ({
         ]
     }),
     listManagedAction: async () => ({ databases: [] }),
+    sshPublicKeyAction: async (id: string) => {
+        publicKeyAsks.push(id);
+        return { publicKey: FIXTURE_PUBLIC_LINE };
+    },
     listTunnelServersAction: async () => ({ servers: tunnelServers }),
     saveConnectionAction: async (input: unknown) => {
         saved.push(input);
@@ -347,5 +354,43 @@ describe("the connection form", () => {
         const summary = await screen.findByText(/^ssh-ed25519 SHA256:/, {}, { timeout: 2000 });
         expect(summary.textContent).not.toContain(passphrase);
         expect(document.body.textContent).not.toContain(passphrase);
+    });
+});
+
+describe("a saved SSH key", () => {
+    const KEY_TUNNEL = {
+        mode: "manual",
+        host: "ssh.example.com",
+        port: 2222,
+        username: "root",
+        authMethod: "key",
+        jumpHostId: null,
+        jumpHostName: null,
+        jumpMissing: false,
+        keyType: "ssh-ed25519",
+        keyFingerprint: "SHA256:fixtureFingerprintThatIsLongEnoughToWrapOnAPhoneScreen",
+        hostKeyFingerprint: "SHA256:fixtureHostKey"
+    };
+
+    it("shows its whole fingerprint and, on request, its public line with a copy button", async () => {
+        publicKeyAsks.length = 0;
+        tunnelled(KEY_TUNNEL);
+
+        const fingerprint = screen.getByText(/SHA256:fixtureFingerprint/);
+        expect(fingerprint.className).toContain("break-all");
+        expect(fingerprint.className).not.toContain("truncate");
+        expect(publicKeyAsks).toEqual([]);
+
+        await userEvent.click(screen.getByRole("button", { name: "Show public key" }));
+
+        expect(await screen.findByText(FIXTURE_PUBLIC_LINE)).toBeTruthy();
+        expect(publicKeyAsks).toEqual(["11111111-1111-4111-8111-111111111111"]);
+        expect(screen.getByText(/authorized_keys/)).toBeTruthy();
+        expect(
+            screen.getByRole("button", { name: /Public key/ }).getAttribute("title")
+        ).toBeTruthy();
+
+        await userEvent.click(screen.getByRole("button", { name: "Hide public key" }));
+        expect(screen.queryByText(FIXTURE_PUBLIC_LINE)).toBeNull();
     });
 });

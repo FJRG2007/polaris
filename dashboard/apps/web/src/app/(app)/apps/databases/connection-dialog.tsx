@@ -72,6 +72,7 @@ import {
 } from "lucide-react";
 import {
     Button,
+    CopyButton,
     Dialog,
     DialogContent,
     DialogDescription,
@@ -81,6 +82,7 @@ import {
     Input,
     SegmentedControl,
     Select,
+    Skeleton,
     Switch,
     Textarea,
     cn
@@ -793,29 +795,37 @@ export function ConnectionDialog({
                                             ) : keepsSshSecret &&
                                               !replacingKey &&
                                               saved?.mode === "manual" ? (
-                                                <div className="flex items-center gap-3 rounded-md border border-border px-3 py-2 text-xs">
-                                                    <KeyRound className="size-4 shrink-0 text-muted-foreground" />
-                                                    <div className="min-w-0 flex-1">
-                                                        <p className="font-medium text-foreground">
-                                                            {t("dialog.keySaved")}
-                                                        </p>
-                                                        {saved.keyFingerprint && (
-                                                            <p
-                                                                className="truncate font-mono text-muted-foreground"
-                                                                title={`${saved.keyType ?? ""} ${saved.keyFingerprint}`}
-                                                            >
-                                                                {saved.keyType}{" "}
-                                                                {saved.keyFingerprint}
+                                                <div className="flex flex-col gap-2 rounded-md border border-border px-3 py-2 text-xs">
+                                                    <div className="flex items-center gap-3">
+                                                        <KeyRound className="size-4 shrink-0 text-muted-foreground" />
+                                                        <div className="min-w-0 flex-1">
+                                                            <p className="font-medium text-foreground">
+                                                                {t("dialog.keySaved")}
                                                             </p>
-                                                        )}
+                                                            {saved.keyFingerprint && (
+                                                                // Wrapped, not cut: a fingerprint
+                                                                // is compared character by
+                                                                // character, and a title is out
+                                                                // of reach on a phone.
+                                                                <p className="break-all font-mono text-muted-foreground">
+                                                                    {saved.keyType}{" "}
+                                                                    {saved.keyFingerprint}
+                                                                </p>
+                                                            )}
+                                                        </div>
+                                                        <Button
+                                                            variant="outline"
+                                                            size="sm"
+                                                            onClick={() => setReplacingKey(true)}
+                                                        >
+                                                            {t("dialog.replace")}
+                                                        </Button>
                                                     </div>
-                                                    <Button
-                                                        variant="outline"
-                                                        size="sm"
-                                                        onClick={() => setReplacingKey(true)}
-                                                    >
-                                                        {t("dialog.replace")}
-                                                    </Button>
+                                                    {connection?.id && (
+                                                        <SavedPublicKey
+                                                            connectionId={connection.id}
+                                                        />
+                                                    )}
                                                 </div>
                                             ) : (
                                                 <>
@@ -1239,9 +1249,7 @@ function HostKeyCheck({ connectionId, pinned }: { connectionId: string; pinned: 
             <div className="flex items-center gap-3">
                 <div className="min-w-0 flex-1">
                     <p className="font-medium text-foreground">{t("dialog.hostKey")}</p>
-                    <p className="truncate font-mono text-muted-foreground" title={current}>
-                        {current}
-                    </p>
+                    <p className="break-all font-mono text-muted-foreground">{current}</p>
                 </div>
                 <Button
                     variant="outline"
@@ -1275,6 +1283,78 @@ function HostKeyCheck({ connectionId, pinned }: { connectionId: string; pinned: 
                         {t("dialog.trustKey")}
                     </Button>
                 </div>
+            )}
+        </div>
+    );
+}
+
+/**
+ * The public half of a saved SSH key, on request.
+ *
+ * The private key never comes back to the browser: the server decrypts it,
+ * reads it and answers with the one `authorized_keys` line, which is what
+ * somebody opening this actually needs - to let this key in on another server.
+ * Asked for once, the first time it is opened.
+ */
+function SavedPublicKey({ connectionId }: { connectionId: string }) {
+    const t = useTranslations("databases");
+    const [open, setOpen] = useState(false);
+    const [state, setState] = useState<
+        | { kind: "idle" }
+        | { kind: "busy" }
+        | { kind: "shown"; line: string }
+        | { kind: "failed"; text: string }
+    >({ kind: "idle" });
+
+    const toggle = async () => {
+        const next = !open;
+        setOpen(next);
+        if (!next || state.kind === "shown" || state.kind === "busy") return;
+        setState({ kind: "busy" });
+        const result = await actions.sshPublicKeyAction(connectionId);
+        setState(
+            result.publicKey
+                ? { kind: "shown", line: result.publicKey }
+                : { kind: "failed", text: result.error ?? t("refusals.generic") }
+        );
+    };
+
+    return (
+        <div className="flex flex-col gap-2">
+            <Button
+                variant="ghost"
+                size="sm"
+                className="self-start"
+                aria-expanded={open}
+                onClick={() => void toggle()}
+            >
+                {open ? t("dialog.hidePublicKey") : t("dialog.showPublicKey")}
+            </Button>
+            {open && state.kind === "busy" && (
+                <Skeleton className="h-12 w-full" aria-label={t("dialog.publicKey")} />
+            )}
+            {open && state.kind === "failed" && (
+                <p role="alert" className="text-danger">
+                    {state.text}
+                </p>
+            )}
+            {open && state.kind === "shown" && (
+                <>
+                    <div className="flex items-start gap-2 rounded-md bg-muted px-2 py-1.5">
+                        <code
+                            aria-label={t("dialog.publicKey")}
+                            className="min-w-0 flex-1 select-all break-all font-mono text-foreground"
+                        >
+                            {state.line}
+                        </code>
+                        <CopyButton
+                            value={state.line}
+                            label={t("dialog.publicKey")}
+                            className="mt-0.5 shrink-0"
+                        />
+                    </div>
+                    <p className="text-muted-foreground">{t("dialog.publicKeyHint")}</p>
+                </>
             )}
         </div>
     );
@@ -1327,10 +1407,7 @@ function CertificateCheck({
                     <p className="truncate font-medium text-foreground" title={trusted.subject}>
                         {trusted.subject}
                     </p>
-                    <p
-                        className="truncate font-mono text-muted-foreground"
-                        title={trusted.fingerprint}
-                    >
+                    <p className="break-all font-mono text-muted-foreground">
                         {trusted.fingerprint}
                     </p>
                 </div>

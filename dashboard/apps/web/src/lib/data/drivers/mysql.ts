@@ -81,6 +81,10 @@ export class MysqlDriver implements data.DataDriver {
             bigNumberStrings: true,
             dateStrings: true
         });
+        connection.on("error", () => {
+            if (this.connection === connection) this.connection = null;
+            connection.destroy();
+        });
         if (this.address.readOnly) await connection.query("SET SESSION TRANSACTION READ ONLY");
         // The server's own limit, so a statement the client gave up on does not
         // keep running there. MySQL and MariaDB name it differently; whichever

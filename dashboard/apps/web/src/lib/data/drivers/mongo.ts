@@ -189,7 +189,9 @@ export class MongoDriver implements data.DataDriver {
             // collection scan somebody did not ask for.
             total: Object.keys(filter).length
                 ? null
-                : await collection.estimatedDocumentCount().catch(() => null)
+                : await collection.estimatedDocumentCount().catch(() => null),
+            // From the collection's metadata, not a count: said as "about".
+            estimated: true
         };
     }
 

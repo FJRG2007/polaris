@@ -23,6 +23,9 @@ vi.mock("pg", async () => {
         }
     }
     class Client {
+        on() {
+            return this;
+        }
         async connect() {}
         async end() {}
         query(query: string | Query) {

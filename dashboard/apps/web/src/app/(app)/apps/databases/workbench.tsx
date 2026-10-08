@@ -33,7 +33,7 @@ import * as openTabs from "./workbench-tabs";
 import type { KeyValueView } from "@/lib/data/browser";
 import { CodeSurface } from "@/components/code-surface";
 import { spreadsheetSafe } from "@/lib/data/spreadsheet";
-import { useTranslations } from "@/components/i18n/i18n-provider";
+import { useLocale, useTranslations } from "@/components/i18n/i18n-provider";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { searchItems, type SearchField } from "@polaris/core/search-text";
 import { DeleteRowsDialog, NewRowDialog, NewTableDialog } from "./row-dialogs";
@@ -109,12 +109,7 @@ const RELATION_FIELDS: readonly SearchField<DataRelation>[] = [
     { text: (relation) => relation.name }
 ];
 
-export function Workbench({
-    connectionId,
-    readOnly,
-    source: given,
-    canCreateTable = !readOnly
-}: {
+interface WorkbenchProps {
     /** What the open tabs are remembered under; a saved connection's id. */
     connectionId: string;
     readOnly: boolean;
@@ -122,9 +117,102 @@ export function Workbench({
     source?: DataSource;
     /** Whether "New table" is offered at all. */
     canCreateTable?: boolean;
+}
+
+/**
+ * The databases on a connection's server, as the picker offers them.
+ *
+ * `home` is the one the connection names, read off the first answer, so picking
+ * it again goes back to the connection as saved rather than to "another database
+ * that happens to have the same name".
+ */
+interface ServerDatabases {
+    readonly list: readonly string[];
+    readonly home: string | null;
+}
+
+/**
+ * The workbench, on whichever database of the connection's server is picked.
+ *
+ * A Postgres connection is bound to one database, and the server holds others -
+ * so, the way Beekeeper Studio does it, the list of them sits at the top of the
+ * sidebar and picking one opens it with the same login, tunnel and encryption.
+ * The bench under it is rebuilt for each database (`key`), because a table, a
+ * schema and an open tab all belong to the database they were read from.
+ */
+export function Workbench(props: WorkbenchProps) {
+    const { connectionId } = props;
+    // Carried with the connection they were read for, so opening another
+    // connection starts on its own database rather than this one's pick.
+    const [picked, setPicked] = useState<{ id: string; database: string | null }>({
+        id: connectionId,
+        database: null
+    });
+    const [server, setServer] = useState<{ id: string; databases: ServerDatabases | null }>({
+        id: connectionId,
+        databases: null
+    });
+    if (picked.id !== connectionId) setPicked({ id: connectionId, database: null });
+    const database = picked.id === connectionId ? picked.database : null;
+    const databases = server.id === connectionId ? server.databases : null;
+
+    const onDatabases = useCallback(
+        (list: readonly string[], opened: string | null) => {
+            setServer((was) =>
+                was.id === connectionId && was.databases
+                    ? { id: connectionId, databases: { ...was.databases, list } }
+                    : // The first answer is on the connection's own database.
+                      { id: connectionId, databases: { list, home: opened } }
+            );
+        },
+        [connectionId]
+    );
+    const onDatabase = useCallback(
+        (next: string) => {
+            setPicked({
+                id: connectionId,
+                database: databases?.home === next ? null : next
+            });
+        },
+        [connectionId, databases]
+    );
+
+    return (
+        <Bench
+            key={`${connectionId}#${database ?? ""}`}
+            {...props}
+            database={database}
+            databases={databases}
+            onDatabases={onDatabases}
+            onDatabase={onDatabase}
+        />
+    );
+}
+
+function Bench({
+    connectionId,
+    readOnly,
+    source: given,
+    canCreateTable = !readOnly,
+    database,
+    databases,
+    onDatabases,
+    onDatabase
+}: WorkbenchProps & {
+    /** The database picked on the server, or null for the connection's own. */
+    database: string | null;
+    databases: ServerDatabases | null;
+    onDatabases: (list: readonly string[], opened: string | null) => void;
+    onDatabase: (next: string) => void;
 }) {
     const t = useTranslations("databases");
-    const source = useMemo(() => given ?? connectionSource(connectionId), [given, connectionId]);
+    const source = useMemo(
+        () => given ?? connectionSource(connectionId, database),
+        [given, connectionId, database]
+    );
+    /** What this bench's tabs are filed under: the connection, and the
+     *  database when it is not the connection's own. */
+    const benchKey = source.key;
     const [shape, setShape] = useState<string>("sql");
     const [namespaces, setNamespaces] = useState<DataNamespace[]>([]);
     const [namespace, setNamespace] = useState<string | null>(null);
@@ -157,13 +245,13 @@ export function Workbench({
     }, []);
 
     useEffect(() => {
-        setBench({ id: connectionId, state: openTabs.readTabState(connectionId) });
-    }, [connectionId]);
+        setBench({ id: benchKey, state: openTabs.readTabState(benchKey) });
+    }, [benchKey]);
 
     useEffect(() => {
-        if (bench.id !== connectionId) return;
-        openTabs.writeTabState(connectionId, bench.state);
-    }, [connectionId, bench]);
+        if (bench.id !== benchKey) return;
+        openTabs.writeTabState(benchKey, bench.state);
+    }, [benchKey, bench]);
 
     /**
      * Which tabs have been in front at least once.
@@ -206,6 +294,7 @@ export function Workbench({
                 return;
             }
             setShape(result.shape ?? "sql");
+            if (result.databases) onDatabases(result.databases, result.database ?? null);
             setNamespaces(result.namespaces ?? []);
             setRelations(result.relations ?? []);
             // What the server actually read from, never a second guess at it.
@@ -229,7 +318,7 @@ export function Workbench({
                 );
             }
         },
-        [change, source]
+        [change, source, onDatabases]
     );
 
     useEffect(() => {
@@ -266,6 +355,28 @@ export function Workbench({
         <DataSourceProvider source={source}>
             <div className="flex min-h-0 flex-1 flex-col gap-4 md:flex-row">
                 <aside className="flex max-h-72 w-full shrink-0 flex-col gap-2 md:max-h-none md:w-64">
+                    {/* A connection's server only: a Deploy database's own tab is
+                    that one database, and its calls carry no other. */}
+                    {!given && databases && databases.list.length > 1 && (
+                        <Select
+                            // The connection's own database when nothing else was
+                            // picked. Null only where the connection names none and
+                            // the server opened its default, which the list holds
+                            // under its own name.
+                            value={database ?? databases.home ?? ""}
+                            onValueChange={onDatabase}
+                            placeholder={t("bench.database")}
+                            aria-label={t("bench.database")}
+                            options={databases.list.map((name) => ({
+                                value: name,
+                                label:
+                                    name === databases.home
+                                        ? t("bench.databaseHome", { name })
+                                        : name
+                            }))}
+                        />
+                    )}
+
                     {namespaces.length > 1 && (
                         <Select
                             value={namespace ?? ""}
@@ -370,9 +481,7 @@ export function Workbench({
                                                 {entry.name}
                                             </span>
                                             {entry.rows !== null && (
-                                                <span className="shrink-0 text-xs text-muted-foreground">
-                                                    {entry.rows}
-                                                </span>
+                                                <RowEstimate rows={entry.rows} />
                                             )}
                                         </button>
                                     </li>
@@ -468,6 +577,29 @@ export function Workbench({
                 }}
             />
         </DataSourceProvider>
+    );
+}
+
+/**
+ * A table's size in the list, as the estimate it is.
+ *
+ * Every engine's figure here is kept rather than counted - Postgres's stats,
+ * InnoDB's `TABLE_ROWS`, MongoDB's metadata - so it is drawn short and marked
+ * (`~1.2k`), and the whole figure is in the label for a screen reader and in
+ * the tooltip, the way the table header of a desktop client says "estimated".
+ */
+function RowEstimate({ rows }: { rows: number }) {
+    const t = useTranslations("databases");
+    const locale = useLocale();
+    const short = new Intl.NumberFormat(locale, {
+        notation: "compact",
+        maximumFractionDigits: 1
+    }).format(rows);
+    const full = t("bench.rowsEstimate", { count: new Intl.NumberFormat(locale).format(rows) });
+    return (
+        <span className="shrink-0 text-xs text-muted-foreground" title={full} aria-label={full}>
+            ~{short}
+        </span>
     );
 }
 
@@ -874,7 +1006,7 @@ function RowsPanel({
                                       from: page.rows.length === 0 ? 0 : offset + 1,
                                       to: offset + page.rows.length
                                   })
-                                : t("bench.rowsOf", {
+                                : t(page.estimated ? "bench.rowsOfAbout" : "bench.rowsOf", {
                                       from: page.rows.length === 0 ? 0 : offset + 1,
                                       to: offset + page.rows.length,
                                       total: page.total

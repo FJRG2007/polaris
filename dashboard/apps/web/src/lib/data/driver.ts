@@ -72,6 +72,20 @@ export interface DataAddress {
     /** The SSH tunnel the database is reached through, when it is not reached
      *  directly. `host` and `port` are then as the SSH server sees them. */
     readonly tunnel?: DataTunnel | null;
+    /**
+     * Kept to the one database it names, even on an engine whose connections can
+     * open any database on the server. Set on Polaris' own database: the browser
+     * is a window on what the instance stores, not on whatever else happens to
+     * share its server.
+     */
+    readonly confined?: boolean;
+    /**
+     * Whose connection this is, when it was resolved for one account's saved or
+     * offered connection (`addressOf`). Set, calls on it share a held session
+     * (`sessions.ts`) - never with another account, never with another id.
+     * Absent, every call opens and closes its own, as a test of a draft does.
+     */
+    readonly session?: { readonly userId: string; readonly connectionId: string } | null;
 }
 
 /** A container of things: a schema, a database, a numbered Redis keyspace. */
@@ -88,8 +102,9 @@ export interface DataRelation {
     readonly name: string;
     readonly namespace: string | null;
     readonly kind: "table" | "view" | "collection" | "keys";
-    /** An estimate, when the engine keeps one. Never a count(*) over a table
-     *  nobody asked to count - that is a full scan somebody did not ask for. */
+    /** An estimate, when the engine keeps one - and always drawn as one. Never a
+     *  count(*) over a table nobody asked to count - that is a full scan
+     *  somebody did not ask for. */
     readonly rows: number | null;
 }
 
@@ -106,6 +121,8 @@ export interface DataPage {
     readonly rows: readonly Record<string, unknown>[];
     /** The total the page came out of, when it is known without a scan. */
     readonly total: number | null;
+    /** True when that total is the engine's estimate rather than a count. */
+    readonly estimated?: boolean;
     /** A cursor for the next page, for an engine that pages by cursor rather
      *  than by offset (Redis). */
     readonly cursor?: string | null;
@@ -177,6 +194,13 @@ export interface DataDriver {
     /** The engine's own version string, which doubles as the connection test. */
     version(): Promise<string>;
     namespaces(): Promise<DataNamespace[]>;
+    /**
+     * The other databases on the same server this account could open instead,
+     * for an engine where a connection is bound to one database (Postgres). The
+     * open one is always among them. Absent where the namespaces already are the
+     * server's databases (MySQL, MongoDB) or there is no such thing (Redis).
+     */
+    databases?(): Promise<string[]>;
     relations(namespace: string | null): Promise<DataRelation[]>;
     columns(namespace: string | null, relation: string): Promise<DataColumn[]>;
     rows(namespace: string | null, relation: string, query: RowQuery): Promise<DataPage>;
@@ -301,6 +325,10 @@ export class DataRequestError extends Error {
         this.name = "DataRequestError";
     }
 }
+
+/** Said when a database asked for is not one the server listed for this
+ *  account. Matched to the catalog by `words`. */
+export const NO_SUCH_DATABASE = "There is no database by that name on this server.";
 
 /** The page size to actually use for a request that asked for one. */
 export function pageSize(asked: number | undefined): number {
