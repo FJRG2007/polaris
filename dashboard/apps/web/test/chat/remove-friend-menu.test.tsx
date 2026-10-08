@@ -58,6 +58,7 @@ const dm = {
     pinned: false,
     mutedUntil: null,
     mayAdminister: false,
+    mayChangePrivacy: false,
     mayModerate: false,
     mayPicture: false,
     mayPin: false,

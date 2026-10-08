@@ -49,7 +49,7 @@ import {
     type ChatErrorText
 } from "./access";
 import { spokenEditWindow, spokenWait } from "./durations";
-import { requireAgeCleared } from "./age-gate";
+import { ageClearedWhere, requireAgeCleared } from "./age-gate";
 
 /** One message, with everything the list needs to draw it. */
 export interface ChatMessageView {
@@ -790,6 +790,7 @@ export async function linkPreviewFor(
     });
     if (!message || message.deletedAt) return null;
     await requireChannel(actor, message.channelId);
+    await requireAgeCleared(actor, message.channelId);
 
     const link = core.firstLink(message.body);
     if (!link) return null;
@@ -883,6 +884,7 @@ export async function editHistory(actor: ChatActor, messageId: string): Promise<
     });
     if (!message) throw new ChatAccessError({ key: "errors.messageGone" });
     await requireChannel(actor, message.channelId);
+    await requireAgeCleared(actor, message.channelId);
 
     const rules = await rulesForChannel(message.channelId);
     // A deleted message has no text to compare against, and handing back what it
@@ -1417,9 +1419,10 @@ export async function deliveryOf(
 export async function forward(actor: ChatActor, input: core.ChatForwardInput): Promise<string> {
     const original = await prisma.chatMessage.findUnique({
         where: { id: input.messageId },
-        select: { id: true, authorId: true, deletedAt: true }
+        select: { id: true, channelId: true, authorId: true, deletedAt: true }
     });
     if (!original || original.deletedAt) throw new ChatAccessError({ key: "errors.messageGone" });
+    await requireAgeCleared(actor, original.channelId);
     if (
         original.authorId &&
         !(await maySee(original.authorId, "forwarding", { id: actor.id, isAdmin: false }))
@@ -1477,7 +1480,10 @@ export async function starred(
     channelId: string | null = null
 ): Promise<ChatMessageView[]> {
     const stars = await prisma.chatStar.findMany({
-        where: { userId: actor.id, ...(channelId ? { message: { channelId } } : {}) },
+        where: {
+            userId: actor.id,
+            message: { ...(channelId ? { channelId } : {}), ...ageClearedWhere(actor.id) }
+        },
         orderBy: { createdAt: "desc" },
         take: limit,
         select: { message: { select: MESSAGE_SELECT } }
@@ -1496,7 +1502,10 @@ export async function starred(
  * their own rows: nothing about it is visible to anybody else, so nothing else
  * needs checking. Returns how many went.
  */
-export async function unstarAll(actor: ChatActor, channelId: string | null = null): Promise<number> {
+export async function unstarAll(
+    actor: ChatActor,
+    channelId: string | null = null
+): Promise<number> {
     const result = await prisma.chatStar.deleteMany({
         where: { userId: actor.id, ...(channelId ? { message: { channelId } } : {}) }
     });

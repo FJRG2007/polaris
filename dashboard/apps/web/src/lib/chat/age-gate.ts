@@ -7,9 +7,10 @@
  * and per channel (`ChatAgeConfirmation`), so it is asked once.
  *
  * Enforced where messages are read, not only drawn: a page, the catch-up after
- * a frame, a thread, a single message carried somewhere, pins and search all
- * refuse a channel this reader has not confirmed. The screen asking first is
- * the courtesy; this is the rule.
+ * a frame, a thread, a single message carried somewhere, pins, search, stars,
+ * toasts, a quoted message link, edit history and forwarding all refuse a
+ * channel this reader has not confirmed. The screen asking first is the
+ * courtesy; this is the rule.
  *
  * It is a statement, not a verification - Polaris has no way to know anybody's
  * age, and neither does Discord. What it buys is that nobody walks into such a

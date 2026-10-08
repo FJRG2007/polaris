@@ -871,6 +871,7 @@
         "private": "Canal privado",
         "privateHint": "Solo lo ven y lo leen las personas, equipos y roles que añadas.",
         "publicNote": "Todo el que esté en el espacio puede ver y leer este canal.",
+        "privacySpaceAdminOnly": "Solo los administradores del espacio pueden cambiarlo.",
         "whoCanReach": "Quién puede entrar",
         "whoCanReachHint": "Aquí aparece la gente de un canal privado una vez guardado.",
         "addPeople": "Añadir gente",

@@ -65,6 +65,7 @@ const channel = () => ({
     pinned: false,
     mutedUntil: null,
     mayAdminister,
+    mayChangePrivacy: mayAdminister,
     mayModerate: mayAdminister,
     mayPicture: false,
     mayPin: false,
@@ -164,8 +165,7 @@ describe("the draft", () => {
                 name: "general",
                 topic: "Release talk",
                 slowmode: 0,
-                contentMode: "default",
-                private: false
+                contentMode: "default"
             }
         });
         await waitFor(() => expect(screen.queryByRole("status")).toBeNull());
@@ -233,6 +233,15 @@ describe("permissions", () => {
         fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
         await waitFor(() => expect(called).toHaveLength(1));
         expect(called[0]?.input).toMatchObject({ private: true });
+    });
+
+    it("locks the private switch for somebody who runs the channel but not the space", () => {
+        pathname = "/chat/c/c1/settings/permissions";
+        chatState = { ...chatState, channels: [{ ...channel(), mayChangePrivacy: false }] };
+        show();
+        const toggle = screen.getByRole("switch", { name: "Private channel" }) as HTMLButtonElement;
+        expect(toggle.disabled).toBe(true);
+        expect(screen.getByText("Only the space's admins can change this.")).toBeTruthy();
     });
 });
 

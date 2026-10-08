@@ -871,6 +871,7 @@
         "private": "Private channel",
         "privateHint": "Only the people, teams and roles you add can see it or read it.",
         "publicNote": "Everybody in the space can see this channel and read it.",
+        "privacySpaceAdminOnly": "Only the space's admins can change this.",
         "whoCanReach": "Who can reach it",
         "whoCanReachHint": "Saved private channels list the people in them here.",
         "addPeople": "Add people",

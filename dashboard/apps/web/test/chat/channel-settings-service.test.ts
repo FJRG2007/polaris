@@ -5,7 +5,8 @@
  *   has not confirmed, and confirming is remembered once per person.
  * - Invite links that open on one channel: only a public, open channel of the
  *   same space; accepting lands on it, unless it has gone private since.
- * - Making a channel private keeps whoever closed it inside it.
+ * - Making a channel private keeps whoever closed it inside it, and only the
+ *   space's administrators may open or close one.
  */
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -55,7 +56,8 @@ vi.mock("@polaris/db", () => {
                 upsert: async ({ create }: { create: { channelId: string; userId: string } }) => {
                     if (
                         !db.confirmations.some(
-                            (row) => row.channelId === create.channelId && row.userId === create.userId
+                            (row) =>
+                                row.channelId === create.channelId && row.userId === create.userId
                         )
                     ) {
                         db.confirmations.push(create);
@@ -98,6 +100,12 @@ vi.mock("@/lib/chat/access", async () => {
     return {
         ...actual,
         spaceAccess: async () => db.standing,
+        requireSpace: async () => {
+            if (db.standing !== "owner" && db.standing !== "admin") {
+                throw new actual.ChatAccessError({ key: "errors.spaceAdminOnly" });
+            }
+            return db.standing;
+        },
         requireChannel: async () => db.access
     };
 });
@@ -116,7 +124,13 @@ const SPACE = "0190a000-0000-7000-8000-00000000000a";
 const CHANNEL = "0190a000-0000-7000-8000-0000000000c1";
 
 beforeEach(() => {
-    db.channel = { id: CHANNEL, spaceId: SPACE, contentMode: "age", private: false, archived: false };
+    db.channel = {
+        id: CHANNEL,
+        spaceId: SPACE,
+        contentMode: "age",
+        private: false,
+        archived: false
+    };
     db.confirmations = [];
     db.invites = [];
     db.standing = "admin";
@@ -202,9 +216,15 @@ describe("a link that opens on a channel", () => {
                 space: { archived: false }
             }
         ];
-        expect(await invites.acceptInvite(ME, "abcdefgh")).toEqual({ spaceId: SPACE, channelId: CHANNEL });
+        expect(await invites.acceptInvite(ME, "abcdefgh")).toEqual({
+            spaceId: SPACE,
+            channelId: CHANNEL
+        });
         db.invites[0] = { ...db.invites[0], channel: { private: true } };
-        expect(await invites.acceptInvite(ME, "abcdefgh")).toEqual({ spaceId: SPACE, channelId: null });
+        expect(await invites.acceptInvite(ME, "abcdefgh")).toEqual({
+            spaceId: SPACE,
+            channelId: null
+        });
     });
 });
 
@@ -222,6 +242,29 @@ describe("saving the settings", () => {
     it("writes no membership when opening a channel up", async () => {
         const chat = await import("@/lib/chat/chat-service");
         await chat.updateChannel(ME, { channelId: CHANNEL, private: false });
+        expect(db.memberUpserts).toEqual([]);
+    });
+
+    it("leaves privacy to the space's administrators, not the channel's", async () => {
+        const chat = await import("@/lib/chat/chat-service");
+        db.standing = "member";
+        await expect(
+            chat.updateChannel(ME, { channelId: CHANNEL, private: true })
+        ).rejects.toThrow();
+        db.channel = { ...db.channel, private: true };
+        await expect(
+            chat.updateChannel(ME, { channelId: CHANNEL, private: false })
+        ).rejects.toThrow();
+        expect(db.channelUpdates).toEqual([]);
+        expect(db.memberUpserts).toEqual([]);
+    });
+
+    it("lets a channel's administrator save the rest with its privacy unchanged", async () => {
+        const chat = await import("@/lib/chat/chat-service");
+        db.standing = null;
+        db.channel = { ...db.channel, private: true };
+        await chat.updateChannel(ME, { channelId: CHANNEL, private: true, name: "lobby" });
+        expect(db.channelUpdates[0]).toEqual({ name: "lobby", private: true });
         expect(db.memberUpserts).toEqual([]);
     });
 

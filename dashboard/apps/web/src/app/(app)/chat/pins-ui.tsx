@@ -90,10 +90,7 @@ export function usePins(channelId: string | null) {
         [channelId, reload]
     );
 
-    const ids = useMemo(
-        () => new Set((pins ?? []).map((entry) => entry.message.id)),
-        [pins]
-    );
+    const ids = useMemo(() => new Set((pins ?? []).map((entry) => entry.message.id)), [pins]);
     return { pins, ids, reload, setPins, onFrame };
 }
 
@@ -130,7 +127,9 @@ export function PinnedBar({
     if (!pins || count === 0) return null;
     const shown = pins[Math.min(at, count - 1)]!;
     const label =
-        count > 1 ? t("pins.pinnedCount", { at: Math.min(at, count - 1) + 1, count }) : t("pins.pinned");
+        count > 1
+            ? t("pins.pinnedCount", { at: Math.min(at, count - 1) + 1, count })
+            : t("pins.pinned");
 
     return (
         <div className="flex shrink-0 items-stretch gap-2 border-b border-border bg-surface px-3 py-1.5">
@@ -160,7 +159,12 @@ export function PinnedBar({
             >
                 <Pin className="size-3.5 shrink-0 text-primary" />
                 <span className="flex min-w-0 flex-col">
-                    <span className="truncate text-[0.6875rem] font-medium text-primary" title={label}>{label}</span>
+                    <span
+                        className="truncate text-[0.6875rem] font-medium text-primary"
+                        title={label}
+                    >
+                        {label}
+                    </span>
                     <span className="truncate text-xs text-muted-foreground">
                         {excerptOf(shown.message, t("pins.attachment"), t("pins.deleted"))}
                     </span>
@@ -227,7 +231,11 @@ export function PinLengthDialog({
                     <DialogTitle>{t("pins.pinFor")}</DialogTitle>
                     <DialogDescription>{t("pins.pinForBody")}</DialogDescription>
                 </DialogHeader>
-                <div role="radiogroup" aria-label={t("pins.pinFor")} className="flex flex-col gap-1.5">
+                <div
+                    role="radiogroup"
+                    aria-label={t("pins.pinFor")}
+                    className="flex flex-col gap-1.5"
+                >
                     {PIN_DURATIONS.map((choice) => (
                         <label
                             key={choice}
@@ -321,7 +329,7 @@ export function PinsDialog({
                         {error}
                     </p>
                 )}
-                <div className="-mx-1 min-h-0 flex-1 overflow-y-auto px-1">
+                <div className="-mx-1 min-h-0 flex-1 overflow-y-auto overscroll-contain px-1">
                     {pins === null ? (
                         <div className="flex flex-col gap-2" aria-hidden="true">
                             {[0, 1].map((row) => (
@@ -345,7 +353,10 @@ export function PinsDialog({
                                         <span className="min-w-0 truncate font-medium text-foreground">
                                             <PersonName
                                                 id={entry.message.authorId}
-                                                name={entry.message.authorName ?? "Somebody who has left"}
+                                                name={
+                                                    entry.message.authorName ??
+                                                    "Somebody who has left"
+                                                }
                                             />
                                         </span>
                                         <MessageTime
@@ -378,7 +389,11 @@ export function PinsDialog({
                                         </span>
                                     </div>
                                     <p className="mt-1 line-clamp-3 break-words text-sm">
-                                        {excerptOf(entry.message, t("pins.attachment"), t("pins.deleted"))}
+                                        {excerptOf(
+                                            entry.message,
+                                            t("pins.attachment"),
+                                            t("pins.deleted")
+                                        )}
                                     </p>
                                     <p className="mt-1 truncate text-[0.6875rem] text-foreground-subtle">
                                         {[

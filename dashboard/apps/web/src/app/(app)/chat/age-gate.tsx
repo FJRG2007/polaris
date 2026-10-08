@@ -44,7 +44,7 @@ export function AgeGate({
     };
 
     return (
-        <div className="flex min-h-0 flex-1 items-center justify-center overflow-y-auto p-6">
+        <div className="flex min-h-0 flex-1 items-center justify-center overflow-y-auto overscroll-contain p-6">
             <div className="flex w-full max-w-sm flex-col items-center gap-3 text-center">
                 <span className="flex size-12 items-center justify-center rounded-full bg-warning-soft text-warning-ink">
                     <ShieldAlert className="size-6 shrink-0" />

@@ -99,6 +99,10 @@ export interface ChatChannelView {
      *  whether the screen offers them anything only a moderator may do. Always
      *  false in a direct message, where everybody in one is equal in it. */
     readonly mayAdminister: boolean;
+    /** Whether this reader may open or close the channel - the space's people,
+     *  not the channel's, since it decides who in the space reaches it. Only
+     *  decides what the screen offers; saving asks the same question again. */
+    readonly mayChangePrivacy: boolean;
     /** Whether this reader may take somebody else's message out of it. The same
      *  as administering it, plus the person whose group it is - a group has no
      *  administrators, so without this nobody could do anything about what is
@@ -697,7 +701,8 @@ export async function listChannels(
                 mutedUntil: true,
                 notifyLevel: true,
                 pinnedAt: true,
-                role: true
+                role: true,
+                timeoutUntil: true
             }
         }),
         administeredSpaceIds(actor)
@@ -723,6 +728,7 @@ export async function listChannels(
             topic: true,
             private: true,
             archived: true,
+            space: { select: { archived: true } },
             lastMessageAt: true,
             ownerId: true,
             createdById: true,
@@ -815,6 +821,16 @@ export async function listChannels(
             channel.spaceId &&
                 (administered.has(channel.spaceId) || mine.get(channel.id)?.role === "admin")
         );
+        const mayModerate =
+            mayAdminister || (channel.kind === "group" && groupOwnerId(channel) === actor.id);
+        // The same rule `channelAccess` posts by: a live room, and no timeout in
+        // force unless this reader runs it. Pinning asks it first.
+        const timedOut =
+            !mayAdminister &&
+            membership?.timeoutUntil !== null &&
+            membership?.timeoutUntil !== undefined &&
+            membership.timeoutUntil.getTime() > Date.now();
+        const mayPost = !channel.archived && !channel.space?.archived && !timedOut;
         return {
             id: channel.id,
             spaceId: channel.spaceId,
@@ -835,26 +851,16 @@ export async function listChannels(
             notifyLevel: channelNotifyOf(membership?.notifyLevel),
             pinned: membership?.pinnedAt !== null && membership?.pinnedAt !== undefined,
             mayAdminister,
+            mayChangePrivacy: Boolean(channel.spaceId && administered.has(channel.spaceId)),
             // The one standing a group confers: its owner may take a message
             // out of it. Not `mayAdminister`, which would also hand them the
             // channel controls a group does not have.
-            mayModerate:
-                mayAdminister || (channel.kind === "group" && groupOwnerId(channel) === actor.id),
+            mayModerate,
             // Whether the screen offers this reader the picture control. The
             // same predicate the route enforces with, asked here so the rule
             // has one implementation rather than two that drift.
             mayPicture: picturesAllowed({ ...channel, mayAdminister }, actor.id),
-            mayPin:
-                !channel.archived &&
-                pinsAllowed(
-                    {
-                        ...channel,
-                        mayModerate:
-                            mayAdminister ||
-                            (channel.kind === "group" && groupOwnerId(channel) === actor.id)
-                    },
-                    actor.id
-                ),
+            mayPin: mayPost && pinsAllowed({ ...channel, mayModerate }, actor.id),
             ownerId: groupOwnerId(channel),
             membersMayEdit: channel.membersMayEdit,
             membersMayInvite: channel.membersMayInvite,
@@ -1215,6 +1221,19 @@ export async function updateChannel(
     if (input.userLimit !== undefined && access.kind !== "voice") {
         throw new ChatAccessError({ key: "errors.limitVoiceOnly" });
     }
+    // Opening a private room shows its history to the whole space, and closing
+    // one decides who in the space may reach it - both the space's call, the
+    // same standing creating a private channel asks for. Running the room alone
+    // is not enough.
+    const current =
+        input.private !== undefined
+            ? await prisma.chatChannel.findUnique({
+                  where: { id: input.channelId },
+                  select: { private: true }
+              })
+            : null;
+    const privacyChanges = current !== null && current.private !== input.private;
+    if (privacyChanges) await requireSpace(actor, access.spaceId, "admin");
 
     await prisma.$transaction(async (tx) => {
         await tx.chatChannel.update({
@@ -1234,7 +1253,7 @@ export async function updateChannel(
         // closes it keeps a row of their own - the same as creating one private.
         // Without it, an administrator of the space who had never posted here
         // would lock themselves out of the room they just closed.
-        if (input.private) {
+        if (input.private && privacyChanges) {
             await tx.chatChannelMember.upsert({
                 where: { channelId_userId: { channelId: input.channelId, userId: actor.id } },
                 update: { role: "admin" },

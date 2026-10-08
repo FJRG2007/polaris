@@ -29,6 +29,7 @@
 import { prisma } from "@polaris/db";
 import * as core from "@polaris/core";
 import { blockedBy } from "@/lib/blocks";
+import { ageClearedWhere } from "./age-gate";
 import { isVoiceFileName } from "./voice-name";
 import { plainExcerpt } from "@/components/rich-text/excerpt";
 import { reachableChannelIds, type ChatActor } from "./access";
@@ -318,7 +319,8 @@ function recentIn(userId: string, channelIds: readonly string[], since: Date, ta
             channelId: { in: [...channelIds] },
             deletedAt: null,
             createdAt: { gte: since },
-            authorId: { not: userId }
+            authorId: { not: userId },
+            ...ageClearedWhere(userId)
         },
         orderBy: { createdAt: "desc" },
         take,

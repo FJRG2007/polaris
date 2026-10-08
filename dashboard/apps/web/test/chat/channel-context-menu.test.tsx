@@ -57,6 +57,7 @@ const channel = (id: string, name: string, unread: number) => ({
     pinned: false,
     mutedUntil: null,
     mayAdminister: access !== "member",
+    mayChangePrivacy: access !== "member",
     mayModerate: access !== "member",
     mayPicture: false,
     mayPin: false,

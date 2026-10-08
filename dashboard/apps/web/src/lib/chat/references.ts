@@ -28,6 +28,7 @@
 
 import { prisma } from "@polaris/db";
 import { plainExcerpt } from "@/components/rich-text/excerpt";
+import { ageClearedWhere } from "./age-gate";
 import { reachableChannelIds, type ChatActor } from "./access";
 import { extractReferences } from "@/components/rich-text/markdown";
 import { appBaseUrl } from "@/lib/domain-service";
@@ -192,7 +193,7 @@ export async function resolveChatReferences(
     // proved reachable too and may not be named anywhere else in the page.
     const messages = messageIds.length
         ? await prisma.chatMessage.findMany({
-              where: { id: { in: messageIds } },
+              where: { id: { in: messageIds }, ...ageClearedWhere(actor.id) },
               select: {
                   id: true,
                   body: true,

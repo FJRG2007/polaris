@@ -11,14 +11,10 @@ ALTER TABLE "ChatMessage" ADD COLUMN IF NOT EXISTS "authorLabel" TEXT;
 ALTER TABLE "ChatSpaceInvite" ADD COLUMN IF NOT EXISTS "channelId" UUID;
 CREATE INDEX IF NOT EXISTS "ChatSpaceInvite_channelId_createdAt_idx" ON "ChatSpaceInvite"("channelId", "createdAt");
 
-DO $$
-BEGIN
-    ALTER TABLE "ChatSpaceInvite"
-        ADD CONSTRAINT "ChatSpaceInvite_channelId_fkey"
-        FOREIGN KEY ("channelId") REFERENCES "ChatChannel"("id") ON DELETE SET NULL ON UPDATE CASCADE;
-EXCEPTION
-    WHEN duplicate_object THEN NULL;
-END $$;
+ALTER TABLE "ChatSpaceInvite" DROP CONSTRAINT IF EXISTS "ChatSpaceInvite_channelId_fkey";
+ALTER TABLE "ChatSpaceInvite"
+    ADD CONSTRAINT "ChatSpaceInvite_channelId_fkey"
+    FOREIGN KEY ("channelId") REFERENCES "ChatChannel"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 CREATE TABLE IF NOT EXISTS "ChatAgeConfirmation" (
     "id" UUID NOT NULL,
@@ -30,14 +26,10 @@ CREATE TABLE IF NOT EXISTS "ChatAgeConfirmation" (
 );
 CREATE UNIQUE INDEX IF NOT EXISTS "ChatAgeConfirmation_channelId_userId_key" ON "ChatAgeConfirmation"("channelId", "userId");
 
-DO $$
-BEGIN
-    ALTER TABLE "ChatAgeConfirmation"
-        ADD CONSTRAINT "ChatAgeConfirmation_channelId_fkey"
-        FOREIGN KEY ("channelId") REFERENCES "ChatChannel"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-EXCEPTION
-    WHEN duplicate_object THEN NULL;
-END $$;
+ALTER TABLE "ChatAgeConfirmation" DROP CONSTRAINT IF EXISTS "ChatAgeConfirmation_channelId_fkey";
+ALTER TABLE "ChatAgeConfirmation"
+    ADD CONSTRAINT "ChatAgeConfirmation_channelId_fkey"
+    FOREIGN KEY ("channelId") REFERENCES "ChatChannel"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 CREATE TABLE IF NOT EXISTS "ChatWebhook" (
     "id" UUID NOT NULL,
@@ -52,11 +44,7 @@ CREATE TABLE IF NOT EXISTS "ChatWebhook" (
 );
 CREATE INDEX IF NOT EXISTS "ChatWebhook_channelId_createdAt_idx" ON "ChatWebhook"("channelId", "createdAt");
 
-DO $$
-BEGIN
-    ALTER TABLE "ChatWebhook"
-        ADD CONSTRAINT "ChatWebhook_channelId_fkey"
-        FOREIGN KEY ("channelId") REFERENCES "ChatChannel"("id") ON DELETE CASCADE ON UPDATE CASCADE;
-EXCEPTION
-    WHEN duplicate_object THEN NULL;
-END $$;
+ALTER TABLE "ChatWebhook" DROP CONSTRAINT IF EXISTS "ChatWebhook_channelId_fkey";
+ALTER TABLE "ChatWebhook"
+    ADD CONSTRAINT "ChatWebhook_channelId_fkey"
+    FOREIGN KEY ("channelId") REFERENCES "ChatChannel"("id") ON DELETE CASCADE ON UPDATE CASCADE;

@@ -177,7 +177,7 @@ export function ChannelSettings({ channelId }: { channelId: string }) {
                     topic: draft.topic,
                     slowmode: draft.slowmode,
                     contentMode: draft.contentMode,
-                    private: draft.private,
+                    ...(draft.private !== channel.private ? { private: draft.private } : {}),
                     ...(voice && userLimit !== null ? { userLimit } : {})
                 }),
             setError
@@ -209,7 +209,8 @@ export function ChannelSettings({ channelId }: { channelId: string }) {
     useEffect(() => {
         const onKey = (event: KeyboardEvent) => {
             if (event.key !== "Escape" || event.defaultPrevented) return;
-            if (document.querySelector("[role='dialog'], [role='alertdialog'], [role='menu']")) return;
+            if (document.querySelector("[role='dialog'], [role='alertdialog'], [role='menu']"))
+                return;
             leave();
         };
         window.addEventListener("keydown", onKey);
@@ -242,7 +243,7 @@ export function ChannelSettings({ channelId }: { channelId: string }) {
         <nav
             aria-label={t("channelSettings.sections.label")}
             className={cn(
-                "min-h-0 w-full flex-col gap-0.5 overflow-y-auto border-border bg-card/40 p-3 md:flex md:w-56 md:shrink-0 md:border-r",
+                "min-h-0 w-full flex-col gap-0.5 overflow-y-auto overscroll-contain border-border bg-card/40 p-3 md:flex md:w-56 md:shrink-0 md:border-r",
                 section ? "hidden" : "flex"
             )}
         >
@@ -259,7 +260,9 @@ export function ChannelSettings({ channelId }: { channelId: string }) {
                         )}
                     </p>
                     <p className="text-[0.6875rem] uppercase tracking-wide text-foreground-subtle">
-                        {voice ? t("channelSettings.voiceChannel") : t("channelSettings.textChannel")}
+                        {voice
+                            ? t("channelSettings.voiceChannel")
+                            : t("channelSettings.textChannel")}
                     </p>
                 </div>
                 {/* On a phone the list is the first screen, so it carries the way
@@ -305,7 +308,9 @@ export function ChannelSettings({ channelId }: { channelId: string }) {
                 className="flex items-center gap-2 rounded-md px-2 py-2 text-left text-sm text-danger transition-colors hover:bg-danger-soft md:py-1.5"
             >
                 <Trash2 className="size-4 shrink-0" />
-                <span className="min-w-0 flex-1 truncate">{t("channelSettings.deleteChannel")}</span>
+                <span className="min-w-0 flex-1 truncate">
+                    {t("channelSettings.deleteChannel")}
+                </span>
             </button>
         </nav>
     );
@@ -342,11 +347,13 @@ export function ChannelSettings({ channelId }: { channelId: string }) {
                         <span className="flex size-8 items-center justify-center rounded-full border border-border">
                             <X className="size-4 shrink-0" />
                         </span>
-                        <span className="text-[0.625rem] font-semibold uppercase">{t("channelSettings.esc")}</span>
+                        <span className="text-[0.625rem] font-semibold uppercase">
+                            {t("channelSettings.esc")}
+                        </span>
                     </button>
                 </header>
 
-                <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-28 pt-4 md:px-8">
+                <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 pb-28 pt-4 md:px-8">
                     <div className="mx-auto flex w-full max-w-2xl flex-col gap-6">
                         {!channel || !shown ? (
                             <div className="flex flex-col gap-3" aria-hidden="true">
@@ -682,11 +689,18 @@ function Permissions({
                             ? t("channelSettings.privateHint")
                             : t("channelSettings.publicNote")}
                     </p>
+                    {!channel.mayChangePrivacy && (
+                        <p id="privacy-locked" className="mt-1 text-xs text-muted-foreground">
+                            {t("channelSettings.privacySpaceAdminOnly")}
+                        </p>
+                    )}
                 </div>
                 <Switch
                     checked={draft.private}
                     onChange={(checked) => onEdit({ private: checked })}
+                    disabled={!channel.mayChangePrivacy}
                     aria-label={t("channelSettings.private")}
+                    aria-describedby={channel.mayChangePrivacy ? undefined : "privacy-locked"}
                 />
             </div>
 
@@ -700,7 +714,11 @@ function Permissions({
                         </h2>
                         {channel.private && (
                             <>
-                                <Button size="sm" variant="secondary" onClick={() => setSharing(true)}>
+                                <Button
+                                    size="sm"
+                                    variant="secondary"
+                                    onClick={() => setSharing(true)}
+                                >
                                     {t("channelSettings.teamsAndRoles")}
                                 </Button>
                                 <Button size="sm" onClick={() => setAdding(true)}>
@@ -719,13 +737,24 @@ function Permissions({
                             <Skeleton className="h-9 w-full" />
                         </div>
                     ) : members.length === 0 ? (
-                        <p className="text-xs text-muted-foreground">{t("channelSettings.nobodyYet")}</p>
+                        <p className="text-xs text-muted-foreground">
+                            {t("channelSettings.nobodyYet")}
+                        </p>
                     ) : (
                         <ul className="flex flex-col divide-y divide-border rounded-lg border border-border">
                             {members.map((member) => (
-                                <li key={member.userId} className="flex items-center gap-2 px-3 py-2">
-                                    <Avatar person={{ id: member.userId, name: member.name }} size={24} />
-                                    <span className="min-w-0 flex-1 truncate text-sm" title={member.name}>
+                                <li
+                                    key={member.userId}
+                                    className="flex items-center gap-2 px-3 py-2"
+                                >
+                                    <Avatar
+                                        person={{ id: member.userId, name: member.name }}
+                                        size={24}
+                                    />
+                                    <span
+                                        className="min-w-0 flex-1 truncate text-sm"
+                                        title={member.name}
+                                    >
                                         {member.name}
                                         {member.userId === viewerId && (
                                             <span className="text-muted-foreground">
