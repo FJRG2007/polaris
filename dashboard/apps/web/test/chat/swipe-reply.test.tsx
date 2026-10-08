@@ -263,8 +263,9 @@ describe("again and again", () => {
 
 // ---- The hook, on a row -----------------------------------------------------
 
-function Row({ onReply }: { onReply?: () => void }) {
+function Row({ onReply, folded }: { onReply?: () => void; folded?: boolean }) {
     const swipe = useSwipeReply(onReply);
+    if (folded) return <p data-testid="folded">a blocked message</p>;
     return (
         <div>
             <span ref={swipe.cue} data-testid="cue" />
@@ -400,6 +401,15 @@ describe("the row", () => {
         row.dispatchEvent(new MouseEvent("mouseup", { bubbles: true, clientX: 140, clientY: 100 }));
         expect(onReply).not.toHaveBeenCalled();
         expect(row.style.transform).toBe("");
+    });
+
+    it("works on a row that first rendered folded away and was then shown", () => {
+        const onReply = vi.fn();
+        const { getByTestId, rerender } = render(<Row onReply={onReply} folded />);
+        expect(getByTestId("folded")).toBeTruthy();
+        act(() => rerender(<Row onReply={onReply} />));
+        drag(getByTestId("row"), SHORT);
+        expect(onReply).toHaveBeenCalledTimes(1);
     });
 
     it("is not there at all where replying is not offered", () => {

@@ -122,13 +122,8 @@ function SteamCard({
                 </span>
             )}
         </span>
-    ) : steam.comingSoon ? (
-        <span>
-            {steam.releaseDate
-                ? t("linkCard.comingOn", { date: steam.releaseDate })
-                : t("linkCard.comingSoon")}
-        </span>
     ) : null;
+    const release = steam.comingSoon ? steam.releaseDate || t("linkCard.comingSoon") : null;
     const recommended =
         typeof steam.recommendations === "number" && steam.recommendations > 0
             ? format.number(steam.recommendations, { maximumFractionDigits: 0 })
@@ -160,12 +155,20 @@ function SteamCard({
                     </span>
                 )}
             </span>
-            {(price || recommended) && (
+            {(price || release || recommended) && (
                 <dl className="grid grid-cols-2 gap-3 text-xs">
                     {price && (
                         <div className="min-w-0">
                             <dt className="font-semibold text-foreground">{t("linkCard.price")}</dt>
                             <dd className="mt-0.5 text-foreground">{price}</dd>
+                        </div>
+                    )}
+                    {release && (
+                        <div className="min-w-0">
+                            <dt className="truncate font-semibold text-foreground">
+                                {t("linkCard.release")}
+                            </dt>
+                            <dd className="mt-0.5 break-words text-foreground">{release}</dd>
                         </div>
                     )}
                     {recommended && (

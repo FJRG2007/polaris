@@ -42,7 +42,7 @@
  * gesture that stutters.
  */
 
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 /** How far the finger has to travel before the gesture decides which way it is
  *  going. Under this it is a tap or the start of a long press. */
@@ -250,18 +250,23 @@ function points(list: TouchList): TouchPoint[] {
  * With no `onReply` the row is left exactly as it was.
  */
 export function useSwipeReply(onReply: (() => void) | undefined) {
-    const line = useRef<HTMLDivElement | null>(null);
+    const moving = useRef<HTMLDivElement | null>(null);
+    const [row, setRow] = useState<HTMLDivElement | null>(null);
+    const line = useCallback((node: HTMLDivElement | null) => {
+        moving.current = node;
+        setRow(node);
+    }, []);
     const cue = useRef<HTMLSpanElement | null>(null);
     const latest = useRef(onReply);
     latest.current = onReply;
     const enabled = Boolean(onReply);
 
     const draw = useCallback((pull: number, armed: boolean, settle: boolean) => {
-        const moving = line.current;
+        const content = moving.current;
         const arrow = cue.current;
-        if (moving) {
-            moving.style.transition = settle ? `transform ${SETTLE_MS}ms ${SPRING}` : "none";
-            moving.style.transform = pull === 0 ? "" : `translateX(${pull}px)`;
+        if (content) {
+            content.style.transition = settle ? `transform ${SETTLE_MS}ms ${SPRING}` : "none";
+            content.style.transform = pull === 0 ? "" : `translateX(${pull}px)`;
         }
         if (arrow) {
             const shown = Math.min(1, pull / REPLY_AT);
@@ -280,7 +285,6 @@ export function useSwipeReply(onReply: (() => void) | undefined) {
     }
 
     useEffect(() => {
-        const row = line.current;
         const swipe = machine.current;
         if (!enabled || !row || !swipe) return;
 
@@ -354,7 +358,7 @@ export function useSwipeReply(onReply: (() => void) | undefined) {
             // the finger) springs back rather than staying pulled out.
             swipe.cancel();
         };
-    }, [enabled]);
+    }, [enabled, row]);
 
     return { line, cue, enabled };
 }

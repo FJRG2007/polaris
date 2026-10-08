@@ -1458,7 +1458,7 @@
         "play": "Reproducir en {provider}, aquí",
         "playHint": "Se reproduce aquí. {provider} te ve en cuanto lo pulsas.",
         "comingSoon": "Próximamente",
-        "comingOn": "Sale {date}",
+        "release": "Lanzamiento",
         "wasPrice": "Antes {price}",
         "price": "Precio",
         "recommendations": "Recomendaciones",

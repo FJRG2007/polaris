@@ -426,14 +426,27 @@ describe("a Steam game", () => {
         expect(terms).toEqual(["Price"]);
     });
 
-    it("says when a game that is not out yet is coming", () => {
-        render(<LinkCard preview={game({ comingSoon: true, releaseDate: "Q1 2027" })} />, {
-            wrapper: MessagesWrapper
-        });
-        expect(screen.getByText("Coming Q1 2027")).toBeTruthy();
-        render(<LinkCard preview={game({ comingSoon: true, releaseDate: "" })} />, {
-            wrapper: MessagesWrapper
-        });
+    it("says when a game that is not out yet is coming, under its own heading", () => {
+        const dated = render(
+            <LinkCard preview={game({ comingSoon: true, releaseDate: "Q1 2027" })} />,
+            { wrapper: MessagesWrapper }
+        );
+        const terms = (root: Element) =>
+            Array.from(root.querySelectorAll("dt")).map((node) => node.textContent);
+        expect(terms(dated.container)).toEqual(["Release date"]);
+        expect(screen.getByText("Q1 2027")).toBeTruthy();
+        dated.unmount();
+        const undated = render(
+            <LinkCard
+                preview={game({
+                    comingSoon: true,
+                    releaseDate: "",
+                    price: { final: "59,99€", initial: "", discount: 0 }
+                })}
+            />,
+            { wrapper: MessagesWrapper }
+        );
+        expect(terms(undated.container)).toEqual(["Price", "Release date"]);
         expect(screen.getByText("Coming soon")).toBeTruthy();
     });
 });
