@@ -20,6 +20,8 @@ import { requireUser } from "@/lib/session";
 import { resolveDisplayPreferences } from "@polaris/core";
 import { SpoilersCard } from "@/app/(app)/chat/spoilers-card";
 import { DeviceCacheCard } from "@/components/device-cache-card";
+import { SeasonalCard } from "@/components/seasonal/seasonal-card";
+import { getSeasonalChoice, seasonsAllowed } from "@/lib/seasonal-service";
 import { AccessibilityForm } from "@/components/accessibility-form";
 import { Button, Card, CardBody, CardHeader, CardTitle } from "@polaris/ui";
 import { LanguageCard } from "./language-card";
@@ -37,12 +39,14 @@ export const dynamic = "force-dynamic";
 
 export default async function PreferencesPage() {
     const session = await requireUser();
-    const [platform, mine, mayChooseTheme, locale, t] = await Promise.all([
+    const [platform, mine, mayChooseTheme, locale, t, seasonsOn, seasonal] = await Promise.all([
         getPlatformDisplayPreferences(),
         getUserDisplayPreferences(session.id),
         usersMayChooseTheme(),
         getLocale(),
-        getTranslations("account")
+        getTranslations("account"),
+        seasonsAllowed(),
+        getSeasonalChoice(session.id)
     ]);
 
     const effective = resolveDisplayPreferences(platform, mine, locale);
@@ -74,6 +78,7 @@ export default async function PreferencesPage() {
                     standard={fallback.textSize}
                     save={saveTextSizeAction}
                 />
+                <SeasonalCard allowed={seasonsOn} initial={seasonal} />
                 <SpoilersCard />
                 <DeviceCacheCard />
                 {/* The install offer used to be on this page, because this is where the

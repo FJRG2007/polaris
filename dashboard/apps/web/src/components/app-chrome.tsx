@@ -80,6 +80,9 @@ import { SoundVolumeSeed } from "@/components/sound-volume-seed";
 import { getSoundVolume } from "@/lib/notifications/sound-volume-service";
 import { DEFAULT_SOUND_VOLUME } from "@/lib/notifications/sound-volume";
 import { buildStamp } from "@/lib/build-stamp";
+import { SEASONAL_DEFAULTS } from "@polaris/core";
+import { getSeasonalChoice, seasonsAllowed } from "@/lib/seasonal-service";
+import { SeasonalBadge, SeasonalFrame } from "@/components/seasonal/seasonal-frame";
 import { NewBuildBanner } from "@/components/new-build-banner";
 import { SnapshotBuild } from "@/components/snapshot-build";
 import { NotificationsProvider } from "@/components/notifications/notifications-provider";
@@ -165,7 +168,9 @@ export async function AppChrome({ user, children }: { user: SessionUser; childre
         shortcuts,
         chatUnread,
         mailUnread,
-        adminWaiting
+        adminWaiting,
+        seasonsOn,
+        seasonal
     ] = await Promise.all([
         // The open shelf's, as the bell shows them - see `lib/shelf`.
         openShelfFor(user.id).then((shelf) => listNotifications(user.id, shelf)),
@@ -190,7 +195,10 @@ export async function AppChrome({ user, children }: { user: SessionUser; childre
         getShortcutOverrides(user.id).catch(() => NO_SHORTCUT_OVERRIDES),
         chatWaiting,
         mailWaiting,
-        adminCount
+        adminCount,
+        // A decoration is never worth a failed page: off, rather than an error.
+        seasonsAllowed().catch(() => false),
+        getSeasonalChoice(user.id).catch(() => SEASONAL_DEFAULTS)
     ]);
     const build = buildStamp();
     // What the apps this person reaches draw beside the bell - Calendar's
@@ -320,6 +328,7 @@ export async function AppChrome({ user, children }: { user: SessionUser; childre
                                     sends a recording and then goes to read their
                                     mail has not cancelled anything. */}
                                                                 <TransfersView />
+                                                                <SeasonalFrame allowed={seasonsOn} theme={seasonal.theme} sounds={seasonal.sounds}>
                                                                 <AppShell
                                                                     mark={
                                                                         <Link
@@ -329,7 +338,10 @@ export async function AppChrome({ user, children }: { user: SessionUser; childre
                                                                             )}
                                                                             className="shrink-0 rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
                                                                         >
-                                                                            <PolarisMark nameClassName="hidden sm:inline" />
+                                                                            <span className="flex items-center gap-1.5">
+                                                                                <PolarisMark nameClassName="hidden sm:inline" />
+                                                                                <SeasonalBadge />
+                                                                            </span>
                                                                         </Link>
                                                                     }
                                                                     switcher={
@@ -435,6 +447,7 @@ export async function AppChrome({ user, children }: { user: SessionUser; childre
                                                                         />
                                                                     ) : null}
                                                                 </AppShell>
+                                                                </SeasonalFrame>
                                                             </CallHolder>
                                                         </ProfileStyleProvider>
                                                     </PresenceProvider>

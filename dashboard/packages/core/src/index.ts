@@ -49,6 +49,7 @@ export * from "./env-values.js";
 export * from "./cron.js";
 export * from "./clock-commands.js";
 export * from "./scaling.js";
+export * from "./seasons.js";
 export * from "./sleep.js";
 export * from "./service-templates.js";
 export * from "./mailbox-folder-look.js";

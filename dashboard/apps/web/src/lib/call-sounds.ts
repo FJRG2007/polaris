@@ -35,10 +35,12 @@
  * exists for.
  */
 
+import type { Season } from "@polaris/core";
 import { soundGain } from "@/lib/notification-sound";
+import { soundSeason } from "@/lib/sound-season";
 
 /** One note: where it starts, where it ends, and how long it takes. */
-interface Note {
+export interface Note {
     /** Hertz. */
     readonly from: number;
     readonly to?: number;
@@ -225,6 +227,78 @@ export const SOUNDS: Record<CallSound, readonly Note[]> = {
 };
 
 /**
+ * The seasonal sound packs: the ring and the message blip, recast for each time
+ * of year, played only to an account that asked for them (see `seasons` in
+ * @polaris/core - Discord's own packs went opt-in after it turned them on for
+ * everybody).
+ *
+ * Only the two sounds that carry the season. Join, leave, share and hang-up are
+ * signals somebody tells apart by their shape, and a season that reshaped them
+ * would make a call harder to follow for a fortnight.
+ *
+ * Each ring keeps the default's skeleton - three overlapping bells, a breath,
+ * the same three again, at the same gain and on the same timings - so what
+ * `call-ring` proves about loudness and fit holds for every pack, and
+ * `seasonal-sounds` checks that it does. What changes is the notes and the
+ * wave: that is what makes a season recognisable in the first half-second.
+ */
+function ringOf(notes: readonly [number, number, number], extra: Partial<Note> = {}): readonly Note[] {
+    const [a, b, c] = notes;
+    return [
+        { from: a, at: 0, seconds: 1, gain: RING_GAIN, bell: true, ...extra },
+        { from: b, at: 0.16, seconds: 1, gain: RING_GAIN, bell: true, ...extra },
+        { from: c, at: 0.32, seconds: 1.2, gain: RING_GAIN, bell: true, ...extra },
+        { from: a, at: 1.1, seconds: 1, gain: RING_GAIN, bell: true, ...extra },
+        { from: b, at: 1.26, seconds: 1, gain: RING_GAIN, bell: true, ...extra },
+        { from: c, at: 1.42, seconds: 1.3, gain: RING_GAIN, bell: true, ...extra }
+    ];
+}
+
+export const SEASONAL_SOUNDS: Record<Season, Partial<Record<CallSound, readonly Note[]>>> = {
+    /** A minor triad sliding down a semitone on a triangle: a theremin, roughly. */
+    halloween: {
+        ring: ringOf([440, 523.25, 659.25], { wave: "triangle" }).map((note) => ({
+            ...note,
+            to: note.from * 0.944
+        })),
+        message: [
+            { from: 659.25, to: 622.25, at: 0, seconds: 0.07, gain: 0.05, wave: "triangle" },
+            { from: 466.16, to: 440, at: 0.06, seconds: 0.1, gain: 0.05, wave: "triangle" }
+        ]
+    },
+    /** Sleigh bells: a major arpeggio high up, struck quickly. */
+    winter: {
+        ring: ringOf([783.99, 987.77, 1174.66]),
+        message: [
+            { from: 1318.51, at: 0, seconds: 0.06, gain: 0.05, bell: true },
+            { from: 1567.98, at: 0.05, seconds: 0.09, gain: 0.05, bell: true }
+        ]
+    },
+    /** A fanfare climbing to the octave, and a three-note sparkle. */
+    newYear: {
+        ring: ringOf([523.25, 659.25, 1046.5]),
+        message: [
+            { from: 1046.5, at: 0, seconds: 0.04, gain: 0.05 },
+            { from: 1318.51, at: 0.035, seconds: 0.04, gain: 0.05 },
+            { from: 1567.98, at: 0.07, seconds: 0.08, gain: 0.05 }
+        ]
+    },
+    /** Pentatonic, the way a festival tune is: D, E and A. */
+    lunarNewYear: {
+        ring: ringOf([587.33, 659.25, 880]),
+        message: [
+            { from: 587.33, at: 0, seconds: 0.06, gain: 0.05, bell: true },
+            { from: 880, at: 0.05, seconds: 0.09, gain: 0.05, bell: true }
+        ]
+    }
+};
+
+/** What a sound is made of right now: the season's version where it has one. */
+export function notesFor(name: CallSound, season: Season | null = soundSeason()): readonly Note[] {
+    return (season ? SEASONAL_SOUNDS[season][name] : undefined) ?? SOUNDS[name];
+}
+
+/**
  * How often each ring repeats, and the longest either goes on for.
  *
  * One interval per sound rather than one for both, because they are two
@@ -291,9 +365,15 @@ function audio(): AudioContext | null {
 /** One pass of a sound, scheduled to begin at `start` on the audio clock, and
  *  the oscillators it will use - which is what lets a ring scheduled minutes
  *  ahead be silenced the moment somebody answers. */
-function schedule(ctx: AudioContext, name: CallSound, start: number, level: number): OscillatorNode[] {
+function schedule(
+    ctx: AudioContext,
+    name: CallSound,
+    start: number,
+    level: number,
+    season: Season | null = soundSeason()
+): OscillatorNode[] {
     const made: OscillatorNode[] = [];
-    for (const note of SOUNDS[name]) {
+    for (const note of notesFor(name, season)) {
         // One partial, or three of them. `sound` is the whole note: the tone
         // itself is the first call and a bell adds its octave and its twelfth
         // over the top, each quieter and all fading together.
@@ -305,15 +385,17 @@ function schedule(ctx: AudioContext, name: CallSound, start: number, level: numb
     return made;
 }
 
-/** Play one sound, once. Does nothing at all where audio is not available. */
-export function playCallSound(name: CallSound): void {
+/** Play one sound, once - the season's version where one is in force, or the
+ *  named season's for a preview. Does nothing at all where audio is not
+ *  available. */
+export function playCallSound(name: CallSound, season: Season | null = soundSeason()): void {
     // The account's volume, applied to every tone here. Zero is silence rather
     // than a scheduled tone: a gain ramp to zero throws.
     const level = soundGain();
     if (level <= 0) return;
     const ctx = audio();
     if (!ctx) return;
-    schedule(ctx, name, ctx.currentTime, level);
+    schedule(ctx, name, ctx.currentTime, level, season);
 }
 
 /**

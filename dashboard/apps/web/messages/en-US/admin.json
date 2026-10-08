@@ -3064,6 +3064,14 @@
             "wrongPassphrase": "The passphrase is wrong, or the file has been changed",
             "confirmReplace": "Confirm that everything here is replaced",
             "uploadExpired": "That upload has expired. Upload the file again."
+        },
+        "seasonal": {
+            "title": "Seasonal themes",
+            "body": "Decorations and optional sounds around Halloween, the winter holidays, New Year and the Lunar New Year. Each person can still turn them off for themselves.",
+            "label": "Seasonal themes for everyone",
+            "on": "On. Each person chooses in their Preferences.",
+            "off": "Off for everyone, whatever they chose.",
+            "notSaved": "The change could not be saved. Try again in a moment."
         }
     }
 }
