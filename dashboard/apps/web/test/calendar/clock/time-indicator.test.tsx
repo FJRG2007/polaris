@@ -12,7 +12,10 @@ import { MessagesWrapper } from "../../setup/i18n";
 import { act, cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const state = vi.hoisted(() => ({ timers: [] as unknown[], watchStartedAt: null as string | null }));
+const state = vi.hoisted(() => ({
+    timers: [] as unknown[],
+    watchStartedAt: null as string | null
+}));
 
 vi.mock("next/link", () => ({
     default: ({ children, ...props }: { children: React.ReactNode }) => <a {...props}>{children}</a>
