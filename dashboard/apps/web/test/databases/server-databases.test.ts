@@ -35,6 +35,9 @@ vi.mock("pg", async () => {
         }
     }
     class Client {
+        on() {
+            return this;
+        }
         private readonly database: string | undefined;
         constructor(config: { database?: string }) {
             this.database = config.database;

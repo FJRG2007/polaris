@@ -60,6 +60,10 @@ class FakeDriver implements data.DataDriver {
     async close() {
         this.closed += 1;
     }
+    /** What a Redis driver does to switch database: close its own client first. */
+    async reopen() {
+        await this.close();
+    }
 }
 
 let clock = 0;
@@ -265,6 +269,13 @@ describe("what is never shared or kept", () => {
         await sessions.use(address(), read);
         expect(drivers).toHaveLength(1);
         expect(drivers[0]?.closed).toBe(0);
+        sessions.closeAll();
+    });
+
+    it("lets a lent driver close its own client from inside a call", async () => {
+        const sessions = cache();
+        await sessions.use(address(), (driver) => (driver as FakeDriver).reopen());
+        expect(drivers[0]?.closed).toBe(1);
         sessions.closeAll();
     });
 });

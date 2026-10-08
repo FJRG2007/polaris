@@ -152,6 +152,7 @@ export function Workbench(props: WorkbenchProps) {
         id: connectionId,
         databases: null
     });
+    if (picked.id !== connectionId) setPicked({ id: connectionId, database: null });
     const database = picked.id === connectionId ? picked.database : null;
     const databases = server.id === connectionId ? server.databases : null;
 

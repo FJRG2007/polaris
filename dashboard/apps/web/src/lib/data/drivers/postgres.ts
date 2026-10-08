@@ -105,6 +105,10 @@ export class PostgresDriver implements data.DataDriver {
             statement_timeout: data.STATEMENT_TIMEOUT_MS,
             application_name: "polaris-data-browser"
         });
+        client.on("error", () => {
+            if (this.client === client) this.client = null;
+            void client.end().catch(() => undefined);
+        });
         await client.connect();
         if (this.address.readOnly)
             await client.query("SET SESSION CHARACTERISTICS AS TRANSACTION READ ONLY");

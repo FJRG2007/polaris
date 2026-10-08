@@ -56,6 +56,10 @@ export class RedisDriver implements data.DataDriver {
             lazyConnect: true,
             connectionName: "polaris-data-browser"
         });
+        client.on("error", () => undefined);
+        client.on("end", () => {
+            if (this.client === client) this.client = null;
+        });
         await client.connect();
         this.client = client;
         this.openedDb = db;

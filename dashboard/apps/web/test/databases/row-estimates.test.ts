@@ -17,6 +17,9 @@ const sent: string[] = [];
 
 vi.mock("pg", () => {
     class Client {
+        on() {
+            return this;
+        }
         async connect() {}
         async end() {}
         async query(text: string) {

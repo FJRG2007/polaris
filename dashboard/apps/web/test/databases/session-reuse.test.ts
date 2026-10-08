@@ -22,6 +22,9 @@ vi.mock("pg", async () => {
         }
     }
     class Client {
+        on() {
+            return this;
+        }
         async connect() {
             counts.logins += 1;
         }

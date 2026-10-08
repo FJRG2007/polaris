@@ -146,17 +146,15 @@ export class SessionCache {
         const driver = await this.acquire(session);
         let discard = false;
         const lent = new Proxy(driver, {
-            get(target, property, receiver) {
-                const value = Reflect.get(target, property, receiver);
-                if (property === "run" && typeof value === "function") {
-                    return (...args: unknown[]) => {
-                        discard = true;
-                        return (value as (...a: unknown[]) => unknown).apply(target, args);
-                    };
-                }
+            get(target, property) {
                 // Lent, not given: closing it is the session's to decide.
                 if (property === "close") return async () => undefined;
-                return value;
+                const value = Reflect.get(target, property, target);
+                if (typeof value !== "function") return value;
+                return (...args: unknown[]) => {
+                    if (property === "run") discard = true;
+                    return (value as (...a: unknown[]) => unknown).apply(target, args);
+                };
             }
         });
         try {
