@@ -1066,7 +1066,7 @@
         "nextFrom": "Próximo: {season}, desde el {date}.",
         "offForAll": "Un administrador desactivó los temas de temporada para todos en este Polaris.",
         "theme": "Decoración",
-        "themeHint": "Una marca junto al logo y unos detalles que caen por la parte de arriba. Se oculta si tu sistema pide menos movimiento.",
+        "themeHint": "Una marca junto al logo y unos detalles que flotan por la parte de arriba. Esos detalles se ocultan si tu sistema pide menos movimiento.",
         "sounds": "Sonidos festivos",
         "soundsHint": "El tono de llamada, de mensaje y de aviso de la temporada en lugar de los habituales.",
         "preview": "Escuchar los sonidos de {season}",

@@ -1066,7 +1066,7 @@
         "nextFrom": "Next: {season}, from {date}.",
         "offForAll": "An administrator turned seasonal themes off for everyone on this Polaris.",
         "theme": "Decorations",
-        "themeHint": "A mark beside the logo and a few things drifting across the top. Hidden when your system asks for less motion.",
+        "themeHint": "A mark beside the logo and a few things drifting across the top. The drifting ones are hidden when your system asks for less motion.",
         "sounds": "Seasonal sounds",
         "soundsHint": "The season's ring, message and alert sounds instead of the usual ones.",
         "preview": "Play the {season} sounds",

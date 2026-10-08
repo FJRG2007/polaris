@@ -1753,6 +1753,11 @@
         "web/src/lib/app-usage.ts",
         "web/src/components/shortcuts/shortcut-settings.tsx",
         "web/src/components/shortcuts/shortcuts-dialog.tsx",
-        "web/src/app/(app)/account/shortcuts/page.tsx"
+        "web/src/app/(app)/account/shortcuts/page.tsx",
+        "web/src/components/seasonal/seasonal-card.tsx",
+        "web/src/components/seasonal/seasonal-frame.tsx",
+        "web/src/app/(app)/account/preferences/seasonal-actions.ts",
+        "web/src/app/(app)/admin/settings/seasonal-actions.ts",
+        "web/src/app/(app)/admin/settings/seasonal-card.tsx"
     ]
 }
