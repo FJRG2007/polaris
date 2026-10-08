@@ -30,16 +30,7 @@ import { useDisplayFormat } from "@/components/display-format";
 import { PeoplePicker, type PickedPerson } from "@/components/people-picker";
 import { findWafPeopleAction, listWafPrincipalsAction, type WafPrincipalOption } from "./actions";
 import { wafPrincipalGrantSchema, type WafPrincipalGrant, type WafScopeType } from "@polaris/core";
-import {
-    ArrowUpRight,
-    CalendarClock,
-    Shield,
-    TriangleAlert,
-    User,
-    UserMinus,
-    Users,
-    X
-} from "lucide-react";
+import { ArrowUpRight, CalendarClock, Shield, TriangleAlert, User, UserMinus, Users, X } from "lucide-react";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { NamespaceKey, NamespaceTranslator } from "@/lib/i18n/types";
 
@@ -198,10 +189,7 @@ export function LoginPrincipals({
 }
 
 /** Options with the later ones added, each ref once. */
-function mergeOptions(
-    base: WafPrincipalOption[],
-    more: WafPrincipalOption[]
-): WafPrincipalOption[] {
+function mergeOptions(base: WafPrincipalOption[], more: WafPrincipalOption[]): WafPrincipalOption[] {
     const merged = new Map(base.map((option) => [option.ref, option]));
     for (const option of more) if (!merged.has(option.ref)) merged.set(option.ref, option);
     return [...merged.values()];
@@ -245,12 +233,8 @@ function GrantList({
     const known = new Map((options ?? []).map((option) => [option.ref, option]));
     const spoken = new Set([...grants, ...taken].map((grant) => grant.ref));
     // People are found by the search below, never listed here.
-    const remaining = (options ?? []).filter(
-        (option) => option.type !== "user" && !spoken.has(option.ref)
-    );
-    const spokenPeople = [...spoken]
-        .filter((ref) => ref.startsWith("user:"))
-        .map((ref) => ref.slice(5));
+    const remaining = (options ?? []).filter((option) => option.type !== "user" && !spoken.has(option.ref));
+    const spokenPeople = [...spoken].filter((ref) => ref.startsWith("user:")).map((ref) => ref.slice(5));
 
     return (
         <div className="flex flex-col gap-2">
@@ -272,13 +256,9 @@ function GrantList({
                             disabled={disabled}
                             tone={tone}
                             open={scheduling === grant.ref}
-                            onToggleSchedule={() =>
-                                setScheduling(scheduling === grant.ref ? null : grant.ref)
-                            }
+                            onToggleSchedule={() => setScheduling(scheduling === grant.ref ? null : grant.ref)}
                             onChange={(next) =>
-                                onChange(
-                                    grants.map((entry) => (entry.ref === grant.ref ? next : entry))
-                                )
+                                onChange(grants.map((entry) => (entry.ref === grant.ref ? next : entry)))
                             }
                             onRemove={() => {
                                 setScheduling(null);
@@ -301,11 +281,7 @@ function GrantList({
                     value=""
                     aria-label={addLabel}
                     disabled={disabled || remaining.length === 0}
-                    placeholder={
-                        remaining.length === 0
-                            ? t("principals.allNamed")
-                            : t("principals.addPlaceholder")
-                    }
+                    placeholder={remaining.length === 0 ? t("principals.allNamed") : t("principals.addPlaceholder")}
                     onValueChange={(ref) => {
                         if (ref) onChange([...grants, { ref }]);
                     }}
@@ -316,9 +292,7 @@ function GrantList({
                         // name are still two different entries to read.
                         label: t("principals.option", {
                             name: option.label,
-                            kind:
-                                option.sublabel ??
-                                t(`principals.types.${option.type}` as NamespaceKey<"firewall">)
+                            kind: option.sublabel ?? t(`principals.types.${option.type}` as NamespaceKey<"firewall">)
                         })
                     }))}
                 />
@@ -332,21 +306,12 @@ function GrantList({
                         label={findLabel}
                         search={findPeople}
                         onChange={(picked) => {
-                            const added = picked.filter(
-                                (person) => !spoken.has(`user:${person.id}`)
-                            );
+                            const added = picked.filter((person) => !spoken.has(`user:${person.id}`));
                             if (added.length === 0) return;
                             for (const person of added) {
-                                onFound({
-                                    ref: `user:${person.id}`,
-                                    type: "user",
-                                    label: person.name
-                                });
+                                onFound({ ref: `user:${person.id}`, type: "user", label: person.name });
                             }
-                            onChange([
-                                ...grants,
-                                ...added.map((person) => ({ ref: `user:${person.id}` }))
-                            ]);
+                            onChange([...grants, ...added.map((person) => ({ ref: `user:${person.id}` }))]);
                         }}
                     />
                 </div>
@@ -388,11 +353,7 @@ function GrantRow({
             <div className="flex items-center gap-2">
                 <span
                     className={`inline-flex min-w-0 items-center gap-1.5 text-xs ${
-                        missing
-                            ? "text-warning"
-                            : tone === "danger"
-                              ? "text-danger"
-                              : "text-foreground"
+                        missing ? "text-warning" : tone === "danger" ? "text-danger" : "text-foreground"
                     }`}
                     title={option?.sublabel ?? grant.ref}
                 >
@@ -409,9 +370,7 @@ function GrantRow({
                 </span>
 
                 {window ? (
-                    <span
-                        className={`truncate text-xs ${window.spent ? "text-muted-foreground" : "text-foreground"}`}
-                    >
+                    <span className={`truncate text-xs ${window.spent ? "text-muted-foreground" : "text-foreground"}`}>
                         {window.text}
                     </span>
                 ) : null}
@@ -468,11 +427,7 @@ function GrantWindow({
     const [from, setFrom] = useState(toInputValue(grant.from));
     const [until, setUntil] = useState(toInputValue(grant.until));
 
-    const draft: WafPrincipalGrant = {
-        ref: grant.ref,
-        from: toSeconds(from),
-        until: toSeconds(until)
-    };
+    const draft: WafPrincipalGrant = { ref: grant.ref, from: toSeconds(from), until: toSeconds(until) };
     // The same schema the server validates against, so the message an operator reads
     // here is the one that would have come back.
     const parsed = wafPrincipalGrantSchema.safeParse(draft);
@@ -541,22 +496,13 @@ function describeWindow(
 ): { text: string; spent: boolean } | null {
     const now = Date.now() / 1000;
     if (grant.until !== undefined && now >= grant.until) {
-        return {
-            text: t("principals.expired", { when: dateTime(new Date(grant.until * 1000)) }),
-            spent: true
-        };
+        return { text: t("principals.expired", { when: dateTime(new Date(grant.until * 1000)) }), spent: true };
     }
     if (grant.from !== undefined && now < grant.from) {
-        return {
-            text: t("principals.from", { when: dateTime(new Date(grant.from * 1000)) }),
-            spent: true
-        };
+        return { text: t("principals.from", { when: dateTime(new Date(grant.from * 1000)) }), spent: true };
     }
     if (grant.until !== undefined) {
-        return {
-            text: t("principals.until", { when: dateTime(new Date(grant.until * 1000)) }),
-            spent: false
-        };
+        return { text: t("principals.until", { when: dateTime(new Date(grant.until * 1000)) }), spent: false };
     }
     return null;
 }

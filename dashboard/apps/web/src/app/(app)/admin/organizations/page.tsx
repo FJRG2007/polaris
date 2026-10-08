@@ -32,7 +32,11 @@ export default async function OrganizationsAdminPage() {
                 title={t("organizations.page.title")}
                 description={t("organizations.page.description")}
             />
-            <OrganizationsAdmin initial={policy} save={saveOrganizationPolicyAction} first={orgs} />
+            <OrganizationsAdmin
+                initial={policy}
+                save={saveOrganizationPolicyAction}
+                first={orgs}
+            />
         </>
     );
 }

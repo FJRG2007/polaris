@@ -32,16 +32,9 @@ const { LoginRulePage } = await import("../../src/app/(app)/apps/firewall/access
 const SCOPE = { scopeType: "project" as const, scopeId: "00000000-0000-7000-8000-0000000000e1" };
 
 function render(admitted: WafPrincipalGrant[], refused: WafPrincipalGrant[]): string {
-    return renderToStaticMarkup(
-        withMessages(
-            <LoginPrincipals
-                scope={SCOPE}
-                admitted={admitted}
-                refused={refused}
-                onChange={() => {}}
-            />
-        )
-    );
+    return renderToStaticMarkup(withMessages(
+        <LoginPrincipals scope={SCOPE} admitted={admitted} refused={refused} onChange={() => {}} />
+    ));
 }
 
 describe("the require-login panel", () => {
@@ -64,10 +57,7 @@ describe("the require-login panel", () => {
     });
 
     it("marks a grant whose window has already passed", () => {
-        const markup = render(
-            [{ ref: "group:ops", until: Math.floor(Date.now() / 1000) - 3600 }],
-            []
-        );
+        const markup = render([{ ref: "group:ops", until: Math.floor(Date.now() / 1000) - 3600 }], []);
         expect(markup).toContain("expired ");
     });
 
@@ -79,19 +69,17 @@ describe("the require-login panel", () => {
 
 describe("the require-login page, when a broader scope already demands one", () => {
     function page(required: boolean, requiredAbove: boolean): string {
-        return renderToStaticMarkup(
-            withMessages(
-                <LoginRulePage
-                    scope={SCOPE}
-                    required={required}
-                    requiredAbove={requiredAbove}
-                    admitted={[]}
-                    refused={[]}
-                    onBack={() => {}}
-                    onChange={() => {}}
-                />
-            )
-        );
+        return renderToStaticMarkup(withMessages(
+            <LoginRulePage
+                scope={SCOPE}
+                required={required}
+                requiredAbove={requiredAbove}
+                admitted={[]}
+                refused={[]}
+                onBack={() => {}}
+                onChange={() => {}}
+            />
+        ));
     }
 
     it("says a login is required rather than showing this scope's unused off", () => {

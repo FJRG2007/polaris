@@ -18,7 +18,10 @@ import { join } from "node:path";
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
-const composer = readFileSync(join(process.cwd(), "src/app/(app)/mail/composer.tsx"), "utf8");
+const composer = readFileSync(
+    join(process.cwd(), "src/app/(app)/mail/composer.tsx"),
+    "utf8"
+);
 const transfers = readFileSync(
     join(process.cwd(), "src/components/transfers/transfers-view.tsx"),
     "utf8"

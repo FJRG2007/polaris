@@ -378,8 +378,7 @@ export async function listUserDirectoryAction(
 ): Promise<Page<DirectoryUser> | { error: string }> {
     await requireAdmin();
     const parsed = directoryQuerySchema.safeParse(input);
-    if (!parsed.success)
-        return { error: (await getTranslations("admin"))("users.directory.loadFailed") };
+    if (!parsed.success) return { error: (await getTranslations("admin"))("users.directory.loadFailed") };
     try {
         return await listUserDirectoryPage(parsed.data);
     } catch (caught) {

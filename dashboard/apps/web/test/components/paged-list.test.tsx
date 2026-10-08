@@ -52,18 +52,10 @@ describe("usePagedList", () => {
             params.query === "an" ? slow.promise : Promise.resolve({ items: ["ana"], next: null })
         );
         const first: ListPage<string> = { items: ["a", "b"], next: "p2" };
-        const { result, rerender } = renderHook(
-            ({ query }) =>
-                usePagedList<string, Params>({
-                    first,
-                    params: { query },
-                    initialParams: { query: "" },
-                    load
-                }),
-            {
-                initialProps: { query: "" }
-            }
-        );
+        const { result, rerender } = renderHook(({ query }) =>
+            usePagedList<string, Params>({ first, params: { query }, initialParams: { query: "" }, load }), {
+            initialProps: { query: "" }
+        });
         rerender({ query: "an" });
         rerender({ query: "ana" });
         await waitFor(() => expect(result.current.items).toEqual(["ana"]));
@@ -79,18 +71,10 @@ describe("usePagedList", () => {
                 ? { items: ["c", "d"], next: "p3" }
                 : { items: ["a", "b", "c", "d"].slice(0, limit), next: "p3" }
         );
-        const { result, rerender } = renderHook(
-            ({ first }) =>
-                usePagedList<string, Params>({
-                    first,
-                    params: { query: "" },
-                    initialParams: { query: "" },
-                    load
-                }),
-            {
-                initialProps: { first: { items: ["a", "b"], next: "p2" } as ListPage<string> }
-            }
-        );
+        const { result, rerender } = renderHook(({ first }) =>
+            usePagedList<string, Params>({ first, params: { query: "" }, initialParams: { query: "" }, load }), {
+            initialProps: { first: { items: ["a", "b"], next: "p2" } as ListPage<string> }
+        });
         act(() => result.current.loadMore());
         await waitFor(() => expect(result.current.items).toHaveLength(4));
         rerender({ first: { items: ["a", "b"], next: "p2" } });
@@ -117,23 +101,13 @@ describe("usePagedList", () => {
     it("drops the old search's rows when the new one fails, and retries the new one", async () => {
         let failing = true;
         const load = vi.fn(async (cursor: string | null, params: Params) =>
-            params.query === "an" && failing
-                ? { error: "nope" }
-                : { items: [`${params.query}:${cursor}`], next: null }
+            params.query === "an" && failing ? { error: "nope" } : { items: [`${params.query}:${cursor}`], next: null }
         );
         const first: ListPage<string> = { items: ["a", "b"], next: "p2" };
-        const { result, rerender } = renderHook(
-            ({ query }) =>
-                usePagedList<string, Params>({
-                    first,
-                    params: { query },
-                    initialParams: { query: "" },
-                    load
-                }),
-            {
-                initialProps: { query: "" }
-            }
-        );
+        const { result, rerender } = renderHook(({ query }) =>
+            usePagedList<string, Params>({ first, params: { query }, initialParams: { query: "" }, load }), {
+            initialProps: { query: "" }
+        });
         rerender({ query: "an" });
         await waitFor(() => expect(result.current.error).toBe("nope"));
         expect(result.current.items).toEqual([]);
@@ -157,12 +131,7 @@ describe("usePagedList", () => {
         );
         const first: ListPage<string> = { items: ["a"], next: "p2" };
         const { result } = renderHook(() =>
-            usePagedList<string, Params>({
-                first,
-                params: { query: "" },
-                initialParams: { query: "" },
-                load
-            })
+            usePagedList<string, Params>({ first, params: { query: "" }, initialParams: { query: "" }, load })
         );
         act(() => result.current.loadMore());
         await waitFor(() => expect(result.current.error).toBe("nope"));

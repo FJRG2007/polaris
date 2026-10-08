@@ -203,10 +203,7 @@ export function UsersAdmin({
             const label = what === "email" ? user.email : user.phone;
             if (on) {
                 const ok = await confirm({
-                    title: t("users.verify.title", {
-                        hasLabel: label ? "yes" : "no",
-                        label: label ?? ""
-                    }),
+                    title: t("users.verify.title", { hasLabel: label ? "yes" : "no", label: label ?? "" }),
                     description: t("users.verify.description", { name: user.name }),
                     confirmLabel: t("users.verify.confirm")
                 });
@@ -275,14 +272,10 @@ export function UsersAdmin({
                     <CardBody className="flex flex-col gap-3">
                         <div>
                             <h2 className="text-sm font-medium">{t("users.invites.title")}</h2>
-                            <p className="text-xs text-muted-foreground">
-                                {t("users.invites.hint")}
-                            </p>
+                            <p className="text-xs text-muted-foreground">{t("users.invites.hint")}</p>
                         </div>
                         {invites.length === 0 ? (
-                            <p className="text-sm text-muted-foreground">
-                                {t("users.invites.none")}
-                            </p>
+                            <p className="text-sm text-muted-foreground">{t("users.invites.none")}</p>
                         ) : (
                             invites.map((invite) => (
                                 <div
@@ -295,14 +288,10 @@ export function UsersAdmin({
                                             <Badge>{t(`users.methods.${invite.method}`)}</Badge>
                                             {invite.role ? <Badge>{invite.role}</Badge> : null}
                                             {invite.needsPassword ? (
-                                                <Badge variant="warning">
-                                                    {t("users.invites.oneTimePassword")}
-                                                </Badge>
+                                                <Badge variant="warning">{t("users.invites.oneTimePassword")}</Badge>
                                             ) : null}
                                             {invite.restricted ? (
-                                                <Badge variant="warning">
-                                                    {t("users.invites.limited")}
-                                                </Badge>
+                                                <Badge variant="warning">{t("users.invites.limited")}</Badge>
                                             ) : null}
                                         </p>
                                         <p className="text-xs text-muted-foreground">
@@ -319,9 +308,7 @@ export function UsersAdmin({
                                     <Button
                                         size="icon"
                                         variant="ghost"
-                                        aria-label={t("users.invites.revokeLabel", {
-                                            email: invite.email
-                                        })}
+                                        aria-label={t("users.invites.revokeLabel", { email: invite.email })}
                                         title={t("users.invites.revoke")}
                                         onClick={() =>
                                             void revokeInviteAction(invite.id).then(() =>
@@ -360,10 +347,7 @@ export function UsersAdmin({
                     aria-label={t("users.directory.filterLabel")}
                     value={filter}
                     onValueChange={(value) => setFilter(value as DirectoryFilter)}
-                    options={DIRECTORY_FILTERS.map((value) => ({
-                        value,
-                        label: t(`users.filters.${value}`)
-                    }))}
+                    options={DIRECTORY_FILTERS.map((value) => ({ value, label: t(`users.filters.${value}`) }))}
                 />
                 <Button onClick={() => setInviting(true)}>
                     <UserPlus className="size-4" />
@@ -375,9 +359,7 @@ export function UsersAdmin({
                 <table className="w-full text-sm">
                     <thead className="bg-surface/60 text-left text-xs text-muted-foreground">
                         <tr>
-                            <th className="w-full max-w-0 px-3 py-2 font-medium">
-                                {t("users.directory.columns.person")}
-                            </th>
+                            <th className="w-full max-w-0 px-3 py-2 font-medium">{t("users.directory.columns.person")}</th>
                             <th className="hidden px-3 py-2 font-medium sm:table-cell">
                                 {t("users.directory.columns.access")}
                             </th>
@@ -396,20 +378,20 @@ export function UsersAdmin({
                                     colSpan={4}
                                     className="px-3 py-8 text-center text-muted-foreground"
                                 >
-                                    {list.loading ? (
-                                        t("users.directory.loading")
-                                    ) : list.error ? (
-                                        <span className="inline-flex items-center gap-2">
-                                            {t("users.directory.loadFailed")}
-                                            <Button size="sm" variant="ghost" onClick={list.retry}>
-                                                {t("users.directory.retry")}
-                                            </Button>
-                                        </span>
-                                    ) : narrowed ? (
-                                        t("users.directory.noMatch")
-                                    ) : (
-                                        t("users.directory.empty")
-                                    )}
+                                    {list.loading
+                                        ? t("users.directory.loading")
+                                        : list.error
+                                          ? (
+                                                <span className="inline-flex items-center gap-2">
+                                                    {t("users.directory.loadFailed")}
+                                                    <Button size="sm" variant="ghost" onClick={list.retry}>
+                                                        {t("users.directory.retry")}
+                                                    </Button>
+                                                </span>
+                                            )
+                                          : narrowed
+                                            ? t("users.directory.noMatch")
+                                            : t("users.directory.empty")}
                                 </td>
                             </tr>
                         </tbody>
@@ -430,11 +412,7 @@ export function UsersAdmin({
                                             {list.error ? (
                                                 <span className="inline-flex items-center gap-2">
                                                     {t("users.directory.loadFailed")}
-                                                    <Button
-                                                        size="sm"
-                                                        variant="ghost"
-                                                        onClick={list.retry}
-                                                    >
+                                                    <Button size="sm" variant="ghost" onClick={list.retry}>
                                                         {t("users.directory.retry")}
                                                     </Button>
                                                 </span>
@@ -448,116 +426,106 @@ export function UsersAdmin({
                             renderRow={(user, row) => (
                                 <ContextMenu key={user.id}>
                                     <ContextMenuTrigger asChild>
-                                        <tr
-                                            {...row}
-                                            tabIndex={0}
-                                            role="button"
-                                            aria-label={t("users.directory.open", {
-                                                name: user.name
-                                            })}
-                                            onClick={() => router.push(`/admin/users/${user.id}`)}
-                                            onKeyDown={(event) => {
-                                                if (event.key === "Enter" || event.key === " ") {
-                                                    event.preventDefault();
-                                                    router.push(`/admin/users/${user.id}`);
-                                                }
-                                            }}
-                                            className={cn(
-                                                "cursor-pointer border-t border-border hover:bg-card-hover",
-                                                user.banned && "opacity-60"
-                                            )}
-                                        >
-                                            <td className="w-full max-w-0 px-3 py-2">
-                                                {/* The plate goes on this rather than on
+                                <tr
+                                    {...row}
+                                    tabIndex={0}
+                                    role="button"
+                                    aria-label={t("users.directory.open", { name: user.name })}
+                                    onClick={() => router.push(`/admin/users/${user.id}`)}
+                                    onKeyDown={(event) => {
+                                        if (event.key === "Enter" || event.key === " ") {
+                                            event.preventDefault();
+                                            router.push(`/admin/users/${user.id}`);
+                                        }
+                                    }}
+                                    className={cn(
+                                        "cursor-pointer border-t border-border hover:bg-card-hover",
+                                        user.banned && "opacity-60"
+                                    )}
+                                >
+                                    <td className="w-full max-w-0 px-3 py-2">
+                                        {/* The plate goes on this rather than on
                                             the row: a table row painted edge to
                                             edge is a band across the whole
                                             directory, not somebody's nameplate. */}
-                                                <PersonRow
-                                                    personId={user.id}
-                                                    className="flex items-center gap-3 rounded-md px-1.5 py-0.5"
-                                                >
-                                                    <Avatar person={user} size={36} />
-                                                    <div className="min-w-0">
-                                                        <p
-                                                            className="flex items-center gap-1.5 font-medium"
-                                                            title={user.name}
-                                                        >
-                                                            <span className="min-w-0 truncate">
-                                                                <PersonName
-                                                                    id={user.id}
-                                                                    name={user.name}
-                                                                />
-                                                            </span>
-                                                            {user.id === viewerId ? (
-                                                                <span className="shrink-0 text-xs text-muted-foreground">
-                                                                    {t("users.directory.you")}
-                                                                </span>
-                                                            ) : null}
-                                                        </p>
-                                                        <p className="truncate text-xs text-muted-foreground">
-                                                            {user.email}
-                                                        </p>
-                                                    </div>
-                                                </PersonRow>
-                                            </td>
-                                            <td className="hidden px-3 py-2 sm:table-cell">
-                                                <div className="flex flex-wrap items-center gap-1">
-                                                    {user.isAdmin ? (
-                                                        <Badge variant="primary">
-                                                            <Shield className="size-3" />
-                                                            {t("users.directory.badges.admin")}
-                                                        </Badge>
-                                                    ) : null}
-                                                    {user.roles.map((role) => (
-                                                        <Badge key={role}>{role}</Badge>
-                                                    ))}
-                                                    {hasLimits(user) ? (
-                                                        <Badge variant="warning">
-                                                            <MapPin className="size-3" />
-                                                            {t("users.directory.badges.limited")}
-                                                        </Badge>
-                                                    ) : null}
-                                                    {user.banned ? (
-                                                        <Badge variant="danger">
-                                                            <Ban className="size-3" />
-                                                            {t("users.directory.badges.banned")}
-                                                        </Badge>
-                                                    ) : null}
-                                                    {user.twoFactorEnabled ? (
-                                                        <Badge variant="success">2FA</Badge> // i18n-ignore: the same abbreviation in every language
-                                                    ) : null}
-                                                </div>
-                                            </td>
-                                            <td className="hidden whitespace-nowrap px-3 py-2 text-xs text-muted-foreground lg:table-cell">
-                                                {isOnline(user.lastSeenAt, now) ? (
-                                                    <span
-                                                        className="flex items-center gap-1.5 text-success"
-                                                        title={
-                                                            user.lastSeenAt
-                                                                ? format.dateTime(user.lastSeenAt)
-                                                                : undefined
-                                                        }
-                                                    >
-                                                        <OnlineDot />
-                                                        {t("users.directory.online")}
+                                        <PersonRow
+                                            personId={user.id}
+                                            className="flex items-center gap-3 rounded-md px-1.5 py-0.5"
+                                        >
+                                            <Avatar person={user} size={36} />
+                                            <div className="min-w-0">
+                                                <p className="flex items-center gap-1.5 font-medium" title={user.name}>
+                                                    <span className="min-w-0 truncate">
+                                                        <PersonName id={user.id} name={user.name} />
                                                     </span>
-                                                ) : user.lastSeenAt ? (
-                                                    <span title={format.dateTime(user.lastSeenAt)}>
-                                                        <RelativeTime iso={user.lastSeenAt} />
-                                                    </span>
-                                                ) : (
-                                                    t("users.directory.never")
-                                                )}
-                                                {user.lastCountry
-                                                    ? t("users.directory.country", {
-                                                          country: user.lastCountry
-                                                      })
-                                                    : ""}
-                                            </td>
-                                            <td className="hidden whitespace-nowrap px-3 py-2 text-xs text-muted-foreground lg:table-cell">
-                                                {format.date(user.createdAt)}
-                                            </td>
-                                        </tr>
+                                                    {user.id === viewerId ? (
+                                                        <span className="shrink-0 text-xs text-muted-foreground">
+                                                            {t("users.directory.you")}
+                                                        </span>
+                                                    ) : null}
+                                                </p>
+                                                <p className="truncate text-xs text-muted-foreground">
+                                                    {user.email}
+                                                </p>
+                                            </div>
+                                        </PersonRow>
+                                    </td>
+                                    <td className="hidden px-3 py-2 sm:table-cell">
+                                        <div className="flex flex-wrap items-center gap-1">
+                                            {user.isAdmin ? (
+                                                <Badge variant="primary">
+                                                    <Shield className="size-3" />
+                                                    {t("users.directory.badges.admin")}
+                                                </Badge>
+                                            ) : null}
+                                            {user.roles.map((role) => (
+                                                <Badge key={role}>{role}</Badge>
+                                            ))}
+                                            {hasLimits(user) ? (
+                                                <Badge variant="warning">
+                                                    <MapPin className="size-3" />
+                                                    {t("users.directory.badges.limited")}
+                                                </Badge>
+                                            ) : null}
+                                            {user.banned ? (
+                                                <Badge variant="danger">
+                                                    <Ban className="size-3" />
+                                                    {t("users.directory.badges.banned")}
+                                                </Badge>
+                                            ) : null}
+                                            {user.twoFactorEnabled ? (
+                                                <Badge variant="success">2FA</Badge> // i18n-ignore: the same abbreviation in every language
+                                            ) : null}
+                                        </div>
+                                    </td>
+                                    <td className="hidden whitespace-nowrap px-3 py-2 text-xs text-muted-foreground lg:table-cell">
+                                        {isOnline(user.lastSeenAt, now) ? (
+                                            <span
+                                                className="flex items-center gap-1.5 text-success"
+                                                title={
+                                                    user.lastSeenAt
+                                                        ? format.dateTime(user.lastSeenAt)
+                                                        : undefined
+                                                }
+                                            >
+                                                <OnlineDot />
+                                                {t("users.directory.online")}
+                                            </span>
+                                        ) : user.lastSeenAt ? (
+                                            <span title={format.dateTime(user.lastSeenAt)}>
+                                                <RelativeTime iso={user.lastSeenAt} />
+                                            </span>
+                                        ) : (
+                                            t("users.directory.never")
+                                        )}
+                                        {user.lastCountry
+                                            ? t("users.directory.country", { country: user.lastCountry })
+                                            : ""}
+                                    </td>
+                                    <td className="hidden whitespace-nowrap px-3 py-2 text-xs text-muted-foreground lg:table-cell">
+                                        {format.date(user.createdAt)}
+                                    </td>
+                                </tr>
                                     </ContextMenuTrigger>
                                     <ContextMenuContent>
                                         <ContextMenuItem
@@ -610,17 +578,13 @@ export function UsersAdmin({
                                             cannot shut or delete themselves. */}
                                         {user.id !== viewerId && (
                                             <>
-                                                <ContextMenuItem
-                                                    onSelect={() => void openAccount(user)}
-                                                >
+                                                <ContextMenuItem onSelect={() => void openAccount(user)}>
                                                     <Eye className="size-4" />
                                                     {t("users.menu.openAccount")}
                                                 </ContextMenuItem>
                                                 <ContextMenuSeparator />
                                                 {user.banned ? (
-                                                    <ContextMenuItem
-                                                        onSelect={() => void liftBan(user)}
-                                                    >
+                                                    <ContextMenuItem onSelect={() => void liftBan(user)}>
                                                         <Undo2 className="size-4" />
                                                         {t("users.menu.liftSuspension")}
                                                     </ContextMenuItem>

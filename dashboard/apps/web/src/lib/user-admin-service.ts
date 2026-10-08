@@ -16,14 +16,7 @@
 import { recordAudit } from "@/lib/audit-service";
 import { z } from "zod";
 import { prisma, VISIBLE_USER, type Prisma } from "@polaris/db";
-import {
-    after,
-    decodeCursor,
-    MAX_PAGE,
-    pageOf,
-    pageSize,
-    type Page
-} from "@/lib/pagination/cursor";
+import { after, decodeCursor, MAX_PAGE, pageOf, pageSize, type Page } from "@/lib/pagination/cursor";
 import { DIRECTORY_FILTERS, type DirectoryFilter } from "@/lib/user-directory-filters";
 import { like } from "@/lib/rich-text/mention-service";
 import { discardAvatars } from "@/lib/avatar-service";
@@ -213,9 +206,7 @@ function directoryWhere(filter: DirectoryFilter, query: string): Prisma.UserWher
  * and filter them on screen, which is a page that grows with the instance until
  * it is the slowest thing in it.
  */
-export async function listUserDirectoryPage(
-    input: DirectoryQuery = {}
-): Promise<Page<DirectoryUser>> {
+export async function listUserDirectoryPage(input: DirectoryQuery = {}): Promise<Page<DirectoryUser>> {
     const parsed = directoryQuerySchema.parse(input);
     const size = pageSize(parsed.limit, DIRECTORY_PAGE);
     const keyset = decodeCursor(parsed.cursor);

@@ -47,17 +47,9 @@ export async function createPolicyAction(
     if (parsed.error) return { error: parsed.error };
     try {
         const { id } = await createPolicy(name, description || undefined, parsed.value);
-        await recordAudit({
-            actorId: admin.id,
-            action: "policy.create",
-            targetType: "policy",
-            targetId: id,
-            metadata: { name }
-        });
+        await recordAudit({ actorId: admin.id, action: "policy.create", targetType: "policy", targetId: id, metadata: { name } });
     } catch (caught) {
-        return {
-            error: caught instanceof Error ? caught.message : t("policies.errors.createFailed")
-        };
+        return { error: caught instanceof Error ? caught.message : t("policies.errors.createFailed") };
     }
     revalidatePath("/admin/policies");
     return {};
@@ -77,16 +69,9 @@ export async function updatePolicyAction(
         await updatePolicy(id, { name, description, document: parsed.value });
         // Rewriting a policy changes what everybody it is attached to holds.
         publishAccessChange();
-        await recordAudit({
-            actorId: admin.id,
-            action: "policy.update",
-            targetType: "policy",
-            targetId: id
-        });
+        await recordAudit({ actorId: admin.id, action: "policy.update", targetType: "policy", targetId: id });
     } catch (caught) {
-        return {
-            error: caught instanceof Error ? caught.message : t("policies.errors.updateFailed")
-        };
+        return { error: caught instanceof Error ? caught.message : t("policies.errors.updateFailed") };
     }
     revalidatePath("/admin/policies");
     return {};
@@ -96,12 +81,7 @@ export async function deletePolicyAction(id: string): Promise<void> {
     const admin = await requireAdmin();
     await deletePolicy(id);
     publishAccessChange();
-    await recordAudit({
-        actorId: admin.id,
-        action: "policy.delete",
-        targetType: "policy",
-        targetId: id
-    });
+    await recordAudit({ actorId: admin.id, action: "policy.delete", targetType: "policy", targetId: id });
     revalidatePath("/admin/policies");
 }
 
@@ -117,13 +97,7 @@ export async function attachPolicyAction(
     // query and a chance to be wrong - so only a person is named. See
     // `access-live`.
     publishAccessChange(principalType === "user" ? { userIds: [principalId] } : {});
-    await recordAudit({
-        actorId: admin.id,
-        action: "policy.attach",
-        targetType: "policy",
-        targetId: policyId,
-        metadata: { principalType, principalId }
-    });
+    await recordAudit({ actorId: admin.id, action: "policy.attach", targetType: "policy", targetId: policyId, metadata: { principalType, principalId } });
     revalidatePath("/admin/policies");
 }
 
@@ -135,20 +109,12 @@ export async function detachPolicyAction(
     const admin = await requireAdmin();
     await detachPolicy(policyId, principalType, principalId);
     publishAccessChange(principalType === "user" ? { userIds: [principalId] } : {});
-    await recordAudit({
-        actorId: admin.id,
-        action: "policy.detach",
-        targetType: "policy",
-        targetId: policyId,
-        metadata: { principalType, principalId }
-    });
+    await recordAudit({ actorId: admin.id, action: "policy.detach", targetType: "policy", targetId: policyId, metadata: { principalType, principalId } });
     revalidatePath("/admin/policies");
 }
 
 /** People a policy can be attached to, found by what was typed. */
-export async function findPolicyPeopleAction(
-    query: string
-): Promise<{ results: { id: string; name: string }[] }> {
+export async function findPolicyPeopleAction(query: string): Promise<{ results: { id: string; name: string }[] }> {
     await requireAdmin();
     const term = z.string().trim().max(120).safeParse(query);
     return { results: term.success ? await findAccountsAsAdmin(term.data) : [] };

@@ -42,8 +42,9 @@ vi.mock("@/lib/rich-text/mention-service", () => ({
     like: (term: string) => ({ contains: term, mode: "insensitive" })
 }));
 
-const { readGroupMembers, firstMembers, findGroupCandidates, GROUP_MEMBERS_PAGE, GROUP_PREVIEW } =
-    await import("@/lib/group-members");
+const { readGroupMembers, firstMembers, findGroupCandidates, GROUP_MEMBERS_PAGE, GROUP_PREVIEW } = await import(
+    "@/lib/group-members"
+);
 
 beforeEach(() => {
     asked = [];

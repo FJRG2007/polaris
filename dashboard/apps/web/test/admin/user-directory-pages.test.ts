@@ -44,20 +44,11 @@ vi.mock("@polaris/db", () => ({
     VISIBLE_USER: {},
     prisma: {
         user: {
-            findMany: async (query: {
-                where: Record<string, unknown>;
-                take?: number;
-                orderBy: unknown;
-            }) => {
+            findMany: async (query: { where: Record<string, unknown>; take?: number; orderBy: unknown }) => {
                 asked.push(query);
                 // Enough of the keyset to page the fixture: after the cursor's row.
                 const and = (query.where.AND as Record<string, unknown>[] | undefined) ?? [];
-                const keyset = and.find(
-                    (part) =>
-                        "OR" in part &&
-                        Array.isArray(part.OR) &&
-                        "createdAt" in (part.OR as object[])[0]!
-                ) as
+                const keyset = and.find((part) => "OR" in part && Array.isArray(part.OR) && "createdAt" in (part.OR as object[])[0]!) as
                     | { OR: [{ createdAt: { gt: Date } }, { createdAt: Date; id: { gt: string } }] }
                     | undefined;
                 const rest = keyset
@@ -76,13 +67,10 @@ vi.mock("@polaris/db", () => ({
 vi.mock("@/lib/session-directory", () => ({ describeOrigin: () => "" }));
 let provider = "postgresql";
 vi.mock("@/lib/rich-text/mention-service", () => ({
-    like: (term: string) =>
-        provider === "sqlite" ? { contains: term } : { contains: term, mode: "insensitive" }
+    like: (term: string) => (provider === "sqlite" ? { contains: term } : { contains: term, mode: "insensitive" })
 }));
 vi.mock("@/lib/notifications/dispatch", () => ({ notify: async () => undefined }));
-vi.mock("@/lib/notifications/session-events", () => ({
-    notifySessionsClosed: async () => undefined
-}));
+vi.mock("@/lib/notifications/session-events", () => ({ notifySessionsClosed: async () => undefined }));
 vi.mock("@/lib/session-guard", () => ({ revokeSessionsRefusedByRules: async () => undefined }));
 vi.mock("@/lib/avatar-service", () => ({ discardAvatars: async () => undefined }));
 vi.mock("@/lib/personal-drive", () => ({ discardPersonalDrive: async () => undefined }));

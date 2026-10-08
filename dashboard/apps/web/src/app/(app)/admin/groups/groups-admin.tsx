@@ -100,10 +100,7 @@ export function GroupsAdmin({ groups }: { groups: GroupRow[] }) {
     // are matched over the rows already on the page - a deployment's groups are a
     // short list - and members by the server, since only a page of each roster is
     // here.
-    const [byMember, setByMember] = useState<{ query: string; ids: Set<string> }>({
-        query: "",
-        ids: new Set()
-    });
+    const [byMember, setByMember] = useState<{ query: string; ids: Set<string> }>({ query: "", ids: new Set() });
     useEffect(() => {
         const term = query.trim();
         if (term.length < 2) return;
@@ -154,9 +151,7 @@ export function GroupsAdmin({ groups }: { groups: GroupRow[] }) {
                 <table className="w-full text-sm">
                     <thead className="bg-surface/60 text-left text-xs text-muted-foreground">
                         <tr>
-                            <th className="w-full max-w-0 px-3 py-2 font-medium">
-                                {t("groups.table.group")}
-                            </th>
+                            <th className="w-full max-w-0 px-3 py-2 font-medium">{t("groups.table.group")}</th>
                             <th className="hidden px-3 py-2 font-medium sm:table-cell">
                                 {t("groups.table.members")}
                             </th>
@@ -217,10 +212,7 @@ export function GroupsAdmin({ groups }: { groups: GroupRow[] }) {
                                                 {t("groups.nobodyYet")}
                                             </span>
                                         ) : (
-                                            <AvatarStack
-                                                people={group.members.items}
-                                                total={group.memberCount}
-                                            />
+                                            <AvatarStack people={group.members.items} total={group.memberCount} />
                                         )}
                                     </td>
                                     <td className="hidden whitespace-nowrap px-3 py-2 text-xs text-muted-foreground lg:table-cell">
@@ -393,10 +385,7 @@ function GroupDialog({
                     </DialogDescription>
                 </DialogHeader>
 
-                <div
-                    className="-mx-1 flex max-h-80 flex-col gap-1 overflow-y-auto overscroll-contain px-1"
-                    onScroll={onScroll}
-                >
+                <div className="-mx-1 flex max-h-80 flex-col gap-1 overflow-y-auto overscroll-contain px-1" onScroll={onScroll}>
                     {roster.items.length === 0 ? (
                         <p className="py-2 text-sm text-muted-foreground">
                             {t("groups.dialog.noMembers")}
@@ -447,24 +436,14 @@ function GroupDialog({
                             </Button>
                         </p>
                     ) : roster.hasMore ? (
-                        <Button
-                            size="sm"
-                            variant="ghost"
-                            className="self-center"
-                            onClick={roster.loadMore}
-                        >
-                            {t("groups.dialog.showMore", {
-                                count: group.memberCount - roster.items.length
-                            })}
+                        <Button size="sm" variant="ghost" className="self-center" onClick={roster.loadMore}>
+                            {t("groups.dialog.showMore", { count: group.memberCount - roster.items.length })}
                         </Button>
                     ) : null}
                 </div>
 
                 <div className="mt-3 flex items-center gap-2">
-                    <UserPlus
-                        className="size-4 shrink-0 text-muted-foreground"
-                        aria-hidden="true"
-                    />
+                    <UserPlus className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
                     <div className="min-w-0 flex-1">
                         <PeoplePicker
                             picked={[]}

@@ -40,9 +40,7 @@ export function encodeCursor(keyset: Keyset): string {
 export function decodeCursor(raw: string | null | undefined): Keyset | null {
     if (!raw || raw.length > 200) return null;
     try {
-        const parsed = keysetSchema.safeParse(
-            JSON.parse(Buffer.from(raw, "base64url").toString("utf8"))
-        );
+        const parsed = keysetSchema.safeParse(JSON.parse(Buffer.from(raw, "base64url").toString("utf8")));
         return parsed.success ? { at: new Date(parsed.data[0]), id: parsed.data[1] } : null;
     } catch {
         return null;
