@@ -303,11 +303,7 @@ describe("the calendar screen", () => {
 
         press("?");
         // The shared sheet, on the calendar's own actions.
-        const sheet = await screen.findByRole(
-            "dialog",
-            { name: "Keyboard shortcuts" },
-            { timeout: 5000 }
-        );
+        const sheet = await screen.findByRole("dialog", { name: "Keyboard shortcuts" }, { timeout: 5000 });
         expect(await within(sheet).findByText("Go to the next period")).toBeDefined();
     });
 

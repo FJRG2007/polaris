@@ -12,13 +12,7 @@ import { describe, expect, it } from "vitest";
 import type { TaskRow } from "@/lib/tasks/facts";
 import * as layout from "@/app/(app)/tasks/views/calendar-layout";
 import type { GoogleEvent } from "@/lib/google-calendar/events-client";
-import {
-    createDisplayFormat,
-    DISPLAY_DEFAULTS,
-    keysOf,
-    resolveShortcuts,
-    type DisplayFormat
-} from "@polaris/core";
+import { createDisplayFormat, DISPLAY_DEFAULTS, keysOf, resolveShortcuts, type DisplayFormat } from "@polaris/core";
 
 const FORMAT: DisplayFormat = createDisplayFormat(DISPLAY_DEFAULTS);
 

@@ -23,7 +23,13 @@ import * as core from "@polaris/core";
 import { MenuShortcut } from "../components/context-menu";
 import { useKeyNames } from "../lib/key-names";
 import { applePlatform, formatShortcut } from "../lib/shortcut";
-import { Fragment, useEffect, useRef, useSyncExternalStore, type ReactNode } from "react";
+import {
+    Fragment,
+    useEffect,
+    useRef,
+    useSyncExternalStore,
+    type ReactNode
+} from "react";
 
 // ---------------------------------------------------------------------------
 // The bindings in force
@@ -52,9 +58,7 @@ function subscribe(listener: () => void): () => void {
 export function readDeviceShortcuts(): core.ShortcutOverrides {
     try {
         const raw = window.localStorage.getItem(DEVICE_SHORTCUTS_KEY);
-        return raw
-            ? core.cleanShortcutOverrides(JSON.parse(raw), account)
-            : core.NO_SHORTCUT_OVERRIDES;
+        return raw ? core.cleanShortcutOverrides(JSON.parse(raw), account) : core.NO_SHORTCUT_OVERRIDES;
     } catch {
         return core.NO_SHORTCUT_OVERRIDES;
     }
@@ -100,10 +104,7 @@ export function useShortcutBindings(): ReadonlyMap<string, readonly string[]> {
 
 /** Whether a press is one action, against the keys in force - for a row or a
  *  field's own `onKeyDown`, where a window listener would be the wrong place. */
-export function shortcutPressed(
-    event: Parameters<typeof core.bindingOfEvent>[0],
-    id: string
-): boolean {
+export function shortcutPressed(event: Parameters<typeof core.bindingOfEvent>[0], id: string): boolean {
     return core.shortcutMatching(resolved, event, [id]) === id;
 }
 
@@ -305,9 +306,7 @@ export interface ShortcutSheetRow {
     /** Said on hover over a fixed key, as in "Always". */
     readonly fixedLabel?: string;
     /** A button drawn inside a key's cap - the settings' "remove this key". */
-    readonly onRemove?: (
-        binding: string
-    ) => { readonly label: string; readonly run: () => void } | null;
+    readonly onRemove?: (binding: string) => { readonly label: string; readonly run: () => void } | null;
     /** Drawn at the end of the row - the settings put their buttons here. */
     readonly end?: ReactNode;
     /** Drawn under the label - a conflict, a "this device" note. */
@@ -352,34 +351,20 @@ export function ShortcutSheet({
                                 className="flex min-w-0 flex-wrap items-center justify-between gap-x-2 gap-y-1 border-b border-border px-3 py-1.5 text-[13px] last:border-b-0"
                             >
                                 <span className="min-w-0 flex-1 basis-40">
-                                    <span className="block [overflow-wrap:anywhere]">
-                                        {row.label}
-                                    </span>
+                                    <span className="block [overflow-wrap:anywhere]">{row.label}</span>
                                     {row.note}
                                 </span>
                                 <span className="flex flex-wrap items-center justify-end gap-1">
                                     {row.bindings.length === 0 && !row.fixed?.length ? (
-                                        <span className="text-xs text-foreground-subtle">
-                                            {none}
-                                        </span>
+                                        <span className="text-xs text-foreground-subtle">{none}</span>
                                     ) : (
                                         [
-                                            ...row.bindings.map((binding) => ({
-                                                binding,
-                                                fixed: false
-                                            })),
-                                            ...(row.fixed ?? []).map((binding) => ({
-                                                binding,
-                                                fixed: true
-                                            }))
+                                            ...row.bindings.map((binding) => ({ binding, fixed: false })),
+                                            ...(row.fixed ?? []).map((binding) => ({ binding, fixed: true }))
                                         ].map(({ binding, fixed }, at) => {
-                                            const remove = fixed
-                                                ? null
-                                                : (row.onRemove?.(binding) ?? null);
+                                            const remove = fixed ? null : (row.onRemove?.(binding) ?? null);
                                             return (
-                                                <Fragment
-                                                    key={`${fixed ? "fixed" : "own"}:${binding}`}
-                                                >
+                                                <Fragment key={`${fixed ? "fixed" : "own"}:${binding}`}>
                                                     {at > 0 ? (
                                                         <span className="px-0.5 text-xs text-muted-foreground">
                                                             {or}
@@ -401,10 +386,7 @@ export function ShortcutSheet({
                                                                 onClick={remove.run}
                                                                 className="inline-flex size-6 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
                                                             >
-                                                                <X
-                                                                    className="size-3"
-                                                                    aria-hidden="true"
-                                                                />
+                                                                <X className="size-3" aria-hidden="true" />
                                                             </button>
                                                         ) : null}
                                                     </span>

@@ -132,7 +132,8 @@ export function CamerasView({ canManage, openId }: { canManage: boolean; openId:
                 }
             },
             () => {
-                if (!cancelled) setError(t("cameras.readFailed"));
+                if (!cancelled)
+                    setError(t("cameras.readFailed"));
             }
         );
         void Promise.all([
@@ -193,11 +194,7 @@ export function CamerasView({ canManage, openId }: { canManage: boolean; openId:
         const list = shown;
         const index = list.findIndex((camera) => camera.id === focused);
         const current = list[index];
-        if (
-            (shortcutPressed(event, "general.rename") || event.key === "Enter") &&
-            current &&
-            canManage
-        ) {
+        if ((shortcutPressed(event, "general.rename") || event.key === "Enter") && current && canManage) {
             event.preventDefault();
             setEditing(current);
         } else if (shortcutPressed(event, "general.delete") && current && canManage) {
@@ -262,10 +259,7 @@ export function CamerasView({ canManage, openId }: { canManage: boolean; openId:
                             aria-label={t("cameras.area")}
                             className="w-48"
                             options={[
-                                {
-                                    value: ALL_AREAS,
-                                    label: t("cameras.everyArea", { count: loaded.length })
-                                },
+                                { value: ALL_AREAS, label: t("cameras.everyArea", { count: loaded.length }) },
                                 ...areas.map((area) => ({
                                     value: area.zone,
                                     label: t("cameras.areaCount", {
@@ -285,7 +279,9 @@ export function CamerasView({ canManage, openId }: { canManage: boolean; openId:
                 <EmptyState
                     icon={<Cctv />}
                     title={t("cameras.empty.title")}
-                    description={canManage ? t("cameras.empty.manage") : t("cameras.empty.view")}
+                    description={
+                        canManage ? t("cameras.empty.manage") : t("cameras.empty.view")
+                    }
                 />
             ) : shown.length === 0 ? (
                 <EmptyState
@@ -298,15 +294,9 @@ export function CamerasView({ canManage, openId }: { canManage: boolean; openId:
                     <table className="w-full text-[0.8125rem]">
                         <thead>
                             <tr>
-                                <th className="w-full max-w-0 px-3 py-2 text-left">
-                                    {t("cameras.columns.camera")}
-                                </th>
-                                <th className="whitespace-nowrap px-3 py-2 text-left">
-                                    {t("cameras.columns.notices")}
-                                </th>
-                                <th className="whitespace-nowrap px-3 py-2 text-left">
-                                    {t("cameras.columns.keeps")}
-                                </th>
+                                <th className="w-full max-w-0 px-3 py-2 text-left">{t("cameras.columns.camera")}</th>
+                                <th className="whitespace-nowrap px-3 py-2 text-left">{t("cameras.columns.notices")}</th>
+                                <th className="whitespace-nowrap px-3 py-2 text-left">{t("cameras.columns.keeps")}</th>
                                 {canManage ? <th className="px-3 py-2" /> : null}
                             </tr>
                         </thead>
@@ -339,35 +329,25 @@ export function CamerasView({ canManage, openId }: { canManage: boolean; openId:
                                                         {camera.name}
                                                     </span>
                                                     {!camera.enabled ? (
-                                                        <Badge variant="neutral">
-                                                            {t("cameras.off")}
-                                                        </Badge>
+                                                        <Badge variant="neutral">{t("cameras.off")}</Badge>
                                                     ) : quietFor(camera) ? (
-                                                        <Badge variant="danger">
-                                                            {t("camera.quiet")}
-                                                        </Badge>
+                                                        <Badge variant="danger">{t("camera.quiet")}</Badge>
                                                     ) : null}
                                                 </div>
                                                 <Subtitle camera={camera} />
                                             </td>
                                             <td className="whitespace-nowrap px-3 py-2 text-muted-foreground">
                                                 {t.has(`detectors.${camera.detector}.label`)
-                                                    ? t(
-                                                          `detectors.${camera.detector}.label` as PlacesKey
-                                                      )
+                                                    ? t(`detectors.${camera.detector}.label` as PlacesKey)
                                                     : camera.detector}
                                             </td>
                                             <td className="whitespace-nowrap px-3 py-2 text-muted-foreground">
                                                 {t.has(`cameras.keeps.${camera.recording}`)
-                                                    ? t(
-                                                          `cameras.keeps.${camera.recording}` as PlacesKey
-                                                      )
+                                                    ? t(`cameras.keeps.${camera.recording}` as PlacesKey)
                                                     : camera.recording}
                                                 {camera.recording !== "off" ? (
                                                     <span className="text-foreground-subtle">
-                                                        {t("cameras.retention", {
-                                                            days: camera.retentionDays
-                                                        })}
+                                                        {t("cameras.retention", { days: camera.retentionDays })}
                                                     </span>
                                                 ) : null}
                                             </td>
@@ -377,9 +357,7 @@ export function CamerasView({ canManage, openId }: { canManage: boolean; openId:
                                                         <Button
                                                             variant="ghost"
                                                             size="icon"
-                                                            aria-label={t("cameras.changeName", {
-                                                                name: camera.name
-                                                            })}
+                                                            aria-label={t("cameras.changeName", { name: camera.name })}
                                                             title={t("cameras.change")}
                                                             onClick={() => setEditing(camera)}
                                                         >
@@ -388,9 +366,7 @@ export function CamerasView({ canManage, openId }: { canManage: boolean; openId:
                                                         <Button
                                                             variant="ghost"
                                                             size="icon"
-                                                            aria-label={t("cameras.drawAreasOn", {
-                                                                name: camera.name
-                                                            })}
+                                                            aria-label={t("cameras.drawAreasOn", { name: camera.name })}
                                                             title={t("cameras.areas")}
                                                             onClick={() => setDrawing(camera)}
                                                         >
@@ -399,9 +375,7 @@ export function CamerasView({ canManage, openId }: { canManage: boolean; openId:
                                                         <Button
                                                             variant="ghost"
                                                             size="icon"
-                                                            aria-label={t("cameras.shareName", {
-                                                                name: camera.name
-                                                            })}
+                                                            aria-label={t("cameras.shareName", { name: camera.name })}
                                                             title={t("cameras.share")}
                                                             onClick={() => setSharing(camera)}
                                                         >
@@ -410,9 +384,7 @@ export function CamerasView({ canManage, openId }: { canManage: boolean; openId:
                                                         <Button
                                                             variant="ghost"
                                                             size="icon"
-                                                            aria-label={t("cameras.removeName", {
-                                                                name: camera.name
-                                                            })}
+                                                            aria-label={t("cameras.removeName", { name: camera.name })}
                                                             title={t("cameras.remove")}
                                                             onClick={() => setRemoving(camera)}
                                                         >

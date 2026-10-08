@@ -30,7 +30,12 @@
 import dynamic from "next/dynamic";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { Loading, ViewerError } from "./status";
-import { Button, cn, ScrollRow, shortcutPressed } from "@polaris/ui";
+import {
+    Button,
+    cn,
+    ScrollRow,
+    shortcutPressed
+} from "@polaris/ui";
 import type { RenderSlide } from "@polaris/pptx-render";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
@@ -196,8 +201,7 @@ export function PptxView({ src, token }: { src: string; token?: string }) {
 
     if (failed) return <ViewerError>{failed}</ViewerError>;
     if (!slides) return <Loading />;
-    if (slides.length === 0)
-        return <ViewerError>{t("pptx.thisPresentationHasNoSlides")}</ViewerError>;
+    if (slides.length === 0) return <ViewerError>{t("pptx.thisPresentationHasNoSlides")}</ViewerError>;
 
     const slide = slides[Math.min(index, slides.length - 1)]!;
 

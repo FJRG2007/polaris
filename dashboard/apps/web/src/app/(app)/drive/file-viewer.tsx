@@ -312,31 +312,23 @@ export function FileViewer({
                             <div className="flex justify-between gap-2">
                                 <span className="text-muted-foreground">{t("viewer.type")}</span>
                                 <span>
-                                    {extension
-                                        ? t("viewer.kindFile", { kind: extension.toUpperCase() })
-                                        : t("viewer.file")}
+                                    {extension ? t("viewer.kindFile", { kind: extension.toUpperCase() }) : t("viewer.file")}
                                 </span>
                             </div>
                             {target.size !== undefined ? (
                                 <div className="flex justify-between gap-2">
-                                    <span className="text-muted-foreground">
-                                        {t("viewer.size")}
-                                    </span>
+                                    <span className="text-muted-foreground">{t("viewer.size")}</span>
                                     <span>{formatBytes(BigInt(target.size))}</span>
                                 </div>
                             ) : null}
                             {target.modifiedAt ? (
                                 <div className="flex flex-col gap-0.5">
-                                    <span className="text-muted-foreground">
-                                        {t("viewer.modified")}
-                                    </span>
+                                    <span className="text-muted-foreground">{t("viewer.modified")}</span>
                                     <span>{format.dateTime(target.modifiedAt)}</span>
                                 </div>
                             ) : null}
                             <div className="flex flex-col gap-0.5">
-                                <span className="text-muted-foreground">
-                                    {t("viewer.location")}
-                                </span>
+                                <span className="text-muted-foreground">{t("viewer.location")}</span>
                                 <span className="break-all">
                                     {target.locationLabel ??
                                         `/${target.path.split("/").slice(0, -1).join("/")}`}

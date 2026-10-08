@@ -201,12 +201,7 @@ export function VariablesEditor({
     useEffect(() => {
         if (!canWrite) return;
         function onKey(event: KeyboardEvent): void {
-            if (
-                event.defaultPrevented ||
-                !hovered.current ||
-                !shortcutPressed(event, "general.rename")
-            )
-                return;
+            if (event.defaultPrevented || !hovered.current || !shortcutPressed(event, "general.rename")) return;
             const target = event.target;
             if (target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement) return;
             if (
@@ -601,12 +596,7 @@ export function VariablesEditor({
                                     if (hovered.current?.id === row.id) hovered.current = null;
                                 }}
                                 onKeyDown={(event) => {
-                                    if (
-                                        !canWrite ||
-                                        removed ||
-                                        !shortcutPressed(event, "general.rename")
-                                    )
-                                        return;
+                                    if (!canWrite || removed || !shortcutPressed(event, "general.rename")) return;
                                     event.preventDefault();
                                     void startEditing(row);
                                 }}

@@ -325,8 +325,7 @@ function Present({
                 if (shortcutPressed(event, "viewer.nextSlide")) {
                     setAt((one) => Math.min(slides.length - 1, one + 1));
                 }
-                if (shortcutPressed(event, "viewer.previousSlide"))
-                    setAt((one) => Math.max(0, one - 1));
+                if (shortcutPressed(event, "viewer.previousSlide")) setAt((one) => Math.max(0, one - 1));
             }}
             className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-black outline-none"
         >

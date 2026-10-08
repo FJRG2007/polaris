@@ -24,11 +24,7 @@ vi.mock("@/app/(app)/shortcut-actions", () => ({
 
 const { ShortcutSettings } = await import("@/components/shortcuts/shortcut-settings");
 
-function press(
-    key: string,
-    init: KeyboardEventInit = {},
-    target: EventTarget = window
-): KeyboardEvent {
+function press(key: string, init: KeyboardEventInit = {}, target: EventTarget = window): KeyboardEvent {
     const event = new KeyboardEvent("keydown", { key, cancelable: true, bubbles: true, ...init });
     target.dispatchEvent(event);
     return event;
@@ -99,23 +95,17 @@ describe("the settings", () => {
         save.mockResolvedValue({ overrides: { "drive.newFolder": ["n", "Shift+f"] } });
         render(withMessages(<ShortcutSettings app="drive" />));
         fireEvent.click(within(row("drive.newFolder")).getByRole("button", { name: /Add a key/ }));
-        const recorder = within(row("drive.newFolder")).getByRole("button", {
-            name: /Press the new keys/
-        });
+        const recorder = within(row("drive.newFolder")).getByRole("button", { name: /Press the new keys/ });
         fireEvent.keyDown(recorder, { key: "F", shiftKey: true });
         expect(save).toHaveBeenCalledWith({ "drive.newFolder": ["n", "Shift+f"] });
         expect(ui.shortcutBindings().get("drive.newFolder")).toEqual(["n", "Shift+f"]);
-        await waitFor(() =>
-            expect(within(row("drive.newFolder")).getAllByText("F").length).toBe(1)
-        );
+        await waitFor(() => expect(within(row("drive.newFolder")).getAllByText("F").length).toBe(1));
     });
 
     it("refuses a key another action here already has, and names it", () => {
         render(withMessages(<ShortcutSettings app="drive" />));
         fireEvent.click(within(row("drive.newFolder")).getByRole("button", { name: /Add a key/ }));
-        const recorder = within(row("drive.newFolder")).getByRole("button", {
-            name: /Press the new keys/
-        });
+        const recorder = within(row("drive.newFolder")).getByRole("button", { name: /Press the new keys/ });
         fireEvent.keyDown(recorder, { key: "u" });
         expect(within(row("drive.newFolder")).getByRole("alert").textContent).toBe(
             "U already does upload files here."
@@ -153,9 +143,7 @@ describe("the settings", () => {
         render(withMessages(<ShortcutSettings app="drive" />));
         fireEvent.click(screen.getByRole("switch", { name: "This device only" }));
         fireEvent.click(within(row("drive.newFolder")).getByRole("button", { name: /Add a key/ }));
-        const recorder = within(row("drive.newFolder")).getByRole("button", {
-            name: /Press the new keys/
-        });
+        const recorder = within(row("drive.newFolder")).getByRole("button", { name: /Press the new keys/ });
         fireEvent.keyDown(recorder, { key: "u" });
         expect(ui.readDeviceShortcuts()).toEqual({ "drive.newFolder": ["n", "u"] });
     });
@@ -164,9 +152,7 @@ describe("the settings", () => {
         ui.writeDeviceShortcuts({ "drive.uploadFiles": ["Alt+u"] });
         render(withMessages(<ShortcutSettings app="drive" />));
         fireEvent.click(within(row("drive.newFolder")).getByRole("button", { name: /Add a key/ }));
-        const recorder = within(row("drive.newFolder")).getByRole("button", {
-            name: /Press the new keys/
-        });
+        const recorder = within(row("drive.newFolder")).getByRole("button", { name: /Press the new keys/ });
         fireEvent.keyDown(recorder, { key: "u" });
         expect(save).not.toHaveBeenCalled();
         expect(within(row("drive.newFolder")).getByRole("alert").textContent).toBe(

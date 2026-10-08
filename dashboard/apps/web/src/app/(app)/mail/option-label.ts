@@ -19,10 +19,6 @@ export type MailOptionGroup =
     | "afterFiling"
     | "mailboxScope";
 
-export function mailOptionLabel(
-    t: NamespaceTranslator<"mail">,
-    group: MailOptionGroup,
-    value: string
-): string {
+export function mailOptionLabel(t: NamespaceTranslator<"mail">, group: MailOptionGroup, value: string): string {
     return t(`labels.${group}.${value}` as NamespaceKey<"mail">);
 }

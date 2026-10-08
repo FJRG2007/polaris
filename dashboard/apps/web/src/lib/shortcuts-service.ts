@@ -19,9 +19,7 @@ import { prisma } from "@polaris/db";
 import { readMailPreferences, saveMailPreferences } from "@/lib/mailbox/prefs";
 
 /** Read a stored set back. Anything that does not parse is no changes. */
-export function parseShortcutOverrides(
-    raw: string | null | undefined
-): core.ShortcutOverrides | null {
+export function parseShortcutOverrides(raw: string | null | undefined): core.ShortcutOverrides | null {
     if (raw === null || raw === undefined) return null;
     try {
         return core.cleanShortcutOverrides(JSON.parse(raw));

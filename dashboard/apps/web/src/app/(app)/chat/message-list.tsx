@@ -589,12 +589,7 @@ function useMessageKeys({
             // only with exactly its modifiers, which is what keeps AltGr+C (Ctrl+Alt
             // on Windows) typing its character and Ctrl+Shift+C opening the
             // developer tools instead of copying a message.
-            const matched = matchShortcut(event, [
-                "chat.copy",
-                "chat.edit",
-                "chat.delete",
-                "chat.reply"
-            ]);
+            const matched = matchShortcut(event, ["chat.copy", "chat.edit", "chat.delete", "chat.reply"]);
             const wanted = matched
                 ? (matched.slice("chat.".length) as "copy" | "edit" | "delete" | "reply")
                 : null;

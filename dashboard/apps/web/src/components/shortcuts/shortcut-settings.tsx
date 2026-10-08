@@ -144,12 +144,9 @@ export function ShortcutSettings({
             ...core.shortcutConflicts(core.resolveShortcuts(onAccount)),
             ...core.shortcutConflicts(core.resolveShortcuts(onAccount, onDevice))
         ];
-        const signature = (clash: core.ShortcutConflict) =>
-            `${clash.binding} ${clash.ids.join(" ")}`;
+        const signature = (clash: core.ShortcutConflict) => `${clash.binding} ${clash.ids.join(" ")}`;
         const before = new Set(clashes(account, device).map(signature));
-        const brought = clashes(nextAccount, nextDevice).filter(
-            (clash) => !before.has(signature(clash))
-        );
+        const brought = clashes(nextAccount, nextDevice).filter((clash) => !before.has(signature(clash)));
         const clash = brought.find((entry) => entry.ids.includes(id)) ?? brought[0];
         if (clash) {
             setProblem({ id, message: clashMessage(clash, id) });
@@ -167,8 +164,7 @@ export function ShortcutSettings({
         const definition = core.shortcutDefinition(id);
         if (!definition) return false;
         const accountKeys = account[id] ?? definition.defaults;
-        if (deviceOnly || id in device)
-            return commit(id, account, setIn(device, accountKeys, id, bindings));
+        if (deviceOnly || id in device) return commit(id, account, setIn(device, accountKeys, id, bindings));
         return commit(id, setIn(account, definition.defaults, id, bindings), device);
     }
 
@@ -198,13 +194,7 @@ export function ShortcutSettings({
         }
         event.preventDefault();
         event.stopPropagation();
-        if (
-            event.key === "Escape" &&
-            !event.shiftKey &&
-            !event.ctrlKey &&
-            !event.metaKey &&
-            !event.altKey
-        ) {
+        if (event.key === "Escape" && !event.shiftKey && !event.ctrlKey && !event.metaKey && !event.altKey) {
             setRecording(null);
             setProblem(null);
             return;
@@ -222,10 +212,7 @@ export function ShortcutSettings({
             return;
         }
         if (current.length >= core.MAX_BINDINGS_PER_SHORTCUT) {
-            setProblem({
-                id,
-                message: t("errors.tooMany", { count: core.MAX_BINDINGS_PER_SHORTCUT })
-            });
+            setProblem({ id, message: t("errors.tooMany", { count: core.MAX_BINDINGS_PER_SHORTCUT }) });
             return;
         }
         const clash = core.conflictsFor(resolved, id, binding)[0];
@@ -324,11 +311,7 @@ export function ShortcutSettings({
                                             ? t("pressFor", { action: label })
                                             : t("add", { action: label })
                                     }
-                                    title={
-                                        listening
-                                            ? t("pressFor", { action: label })
-                                            : t("add", { action: label })
-                                    }
+                                    title={listening ? t("pressFor", { action: label }) : t("add", { action: label })}
                                     onClick={() => {
                                         setProblem(null);
                                         setRecording(listening ? null : id);
@@ -338,11 +321,7 @@ export function ShortcutSettings({
                                         if (listening) setRecording(null);
                                     }}
                                 >
-                                    {listening ? (
-                                        t("press")
-                                    ) : (
-                                        <Plus className="size-3.5" aria-hidden="true" />
-                                    )}
+                                    {listening ? t("press") : <Plus className="size-3.5" aria-hidden="true" />}
                                 </Button>
                                 {moved ? (
                                     <Button
@@ -405,17 +384,10 @@ export function ShortcutSettings({
                     />
                     <span className="min-w-0">
                         <span className="block">{t("deviceOnly")}</span>
-                        <span className="block text-[12px] text-muted-foreground">
-                            {t("deviceOnlyHint")}
-                        </span>
+                        <span className="block text-[12px] text-muted-foreground">{t("deviceOnlyHint")}</span>
                     </span>
                 </label>
-                <Button
-                    variant="ghost"
-                    size="sm"
-                    disabled={!anyMoved}
-                    onClick={() => void resetAll()}
-                >
+                <Button variant="ghost" size="sm" disabled={!anyMoved} onClick={() => void resetAll()}>
                     {t("resetAll")}
                 </Button>
             </div>

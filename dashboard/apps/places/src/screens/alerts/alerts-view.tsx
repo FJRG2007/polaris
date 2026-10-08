@@ -46,16 +46,7 @@ import type { PlacesKey } from "../../../messages";
 const { runAction } = hostUi.runAction;
 
 /** The kinds a rule can name, each read as `alerts.said.<kind>` in a sentence. */
-const SAID = new Set([
-    "motion",
-    "person",
-    "face",
-    "vehicle",
-    "animal",
-    "package",
-    "tamper",
-    "offline"
-]);
+const SAID = new Set(["motion", "person", "face", "vehicle", "animal", "package", "tamper", "offline"]);
 
 export function AlertsView({ canManage }: { canManage: boolean }) {
     const t = usePlacesT();
@@ -95,7 +86,8 @@ export function AlertsView({ canManage }: { canManage: boolean }) {
                 setRules(list.rules ?? []);
             },
             () => {
-                if (!cancelled) setError(t("alerts.readFailed"));
+                if (!cancelled)
+                    setError(t("alerts.readFailed"));
             }
         );
         void Promise.all([actions.listPeopleAction(), actions.listPlaceZoneNamesAction()]).then(
@@ -109,7 +101,9 @@ export function AlertsView({ canManage }: { canManage: boolean }) {
             },
             () => {
                 if (cancelled) return;
-                setError(t("alerts.extrasFailed"));
+                setError(
+                    t("alerts.extrasFailed")
+                );
             }
         );
         return () => {
@@ -160,11 +154,7 @@ export function AlertsView({ canManage }: { canManage: boolean }) {
         const list = rules ?? [];
         const index = list.findIndex((rule) => rule.id === focused);
         const current = list[index];
-        if (
-            (shortcutPressed(event, "general.rename") || event.key === "Enter") &&
-            current &&
-            canManage
-        ) {
+        if ((shortcutPressed(event, "general.rename") || event.key === "Enter") && current && canManage) {
             event.preventDefault();
             setEditing(current);
         } else if (shortcutPressed(event, "general.delete") && current && canManage) {
@@ -250,9 +240,7 @@ export function AlertsView({ canManage }: { canManage: boolean }) {
                                                 {rule.name}
                                             </span>
                                             {rule.channelId ? null : (
-                                                <Badge variant="neutral">
-                                                    {t("alerts.neverFired")}
-                                                </Badge>
+                                                <Badge variant="neutral">{t("alerts.neverFired")}</Badge>
                                             )}
                                         </div>
                                         <p className="truncate text-[0.6875rem] text-foreground-subtle">
@@ -263,9 +251,8 @@ export function AlertsView({ canManage }: { canManage: boolean }) {
                                                 names: rule.recipients
                                                     .map(
                                                         (id) =>
-                                                            people.find(
-                                                                (person) => person.id === id
-                                                            )?.name ?? t("alerts.somebody")
+                                                            people.find((person) => person.id === id)
+                                                                ?.name ?? t("alerts.somebody")
                                                     )
                                                     .join(", "),
                                                 bell: rule.notify ? "yes" : "no"
@@ -277,20 +264,13 @@ export function AlertsView({ canManage }: { canManage: boolean }) {
                                             <>
                                                 <Switch
                                                     checked={rule.enabled}
-                                                    aria-label={t(
-                                                        rule.enabled
-                                                            ? "alerts.turnOffName"
-                                                            : "alerts.turnOnName",
-                                                        { name: rule.name }
-                                                    )}
+                                                    aria-label={t(rule.enabled ? "alerts.turnOffName" : "alerts.turnOnName", { name: rule.name })}
                                                     onChange={(value) => void toggle(rule, value)}
                                                 />
                                                 <Button
                                                     variant="ghost"
                                                     size="icon"
-                                                    aria-label={t("cameras.changeName", {
-                                                        name: rule.name
-                                                    })}
+                                                    aria-label={t("cameras.changeName", { name: rule.name })}
                                                     title={t("cameras.change")}
                                                     onClick={() => setEditing(rule)}
                                                 >
@@ -299,9 +279,7 @@ export function AlertsView({ canManage }: { canManage: boolean }) {
                                                 <Button
                                                     variant="ghost"
                                                     size="icon"
-                                                    aria-label={t("cameras.removeName", {
-                                                        name: rule.name
-                                                    })}
+                                                    aria-label={t("cameras.removeName", { name: rule.name })}
                                                     title={t("cameras.remove")}
                                                     onClick={() => setRemoving(rule)}
                                                 >
@@ -324,9 +302,7 @@ export function AlertsView({ canManage }: { canManage: boolean }) {
                                             onSelect={() => void toggle(rule, !rule.enabled)}
                                         >
                                             <Bell className="size-4 shrink-0" />
-                                            {rule.enabled
-                                                ? t("alerts.turnOff")
-                                                : t("alerts.turnOn")}
+                                            {rule.enabled ? t("alerts.turnOff") : t("alerts.turnOn")}
                                         </ContextMenuItem>
                                         <ContextMenuSeparator />
                                         <ContextMenuItem
@@ -374,9 +350,7 @@ export function AlertsView({ canManage }: { canManage: boolean }) {
                     title={t("alerts.removeTitle")}
                     question={t.rich("alerts.removeQuestion", {
                         name: removing.name,
-                        em: (chunks) => (
-                            <span className="font-medium text-foreground">{chunks}</span>
-                        )
+                        em: (chunks) => <span className="font-medium text-foreground">{chunks}</span>
                     })}
                     requireTyping={false}
                     description={t("alerts.removeBody")}

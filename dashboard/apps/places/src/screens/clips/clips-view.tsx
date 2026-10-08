@@ -389,19 +389,16 @@ export function ClipsView({ canManage }: { canManage: boolean }) {
                                                     </p>
                                                     <p className="truncate text-[0.6875rem] text-foreground-subtle">
                                                         {REASONS.has(clip.reason)
-                                                            ? t(
-                                                                  `clips.reasons.${clip.reason}` as PlacesKey
-                                                              )
+                                                            ? t(`clips.reasons.${clip.reason}` as PlacesKey)
                                                             : clip.reason}{" "}
-                                                        - {duration(clip.durationMs)} -{" "}
+                                                        -{" "}
+                                                        {duration(clip.durationMs)} -{" "}
                                                         {size(clip.bytes)}
                                                     </p>
                                                 </div>
                                                 <div className="flex shrink-0 items-center gap-1">
                                                     {clip.pinned ? (
-                                                        <Badge variant="neutral">
-                                                            {t("clips.kept")}
-                                                        </Badge>
+                                                        <Badge variant="neutral">{t("clips.kept")}</Badge>
                                                     ) : null}
                                                     <Button
                                                         variant="ghost"
@@ -412,9 +409,7 @@ export function ClipsView({ canManage }: { canManage: boolean }) {
                                                                 : t("clips.playThis")
                                                         }
                                                         title={
-                                                            playing === clip.id
-                                                                ? t("clips.stop")
-                                                                : t("clips.play")
+                                                            playing === clip.id ? t("clips.stop") : t("clips.play")
                                                         }
                                                         onClick={(event) => {
                                                             event.stopPropagation();
@@ -517,9 +512,7 @@ export function ClipsView({ canManage }: { canManage: boolean }) {
                                             }
                                         >
                                             <Play className="size-4 shrink-0" />
-                                            {playing === clip.id
-                                                ? t("clips.stop")
-                                                : t("clips.play")}
+                                            {playing === clip.id ? t("clips.stop") : t("clips.play")}
                                         </ContextMenuItem>
                                         <ContextMenuItem
                                             onSelect={() => {
@@ -605,9 +598,7 @@ export function ClipsView({ canManage }: { canManage: boolean }) {
                             removing.length === 1 && removing[0]
                                 ? `${removing[0].cameraName} - ${format.dateTime(removing[0].startedAt)}`
                                 : t("clips.count", { count: removing.length }),
-                        em: (chunks) => (
-                            <span className="font-medium text-foreground">{chunks}</span>
-                        )
+                        em: (chunks) => <span className="font-medium text-foreground">{chunks}</span>
                     })}
                     requireTyping={false}
                     description={t("clips.deleteBody")}

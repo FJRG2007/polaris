@@ -1,11 +1,7 @@
 import { describe, expect, it } from "vitest";
 import * as keys from "./shortcuts";
 
-const press = (
-    key: string,
-    held: Partial<Record<"ctrl" | "meta" | "alt" | "shift", boolean>> = {},
-    code?: string
-) => ({
+const press = (key: string, held: Partial<Record<"ctrl" | "meta" | "alt" | "shift", boolean>> = {}, code?: string) => ({
     key,
     code,
     ctrlKey: held.ctrl ?? false,
@@ -66,12 +62,8 @@ describe("reading a press", () => {
     it("keeps AltGr apart from Ctrl, so a character typed with it is not a copy", () => {
         // AltGr arrives as Ctrl+Alt on Windows.
         const resolved = keys.resolveShortcuts();
-        expect(
-            keys.shortcutMatching(resolved, press("c", { ctrl: true, alt: true }), ["chat.copy"])
-        ).toBeNull();
-        expect(keys.shortcutMatching(resolved, press("c", { ctrl: true }), ["chat.copy"])).toBe(
-            "chat.copy"
-        );
+        expect(keys.shortcutMatching(resolved, press("c", { ctrl: true, alt: true }), ["chat.copy"])).toBeNull();
+        expect(keys.shortcutMatching(resolved, press("c", { ctrl: true }), ["chat.copy"])).toBe("chat.copy");
     });
 
     it("is nothing for a modifier going down, or a press with no key", () => {
@@ -84,9 +76,7 @@ describe("reading a press", () => {
 
 describe("the table", () => {
     it("has one entry per id and no two actions sharing a key out of the box", () => {
-        expect(new Set(keys.SHORTCUTS.map((definition) => definition.id)).size).toBe(
-            keys.SHORTCUTS.length
-        );
+        expect(new Set(keys.SHORTCUTS.map((definition) => definition.id)).size).toBe(keys.SHORTCUTS.length);
         expect(keys.shortcutConflicts(keys.resolveShortcuts())).toEqual([]);
     });
 
@@ -100,31 +90,22 @@ describe("the table", () => {
     it("answers a fixed key whatever the movable ones are", () => {
         const resolved = keys.resolveShortcuts({ "mail.next": ["n"] });
         expect(keys.keysOf(resolved, "mail.next")).toEqual(["n", "ArrowDown"]);
-        expect(keys.shortcutMatching(resolved, press("ArrowDown"), ["mail.next"])).toBe(
-            "mail.next"
-        );
+        expect(keys.shortcutMatching(resolved, press("ArrowDown"), ["mail.next"])).toBe("mail.next");
         expect(keys.shortcutMatching(resolved, press("j"), ["mail.next"])).toBeNull();
     });
 });
 
 describe("moving keys", () => {
     it("lays the device over the account over the defaults", () => {
-        const resolved = keys.resolveShortcuts(
-            { "tasks.new": ["Shift+n"] },
-            { "tasks.new": ["q"] }
-        );
+        const resolved = keys.resolveShortcuts({ "tasks.new": ["Shift+n"] }, { "tasks.new": ["q"] });
         expect(resolved.get("tasks.new")).toEqual(["q"]);
-        expect(keys.resolveShortcuts({ "tasks.new": ["Shift+n"] }).get("tasks.new")).toEqual([
-            "Shift+n"
-        ]);
+        expect(keys.resolveShortcuts({ "tasks.new": ["Shift+n"] }).get("tasks.new")).toEqual(["Shift+n"]);
         expect(keys.resolveShortcuts().get("tasks.new")).toEqual(["n"]);
     });
 
     it("finds who already has a key, only among actions listening at the same time", () => {
         const resolved = keys.resolveShortcuts();
-        expect(keys.conflictsFor(resolved, "tasks.calendar.day", "t")).toEqual([
-            "tasks.calendar.today"
-        ]);
+        expect(keys.conflictsFor(resolved, "tasks.calendar.day", "t")).toEqual(["tasks.calendar.today"]);
         // Drive's N and the calendar's D are never listening together.
         expect(keys.conflictsFor(resolved, "drive.newFolder", "d")).toEqual([]);
         // The list-level keys are listening while the calendar is drawn.
@@ -132,9 +113,7 @@ describe("moving keys", () => {
         // A fixed key cannot be taken.
         expect(keys.conflictsFor(resolved, "mail.archive", "Escape")).toEqual(["mail.back"]);
         // The palette is listening everywhere.
-        expect(keys.conflictsFor(resolved, "drive.newFile", "Mod+k")).toEqual([
-            "general.commandPalette"
-        ]);
+        expect(keys.conflictsFor(resolved, "drive.newFile", "Mod+k")).toEqual(["general.commandPalette"]);
     });
 
     it("puts an action back when its keys are its defaults again", () => {
@@ -160,22 +139,14 @@ describe("moving keys", () => {
     it("checks a device's set over the account's it is laid on", () => {
         const device = { "drive.newFolder": ["n", "u"] };
         expect(keys.cleanShortcutOverrides(device)).toEqual({});
-        expect(keys.cleanShortcutOverrides(device, { "drive.uploadFiles": ["Alt+u"] })).toEqual(
-            device
-        );
+        expect(keys.cleanShortcutOverrides(device, { "drive.uploadFiles": ["Alt+u"] })).toEqual(device);
     });
 
     it("refuses a save that would collide or name what is not a shortcut", () => {
-        expect(
-            keys.shortcutOverridesSchema.safeParse({ "tasks.calendar.day": ["t"] }).success
-        ).toBe(false);
+        expect(keys.shortcutOverridesSchema.safeParse({ "tasks.calendar.day": ["t"] }).success).toBe(false);
         expect(keys.shortcutOverridesSchema.safeParse({ "drive.open": ["o"] }).success).toBe(false);
-        expect(
-            keys.shortcutOverridesSchema.safeParse({ "drive.newFolder": ["Mod+w"] }).success
-        ).toBe(false);
-        expect(keys.shortcutOverridesSchema.safeParse({ "drive.newFolder": [] }).success).toBe(
-            true
-        );
+        expect(keys.shortcutOverridesSchema.safeParse({ "drive.newFolder": ["Mod+w"] }).success).toBe(false);
+        expect(keys.shortcutOverridesSchema.safeParse({ "drive.newFolder": [] }).success).toBe(true);
     });
 
     it("carries over the keys somebody moved in Mail before the table was shared", () => {
