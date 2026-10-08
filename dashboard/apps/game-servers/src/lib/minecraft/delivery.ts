@@ -8,7 +8,8 @@
  * taking anything, from 1.13), and whatever did not go in is known to have been
  * dropped: the operator has chosen that a full inventory drops the rest rather
  * than keeping it owed. Levels need no room; the level is read before and after
- * to see the rise.
+ * to see the rise. Levels go to the player's worn Mending gear first, as the
+ * experience they are worth (`mending`), and only the rest to the bar.
  *
  * One command at a time, through the caller's `say`, which keeps each in the
  * server's RCON turn.
@@ -16,6 +17,8 @@
 
 import { stripFormatting } from "./parse";
 import { gaveIt } from "./events/commands";
+import { readLiveInventory } from "./inventory-service";
+import * as mending from "./mending";
 
 export interface Reward {
     readonly items: readonly { readonly id: string; readonly count: number }[];
@@ -32,10 +35,19 @@ export interface DeliveredItem {
     readonly label: string | null;
 }
 
+/** An item with Mending the prize's experience repaired. */
+export interface MendedItem {
+    readonly id: string;
+    /** Points of experience it took. */
+    readonly points: number;
+}
+
 export interface Delivery {
     readonly items: readonly DeliveredItem[];
     /** Levels the player went up by. */
     readonly levels: number;
+    /** What the experience repaired before the rest went on the bar. */
+    readonly mended?: readonly MendedItem[];
 }
 
 export interface Handed {
@@ -69,6 +81,10 @@ export function readCount(output: string): number | null {
 
 export function levelLine(name: string): string {
     return `xp query ${name} levels`;
+}
+
+export function pointsLine(name: string, points: number): string {
+    return `xp add ${name} ${points} points`;
 }
 
 /** `Ana has 12 experience levels`; null for any other answer. */
@@ -118,20 +134,77 @@ export async function deliver(
     }
     let levels = 0;
     let levelsLeft = 0;
+    let mended: MendedItem[] = [];
     if (reward.levels > 0) {
         const before = readLevel(await say(levelLine(name)));
-        if (gaveIt(await say(levelsLine(name, reward.levels)))) {
-            const after = readLevel(await say(levelLine(name)));
+        const repaired = before === null ? null : await mend(say, name, before, reward.levels);
+        mended = repaired?.mended ?? [];
+        // The rest of the experience on the bar: the levels whole when nothing
+        // was repaired, the points left when something was.
+        const line = repaired
+            ? repaired.left > 0
+                ? pointsLine(name, repaired.left)
+                : null
+            : levelsLine(name, reward.levels);
+        if (line === null || gaveIt(await say(line))) {
+            const after = line === null ? before : readLevel(await say(levelLine(name)));
             levels =
-                before !== null && after !== null ? Math.max(0, after - before) : reward.levels;
+                before !== null && after !== null
+                    ? Math.max(0, after - before)
+                    : repaired
+                      ? 0
+                      : reward.levels;
         } else {
-            levelsLeft = reward.levels;
+            // Repaired already, only the rest is still owed: as the whole
+            // levels it buys, never more than the prize was.
+            levelsLeft = repaired ? mending.levelsFor(before!, repaired.left) : reward.levels;
         }
     }
     return {
-        delivery: { items, levels },
+        delivery: { items, levels, ...(mended.length > 0 ? { mended } : {}) },
         left: left.length === 0 && levelsLeft === 0 ? null : { items: left, levels: levelsLeft }
     };
+}
+
+/**
+ * The experience `levels` are worth to somebody at `level`, spent on their
+ * worn Mending gear (`mending`). Null when nothing was repaired - nothing
+ * worn, an older server, a bag that could not be read - so the levels are
+ * paid as they were; otherwise what was repaired and the points still owed.
+ */
+async function mend(
+    say: (line: string) => Promise<string>,
+    name: string,
+    level: number,
+    levels: number
+): Promise<{ mended: MendedItem[]; left: number } | null> {
+    const ask = (argv: readonly string[]) => say(argv.join(" "));
+    const read = async () => {
+        const reading = await readLiveInventory(ask, name).catch(() => null);
+        return reading?.answered ? reading.items : null;
+    };
+    const items = await read();
+    if (!items) return null;
+    const points = mending.pointsFor(level, levels);
+    const repairs = mending.plan(mending.wornMending(items), points);
+    if (repairs.length === 0) return null;
+    for (const repair of repairs) await say(mending.repairLine(name, repair));
+    const after = await read();
+    if (!after) return null;
+    const mended = repairs.flatMap((repair) => {
+        const taken = mending.pointsTaken([repair], after);
+        return taken > 0 ? [{ id: repair.id, points: taken }] : [];
+    });
+    if (mended.length === 0) return null;
+    const taken = mended.reduce((sum, one) => sum + one.points, 0);
+    return { mended, left: Math.max(0, points - taken) };
+}
+
+/** Everything a delivery repaired, and the experience it took. */
+export function mendedOf(delivery: Delivery): { count: number; points: number } | null {
+    const mended = delivery.mended ?? [];
+    if (mended.length === 0) return null;
+    return { count: mended.length, points: mended.reduce((sum, one) => sum + one.points, 0) };
 }
 
 /** Everything of a delivery that fell at the player's feet. */

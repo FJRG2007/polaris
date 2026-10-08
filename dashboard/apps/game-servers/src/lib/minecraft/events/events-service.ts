@@ -4901,6 +4901,14 @@ async function give(
                         messages.droppedAtFeet(one.dropped, one.label ?? one.id, speech.EVERY)
                 )}`
         );
+    const mended = delivery.mendedOf(handed.delivery);
+    if (mended)
+        told.push(
+            `tellraw ${name} ${commands.text(
+                messages.tag(speech.EVERY) +
+                    messages.mendedWith(mended.count, mended.points, speech.EVERY)
+            )}`
+        );
     if (told.length > 0) await server.sayAll(told);
     return {
         left: handed.left ? { items: [...handed.left.items], levels: handed.left.levels } : null,
