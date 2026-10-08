@@ -620,24 +620,34 @@ export function CallRoom({
                                     ? t("callRoom.stopRecording")
                                     : t("callRoom.recordThisCall")
                             }
+                            // What does not move. The time runs in the button
+                            // itself; a tooltip carrying it changed every second,
+                            // and a browser hides one whose text changes.
                             title={
                                 call.recording
-                                    ? t("callRoom.stopRecordingAt", {
-                                          time: clock(held?.recording.seconds ?? 0)
-                                      })
+                                    ? t("callRoom.stopRecording")
                                     : t("callRoom.writeThisCallToA")
                             }
                             className={cn(
-                                "rounded p-1.5 transition-colors hover:bg-muted",
+                                "flex items-center gap-1.5 rounded transition-colors",
                                 call.recording
-                                    ? "text-danger"
-                                    : "text-muted-foreground hover:text-foreground"
+                                    ? "border border-danger-edge bg-danger-soft px-2 py-1 text-danger hover:border-danger"
+                                    : "p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
                             )}
                         >
                             {call.recording ? (
-                                <Square className="size-4 fill-current" />
+                                <>
+                                    <Circle
+                                        aria-hidden
+                                        className="size-2.5 shrink-0 fill-current motion-safe:animate-pulse"
+                                    />
+                                    <span className="text-xs font-medium tabular-nums">
+                                        {clock(held?.recording.seconds ?? 0)}
+                                    </span>
+                                    <Square aria-hidden className="size-3 shrink-0 fill-current" />
+                                </>
                             ) : (
-                                <Circle className="size-4" />
+                                <RecordGlyph />
                             )}
                         </button>
                     )}
@@ -1320,7 +1330,7 @@ export function CallRoom({
                                 held?.recording.start();
                             }}
                         >
-                            <Circle className="size-4" />
+                            <Circle aria-hidden className="size-3 fill-current text-danger" />
                             {t("callRoom.startRecording")}
                         </Button>
                     </DialogFooter>
@@ -2774,5 +2784,21 @@ function MicVolumeItem() {
                 className="w-full accent-primary"
             />
         </DropdownMenuItem>
+    );
+}
+
+/**
+ * The record mark every recorder uses - a red dot inside a ring - so the button
+ * reads as "record" before anybody hovers it. A bare ring, which is what this
+ * was, is the shape of a radio button or an empty status, not of a recorder.
+ * The ring takes the button's colour and the dot stays red: red marks what the
+ * button does, not that it is already doing it.
+ */
+function RecordGlyph() {
+    return (
+        <svg viewBox="0 0 16 16" aria-hidden className="size-4 shrink-0">
+            <circle cx="8" cy="8" r="6.75" fill="none" stroke="currentColor" strokeWidth="1.5" />
+            <circle cx="8" cy="8" r="3.75" className="fill-danger" />
+        </svg>
     );
 }

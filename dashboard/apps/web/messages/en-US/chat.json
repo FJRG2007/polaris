@@ -380,7 +380,6 @@
         "createALink": "Create a link",
         "anybodyWithItCanAsk": "Anybody with it can ask to join, and waits until somebody here lets them in. It stops working when the call ends.",
         "forSomebodyWithNoAccount": "For somebody with no account here. They ask to join, and wait until somebody here lets them in.",
-        "stopRecordingAt": "Stop recording ({time})",
         "recordedBy": "{name} is recording this call.",
         "wantsToJoin": "<who>{name}</who><rest> wants to join</rest>",
         "letIn": "Let {name} in",

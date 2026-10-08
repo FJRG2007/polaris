@@ -154,8 +154,8 @@
             "title": "En tu reloj mundial"
         },
         "indicator": {
-            "timer": "{name}: quedan {left}. Abrir temporizadores",
-            "stopwatch": "Cronómetro en {reading}. Abrir cronómetro"
+            "timerEnds": "{name}: acaba a las {time}. Ver temporizadores",
+            "stopwatchRunning": "Cronómetro en marcha. Abrir cronómetro"
         },
         "ring": {
             "stop": "Parar",
