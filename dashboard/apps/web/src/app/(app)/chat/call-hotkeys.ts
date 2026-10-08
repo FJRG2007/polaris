@@ -50,10 +50,7 @@ export function callHotkey(
         altKey: event.altKey,
         shiftKey: event.shiftKey ?? false
     };
-    const id = core.shortcutMatching(bindings, press, [
-        "chat.toggleMic",
-        "chat.toggleDeafen"
-    ]);
+    const id = core.shortcutMatching(bindings, press, ["chat.toggleMic", "chat.toggleDeafen"]);
     if (id === "chat.toggleMic") return "mic";
     if (id === "chat.toggleDeafen") return "deafen";
     return null;

@@ -100,7 +100,9 @@ export function PlainTextEditor({
             <div className="flex items-center gap-2 border-b border-border px-3 py-2">
                 {editing ? (
                     <>
-                        <span className="text-xs font-medium text-muted-foreground">{t("textEditor.editing")}</span>
+                        <span className="text-xs font-medium text-muted-foreground">
+                            {t("textEditor.editing")}
+                        </span>
                         <div className="ml-auto flex items-center gap-2">
                             <Button
                                 size="sm"

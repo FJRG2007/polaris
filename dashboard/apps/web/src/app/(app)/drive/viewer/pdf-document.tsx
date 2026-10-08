@@ -170,9 +170,7 @@ export default function PdfDocument({
                 <PdfSearch pdfSlick={pdfSlick} onClose={() => setSearchOpen(false)} />
             ) : null}
             {error ? (
-                <ViewerError>
-                    {t("pdfDocument.thisPdfCouldNotBe")}
-                </ViewerError>
+                <ViewerError>{t("pdfDocument.thisPdfCouldNotBe")}</ViewerError>
             ) : (
                 <div className="flex min-h-0 flex-1">
                     <PdfSidebar
@@ -187,7 +185,9 @@ export default function PdfDocument({
                             <div className="absolute inset-0 z-10 flex items-center justify-center gap-2 bg-background text-sm text-muted-foreground">
                                 <Loader2 className="size-4 animate-spin" />
                                 {progress > 0 && progress < 1
-                                    ? t("pdfDocument.loadingPercent", { percent: Math.round(progress * 100) })
+                                    ? t("pdfDocument.loadingPercent", {
+                                          percent: Math.round(progress * 100)
+                                      })
                                     : t("pdfDocument.loadingPreview")}
                             </div>
                         )}

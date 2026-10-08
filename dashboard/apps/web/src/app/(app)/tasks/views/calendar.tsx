@@ -255,7 +255,9 @@ export function CalendarView(props: ViewProps) {
                     <Button
                         size="sm"
                         variant="ghost"
-                        title={todayKey ? `${t("calendar.today")} (${todayKey})` : t("calendar.today")}
+                        title={
+                            todayKey ? `${t("calendar.today")} (${todayKey})` : t("calendar.today")
+                        }
                         onClick={() => setOffset(0)}
                     >
                         {t("calendar.today")}
@@ -376,7 +378,9 @@ function ScopeMenu({
                         className={cn(entry === scope && "font-medium text-primary")}
                     >
                         {t(`calendar.scope.${entry}`)}
-                        <MenuShortcut keys={core.keysOf(bindings, layout.SCOPE_SHORTCUTS[entry])[0]} />
+                        <MenuShortcut
+                            keys={core.keysOf(bindings, layout.SCOPE_SHORTCUTS[entry])[0]}
+                        />
                     </DropdownMenuItem>
                 ))}
                 <DropdownMenuSeparator />

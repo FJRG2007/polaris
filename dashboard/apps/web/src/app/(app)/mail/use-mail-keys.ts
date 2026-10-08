@@ -51,10 +51,12 @@ function typing(target: EventTarget | null): boolean {
  * where a key moved in Mail's settings before that table existed now lives.
  */
 export function useMailKeys(actions: MailKeyActions): void {
-    const run = (action: (() => void) | undefined): ShortcutHandler => () => {
-        if (!action) return false;
-        action();
-    };
+    const run =
+        (action: (() => void) | undefined): ShortcutHandler =>
+        () => {
+            if (!action) return false;
+            action();
+        };
     const handlers: Record<string, ShortcutHandler | undefined> = {
         "mail.selectAll": run(actions.selectAll),
         // Escape undoes the nearest thing first: a selection if there is one,

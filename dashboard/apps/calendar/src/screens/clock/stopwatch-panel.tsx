@@ -15,13 +15,7 @@ import { useEffect, useState } from "react";
 import * as model from "../../lib/clock/model";
 import { mutate, type ClockRead } from "./store";
 import * as clockActions from "../../actions/clock";
-import {
-    Button,
-    cn,
-    Skeleton,
-    useToast,
-    shortcutPressed
-} from "@polaris/ui";
+import { Button, cn, Skeleton, useToast, shortcutPressed } from "@polaris/ui";
 import { Copy, Download, Flag, Pause, Play, RotateCcw } from "lucide-react";
 
 type Change = "start" | "pause" | "reset" | "lap";

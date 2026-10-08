@@ -10,13 +10,7 @@ import type { ReactNode } from "react";
 import type * as core from "@polaris/core";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { ShortcutSettings } from "@/components/shortcuts/shortcut-settings";
-import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogHeader,
-    DialogTitle
-} from "@polaris/ui";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@polaris/ui";
 
 export function ShortcutsDialog({
     app,

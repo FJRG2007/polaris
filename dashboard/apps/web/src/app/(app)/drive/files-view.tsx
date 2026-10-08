@@ -1364,9 +1364,7 @@ export function FilesView({
                                     {onDelete
                                         ? t("filesView.menu.deletePermanently")
                                         : t("filesView.menu.delete")}
-                                    {onDelete ? null : (
-                                        <ShortcutHint id="drive.delete" />
-                                    )}
+                                    {onDelete ? null : <ShortcutHint id="drive.delete" />}
                                 </ContextMenuItem>
                                 {!many && entry.kind === "dir" ? (
                                     <>
@@ -1894,7 +1892,9 @@ export function FilesView({
                                 disabled={pending}
                                 title={
                                     requestFilesKey
-                                        ? t("filesView.toolbar.requestFilesHint", { shortcut: requestFilesKey })
+                                        ? t("filesView.toolbar.requestFilesHint", {
+                                              shortcut: requestFilesKey
+                                          })
                                         : t("filesView.toolbar.requestFiles")
                                 }
                                 aria-label={t("filesView.toolbar.requestFiles")}
@@ -1913,7 +1913,9 @@ export function FilesView({
                                 disabled={pending}
                                 title={
                                     newFolderKey
-                                        ? t("filesView.toolbar.newFolderHint", { shortcut: newFolderKey })
+                                        ? t("filesView.toolbar.newFolderHint", {
+                                              shortcut: newFolderKey
+                                          })
                                         : t("filesView.toolbar.newFolder")
                                 }
                                 aria-label={t("filesView.toolbar.newFolder")}

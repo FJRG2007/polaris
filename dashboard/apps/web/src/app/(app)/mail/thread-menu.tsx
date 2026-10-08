@@ -173,7 +173,11 @@ export function ThreadContextMenu({
 
                 <ContextMenuItem
                     onSelect={() =>
-                        onAct(unread ? "read" : "unread", ids, unread ? t("thread.announce.read") : t("thread.announce.unread"))
+                        onAct(
+                            unread ? "read" : "unread",
+                            ids,
+                            unread ? t("thread.announce.read") : t("thread.announce.unread")
+                        )
                     }
                 >
                     {unread ? (
@@ -191,7 +195,9 @@ export function ThreadContextMenu({
                         onAct(
                             thread.starred ? "unstar" : "star",
                             ids,
-                            thread.starred ? t("thread.announce.unstarred") : t("thread.announce.starred")
+                            thread.starred
+                                ? t("thread.announce.unstarred")
+                                : t("thread.announce.starred")
                         )
                     }
                 >
@@ -206,7 +212,9 @@ export function ThreadContextMenu({
                         onAct(
                             thread.important ? "unimportant" : "important",
                             ids,
-                            thread.important ? t("thread.announce.unimportant") : t("thread.announce.important")
+                            thread.important
+                                ? t("thread.announce.unimportant")
+                                : t("thread.announce.important")
                         )
                     }
                 >
@@ -221,7 +229,9 @@ export function ThreadContextMenu({
                         onConversation(
                             ids,
                             { pinned: !thread.pinned },
-                            thread.pinned ? t("thread.announce.unpinned") : t("thread.announce.pinned")
+                            thread.pinned
+                                ? t("thread.announce.unpinned")
+                                : t("thread.announce.pinned")
                         )
                     }
                 >
@@ -240,9 +250,7 @@ export function ThreadContextMenu({
                         onConversation(
                             ids,
                             { muted: !thread.muted },
-                            thread.muted
-                                ? t("thread.announce.unmuted")
-                                : t("thread.announce.muted")
+                            thread.muted ? t("thread.announce.unmuted") : t("thread.announce.muted")
                         )
                     }
                 >
@@ -264,7 +272,10 @@ export function ThreadContextMenu({
                     </ContextMenuSubTrigger>
                     <ContextMenuSubContent>
                         {SNOOZES.map((snooze) => (
-                            <ContextMenuItem key={snooze.id} onSelect={() => onSnooze(ids, snooze.when())}>
+                            <ContextMenuItem
+                                key={snooze.id}
+                                onSelect={() => onSnooze(ids, snooze.when())}
+                            >
                                 {t(`thread.snoozes.${snooze.id}`)}
                             </ContextMenuItem>
                         ))}
@@ -279,7 +290,10 @@ export function ThreadContextMenu({
                         </ContextMenuSubTrigger>
                         <ContextMenuSubContent>
                             {labels.map((label) => (
-                                <ContextMenuItem key={label.id} onSelect={() => onLabel(label.id, ids)}>
+                                <ContextMenuItem
+                                    key={label.id}
+                                    onSelect={() => onLabel(label.id, ids)}
+                                >
                                     <Tag
                                         className="size-3.5 shrink-0"
                                         style={{ color: label.color }}
@@ -295,7 +309,9 @@ export function ThreadContextMenu({
                 <ContextMenuSeparator />
 
                 {canArchive ? (
-                    <ContextMenuItem onSelect={() => onAct("archive", ids, t("thread.announce.archived"))}>
+                    <ContextMenuItem
+                        onSelect={() => onAct("archive", ids, t("thread.announce.archived"))}
+                    >
                         <Archive className="size-3.5 shrink-0" aria-hidden />
                         {t("thread.archive", { count: shown })}
                         <MenuShortcut keys={keyFor("archive")} />
@@ -305,7 +321,9 @@ export function ThreadContextMenu({
                     they are. Spam is destructive twice over: it moves the
                     message AND teaches a provider about the sender. */}
                 {restorable ? (
-                    <ContextMenuItem onSelect={() => onAct("restore", ids, t("thread.announce.restored"))}>
+                    <ContextMenuItem
+                        onSelect={() => onAct("restore", ids, t("thread.announce.restored"))}
+                    >
                         <Undo2 className="size-3.5 shrink-0" aria-hidden />
                         {t("thread.restore", { count: shown })}
                     </ContextMenuItem>
@@ -325,7 +343,9 @@ export function ThreadContextMenu({
                         onAct(
                             permanentDelete ? "delete" : "trash",
                             ids,
-                            permanentDelete ? t("thread.announce.deleted") : t("thread.announce.trashed")
+                            permanentDelete
+                                ? t("thread.announce.deleted")
+                                : t("thread.announce.trashed")
                         )
                     }
                 >
@@ -368,7 +388,9 @@ export function ThreadContextMenu({
                     // Built on the address this Polaris is configured with rather
                     // than on the tab's hostname, so a link handed to somebody
                     // else opens for them too.
-                    onSelect={() => void copy(`${appUrl}/mail/t/${thread.id}`, t("thread.announce.linkCopied"))}
+                    onSelect={() =>
+                        void copy(`${appUrl}/mail/t/${thread.id}`, t("thread.announce.linkCopied"))
+                    }
                 >
                     <Link2 className="size-3.5 shrink-0" aria-hidden />
                     {t("thread.copyLink")}
@@ -387,7 +409,10 @@ function SEARCH_FOR(address: string): string {
 
 /** The snoozes worth having on a menu. Anything finer belongs in a picker, and
  *  nobody has ever wanted one on a right-click. */
-const SNOOZES: readonly { id: "laterToday" | "tomorrow" | "weekend" | "nextWeek"; when: () => Date }[] = [
+const SNOOZES: readonly {
+    id: "laterToday" | "tomorrow" | "weekend" | "nextWeek";
+    when: () => Date;
+}[] = [
     {
         id: "laterToday",
         when: () => {
