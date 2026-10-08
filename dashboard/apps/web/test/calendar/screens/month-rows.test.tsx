@@ -11,7 +11,12 @@ import { afterEach, describe, expect, it } from "vitest";
 import { cleanup, render } from "@testing-library/react";
 import GridView, { type GridViewProps } from "@polaris-app/calendar/src/screens/grid-view";
 import { GRID_CSS } from "@polaris-app/calendar/src/screens/grid-css";
-import { measureMonth, monthDayLimit } from "@polaris-app/calendar/src/screens/month-rows";
+import {
+    measureMonth,
+    monthDayLimit,
+    monthLimits
+} from "@polaris-app/calendar/src/screens/month-rows";
+import { readPreferences } from "@polaris-app/calendar/src/lib/preferences";
 
 afterEach(cleanup);
 
@@ -28,6 +33,42 @@ describe("monthDayLimit", () => {
 
     it("shows every event when the setting is All", () => {
         expect(monthDayLimit(0, 3)).toBe(false);
+    });
+});
+
+describe("monthLimits", () => {
+    const room = { fit: 3, rows: 4, tallest: 200 };
+
+    it("fills a day by default, the link taking only the last line", () => {
+        // Four lines: four events show all four, a fifth makes it 3 + "+2 more".
+        expect(monthLimits("fit", room)).toEqual({ dayMaxEvents: false, dayMaxEventRows: 4 });
+    });
+
+    it("lets FullCalendar read the cell before anything is measured", () => {
+        expect(monthLimits("fit", null)).toEqual({ dayMaxEvents: false, dayMaxEventRows: true });
+    });
+
+    it("keeps a number chosen in settings, capped by what fits", () => {
+        expect(monthLimits(6, room)).toEqual({ dayMaxEvents: 3, dayMaxEventRows: false });
+        expect(monthLimits(0, room)).toEqual({ dayMaxEvents: false, dayMaxEventRows: false });
+    });
+});
+
+describe("the month's setting, as stored before it could fit", () => {
+    it("reads the old default of 4 as filling the day", () => {
+        expect(readPreferences(JSON.stringify({ eventLimit: 4 })).monthEvents).toBe("fit");
+        expect(readPreferences(null).monthEvents).toBe("fit");
+    });
+
+    it("keeps another number somebody chose, and All", () => {
+        expect(readPreferences(JSON.stringify({ eventLimit: 6 })).monthEvents).toBe(6);
+        expect(readPreferences(JSON.stringify({ eventLimit: 0 })).monthEvents).toBe(0);
+    });
+
+    it("prefers the new setting once there is one", () => {
+        expect(
+            readPreferences(JSON.stringify({ eventLimit: 6, monthEvents: "fit" })).monthEvents
+        ).toBe("fit");
     });
 });
 
@@ -80,6 +121,11 @@ describe("measureMonth", () => {
         expect(measureMonth(monthGrid(5, 750, 9))?.fit).toBe(3);
         // A shorter window holds fewer: 90 - 30 - 24 - 4 = 32, one event.
         expect(measureMonth(monthGrid(5, 450, 9))?.fit).toBe(1);
+    });
+
+    it("counts the lines a day holds, the link's included", () => {
+        // (150 - 30 - 4) / 24 = 4.8: four lines.
+        expect(measureMonth(monthGrid(5, 750, 9))?.rows).toBe(4);
     });
 
     it("reports how far the busiest day's events reach, for All", () => {

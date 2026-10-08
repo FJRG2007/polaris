@@ -23,7 +23,8 @@ import {
 import type {
     CalendarSummary,
     OccurrenceView,
-    RangeView
+    RangeView,
+    TaskItemView
 } from "@polaris-app/calendar/src/lib/wire";
 
 /** The card of each theme, from the tokens (`packages/ui/src/styles/tokens.css`). */
@@ -199,6 +200,51 @@ describe("the grid's events", () => {
         const [declined] = draw([occurrence({ myPartstat: "DECLINED" })]);
         expect(declined!.classNames).toEqual(expect.arrayContaining(["pc-declined", "pc-striped"]));
         expect((declined!.extendedProps as { stripe: string | null }).stripe).not.toBeNull();
+    });
+
+    const task = (patch: Partial<TaskItemView>): TaskItemView => ({
+        source: "calendar",
+        id: "t1",
+        calendarId: "c1",
+        title: "File taxes",
+        due: "2026-10-05T09:00:00Z",
+        allDay: false,
+        done: false,
+        reference: null,
+        listName: null,
+        editable: true,
+        statusType: "open",
+        statusColor: null,
+        statusName: null,
+        ...patch
+    });
+    const drawTasks = (tasks: TaskItemView[], showDoneTasks?: boolean) =>
+        gridEvents({ occurrences: [], tasks } as unknown as RangeView, {
+            zone: "UTC",
+            locale: "en-US",
+            now: new Date("2026-10-01T00:00:00Z"),
+            showDeclined: true,
+            showTasks: true,
+            showDoneTasks,
+            dimPast: true,
+            surface: SURFACES.light,
+            calendars: new Map([["c1", calendar]]),
+            t: ((key: string) => key) as never
+        });
+
+    it("draws a done task struck through and faded, before its time too", () => {
+        const [done] = drawTasks([task({ done: true, statusType: "done" })]);
+        expect(done!.classNames).toEqual(expect.arrayContaining(["pc-task", "pc-done", "pc-past"]));
+        expect(done!.backgroundColor).toBe(mix("#d62728", SURFACES.light, 0.55));
+        const [open] = drawTasks([task({})]);
+        expect(open!.classNames).not.toContain("pc-done");
+        expect(open!.classNames).not.toContain("pc-past");
+    });
+
+    it("leaves done tasks out when completed tasks are switched off", () => {
+        const tasks = [task({}), task({ id: "t2", done: true, statusType: "done" })];
+        expect(drawTasks(tasks, false).map((event) => event.id)).toEqual(["task|calendar|t1"]);
+        expect(drawTasks(tasks)).toHaveLength(2);
     });
 
     it("fades an event once it has ended, and not before", () => {

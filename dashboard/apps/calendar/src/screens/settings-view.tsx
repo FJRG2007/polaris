@@ -203,6 +203,7 @@ export function SettingsView() {
             | "dimPast"
             | "showDeclined"
             | "showTasks"
+            | "showDoneTasks"
             | "skipPopover"
             | "keyboardShortcuts"
             | "speedyMeetings"
@@ -282,14 +283,19 @@ export function SettingsView() {
                 </Row>
                 <Row label={t("settingsPage.eventLimit")} hint={t("settingsPage.eventLimitHint")}>
                     <Select
-                        className="w-28"
+                        className="w-36"
                         aria-label={t("settingsPage.eventLimit")}
-                        value={String(preferences.eventLimit)}
-                        onValueChange={(limit) => void save({ eventLimit: Number(limit) })}
-                        options={[0, 2, 3, 4, 5, 6, 8, 10].map((limit) => ({
-                            value: String(limit),
-                            label: limit === 0 ? t("settingsPage.all") : String(limit)
-                        }))}
+                        value={String(preferences.monthEvents)}
+                        onValueChange={(limit) =>
+                            void save({ monthEvents: limit === "fit" ? "fit" : Number(limit) })
+                        }
+                        options={[
+                            { value: "fit", label: t("settingsPage.eventLimitFit") },
+                            ...[0, 2, 3, 4, 5, 6, 8, 10].map((limit) => ({
+                                value: String(limit),
+                                label: limit === 0 ? t("settingsPage.all") : String(limit)
+                            }))
+                        ]}
                     />
                 </Row>
                 <Row label={t("settingsPage.dimPast")}>{toggle("dimPast")}</Row>
@@ -297,6 +303,9 @@ export function SettingsView() {
                 <Row label={t("settingsPage.showTasks")} hint={t("settingsPage.showTasksHint")}>
                     {toggle("showTasks")}
                 </Row>
+                {preferences.showTasks ? (
+                    <Row label={t("settingsPage.showDoneTasks")}>{toggle("showDoneTasks")}</Row>
+                ) : null}
                 <Row label={t("settingsPage.skipPopover")} hint={t("settingsPage.skipPopoverHint")}>
                     {toggle("skipPopover")}
                 </Row>

@@ -75,6 +75,11 @@ const calendar: CalendarSummary = {
     shareCount: 0
 };
 
+const pulledAccounts = vi.fn(async (_soon?: boolean) => ({ ok: true as const, pulled: 0 }));
+vi.mock("@polaris-app/calendar/src/actions/sources", () => ({
+    refreshOpenSourcesAction: (soon?: boolean) => pulledAccounts(soon)
+}));
+
 vi.mock("@polaris-app/calendar/src/actions/calendars", () => ({
     listCalendarsAction: async () => ({ ok: true, calendars: [calendar] }),
     createCalendarAction: async () => ({ ok: true, calendar }),
@@ -201,13 +206,45 @@ describe("the calendar screen", () => {
         await settle();
         expect((await screen.findByTestId("grid")).getAttribute("data-view")).toBe("day");
 
-        fireEvent.click(screen.getByRole("radio", { name: "Month" }));
+        // Google's picker: one button, every view on its key.
+        fireEvent.pointerDown(screen.getByRole("button", { name: "View" }), {
+            button: 0,
+            ctrlKey: false
+        });
+        const month = await screen.findByRole("menuitemradio", { name: /^Month/ });
+        expect(month.textContent).toContain("M");
+        fireEvent.click(month);
         await settle();
         expect(grid().getAttribute("data-view")).toBe("month");
         expect(window.location.pathname).toBe(
             `/calendar/month/${grid().getAttribute("data-anchor")}`
         );
         expect(savedPreferences).toHaveBeenCalledWith({ view: "month" });
+    });
+
+    it("asks for the linked accounts' latest when it opens, and sooner on Refresh", async () => {
+        pulledAccounts.mockClear();
+        render(<CalendarScreen path={[]} />, { wrapper: MessagesWrapper });
+        await settle();
+        expect(pulledAccounts).toHaveBeenCalledWith(false);
+        press("r");
+        await settle();
+        expect(pulledAccounts).toHaveBeenLastCalledWith(true);
+    });
+
+    it("switches what the grid shows from the view picker, and keeps the menu open", async () => {
+        render(<CalendarScreen path={[]} />, { wrapper: MessagesWrapper });
+        await settle();
+        fireEvent.pointerDown(screen.getByRole("button", { name: "View" }), {
+            button: 0,
+            ctrlKey: false
+        });
+        const done = await screen.findByRole("menuitemcheckbox", { name: "Show completed tasks" });
+        expect(done.getAttribute("aria-checked")).toBe("true");
+        fireEvent.click(done);
+        await settle();
+        expect(savedPreferences).toHaveBeenCalledWith({ showDoneTasks: false });
+        expect(screen.getByRole("menuitemcheckbox", { name: "Show weekends" })).toBeTruthy();
     });
 
     it("says so when a view holds more events than were drawn", async () => {

@@ -45,7 +45,12 @@ export const GRID_CSS = `
 .pc-grid .fc .fc-timegrid-slot { height: 1.75rem; }
 .pc-grid .fc .fc-daygrid-week-number,
 .pc-grid .fc .fc-timegrid-axis .fc-week-number { background: transparent; color: hsl(var(--subtle-foreground)); }
-.pc-grid .fc a.fc-daygrid-more-link { color: hsl(var(--muted-foreground)); }
+/* "+N more" is a line of its own, as wide as an event and pressed anywhere on
+   it, with no box until the pointer is over it - Google's. */
+.pc-grid .fc .fc-daygrid-day-bottom { margin: 0 2px; padding: 0; font-size: 0.75rem; }
+.pc-grid .fc a.fc-daygrid-more-link { display: block; float: none; margin: 1px 0 0; padding: 0 4px; border-radius: 4px; color: hsl(var(--muted-foreground)); font-weight: 500; line-height: 1.5; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; transition: background-color 120ms; }
+.pc-grid .fc a.fc-daygrid-more-link:hover { background: hsl(var(--card-hover)); color: hsl(var(--foreground)); text-decoration: none; }
+.pc-grid .fc a.fc-daygrid-more-link:focus-visible { outline: 2px solid hsl(var(--ring)); outline-offset: -2px; }
 .pc-grid .fc .fc-popover { background: hsl(var(--elevated)); border-color: hsl(var(--border-strong)); border-radius: 0.5rem; box-shadow: var(--shadow-popover, 0 8px 24px rgb(0 0 0 / 0.35)); }
 .pc-grid .fc .fc-popover-header { background: transparent; color: hsl(var(--muted-foreground)); }
 .pc-grid .fc .fc-event { border-radius: 4px; font-size: 0.75rem; cursor: pointer; }
@@ -102,6 +107,9 @@ export const GRID_CSS = `
 .pc-grid .fc .pc-declined .fc-event-title,
 .pc-grid .fc .pc-declined .fc-list-event-title,
 .pc-grid .fc .pc-done .fc-event-title { text-decoration: line-through; }
+/* A done task reads as finished wherever it is drawn: struck through, and
+   faded like something switched off, its mark included. */
+.pc-grid .fc .pc-done .pc-task-chip { opacity: 0.6; }
 .pc-grid .fc .fc-daygrid-dot-event.pc-past .fc-event-title,
 .pc-grid .fc .fc-daygrid-dot-event.pc-past .fc-event-time,
 .pc-grid .fc .fc-list-event.pc-past { color: hsl(var(--muted-foreground)); }

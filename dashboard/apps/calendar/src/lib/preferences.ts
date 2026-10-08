@@ -62,12 +62,17 @@ const fields = {
     speedyMeetings: z.boolean(),
     /** Reminders a new event starts with, in minutes relative to the start. */
     defaultAlarms: z.object({ timed: alarmMinutes, allDay: alarmMinutes }),
-    /** Events shown per day in the month view before "+N more"; 0 means all. */
-    eventLimit: z.number().int().min(0).max(20),
+    /** Events shown per day in the month view before "+N more": as many as
+     *  the day has room for ("fit", Google's way), all of them (0), or at most a
+     *  number. Stored as `monthEvents`: `eventLimit` was a number defaulting to
+     *  4, which cut a roomy day short (see `readPreferences`). */
+    monthEvents: z.union([z.literal("fit"), z.number().int().min(0).max(20)]),
     /** Open the full editor straight away instead of the quick popover. */
     skipPopover: z.boolean(),
     showTasks: z.boolean(),
     showDeclined: z.boolean(),
+    /** Draw tasks already done (Google's "Show completed tasks"). */
+    showDoneTasks: z.boolean(),
     dimPast: z.boolean(),
     keyboardShortcuts: z.boolean(),
     /** The hour day and week views scroll to first. */
@@ -105,10 +110,11 @@ export const DEFAULT_PREFERENCES: CalendarPreferences = {
     defaultDuration: 60,
     speedyMeetings: false,
     defaultAlarms: { timed: [-10], allDay: [-900] },
-    eventLimit: 4,
+    monthEvents: "fit",
     skipPopover: false,
     showTasks: true,
     showDeclined: true,
+    showDoneTasks: true,
     dimPast: true,
     keyboardShortcuts: true,
     dayStart: "07:00",
@@ -143,6 +149,13 @@ export function readPreferences(raw: string | null | undefined): CalendarPrefere
         if (!(key in stored)) continue;
         const result = (schema as z.ZodTypeAny).safeParse(stored[key]);
         if (result.success) read[key] = result.data;
+    }
+    // The old `eventLimit`. Any change in settings stored the whole document,
+    // so 4 - the old default - is in nearly every one whether or not somebody
+    // chose it; it reads as the new default. Another number was chosen.
+    if (!("monthEvents" in stored) && "eventLimit" in stored && stored.eventLimit !== 4) {
+        const old = fields.monthEvents.safeParse(stored.eventLimit);
+        if (old.success && old.data !== "fit") read.monthEvents = old.data;
     }
     return read as CalendarPreferences;
 }

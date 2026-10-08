@@ -479,8 +479,20 @@ async function storeRemote(
     });
 }
 
-/** Pull everything one source has. */
-export async function syncSource(sourceId: string, now = new Date()): Promise<void> {
+/** Sources being pulled in this process, so the scheduled pass and somebody
+ *  looking at their calendar never pull the same one twice at once. */
+const pulling = new Map<string, Promise<void>>();
+
+/** Pull everything one source has; a pull already under way is joined. */
+export function syncSource(sourceId: string, now = new Date()): Promise<void> {
+    const running = pulling.get(sourceId);
+    if (running) return running;
+    const work = pullSource(sourceId, now).finally(() => pulling.delete(sourceId));
+    pulling.set(sourceId, work);
+    return work;
+}
+
+async function pullSource(sourceId: string, now: Date): Promise<void> {
     const source = await prisma.calendarSource.findUnique({
         where: { id: sourceId },
         select: { ...SOURCE_COLUMNS, refreshMinutes: true }

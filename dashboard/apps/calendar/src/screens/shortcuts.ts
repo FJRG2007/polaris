@@ -59,6 +59,16 @@ const KEYS: Readonly<Record<string, ShortcutAction>> = {
     Escape: { kind: "close" }
 };
 
+/** Google's letter for each view, the one the view picker shows. */
+export const VIEW_KEYS: Readonly<Record<CalendarViewName, string>> = {
+    day: "d",
+    week: "w",
+    month: "m",
+    year: "y",
+    list: "a",
+    days: "x"
+};
+
 /** The overview's rows: the keys, and the catalog key that says what they do. */
 export const SHORTCUT_ROWS = [
     { keys: ["k", "p"], label: "previous" },
