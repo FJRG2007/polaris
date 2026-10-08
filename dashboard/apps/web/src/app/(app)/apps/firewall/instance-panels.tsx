@@ -23,7 +23,7 @@ import { localizeJail } from "./waf-words";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useDisplayFormat } from "@/components/display-format";
 import type { WafAnomalySettings } from "@/lib/waf-anomaly-service";
-import { useCallback, useEffect, useState, useTransition } from "react";
+import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import type { WafAnomaly, WafJail, WafTrafficSummary } from "@polaris/core";
 import {
     Activity,
@@ -111,25 +111,29 @@ export function FirewallInstancePanels({
 
     useEffect(() => load(hours), [hours, load]);
 
+    // The overview as it is on screen, outside React, so a change can be applied
+    // and confirmed without running its request inside a state updater - which
+    // StrictMode runs twice, sending every change twice.
+    const current = useRef<Overview | null>(null);
+    current.current = data;
+
     const mutate = useCallback<Mutate>(
         (patch, run) => {
-            setData((current) => {
-                if (!current) return current;
-                const previous = current;
-                setFailure(null);
-                void run().then((result) => {
-                    if (result.error) {
-                        // Put back exactly what was there. Rolling back to a refetch
-                        // instead would also undo anything else changed meanwhile.
-                        setData(previous);
-                        setFailure(result.error);
-                        return;
-                    }
-                    // Re-read so the figures the server derives - ban counts, the size
-                    // of a feed - catch up with the change that was just made.
-                    load(hours);
-                });
-                return patch(current);
+            const previous = current.current;
+            if (!previous) return;
+            setFailure(null);
+            setData(patch(previous));
+            void run().then((result) => {
+                if (result.error) {
+                    // Put back exactly what was there. Rolling back to a refetch
+                    // instead would also undo anything else changed meanwhile.
+                    setData(previous);
+                    setFailure(result.error);
+                    return;
+                }
+                // Re-read so the figures the server derives - ban counts, the size
+                // of a feed - catch up with the change that was just made.
+                load(hours);
             });
         },
         [hours, load]

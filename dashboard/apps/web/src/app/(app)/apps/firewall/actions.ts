@@ -9,7 +9,6 @@
 import { z } from "zod";
 import { prisma } from "@polaris/db";
 import * as core from "@polaris/core";
-import { revalidatePath } from "next/cache";
 import * as intel from "@/lib/waf-intel-service";
 import { recordAudit } from "@/lib/audit-service";
 import { syncAppRoutes } from "@/lib/deploy-service";
@@ -62,7 +61,9 @@ type WafTrafficSummary = core.WafTrafficSummary;
  *  enough to read or write them - only `system.manage`. */
 const OPERATOR_SCOPES = new Set<WafScopeType>(["global", "polaris"]);
 
-const FIREWALL_PATH = "/apps/firewall";
+// None of these revalidates the page. The screen reads everything it shows through
+// these actions and keeps it itself, and a revalidation from an action re-renders the
+// whole route on every switch - which is what made the page flicker under the finger.
 
 /** A jail as the panel may change it. The label and the description belong to the
  *  release, so they are not accepted from the client at all. */
@@ -189,8 +190,6 @@ export async function setWafRuleAction(
             // pick up the change on their next deploy (their rules ride on container labels).
             await syncAppRoutes().catch(() => undefined);
         }
-        revalidatePath("/apps/firewall");
-        revalidatePath("/apps/deploy");
         return {};
     } catch (caught) {
         return {
@@ -489,7 +488,6 @@ export async function setWafJailsAction(jails: WafJailSettings[]): Promise<{ err
             targetType: "global",
             targetId: "jails"
         });
-        revalidatePath(FIREWALL_PATH);
         return {};
     } catch (caught) {
         return {
@@ -516,7 +514,6 @@ export async function setWafIgnoreListAction(entries: string[]): Promise<{ error
             targetType: "global",
             targetId: "ignore"
         });
-        revalidatePath(FIREWALL_PATH);
         return {};
     } catch (caught) {
         return { error: await failure(caught, "errors.listSave") };
@@ -542,7 +539,6 @@ export async function liftWafBanAction(ip: string): Promise<{ error?: string }> 
             targetType: "ip",
             targetId: parsed.data
         });
-        revalidatePath(FIREWALL_PATH);
         return {};
     } catch (caught) {
         return { error: await failure(caught, "errors.lift") };
@@ -561,7 +557,6 @@ export async function setTorBlockedAction(enabled: boolean): Promise<{ error?: s
             targetType: "global",
             targetId: String(enabled)
         });
-        revalidatePath(FIREWALL_PATH);
         return {};
     } catch (caught) {
         return {
@@ -598,7 +593,6 @@ export async function setWafAnomalySettingsAction(
             targetType: "global",
             targetId: "anomalies"
         });
-        revalidatePath(FIREWALL_PATH);
         return {};
     } catch (caught) {
         return { error: await failure(caught, "errors.settingsSave") };
@@ -627,7 +621,6 @@ export async function blockAnomalyAction(ip: string, note: string): Promise<{ er
             targetType: "ip",
             targetId: parsed.data
         });
-        revalidatePath(FIREWALL_PATH);
         return {};
     } catch (caught) {
         return { error: await failure(caught, "errors.block") };

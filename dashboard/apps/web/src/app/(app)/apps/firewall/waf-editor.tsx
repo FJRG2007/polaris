@@ -34,7 +34,7 @@ import { ruleDescription } from "./rule-language";
 import { ChipList } from "./chip-list";
 import { Frame, Loader2, Mail, Search } from "lucide-react";
 import { ManagedRulePage } from "./managed-rule-page";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { WafInheritedView } from "@/lib/waf-service";
 import { Input, Select, Skeleton, Switch } from "@polaris/ui";
 import { AddressRulesPage, LoginRulePage } from "./access-rules";
@@ -212,7 +212,11 @@ export function WafEditor({
     const [tor, setTor] = useState<WafFeedView | null>(null);
     const [view, setView] = useState<View>({ kind: "list" });
     const [error, setError] = useState<string | null>(null);
-    const [busy, setBusy] = useState(false);
+    // What the server last accepted, and what is on screen, kept outside React so a
+    // save can compare them without running inside a state updater.
+    const confirmed = useRef<WafScopeRule | null>(null);
+    const onScreen = useRef<WafScopeRule | null>(null);
+    const sending = useRef(false);
     // The address lists as they are being typed, held here rather than on their own
     // page so walking back to the rules and returning does not bin a half-written
     // allowlist. Null until somebody edits one, which is what keeps it in step with
@@ -235,7 +239,10 @@ export function WafEditor({
         setMatches(undefined);
         void getWafRuleAction({ scopeType, scopeId }).then((result) => {
             if (!active) return;
-            setSaved(result.rule ?? BLANK);
+            const rule = result.rule ?? BLANK;
+            confirmed.current = rule;
+            onScreen.current = rule;
+            setSaved(rule);
             setInherited(result.inherited ?? null);
             setTor(result.tor ?? null);
             if (result.error) setError(result.error);
@@ -251,30 +258,46 @@ export function WafEditor({
     }, [scopeType, scopeId]);
 
     /**
-     * Apply a change to what is on screen, then confirm it with the server, then put
-     * the old value back if the server refused. The switch moves under the finger and
-     * only a real failure moves it back.
+     * Send what is on screen until the server holds it. One save at a time, always of
+     * the latest state: a second switch flipped while the first is still saving rides
+     * on the next save instead of racing it, and nothing on the page waits for either.
+     * A refusal puts the screen back to what the server actually holds - re-read rather
+     * than remembered, since the switches flipped meanwhile were never saved either.
      */
+    const flush = useCallback(async () => {
+        if (sending.current) return;
+        sending.current = true;
+        try {
+            while (onScreen.current && onScreen.current !== confirmed.current) {
+                const sent = onScreen.current;
+                const result = await setWafRuleAction({ scopeType, scopeId, ...sent });
+                if (result.error) {
+                    const fresh = await getWafRuleAction({ scopeType, scopeId });
+                    const held = fresh.rule ?? confirmed.current;
+                    confirmed.current = held;
+                    onScreen.current = held;
+                    setSaved(held);
+                    setError(result.error);
+                    return;
+                }
+                confirmed.current = sent;
+            }
+        } finally {
+            sending.current = false;
+        }
+    }, [scopeType, scopeId]);
+
+    /** Apply a change to what is on screen at once, then save it in the background.
+     *  The switch moves under the finger; only a refusal moves it back. */
     const persist = useCallback(
         (patch: Partial<WafScopeRule>) => {
-            setSaved((current) => {
-                if (!current) return current;
-                const previous = current;
-                const next = { ...current, ...patch };
-                setError(null);
-                setBusy(true);
-                void setWafRuleAction({ scopeType, scopeId, ...next })
-                    .then((result) => {
-                        if (result.error) {
-                            setSaved(previous);
-                            setError(result.error);
-                        }
-                    })
-                    .finally(() => setBusy(false));
-                return next;
-            });
+            if (!onScreen.current) return;
+            onScreen.current = { ...onScreen.current, ...patch };
+            setSaved(onScreen.current);
+            setError(null);
+            void flush();
         },
-        [scopeType, scopeId]
+        [flush]
     );
 
     /**
@@ -295,7 +318,6 @@ export function WafEditor({
         (on: boolean) => {
             const previous = tor;
             setError(null);
-            setBusy(true);
             setTor({ count: 0, fetchedAt: null, error: null, ...previous, enabled: on });
             void setTorBlockedAction(on)
                 .then(async (result) => {
@@ -306,8 +328,7 @@ export function WafEditor({
                     }
                     const fresh = await getWafRuleAction({ scopeType, scopeId });
                     if (fresh.tor) setTor(fresh.tor);
-                })
-                .finally(() => setBusy(false));
+                });
         },
         [tor, scopeType, scopeId]
     );
@@ -344,7 +365,7 @@ export function WafEditor({
             <ManagedRulePage
                 rule={rule}
                 enabled={managedEnabled(rule, saved, tor)}
-                disabled={busy || (feed && !canOperate)}
+                disabled={feed && !canOperate}
                 // A feed is the one rule this page can change instance-wide, so the
                 // switch stays live here for an operator - the row does not offer it.
                 decidedElsewhere={
@@ -389,7 +410,6 @@ export function WafEditor({
                 allow={addresses?.allow ?? [...saved.ipAllowlist]}
                 deny={addresses?.deny ?? [...saved.ipDenylist]}
                 callerIp={callerIp}
-                disabled={busy}
                 onBack={backToList}
                 onEdit={(allow, deny) => setAddresses({ allow, deny })}
                 onSave={(ipAllowlist, ipDenylist) => {
@@ -408,7 +428,6 @@ export function WafEditor({
                 requiredAbove={inherited?.requireLogin ?? false}
                 admitted={saved.loginAllowPrincipals}
                 refused={saved.loginDenyPrincipals}
-                disabled={busy}
                 onBack={backToList}
                 onChange={(patch) => persist(patch)}
             />
@@ -573,7 +592,7 @@ export function WafEditor({
                 // Dragging renumbers the list, and the list on screen is not the whole
                 // list while a search is on - so the drag is off rather than moving a
                 // rule the reader cannot see.
-                canEdit={!busy && !filtering}
+                canEdit={!filtering}
                 hidden={hiddenRules}
                 matches={matches}
                 onCreate={() =>
@@ -589,7 +608,7 @@ export function WafEditor({
             <PredefinedRuleList
                 title={t("access.title")}
                 hint={t("access.hint")}
-                canEdit={!busy}
+                canEdit
                 onOpen={(id) =>
                     setView(id === "addresses" ? { kind: "addresses" } : { kind: "login" })
                 }
@@ -600,7 +619,7 @@ export function WafEditor({
             <PredefinedRuleList
                 title={t("managedList.title")}
                 hint={t("managedList.hint")}
-                canEdit={!busy}
+                canEdit
                 onOpen={(id) => setView({ kind: "managed", id })}
                 onToggle={(id, on) => {
                     const rule = wafManagedRule(id);
@@ -641,7 +660,7 @@ export function WafEditor({
                     </div>
                     <Switch
                         checked={saved.emailObfuscation && !obfuscationOffAbove}
-                        disabled={busy || obfuscationOffAbove}
+                        disabled={obfuscationOffAbove}
                         onChange={(on) => persist({ emailObfuscation: on })}
                         aria-label={t("shield.obfuscation")}
                     />
@@ -653,7 +672,6 @@ export function WafEditor({
                 saved={saved}
                 offFromAbove={framingOffAbove}
                 allowedAbove={inherited?.frameAncestors ?? []}
-                busy={busy}
                 onChange={persist}
             />
 
@@ -685,14 +703,12 @@ function FramingSection({
     saved,
     offFromAbove,
     allowedAbove,
-    busy,
     onChange
 }: {
     polaris: boolean;
     saved: WafScopeRule;
     offFromAbove: boolean;
     allowedAbove: readonly string[];
-    busy: boolean;
     onChange: (patch: Partial<WafScopeRule>) => void;
 }) {
     const t = useTranslations("firewall");
@@ -721,7 +737,7 @@ function FramingSection({
                     </div>
                     <Switch
                         checked={on}
-                        disabled={busy || polaris || offFromAbove}
+                        disabled={polaris || offFromAbove}
                         onChange={(next) => onChange({ frameProtection: next })}
                         aria-label={t("framing.title")}
                     />
@@ -735,7 +751,6 @@ function FramingSection({
                             placeholder={t("framing.placeholder")}
                             validate={(value) => normalizeFrameOrigin(value) !== null}
                             invalidMessage={t("framing.invalid")}
-                            disabled={busy}
                             onChange={(next) =>
                                 onChange({
                                     // Stored in the one form the edge writes, so the chip
