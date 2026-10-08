@@ -22,49 +22,17 @@
  */
 
 import { describe, expect, it } from "vitest";
+import { peakLevel, passLength } from "./sound-peak";
 import { DEFAULT_GAIN, RING_EVERY_MS, RING_FOR_MS, ringPasses, SOUNDS } from "@/lib/call-sounds";
 
 /** When the last note of a pass falls silent, in seconds. */
 function passSeconds(name: keyof typeof SOUNDS): number {
-    return SOUNDS[name].reduce((end, note) => Math.max(end, note.at + note.seconds), 0);
+    return passLength(SOUNDS[name]);
 }
 
-/**
- * What the speakers are asked for at once, at its worst.
- *
- * The envelopes `sound()` schedules: an exponential ramp from a floor up to the
- * peak over the attack, then an exponential ramp back to the floor across the
- * note. Every partial of every note sounding at an instant adds to the same
- * output, and whatever the sum passes 1 by is clipped flat - which is what
- * saturation is. Written out here because the only other way to know is to
- * listen to it.
- */
+/** What the speakers are asked for at once, at its worst - see `sound-peak`. */
 function peakOf(name: keyof typeof SOUNDS): number {
-    const OCTAVE = 0.3;
-    const TWELFTH = 0.12;
-    const ATTACK = 0.012;
-    const FLOOR = 0.0001;
-
-    const gainAt = (peak: number, at: number, seconds: number, t: number): number => {
-        if (t < at || t > at + seconds) return 0;
-        const top = Math.max(peak, 0.0002);
-        if (t <= at + ATTACK) return FLOOR * (top / FLOOR) ** ((t - at) / ATTACK);
-        return top * (FLOOR / top) ** ((t - at - ATTACK) / Math.max(seconds - ATTACK, 1e-9));
-    };
-
-    const span = SOUNDS[name].reduce((end, note) => Math.max(end, note.at + note.seconds), 0);
-    let worst = 0;
-    for (let step = 0; step <= 4000; step += 1) {
-        const t = (span * step) / 4000;
-        let sum = 0;
-        for (const note of SOUNDS[name]) {
-            const gain = note.gain ?? DEFAULT_GAIN;
-            const shares = note.bell ? [1, OCTAVE, TWELFTH] : [1];
-            for (const share of shares) sum += gainAt(gain * share, note.at, note.seconds, t);
-        }
-        worst = Math.max(worst, sum);
-    }
-    return worst;
+    return peakLevel(SOUNDS[name]);
 }
 
 describe("the incoming ring", () => {

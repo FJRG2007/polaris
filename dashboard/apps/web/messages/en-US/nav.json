@@ -321,5 +321,11 @@
         "errors": {
             "notMarked": "That could not be marked. Try again in a moment."
         }
+    },
+    "season": {
+        "halloween": "Halloween",
+        "winter": "Winter holidays",
+        "newYear": "New Year",
+        "lunarNewYear": "Lunar New Year"
     }
 }

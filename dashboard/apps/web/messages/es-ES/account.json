@@ -1052,5 +1052,24 @@
         },
         "title": "Iniciar sesión en {device}",
         "signedInAs": "Sesión iniciada como {name}"
+    },
+    "seasonal": {
+        "title": "Temas de temporada",
+        "intro": "Polaris se viste para Halloween, las fiestas de invierno, Año Nuevo y el Año Nuevo Lunar.",
+        "names": {
+            "halloween": "Halloween",
+            "winter": "Fiestas de invierno",
+            "newYear": "Año Nuevo",
+            "lunarNewYear": "Año Nuevo Lunar"
+        },
+        "onUntil": "Ahora: {season}, hasta el {date}.",
+        "nextFrom": "Próximo: {season}, desde el {date}.",
+        "offForAll": "Un administrador desactivó los temas de temporada para todos en este Polaris.",
+        "theme": "Decoración",
+        "themeHint": "Una marca junto al logo y unos detalles que caen por la parte de arriba. Se oculta si tu sistema pide menos movimiento.",
+        "sounds": "Sonidos festivos",
+        "soundsHint": "El tono de llamada, de mensaje y de aviso de la temporada en lugar de los habituales.",
+        "preview": "Escuchar los sonidos de {season}",
+        "notSaved": "No se pudo guardar tu elección. Inténtalo de nuevo en un momento."
     }
 }

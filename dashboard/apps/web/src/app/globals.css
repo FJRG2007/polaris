@@ -729,3 +729,119 @@ dialog.pdfSlick-dialog .dialogButton {
 [data-service-panel] [role="switch"][aria-checked="false"] {
     background-color: hsl(var(--switch-off));
 }
+
+/* The time of year (see `components/seasonal`). Two colours per season, set on
+   the root while one is in force: `--season-a` marks the logo, both colour what
+   drifts across the top of the page. Brighter on dark, deeper on light, so the
+   mark holds its contrast against the bar either way. */
+:root[data-season="halloween"] {
+    --season-a: 28 92% 58%;
+    --season-b: 270 60% 70%;
+}
+:root[data-season="winter"] {
+    --season-a: 200 85% 72%;
+    --season-b: 210 30% 92%;
+}
+:root[data-season="newYear"] {
+    --season-a: 45 92% 60%;
+    --season-b: 330 80% 70%;
+}
+:root[data-season="lunarNewYear"] {
+    --season-a: 4 80% 62%;
+    --season-b: 42 90% 58%;
+}
+:root.light[data-season="halloween"] {
+    --season-a: 24 90% 44%;
+    --season-b: 270 50% 50%;
+}
+:root.light[data-season="winter"] {
+    --season-a: 205 80% 42%;
+    --season-b: 210 30% 62%;
+}
+:root.light[data-season="newYear"] {
+    --season-a: 38 92% 40%;
+    --season-b: 330 70% 50%;
+}
+:root.light[data-season="lunarNewYear"] {
+    --season-a: 2 75% 46%;
+    --season-b: 38 90% 42%;
+}
+@media (prefers-color-scheme: light) {
+    :root.system[data-season="halloween"] {
+        --season-a: 24 90% 44%;
+        --season-b: 270 50% 50%;
+    }
+    :root.system[data-season="winter"] {
+        --season-a: 205 80% 42%;
+        --season-b: 210 30% 62%;
+    }
+    :root.system[data-season="newYear"] {
+        --season-a: 38 92% 40%;
+        --season-b: 330 70% 50%;
+    }
+    :root.system[data-season="lunarNewYear"] {
+        --season-a: 2 75% 46%;
+        --season-b: 38 90% 42%;
+    }
+}
+
+/* What drifts: a band over the top of the page, above the bar and below every
+   menu and dialog, fading out before it reaches anything worth reading. */
+.season-drift {
+    position: fixed;
+    inset: 0 0 auto 0;
+    height: 11rem;
+    overflow: hidden;
+    pointer-events: none;
+    z-index: 41;
+    mask-image: linear-gradient(to bottom, black 35%, transparent);
+}
+.season-piece {
+    position: absolute;
+    top: -1.5rem;
+    opacity: 0.55;
+    animation-name: season-fall;
+    animation-timing-function: linear;
+    animation-iteration-count: infinite;
+}
+.season-piece[data-shape="confetti"] {
+    border-radius: 1px;
+    height: auto !important;
+    aspect-ratio: 2 / 1;
+}
+.season-piece[data-shape="lantern"] {
+    border-radius: 40%;
+    opacity: 0.45;
+}
+.season-drift[data-rises] .season-piece {
+    top: auto;
+    bottom: -1.5rem;
+    animation-name: season-rise;
+}
+@keyframes season-fall {
+    from {
+        transform: translate(0, 0) rotate(0deg);
+    }
+    50% {
+        transform: translate(1.25rem, 6rem) rotate(160deg);
+    }
+    to {
+        transform: translate(-0.5rem, 13rem) rotate(320deg);
+    }
+}
+@keyframes season-rise {
+    from {
+        transform: translate(0, 0);
+    }
+    50% {
+        transform: translate(0.75rem, -6rem);
+    }
+    to {
+        transform: translate(-0.5rem, -13rem);
+    }
+}
+@media (prefers-reduced-motion: reduce) {
+    .season-drift {
+        display: none;
+    }
+}

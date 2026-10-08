@@ -117,6 +117,10 @@ model User {
     // code, which is full volume, so an account that never chose keeps what it
     // always heard.
     soundVolume   Int?
+    // Whether this account sees the seasonal decoration and hears the seasonal
+    // sounds (see `seasons` in @polaris/core), as stringified JSON. Absent fields
+    // and a null column follow the defaults in code: decorated, ordinary sounds.
+    seasonal      String?
     // How this account reads mail - the order lists come in, when an opened
     // message stops being unread, where the screen goes after one is filed, and
     // how long a sent message can be caught back - as stringified JSON. A

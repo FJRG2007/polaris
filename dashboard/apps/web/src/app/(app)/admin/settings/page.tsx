@@ -5,6 +5,8 @@ import { requireAdmin } from "@/lib/session";
 import { getTranslations } from "@/lib/i18n/request";
 import { SettingsView } from "./settings-view";
 import { TransferCard } from "./transfer-card";
+import { SeasonalAdminCard } from "./seasonal-card";
+import { seasonsAllowed } from "@/lib/seasonal-service";
 import { getUpdateSource } from "@/lib/update-source";
 import { getAutoUpdatePolicy } from "@/lib/update-watcher";
 import { getLegalContact, publicUrls } from "@/lib/legal/service";
@@ -26,13 +28,14 @@ export default async function SettingsPage() {
     const user = await requireAdmin();
     const t = await getTranslations("admin");
     const env = loadEnv();
-    const [policy, source, contact, publicPages] = await Promise.all([
+    const [policy, source, contact, publicPages, seasons] = await Promise.all([
         getAutoUpdatePolicy(),
         getUpdateSource(),
         // The public pages, which are the only part of this deployment an outside
         // review desk can read - and the one line on them an operator writes.
         getLegalContact(),
-        publicUrls()
+        publicUrls(),
+        seasonsAllowed()
     ]);
 
     return (
@@ -54,6 +57,7 @@ export default async function SettingsPage() {
                     autoUpdate: env.POLARIS_AUTO_UPDATE
                 }}
             />
+            <SeasonalAdminCard initial={seasons} />
             <TransferCard identity={[user.email, user.name].filter(Boolean)} />
         </div>
     );

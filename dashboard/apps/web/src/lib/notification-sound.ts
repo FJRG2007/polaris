@@ -14,6 +14,8 @@
  * be heard.
  */
 
+import type { Season } from "@polaris/core";
+import { soundSeason } from "@/lib/sound-season";
 import {
     asSoundVolume,
     DEFAULT_SOUND_VOLUME,
@@ -155,8 +157,58 @@ export function hasNewArrival(seen: Set<string>, rows: Array<{ id: string; read:
     return arrived;
 }
 
-/** A rising two-note chime. Silent rather than throwing when audio is unavailable. */
+/** One note of the chime: hertz, when it starts and how long it lasts, in seconds. */
+export type ChimeNote = readonly [frequency: number, at: number, seconds: number];
+
+/** The ordinary chime: two notes rising a fifth. */
+export const CHIME: readonly ChimeNote[] = [
+    [880, 0, 0.16],
+    [1318.51, 0.11, 0.24]
+];
+
+/**
+ * The chime recast for each season, for an account that asked for the seasonal
+ * sounds. The same length and level as the ordinary one - it means the same
+ * thing - in the notes the season's ring uses, so a season sounds like one pack
+ * rather than several.
+ */
+export const SEASONAL_CHIMES: Record<Season, readonly ChimeNote[]> = {
+    halloween: [
+        [659.25, 0, 0.16],
+        [466.16, 0.11, 0.26]
+    ],
+    winter: [
+        [1174.66, 0, 0.12],
+        [1567.98, 0.08, 0.12],
+        [1975.53, 0.16, 0.2]
+    ],
+    newYear: [
+        [1046.5, 0, 0.1],
+        [1318.51, 0.07, 0.1],
+        [2093, 0.14, 0.22]
+    ],
+    lunarNewYear: [
+        [587.33, 0, 0.16],
+        [880, 0.11, 0.26]
+    ]
+};
+
+/** The chime in force: the season's where one is chosen, otherwise the ordinary one. */
+export function chimeFor(season: Season | null = soundSeason()): readonly ChimeNote[] {
+    return season ? SEASONAL_CHIMES[season] : CHIME;
+}
+
+/** A rising chime. Silent rather than throwing when audio is unavailable. */
 export function playNotificationSound(): void {
+    playChime(chimeFor());
+}
+
+/** One season's chime, or the ordinary one for null - what a preview plays. */
+export function playChimeOf(season: Season | null): void {
+    playChime(chimeFor(season));
+}
+
+function playChime(notes: readonly ChimeNote[]): void {
     const level = soundGain();
     // Silence is a volume somebody chose, not a tone to schedule: an
     // exponential ramp to zero throws.
@@ -166,8 +218,7 @@ export function playNotificationSound(): void {
         const audio = context;
         const ring = () => {
             const now = audio.currentTime;
-            note(audio, 880, now, 0.16, level);
-            note(audio, 1318.51, now + 0.11, 0.24, level);
+            for (const [frequency, at, seconds] of notes) note(audio, frequency, now + at, seconds, level);
         };
         // A context created before the page was interacted with starts suspended,
         // and notes scheduled while it is are dropped, so it is resumed first.
