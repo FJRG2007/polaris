@@ -8299,12 +8299,52 @@ model ChatSpaceInvite {
     maxUses     Int?
     uses        Int       @default(0)
     revokedAt   DateTime?
+    // The channel the link opens on, or null for the space itself. ON DELETE
+    // SET NULL: deleting the room leaves a link that still lets people into the
+    // space, which is what the person who shared it meant first.
+    channelId   String?   @db.Uuid
     createdAt   DateTime  @default(now())
 
-    space     ChatSpace @relation(fields: [spaceId], references: [id], onDelete: Cascade)
-    createdBy User      @relation(fields: [createdById], references: [id], onDelete: Cascade)
+    space     ChatSpace    @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+    createdBy User         @relation(fields: [createdById], references: [id], onDelete: Cascade)
+    channel   ChatChannel? @relation(fields: [channelId], references: [id], onDelete: SetNull)
 
     @@index([spaceId, createdAt])
+    @@index([channelId, createdAt])
+}
+
+// Somebody confirming they are an adult before reading an age-restricted
+// channel. Its own table rather than a column on the membership row, because
+// writing a membership row for somebody who reaches a private room through a
+// team grant would make them a member of it.
+model ChatAgeConfirmation {
+    id        String   @id @default(uuid(7)) @db.Uuid
+    channelId String   @db.Uuid
+    userId    String   @db.Uuid
+    createdAt DateTime @default(now())
+
+    channel ChatChannel @relation(fields: [channelId], references: [id], onDelete: Cascade)
+
+    @@unique([channelId, userId])
+}
+
+// An address something outside Polaris posts into a channel through - a CI
+// run, a monitor, a form. Discord's incoming webhook, and accepting Discord's
+// body shape (`content`, `username`), so the tools that already speak to one
+// speak to this. Only the hash of the secret in its address is kept: the full
+// address is shown once, when it is made or reset.
+model ChatWebhook {
+    id          String    @id @default(uuid(7)) @db.Uuid
+    channelId   String    @db.Uuid
+    name        String
+    tokenHash   String
+    createdById String?   @db.Uuid
+    lastUsedAt  DateTime?
+    createdAt   DateTime  @default(now())
+
+    channel ChatChannel @relation(fields: [channelId], references: [id], onDelete: Cascade)
+
+    @@index([channelId, createdAt])
 }
 
 // A picture somebody kept, so they can send it again.
@@ -8469,6 +8509,11 @@ model ChatChannel {
     // every channel until whoever runs it decides otherwise. Only read for a
     // voice channel, and whoever may moderate the room is let in past it.
     userLimit     Int       @default(0)
+    // What its pictures are before anybody looks: default | spoiler | age.
+    // `spoiler` covers every picture, video and link card until it is pressed;
+    // `age` is an age-restricted channel nobody reads until they have confirmed
+    // they are an adult (`ChatAgeConfirmation`). Only read for a space's channel.
+    contentMode   String    @default("default")
     // Denormalized so the rail can sort conversations by what is happening
     // without reading every message table.
     lastMessageAt DateTime?
@@ -8486,6 +8531,9 @@ model ChatChannel {
     meetings Meeting[]
     scheduled ChatScheduledMessage[]
     uploads  ChatUpload[]
+    invites  ChatSpaceInvite[]
+    webhooks ChatWebhook[]
+    ageConfirmations ChatAgeConfirmation[]
 
     @@index([spaceId, order])
     @@index([categoryId, order])
@@ -8658,6 +8706,12 @@ model ChatMessage {
     pinnedAt     DateTime?
     pinnedById   String?   @db.Uuid
     pinExpiresAt DateTime?
+    // Posted through a webhook rather than by a person: which one, and the name
+    // it posted under (its own, or the one the request asked for). Not a
+    // foreign key, so a message outlives the webhook that sent it, like
+    // `authorId` outlives an account.
+    webhookId    String?   @db.Uuid
+    authorLabel  String?
     createdAt   DateTime  @default(now())
 
     channel     ChatChannel      @relation(fields: [channelId], references: [id], onDelete: Cascade)

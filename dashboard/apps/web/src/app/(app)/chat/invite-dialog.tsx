@@ -20,7 +20,7 @@ import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { NamespaceKey } from "@/lib/i18n/types";
 
 /** How long an invitation lasts, by its length in minutes. */
-const INVITE_DURATION_KEYS: Readonly<Record<number, NamespaceKey<"chat">>> = {
+export const INVITE_DURATION_KEYS: Readonly<Record<number, NamespaceKey<"chat">>> = {
     30: "invite.durations.m30",
     60: "invite.durations.h1",
     360: "invite.durations.h6",

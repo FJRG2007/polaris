@@ -19,6 +19,7 @@ import { postNotice } from "./notices";
 import { publishChatChange } from "./live";
 import { decorateMessages, MESSAGE_SELECT, type ChatMessageView } from "./messages";
 import { MAX_PINS, pinExpiry, type PinInput } from "./pin-rules";
+import { requireAgeCleared } from "./age-gate";
 
 export { MAX_PINS, PIN_DURATIONS, pinExpiry, pinInputSchema } from "./pin-rules";
 export type { PinDuration, PinInput } from "./pin-rules";
@@ -127,6 +128,7 @@ export async function unpin(actor: ChatActor, messageId: string): Promise<void> 
 /** Every pin in a conversation this reader can read, newest pin first. */
 export async function pinsIn(actor: ChatActor, channelId: string): Promise<ChatPinView[]> {
     await requireChannel(actor, channelId);
+    await requireAgeCleared(actor, channelId);
     const rows = await prisma.chatMessage.findMany({
         where: pinnedWhere(channelId, new Date()),
         orderBy: { pinnedAt: "desc" },

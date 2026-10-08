@@ -128,6 +128,22 @@ export const chatActivitySchema = z.enum(CHAT_ACTIVITIES).catch("typing").defaul
 export const MAX_CHAT_SPACE_NAME = 60;
 export const MAX_CHAT_CHANNEL_NAME = 60;
 export const MAX_CHAT_TOPIC = 200;
+/** What a channel says it is for. Discord's length: a channel's topic is often
+ *  its rules, and two hundred characters is not enough room for rules. A space's
+ *  description keeps `MAX_CHAT_TOPIC`. */
+export const MAX_CHANNEL_TOPIC = 1024;
+
+/**
+ * What a channel's pictures and videos are, before anybody looks.
+ *
+ * - `default`: drawn as sent, with the sender's own spoiler marks.
+ * - `spoiler`: every picture, video and link card in it starts covered, the way
+ *   a spoiler mark covers one, and a press uncovers it.
+ * - `age`: the channel is age-restricted. Nobody reads a line of it until they
+ *   have confirmed they are an adult, once per channel - Discord's gate.
+ */
+export const CHAT_CONTENT_MODES = ["default", "spoiler", "age"] as const;
+export type ChatContentMode = (typeof CHAT_CONTENT_MODES)[number];
 
 /** Long enough for anybody explaining something properly, short enough that a
  *  paste of a log file is refused rather than stored. Somebody with a log file to
@@ -220,7 +236,7 @@ export type ChatSpaceUpdateInput = z.infer<typeof chatSpaceUpdateSchema>;
 export const chatChannelCreateSchema = z.object({
     spaceId: z.string().uuid(),
     name: channelName,
-    topic: z.string().trim().max(MAX_CHAT_TOPIC).default(""),
+    topic: z.string().trim().max(MAX_CHANNEL_TOPIC).default(""),
     /** A channel only the people put in it can see. */
     private: z.boolean().default(false),
     kind: z.enum(CHAT_SPACE_CHANNEL_KINDS).default("text"),
@@ -242,7 +258,10 @@ export type ChatChannelCreateInput = z.infer<typeof chatChannelCreateSchema>;
  * other, and a room that needs the second usually needs it for an hour rather
  * than forever.
  */
-export const CHAT_SLOWMODE_STEPS = [0, 5, 10, 15, 30, 60, 120, 300, 600, 900, 3600, 21600] as const;
+// Discord's ladder: off, 5s, 10s, 15s, 30s, 1m, 2m, 5m, 10m, 15m, 30m, 1h, 2h, 6h.
+export const CHAT_SLOWMODE_STEPS = [
+    0, 5, 10, 15, 30, 60, 120, 300, 600, 900, 1800, 3600, 7200, 21600
+] as const;
 
 export type ChatSlowmode = (typeof CHAT_SLOWMODE_STEPS)[number];
 
@@ -342,8 +361,13 @@ export function voiceOccupancy(input: { limit: number; present: number }): strin
 export const chatChannelUpdateSchema = z.object({
     channelId: z.string().uuid(),
     name: channelName.optional(),
-    topic: z.string().trim().max(MAX_CHAT_TOPIC).optional(),
+    topic: z.string().trim().max(MAX_CHANNEL_TOPIC).optional(),
     archived: z.boolean().optional(),
+    /** Only the people put in it, and the teams and roles it is shared with,
+     *  can see it. */
+    private: z.boolean().optional(),
+    /** What its pictures are before anybody looks - see `CHAT_CONTENT_MODES`. */
+    contentMode: z.enum(CHAT_CONTENT_MODES).optional(),
     /** Moving it under a different heading, or out from under all of them. */
     categoryId: z.string().uuid().nullable().optional(),
     slowmode: chatSlowmodeSchema.optional(),
@@ -1042,6 +1066,9 @@ const inviteUses: readonly number[] = [INVITE_UNLIMITED, ...INVITE_USE_LIMITS];
 
 export const chatInviteCreateSchema = z.object({
     spaceId: z.string().uuid(),
+    /** The channel the link opens on, Discord's way: somebody who follows it
+     *  joins the space and lands in that room. Absent for the space itself. */
+    channelId: z.string().uuid().optional(),
     expiresMinutes: z
         .number()
         .refine((value) => inviteMinutes.includes(value), "That is not a length to offer"),
@@ -1051,6 +1078,55 @@ export const chatInviteCreateSchema = z.object({
 });
 
 export type ChatInviteCreateInput = z.infer<typeof chatInviteCreateSchema>;
+
+/** How many webhooks one channel holds. Discord's number: past it, a channel is
+ *  a bus rather than a conversation. */
+export const MAX_CHAT_WEBHOOKS = 15;
+
+/** A webhook's name, which is also the name its messages carry unless a request
+ *  asks for another. Discord's length. */
+export const MAX_CHAT_WEBHOOK_NAME = 80;
+
+const webhookName = z
+    .string()
+    .trim()
+    .min(1, "Give it a name")
+    .max(MAX_CHAT_WEBHOOK_NAME, "That name is too long");
+
+export const chatWebhookCreateSchema = z.object({
+    channelId: z.string().uuid(),
+    name: webhookName
+});
+
+export type ChatWebhookCreateInput = z.infer<typeof chatWebhookCreateSchema>;
+
+export const chatWebhookRenameSchema = z.object({
+    webhookId: z.string().uuid(),
+    name: webhookName
+});
+
+export type ChatWebhookRenameInput = z.infer<typeof chatWebhookRenameSchema>;
+
+/**
+ * What something outside Polaris posts to a webhook's address.
+ *
+ * Discord's body, so a tool that already posts to a Discord webhook posts here
+ * by changing the address: `content` is the message and `username` the name it
+ * goes out under. Discord's other fields (`avatar_url`, `embeds`, `tts`,
+ * `allowed_mentions`) are accepted and ignored rather than refused, because a
+ * tool sends them whether or not they are used.
+ */
+export const chatWebhookExecuteSchema = z
+    .object({
+        content: z
+            .string()
+            .max(MAX_CHAT_MESSAGE, "That is longer than a message can be")
+            .refine((value) => value.trim().length > 0, "Cannot send an empty message"),
+        username: z.string().trim().max(MAX_CHAT_WEBHOOK_NAME).optional()
+    })
+    .passthrough();
+
+export type ChatWebhookExecuteInput = z.infer<typeof chatWebhookExecuteSchema>;
 
 /** An invite code as it appears in a URL: the alphabet the generator uses and
  *  nothing else, so a malformed one is refused before it reaches the database. */

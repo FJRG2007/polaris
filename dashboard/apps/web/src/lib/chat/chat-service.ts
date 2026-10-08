@@ -135,6 +135,12 @@ export interface ChatChannelView {
     /** How many people a voice channel holds at once. Zero is no limit, and is
      *  what every other kind of conversation reads. */
     readonly userLimit: number;
+    /** What its pictures are before anybody looks - see `CHAT_CONTENT_MODES`.
+     *  Always `default` for a direct message or a group. */
+    readonly contentMode: core.ChatContentMode;
+    /** Whether this reader has said they are an adult here. Only read when the
+     *  channel is age-restricted; true everywhere else, so nothing gates. */
+    readonly ageConfirmed: boolean;
     /** The other people in a direct message, for the avatars beside it. Empty
      *  for a named channel, where the name is the whole label. */
     readonly others: readonly { id: string; name: string }[];
@@ -725,6 +731,7 @@ export async function listChannels(
             membersMayMention: true,
             slowmode: true,
             userLimit: true,
+            contentMode: true,
             // Only where somebody reads them: a direct message or a group is
             // named after, and drawn with, the people in it. A channel in a
             // space is neither - its `others` is always empty - and a public
@@ -747,6 +754,22 @@ export async function listChannels(
     // over reachable spaces would not do.
     const channels = await onOpenShelf(actor, found);
     if (channels.length === 0) return [];
+
+    // Which age-restricted rooms this reader has already said yes to. Asked only
+    // when the rail has one, which is nearly never.
+    const gated = channels
+        .filter((channel) => channel.spaceId && channel.contentMode === "age")
+        .map((channel) => channel.id);
+    const confirmed = new Set(
+        gated.length
+            ? (
+                  await prisma.chatAgeConfirmation.findMany({
+                      where: { userId: actor.id, channelId: { in: gated } },
+                      select: { channelId: true }
+                  })
+              ).map((row) => row.channelId)
+            : []
+    );
 
     // Four reads that depend on nothing but the rows above, asked together
     // rather than one after another.
@@ -840,11 +863,22 @@ export async function listChannels(
             mayMentionRoom: roomMentionsAllowed(channel, actor.id),
             slowmode: channel.slowmode,
             userLimit: channel.kind === "voice" ? channel.userLimit : 0,
+            contentMode: channel.spaceId ? contentModeOf(channel.contentMode) : "default",
+            ageConfirmed:
+                !channel.spaceId || channel.contentMode !== "age" || confirmed.has(channel.id),
             others: channel.spaceId ? [] : others,
             blocked: channel.kind === "dm" && others.some((other) => shut.has(other.id)),
             gameLinks: linked.get(channel.id) ?? []
         };
     });
+}
+
+/** A stored content mode, or `default` for anything this version does not
+ *  know - a row is older than the screen reading it, and newer ones exist. */
+function contentModeOf(stored: string | null | undefined): core.ChatContentMode {
+    return (core.CHAT_CONTENT_MODES as readonly string[]).includes(stored ?? "")
+        ? (stored as core.ChatContentMode)
+        : "default";
 }
 
 /** A stored channel level, or `inherit` for anything the column holds that this
@@ -1013,6 +1047,7 @@ export async function duplicateChannel(
             private: true,
             slowmode: true,
             userLimit: true,
+            contentMode: true,
             order: true,
             members: { select: { userId: true, role: true } }
         }
@@ -1053,6 +1088,7 @@ export async function duplicateChannel(
                 kind: source.kind,
                 slowmode: source.slowmode,
                 userLimit: source.userLimit,
+                contentMode: source.contentMode,
                 order,
                 createdById: actor.id,
                 ...(members.length > 0
@@ -1180,15 +1216,30 @@ export async function updateChannel(
         throw new ChatAccessError({ key: "errors.limitVoiceOnly" });
     }
 
-    await prisma.chatChannel.update({
-        where: { id: input.channelId },
-        data: {
-            ...(input.name !== undefined ? { name: input.name } : {}),
-            ...(input.topic !== undefined ? { topic: input.topic } : {}),
-            ...(input.archived !== undefined ? { archived: input.archived } : {}),
-            ...(input.categoryId !== undefined ? { categoryId: input.categoryId } : {}),
-            ...(input.slowmode !== undefined ? { slowmode: input.slowmode } : {}),
-            ...(input.userLimit !== undefined ? { userLimit: input.userLimit } : {})
+    await prisma.$transaction(async (tx) => {
+        await tx.chatChannel.update({
+            where: { id: input.channelId },
+            data: {
+                ...(input.name !== undefined ? { name: input.name } : {}),
+                ...(input.topic !== undefined ? { topic: input.topic } : {}),
+                ...(input.archived !== undefined ? { archived: input.archived } : {}),
+                ...(input.categoryId !== undefined ? { categoryId: input.categoryId } : {}),
+                ...(input.slowmode !== undefined ? { slowmode: input.slowmode } : {}),
+                ...(input.userLimit !== undefined ? { userLimit: input.userLimit } : {}),
+                ...(input.private !== undefined ? { private: input.private } : {}),
+                ...(input.contentMode !== undefined ? { contentMode: input.contentMode } : {})
+            }
+        });
+        // A private channel is reached by its member rows alone, so whoever
+        // closes it keeps a row of their own - the same as creating one private.
+        // Without it, an administrator of the space who had never posted here
+        // would lock themselves out of the room they just closed.
+        if (input.private) {
+            await tx.chatChannelMember.upsert({
+                where: { channelId_userId: { channelId: input.channelId, userId: actor.id } },
+                update: { role: "admin" },
+                create: { channelId: input.channelId, userId: actor.id, role: "admin" }
+            });
         }
     });
     publishChatChange({ channelId: input.channelId, kind: "channels", actorId: actor.id });

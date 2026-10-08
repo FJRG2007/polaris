@@ -89,6 +89,7 @@ import {
 } from "@polaris/ui";
 import { PersonCardProvider } from "./person-card";
 import { PinLengthDialog, PinnedBar, PinsDialog, usePins } from "./pins-ui";
+import { AgeGate } from "./age-gate";
 
 /** How close to the bottom still counts as "following along". A few pixels of
  *  slack, because a trackpad rarely lands exactly on zero. */
@@ -1276,6 +1277,8 @@ export function ChannelView({
 
     /** The room's pins, the message being given a length, and the list. */
     const pins = usePins(channelId);
+    /** The channel whose age gate was answered in this tab - see `gated`. */
+    const [ageConfirmedHere, setAgeConfirmedHere] = useState<string | null>(null);
     pinFrames.current = pins.onFrame;
     const [pinning, setPinning] = useState<ChatMessageView | null>(null);
     const [pinsOpen, setPinsOpen] = useState(false);
@@ -1894,6 +1897,7 @@ export function ChannelView({
                 ) : (
                     <MessageList
                         messages={shown}
+                        coverMedia={channel?.contentMode === "spoiler"}
                         viewerId={viewerId}
                         canPost={canPost}
                         canModerate={canModerate}
@@ -2144,6 +2148,34 @@ export function ChannelView({
         </>
     );
 
+    /**
+     * An age-restricted channel this reader has not said they are old enough
+     * for: the gate stands where the conversation would, and the server hands
+     * over no message until it is answered. Held locally once answered, so the
+     * conversation opens at once rather than when the rail catches up.
+     */
+    const gated =
+        channel !== null &&
+        channel.spaceId !== null &&
+        channel.contentMode === "age" &&
+        !channel.ageConfirmed &&
+        ageConfirmedHere !== channelId;
+    const shownConversation = gated ? (
+        <AgeGate
+            channelId={channelId}
+            channelName={channel.name}
+            onConfirmed={() => {
+                setAgeConfirmedHere(channelId);
+                setError("");
+                refresh();
+                void load();
+                void pins.reload();
+            }}
+        />
+    ) : (
+        conversation
+    );
+
     /** Start the call here, or walk into the one already running. */
     async function startCall(withVideo: boolean): Promise<void> {
         // Through `runAction`, which is the difference between a button that
@@ -2352,7 +2384,7 @@ export function ChannelView({
                     not taken down, behind an expanded call: what somebody was
                     typing is still there when it shrinks again. */}
                 {!voiceRoom && (
-                    <div className={expanded ? "hidden" : "contents"}>{conversation}</div>
+                    <div className={expanded ? "hidden" : "contents"}>{shownConversation}</div>
                 )}
             </div>
 
@@ -2367,7 +2399,7 @@ export function ChannelView({
                     label={t("channelView.voiceChannelChatWidth")}
                     className="border-t border-border lg:border-l lg:border-t-0"
                 >
-                    {conversation}
+                    {shownConversation}
                 </SidePane>
             )}
 

@@ -25,6 +25,8 @@ import * as chat from "@/lib/chat/chat-service";
 import * as messages from "@/lib/chat/messages";
 import * as polls from "@/lib/chat/polls";
 import * as pins from "@/lib/chat/pins";
+import * as webhooks from "@/lib/chat/webhooks";
+import { confirmAge } from "@/lib/chat/age-gate";
 import { allChatRules } from "@/lib/chat/rules";
 import { requirePermission } from "@/lib/session";
 import { getLocale, getTranslations } from "@/lib/i18n/request";
@@ -193,7 +195,10 @@ export async function readChannelAction(
               )
             : Promise.resolve(undefined)
     ]);
-    if (result.error) return { error: result.error };
+    // The conversation still comes back with a refusal, so the screen can say
+    // what the refusal is about - an age-restricted channel's gate needs its
+    // name and its setting to draw.
+    if (result.error) return described ? { error: result.error, channel: described } : { error: result.error };
     return described === undefined
         ? { page: result.value }
         : { page: result.value, channel: described };
@@ -1380,10 +1385,15 @@ export async function createInviteAction(
 }
 
 export async function listInvitesAction(
-    spaceId: string
+    spaceId: string,
+    channelId?: string
 ): Promise<{ invites?: readonly ChatInviteView[]; error?: string }> {
     const me = await actor();
-    const result = await guard(() => invites.listInvites(me, String(spaceId)));
+    const channel = channelId === undefined ? undefined : z.string().uuid().safeParse(channelId);
+    if (channel && !channel.success) return { invites: [] };
+    const result = await guard(() =>
+        invites.listInvites(me, String(spaceId), channel?.success ? channel.data : undefined)
+    );
     return result.error ? { error: result.error } : { invites: result.value };
 }
 
@@ -1405,13 +1415,74 @@ export async function readInviteAction(
 
 export async function acceptInviteAction(
     code: string
-): Promise<{ spaceId?: string; error?: string }> {
+): Promise<{ spaceId?: string; channelId?: string | null; error?: string }> {
     const me = await actor();
     const parsed = core.inviteCodeSchema.safeParse(code);
     if (!parsed.success) return { error: (await getTranslations("chat"))("errors.notAnInvite") };
     const result = await guard(() => invites.acceptInvite(me, parsed.data));
     if (!result.error) revalidatePath(CHAT_PATH);
-    return result.error ? { error: result.error } : { spaceId: result.value!.spaceId };
+    return result.error
+        ? { error: result.error }
+        : { spaceId: result.value!.spaceId, channelId: result.value!.channelId };
+}
+
+// ---------------------------------------------------------------------------
+// Channel settings: the age gate and webhooks
+// ---------------------------------------------------------------------------
+
+/** Say yes at an age-restricted channel's gate. Remembered for this channel. */
+export async function confirmAgeAction(channelId: unknown): Promise<{ error?: string }> {
+    const me = await actor();
+    const parsed = z.string().uuid().safeParse(channelId);
+    if (!parsed.success) return { error: (await getTranslations("chat"))("errors.notInConversation") };
+    return guard(() => confirmAge(me, parsed.data));
+}
+
+/** The webhooks on one channel, for its settings. Whoever runs the channel. */
+export async function listWebhooksAction(
+    channelId: unknown
+): Promise<{ webhooks?: readonly webhooks.ChatWebhookView[]; error?: string }> {
+    const me = await actor();
+    const parsed = z.string().uuid().safeParse(channelId);
+    if (!parsed.success) return { webhooks: [] };
+    const result = await guard(() => webhooks.listWebhooks(me, parsed.data));
+    return result.error ? { error: result.error } : { webhooks: result.value };
+}
+
+/** Make a webhook. The answer carries its secret, which is never shown again. */
+export async function createWebhookAction(
+    input: unknown
+): Promise<{ created?: webhooks.ChatWebhookSecret; error?: string }> {
+    const me = await actor();
+    const parsed = core.chatWebhookCreateSchema.safeParse(input);
+    if (!parsed.success) return { error: (await getTranslations("chat"))("errors.webhookName") };
+    const result = await guard(() => webhooks.createWebhook(me, parsed.data));
+    return result.error ? { error: result.error } : { created: result.value };
+}
+
+export async function renameWebhookAction(input: unknown): Promise<{ error?: string }> {
+    const me = await actor();
+    const parsed = core.chatWebhookRenameSchema.safeParse(input);
+    if (!parsed.success) return { error: (await getTranslations("chat"))("errors.webhookName") };
+    return guard(() => webhooks.renameWebhook(me, parsed.data));
+}
+
+/** A new secret for a webhook; the old address stops working at once. */
+export async function resetWebhookAction(
+    webhookId: unknown
+): Promise<{ created?: webhooks.ChatWebhookSecret; error?: string }> {
+    const me = await actor();
+    const parsed = z.string().uuid().safeParse(webhookId);
+    if (!parsed.success) return { error: (await getTranslations("chat"))("errors.webhookGone") };
+    const result = await guard(() => webhooks.resetWebhook(me, parsed.data));
+    return result.error ? { error: result.error } : { created: result.value };
+}
+
+export async function deleteWebhookAction(webhookId: unknown): Promise<{ error?: string }> {
+    const me = await actor();
+    const parsed = z.string().uuid().safeParse(webhookId);
+    if (!parsed.success) return { error: (await getTranslations("chat"))("errors.webhookGone") };
+    return guard(() => webhooks.deleteWebhook(me, parsed.data));
 }
 
 /**

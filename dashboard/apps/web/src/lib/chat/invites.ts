@@ -29,7 +29,7 @@ import * as core from "@polaris/core";
 import { randomBytes } from "node:crypto";
 import { publishChatChange } from "./live";
 import { postSpaceNotice } from "./notices";
-import { ChatAccessError, type ChatActor } from "./access";
+import { ChatAccessError, spaceAccess, type ChatActor } from "./access";
 
 /** One invitation, as the panel that made it draws it. */
 export interface ChatInviteView {
@@ -40,6 +40,11 @@ export interface ChatInviteView {
     readonly uses: number;
     readonly usable: boolean;
     readonly createdAt: string;
+    /** The channel it opens on, or null for one onto the space itself. */
+    readonly channelId: string | null;
+    /** Who made it, for the list an administrator reads. Null once their
+     *  account is gone. */
+    readonly createdBy: string | null;
 }
 
 /** What somebody following a link is shown before they decide. */
@@ -48,6 +53,9 @@ export interface ChatInviteOffer {
     readonly spaceId: string;
     readonly spaceName: string;
     readonly spaceDescription: string;
+    /** The channel the link opens on, when it names one joining reaches. */
+    readonly channelId: string | null;
+    readonly channelName: string | null;
     readonly invitedBy: string | null;
     /** Whether it can still be used at all. A refused invite still names the
      *  space, because "this link has expired" is only useful with the thing it
@@ -75,20 +83,33 @@ export async function createInvite(
     });
     if (!space || space.archived) throw new ChatAccessError({ key: "errors.spaceNotOpen" });
 
-    const membership = await prisma.chatSpaceMember.findUnique({
-        where: { spaceId_userId: { spaceId: input.spaceId, userId: actor.id } },
-        select: { role: true }
-    });
-    if (!membership) throw new ChatAccessError({ key: "errors.notInSpace" });
+    // The owner has no membership row - the space is theirs - so the standing is
+    // asked the way every other screen asks it, not off the row alone.
+    const standing = await spaceAccess(actor, input.spaceId);
+    if (!standing) throw new ChatAccessError({ key: "errors.notInSpace" });
     // A private space is one whose roster was chosen. A member who could hand
     // out a link would be choosing it instead of the administrator.
-    if (space.visibility === "private" && membership.role !== "admin") {
+    if (space.visibility === "private" && standing === "member") {
         throw new ChatAccessError({ key: "errors.spaceInviteAdminOnly" });
+    }
+
+    // A link that opens on one channel: that channel has to be one joining the
+    // space leads to. A private one is not - joining the space does not open
+    // it - so a link to it would be a link to a door that stays shut.
+    if (input.channelId) {
+        const channel = await prisma.chatChannel.findUnique({
+            where: { id: input.channelId },
+            select: { spaceId: true, private: true, archived: true }
+        });
+        if (!channel || channel.spaceId !== input.spaceId || channel.private || channel.archived) {
+            throw new ChatAccessError({ key: "errors.inviteChannelNotOpen" });
+        }
     }
 
     const invite = await prisma.chatSpaceInvite.create({
         data: {
             spaceId: input.spaceId,
+            channelId: input.channelId ?? null,
             code: newCode(),
             createdById: actor.id,
             expiresAt: core.inviteExpiresAt(input.expiresMinutes),
@@ -100,22 +121,22 @@ export async function createInvite(
 }
 
 /** The invitations somebody made for a space, newest first. Only an
- *  administrator sees the lot; anybody else sees their own. */
+ *  administrator sees the lot; anybody else sees their own. With a channel,
+ *  only the links that open on it - what that channel's settings list. */
 export async function listInvites(
     actor: ChatActor,
-    spaceId: string
+    spaceId: string,
+    channelId?: string
 ): Promise<readonly ChatInviteView[]> {
-    const membership = await prisma.chatSpaceMember.findUnique({
-        where: { spaceId_userId: { spaceId, userId: actor.id } },
-        select: { role: true }
-    });
-    if (!membership) throw new ChatAccessError({ key: "errors.notInSpace" });
+    const standing = await spaceAccess(actor, spaceId);
+    if (!standing) throw new ChatAccessError({ key: "errors.notInSpace" });
 
     const rows = await prisma.chatSpaceInvite.findMany({
         where: {
             spaceId,
             revokedAt: null,
-            ...(membership.role === "admin" ? {} : { createdById: actor.id })
+            ...(channelId ? { channelId } : {}),
+            ...(standing === "member" ? { createdById: actor.id } : {})
         },
         orderBy: { createdAt: "desc" },
         take: 25,
@@ -133,11 +154,8 @@ export async function revokeInvite(actor: ChatActor, inviteId: string): Promise<
     if (!invite) throw new ChatAccessError({ key: "errors.invitationGone" });
 
     if (invite.createdById !== actor.id) {
-        const membership = await prisma.chatSpaceMember.findUnique({
-            where: { spaceId_userId: { spaceId: invite.spaceId, userId: actor.id } },
-            select: { role: true }
-        });
-        if (membership?.role !== "admin") {
+        const standing = await spaceAccess(actor, invite.spaceId);
+        if (standing !== "owner" && standing !== "admin") {
             throw new ChatAccessError({ key: "errors.invitationNotYours" });
         }
     }
@@ -161,10 +179,12 @@ export async function readInvite(actor: ChatActor, code: string): Promise<ChatIn
             uses: true,
             revokedAt: true,
             createdBy: { select: { name: true } },
-            space: { select: { id: true, name: true, description: true, archived: true } }
+            space: { select: { id: true, name: true, description: true, archived: true } },
+            channel: { select: { id: true, name: true, private: true } }
         }
     });
     if (!invite) return null;
+    const landing = invite.channel && !invite.channel.private ? invite.channel : null;
 
     const member = await prisma.chatSpaceMember.findUnique({
         where: { spaceId_userId: { spaceId: invite.space.id, userId: actor.id } },
@@ -176,6 +196,8 @@ export async function readInvite(actor: ChatActor, code: string): Promise<ChatIn
         spaceId: invite.space.id,
         spaceName: invite.space.name,
         spaceDescription: invite.space.description,
+        channelId: landing?.id ?? null,
+        channelName: landing?.name ?? null,
         invitedBy: invite.createdBy?.name ?? null,
         usable: !invite.space.archived && core.inviteUsable(invite),
         alreadyIn: member !== null
@@ -190,9 +212,13 @@ export async function readInvite(actor: ChatActor, code: string): Promise<ChatIn
  * one-use invite at the same instant means one of them is refused rather than
  * both being let in.
  *
- * @returns The space that was joined.
+ * @returns The space that was joined, and the channel the link opens on when it
+ *   names one that joining the space reaches.
  */
-export async function acceptInvite(actor: ChatActor, code: string): Promise<{ spaceId: string }> {
+export async function acceptInvite(
+    actor: ChatActor,
+    code: string
+): Promise<{ spaceId: string; channelId: string | null }> {
     const invite = await prisma.chatSpaceInvite.findUnique({
         where: { code },
         select: {
@@ -202,10 +228,15 @@ export async function acceptInvite(actor: ChatActor, code: string): Promise<{ sp
             maxUses: true,
             uses: true,
             revokedAt: true,
+            channelId: true,
+            channel: { select: { private: true } },
             space: { select: { archived: true } }
         }
     });
     if (!invite || invite.space.archived) throw new ChatAccessError({ key: "errors.invitationGone" });
+    // Made private since the link was shared: joining no longer opens it, so the
+    // link lands on the space instead of on a room that would refuse them.
+    const landing = invite.channelId && invite.channel && !invite.channel.private ? invite.channelId : null;
     if (!core.inviteUsable(invite)) throw new ChatAccessError({ key: "errors.invitationExpired" });
 
     const already = await prisma.chatSpaceMember.findUnique({
@@ -214,7 +245,7 @@ export async function acceptInvite(actor: ChatActor, code: string): Promise<{ sp
     });
     // Already in it: the link takes them there, and no use is spent. Somebody
     // opening their own invite twice must not burn one of its uses.
-    if (already) return { spaceId: invite.spaceId };
+    if (already) return { spaceId: invite.spaceId, channelId: landing };
 
     // A link is exactly how somebody who has been banned gets back in, and it is
     // the door a ban exists to stand at. Refused before a use is spent: an
@@ -250,7 +281,7 @@ export async function acceptInvite(actor: ChatActor, code: string): Promise<{ sp
         actorId: "",
         audience: [actor.id]
     });
-    return { spaceId: invite.spaceId };
+    return { spaceId: invite.spaceId, channelId: landing };
 }
 
 // ---------------------------------------------------------------------------
@@ -264,7 +295,9 @@ const SELECT = {
     maxUses: true,
     uses: true,
     revokedAt: true,
-    createdAt: true
+    createdAt: true,
+    channelId: true,
+    createdBy: { select: { name: true } }
 } as const;
 
 /** A code from the URL-safe alphabet, so it survives being pasted anywhere. */
@@ -280,6 +313,8 @@ function view(row: {
     uses: number;
     revokedAt: Date | null;
     createdAt: Date;
+    channelId: string | null;
+    createdBy: { name: string } | null;
 }): ChatInviteView {
     return {
         id: row.id,
@@ -288,6 +323,8 @@ function view(row: {
         maxUses: row.maxUses,
         uses: row.uses,
         usable: core.inviteUsable(row),
-        createdAt: row.createdAt.toISOString()
+        createdAt: row.createdAt.toISOString(),
+        channelId: row.channelId,
+        createdBy: row.createdBy?.name ?? null
     };
 }

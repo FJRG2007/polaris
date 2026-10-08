@@ -37,7 +37,7 @@ import { NicknameDialog } from "./nickname-dialog";
 import { useAppUrl } from "@/components/app-url";
 import { useOpenDirect } from "./use-open-direct";
 import { MemberMenu, type MenuPerson } from "./member-menu";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { recentEmoji, rememberEmoji } from "./recents";
 import { embedFor } from "@/lib/chat/embeds";
 import { LinkCard } from "./link-card";
@@ -170,8 +170,17 @@ import {
     SmilePlus,
     Star,
     Trash2,
-    Volume2
+    Volume2,
+    Webhook
 } from "lucide-react";
+
+/**
+ * Whether every picture, video and link card in this conversation starts
+ * covered - a channel whose settings say its content is spoilers. A context
+ * rather than a prop down every message, because only the attachment and the
+ * card read it.
+ */
+const CoverMedia = createContext(false);
 
 /** How close together two messages have to be to share a header. Long enough
  *  that a paused sentence stays one block, short enough that coming back an hour
@@ -208,6 +217,9 @@ function quickEmoji(recent: readonly string[]): string[] {
 
 export interface MessageListProps {
     messages: readonly ChatMessageView[];
+    /** Cover every picture, video and link card until it is pressed - the
+     *  channel's content setting, not the sender's. */
+    coverMedia?: boolean;
     viewerId: string;
     /** False in an archived conversation: everything is still readable, nothing
      *  is actionable. */
@@ -280,7 +292,8 @@ export function MessageList({
     onForward,
     onEdit,
     onDelete,
-    onMention
+    onMention,
+    coverMedia = false
 }: MessageListProps) {
     useMessageKeys({ messages, viewerId, canPost, canModerate, onReply, onEdit, onDelete });
     const { refresh } = useChat();
@@ -379,6 +392,7 @@ export function MessageList({
     }, [asked]);
 
     return (
+        <CoverMedia.Provider value={coverMedia}>
         <ol className="flex flex-col">
             {messages.map((message, index) => {
                 const previous = index > 0 ? messages[index - 1] : undefined;
@@ -488,6 +502,7 @@ export function MessageList({
                 onSaved={refresh}
             />
         </ol>
+        </CoverMedia.Provider>
     );
 }
 
@@ -759,6 +774,7 @@ function Message({
             ? () => onReply(message)
             : undefined
     );
+    const coverAll = useContext(CoverMedia);
 
     // Something Polaris said rather than somebody: joined, left, was added.
     // Indented to where message text starts rather than to the avatar gutter,
@@ -906,6 +922,13 @@ function Message({
                                 </span>
                             )}
                         </Writer>
+                    ) : message.fromWebhook ? (
+                        <span
+                            className="inline-flex size-7 items-center justify-center rounded-full bg-primary/15 text-primary"
+                            aria-hidden="true"
+                        >
+                            <Webhook className="size-4 shrink-0" />
+                        </span>
                     ) : (
                         <span className="inline-flex size-7 items-center justify-center rounded-full bg-muted text-[0.625rem] text-muted-foreground">
                             ?
@@ -968,6 +991,17 @@ function Message({
                             ) : (
                                 <span className="text-sm font-medium">
                                     <PersonName id={message.authorId} name={author} />
+                                </span>
+                            )}
+                            {/* Not a person: something outside Polaris posting
+                                through one of the channel's webhooks, under a name
+                                it chose. Discord's APP tag says the same. */}
+                            {message.fromWebhook && (
+                                <span
+                                    className="shrink-0 self-center rounded bg-primary px-1 text-[0.625rem] font-semibold uppercase leading-4 text-primary-foreground"
+                                    title={t("messageList.webhookHint")}
+                                >
+                                    {t("messageList.app")}
                                 </span>
                             )}
                             <MessageTime
@@ -1038,7 +1072,9 @@ function Message({
                         />
                     )}
 
-                    <LinkArea message={message} />
+                    <Spoiler kind="link" covered={coverAll}>
+                        <LinkArea message={message} />
+                    </Spoiler>
                     <ReferenceCards message={message} inRoom={inVoice} onJumpTo={onJumpTo} />
 
                     {message.attachments.length > 0 && (
@@ -1057,8 +1093,10 @@ function Message({
                                                   ? "video"
                                                   : "file"
                                         }
-                                        className={file.spoiler ? undefined : "contents"}
-                                        covered={file.spoiler}
+                                        className={
+                                            file.spoiler || coverAll ? undefined : "contents"
+                                        }
+                                        covered={file.spoiler || coverAll}
                                     >
                                         {file.inline ? (
                                             <KeepableImage

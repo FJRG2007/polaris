@@ -49,6 +49,7 @@ import {
     type ChatErrorText
 } from "./access";
 import { spokenEditWindow, spokenWait } from "./durations";
+import { requireAgeCleared } from "./age-gate";
 
 /** One message, with everything the list needs to draw it. */
 export interface ChatMessageView {
@@ -57,6 +58,10 @@ export interface ChatMessageView {
     readonly authorId: string | null;
     /** Null when the account is gone. The message stays; the name does not. */
     readonly authorName: string | null;
+    /** Posted by something outside Polaris through one of the channel's
+     *  webhooks, rather than by a person - drawn with an APP badge, as Discord
+     *  does, because the name on it is whatever the sender chose. */
+    readonly fromWebhook?: boolean;
     readonly kind: core.ChatMessageKind;
     /** Empty for a deleted message - the tombstone carries no text. */
     readonly body: string;
@@ -253,7 +258,9 @@ export async function readChannel(
     channelId: string,
     before?: string
 ): Promise<ChatPage> {
-    await markDelivered(actor, await requireChannel(actor, channelId));
+    const access = await requireChannel(actor, channelId);
+    await requireAgeCleared(actor, channelId);
+    await markDelivered(actor, access);
 
     const cursor = before
         ? await prisma.chatMessage.findFirst({
@@ -297,6 +304,7 @@ export async function readThread(
     });
     if (!root) return [];
     await requireChannel(actor, root.channelId);
+    await requireAgeCleared(actor, root.channelId);
 
     // A reply passed in place of the root opens the thread it is in, which is
     // what somebody clicking a reply in a search result means.
@@ -324,7 +332,9 @@ export async function readSince(
     channelId: string,
     afterId: string | null
 ): Promise<ChatNewerPage> {
-    await markDelivered(actor, await requireChannel(actor, channelId));
+    const access = await requireChannel(actor, channelId);
+    await requireAgeCleared(actor, channelId);
+    await markDelivered(actor, access);
     const cursor = afterId
         ? await prisma.chatMessage.findFirst({
               where: { id: afterId, channelId },
@@ -754,7 +764,7 @@ export async function edit(actor: ChatActor, input: core.ChatEditInput): Promise
  * nothing was going to reload again until somebody else said something - so the
  * last message in a conversation, which is the one being read, never got one.
  */
-function unfurlLater(body: string): void {
+export function unfurlLater(body: string): void {
     const link = core.firstLink(body);
     if (link) void unfurl(link).catch(() => undefined);
 }
@@ -844,6 +854,7 @@ export async function readMessage(actor: ChatActor, messageId: string): Promise<
     });
     if (!found) throw new ChatAccessError({ key: "errors.messageGone" });
     await requireChannel(actor, found.channelId);
+    await requireAgeCleared(actor, found.channelId);
 
     const [row, channel] = await Promise.all([
         prisma.chatMessage.findUnique({ where: { id: messageId }, select: MESSAGE_SELECT }),
@@ -1523,7 +1534,9 @@ export const MESSAGE_SELECT = {
     lastReplyAt: true,
     editedAt: true,
     deletedAt: true,
-    createdAt: true
+    createdAt: true,
+    webhookId: true,
+    authorLabel: true
 } as const;
 
 interface Row {
@@ -1540,6 +1553,10 @@ interface Row {
     editedAt: Date | null;
     deletedAt: Date | null;
     createdAt: Date;
+    /** Posted through a webhook, and the name it posted under. Optional so a
+     *  read that selected its own columns (search) still decorates. */
+    webhookId?: string | null;
+    authorLabel?: string | null;
 }
 
 /**
@@ -1766,7 +1783,14 @@ export async function decorateMessages(
             id: row.id,
             channelId: row.channelId,
             authorId: row.authorId,
-            authorName: row.authorId ? (names.get(row.authorId) ?? null) : null,
+            // A webhook's message has no account behind it; the name it posted
+            // under is the whole of who wrote it.
+            authorName: row.authorId
+                ? (names.get(row.authorId) ?? null)
+                : row.webhookId
+                  ? (row.authorLabel ?? null)
+                  : null,
+            ...(row.webhookId ? { fromWebhook: true } : {}),
             kind: row.kind as core.ChatMessageKind,
             body: row.deletedAt ? "" : notice ? noticeString(notice) : row.body,
             ...(notice ? { notice } : {}),

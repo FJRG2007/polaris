@@ -51,7 +51,6 @@ import { LeaveDialog } from "./leave-dialog";
 import { runAction } from "@/lib/run-action";
 import { NicknameDialog } from "./nickname-dialog";
 import { useRemoveFriend } from "./remove-friend";
-import { ChannelSettingsDialog } from "./channel-settings-dialog";
 import { DuplicateChannelDialog } from "./duplicate-channel-dialog";
 import { InviteDialog } from "./invite-dialog";
 import { useTranslations } from "@/components/i18n/i18n-provider";
@@ -151,7 +150,6 @@ export function ChatSidebar() {
     const [newCategory, setNewCategory] = useState(false);
     const [categoryName, setCategoryName] = useState("");
     const [error, setError] = useState("");
-    const [managing, setManaging] = useState<ChatChannelView | null>(null);
     const [duplicating, setDuplicating] = useState<ChatChannelView | null>(null);
     const [deleting, setDeleting] = useState<ChatChannelView | null>(null);
     const [deleteError, setDeleteError] = useState("");
@@ -238,14 +236,15 @@ export function ChatSidebar() {
 
     const manage = useCallback(
         (channel: ChatChannelView, action: ChannelManage) => {
-            if (action === "edit") setManaging(channel);
+            // The channel's settings are a page of their own, Discord's way.
+            if (action === "edit") router.push(`/chat/c/${channel.id}/settings`);
             else if (action === "duplicate") setDuplicating(channel);
             else if (action === "delete") {
                 setDeleteError("");
                 setDeleting(channel);
             } else if (space) setNewChannelIn({ space, categoryId: channel.categoryId });
         },
-        [space]
+        [space, router]
     );
 
     /**
@@ -686,10 +685,6 @@ export function ChatSidebar() {
                 )}
             </div>
 
-            <ChannelSettingsDialog
-                channel={managing}
-                onOpenChange={(next) => !next && setManaging(null)}
-            />
             <DuplicateChannelDialog
                 channel={duplicating}
                 onOpenChange={(next) => !next && setDuplicating(null)}
@@ -1249,12 +1244,39 @@ function Row({
         </PersonRow>
     );
 
-    return channel ? (
-        <RowMenu channel={channel} onManage={onManage}>
+    // The gear on the row, Discord's: for whoever may change the channel - the
+    // same `mayAdminister` the settings page and every save behind it check -
+    // shown on hover and always on the open one, which is where a finger with
+    // no hover finds it.
+    const settingsHref =
+        channel && channel.spaceId && channel.mayAdminister
+            ? `/chat/c/${channel.id}/settings`
+            : null;
+    const body = settingsHref ? (
+        <div className="group/row relative">
             {row}
-        </RowMenu>
+            <Link
+                href={settingsHref}
+                aria-label={t("sidebar.editChannelNamed", { name: label })}
+                title={t("sidebar.editChannel")}
+                className={cn(
+                    "absolute right-1 top-1/2 flex size-6 -translate-y-1/2 items-center justify-center rounded bg-card-hover text-muted-foreground transition-opacity hover:text-foreground focus-visible:opacity-100",
+                    active ? "opacity-100" : "opacity-0 group-hover/row:opacity-100"
+                )}
+            >
+                <Settings2 className="size-3.5 shrink-0" />
+            </Link>
+        </div>
     ) : (
         row
+    );
+
+    return channel ? (
+        <RowMenu channel={channel} onManage={onManage}>
+            {body}
+        </RowMenu>
+    ) : (
+        body
     );
 }
 

@@ -452,8 +452,19 @@ export function ChannelHeader({
                                     </DropdownMenuItem>
                                 </>
                             )}
-                            {named && (
+                            {/* Only for whoever runs it: archiving, deleting
+                                and the settings page are all refused anybody
+                                else, so nobody else is offered them. */}
+                            {named && channel.mayAdminister && (
                                 <>
+                                    {/* Everything about the room on its own page,
+                                        Discord's Edit Channel. */}
+                                    <DropdownMenuItem asChild>
+                                        <Link href={`/chat/c/${channel.id}/settings`}>
+                                            <Settings2 className="size-3.5" />
+                                            {t("channelHeader.channelSettings")}
+                                        </Link>
+                                    </DropdownMenuItem>
                                     <DropdownMenuItem
                                         onSelect={() =>
                                             void act(() =>
