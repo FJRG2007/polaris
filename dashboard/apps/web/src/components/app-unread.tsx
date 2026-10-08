@@ -38,7 +38,7 @@ import { useAdminWaiting } from "@/components/admin-waiting";
 export type AppUnread = Readonly<Record<string, number>>;
 
 /** The counts as the providers hold them, before anything this browser did. */
-function useServerUnread(): AppUnread {
+export function useServerUnread(): AppUnread {
     const chat = useChatUnread();
     const mail = useMailUnread();
     // Management counts work rather than messages - a report nobody has settled,
@@ -60,16 +60,20 @@ function useServerUnread(): AppUnread {
  * like it did nothing. So the menu moves the number at once, by app, and the
  * overlay goes the moment that app's own count moves - the same overlay Mail's
  * badge keeps, for the same reason and exactly as long. A mark the server
- * refused is moved back by the menu.
+ * refused is moved back by the menu, through the undo its nudge handed back -
+ * which does nothing once the app's count has moved, since the overlay it would
+ * take back is already gone.
  */
+type Nudge = (app: string, by: number) => () => void;
+
 const DriftContext = createContext<{
     readonly drift: Readonly<Record<string, number>>;
-    readonly nudge: (app: string, by: number) => void;
-}>({ drift: {}, nudge: () => undefined });
+    readonly nudge: Nudge;
+}>({ drift: {}, nudge: () => () => undefined });
 
-/** Moves an app's badge by what this screen has just done. Does nothing
- *  outside the provider. */
-export function useNudgeAppUnread(): (app: string, by: number) => void {
+/** Moves an app's badge by what this screen has just done, and answers with
+ *  the way to take it back. Does nothing outside the provider. */
+export function useNudgeAppUnread(): Nudge {
     return useContext(DriftContext).nudge;
 }
 
@@ -77,22 +81,39 @@ export function AppUnreadDriftProvider({ children }: { children: ReactNode }) {
     const server = useServerUnread();
     const [drift, setDrift] = useState<Record<string, number>>({});
     const seen = useRef(server);
+    // How many times each app's overlay has been dropped, so an undo can tell
+    // that the overlay it was handed is gone.
+    const cleared = useRef<Record<string, number>>({});
     // An app's count moved on the server: whatever was laid over it is either
     // counted there now, or was never true.
     useEffect(() => {
         const before = seen.current;
         seen.current = server;
+        const moved = Object.keys(server).filter((app) => before[app] !== server[app]);
+        if (moved.length === 0) return;
+        for (const app of moved) cleared.current[app] = (cleared.current[app] ?? 0) + 1;
         setDrift((held) => {
-            const moved = Object.keys(held).filter((app) => before[app] !== server[app]);
-            if (moved.length === 0) return held;
+            const dropped = moved.filter((app) => app in held);
+            if (dropped.length === 0) return held;
             const next = { ...held };
-            for (const app of moved) delete next[app];
+            for (const app of dropped) delete next[app];
             return next;
         });
     }, [server]);
-    const nudge = useCallback((app: string, by: number) => {
-        if (by === 0) return;
+    const nudge = useCallback<Nudge>((app, by) => {
+        if (by === 0) return () => undefined;
+        const at = cleared.current[app] ?? 0;
         setDrift((held) => ({ ...held, [app]: (held[app] ?? 0) + by }));
+        return () => {
+            if ((cleared.current[app] ?? 0) !== at) return;
+            setDrift((held) => {
+                const left = (held[app] ?? 0) - by;
+                const next = { ...held };
+                if (left === 0) delete next[app];
+                else next[app] = left;
+                return next;
+            });
+        };
     }, []);
     const value = useMemo(() => ({ drift, nudge }), [drift, nudge]);
     return <DriftContext.Provider value={value}>{children}</DriftContext.Provider>;

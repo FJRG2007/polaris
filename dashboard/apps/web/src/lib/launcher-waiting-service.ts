@@ -17,11 +17,12 @@ import { onShelf } from "@/lib/mailbox/access";
 import { addressesFrom } from "@/lib/mailbox/json";
 import { mailShelfFor } from "@/lib/mailbox/shelf";
 import { actOnMessages } from "@/lib/mailbox/messages";
-import { listChannels } from "@/lib/chat/chat-service";
 import { markChannelsRead } from "@/lib/chat/messages";
 import { adminWaiting, dismissAdminWaiting } from "@/lib/admin-waiting";
+import { listChannels, unreadConversations } from "@/lib/chat/chat-service";
 import {
     ADMIN_ITEM_IDS,
+    clipText,
     DISMISSABLE_ADMIN_ITEMS,
     LAUNCHER_ITEMS_PER_APP,
     type AdminItemId,
@@ -49,37 +50,47 @@ const MAIL_BATCHES = 20;
 // Chat
 // ---------------------------------------------------------------------------
 
-/** The conversations with something unread, as the badge counts them: ones the
- *  reader is in, not muted, not archived, on the open shelf. */
-async function unreadConversations(userId: string) {
-    const memberships = await prisma.chatChannelMember.findMany({
-        where: { userId },
-        select: { channelId: true, muted: true, mutedUntil: true }
-    });
-    const heard = new Set(
-        memberships.filter((row) => !core.muteInForce(row)).map((row) => row.channelId)
+/** The conversations with something unread, as the badge counts them (see
+ *  `unreadTotal`), newest first. */
+async function newestUnread(userId: string) {
+    const unread = await unreadConversations({ id: userId });
+    return unread.sort(
+        (left, right) =>
+            (right.lastMessageAt?.getTime() ?? 0) - (left.lastMessageAt?.getTime() ?? 0)
     );
-    if (heard.size === 0) return [];
-    const channels = await listChannels({ id: userId });
-    return channels
-        .filter((channel) => heard.has(channel.id) && !channel.archived && channel.unread > 0)
-        .sort((left, right) => (right.lastMessageAt ?? "").localeCompare(left.lastMessageAt ?? ""));
 }
 
 async function chatGroup(userId: string): Promise<LauncherWaitingGroup | null> {
-    const unread = await unreadConversations(userId);
+    const unread = await newestUnread(userId);
     if (unread.length === 0) return null;
+    const shown = unread.slice(0, LAUNCHER_ITEMS_PER_APP);
+    // Named the way the rail names them - a direct message after who is in it -
+    // for the few listed, not the whole rail.
+    const named = new Map(
+        (
+            await listChannels(
+                { id: userId },
+                shown.map((channel) => channel.id)
+            )
+        ).map((channel) => [channel.id, channel.name])
+    );
     return {
         app: "chat",
         total: unread.reduce((sum, channel) => sum + channel.unread, 0),
-        items: unread.slice(0, LAUNCHER_ITEMS_PER_APP).map((channel) => ({
-            id: channel.id,
-            title: channel.name,
-            detail: "",
-            href: `/chat/c/${channel.id}`,
-            count: channel.unread,
-            dismissable: true
-        }))
+        items: shown.flatMap((channel) => {
+            const name = named.get(channel.id);
+            if (name === undefined) return [];
+            return [
+                {
+                    id: channel.id,
+                    title: clipText(name),
+                    detail: "",
+                    href: `/chat/c/${channel.id}`,
+                    count: channel.unread,
+                    dismissable: true
+                }
+            ];
+        })
     };
 }
 
@@ -136,8 +147,8 @@ async function mailGroup(userId: string): Promise<LauncherWaitingGroup | null> {
         return [
             {
                 id: thread.threadId,
-                title: sender ? core.addressLabel(sender) : "",
-                detail: row.subject.trim(),
+                title: sender ? clipText(core.addressLabel(sender)) : "",
+                detail: clipText(row.subject.trim()),
                 href: `/mail/t/${thread.threadId}`,
                 count: thread._count._all,
                 dismissable: true
@@ -254,7 +265,7 @@ export async function markLauncherRead(
     id: string | null
 ): Promise<void> {
     if (app === "chat") {
-        const ids = id ? [id] : (await unreadConversations(userId)).map((channel) => channel.id);
+        const ids = id ? [id] : (await newestUnread(userId)).map((channel) => channel.id);
         if (ids.length > 0) await markChatRead(userId, ids);
         return;
     }

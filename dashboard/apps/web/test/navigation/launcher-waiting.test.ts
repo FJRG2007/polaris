@@ -7,6 +7,8 @@
 import { describe, expect, it } from "vitest";
 import {
     badgeDelta,
+    clipText,
+    LAUNCHER_TEXT_MAX,
     launcherWaitingSchema,
     markLauncherReadSchema,
     withoutApp,
@@ -72,6 +74,13 @@ describe("the shapes both ends check", () => {
         expect(markLauncherReadSchema.safeParse({ scope: "app", app: "admin" }).success).toBe(true);
         expect(markLauncherReadSchema.safeParse({ scope: "item", app: "mail" }).success).toBe(false);
         expect(markLauncherReadSchema.safeParse({ scope: "app", app: "drive" }).success).toBe(false);
+    });
+
+    it("cuts text to what an entry carries, never through a character", () => {
+        expect(clipText("Invoice")).toBe("Invoice");
+        expect(clipText("x".repeat(LAUNCHER_TEXT_MAX + 1))).toHaveLength(LAUNCHER_TEXT_MAX);
+        const split = `${"x".repeat(LAUNCHER_TEXT_MAX - 1)}\u{1F600}`;
+        expect(clipText(split)).toBe("x".repeat(LAUNCHER_TEXT_MAX - 1));
     });
 
     it("refuses a link that leaves Polaris", () => {

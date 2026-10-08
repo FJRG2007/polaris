@@ -668,9 +668,9 @@ export async function listChannels(
     actor: ChatActor,
     /** One conversation rather than the whole rail - what opening one asks for,
      *  so its header can be drawn with its first page instead of waiting for
-     *  the list. Answered by exactly the same rules: absent from the answer is
-     *  absent from the rail. */
-    only?: string
+     *  the list - or a few named ones. Answered by exactly the same rules:
+     *  absent from the answer is absent from the rail. */
+    only?: string | readonly string[]
 ): Promise<ChatChannelView[]> {
     // Three independent reads, asked together: the spaces decide which public
     // channels are listed, and neither the memberships nor the administered
@@ -695,7 +695,7 @@ export async function listChannels(
 
     const found = await prisma.chatChannel.findMany({
         where: {
-            ...(only ? { id: only } : {}),
+            ...(typeof only === "string" ? { id: only } : only ? { id: { in: [...only] } } : {}),
             OR: [
                 { id: { in: memberships.map((row) => row.channelId) } },
                 ...(spaces.size ? [{ spaceId: { in: [...spaces] }, private: false }] : [])
@@ -2016,6 +2016,23 @@ export async function conversationsElsewhere(actor: ChatActor): Promise<ChatElse
 }
 
 export async function unreadTotal(actor: ChatActor): Promise<ChatUnread> {
+    const waiting = await unreadConversations(actor);
+    return {
+        messages: waiting.reduce((sum, channel) => sum + channel.unread, 0),
+        conversations: waiting.length
+    };
+}
+
+/** One conversation the badge counts, with what is waiting in it. */
+export interface ChatUnreadConversation {
+    readonly id: string;
+    readonly unread: number;
+    readonly lastMessageAt: Date | null;
+}
+
+/** The conversations the badge counts - see `ChatUnread` - each with
+ *  something waiting, without anything the rail needs to draw them. */
+export async function unreadConversations(actor: ChatActor): Promise<ChatUnreadConversation[]> {
     const memberships = await prisma.chatChannelMember.findMany({
         where: { userId: actor.id },
         select: { channelId: true, lastReadAt: true, muted: true, mutedUntil: true }
@@ -2023,7 +2040,7 @@ export async function unreadTotal(actor: ChatActor): Promise<ChatUnread> {
     // Worked out rather than read, for the reason the rail works it out: a mute
     // with an end that has passed is not a mute, and nothing runs to clear it.
     const heard = memberships.filter((row) => !core.muteInForce(row));
-    if (heard.length === 0) return { messages: 0, conversations: 0 };
+    if (heard.length === 0) return [];
 
     // The open shelf's chat only, as the rail lists it: an organization keeping
     // its own chat is a count on its shelf, not on every shelf the reader has.
@@ -2031,24 +2048,20 @@ export async function unreadTotal(actor: ChatActor): Promise<ChatUnread> {
         actor,
         await prisma.chatChannel.findMany({
             where: { id: { in: heard.map((row) => row.channelId) }, archived: false },
-            select: { id: true, spaceId: true, orgId: true }
+            select: { id: true, spaceId: true, orgId: true, lastMessageAt: true }
         })
     );
-    if (live.length === 0) return { messages: 0, conversations: 0 };
+    if (live.length === 0) return [];
 
     const counts = await unreadCounts(
         actor,
         live,
         new Map(heard.map((row) => [row.channelId, row]))
     );
-    let messages = 0;
-    let conversations = 0;
-    for (const count of counts.values()) {
-        if (count <= 0) continue;
-        messages += count;
-        conversations += 1;
-    }
-    return { messages, conversations };
+    return live.flatMap((channel) => {
+        const unread = counts.get(channel.id) ?? 0;
+        return unread > 0 ? [{ id: channel.id, unread, lastMessageAt: channel.lastMessageAt }] : [];
+    });
 }
 
 /**

@@ -98,8 +98,9 @@ vi.mock("@polaris/db", () => ({
                     row("dm", null, "dm", ["ada", "grace"]),
                     row("general", "s1", "text", [])
                 ];
-                const only = query.where?.id;
-                return typeof only === "string" ? rows.filter((entry) => entry.id === only) : rows;
+                const only = query.where?.id as string | { in: string[] } | undefined;
+                if (typeof only === "string") return rows.filter((entry) => entry.id === only);
+                return only ? rows.filter((entry) => only.in.includes(entry.id)) : rows;
             },
             findUnique: async ({ where }: { where: { dmKey?: string } }) =>
                 where.dmKey === "ada:grace" ? { id: "dm" } : null,
@@ -136,6 +137,12 @@ describe("the conversation list", () => {
         expect(channelQueries[0]?.where?.id).toBe("dm");
         expect(described.map((entry) => entry.id)).toEqual(["dm"]);
         expect(described[0]?.name).toBe("grace");
+    });
+
+    it("describes a few named conversations, by the same rules", async () => {
+        const described = await chat.listChannels({ id: "ada" }, ["dm"]);
+        expect(channelQueries[0]?.where?.id).toEqual({ in: ["dm"] });
+        expect(described.map((entry) => [entry.id, entry.name])).toEqual([["dm", "grace"]]);
     });
 });
 

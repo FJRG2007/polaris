@@ -84,7 +84,7 @@ vi.mock("@polaris/db", () => ({
     }
 }));
 
-const { unreadTotal } = await import("@/lib/chat/chat-service");
+const { unreadConversations, unreadTotal } = await import("@/lib/chat/chat-service");
 
 /** A membership in a conversation, read up to `at` or never opened. */
 function member(
@@ -126,6 +126,18 @@ describe("what is waiting in Chat", () => {
         say("b", 2);
         // Three messages in one and two in another, and the third is silent.
         expect(await unreadTotal({ id: "u1" })).toEqual({ messages: 5, conversations: 2 });
+    });
+
+    it("lists the same conversations it counts, each with its own number", async () => {
+        members = [member("a"), member("b"), member("c")];
+        channels = [room("a"), room("b"), room("c")];
+        say("a", 3);
+        say("b", 2);
+        const listed = await unreadConversations({ id: "u1" });
+        expect(listed.map((entry) => [entry.id, entry.unread])).toEqual([
+            ["a", 3],
+            ["b", 2]
+        ]);
     });
 
     it("counts only what arrived after they last caught up", async () => {

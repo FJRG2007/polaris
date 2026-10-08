@@ -24,7 +24,7 @@ import { useAdminRecount } from "@/components/admin-waiting";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { DropdownMenuItem, useToast, type PolarisApp } from "@polaris/ui";
-import { useAppUnread, useNudgeAppUnread } from "@/components/app-unread";
+import { useAppUnread, useNudgeAppUnread, useServerUnread } from "@/components/app-unread";
 import { markLauncherReadAction } from "@/app/(app)/launcher-waiting-actions";
 import {
     badgeDelta,
@@ -58,10 +58,15 @@ export function LauncherWaitingList({
     const t = useTranslations("nav");
     const toast = useToast();
     const unread = useAppUnread();
+    const server = useServerUnread();
     const nudge = useNudgeAppUnread();
     const recountAdmin = useAdminRecount();
     const [waiting, setWaiting] = useState<LauncherWaiting | null>(lastKnown);
     const latest = useRef<LauncherWaiting | null>(lastKnown);
+    // Marks still on their way: an answer read before they land would put back
+    // what they took away, so it is set aside and asked for again after.
+    const marking = useRef(0);
+    const missed = useRef(false);
 
     const apply = useCallback((next: LauncherWaiting) => {
         latest.current = next;
@@ -75,7 +80,9 @@ export function LauncherWaitingList({
                 .then((response) => (response.ok ? response.json() : null))
                 .then((body) => {
                     const parsed = launcherWaitingSchema.safeParse(body);
-                    if (parsed.success) apply(parsed.data);
+                    if (!parsed.success) return;
+                    missed.current = marking.current > 0;
+                    if (!missed.current) apply(parsed.data);
                 })
                 .catch(() => {
                     // Left as it was: the badges still say what is waiting, and
@@ -84,9 +91,10 @@ export function LauncherWaitingList({
         [apply]
     );
 
-    // On opening, and again while open whenever a badge moves - something
-    // arrived, or was read somewhere else.
-    const counts = LAUNCHER_WAITING_APPS.map((app) => unread[app] ?? 0).join(",");
+    // On opening, and again while open whenever a count moves on the server -
+    // something arrived, or was read somewhere else. Not on a mark made here,
+    // which moves the badge before the server has it.
+    const counts = LAUNCHER_WAITING_APPS.map((app) => server[app] ?? 0).join(",");
     useEffect(() => {
         if (!open) return;
         const controller = new AbortController();
@@ -101,18 +109,27 @@ export function LauncherWaitingList({
             const after = id ? withoutItem(before, app, id) : withoutApp(before, app);
             const delta = badgeDelta(before, after, app);
             apply(after);
-            nudge(app, delta);
+            const undo = nudge(app, delta);
+            marking.current += 1;
             const result = await markLauncherReadAction(
                 id ? { scope: "item", app, id } : { scope: "app", app }
-            ).catch(() => ({ error: t("waitingList.errors.notMarked") }));
+            )
+                .catch(() => ({ error: t("waitingList.errors.notMarked") }))
+                .finally(() => {
+                    marking.current -= 1;
+                });
             if (result.error) {
-                nudge(app, -delta);
+                undo();
                 if (latest.current === after) apply(before);
                 toast.show({ title: result.error });
                 void refresh();
                 return;
             }
             if (app === "admin") recountAdmin();
+            if (marking.current === 0 && missed.current) {
+                missed.current = false;
+                void refresh();
+            }
         },
         [apply, nudge, recountAdmin, refresh, t, toast]
     );

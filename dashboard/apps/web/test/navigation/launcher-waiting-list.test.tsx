@@ -3,8 +3,9 @@
 /**
  * What each app has waiting, under the app menu's grid: the entries come from
  * the route when the menu opens; marking one read takes it away and moves the
- * badge at once; a refusal puts both back and says so; "mark all" leaves only
- * what cannot be dismissed; and a search puts the list away.
+ * badge at once; a refusal puts both back and says so; an answer read while a
+ * mark is on its way does not undo it; "mark all" leaves only what cannot be
+ * dismissed; and a search puts the list away.
  */
 
 import { AppSwitcher } from "@polaris/ui";
@@ -19,16 +20,23 @@ const marked: unknown[] = [];
 let refuse = false;
 const nudges: [string, number][] = [];
 const shown: string[] = [];
+let server = { chat: 7, mail: 2, admin: 4 };
+let hold: Promise<void> | null = null;
 
 vi.mock("@/app/(app)/launcher-waiting-actions", () => ({
     markLauncherReadAction: async (input: unknown) => {
         marked.push(input);
+        if (hold) await hold;
         return refuse ? { error: "That could not be marked." } : {};
     }
 }));
 vi.mock("@/components/app-unread", () => ({
     useAppUnread: () => ({ chat: 7, mail: 2, admin: 4 }),
-    useNudgeAppUnread: () => (app: string, by: number) => nudges.push([app, by])
+    useServerUnread: () => server,
+    useNudgeAppUnread: () => (app: string, by: number) => {
+        nudges.push([app, by]);
+        return () => nudges.push([app, -by]);
+    }
 }));
 vi.mock("@/components/admin-waiting", () => ({ useAdminRecount: () => () => undefined }));
 vi.mock("@polaris/ui", async (original) => ({
@@ -90,6 +98,8 @@ beforeEach(() => {
     nudges.length = 0;
     shown.length = 0;
     refuse = false;
+    server = { chat: 7, mail: 2, admin: 4 };
+    hold = null;
     vi.stubGlobal(
         "fetch",
         vi.fn(async () => new Response(JSON.stringify(ANSWER), { status: 200 }))
@@ -102,11 +112,11 @@ afterEach(() => {
 
 async function open() {
     const user = userEvent.setup();
-    render(<Menu />, { wrapper: MessagesWrapper });
+    const view = render(<Menu />, { wrapper: MessagesWrapper });
     await user.click(screen.getByRole("button", { name: /chat/i }));
     const list = await screen.findByRole("region", { name: "Waiting in your apps" });
     await within(list).findByText("Ada");
-    return { user, list };
+    return { user, list, view };
 }
 
 describe("the waiting list in the app menu", () => {
@@ -140,6 +150,31 @@ describe("the waiting list in the app menu", () => {
             ["chat", 5]
         ]);
         expect(within(list).getByText("Ada")).toBeTruthy();
+    });
+
+    it("sets aside an answer read while a mark is on its way, and asks again after", async () => {
+        let release = () => undefined as void;
+        hold = new Promise<void>((resolve) => {
+            release = resolve;
+        });
+        const { user, list, view } = await open();
+        const fetched = vi.mocked(fetch);
+        await user.click(within(list).getByRole("menuitem", { name: "Mark Ada read" }));
+        expect(fetched).toHaveBeenCalledTimes(1);
+        // Something arrived somewhere else while the mark was on its way: the
+        // answer still has Ada, read before the mark landed.
+        server = { chat: 8, mail: 2, admin: 4 };
+        view.rerender(<Menu />);
+        await waitFor(() => expect(fetched).toHaveBeenCalledTimes(2));
+        await new Promise((resolve) => setTimeout(resolve, 0));
+        expect(within(list).queryByText("Ada")).toBeNull();
+        fetched.mockImplementation(
+            async () =>
+                new Response(JSON.stringify({ groups: ANSWER.groups.slice(1) }), { status: 200 })
+        );
+        release();
+        await waitFor(() => expect(fetched).toHaveBeenCalledTimes(3));
+        await waitFor(() => expect(within(list).queryByText("Ops")).toBeNull());
     });
 
     it("marks a whole app, leaving what cannot be dismissed", async () => {

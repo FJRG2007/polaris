@@ -39,14 +39,26 @@ export type AdminItemId = (typeof ADMIN_ITEM_IDS)[number];
 /** The Management entries the menu can mark seen. APIs are a fault. */
 export const DISMISSABLE_ADMIN_ITEMS: readonly AdminItemId[] = ["reports", "cases", "update"];
 
+/** The longest title or detail an entry carries. A row truncates long before
+ *  it, and the full text is in what the entry opens. */
+export const LAUNCHER_TEXT_MAX = 300;
+
+/** A title or detail cut to what an entry carries, so one long subject cannot
+ *  fail the whole answer. Never ends on half of a character. */
+export function clipText(text: string): string {
+    if (text.length <= LAUNCHER_TEXT_MAX) return text;
+    const cut = text.slice(0, LAUNCHER_TEXT_MAX);
+    return /[\uD800-\uDBFF]$/.test(cut) ? cut.slice(0, -1) : cut;
+}
+
 const itemSchema = z.object({
     /** The conversation, the mail thread, or the Management entry. */
     id: z.string().min(1).max(64),
     /** Who or what it is: the conversation's name, the sender. For Management,
      *  empty - the words come from the catalogue by `id`. */
-    title: z.string().max(300),
+    title: z.string().max(LAUNCHER_TEXT_MAX),
     /** The subject of a message; empty where there is none. */
-    detail: z.string().max(300),
+    detail: z.string().max(LAUNCHER_TEXT_MAX),
     href: z.string().startsWith("/").max(300),
     /** How many are waiting in it: messages in a conversation, reports. */
     count: z.number().int().nonnegative(),

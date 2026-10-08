@@ -2,10 +2,11 @@
  * The entries behind each badge, and what marking them read does.
  *
  * Chat lists what its badge counts - conversations the reader is in, not muted,
- * not archived, with something unread - newest first, and marks them read the
- * way Chat does. Mail lists the newest unread threads of the open shelf's
+ * not archived, with something unread - newest first, names only the few it
+ * lists, and marks them read the way Chat does. Mail lists the newest unread threads of the open shelf's
  * inboxes and reads them on the mail server through Mail's own action. A group
- * the reader cannot reach is never asked for.
+ * the reader cannot reach is never asked for, and no subject or name is long
+ * enough to fail the answer the menu validates.
  */
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -13,18 +14,12 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const chatRead: string[][] = [];
 const mailRead: { ids: string[]; scope?: string }[] = [];
 const dismissed: string[][] = [];
+const named: string[][] = [];
 let mailIdsLeft = 0;
+let subject = "  ";
 
 vi.mock("@polaris/db", () => ({
     prisma: {
-        chatChannelMember: {
-            findMany: async () => [
-                { channelId: "a", muted: false, mutedUntil: null },
-                { channelId: "b", muted: true, mutedUntil: null },
-                { channelId: "c", muted: false, mutedUntil: null },
-                { channelId: "d", muted: false, mutedUntil: null }
-            ]
-        },
         mailMessage: {
             groupBy: async () => [{ threadId: "t1", _count: { _all: 2 }, _max: { sentAt: new Date() } }],
             count: async () => 9,
@@ -33,7 +28,7 @@ vi.mock("@polaris/db", () => ({
                     return [
                         {
                             threadId: "t1",
-                            subject: "  ",
+                            subject,
                             fromJson: [{ name: "Grace", address: "grace@example.test" }]
                         }
                     ];
@@ -46,13 +41,15 @@ vi.mock("@polaris/db", () => ({
     }
 }));
 vi.mock("@/lib/chat/chat-service", () => ({
-    listChannels: async () => [
-        { id: "a", name: "Ada", unread: 3, archived: false, lastMessageAt: "2026-10-01T00:00:00Z" },
-        { id: "b", name: "Muted", unread: 9, archived: false, lastMessageAt: "2026-10-03T00:00:00Z" },
-        { id: "c", name: "Ops", unread: 1, archived: false, lastMessageAt: "2026-10-02T00:00:00Z" },
-        { id: "d", name: "Old", unread: 4, archived: true, lastMessageAt: "2026-10-04T00:00:00Z" },
-        { id: "e", name: "Public", unread: 6, archived: false, lastMessageAt: "2026-10-05T00:00:00Z" }
-    ]
+    unreadConversations: async () => [
+        { id: "a", unread: 3, lastMessageAt: new Date("2026-10-01T00:00:00Z") },
+        { id: "c", unread: 1, lastMessageAt: new Date("2026-10-02T00:00:00Z") }
+    ],
+    listChannels: async (_actor: unknown, only: string[]) => {
+        named.push(only);
+        const names: Record<string, string> = { a: "Ada", c: "Ops" };
+        return only.map((id) => ({ id, name: names[id] }));
+    }
 }));
 vi.mock("@/lib/chat/messages", () => ({
     markChannelsRead: async (_actor: unknown, input: { channelIds: string[] }) => {
@@ -74,12 +71,15 @@ vi.mock("@/lib/admin-waiting", () => ({
 }));
 
 const { launcherWaiting, markLauncherRead } = await import("@/lib/launcher-waiting-service");
+const { LAUNCHER_TEXT_MAX, launcherWaitingSchema } = await import("@/lib/launcher-waiting");
 
 beforeEach(() => {
     chatRead.length = 0;
     mailRead.length = 0;
     dismissed.length = 0;
+    named.length = 0;
     mailIdsLeft = 0;
+    subject = "  ";
 });
 
 describe("what the menu lists", () => {
@@ -88,6 +88,7 @@ describe("what the menu lists", () => {
         const chat = groups.find((group) => group.app === "chat");
         expect(chat?.items.map((item) => item.title)).toEqual(["Ops", "Ada"]);
         expect(chat?.total).toBe(4);
+        expect(named).toEqual([["c", "a"]]);
         const mail = groups.find((group) => group.app === "mail");
         expect(mail).toMatchObject({
             total: 9,
@@ -99,6 +100,13 @@ describe("what the menu lists", () => {
             ["update", true],
             ["apis", false]
         ]);
+    });
+
+    it("cuts a subject too long for the menu rather than failing the answer", async () => {
+        subject = "x".repeat(LAUNCHER_TEXT_MAX + 50);
+        const groups = await launcherWaiting("ada", { chat: true, mail: true, admin: true });
+        expect(groups.find((group) => group.app === "mail")?.items[0]?.detail).toHaveLength(LAUNCHER_TEXT_MAX);
+        expect(launcherWaitingSchema.safeParse({ groups }).success).toBe(true);
     });
 
     it("never asks for an app the reader cannot reach", async () => {
