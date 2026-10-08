@@ -70,7 +70,10 @@ describe("a shortcut closed by a dead key", () => {
     });
 
     it("sends at once when nothing is being composed", () => {
-        editor = new Editor({ element: document.createElement("div"), extensions: baseExtensions("") });
+        editor = new Editor({
+            element: document.createElement("div"),
+            extensions: baseExtensions("")
+        });
         let sent = false;
         afterComposition(editor.view, () => (sent = true));
         expect(sent).toBe(true);

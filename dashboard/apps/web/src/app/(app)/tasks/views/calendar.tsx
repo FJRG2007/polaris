@@ -84,7 +84,9 @@ function readOptions(): CalendarOptions {
         if (!raw) return layout.DEFAULT_OPTIONS;
         const stored = JSON.parse(raw) as Partial<Record<keyof CalendarOptions, unknown>>;
         const flag = (name: keyof CalendarOptions) =>
-            typeof stored[name] === "boolean" ? (stored[name] as boolean) : layout.DEFAULT_OPTIONS[name];
+            typeof stored[name] === "boolean"
+                ? (stored[name] as boolean)
+                : layout.DEFAULT_OPTIONS[name];
         return {
             showWeekends: flag("showWeekends"),
             showDeclined: flag("showDeclined"),
@@ -163,7 +165,14 @@ export function CalendarView(props: ViewProps) {
     keys.current = { chooseScope, setOffset };
     useEffect(() => {
         function onKeyDown(event: KeyboardEvent) {
-            if (event.defaultPrevented || event.metaKey || event.ctrlKey || event.altKey || event.shiftKey) return;
+            if (
+                event.defaultPrevented ||
+                event.metaKey ||
+                event.ctrlKey ||
+                event.altKey ||
+                event.shiftKey
+            )
+                return;
             const target = event.target instanceof HTMLElement ? event.target : null;
             if (target && (target.isContentEditable || target.closest(KEEPS_ITS_KEYS))) return;
             const key = event.key.toLowerCase();
@@ -184,7 +193,16 @@ export function CalendarView(props: ViewProps) {
     }, []);
 
     const { days, label, monthShown } = useMemo(
-        () => layout.buildRange(scope, offset, weekStartsOn, format, new Date(), locale, options.showWeekends),
+        () =>
+            layout.buildRange(
+                scope,
+                offset,
+                weekStartsOn,
+                format,
+                new Date(),
+                locale,
+                options.showWeekends
+            ),
         [scope, offset, weekStartsOn, format, locale, options.showWeekends]
     );
 
@@ -198,7 +216,9 @@ export function CalendarView(props: ViewProps) {
         const fromTasks = rows
             .map(layout.taskEntry)
             .filter((entry): entry is CalendarEntry => entry !== null);
-        const all = showGoogle ? [...fromTasks, ...google.events.map(layout.googleEntry)] : fromTasks;
+        const all = showGoogle
+            ? [...fromTasks, ...google.events.map(layout.googleEntry)]
+            : fromTasks;
         return all.filter((entry) => layout.isShown(entry, options));
     }, [rows, google.events, showGoogle, options]);
 
@@ -317,9 +337,7 @@ export function CalendarView(props: ViewProps) {
 
             <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
                 {undated.length > 0 && (
-                    <span>
-                        {t("calendar.undated", { count: undated.length })}
-                    </span>
+                    <span>{t("calendar.undated", { count: undated.length })}</span>
                 )}
                 {canEdit && scope !== "year" && scope !== "schedule" && (
                     <span>
@@ -327,7 +345,9 @@ export function CalendarView(props: ViewProps) {
                     </span>
                 )}
                 {google.status === "error" ? (
-                    <span className="text-danger">{google.error ?? t("calendar.googleUnreachable")}</span>
+                    <span className="text-danger">
+                        {google.error ?? t("calendar.googleUnreachable")}
+                    </span>
                 ) : null}
             </div>
         </div>
@@ -384,7 +404,9 @@ function ScopeMenu({
                             onToggle(entry.name);
                         }}
                     >
-                        <Check className={cn("text-primary", !options[entry.name] && "invisible")} />
+                        <Check
+                            className={cn("text-primary", !options[entry.name] && "invisible")}
+                        />
                         {entry.label}
                     </DropdownMenuItem>
                 ))}
@@ -455,7 +477,9 @@ function MonthGrid({
                         className="px-2 py-1.5 text-center text-[0.6875rem] text-muted-foreground"
                     >
                         <span className="hidden sm:inline">{shortNames[index]}</span>
-                        <span className="sm:hidden">{(shortNames[index] as string).slice(0, 1)}</span>
+                        <span className="sm:hidden">
+                            {(shortNames[index] as string).slice(0, 1)}
+                        </span>
                     </div>
                 ))}
             </div>
@@ -517,7 +541,10 @@ function MonthGrid({
                                 {entries.slice(0, 4).map((entry) => (
                                     <span
                                         key={entry.key}
-                                        className={cn("size-1.5 rounded-full", entry.settled && "opacity-40")}
+                                        className={cn(
+                                            "size-1.5 rounded-full",
+                                            entry.settled && "opacity-40"
+                                        )}
                                         style={{ backgroundColor: entry.color }}
                                     />
                                 ))}
@@ -576,7 +603,10 @@ function MoreEntries({
                     {t("calendar.more", { count: hidden })}
                 </button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="start" className="max-h-80 w-64 overflow-y-auto overscroll-contain">
+            <DropdownMenuContent
+                align="start"
+                className="max-h-80 w-64 overflow-y-auto overscroll-contain"
+            >
                 <DropdownMenuLabel>
                     {core.weekdayNames(locale, "long")[day.getDay()]} {format.date(day)}
                 </DropdownMenuLabel>
@@ -588,18 +618,32 @@ function MoreEntries({
                             className={cn(entry.settled && "opacity-60")}
                         >
                             <TaskMark task={entry.task} />
-                            <span className={cn("min-w-0 flex-1 truncate", entry.settled && "line-through")}>
+                            <span
+                                className={cn(
+                                    "min-w-0 flex-1 truncate",
+                                    entry.settled && "line-through"
+                                )}
+                            >
                                 {entry.title}
                             </span>
                         </DropdownMenuItem>
                     ) : (
-                        <DropdownMenuItem key={entry.key} asChild className={cn(entry.settled && "opacity-60")}>
+                        <DropdownMenuItem
+                            key={entry.key}
+                            asChild
+                            className={cn(entry.settled && "opacity-60")}
+                        >
                             <a href={entry.url ?? "#"} target="_blank" rel="noreferrer noopener">
                                 <span
                                     className="size-2.5 shrink-0 rounded-[2px]"
                                     style={{ backgroundColor: entry.color }}
                                 />
-                                <span className={cn("min-w-0 flex-1 truncate", entry.settled && "line-through")}>
+                                <span
+                                    className={cn(
+                                        "min-w-0 flex-1 truncate",
+                                        entry.settled && "line-through"
+                                    )}
+                                >
                                     {entry.title}
                                 </span>
                             </a>
@@ -668,7 +712,11 @@ function YearGrid({
                                             key={column}
                                             type="button"
                                             onClick={() => onOpenDay(day)}
-                                            title={count > 0 ? t("calendar.dayCount", { count }) : undefined}
+                                            title={
+                                                count > 0
+                                                    ? t("calendar.dayCount", { count })
+                                                    : undefined
+                                            }
                                             className={cn(
                                                 "relative mx-auto flex size-7 items-center justify-center rounded-full text-[0.6875rem] transition-colors",
                                                 isToday
@@ -736,7 +784,9 @@ function ScheduleList({
                                     <span
                                         className={cn(
                                             "flex size-7 shrink-0 items-center justify-center rounded-full text-sm",
-                                            isToday ? "bg-primary font-medium text-primary-foreground" : "text-foreground"
+                                            isToday
+                                                ? "bg-primary font-medium text-primary-foreground"
+                                                : "text-foreground"
                                         )}
                                     >
                                         {day.getDate()}
@@ -747,7 +797,12 @@ function ScheduleList({
                                 </div>
                                 <ul className="flex min-w-0 flex-1 flex-col gap-0.5">
                                     {entries.map((entry) => (
-                                        <ScheduleRow key={entry.key} entry={entry} format={format} props={props} />
+                                        <ScheduleRow
+                                            key={entry.key}
+                                            entry={entry}
+                                            format={format}
+                                            props={props}
+                                        />
                                     ))}
                                 </ul>
                             </li>
@@ -776,7 +831,12 @@ function ScheduleRow({
           : format.time(entry.start);
     const line = (
         <>
-            <span className="w-24 shrink-0 truncate text-xs text-muted-foreground sm:w-32" title={when}>{when}</span>
+            <span
+                className="w-24 shrink-0 truncate text-xs text-muted-foreground sm:w-32"
+                title={when}
+            >
+                {when}
+            </span>
             <span className={cn("min-w-0 flex-1 truncate", entry.settled && "line-through")}>
                 {entry.title}
             </span>
@@ -814,7 +874,12 @@ function ScheduleRow({
         <TaskMenu commands={commandsFor(props, task)}>
             <li className={cn("flex items-center gap-1.5", entry.settled && "opacity-60")}>
                 <TaskCheck task={task} props={props} />
-                <button type="button" onClick={() => props.onOpen(task.id)} title={task.name} className={rowClass}>
+                <button
+                    type="button"
+                    onClick={() => props.onOpen(task.id)}
+                    title={task.name}
+                    className={rowClass}
+                >
                     {line}
                 </button>
             </li>
@@ -917,7 +982,10 @@ function TimeGrid({
 
             <div
                 ref={scroller}
-                className={cn("min-h-0 flex-1 overflow-y-auto overscroll-contain", wide && "overflow-x-auto")}
+                className={cn(
+                    "min-h-0 flex-1 overflow-y-auto overscroll-contain",
+                    wide && "overflow-x-auto"
+                )}
             >
                 <div className={cn("flex", wide && "min-w-[42rem]")}>
                     <div className="w-12 shrink-0 sm:w-14">
@@ -1080,8 +1148,10 @@ function TimedEntry({
  * any size instead of as a coloured dot.
  */
 function TaskMark({ task }: { task: TaskRow }) {
-    if (task.statusType === "done") return <CircleCheck className="size-3.5 shrink-0 text-muted-foreground" />;
-    if (task.statusType === "closed") return <CircleX className="size-3.5 shrink-0 text-muted-foreground" />;
+    if (task.statusType === "done")
+        return <CircleCheck className="size-3.5 shrink-0 text-muted-foreground" />;
+    if (task.statusType === "closed")
+        return <CircleX className="size-3.5 shrink-0 text-muted-foreground" />;
     return <StatusIcon color={task.statusColor} type={task.statusType} size={14} />;
 }
 
@@ -1091,7 +1161,9 @@ function TaskCheck({ task, props }: { task: TaskRow; props: ViewProps }) {
     const t = useTranslations("tasksViews");
     const target = props.canEdit ? layout.completionTarget(task, props.context.statuses) : null;
     if (!target) return <TaskMark task={task} />;
-    const label = core.isFinishedStatus(task.statusType) ? t("calendar.markOpen") : t("calendar.markDone");
+    const label = core.isFinishedStatus(task.statusType)
+        ? t("calendar.markOpen")
+        : t("calendar.markDone");
     return (
         <button
             type="button"
@@ -1114,7 +1186,9 @@ function TaskCheck({ task, props }: { task: TaskRow; props: ViewProps }) {
 function EntryChip({ entry, props }: { entry: CalendarEntry; props: ViewProps }) {
     const t = useTranslations("tasksViews");
     const title = (
-        <span className={cn("min-w-0 truncate", entry.settled && "line-through")}>{entry.title}</span>
+        <span className={cn("min-w-0 truncate", entry.settled && "line-through")}>
+            {entry.title}
+        </span>
     );
     if (!entry.task) {
         return (
@@ -1186,7 +1260,9 @@ function DayList({
                 {core.weekdayNames(locale, "long")[day.getDay()]} {format.date(day)}
             </p>
             {entries.length === 0 ? (
-                <p className="px-3 py-4 text-xs text-muted-foreground">{t("calendar.nothingToday")}</p>
+                <p className="px-3 py-4 text-xs text-muted-foreground">
+                    {t("calendar.nothingToday")}
+                </p>
             ) : (
                 <ul className="divide-y divide-border">
                     {entries.map((entry) => (
@@ -1204,7 +1280,12 @@ function DayList({
                                         style={{ backgroundColor: entry.color }}
                                     />
                                 )}
-                                <span className={cn("min-w-0 flex-1 truncate", entry.settled && "line-through")}>
+                                <span
+                                    className={cn(
+                                        "min-w-0 flex-1 truncate",
+                                        entry.settled && "line-through"
+                                    )}
+                                >
                                     {entry.title}
                                 </span>
                                 <span className="shrink-0 text-xs text-muted-foreground">
@@ -1236,7 +1317,9 @@ function GoogleControl({
             <Button size="sm" variant="secondary" asChild>
                 <a href="/api/connections/google/link">
                     <GoogleMark className="size-4" />
-                    {state.status === "expired" ? t("calendar.reconnectGoogle") : t("calendar.connectGoogle")}
+                    {state.status === "expired"
+                        ? t("calendar.reconnectGoogle")
+                        : t("calendar.connectGoogle")}
                 </a>
             </Button>
         );
@@ -1253,7 +1336,9 @@ function GoogleControl({
             )}
         >
             <GoogleMark className="size-3.5" />
-            {state.status === "loading" ? t("calendar.loading") : t("calendar.googleCount", { count: state.events.length })}
+            {state.status === "loading"
+                ? t("calendar.loading")
+                : t("calendar.googleCount", { count: state.events.length })}
         </button>
     );
 }

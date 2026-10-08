@@ -90,7 +90,11 @@ function isFresh(cached: CachedWindow | null): boolean {
 
 export function useGoogleCalendarEvents(from: Date, to: Date): GoogleCalendarState {
     const key = `${from.toISOString()}|${to.toISOString()}`;
-    const [state, setState] = useState<GoogleCalendarState>({ status: "loading", events: [], error: null });
+    const [state, setState] = useState<GoogleCalendarState>({
+        status: "loading",
+        events: [],
+        error: null
+    });
 
     useEffect(() => {
         let current = true;
@@ -112,25 +116,35 @@ export function useGoogleCalendarEvents(from: Date, to: Date): GoogleCalendarSta
                 signal: controller.signal
             })
                 .then((response) => response.json())
-                .then((body: { status?: GoogleCalendarStatus; events?: GoogleEvent[]; error?: string }) => {
-                    if (!current) return;
-                    const status = body.status ?? "error";
-                    const events = Array.isArray(body.events) ? body.events : [];
-                    if (status === "error" && settled) return;
-                    setState((previous) =>
-                        previous.status === status &&
-                        previous.error === (body.error ?? null) &&
-                        JSON.stringify(previous.events) === JSON.stringify(events)
-                            ? previous
-                            : { status, events, error: body.error ?? null }
-                    );
-                    // Only a settled answer is worth keeping: caching a failure would
-                    // hold the calendar in it.
-                    if (status === "ready" || status === "unlinked" || status === "unavailable") {
-                        settled = true;
-                        writeCache(key, { at: Date.now(), status, events });
+                .then(
+                    (body: {
+                        status?: GoogleCalendarStatus;
+                        events?: GoogleEvent[];
+                        error?: string;
+                    }) => {
+                        if (!current) return;
+                        const status = body.status ?? "error";
+                        const events = Array.isArray(body.events) ? body.events : [];
+                        if (status === "error" && settled) return;
+                        setState((previous) =>
+                            previous.status === status &&
+                            previous.error === (body.error ?? null) &&
+                            JSON.stringify(previous.events) === JSON.stringify(events)
+                                ? previous
+                                : { status, events, error: body.error ?? null }
+                        );
+                        // Only a settled answer is worth keeping: caching a failure would
+                        // hold the calendar in it.
+                        if (
+                            status === "ready" ||
+                            status === "unlinked" ||
+                            status === "unavailable"
+                        ) {
+                            settled = true;
+                            writeCache(key, { at: Date.now(), status, events });
+                        }
                     }
-                })
+                )
                 .catch(() => {
                     if (!current || controller.signal.aborted || settled) return;
                     // No sentence of its own: the calendar says it could not be

@@ -413,7 +413,10 @@ const eventsSchema = z.object({
                 // the guests, and nobody else's reply changes how it is drawn.
                 attendees: z
                     .array(
-                        z.object({ self: z.boolean().optional(), responseStatus: z.string().optional() })
+                        z.object({
+                            self: z.boolean().optional(),
+                            responseStatus: z.string().optional()
+                        })
                     )
                     .optional()
             })
@@ -485,7 +488,10 @@ export async function listGoogleEvents(
                 allDay: item.start?.dateTime === undefined,
                 location: item.location ?? null,
                 url: item.htmlLink ?? null,
-                declined: item.attendees?.some((guest) => guest.self && guest.responseStatus === "declined") ?? false
+                declined:
+                    item.attendees?.some(
+                        (guest) => guest.self && guest.responseStatus === "declined"
+                    ) ?? false
             });
         }
         if (!body.nextPageToken) break;

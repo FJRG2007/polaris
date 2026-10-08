@@ -15,7 +15,11 @@ import { apiUser } from "@/lib/api-session";
 import { NextResponse } from "next/server";
 
 import { listConnections, readCredential } from "@/lib/connections/store";
-import { getGoogleOAuthClient, listGoogleEvents, GoogleAuthExpiredError } from "@/lib/google-calendar/service";
+import {
+    getGoogleOAuthClient,
+    listGoogleEvents,
+    GoogleAuthExpiredError
+} from "@/lib/google-calendar/service";
 import { readerWords } from "@/lib/i18n/reader-words";
 
 export const runtime = "nodejs";
@@ -41,9 +45,19 @@ export async function GET(request: Request): Promise<Response> {
     const user = await apiUser();
     if (user instanceof Response) return user;
     const url = new URL(request.url);
-    const parsed = rangeSchema.safeParse({ from: url.searchParams.get("from"), to: url.searchParams.get("to") });
+    const parsed = rangeSchema.safeParse({
+        from: url.searchParams.get("from"),
+        to: url.searchParams.get("to")
+    });
     if (!parsed.success) {
-        return NextResponse.json({ status: "error", error: (await readerWords("api"))("errors.unreadableWindow"), events: [] }, { status: 400 });
+        return NextResponse.json(
+            {
+                status: "error",
+                error: (await readerWords("api"))("errors.unreadableWindow"),
+                events: []
+            },
+            { status: 400 }
+        );
     }
 
     const client = await getGoogleOAuthClient();
@@ -62,7 +76,12 @@ export async function GET(request: Request): Promise<Response> {
     if (!refreshToken) return NextResponse.json({ status: "expired", events: [] });
 
     try {
-        const events = await listGoogleEvents(client, refreshToken, parsed.data.from, parsed.data.to);
+        const events = await listGoogleEvents(
+            client,
+            refreshToken,
+            parsed.data.from,
+            parsed.data.to
+        );
         return NextResponse.json({ status: "ready", events });
     } catch (caught) {
         if (caught instanceof GoogleAuthExpiredError) {
@@ -71,6 +90,10 @@ export async function GET(request: Request): Promise<Response> {
         // The reason stays in the server log; the screen is told the calendar
         // could not be reached, which is all it can act on.
         console.error("google calendar events failed", caught);
-        return NextResponse.json({ status: "error", error: (await readerWords("api"))("errors.googleCalendarUnreachable"), events: [] });
+        return NextResponse.json({
+            status: "error",
+            error: (await readerWords("api"))("errors.googleCalendarUnreachable"),
+            events: []
+        });
     }
 }

@@ -48,7 +48,9 @@ function flushComposed(view: EditorView): void {
     view.dispatch(view.state.tr.setMeta(composedKey, null));
     const committed = view.state.doc.textBetween(at - 1, at);
     if (!CLOSERS.has(committed)) return;
-    view.someProp("handleTextInput", (handle) => handle(view, at - 1, at, committed, () => view.state.tr));
+    view.someProp("handleTextInput", (handle) =>
+        handle(view, at - 1, at, committed, () => view.state.tr)
+    );
 }
 
 /**
@@ -85,7 +87,9 @@ export const ComposedShortcuts = Extension.create({
                 props: {
                     handleDOMEvents: {
                         compositionend: (view) => {
-                            view.dispatch(view.state.tr.setMeta(composedKey, view.state.selection.from));
+                            view.dispatch(
+                                view.state.tr.setMeta(composedKey, view.state.selection.from)
+                            );
                             window.setTimeout(() => offerComposed(view), 0);
                             return false;
                         }

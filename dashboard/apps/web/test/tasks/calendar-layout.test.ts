@@ -111,20 +111,28 @@ describe("what lands on a day", () => {
     });
 
     it("treats a task with no time of day as all-day, and one with a time as timed", () => {
-        const allDay = layout.taskEntry(task({ dueDate: new Date(2026, 7, 5, 0, 0).toISOString(), timed: false }));
-        const timed = layout.taskEntry(task({ dueDate: new Date(2026, 7, 5, 14, 0).toISOString(), timed: true }));
+        const allDay = layout.taskEntry(
+            task({ dueDate: new Date(2026, 7, 5, 0, 0).toISOString(), timed: false })
+        );
+        const timed = layout.taskEntry(
+            task({ dueDate: new Date(2026, 7, 5, 14, 0).toISOString(), timed: true })
+        );
         expect(allDay?.allDay).toBe(true);
         expect(timed?.allDay).toBe(false);
         expect(layout.minutesInto(timed?.start as Date)).toBe(14 * 60);
     });
 
     it("falls back to the start date when a task has no deadline", () => {
-        const entry = layout.taskEntry(task({ startDate: new Date(2026, 7, 3, 9, 0).toISOString() }));
+        const entry = layout.taskEntry(
+            task({ startDate: new Date(2026, 7, 3, 9, 0).toISOString() })
+        );
         expect(entry?.start.getDate()).toBe(3);
     });
 
     it("keeps an all-day event on the day it says, whatever the reader's timezone", () => {
-        const entry = layout.googleEntry(event({ start: "2026-08-05", end: "2026-08-06", allDay: true }));
+        const entry = layout.googleEntry(
+            event({ start: "2026-08-05", end: "2026-08-06", allDay: true })
+        );
         expect(entry.start.getDate()).toBe(5);
         expect(layout.coversDay(entry, new Date(2026, 7, 5))).toBe(true);
         // Google's end is the morning after; a one-day event must not spill.
@@ -132,15 +140,23 @@ describe("what lands on a day", () => {
     });
 
     it("puts a multi-day event on every day it covers", () => {
-        const entry = layout.googleEntry(event({ start: "2026-08-05", end: "2026-08-08", allDay: true }));
-        expect([5, 6, 7].every((day) => layout.coversDay(entry, new Date(2026, 7, day)))).toBe(true);
+        const entry = layout.googleEntry(
+            event({ start: "2026-08-05", end: "2026-08-08", allDay: true })
+        );
+        expect([5, 6, 7].every((day) => layout.coversDay(entry, new Date(2026, 7, day)))).toBe(
+            true
+        );
         expect(layout.coversDay(entry, new Date(2026, 7, 9))).toBe(false);
     });
 
     it("counts a day in the year on the same days the other views place an entry", () => {
         const entries = [
-            layout.googleEntry(event({ id: "one", start: "2026-08-05", end: "2026-08-06", allDay: true })),
-            layout.googleEntry(event({ id: "three", start: "2026-08-05", end: "2026-08-08", allDay: true })),
+            layout.googleEntry(
+                event({ id: "one", start: "2026-08-05", end: "2026-08-06", allDay: true })
+            ),
+            layout.googleEntry(
+                event({ id: "three", start: "2026-08-05", end: "2026-08-08", allDay: true })
+            ),
             layout.googleEntry(
                 event({
                     id: "midnight",
@@ -161,15 +177,19 @@ describe("what lands on a day", () => {
 
     it("lists a day with the all-day items first and the rest in clock order", () => {
         const entries = [
-            layout.googleEntry(event({ id: "late", start: new Date(2026, 7, 5, 16, 0).toISOString() })),
-            layout.googleEntry(event({ id: "early", start: new Date(2026, 7, 5, 9, 0).toISOString() })),
-            layout.googleEntry(event({ id: "whole", start: "2026-08-05", end: "2026-08-06", allDay: true }))
+            layout.googleEntry(
+                event({ id: "late", start: new Date(2026, 7, 5, 16, 0).toISOString() })
+            ),
+            layout.googleEntry(
+                event({ id: "early", start: new Date(2026, 7, 5, 9, 0).toISOString() })
+            ),
+            layout.googleEntry(
+                event({ id: "whole", start: "2026-08-05", end: "2026-08-06", allDay: true })
+            )
         ];
-        expect(layout.entriesOnDay(entries, new Date(2026, 7, 5)).map((entry) => entry.key)).toEqual([
-            "google:whole",
-            "google:early",
-            "google:late"
-        ]);
+        expect(
+            layout.entriesOnDay(entries, new Date(2026, 7, 5)).map((entry) => entry.key)
+        ).toEqual(["google:whole", "google:early", "google:late"]);
     });
 });
 
@@ -230,7 +250,9 @@ describe("the scopes Google offers beside these", () => {
     it("gives a schedule four weeks from today", () => {
         const range = layout.buildRange("schedule", 1, 0, FORMAT, NOW);
         expect(range.days).toHaveLength(layout.SCHEDULE_DAYS);
-        expect(range.days[0]?.getTime()).toBe(new Date(2026, 7, 5 + layout.SCHEDULE_DAYS).getTime());
+        expect(range.days[0]?.getTime()).toBe(
+            new Date(2026, 7, 5 + layout.SCHEDULE_DAYS).getTime()
+        );
     });
 
     it("drops Saturday and Sunday from a week and a month when weekends are hidden", () => {
@@ -247,7 +269,9 @@ describe("the scopes Google offers beside these", () => {
     it("pages four working days across a weekend without leaving a gap", () => {
         // Wednesday the 5th: Wed, Thu, Fri, Mon - then Tue, Wed, Thu, Fri.
         expect(layout.workdaysFrom(NOW, 0, 4).map((day) => day.getDate())).toEqual([5, 6, 7, 10]);
-        expect(layout.workdaysFrom(NOW, 4, 4).map((day) => day.getDate())).toEqual([11, 12, 13, 14]);
+        expect(layout.workdaysFrom(NOW, 4, 4).map((day) => day.getDate())).toEqual([
+            11, 12, 13, 14
+        ]);
         expect(layout.workdaysFrom(NOW, -4, 4).map((day) => day.getDate())).toEqual([30, 31, 3, 4]);
         // Starting on a Saturday begins on the Monday after.
         expect(layout.workdaysFrom(new Date(2026, 7, 8), 0, 1)[0]?.getDate()).toBe(10);
@@ -292,15 +316,27 @@ describe("ticking a task off from the calendar", () => {
     ];
 
     it("moves unfinished work to done, and finished work back to where it starts", () => {
-        expect(layout.completionTarget({ statusId: "doing", statusType: "active" }, statuses)).toBe("done");
-        expect(layout.completionTarget({ statusId: "done", statusType: "done" }, statuses)).toBe("todo");
-        expect(layout.completionTarget({ statusId: "dropped", statusType: "closed" }, statuses)).toBe("todo");
+        expect(layout.completionTarget({ statusId: "doing", statusType: "active" }, statuses)).toBe(
+            "done"
+        );
+        expect(layout.completionTarget({ statusId: "done", statusType: "done" }, statuses)).toBe(
+            "todo"
+        );
+        expect(
+            layout.completionTarget({ statusId: "dropped", statusType: "closed" }, statuses)
+        ).toBe("todo");
     });
 
     it("offers nothing for a task from a space whose statuses the screen does not hold", () => {
-        expect(layout.completionTarget({ statusId: "elsewhere", statusType: "open" }, statuses)).toBeNull();
-        expect(layout.completionTarget({ statusId: null, statusType: "open" }, statuses)).toBeNull();
-        expect(layout.completionTarget({ statusId: "todo", statusType: "open" }, statuses.slice(0, 1))).toBeNull();
+        expect(
+            layout.completionTarget({ statusId: "elsewhere", statusType: "open" }, statuses)
+        ).toBeNull();
+        expect(
+            layout.completionTarget({ statusId: null, statusType: "open" }, statuses)
+        ).toBeNull();
+        expect(
+            layout.completionTarget({ statusId: "todo", statusType: "open" }, statuses.slice(0, 1))
+        ).toBeNull();
     });
 
     it("draws a finished task and a declined event struck through, and hides them on request", () => {

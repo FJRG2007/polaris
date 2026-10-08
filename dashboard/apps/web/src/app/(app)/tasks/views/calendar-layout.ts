@@ -111,7 +111,8 @@ export function buildRange(
     showWeekends: boolean = true
 ): CalendarRange {
     const today = core.startOfDay(now);
-    const span = (days: Date[]) => `${format.date(days[0] as Date)} - ${format.date(days[days.length - 1] as Date)}`;
+    const span = (days: Date[]) =>
+        `${format.date(days[0] as Date)} - ${format.date(days[days.length - 1] as Date)}`;
     const keep = (days: Date[]) => (showWeekends ? days : days.filter((day) => !isWeekend(day)));
 
     if (scope === "day") {
@@ -135,13 +136,19 @@ export function buildRange(
     }
     if (scope === "schedule") {
         const first = core.addDays(today, offset * SCHEDULE_DAYS);
-        const days = Array.from({ length: SCHEDULE_DAYS }, (_, index) => core.addDays(first, index));
+        const days = Array.from({ length: SCHEDULE_DAYS }, (_, index) =>
+            core.addDays(first, index)
+        );
         return { days, label: span(days), monthShown: first.getMonth() };
     }
     if (scope === "year") {
         const year = now.getFullYear() + offset;
         const days: Date[] = [];
-        for (let cursor = new Date(year, 0, 1); cursor.getFullYear() === year; cursor = core.addDays(cursor, 1)) {
+        for (
+            let cursor = new Date(year, 0, 1);
+            cursor.getFullYear() === year;
+            cursor = core.addDays(cursor, 1)
+        ) {
             days.push(cursor);
         }
         return { days, label: String(year), monthShown: 0 };
@@ -192,7 +199,9 @@ export function monthWeeks(year: number, month: number, weekStartsOn: number): (
     const cells: (Date | null)[] = Array.from({ length: lead }, () => null);
     for (let date = 1; date <= length; date += 1) cells.push(new Date(year, month, date));
     while (cells.length % 7 !== 0) cells.push(null);
-    return Array.from({ length: cells.length / 7 }, (_, week) => cells.slice(week * 7, week * 7 + 7));
+    return Array.from({ length: cells.length / 7 }, (_, week) =>
+        cells.slice(week * 7, week * 7 + 7)
+    );
 }
 
 /** The height of one line in a month cell, and the gap between two of them. The
@@ -243,7 +252,8 @@ export function completionTarget(
 /** Whether an entry is drawn at all with these options. */
 export function isShown(entry: CalendarEntry, options: CalendarOptions): boolean {
     if (!options.showDeclined && entry.declined) return false;
-    if (!options.showCompleted && entry.task && core.isFinishedStatus(entry.task.statusType)) return false;
+    if (!options.showCompleted && entry.task && core.isFinishedStatus(entry.task.statusType))
+        return false;
     return true;
 }
 
@@ -319,13 +329,18 @@ export function entriesOnDay(entries: readonly CalendarEntry[], day: Date): Cale
         .filter((entry) => coversDay(entry, day))
         .sort(
             (left, right) =>
-                Number(right.allDay) - Number(left.allDay) || left.start.getTime() - right.start.getTime()
+                Number(right.allDay) - Number(left.allDay) ||
+                left.start.getTime() - right.start.getTime()
         );
 }
 
 /** How many entries fall on each day from `first` to `last`, keyed by
  *  `toDateString()`, counted on the same days `coversDay` places them. */
-export function countByDay(entries: readonly CalendarEntry[], first: Date, last: Date): Map<string, number> {
+export function countByDay(
+    entries: readonly CalendarEntry[],
+    first: Date,
+    last: Date
+): Map<string, number> {
     const found = new Map<string, number>();
     for (const entry of entries) {
         let cursor = core.startOfDay(entry.start < first ? first : entry.start);
@@ -385,6 +400,11 @@ export function laneOut(entries: readonly CalendarEntry[]): PlacedEntry[] {
     }
 
     const widthOf = new Map<number, number>();
-    for (const item of placed) widthOf.set(item.group, Math.max(widthOf.get(item.group) ?? 1, item.lane + 1));
-    return placed.map((item) => ({ entry: item.entry, lane: item.lane, lanes: widthOf.get(item.group) ?? 1 }));
+    for (const item of placed)
+        widthOf.set(item.group, Math.max(widthOf.get(item.group) ?? 1, item.lane + 1));
+    return placed.map((item) => ({
+        entry: item.entry,
+        lane: item.lane,
+        lanes: widthOf.get(item.group) ?? 1
+    }));
 }

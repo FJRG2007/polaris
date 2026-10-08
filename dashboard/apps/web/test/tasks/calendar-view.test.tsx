@@ -101,17 +101,25 @@ function props(rows: TaskRow[]): ViewProps {
     };
 }
 
-function render(rows: TaskRow[], preferences: DisplayPreferences, context: SpaceContext = CONTEXT): string {
-    return renderToStaticMarkup(withMessages(
-        <DisplayFormatProvider preferences={preferences}>
-            <CalendarView {...props(rows)} context={context} />
-        </DisplayFormatProvider>
-    ));
+function render(
+    rows: TaskRow[],
+    preferences: DisplayPreferences,
+    context: SpaceContext = CONTEXT
+): string {
+    return renderToStaticMarkup(
+        withMessages(
+            <DisplayFormatProvider preferences={preferences}>
+                <CalendarView {...props(rows)} context={context} />
+            </DisplayFormatProvider>
+        )
+    );
 }
 
 /** The weekday headings, in the order the grid drew them. */
 function headings(markup: string): string[] {
-    return [...markup.matchAll(/>(Sun|Mon|Tue|Wed|Thu|Fri|Sat)</g)].map((match) => match[1] as string);
+    return [...markup.matchAll(/>(Sun|Mon|Tue|Wed|Thu|Fri|Sat)</g)].map(
+        (match) => match[1] as string
+    );
 }
 
 describe("the calendar grid", () => {
@@ -121,24 +129,12 @@ describe("the calendar grid", () => {
     });
 
     it("starts it where the account said instead", () => {
-        expect(headings(render([], { ...DISPLAY_DEFAULTS, weekStart: "mon" })).slice(0, 7)).toEqual([
-            "Mon",
-            "Tue",
-            "Wed",
-            "Thu",
-            "Fri",
-            "Sat",
-            "Sun"
-        ]);
-        expect(headings(render([], { ...DISPLAY_DEFAULTS, weekStart: "sat" })).slice(0, 7)).toEqual([
-            "Sat",
-            "Sun",
-            "Mon",
-            "Tue",
-            "Wed",
-            "Thu",
-            "Fri"
-        ]);
+        expect(headings(render([], { ...DISPLAY_DEFAULTS, weekStart: "mon" })).slice(0, 7)).toEqual(
+            ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+        );
+        expect(headings(render([], { ...DISPLAY_DEFAULTS, weekStart: "sat" })).slice(0, 7)).toEqual(
+            ["Sat", "Sun", "Mon", "Tue", "Wed", "Thu", "Fri"]
+        );
     });
 
     it("names the scope on the view picker and draws a task due this month", () => {
@@ -153,13 +149,17 @@ describe("the calendar grid", () => {
     it("draws a done task with a check that reopens it, struck through", () => {
         const today = new Date();
         const due = new Date(today.getFullYear(), today.getMonth(), 15).toISOString();
-        const markup = render([taskRow({ dueDate: due, statusId: "st2", statusType: "done" })], DISPLAY_DEFAULTS, {
-            ...CONTEXT,
-            statuses: [
-                { id: "st1", name: "Open", type: "open", color: "#64748b", order: 0 },
-                { id: "st2", name: "Done", type: "done", color: "#22c55e", order: 1 }
-            ]
-        });
+        const markup = render(
+            [taskRow({ dueDate: due, statusId: "st2", statusType: "done" })],
+            DISPLAY_DEFAULTS,
+            {
+                ...CONTEXT,
+                statuses: [
+                    { id: "st1", name: "Open", type: "open", color: "#64748b", order: 0 },
+                    { id: "st2", name: "Done", type: "done", color: "#22c55e", order: 1 }
+                ]
+            }
+        );
         expect(markup).toContain('aria-label="Mark not complete"');
         expect(markup).toContain("lucide-circle-check");
         expect(markup).toMatch(/line-through[^>]*>Review the quarter</);
