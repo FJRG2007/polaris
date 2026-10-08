@@ -136,4 +136,27 @@ describe("the settings", () => {
         fireEvent.click(within(row("drive.newFolder")).getByRole("button", { name: /Reset/ }));
         expect(ui.readDeviceShortcuts()).toEqual({});
     });
+
+    it("keeps a device key that is free only because the account moved its holder", () => {
+        save.mockResolvedValue({ overrides: { "drive.uploadFiles": ["Alt+u"] } });
+        ui.setAccountShortcuts({ "drive.uploadFiles": ["Alt+u"] });
+        render(withMessages(<ShortcutSettings app="drive" />));
+        fireEvent.click(screen.getByRole("switch", { name: "This device only" }));
+        fireEvent.click(within(row("drive.newFolder")).getByRole("button", { name: /Add a key/ }));
+        const recorder = within(row("drive.newFolder")).getByRole("button", { name: /Press the new keys/ });
+        fireEvent.keyDown(recorder, { key: "u" });
+        expect(ui.readDeviceShortcuts()).toEqual({ "drive.newFolder": ["n", "u"] });
+    });
+
+    it("refuses an account key that is free only on this device, and names its holder", () => {
+        ui.writeDeviceShortcuts({ "drive.uploadFiles": ["Alt+u"] });
+        render(withMessages(<ShortcutSettings app="drive" />));
+        fireEvent.click(within(row("drive.newFolder")).getByRole("button", { name: /Add a key/ }));
+        const recorder = within(row("drive.newFolder")).getByRole("button", { name: /Press the new keys/ });
+        fireEvent.keyDown(recorder, { key: "u" });
+        expect(save).not.toHaveBeenCalled();
+        expect(within(row("drive.newFolder")).getByRole("alert").textContent).toBe(
+            "U already does upload files here."
+        );
+    });
 });

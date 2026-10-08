@@ -53,12 +53,12 @@ function subscribe(listener: () => void): () => void {
     return () => listeners.delete(listener);
 }
 
-/** The device's own changes, read defensively: a private window or blocked
- *  storage is no changes, never a broken page. */
+/** The device's own changes, read defensively and over the account's: a
+ *  private window or blocked storage is no changes, never a broken page. */
 export function readDeviceShortcuts(): core.ShortcutOverrides {
     try {
         const raw = window.localStorage.getItem(DEVICE_SHORTCUTS_KEY);
-        return raw ? core.cleanShortcutOverrides(JSON.parse(raw)) : core.NO_SHORTCUT_OVERRIDES;
+        return raw ? core.cleanShortcutOverrides(JSON.parse(raw), account) : core.NO_SHORTCUT_OVERRIDES;
     } catch {
         return core.NO_SHORTCUT_OVERRIDES;
     }

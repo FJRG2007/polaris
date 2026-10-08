@@ -126,7 +126,7 @@ function rowKeys(
     event: React.KeyboardEvent,
     handlers: { onRename?: () => void; onDelete?: () => void }
 ): void {
-    if ((event.target as HTMLElement).tagName === "INPUT") return;
+    if ((event.target as HTMLElement).closest("input, textarea, select, [contenteditable='true']")) return;
     if (handlers.onRename && shortcutPressed(event, "general.rename")) {
         event.preventDefault();
         event.stopPropagation();

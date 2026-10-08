@@ -539,8 +539,14 @@ export function conflictsFor(
  * action equal to its defaults is no change at all. A set that would make two
  * actions collide is dropped whole rather than half-applied - the defaults
  * always work, a half-moved keyboard may not.
+ *
+ * A device's set is checked over the account's, `under` it: that is what it is
+ * laid on, so a key the account moved away is free for the device to take.
  */
-export function cleanShortcutOverrides(raw: unknown): ShortcutOverrides {
+export function cleanShortcutOverrides(
+    raw: unknown,
+    under: ShortcutOverrides = NO_SHORTCUT_OVERRIDES
+): ShortcutOverrides {
     if (!raw || typeof raw !== "object" || Array.isArray(raw)) return NO_SHORTCUT_OVERRIDES;
     const kept: Record<string, readonly string[]> = {};
     for (const [id, value] of Object.entries(raw as Record<string, unknown>)) {
@@ -556,7 +562,7 @@ export function cleanShortcutOverrides(raw: unknown): ShortcutOverrides {
         if (sameBindings(bindings, definition.defaults)) continue;
         kept[id] = bindings;
     }
-    return shortcutConflicts(resolveShortcuts(kept)).length > 0 ? NO_SHORTCUT_OVERRIDES : kept;
+    return shortcutConflicts(resolveShortcuts(under, kept)).length > 0 ? NO_SHORTCUT_OVERRIDES : kept;
 }
 
 /** Whether two lists of bindings are the same keys in the same order. */
@@ -652,7 +658,10 @@ export function overridesFromMailKeymap(
         const id = `mail.${command}`;
         const definition = BY_ID.get(id);
         if (!definition || !isRebindable(definition)) continue;
-        const binding = normalizeBinding(key);
+        // Mail told `A` from `a` by the character: the capital was Shift.
+        const binding = normalizeBinding(
+            [...key].length === 1 && key !== key.toLowerCase() ? `Shift+${key}` : key
+        );
         if (binding && !sameBindings([binding], definition.defaults)) out[id] = [binding];
     }
     return out;

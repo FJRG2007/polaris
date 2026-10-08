@@ -702,10 +702,12 @@ export async function setMailKeysAction(input: unknown) {
         const others = Object.fromEntries(
             Object.entries(current).filter(([id]) => !id.startsWith("mail."))
         );
-        await shortcuts.saveShortcutOverrides(userId, {
-            ...others,
-            ...core.overridesFromMailKeymap(parsed.data)
-        });
+        const next = { ...others, ...core.overridesFromMailKeymap(parsed.data) };
+        // Saving cleans a set whose keys collide down to none at all, which
+        // would put back every app's keys and still answer that it saved.
+        if (core.shortcutConflicts(core.resolveShortcuts(next)).length > 0)
+            return { error: await errorText("errors.shortcutsSave") };
+        await shortcuts.saveShortcutOverrides(userId, next);
         refresh();
         return { keys: parsed.data };
     } catch (caught) {

@@ -136,6 +136,12 @@ describe("moving keys", () => {
         expect(keys.cleanShortcutOverrides("garbage")).toEqual({});
     });
 
+    it("checks a device's set over the account's it is laid on", () => {
+        const device = { "drive.newFolder": ["n", "u"] };
+        expect(keys.cleanShortcutOverrides(device)).toEqual({});
+        expect(keys.cleanShortcutOverrides(device, { "drive.uploadFiles": ["Alt+u"] })).toEqual(device);
+    });
+
     it("refuses a save that would collide or name what is not a shortcut", () => {
         expect(keys.shortcutOverridesSchema.safeParse({ "tasks.calendar.day": ["t"] }).success).toBe(false);
         expect(keys.shortcutOverridesSchema.safeParse({ "drive.open": ["o"] }).success).toBe(false);
@@ -146,6 +152,10 @@ describe("moving keys", () => {
     it("carries over the keys somebody moved in Mail before the table was shared", () => {
         expect(keys.overridesFromMailKeymap({ archive: "y", reply: "r", nope: "z" })).toEqual({
             "mail.archive": ["y"]
+        });
+        expect(keys.overridesFromMailKeymap({ star: "A", archive: "#" })).toEqual({
+            "mail.star": ["Shift+a"],
+            "mail.archive": ["#"]
         });
     });
 });

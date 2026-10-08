@@ -124,20 +124,52 @@ export function ShortcutSettings({
         if (!writeDeviceShortcuts(next)) toast.show({ title: t("errors.deviceNotSaved") });
     }
 
+    function clashMessage(clash: core.ShortcutConflict, id: string): string {
+        return t("errors.clash", {
+            keys: text(clash.binding),
+            action: shortcutLabel(t, clash.ids.find((other) => other !== id) ?? id).toLowerCase()
+        });
+    }
+
+    /** Keep both layers as they will be stored, or say why not. The account's
+     *  keys are saved and read back on their own and this device's over them,
+     *  so a change may bring a clash into neither - one already there is not
+     *  this change's to refuse. */
+    function commit(
+        id: string,
+        nextAccount: core.ShortcutOverrides,
+        nextDevice: core.ShortcutOverrides
+    ): boolean {
+        const clashes = (onAccount: core.ShortcutOverrides, onDevice: core.ShortcutOverrides) => [
+            ...core.shortcutConflicts(core.resolveShortcuts(onAccount)),
+            ...core.shortcutConflicts(core.resolveShortcuts(onAccount, onDevice))
+        ];
+        const signature = (clash: core.ShortcutConflict) => `${clash.binding} ${clash.ids.join(" ")}`;
+        const before = new Set(clashes(account, device).map(signature));
+        const brought = clashes(nextAccount, nextDevice).filter((clash) => !before.has(signature(clash)));
+        const clash = brought.find((entry) => entry.ids.includes(id)) ?? brought[0];
+        if (clash) {
+            setProblem({ id, message: clashMessage(clash, id) });
+            return false;
+        }
+        setProblem(null);
+        if (nextDevice !== device) saveDevice(nextDevice);
+        if (nextAccount !== account) saveAccount(nextAccount);
+        return true;
+    }
+
     /** Set an action's movable keys, in the layer this change belongs to: this
      *  device when it already moved the action or "this device only" is on. */
-    function change(id: string, bindings: readonly string[]) {
+    function change(id: string, bindings: readonly string[]): boolean {
         const definition = core.shortcutDefinition(id);
-        if (!definition) return;
+        if (!definition) return false;
         const accountKeys = account[id] ?? definition.defaults;
-        if (deviceOnly || id in device) saveDevice(setIn(device, accountKeys, id, bindings));
-        else saveAccount(setIn(account, definition.defaults, id, bindings));
+        if (deviceOnly || id in device) return commit(id, account, setIn(device, accountKeys, id, bindings));
+        return commit(id, setIn(account, definition.defaults, id, bindings), device);
     }
 
     function reset(id: string) {
-        if (id in device) saveDevice(core.withoutOverride(device, id));
-        if (id in account) saveAccount(core.withoutOverride(account, id));
-        setProblem(null);
+        commit(id, core.withoutOverride(account, id), core.withoutOverride(device, id));
     }
 
     async function resetAll() {
@@ -194,9 +226,7 @@ export function ShortcutSettings({
             });
             return;
         }
-        setRecording(null);
-        setProblem(null);
-        change(id, [...current, binding]);
+        if (change(id, [...current, binding])) setRecording(null);
     }
 
     const needle = query.trim().toLowerCase();
@@ -265,13 +295,7 @@ export function ShortcutSettings({
                                     </span>
                                 ) : clash ? (
                                     <span className="block text-[12px] text-danger">
-                                        {t("errors.clash", {
-                                            keys: text(clash.binding),
-                                            action: shortcutLabel(
-                                                t,
-                                                clash.ids.find((other) => other !== id) ?? id
-                                            ).toLowerCase()
-                                        })}
+                                        {clashMessage(clash, id)}
                                     </span>
                                 ) : null}
                             </>
