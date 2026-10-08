@@ -67,6 +67,12 @@ describe("the corner the composer and the transfer card share", () => {
     });
 
     it("keeps the composer under it, so the card is never the thing hidden", () => {
-        expect(composer).toContain('"fixed z-40 flex flex-col');
+        expect(composer).toContain('"fixed z-[42] flex flex-col');
+    });
+
+    it("keeps the composer over the seasonal drift, which sits at 41", () => {
+        const css = readFileSync(join(process.cwd(), "src/app/globals.css"), "utf8");
+        expect(/\.season-drift \{[^}]*z-index: 41;/.test(css)).toBe(true);
+        expect(composer).not.toMatch(/"fixed[^"]*z-40/);
     });
 });

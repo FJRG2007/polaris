@@ -517,9 +517,12 @@ export function Composer() {
 
     return (
         <>
+            {/* Above the seasonal drift (41) as well as the app bar (40): a
+                composer is written in like a dialog, and nothing decorative
+                drifts across one. Under the transfer card (50) still. */}
             <div
                 className={cn(
-                    "fixed z-40 flex flex-col rounded-t-lg border border-b-0 border-border bg-elevated shadow-modal",
+                    "fixed z-[42] flex flex-col rounded-t-lg border border-b-0 border-border bg-elevated shadow-modal",
                     // Queued, the panel folds down into the corner the countdown
                     // appears in rather than standing there the same size to say
                     // one line. It stays mounted underneath: Undo unfolds the same
@@ -1081,7 +1084,7 @@ function QueuedPill({
         <div
             ref={pill}
             className={cn(
-                "fixed inset-x-4 bottom-4 z-40 flex items-center gap-1 rounded-full border border-border bg-elevated py-1 pl-4 pr-1 shadow-modal md:inset-x-auto md:right-6",
+                "fixed inset-x-4 bottom-4 z-[42] flex items-center gap-1 rounded-full border border-border bg-elevated py-1 pl-4 pr-1 shadow-modal md:inset-x-auto md:right-6",
                 "animate-in fade-in slide-in-from-bottom-2 zoom-in-95 duration-300 motion-reduce:animate-none"
             )}
         >
