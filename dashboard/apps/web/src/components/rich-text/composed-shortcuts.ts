@@ -19,8 +19,9 @@
  * A pair is also settled when it is written the other way round: pressing the
  * dead key twice gives both backticks at once, so the natural thing is to step
  * back between them and type the word - which never types a closing character
- * at all. Typing inside a pair, or typing its opening in front of one already
- * closed, turns it into the mark too, and the caret stays inside it.
+ * at all. Typing into an empty pair, or typing its opening in front of one
+ * already closed, turns it into the mark too, and the caret stays inside it.
+ * Editing between two backticks already left as text keeps them text.
  */
 
 import { Extension } from "@tiptap/core";
@@ -153,10 +154,11 @@ function pairAround(
         if (valid(open, close)) return { open, close, closed: true };
     }
     if (typed.closingOnly || typed.to <= typed.from) return null;
-    // Typed between the two halves of a pair.
+    // Typed between the two halves of a pair that was empty until now.
     const open = before(typed.from);
     const close = after(typed.to);
-    if (valid(open, close)) return { open, close, closed: false };
+    const filled = open + width === typed.from && close === typed.to;
+    if (filled && valid(open, close)) return { open, close, closed: false };
     // Typed the opening in front of a pair already closed.
     if (endsToken) {
         const opening = typed.to - width;

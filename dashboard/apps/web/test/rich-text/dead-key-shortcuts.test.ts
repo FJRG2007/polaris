@@ -201,6 +201,19 @@ describe("a shortcut whose closing character the rules never saw", () => {
         expect(current.getHTML()).toContain("<s>gone</s>");
     });
 
+    it("leaves backticks kept as text alone when the words between them are edited", () => {
+        editor = new Editor({
+            element: document.createElement("div"),
+            extensions: baseExtensions("")
+        });
+        const current = editor;
+        current.commands.insertContent("kept `as typed`");
+        current.commands.setTextSelection(10);
+        insertedPlainly("x", current);
+        expect(current.getHTML()).not.toContain("<code>");
+        expect(current.state.doc.textContent).toBe("kept `as xtyped`");
+    });
+
     it("does not reach into a neighbouring pair when typing between two", () => {
         const current = insertedPlainly("`a` and `b`");
         expect(md.docToMarkdown(current.getJSON())).toBe("`a` and `b`");
