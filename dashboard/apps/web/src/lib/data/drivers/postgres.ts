@@ -200,7 +200,8 @@ export class PostgresDriver implements data.DataDriver {
         return result.rows.map((row) => ({
             name: row.name,
             namespace: namespace ?? "public",
-            kind: row.relkind === "v" || row.relkind === "m" ? ("view" as const) : ("table" as const),
+            kind:
+                row.relkind === "v" || row.relkind === "m" ? ("view" as const) : ("table" as const),
             // A plain view holds no rows of its own to estimate.
             rows: row.relkind === "v" ? null : rowEstimate(row.live, row.planned)
         }));

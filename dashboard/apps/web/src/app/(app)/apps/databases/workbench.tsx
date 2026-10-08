@@ -597,11 +597,7 @@ function RowEstimate({ rows }: { rows: number }) {
     }).format(rows);
     const full = t("bench.rowsEstimate", { count: new Intl.NumberFormat(locale).format(rows) });
     return (
-        <span
-            className="shrink-0 text-xs text-muted-foreground"
-            title={full}
-            aria-label={full}
-        >
+        <span className="shrink-0 text-xs text-muted-foreground" title={full} aria-label={full}>
             ~{short}
         </span>
     );

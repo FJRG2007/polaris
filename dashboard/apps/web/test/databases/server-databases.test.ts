@@ -65,7 +65,8 @@ vi.mock("pg", async () => {
                 return { rows: listed.map((name) => ({ name })) };
             }
             if (text.includes("current_database()")) return { rows: [{ name: this.database }] };
-            if (text.includes("FROM pg_namespace")) return { rows: [{ name: "public", count: "1" }] };
+            if (text.includes("FROM pg_namespace"))
+                return { rows: [{ name: "public", count: "1" }] };
             if (text.includes("FROM pg_attribute")) {
                 return { rows: [{ name: "id", type: "integer", nullable: "NO", pk: true }] };
             }
@@ -214,7 +215,13 @@ describe("switching to another database", () => {
     });
 
     it("sends rows, statements and edits to the picked database", async () => {
-        const page = await browser.rowsAt(address(), "public", "t_billing", { limit: 10 }, "billing");
+        const page = await browser.rowsAt(
+            address(),
+            "public",
+            "t_billing",
+            { limit: 10 },
+            "billing"
+        );
         expect(page.rows).toEqual([{ id: 1, from: "billing" }]);
 
         sent.length = 0;
@@ -227,7 +234,13 @@ describe("switching to another database", () => {
         await expect(
             browser.updateCellAt(
                 address(),
-                { namespace: "public", relation: "t_billing", column: "id", value: "2", key: { id: 1 } },
+                {
+                    namespace: "public",
+                    relation: "t_billing",
+                    column: "id",
+                    value: "2",
+                    key: { id: 1 }
+                },
                 "billing"
             )
         ).rejects.toThrow(/primary key/);

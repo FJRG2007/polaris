@@ -418,12 +418,7 @@ export async function insertRowAction(
     const refused = await readAllowed(me.id);
     if (refused) return { error: refused };
     const result = await guard(async () =>
-        browser.insertRow(
-            me.id,
-            String(id),
-            parsed(rowInsertSchema, insert),
-            databaseOf(database)
-        )
+        browser.insertRow(me.id, String(id), parsed(rowInsertSchema, insert), databaseOf(database))
     );
     return result.error ? { error: result.error } : { changed: result.value?.changed ?? 0 };
 }

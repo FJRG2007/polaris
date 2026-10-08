@@ -112,9 +112,7 @@ export async function withDriverOn<T>(
         return withDriver({ ...address, database }, use);
     }
     return withRoute(address, async (reached) => {
-        const listed = await withOpenDriver(reached, (driver) =>
-            serverDatabases(address, driver)
-        );
+        const listed = await withOpenDriver(reached, (driver) => serverDatabases(address, driver));
         if (!listed.includes(database)) throw new data.DataRequestError(data.NO_SUCH_DATABASE);
         return withOpenDriver({ ...reached, database }, use);
     });

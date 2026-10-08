@@ -73,10 +73,7 @@ export interface DataSource {
  * Every read and write goes to that one, and the server checks it is a database
  * this account may open before dialling it.
  */
-export function connectionSource(
-    connectionId: string,
-    database: string | null = null
-): DataSource {
+export function connectionSource(connectionId: string, database: string | null = null): DataSource {
     return {
         // Tabs are kept per database: a table open in one is not in another.
         key: database === null ? connectionId : `${connectionId}#${database}`,

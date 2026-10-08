@@ -1391,7 +1391,8 @@ export async function savedPublicKey(userId: string, id: string): Promise<string
         throw new DataConnectionError(CONNECTION_REFUSALS.noStoredKey);
     }
     const credentials = readSshCredentials(row);
-    if (credentials.method !== "key") throw new DataConnectionError(CONNECTION_REFUSALS.noStoredKey);
+    if (credentials.method !== "key")
+        throw new DataConnectionError(CONNECTION_REFUSALS.noStoredKey);
     try {
         return publicKeyLine(credentials.privateKey, credentials.passphrase ?? null);
     } catch (error) {

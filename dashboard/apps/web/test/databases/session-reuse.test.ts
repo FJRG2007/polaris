@@ -40,7 +40,8 @@ vi.mock("pg", async () => {
                 return query;
             }
             const text = typeof query === "string" ? query : query.text;
-            if (text.includes("FROM pg_database")) return Promise.resolve({ rows: [{ name: "app" }] });
+            if (text.includes("FROM pg_database"))
+                return Promise.resolve({ rows: [{ name: "app" }] });
             if (text.includes("FROM pg_namespace"))
                 return Promise.resolve({ rows: [{ name: "public", count: "1" }] });
             if (text.includes("FROM pg_attribute")) {
@@ -149,7 +150,10 @@ describe("a screenful of browsing through a tunnel", () => {
     });
 
     it("still enforces read-only on a held session", async () => {
-        const readOnly = { ...address({ userId: "alice", connectionId: "conn-1" }), readOnly: true };
+        const readOnly = {
+            ...address({ userId: "alice", connectionId: "conn-1" }),
+            readOnly: true
+        };
         await expect(browser.runAt(readOnly, "DELETE FROM posts")).rejects.toThrow(/read-only/);
         await expect(
             browser.updateCellAt(readOnly, {

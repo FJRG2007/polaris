@@ -25,7 +25,9 @@ describe("choosing a schema to open on", () => {
     it("prefers public, wherever it sorts", () => {
         // The whole case: Postgres hands back information_schema first, and it
         // is never what anybody came to look at.
-        expect(openingNamespace(schemas("information_schema", "pg_catalog", "public"))).toBe("public");
+        expect(openingNamespace(schemas("information_schema", "pg_catalog", "public"))).toBe(
+            "public"
+        );
     });
 
     it("skips the engine's own bookkeeping when there is no public", () => {
@@ -36,7 +38,9 @@ describe("choosing a schema to open on", () => {
     it("takes the first one rather than nothing when they are all the engine's", () => {
         // A role that can only see the catalogues still gets a list to look at,
         // which is better than an empty pane with no way to tell why.
-        expect(openingNamespace(schemas("information_schema", "pg_catalog"))).toBe("information_schema");
+        expect(openingNamespace(schemas("information_schema", "pg_catalog"))).toBe(
+            "information_schema"
+        );
     });
 
     it("answers null for a database with no schemas at all", () => {

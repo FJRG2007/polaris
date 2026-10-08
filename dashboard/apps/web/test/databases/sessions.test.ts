@@ -95,10 +95,7 @@ function cache(): SessionCache {
     });
 }
 
-function address(
-    userId = ALICE,
-    overrides: Partial<data.DataAddress> = {}
-): data.DataAddress {
+function address(userId = ALICE, overrides: Partial<data.DataAddress> = {}): data.DataAddress {
     return {
         engine: "postgres",
         host: "db.internal",
@@ -175,9 +172,7 @@ describe("reuse", () => {
         const answers = await Promise.all(calls);
 
         expect(answers.filter((answer) => answer === SESSIONS_BUSY)).toHaveLength(1);
-        expect(answers.filter((answer) => answer === "done")).toHaveLength(
-            PER_SESSION + MAX_QUEUE
-        );
+        expect(answers.filter((answer) => answer === "done")).toHaveLength(PER_SESSION + MAX_QUEUE);
         sessions.closeAll();
     });
 
