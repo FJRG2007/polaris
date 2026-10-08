@@ -166,6 +166,61 @@ describe("a shortcut whose closing character the rules never saw", () => {
         }
     });
 
+    it("turns a pair typed first and filled in after into code", () => {
+        // A dead key pressed twice gives both backticks; the word goes between.
+        const current = insertedPlainly("run ``");
+        const at = current.state.selection.from - 1;
+        current.commands.setTextSelection(at);
+        insertedPlainly("test", current);
+        expect(current.getHTML()).toContain("<code>test</code>");
+        expect(md.docToMarkdown(current.getJSON())).toBe("run `test`");
+    });
+
+    it("keeps the caret in the code while the word is typed, and leaves it after", () => {
+        const current = insertedPlainly("``");
+        current.commands.setTextSelection(2);
+        insertedPlainly("npm i", current);
+        expect(md.docToMarkdown(current.getJSON())).toBe("`npm i`");
+        current.commands.setTextSelection(current.state.doc.content.size - 1);
+        current.view.dispatch(current.state.tr.setStoredMarks([]));
+        insertedPlainly(" now", current);
+        expect(md.docToMarkdown(current.getJSON())).toBe("`npm i` now");
+    });
+
+    it("turns a pair whose opening is typed last into code", () => {
+        const current = insertedPlainly("test`");
+        current.commands.setTextSelection(1);
+        insertedPlainly("`", current);
+        expect(md.docToMarkdown(current.getJSON())).toBe("`test`");
+    });
+
+    it("turns ~~this~~ filled in between its halves into a strike", () => {
+        const current = insertedPlainly("a ~~~~");
+        current.commands.setTextSelection(5);
+        insertedPlainly("gone", current);
+        expect(current.getHTML()).toContain("<s>gone</s>");
+    });
+
+    it("leaves backticks kept as text alone when the words between them are edited", () => {
+        editor = new Editor({
+            element: document.createElement("div"),
+            extensions: baseExtensions("")
+        });
+        const current = editor;
+        current.commands.insertContent("kept `as typed`");
+        current.commands.setTextSelection(10);
+        insertedPlainly("x", current);
+        expect(current.getHTML()).not.toContain("<code>");
+        expect(current.state.doc.textContent).toBe("kept `as xtyped`");
+    });
+
+    it("does not reach into a neighbouring pair when typing between two", () => {
+        const current = insertedPlainly("`a` and `b`");
+        expect(md.docToMarkdown(current.getJSON())).toBe("`a` and `b`");
+        insertedPlainly("!", current);
+        expect(md.docToMarkdown(current.getJSON())).toBe("`a` and `b`!");
+    });
+
     it("leaves backticks inside a code block as they are", () => {
         editor = new Editor({
             element: document.createElement("div"),
