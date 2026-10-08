@@ -408,11 +408,26 @@ const eventsSchema = z.object({
                     .optional(),
                 end: z
                     .object({ date: z.string().optional(), dateTime: z.string().optional() })
+                    .optional(),
+                // Only the account's own answer is read: `self` marks it among
+                // the guests, and nobody else's reply changes how it is drawn.
+                attendees: z
+                    .array(
+                        z.object({
+                            self: z.boolean().optional(),
+                            responseStatus: z.string().optional()
+                        })
+                    )
                     .optional()
             })
         )
-        .optional()
+        .optional(),
+    nextPageToken: z.string().optional()
 });
+
+/** Pages read for one window at most. A year of a busy calendar fits in a few;
+ *  the ceiling is what stops a runaway answer from becoming a loop. */
+const MAX_EVENT_PAGES = 8;
 
 /** One event as the calendar screen receives it. All-day events keep Google's
  *  plain `YYYY-MM-DD`, because turning it into an instant here would move it a
@@ -425,6 +440,8 @@ export interface CalendarEventView {
     readonly allDay: boolean;
     readonly location: string | null;
     readonly url: string | null;
+    /** The account was invited and said no. */
+    readonly declined: boolean;
 }
 
 /**
@@ -447,28 +464,38 @@ export async function listGoogleEvents(
     url.searchParams.set("timeMax", to.toISOString());
     url.searchParams.set("singleEvents", "true");
     url.searchParams.set("orderBy", "startTime");
-    url.searchParams.set("maxResults", "250");
+    url.searchParams.set("maxResults", "2500");
 
-    const body = await fetchJson(url.toString(), eventsSchema, {
-        Authorization: `Bearer ${accessToken}`
-    });
     // Read in a request - the events route - so the placeholder for an event
     // with no title is in the reader's language.
     const untitled = (await readerWords("tasksViews"))("calendar.noTitle");
     const events: CalendarEventView[] = [];
-    for (const item of body.items ?? []) {
-        if (item.status === "cancelled") continue;
-        const start = item.start?.dateTime ?? item.start?.date;
-        if (!start) continue;
-        events.push({
-            id: item.id,
-            title: item.summary?.trim() || untitled,
-            start,
-            end: item.end?.dateTime ?? item.end?.date ?? null,
-            allDay: item.start?.dateTime === undefined,
-            location: item.location ?? null,
-            url: item.htmlLink ?? null
+    // A year view asks for more than one page holds, and a window cut at the
+    // first page would draw the rest of the year empty without saying so.
+    for (let page = 0; page < MAX_EVENT_PAGES; page += 1) {
+        const body = await fetchJson(url.toString(), eventsSchema, {
+            Authorization: `Bearer ${accessToken}`
         });
+        for (const item of body.items ?? []) {
+            if (item.status === "cancelled") continue;
+            const start = item.start?.dateTime ?? item.start?.date;
+            if (!start) continue;
+            events.push({
+                id: item.id,
+                title: item.summary?.trim() || untitled,
+                start,
+                end: item.end?.dateTime ?? item.end?.date ?? null,
+                allDay: item.start?.dateTime === undefined,
+                location: item.location ?? null,
+                url: item.htmlLink ?? null,
+                declined:
+                    item.attendees?.some(
+                        (guest) => guest.self && guest.responseStatus === "declined"
+                    ) ?? false
+            });
+        }
+        if (!body.nextPageToken) break;
+        url.searchParams.set("pageToken", body.nextPageToken);
     }
     return events;
 }
