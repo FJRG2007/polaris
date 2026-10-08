@@ -91,7 +91,9 @@ describe("a shortcut closed by a dead key", () => {
 /** Characters landing one at a time without the editor's rules seeing them -
  *  how a dead key's character arrives on some systems and browsers. */
 function insertedPlainly(text: string, into?: Editor): Editor {
-    const current = into ?? new Editor({ element: document.createElement("div"), extensions: baseExtensions("") });
+    const current =
+        into ??
+        new Editor({ element: document.createElement("div"), extensions: baseExtensions("") });
     editor = current;
     for (const char of text) current.view.dispatch(current.state.tr.insertText(char));
     return current;
@@ -123,7 +125,10 @@ describe("a shortcut whose closing character the rules never saw", () => {
     });
 
     it("does not rewrite text that was loaded rather than typed", () => {
-        editor = new Editor({ element: document.createElement("div"), extensions: baseExtensions("") });
+        editor = new Editor({
+            element: document.createElement("div"),
+            extensions: baseExtensions("")
+        });
         editor.commands.insertContent("kept `as typed`");
         expect(editor.getHTML()).not.toContain("<code>");
     });
@@ -137,8 +142,35 @@ describe("a shortcut whose closing character the rules never saw", () => {
         expect(current.getHTML()).not.toContain("<code>x</code>");
     });
 
+    it("keeps the pair as text when Backspace takes the shortcut back", () => {
+        for (const [text, mark] of [
+            ["`x`", "<code>"],
+            ["a ~~gone~~", "<s>"]
+        ] as const) {
+            const current = new Editor({
+                element: document.createElement("div"),
+                extensions: baseExtensions("")
+            });
+            editor = current;
+            current.commands.insertContent(text.slice(0, -1));
+            const at = current.state.selection.from;
+            current.view.someProp("handleTextInput", (handle) =>
+                handle(current.view, at, at, text.slice(-1))
+            );
+            expect(current.getHTML()).toContain(mark);
+            const backspace = new KeyboardEvent("keydown", { key: "Backspace" });
+            current.view.someProp("handleKeyDown", (handle) => handle(current.view, backspace));
+            expect(current.getHTML()).not.toContain(mark);
+            expect(current.state.doc.textContent).toBe(text);
+            current.destroy();
+        }
+    });
+
     it("leaves backticks inside a code block as they are", () => {
-        editor = new Editor({ element: document.createElement("div"), extensions: baseExtensions("") });
+        editor = new Editor({
+            element: document.createElement("div"),
+            extensions: baseExtensions("")
+        });
         editor.commands.setCodeBlock();
         insertedPlainly("`a`", editor);
         expect(md.docToMarkdown(editor.getJSON())).toContain("`a`");

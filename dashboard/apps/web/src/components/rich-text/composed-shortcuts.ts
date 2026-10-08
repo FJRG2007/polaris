@@ -19,6 +19,7 @@
 
 import { Extension } from "@tiptap/core";
 import type { MarkType } from "@tiptap/pm/model";
+import type { Transform } from "@tiptap/pm/transform";
 import type { EditorView } from "@tiptap/pm/view";
 import { Plugin, PluginKey, type EditorState, type Transaction } from "@tiptap/pm/state";
 
@@ -51,13 +52,30 @@ function typed(tr: Transaction): boolean {
     return event !== "paste" && event !== "drop" && !tr.getMeta("paste");
 }
 
+/** Whether `tr` takes back the shortcut an input rule just applied in `state` -
+ *  what Backspace does straight after one, putting the typed character back. */
+function undoesInputRule(state: EditorState, tr: Transaction): boolean {
+    return state.plugins.some((plugin) => {
+        if (!plugin.spec.isInputRules) return false;
+        const done = (plugin.getState(state) as { transform?: Transform } | null | undefined)
+            ?.transform;
+        if (!done || tr.steps.length <= done.steps.length) return false;
+        const undone = done.steps.map((step, index) => step.invert(done.docs[index]!)).reverse();
+        return undone.every(
+            (step, index) =>
+                JSON.stringify(tr.steps[index]?.toJSON()) === JSON.stringify(step.toJSON())
+        );
+    });
+}
+
 /** Where, in the final document, a character or two was just put. */
-function typedEnds(transactions: readonly Transaction[]): number[] {
+function typedEnds(transactions: readonly Transaction[], before: EditorState): number[] {
     const ends: number[] = [];
     transactions.forEach((tr, index) => {
         const requested = tr.getMeta(settleKey) as number[] | number | null | undefined;
-        if (Array.isArray(requested)) ends.push(...requested.map((at) => mapOn(transactions, index + 1, at)));
-        if (!typed(tr)) return;
+        if (Array.isArray(requested))
+            ends.push(...requested.map((at) => mapOn(transactions, index + 1, at)));
+        if (!typed(tr) || (index === 0 && undoesInputRule(before, tr))) return;
         tr.steps.forEach((step, stepIndex) => {
             step.getMap().forEach((_from, _to, start, end) => {
                 const size = end - start;
@@ -98,6 +116,9 @@ function settleAt(state: EditorState, end: number): Transaction | null {
             .delete(from, from + width)
             .addMark(from, end - 2 * width, type.create())
             .removeStoredMark(type);
+        const rules = state.plugins.find((plugin) => plugin.spec.isInputRules);
+        if (rules)
+            tr.setMeta(rules, { transform: tr, from: end - width, to: end, text: pair.close });
         return tr;
     }
     return null;
@@ -161,8 +182,8 @@ export const ComposedShortcuts = Extension.create({
                         return value === null ? null : tr.mapping.map(value, -1);
                     }
                 },
-                appendTransaction(transactions, _old, state) {
-                    for (const end of typedEnds(transactions)) {
+                appendTransaction(transactions, old, state) {
+                    for (const end of typedEnds(transactions, old)) {
                         const tr = settleAt(state, end);
                         if (tr) return tr;
                     }
@@ -171,7 +192,9 @@ export const ComposedShortcuts = Extension.create({
                 props: {
                     handleDOMEvents: {
                         compositionend: (view) => {
-                            view.dispatch(view.state.tr.setMeta(settleKey, view.state.selection.from));
+                            view.dispatch(
+                                view.state.tr.setMeta(settleKey, view.state.selection.from)
+                            );
                             window.setTimeout(() => offerComposed(view), 0);
                             return false;
                         }
