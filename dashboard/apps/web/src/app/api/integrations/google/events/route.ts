@@ -21,9 +21,9 @@ import { readerWords } from "@/lib/i18n/reader-words";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-/** The widest window worth answering: a month view spans six weeks, and nothing
- *  on screen asks for more. */
-const MAX_DAYS = 70;
+/** The widest window worth answering: a year view, plus the slack of a leap
+ *  year and a daylight-saving change. Nothing on screen asks for more. */
+const MAX_DAYS = 370;
 
 const rangeSchema = z
     .object({

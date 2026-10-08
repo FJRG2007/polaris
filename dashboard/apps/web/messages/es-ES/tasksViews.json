@@ -114,13 +114,16 @@
         "list": "Lista"
     },
     "calendar": {
-        "previous": "{scope, select, day {Día anterior} week {Semana anterior} other {Mes anterior}}",
-        "next": "{scope, select, day {Día siguiente} week {Semana siguiente} other {Mes siguiente}}",
+        "previous": "{scope, select, day {Día anterior} week {Semana anterior} month {Mes anterior} year {Año anterior} other {Periodo anterior}}",
+        "next": "{scope, select, day {Día siguiente} week {Semana siguiente} month {Mes siguiente} year {Año siguiente} other {Periodo siguiente}}",
         "today": "Hoy",
         "scope": {
             "day": "Día",
             "week": "Semana",
-            "month": "Mes"
+            "month": "Mes",
+            "year": "Año",
+            "schedule": "Agenda",
+            "fourDays": "4 días"
         },
         "undated": "{count} {count, plural, one {tarea no tiene fechas y no se muestra} other {tareas no tienen fechas y no se muestran}} aquí.",
         "doubleClick": "Haz doble clic en {scope, select, month {un día} other {una hora}} para añadir ahí una tarea.",
@@ -134,7 +137,16 @@
         "loading": "Cargando...",
         "googleCount": "Google ({count})",
         "googleUnreachable": "No se pudo contactar con Google Calendar.",
-        "noTitle": "(sin título)"
+        "noTitle": "(sin título)",
+        "changeView": "Cambiar vista",
+        "showWeekends": "Fines de semana",
+        "showDeclined": "Eventos rechazados",
+        "showCompleted": "Tareas completadas",
+        "more": "+{count} más",
+        "markDone": "Completar",
+        "markOpen": "Reabrir tarea",
+        "dayCount": "{count, plural, one {# elemento} other {# elementos}}",
+        "scheduleEmpty": "Nada programado en estas cuatro semanas."
     },
     "board": {
         "columnName": "Nombre",

@@ -114,13 +114,16 @@
         "list": "List"
     },
     "calendar": {
-        "previous": "Previous {scope}",
-        "next": "Next {scope}",
+        "previous": "{scope, select, day {Previous day} week {Previous week} month {Previous month} year {Previous year} other {Previous period}}",
+        "next": "{scope, select, day {Next day} week {Next week} month {Next month} year {Next year} other {Next period}}",
         "today": "Today",
         "scope": {
             "day": "Day",
             "week": "Week",
-            "month": "Month"
+            "month": "Month",
+            "year": "Year",
+            "schedule": "Schedule",
+            "fourDays": "4 days"
         },
         "undated": "{count} {count, plural, one {task has} other {tasks have}} no dates and are not shown here.",
         "doubleClick": "Double-click {scope, select, month {a day} other {an hour}} to add a task there.",
@@ -134,7 +137,16 @@
         "loading": "Loading...",
         "googleCount": "Google ({count})",
         "googleUnreachable": "Google Calendar could not be reached.",
-        "noTitle": "(no title)"
+        "noTitle": "(no title)",
+        "changeView": "Change view",
+        "showWeekends": "Show weekends",
+        "showDeclined": "Show declined events",
+        "showCompleted": "Show completed tasks",
+        "more": "+{count} more",
+        "markDone": "Mark complete",
+        "markOpen": "Mark not complete",
+        "dayCount": "{count, plural, one {# item} other {# items}}",
+        "scheduleEmpty": "Nothing scheduled in these four weeks."
     },
     "board": {
         "columnName": "Column name",

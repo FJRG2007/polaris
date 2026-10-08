@@ -178,3 +178,120 @@ describe("things happening at the same time", () => {
         expect(placed.map((item) => item.lane)).toEqual([0, 1, 0]);
     });
 });
+
+describe("the scopes Google offers beside these", () => {
+    it("answers each of Google's keys with its scope, in either case, and nothing else", () => {
+        expect(layout.scopeForKey("d")).toBe("day");
+        expect(layout.scopeForKey("W")).toBe("week");
+        expect(layout.scopeForKey("m")).toBe("month");
+        expect(layout.scopeForKey("y")).toBe("year");
+        expect(layout.scopeForKey("a")).toBe("schedule");
+        expect(layout.scopeForKey("x")).toBe("fourDays");
+        expect(layout.scopeForKey("q")).toBeNull();
+        expect(layout.scopeForKey("Enter")).toBeNull();
+    });
+
+    it("gives four days from today, paging four at a time", () => {
+        const range = layout.buildRange("fourDays", 0, 0, FORMAT, NOW);
+        expect(range.days.map((day) => day.getDate())).toEqual([5, 6, 7, 8]);
+        expect(layout.buildRange("fourDays", 1, 0, FORMAT, NOW).days[0]?.getDate()).toBe(9);
+    });
+
+    it("gives a whole calendar year, leap day included", () => {
+        const range = layout.buildRange("year", 2, 0, FORMAT, NOW);
+        expect(range.label).toBe("2028");
+        expect(range.days).toHaveLength(366);
+        expect(range.days[0]?.getMonth()).toBe(0);
+        expect(range.days[365]?.getDate()).toBe(31);
+    });
+
+    it("gives a schedule four weeks from today", () => {
+        const range = layout.buildRange("schedule", 1, 0, FORMAT, NOW);
+        expect(range.days).toHaveLength(layout.SCHEDULE_DAYS);
+        expect(range.days[0]?.getTime()).toBe(new Date(2026, 7, 5 + layout.SCHEDULE_DAYS).getTime());
+    });
+
+    it("drops Saturday and Sunday from a week and a month when weekends are hidden", () => {
+        const week = layout.buildRange("week", 0, 1, FORMAT, NOW, "en-US", false);
+        expect(week.days.map((day) => day.getDay())).toEqual([1, 2, 3, 4, 5]);
+        const month = layout.buildRange("month", 0, 0, FORMAT, NOW, "en-US", false);
+        expect(month.days.length % 5).toBe(0);
+        expect(month.days.some(layout.isWeekend)).toBe(false);
+        // A single day is shown whatever it is.
+        const saturday = layout.buildRange("day", 3, 0, FORMAT, NOW, "en-US", false);
+        expect(saturday.days[0]?.getDay()).toBe(6);
+    });
+
+    it("pages four working days across a weekend without leaving a gap", () => {
+        // Wednesday the 5th: Wed, Thu, Fri, Mon - then Tue, Wed, Thu, Fri.
+        expect(layout.workdaysFrom(NOW, 0, 4).map((day) => day.getDate())).toEqual([5, 6, 7, 10]);
+        expect(layout.workdaysFrom(NOW, 4, 4).map((day) => day.getDate())).toEqual([11, 12, 13, 14]);
+        expect(layout.workdaysFrom(NOW, -4, 4).map((day) => day.getDate())).toEqual([30, 31, 3, 4]);
+        // Starting on a Saturday begins on the Monday after.
+        expect(layout.workdaysFrom(new Date(2026, 7, 8), 0, 1)[0]?.getDate()).toBe(10);
+    });
+
+    it("lays a year's month out in whole weeks from the account's first day", () => {
+        // August 2026 begins on a Saturday.
+        const weeks = layout.monthWeeks(2026, 7, 0);
+        expect(weeks[0]?.slice(0, 6).every((cell) => cell === null)).toBe(true);
+        expect(weeks[0]?.[6]?.getDate()).toBe(1);
+        expect(weeks.flat().filter(Boolean)).toHaveLength(31);
+        expect(weeks.every((week) => week.length === 7)).toBe(true);
+        expect(layout.monthWeeks(2026, 7, 6)[0]?.[0]?.getDate()).toBe(1);
+    });
+});
+
+describe("how much a month cell shows", () => {
+    const line = layout.CHIP_HEIGHT + layout.CHIP_GAP;
+
+    it("shows everything that fits, with no '+N more' when nothing is left over", () => {
+        expect(layout.chipsThatFit(line * 6, 6)).toBe(6);
+        expect(layout.chipsThatFit(line * 10, 3)).toBe(3);
+    });
+
+    it("gives one line up to the count when the rest does not fit", () => {
+        expect(layout.chipsThatFit(line * 3, 7)).toBe(2);
+        expect(layout.chipsThatFit(layout.CHIP_HEIGHT, 2)).toBe(0);
+    });
+
+    it("draws a few before anything has measured the cell", () => {
+        expect(layout.chipsThatFit(0, 2)).toBe(2);
+        expect(layout.chipsThatFit(0, 9)).toBe(3);
+    });
+});
+
+describe("ticking a task off from the calendar", () => {
+    const statuses = [
+        { id: "todo", type: "open" as const },
+        { id: "doing", type: "active" as const },
+        { id: "done", type: "done" as const },
+        { id: "dropped", type: "closed" as const }
+    ];
+
+    it("moves unfinished work to done, and finished work back to where it starts", () => {
+        expect(layout.completionTarget({ statusId: "doing", statusType: "active" }, statuses)).toBe("done");
+        expect(layout.completionTarget({ statusId: "done", statusType: "done" }, statuses)).toBe("todo");
+        expect(layout.completionTarget({ statusId: "dropped", statusType: "closed" }, statuses)).toBe("todo");
+    });
+
+    it("offers nothing for a task from a space whose statuses the screen does not hold", () => {
+        expect(layout.completionTarget({ statusId: "elsewhere", statusType: "open" }, statuses)).toBeNull();
+        expect(layout.completionTarget({ statusId: null, statusType: "open" }, statuses)).toBeNull();
+        expect(layout.completionTarget({ statusId: "todo", statusType: "open" }, statuses.slice(0, 1))).toBeNull();
+    });
+
+    it("draws a finished task and a declined event struck through, and hides them on request", () => {
+        const finished = layout.taskEntry(task({ dueDate: NOW.toISOString(), statusType: "done" }));
+        const declined = layout.googleEntry(event({ declined: true }));
+        const accepted = layout.googleEntry(event({ id: "other" }));
+        expect(finished?.settled).toBe(true);
+        expect(declined.settled).toBe(true);
+        expect(accepted.settled).toBe(false);
+        const hideAll = { showWeekends: true, showDeclined: false, showCompleted: false };
+        expect(layout.isShown(finished as layout.CalendarEntry, hideAll)).toBe(false);
+        expect(layout.isShown(declined, hideAll)).toBe(false);
+        expect(layout.isShown(accepted, hideAll)).toBe(true);
+        expect(layout.isShown(finished as layout.CalendarEntry, layout.DEFAULT_OPTIONS)).toBe(true);
+    });
+});

@@ -101,10 +101,10 @@ function props(rows: TaskRow[]): ViewProps {
     };
 }
 
-function render(rows: TaskRow[], preferences: DisplayPreferences): string {
+function render(rows: TaskRow[], preferences: DisplayPreferences, context: SpaceContext = CONTEXT): string {
     return renderToStaticMarkup(withMessages(
         <DisplayFormatProvider preferences={preferences}>
-            <CalendarView {...props(rows)} />
+            <CalendarView {...props(rows)} context={context} />
         </DisplayFormatProvider>
     ));
 }
@@ -141,12 +141,28 @@ describe("the calendar grid", () => {
         ]);
     });
 
-    it("offers all three scopes and draws a task due this month", () => {
+    it("names the scope on the view picker and draws a task due this month", () => {
         const today = new Date();
         const due = new Date(today.getFullYear(), today.getMonth(), 15, 10, 0).toISOString();
         const markup = render([taskRow({ dueDate: due })], DISPLAY_DEFAULTS);
         expect(markup).toContain("Review the quarter");
-        for (const scope of ["Day", "Week", "Month"]) expect(markup).toContain(`>${scope}<`);
+        expect(markup).toContain('aria-label="Change view"');
+        expect(markup).toMatch(/>Month<svg/);
+    });
+
+    it("draws a done task with a check that reopens it, struck through", () => {
+        const today = new Date();
+        const due = new Date(today.getFullYear(), today.getMonth(), 15).toISOString();
+        const markup = render([taskRow({ dueDate: due, statusId: "st2", statusType: "done" })], DISPLAY_DEFAULTS, {
+            ...CONTEXT,
+            statuses: [
+                { id: "st1", name: "Open", type: "open", color: "#64748b", order: 0 },
+                { id: "st2", name: "Done", type: "done", color: "#22c55e", order: 1 }
+            ]
+        });
+        expect(markup).toContain('aria-label="Mark not complete"');
+        expect(markup).toContain("lucide-circle-check");
+        expect(markup).toMatch(/line-through[^>]*>Review the quarter</);
     });
 
     it("says how many tasks it could not place rather than inventing a day for them", () => {
