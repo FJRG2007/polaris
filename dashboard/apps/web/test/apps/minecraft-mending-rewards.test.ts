@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import * as mending from "@polaris-app/game-servers/src/lib/minecraft/mending";
 import { parseInventory } from "@polaris-app/game-servers/src/lib/minecraft/inventory";
 import { deliver, mendedOf } from "@polaris-app/game-servers/src/lib/minecraft/delivery";
+import { mendedWith } from "@polaris-app/game-servers/src/lib/minecraft/events/messages";
 
 /** A stack as a 1.20.5-1.21.4 server writes it, with Mending and some wear. */
 function worn(slot: number, id: string, damage: number, mended = true): string {
@@ -89,7 +90,10 @@ describe("experience a prize pays, spent on Mending gear first", () => {
         expect(mending.pointsFor(0, 5)).toBe(55);
         expect(mending.pointsFor(30, 1)).toBe(112);
         expect(mending.levelsFor(0, 55)).toBe(5);
-        expect(mending.levelsFor(0, 54)).toBe(4);
+        expect(mending.levelsFor(0, 54)).toBe(5);
+        expect(mending.levelsFor(0, 40)).toBe(4);
+        expect(mending.levelsFor(0, 41)).toBe(5);
+        expect(mending.levelsFor(0, 0)).toBe(0);
     });
 
     it("finds only damaged items that carry Mending, in either enchantment layout", () => {
@@ -141,7 +145,7 @@ describe("experience a prize pays, spent on Mending gear first", () => {
         expect(sent).toContain("xp add Ana 5 points");
         expect(sent).not.toContain("xp add Ana 5 levels");
         expect(handed.left).toBeNull();
-        expect(mendedOf(handed.delivery)).toEqual({ count: 1, points: 50 });
+        expect(mendedOf(handed.delivery)).toEqual({ count: 1, points: 50, rest: 5 });
         expect(state.level).toBe(0);
         expect(state.points).toBe(5);
     });
@@ -157,7 +161,7 @@ describe("experience a prize pays, spent on Mending gear first", () => {
         expect(sent.some((line) => line.startsWith("xp add"))).toBe(false);
         expect(handed.left).toBeNull();
         expect(handed.delivery.levels).toBe(0);
-        expect(mendedOf(handed.delivery)).toEqual({ count: 1, points });
+        expect(mendedOf(handed.delivery)).toEqual({ count: 1, points, rest: 0 });
     });
 
     it("pays the levels as before when nothing needs repairing", async () => {
@@ -196,8 +200,32 @@ describe("experience a prize pays, spent on Mending gear first", () => {
         const offline = async (line: string) =>
             line.startsWith("xp add") ? "No player was found" : say(line);
         const handed = await deliver(offline, "Ana", { items: [], levels: 5 });
-        // 10 of the 55 points mended the sword; 45 buy 4 whole levels from 0.
+        // 10 of the 55 points mended the sword; 45 need 5 whole levels from 0.
         expect(state.stacks[0]!.damage).toBe(0);
-        expect(handed.left).toEqual({ items: [], levels: 4 });
+        expect(handed.left).toEqual({ items: [], levels: 5 });
+    });
+
+    it("never pays the levels too when the bag cannot be read again after a repair", async () => {
+        const { say, sent, state } = game([
+            { slot: 0, id: "minecraft:diamond_sword", damage: 100 }
+        ]);
+        let repaired = false;
+        const blind = async (line: string) => {
+            if (line.startsWith("execute if items")) repaired = true;
+            if (repaired && line === "data get entity Ana Inventory") return "Unknown command";
+            return say(line);
+        };
+        const handed = await deliver(blind, "Ana", { items: [], levels: 5 });
+        expect(state.stacks[0]!.damage).toBe(0);
+        expect(sent).not.toContain("xp add Ana 5 levels");
+        expect(sent).toContain("xp add Ana 5 points");
+        expect(mendedOf(handed.delivery)).toEqual({ count: 1, points: 50, rest: 5 });
+    });
+
+    it("says the rest goes on the bar only when some did", () => {
+        expect(mendedWith(1, 50, true, "en")).toContain("The rest goes on your bar.");
+        expect(mendedWith(1, 50, false, "en")).not.toContain("bar");
+        expect(mendedWith(1, 50, true, "es")).toContain("El resto va a tu barra.");
+        expect(mendedWith(1, 50, false, "es")).not.toContain("barra");
     });
 });

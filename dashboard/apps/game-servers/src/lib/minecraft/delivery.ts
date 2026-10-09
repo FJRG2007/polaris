@@ -48,6 +48,8 @@ export interface Delivery {
     readonly levels: number;
     /** What the experience repaired before the rest went on the bar. */
     readonly mended?: readonly MendedItem[];
+    /** Points of the experience left for the bar once the repairs were paid. */
+    readonly rest?: number;
 }
 
 export interface Handed {
@@ -135,10 +137,12 @@ export async function deliver(
     let levels = 0;
     let levelsLeft = 0;
     let mended: MendedItem[] = [];
+    let rest = 0;
     if (reward.levels > 0) {
         const before = readLevel(await say(levelLine(name)));
         const repaired = before === null ? null : await mend(say, name, before, reward.levels);
         mended = repaired?.mended ?? [];
+        rest = repaired?.left ?? 0;
         // The rest of the experience on the bar: the levels whole when nothing
         // was repaired, the points left when something was.
         const line = repaired
@@ -156,12 +160,14 @@ export async function deliver(
                       : reward.levels;
         } else {
             // Repaired already, only the rest is still owed: as the whole
-            // levels it buys, never more than the prize was.
-            levelsLeft = repaired ? mending.levelsFor(before!, repaired.left) : reward.levels;
+            // levels that cover it, never more than the prize was.
+            levelsLeft = repaired
+                ? Math.min(reward.levels, mending.levelsFor(before!, repaired.left))
+                : reward.levels;
         }
     }
     return {
-        delivery: { items, levels, ...(mended.length > 0 ? { mended } : {}) },
+        delivery: { items, levels, ...(mended.length > 0 ? { mended, rest } : {}) },
         left: left.length === 0 && levelsLeft === 0 ? null : { items: left, levels: levelsLeft }
     };
 }
@@ -171,6 +177,8 @@ export async function deliver(
  * worn Mending gear (`mending`). Null when nothing was repaired - nothing
  * worn, an older server, a bag that could not be read - so the levels are
  * paid as they were; otherwise what was repaired and the points still owed.
+ * A bag that cannot be read again once the repairs were sent is taken as
+ * every one of them landed, so the experience they took is never paid twice.
  */
 async function mend(
     say: (line: string) => Promise<string>,
@@ -190,7 +198,13 @@ async function mend(
     if (repairs.length === 0) return null;
     for (const repair of repairs) await say(mending.repairLine(name, repair));
     const after = await read();
-    if (!after) return null;
+    if (!after) {
+        const taken = repairs.reduce((sum, repair) => sum + repair.points, 0);
+        return {
+            mended: repairs.map((repair) => ({ id: repair.id, points: repair.points })),
+            left: Math.max(0, points - taken)
+        };
+    }
     const mended = repairs.flatMap((repair) => {
         const taken = mending.pointsTaken([repair], after);
         return taken > 0 ? [{ id: repair.id, points: taken }] : [];
@@ -201,10 +215,16 @@ async function mend(
 }
 
 /** Everything a delivery repaired, and the experience it took. */
-export function mendedOf(delivery: Delivery): { count: number; points: number } | null {
+export function mendedOf(
+    delivery: Delivery
+): { count: number; points: number; rest: number } | null {
     const mended = delivery.mended ?? [];
     if (mended.length === 0) return null;
-    return { count: mended.length, points: mended.reduce((sum, one) => sum + one.points, 0) };
+    return {
+        count: mended.length,
+        points: mended.reduce((sum, one) => sum + one.points, 0),
+        rest: delivery.rest ?? 0
+    };
 }
 
 /** Everything of a delivery that fell at the player's feet. */

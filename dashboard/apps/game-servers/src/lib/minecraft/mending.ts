@@ -45,11 +45,11 @@ export function pointsFor(level: number, levels: number): number {
     return total;
 }
 
-/** The most whole levels `points` buy from `level`. */
+/** The fewest whole levels from `level` worth at least `points`. */
 export function levelsFor(level: number, points: number): number {
     let levels = 0;
     let left = points;
-    while (left >= pointsToNext(level + levels)) {
+    while (left > 0) {
         left -= pointsToNext(level + levels);
         levels += 1;
     }

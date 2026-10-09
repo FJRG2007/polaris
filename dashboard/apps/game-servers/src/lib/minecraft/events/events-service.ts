@@ -4906,7 +4906,7 @@ async function give(
         told.push(
             `tellraw ${name} ${commands.text(
                 messages.tag(speech.EVERY) +
-                    messages.mendedWith(mended.count, mended.points, speech.EVERY)
+                    messages.mendedWith(mended.count, mended.points, mended.rest > 0, speech.EVERY)
             )}`
         );
     if (told.length > 0) await server.sayAll(told);
