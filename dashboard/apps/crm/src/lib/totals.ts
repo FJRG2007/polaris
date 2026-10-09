@@ -5,7 +5,7 @@
  * Server-only.
  */
 
-import { listWhere } from "./query";
+import { listWhere, type ListScope } from "./query";
 import { requireCan, type CrmActor } from "./access";
 import { aggregatesFor, type Aggregate } from "../model/views";
 import { columnOf, dayText, table, type ColumnSpec } from "./columns";
@@ -179,7 +179,7 @@ export async function computeTotals(
     actor: CrmActor,
     object: CrmObject,
     asked: readonly { readonly key: string; readonly aggregate: Aggregate }[],
-    options: { readonly search?: string; readonly deleted?: boolean }
+    options: Omit<ListScope, "group">
 ): Promise<Total[]> {
     await requireCan(actor, object, "read");
     const where = listWhere(object, actor.shelf, options);

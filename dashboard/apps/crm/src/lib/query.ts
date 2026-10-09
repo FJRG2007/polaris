@@ -1,6 +1,7 @@
 /**
  * How a list of records is narrowed and ordered in the database: the shelf, the
- * trash, the search box and the sorts, as one Prisma `where` and `orderBy`.
+ * trash, the search box, the view's filter, one group of a grouped list and the
+ * sorts, as one Prisma `where` and `orderBy`.
  *
  * Nothing here filters or sorts in memory - a table of fifty thousand people is
  * paged by the database, the same `where` its totals are counted over.
@@ -9,17 +10,11 @@
  */
 
 import type { ViewSort } from "../model/views";
+import { contains, filterWhere } from "./filters";
+import type { ViewFilter } from "../model/filters";
 import { shelfWhere, type Shelf } from "./access";
 import type { CrmObject } from "../model/objects";
 import { columnOf, type ColumnSpec } from "./columns";
-
-/** Case-insensitive `contains`. SQLite has no `mode` and its LIKE already
- *  ignores ASCII case; Postgres needs to be asked. */
-export function contains(term: string): { contains: string; mode?: "insensitive" } {
-    return process.env.POLARIS_DB_PROVIDER === "sqlite"
-        ? { contains: term }
-        : { contains: term, mode: "insensitive" };
-}
 
 /** The text columns the search box looks in, per kind of record. */
 const SEARCHED: Readonly<Record<CrmObject, readonly string[]>> = {
@@ -45,17 +40,44 @@ export function searchWhere(object: CrmObject, search: string): Record<string, u
     };
 }
 
-/** The rows a list reads: this shelf, in or out of the trash, matching the search. */
+/** One group of a grouped list or one column of a board: the records whose
+ *  field holds this choice. */
+export interface GroupScope {
+    readonly key: string;
+    readonly value: string;
+}
+
+export interface ListScope {
+    readonly search?: string;
+    readonly deleted?: boolean;
+    readonly filter?: ViewFilter;
+    readonly group?: GroupScope;
+}
+
+/** The rows a list reads: this shelf, in or out of the trash, matching the
+ *  search and the filter, in one group when it is grouped. */
 export function listWhere(
     object: CrmObject,
     shelf: Shelf,
-    options: { readonly search?: string; readonly deleted?: boolean }
+    options: ListScope
 ): Record<string, unknown> {
+    const narrowed = [
+        searchWhere(object, options.search ?? ""),
+        options.filter ? filterWhere(object, options.filter) : {},
+        options.group ? groupWhere(object, options.group) : {}
+    ].filter((part) => Object.keys(part).length > 0);
     return {
         ...shelfWhere(shelf),
         deletedAt: options.deleted ? { not: null } : null,
-        ...searchWhere(object, options.search ?? "")
+        ...(narrowed.length > 0 ? { AND: narrowed } : {})
     };
+}
+
+/** The records of one group. */
+export function groupWhere(object: CrmObject, group: GroupScope): Record<string, unknown> {
+    const spec = columnOf(object, group.key);
+    if (spec.type !== "scalar") throw new Error(`crm: ${object} cannot group by ${group.key}`);
+    return { [spec.column]: group.value };
 }
 
 /** Columns that may hold null, so a sort puts their empty rows last. */
@@ -91,13 +113,18 @@ function sortOrder(spec: ColumnSpec, direction: "asc" | "desc"): Record<string, 
  * The order a list is read in: the view's sorts, then newest first, then the
  * id - so two rows that tie on everything still come back in one order and a
  * page boundary never shows a row twice.
+ *
+ * A board with no sorts is read in the order its cards were put in
+ * (`byPosition`), so a card dragged between two others stays there.
  */
 export function listOrder(
     object: CrmObject,
-    sorts: readonly ViewSort[]
+    sorts: readonly ViewSort[],
+    byPosition = false
 ): Record<string, unknown>[] {
     return [
         ...sorts.flatMap((sort) => sortOrder(columnOf(object, sort.key), sort.direction)),
+        ...(byPosition && sorts.length === 0 ? [{ position: "asc" }] : []),
         { createdAt: "desc" },
         { id: "desc" }
     ];

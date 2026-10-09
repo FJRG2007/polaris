@@ -13,6 +13,7 @@ import { unwrap } from "./call";
 import { useCrmT } from "./i18n";
 import * as actions from "../actions/records";
 import type { ViewSort } from "../model/views";
+import type { ViewFilter } from "../model/filters";
 import { hostUi } from "@polaris/app-host/client";
 import type { CrmObject, CrmRecord, FieldValue } from "../model/objects";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -20,14 +21,14 @@ import { useCallback, useEffect, useRef, useState } from "react";
 /** What the tab keeps of a list: its first page. */
 const KEPT_ROWS = 50;
 
-export interface RecordsState {
-    /** Null until there is something to show. */
+/** What every way of holding a list's rows offers the screen that edits them,
+ *  flat or in groups. */
+export interface RowStore {
+    /** Null until there is something to show; every row on screen, in order. */
     readonly rows: readonly CrmRecord[] | null;
+    /** How many rows match, across every page (and every group). */
     readonly total: number;
     readonly error: string | null;
-    /** A page after the first is on its way. */
-    readonly loadingMore: boolean;
-    readonly loadMore: () => void;
     /** Put records on screen as given - an optimistic change, its answer or its
      *  rollback. Records not on screen are ignored. */
     readonly put: (records: readonly CrmRecord[]) => void;
@@ -40,10 +41,17 @@ export interface RecordsState {
     readonly prepend: (record: CrmRecord) => void;
     /** Take records off screen (moved to the trash). */
     readonly drop: (ids: readonly string[]) => void;
-    /** Put records back where they were, after a refused removal. */
-    readonly restore: (rows: readonly CrmRecord[], total: number) => void;
+    /** What is on screen now, to hand back to `restore` after a refused change. */
+    readonly snapshot: () => unknown;
+    readonly restore: (snapshot: unknown) => void;
     /** Read the first page again. */
     readonly refresh: () => void;
+}
+
+export interface RecordsState extends RowStore {
+    /** A page after the first is on its way. */
+    readonly loadingMore: boolean;
+    readonly loadMore: () => void;
 }
 
 interface Listing {
@@ -56,6 +64,8 @@ export function useRecords(
     query: {
         readonly search: string;
         readonly sorts: readonly ViewSort[];
+        /** Only its whole rules: a rule being typed does not read the list. */
+        readonly filter: ViewFilter;
         /** Off until the view the sorts come from is known, so the list is not
          *  read once unsorted and again sorted. What the tab kept still paints. */
         readonly enabled?: boolean;
@@ -63,7 +73,8 @@ export function useRecords(
 ): RecordsState {
     const t = useCrmT();
     const sortsKey = query.sorts.map((sort) => `${sort.key}.${sort.direction}`).join(",");
-    const key = `crm:list:${object}:${sortsKey}:${query.search}`;
+    const filterKey = JSON.stringify(query.filter);
+    const key = `crm:list:${object}:${sortsKey}:${filterKey}:${query.search}`;
     const load = useCallback(
         async () =>
             unwrap(
@@ -72,14 +83,15 @@ export function useRecords(
                         object,
                         search: query.search,
                         sorts: query.sorts,
+                        filter: query.filter,
                         offset: 0
                     }),
                 t("errors.loadFailed")
             ).then(({ records, total }) => ({ records, total })),
-        // The sorts are read through their key: a new array with the same
-        // sorts is the same read.
+        // The sorts and the filter are read through their keys: a new array
+        // with the same sorts is the same read.
         // eslint-disable-next-line react-hooks/exhaustive-deps
-        [object, query.search, sortsKey, t]
+        [object, query.search, sortsKey, filterKey, t]
     );
     const first = hostUi.liveRead.useLiveRead({
         cacheKey: key,
@@ -134,6 +146,7 @@ export function useRecords(
                     object,
                     search: query.search,
                     sorts: query.sorts,
+                    filter: query.filter,
                     offset: listed.rows.length
                 }),
             t("errors.loadFailed")
@@ -151,7 +164,7 @@ export function useRecords(
             })
             .catch(() => undefined)
             .finally(() => setLoadingMore(false));
-    }, [loadingMore, key, object, query.search, query.sorts, t]);
+    }, [loadingMore, key, object, query.search, query.sorts, query.filter, t]);
 
     const put = useCallback(
         (records: readonly CrmRecord[]) => {
@@ -204,8 +217,11 @@ export function useRecords(
         [commit]
     );
 
+    const snapshot = useCallback(() => current.current, []);
     const restore = useCallback(
-        (rows: readonly CrmRecord[], total: number) => commit({ rows, total }),
+        (kept: unknown) => {
+            if (kept) commit(kept as Listing);
+        },
         [commit]
     );
 
@@ -220,6 +236,7 @@ export function useRecords(
         patch,
         prepend,
         drop,
+        snapshot,
         restore,
         refresh: first.refresh
     };

@@ -2,11 +2,11 @@
     "objects": {
         "companies": {
             "plural": "Companies",
-            "new": "New company"
+            "new": "Add customer or partner"
         },
         "people": {
             "plural": "People",
-            "new": "New person"
+            "new": "New contact"
         },
         "opportunities": {
             "plural": "Opportunities",
@@ -172,26 +172,31 @@
     },
     "empty": {
         "companies": {
-            "title": "No companies yet",
-            "body": "Add the companies you sell to or work with."
+            "title": "No companies tracked yet",
+            "body": "Add the customers, suppliers and partners you work with.",
+            "bodyOrg": "Add the companies {org} sells to, buys from or partners with. {org} itself is the workspace, not a record here."
         },
         "people": {
-            "title": "No people yet",
-            "body": "Add the people you talk to at those companies."
+            "title": "No contacts yet",
+            "body": "Add your contacts at the companies you work with.",
+            "bodyOrg": "Add the people {org} talks to at those companies. {org}'s own members are not records here."
         },
         "opportunities": {
             "title": "No opportunities yet",
-            "body": "Add a deal to follow it from first contact to customer."
+            "body": "Add a deal to follow it from first contact to customer.",
+            "bodyOrg": "Add a deal {org} is working on to follow it from first contact to customer."
         },
         "noMatches": "Nothing matches \"{search}\"",
         "forbiddenTitle": "Your role cannot see this list",
-        "forbiddenBody": "An organization admin can give your role access in the organization's roles."
+        "forbiddenBody": "An organization admin can give your role access in the organization's roles.",
+        "filtered": "No records match these filters"
     },
     "actions": {
         "cancel": "Cancel",
         "clear": "Clear",
         "clearSearch": "Clear search",
-        "retry": "Try again"
+        "retry": "Try again",
+        "clearFilters": "Clear filters"
     },
     "errors": {
         "generic": "Something went wrong. Try again.",
@@ -205,6 +210,104 @@
         "notSaved": "The change was not saved",
         "notCreated": "The record was not created",
         "notTrashed": "Nothing was deleted",
-        "viewNotSaved": "The columns were not saved"
+        "viewNotSaved": "The view was not saved",
+        "viewNameTaken": "A view with this name already exists.",
+        "viewName": "Give the view a name of up to {length} characters.",
+        "viewDefault": "The default view cannot be renamed or deleted.",
+        "viewLimit": "This list already has {max} views. Delete one first.",
+        "viewNotRenamed": "The view was not renamed",
+        "viewNotDeleted": "The view was not deleted",
+        "notMoved": "The card was not moved"
+    },
+    "views": {
+        "title": "Views",
+        "picker": "Choose a view",
+        "default": "Default view",
+        "create": "New view",
+        "createTitle": "Save as a new view",
+        "createButton": "Create view",
+        "rename": "Rename view",
+        "renameTitle": "Rename view",
+        "save": "Save",
+        "delete": "Delete view",
+        "deleteTitle": "Delete \"{name}\"?",
+        "deleteDescription": "Everyone here loses this view. The records stay as they are.",
+        "created": "View \"{name}\" created.",
+        "deleted": "View \"{name}\" deleted.",
+        "name": "Name",
+        "namePlaceholder": "Open deals this quarter",
+        "nameTaken": "A view with this name already exists.",
+        "layout": "Layout",
+        "kinds": {
+            "table": "Table",
+            "kanban": "Board"
+        },
+        "noBoard": "A board needs a field with fixed choices, like a stage."
+    },
+    "board": {
+        "label": "Board by {field}",
+        "add": "Add to {column}",
+        "more": "{count, plural, one {Show # more} other {Show # more}}",
+        "moveCard": "Move {name}",
+        "moveTo": "Move to"
+    },
+    "filters": {
+        "button": "Filter",
+        "title": "Filters",
+        "description": "Only the records that match are listed and counted.",
+        "empty": "No filters yet. Add one to narrow the list.",
+        "showWhere": "Show records matching",
+        "groupWhere": "This group matches",
+        "matchLabel": "How the rules combine",
+        "match": {
+            "and": "all of these",
+            "or": "any of these"
+        },
+        "field": "Field",
+        "operator": "Condition",
+        "value": "Value",
+        "choose": "Choose",
+        "textPlaceholder": "Text",
+        "numberPlaceholder": "Number",
+        "addRule": "Add filter",
+        "addGroup": "Add group",
+        "removeRule": "Remove filter",
+        "removeGroup": "Remove group",
+        "clearAll": "Clear all",
+        "done": "Done",
+        "full": "Up to {max} filters.",
+        "operators": {
+            "contains": "contains",
+            "notContains": "does not contain",
+            "is": "is",
+            "greaterThan": "greater than",
+            "lessThan": "less than",
+            "before": "before",
+            "after": "after",
+            "isAnyOf": "is any of",
+            "isNoneOf": "is none of",
+            "isTrue": "is yes",
+            "isFalse": "is no",
+            "isEmpty": "is empty",
+            "isNotEmpty": "is not empty"
+        }
+    },
+    "sorts": {
+        "button": "Sort",
+        "current": "Sorted by",
+        "add": "Add a sort",
+        "full": "Up to {max} sorts",
+        "clear": "Remove all sorts",
+        "asc": "Ascending",
+        "desc": "Descending"
+    },
+    "groups": {
+        "button": "Group",
+        "buttonField": "Group: {field}",
+        "columnsField": "Columns: {field}",
+        "by": "Group by",
+        "columnsBy": "Columns by",
+        "none": "No grouping",
+        "unavailable": "Nothing here has fixed choices to group by."
     }
 }

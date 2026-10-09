@@ -11,11 +11,12 @@
 import { crmT } from "./i18n";
 import { CrmRefusal } from "./errors";
 import { host } from "@polaris/app-host";
-import { listOrder, listWhere, searchWhere } from "./query";
+import { listOrder, listWhere, searchWhere, type ListScope } from "./query";
 import { normalizeInput, type InputValue } from "../model/values";
 import { requireCan, shelfData, shelfWhere, type CrmActor } from "./access";
 import { recordSelect, table, toRecord, writable, writeData } from "./columns";
 import {
+    fieldOf,
     primaryField,
     recordName,
     type CrmObject,
@@ -23,7 +24,7 @@ import {
     type FieldDef,
     type Ref
 } from "../model/objects";
-import type { ViewSort } from "../model/views";
+import { groupable, type ViewSort } from "../model/views";
 
 /** The most rows one page of a list returns. */
 export const PAGE_SIZE = 50;
@@ -37,24 +38,27 @@ export interface RecordPage {
     readonly total: number;
 }
 
+export interface ListOptions extends ListScope {
+    readonly sorts?: readonly ViewSort[];
+    /** A board's order: where its cards were put, when it has no sorts. */
+    readonly byPosition?: boolean;
+    readonly offset?: number;
+    readonly limit?: number;
+}
+
 /** One page of a list. */
 export async function listRecords(
     actor: CrmActor,
     object: CrmObject,
-    options: {
-        readonly search?: string;
-        readonly sorts?: readonly ViewSort[];
-        readonly deleted?: boolean;
-        readonly offset?: number;
-        readonly limit?: number;
-    }
+    options: ListOptions
 ): Promise<RecordPage> {
     await requireCan(actor, object, "read");
+    if (options.group) requireGroupable(object, options.group.key);
     const where = listWhere(object, actor.shelf, options);
     const [rows, total] = await Promise.all([
         table(object).findMany({
             where,
-            orderBy: listOrder(object, options.sorts ?? []),
+            orderBy: listOrder(object, options.sorts ?? [], options.byPosition),
             skip: Math.max(0, options.offset ?? 0),
             take: Math.min(Math.max(1, options.limit ?? PAGE_SIZE), PAGE_SIZE),
             select: recordSelect(object)
@@ -65,6 +69,93 @@ export async function listRecords(
         records: (rows as Record<string, unknown>[]).map((row) => toRecord(object, row)),
         total
     };
+}
+
+function requireGroupable(object: CrmObject, key: string): FieldDef {
+    const field = fieldOf(object, key);
+    if (!field || !groupable(field)) throw new Error(`crm: ${object} cannot group by ${key}`);
+    return field;
+}
+
+/** One group of a grouped list, or one column of a board: its first page. */
+export interface RecordGroup extends RecordPage {
+    readonly value: string;
+}
+
+/**
+ * The first page of every group of a list grouped by a field - one per choice
+ * of the field, in the field's order, the empty ones too, so a board draws
+ * every column. Read one group after the other: a board must not take a
+ * connection per column.
+ */
+export async function listGroups(
+    actor: CrmActor,
+    object: CrmObject,
+    key: string,
+    options: Omit<ListOptions, "group" | "offset" | "limit">
+): Promise<RecordGroup[]> {
+    await requireCan(actor, object, "read");
+    const field = requireGroupable(object, key);
+    const groups: RecordGroup[] = [];
+    for (const value of field.options ?? []) {
+        const page = await listRecords(actor, object, { ...options, group: { key, value } });
+        groups.push({ value, ...page });
+    }
+    return groups;
+}
+
+/**
+ * Put a record in another group, or another place in its group: the field
+ * takes the group's choice and the record takes the place it was dropped at.
+ */
+export async function moveRecord(
+    actor: CrmActor,
+    object: CrmObject,
+    id: string,
+    move: {
+        readonly key: string;
+        readonly value: string;
+        readonly position: number;
+        readonly last?: boolean;
+    }
+): Promise<CrmRecord> {
+    await requireCan(actor, object, "edit");
+    requireGroupable(object, move.key);
+    const data = await prepare(actor, object, { [move.key]: move.value });
+    const where = { id, ...shelfWhere(actor.shelf), deletedAt: null };
+    const position = move.last ? await pastLast(actor, object, id, move) : move.position;
+    const result = await table(object).updateMany({
+        where,
+        data: { ...data, position }
+    });
+    const row =
+        result.count > 0
+            ? await table(object).findFirst({ where, select: recordSelect(object) })
+            : null;
+    if (!row) {
+        const t = await crmT();
+        throw new CrmRefusal(t("errors.notFound"));
+    }
+    return toRecord(object, row as Record<string, unknown>);
+}
+
+/** A place after every other card of the group, even the ones the board has
+ *  not loaded yet. */
+async function pastLast(
+    actor: CrmActor,
+    object: CrmObject,
+    id: string,
+    move: { readonly key: string; readonly value: string; readonly position: number }
+): Promise<number> {
+    const top = (await table(object).findFirst({
+        where: {
+            ...listWhere(object, actor.shelf, { group: { key: move.key, value: move.value } }),
+            id: { not: id }
+        },
+        orderBy: { position: "desc" },
+        select: { position: true }
+    })) as { position: number } | null;
+    return top ? Math.max(move.position, top.position + 1) : move.position;
 }
 
 /** One record on the reader's shelf, or null. */

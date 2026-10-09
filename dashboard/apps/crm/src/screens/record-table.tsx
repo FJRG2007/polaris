@@ -5,6 +5,8 @@
  * under them, and the box and name columns stay put while the rest scrolls
  * sideways. A press on a cell edits it in place, a tick box chooses the row
  * (Shift chooses a run of them), and reaching the bottom asks for the next page.
+ * Grouped by a field, the rows sit in a section per choice, each folding away
+ * and asking for its own next page.
  *
  * What it changes it hands up: the screen applies it at once and undoes it if
  * the server refuses.
@@ -16,11 +18,13 @@ import { CellPicker } from "./cell-picker";
 import type { Total } from "../lib/totals";
 import { editorFor } from "./cell-editors";
 import { HeaderCell } from "./table-header";
-import { CellDisplay } from "./cell-display";
+import { ChevronRight } from "lucide-react";
+import type { RowGroup } from "./use-groups";
+import { CellDisplay, OptionChip } from "./cell-display";
 import type { InputValue } from "../model/values";
 import { cn, Checkbox, useRangeSelection } from "@polaris/ui";
 import type { Aggregate, ViewColumn, ViewSort } from "../model/views";
-import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import {
     fieldOf,
     primaryField,
@@ -67,6 +71,14 @@ export interface TableProps {
     readonly hasMore: boolean;
     readonly loadingMore: boolean;
     readonly onLoadMore: () => void;
+    /** The rows in sections, one per choice of `groupField`; `rows` is then
+     *  every row of every section, in order. */
+    readonly grouping?: {
+        readonly field: FieldDef;
+        readonly groups: readonly RowGroup[];
+        readonly loadingGroup: string | null;
+        readonly onLoadMore: (value: string) => void;
+    } | null;
 }
 
 interface Editing {
@@ -84,6 +96,8 @@ export function RecordTable(props: TableProps) {
     const { object, columns, rows, canEdit, selected, onSelect } = props;
     const t = useCrmT();
     const [editing, setEditing] = useState<Editing | null>(null);
+    const [folded, setFolded] = useState<ReadonlySet<string>>(() => new Set());
+    const grouping = props.grouping ?? null;
     const scroller = useRef<HTMLDivElement>(null);
     const sentinel = useRef<HTMLTableRowElement>(null);
     const order = useMemo(
@@ -108,7 +122,7 @@ export function RecordTable(props: TableProps) {
     const { hasMore, loadingMore, onLoadMore } = props;
     useEffect(() => {
         const end = sentinel.current;
-        if (!end || !hasMore || loadingMore) return;
+        if (!end || !hasMore || loadingMore || grouping) return;
         const watch = new IntersectionObserver(
             (entries) => {
                 if (entries.some((entry) => entry.isIntersecting)) onLoadMore();
@@ -117,7 +131,7 @@ export function RecordTable(props: TableProps) {
         );
         watch.observe(end);
         return () => watch.disconnect();
-    }, [hasMore, loadingMore, onLoadMore, rows.length]);
+    }, [hasMore, loadingMore, onLoadMore, rows.length, grouping]);
 
     const pinned = (field: FieldDef) => (field.primary ? `${BOX_WIDTH}px` : undefined);
 
@@ -212,6 +226,42 @@ export function RecordTable(props: TableProps) {
         );
     };
 
+    const row = (record: CrmRecord) => {
+        const chosen = selected.includes(record.id);
+        const pending = record.id.startsWith("draft:");
+        return (
+            <tr
+                key={record.id}
+                aria-selected={chosen}
+                className={cn(
+                    "group/row hover:bg-card-hover",
+                    chosen && "bg-primary/5",
+                    pending && "pointer-events-none opacity-60"
+                )}
+            >
+                <td className="sticky left-0 z-[5] h-9 border-b border-r border-border bg-card p-0 group-hover/row:bg-card-hover">
+                    <span className="flex h-9 items-center justify-center">
+                        <Checkbox
+                            checked={chosen}
+                            disabled={pending}
+                            aria-label={t("selection.row")}
+                            onClick={(event) => {
+                                selection.press(record.id, {
+                                    shiftKey: event.shiftKey
+                                });
+                            }}
+                            onChange={() => undefined}
+                        />
+                    </span>
+                </td>
+                {fields.map(({ field }) => cell(record, field))}
+            </tr>
+        );
+    };
+
+    const groupLabel = (field: FieldDef, value: string) =>
+        t(`options.${object}.${field.key}.${value}` as Parameters<typeof t>[0]);
+
     const DraftEditor = props.draft ? editorFor(primary) : null;
     const totalWidth = BOX_WIDTH + fields.reduce((sum, { column }) => sum + column.width, 0);
 
@@ -287,38 +337,76 @@ export function RecordTable(props: TableProps) {
                             />
                         </tr>
                     ) : null}
-                    {rows.map((record) => {
-                        const chosen = selected.includes(record.id);
-                        const pending = record.id.startsWith("draft:");
-                        return (
-                            <tr
-                                key={record.id}
-                                aria-selected={chosen}
-                                className={cn(
-                                    "group/row hover:bg-card-hover",
-                                    chosen && "bg-primary/5",
-                                    pending && "pointer-events-none opacity-60"
-                                )}
-                            >
-                                <td className="sticky left-0 z-[5] h-9 border-b border-r border-border bg-card p-0 group-hover/row:bg-card-hover">
-                                    <span className="flex h-9 items-center justify-center">
-                                        <Checkbox
-                                            checked={chosen}
-                                            disabled={pending}
-                                            aria-label={t("selection.row")}
-                                            onClick={(event) => {
-                                                selection.press(record.id, {
-                                                    shiftKey: event.shiftKey
-                                                });
-                                            }}
-                                            onChange={() => undefined}
-                                        />
-                                    </span>
-                                </td>
-                                {fields.map(({ field }) => cell(record, field))}
-                            </tr>
-                        );
-                    })}
+                    {grouping
+                        ? grouping.groups.map((group) => {
+                              const closed = folded.has(group.value);
+                              const label = groupLabel(grouping.field, group.value);
+                              return (
+                                  <Fragment key={group.value}>
+                                      <tr>
+                                          <td
+                                              colSpan={fields.length + 1}
+                                              className="h-9 border-b border-border bg-muted/40 p-0"
+                                          >
+                                              <button
+                                                  type="button"
+                                                  aria-expanded={!closed}
+                                                  onClick={() =>
+                                                      setFolded((current) => {
+                                                          const next = new Set(current);
+                                                          if (closed) next.delete(group.value);
+                                                          else next.add(group.value);
+                                                          return next;
+                                                      })
+                                                  }
+                                                  className="sticky left-0 flex h-9 max-w-[min(100%,24rem)] items-center gap-2 px-2.5 text-[0.8125rem]"
+                                              >
+                                                  <ChevronRight
+                                                      className={cn(
+                                                          "size-3.5 shrink-0 text-muted-foreground transition-transform duration-fast",
+                                                          !closed && "rotate-90"
+                                                      )}
+                                                  />
+                                                  <OptionChip
+                                                      field={grouping.field}
+                                                      option={group.value}
+                                                      label={label}
+                                                  />
+                                                  <span className="tabular-nums text-muted-foreground">
+                                                      {group.total}
+                                                  </span>
+                                              </button>
+                                          </td>
+                                      </tr>
+                                      {closed ? null : group.rows.map(row)}
+                                      {!closed && group.rows.length < group.total ? (
+                                          <tr>
+                                              <td
+                                                  colSpan={fields.length + 1}
+                                                  className="h-9 border-b border-border p-0"
+                                              >
+                                                  <button
+                                                      type="button"
+                                                      disabled={grouping.loadingGroup !== null}
+                                                      onClick={() =>
+                                                          grouping.onLoadMore(group.value)
+                                                      }
+                                                      className="sticky left-0 flex h-9 items-center px-3 text-[0.8125rem] text-muted-foreground hover:text-foreground disabled:opacity-60"
+                                                  >
+                                                      {grouping.loadingGroup === group.value
+                                                          ? t("list.loadingMore")
+                                                          : t("board.more", {
+                                                                count:
+                                                                    group.total - group.rows.length
+                                                            })}
+                                                  </button>
+                                              </td>
+                                          </tr>
+                                      ) : null}
+                                  </Fragment>
+                              );
+                          })
+                        : rows.map(row)}
                     <tr ref={sentinel} aria-hidden>
                         <td colSpan={fields.length + 1} className="h-px p-0">
                             {loadingMore ? (
