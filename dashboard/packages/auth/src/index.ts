@@ -115,6 +115,17 @@ export {
     type DeviceExchange,
     type IssuedCookie
 } from "./device-login.js";
+export {
+    MAX_DEVICE_ACCOUNTS,
+    deviceAccountRoom,
+    enrollDeviceAccount,
+    listDeviceAccounts,
+    signOutAllDeviceAccounts,
+    signOutDeviceAccount,
+    staleDeviceCookies,
+    switchDeviceAccount,
+    type DeviceAccount
+} from "./device-accounts.js";
 export { signInWithConnection, type ConnectionSignInResult } from "./connection-sign-in.js";
 export {
     verifyTotpForSession,

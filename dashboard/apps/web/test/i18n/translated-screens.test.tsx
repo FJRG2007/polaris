@@ -28,7 +28,7 @@ vi.mock("next/navigation", () => ({
 }));
 vi.mock("@/lib/auth-client", () => ({ signOut: async () => undefined }));
 vi.mock("@/components/presence-store", () => ({ usePresenceRefresh: () => () => undefined, usePresence: () => null }));
-vi.mock("@/app/(app)/account/sessions/actions", () => ({ noteSignOutAction: async () => undefined }));
+vi.mock("@/components/device-accounts", () => ({ AccountSwitcherDialog: () => null }));
 vi.mock("@/app/(app)/account/preferences/actions", () => ({
     presenceNowAction: async () => ({}),
     setPresenceAction: async () => ({}),

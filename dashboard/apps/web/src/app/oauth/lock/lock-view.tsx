@@ -45,8 +45,6 @@ export function LockView({
 
     async function onSignOut() {
         await signOut();
-        router.push("/oauth/login");
-        router.refresh();
     }
 
     return (

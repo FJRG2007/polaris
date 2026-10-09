@@ -127,8 +127,13 @@ describe("signing out", () => {
                 signOut: async () => ({ data: null })
             })
         }));
+        // Signing out is a server action now, and leaves on a full load.
+        vi.doMock("@/app/device-account-actions", () => ({ signOutAccountAction: async () => ({}) }));
+        const assign = vi.fn();
+        Object.defineProperty(window, "location", { value: { ...window.location, assign }, configurable: true });
         const { signOut } = await import("@/lib/auth-client");
         await signOut();
+        expect(assign).toHaveBeenCalledWith("/oauth/login");
 
         expect(cache.readSnapshot("mail.list.inbox", 60_000)).toBeNull();
         expect(cache.readSnapshot("drive.folder.root", 60_000)).toBeNull();

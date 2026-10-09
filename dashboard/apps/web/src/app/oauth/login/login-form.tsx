@@ -16,7 +16,9 @@ import { useTranslations } from "@/components/i18n/i18n-provider";
 import { validationMessage } from "@/components/i18n/validation-message";
 import { accountHasPasskey, emailLinkOffered, resolveIdentifier } from "./actions";
 import { pendingEnrollmentAction, type PendingEnrollment } from "@/app/oauth/enroll/actions";
-import { Button, Card, CardBody, CardHeader, CardTitle, Input, PolarisMark } from "@polaris/ui";
+import { AccountChooser } from "./account-chooser";
+import type { DeviceAccountView } from "@/app/device-account-actions";
+import { Button, Card, CardBody, CardHeader, CardTitle, Input, PolarisMark, cn } from "@polaris/ui";
 
 /** Where the last-used identifier is remembered so the field is prefilled. */
 const LAST_IDENTIFIER_KEY = "polaris:last-identifier";
@@ -75,14 +77,29 @@ export interface SignInProvider {
     name: string;
 }
 
+/** Signing in to one more account while another stays signed in. */
+export interface AddingAccount {
+    /** The account already signed in, which stays so. */
+    name: string;
+    /** Where "back" returns to. */
+    back: string;
+    /** The browser holds as many accounts as it may. */
+    full: boolean;
+}
+
 export function LoginForm({
     awaitingSetup,
-    providers
+    providers,
+    add = null,
+    chooser = []
 }: {
     awaitingSetup: boolean;
     /** The services offered as a way in. Empty on a deployment whose operator
      *  has connected none or allows none. */
     providers: SignInProvider[];
+    add?: AddingAccount | null;
+    /** Accounts still signed in on this browser, none of them active. */
+    chooser?: DeviceAccountView[];
 }) {
     const router = useRouter();
     const t = useTranslations("auth");
@@ -102,7 +119,8 @@ export function LoginForm({
     // Prefill the identifier with the one used last on this device, and explain
     // why the last session ended if it ended for a reason.
     useEffect(() => {
-        const remembered = window.localStorage.getItem(LAST_IDENTIFIER_KEY);
+        // Not when adding an account: the one used last is the one already in.
+        const remembered = add ? null : window.localStorage.getItem(LAST_IDENTIFIER_KEY);
         if (remembered) setValues((prev) => ({ ...prev, identifier: remembered }));
         setNotice(sessionNotice());
     }, []);
@@ -259,18 +277,33 @@ export function LoginForm({
             <Card className="w-full max-w-sm sm:max-w-2xl">
                 <CardHeader className="items-center">
                     <PolarisMark className="mb-1" />
-                    <CardTitle>{t("login.title")}</CardTitle>
+                    <CardTitle>{add ? t("login.addTitle") : t("login.title")}</CardTitle>
+                    {add ? (
+                        <p className="text-center text-sm text-muted-foreground">
+                            {t("login.addIntro", { name: add.name })}
+                        </p>
+                    ) : null}
                 </CardHeader>
                 {/* The QR sits beside the form from the `sm` breakpoint up, and is
                     left out below it - a phone cannot scan its own screen. */}
                 <CardBody className="grid gap-6 sm:grid-cols-2">
-                    <div>
+                    <div className="min-w-0">
+                        {chooser.length > 0 ? <AccountChooser accounts={chooser} /> : null}
+                        {add?.full ? (
+                            <p className="mb-3 rounded-md border border-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
+                                {t("login.addFull")}
+                            </p>
+                        ) : null}
                         {notice ? (
                             <p className="mb-3 rounded-md border border-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
                                 {t(notice)}
                             </p>
                         ) : null}
-                        <form onSubmit={onSubmit} noValidate className="flex flex-col gap-3">
+                        <form
+                            onSubmit={onSubmit}
+                            noValidate
+                            className={cn("flex flex-col gap-3", add?.full && "hidden")}
+                        >
                             <div className="flex flex-col gap-1">
                                 <Input
                                     placeholder={t("login.identifier")}
@@ -356,6 +389,18 @@ export function LoginForm({
                                 )
                             ) : null}
                         </form>
+                        {add ? (
+                            <p className="mt-4 text-center text-sm">
+                                {/* A full load: the page behind it is the other
+                                    account's, drawn fresh. */}
+                                <a
+                                    href={add.back}
+                                    className="underline underline-offset-2 hover:text-foreground"
+                                >
+                                    {t("login.addBack", { name: add.name })}
+                                </a>
+                            </p>
+                        ) : null}
                         <p className="mt-4 text-center text-xs text-muted-foreground">
                             <Link
                                 href="/oauth/recover"
@@ -376,7 +421,7 @@ export function LoginForm({
                             </p>
                         ) : null}
                     </div>
-                    <QrSignInPanel />
+                    {add?.full ? null : <QrSignInPanel />}
                 </CardBody>
             </Card>
         </main>

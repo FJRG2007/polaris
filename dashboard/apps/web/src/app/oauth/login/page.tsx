@@ -1,7 +1,10 @@
+import { auth } from "@/lib/auth";
+import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { hasAnyUser } from "@polaris/auth";
 import { resolveSession } from "@/lib/session";
 import { CONNECTION_PROVIDERS } from "@polaris/core";
+import { deviceAccountRoom, listDeviceAccounts } from "@polaris/auth";
 import { safeRedirect } from "./post-login-target";
 import { LoginForm, type SignInProvider } from "./login-form";
 import { connectionSignInOffered } from "@/lib/connections/oauth";
@@ -51,17 +54,42 @@ export default async function LoginPage({
     // Checked after the challenge above, which is the more specific state: a
     // session plus a live challenge is somebody deliberately signing in as
     // somebody else, and that belongs at the challenge.
+    //
+    // Unless they asked to add another account: then this screen is exactly
+    // what they came for, and the account they are signed in to stays signed in.
     const params = await searchParams;
+    const adding = params.add === "1";
     const session = await resolveSession().catch(() => null);
-    if (session) {
+    if (session && !adding) {
         redirect(safeRedirect(typeof params.redirect === "string" ? params.redirect : null));
     }
     // Where to get an account from is only worth saying while there is no way in
     // at all. Once the instance has its first account the answer is "ask whoever
     // runs it", and the setup command has stopped working anyway.
-    const [awaitingSetup, providers] = await Promise.all([
+    const [awaitingSetup, providers, onDevice] = await Promise.all([
         hasAnyUser().then((exists) => !exists),
-        signInProviders()
+        signInProviders(),
+        listDeviceAccounts(auth, new Headers(await headers())).catch(() => [])
     ]);
-    return <LoginForm awaitingSetup={awaitingSetup} providers={providers} />;
+    const add = session
+        ? {
+              name: session.name,
+              back: safeRedirect(typeof params.back === "string" ? params.back : null),
+              full: deviceAccountRoom(onDevice.length) === 0
+          }
+        : null;
+    // The accounts still signed in here, offered when none of them is active.
+    const chooser = session
+        ? []
+        : onDevice.map((account) => ({
+              id: account.sessionId,
+              userId: account.userId,
+              name: account.name,
+              email: account.email,
+              image: null,
+              active: false
+          }));
+    return (
+        <LoginForm awaitingSetup={awaitingSetup} providers={providers} add={add} chooser={chooser} />
+    );
 }

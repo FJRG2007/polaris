@@ -30,7 +30,6 @@ import type { SessionView, TrustedDeviceRow } from "@/lib/session-directory";
 import {
     decideLoginApprovalAction,
     disconnectExtensionAction,
-    noteSignOutAction,
     revokeOtherSessionsAction,
     pinCliSessionAction,
     pinExtensionAction,
@@ -219,10 +218,7 @@ export function SessionsView({
     /** Ending your own session goes through the auth client, so the cookie is
      *  dropped here too - deleting the row alone would leave a stale one. */
     async function signOutHere() {
-        await noteSignOutAction().catch(() => undefined);
         await signOut();
-        router.push("/oauth/login");
-        router.refresh();
     }
 
     async function revokeOthers() {

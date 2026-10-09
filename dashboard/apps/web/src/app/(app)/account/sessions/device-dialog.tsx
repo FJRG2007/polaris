@@ -18,7 +18,6 @@
  * says so rather than letting the grouping read as a fact.
  */
 
-import { useRouter } from "next/navigation";
 import { signOut } from "@/lib/auth-client";
 import { useConfirm } from "@/components/confirm-dialog";
 import { RelativeTime } from "@/components/relative-time";
@@ -41,7 +40,6 @@ import {
 } from "@polaris/ui";
 import {
     forgetTrustedDeviceAction,
-    noteSignOutAction,
     revokeSessionAction,
     signOutTrustedDeviceAction,
     trustedDeviceAction
@@ -67,7 +65,6 @@ export function DeviceDialog({
     /** Something was ended, so the page behind this has to be re-read. */
     onChanged: () => void;
 }) {
-    const router = useRouter();
     const format = useDisplayFormat();
     const t = useTranslations("accountSecurity");
     const [confirm, confirmElement] = useConfirm();
@@ -98,15 +95,14 @@ export function DeviceDialog({
      *  too, not only the row behind it. */
     async function leaveHere() {
         await signOut();
-        router.push("/oauth/login");
-        router.refresh();
     }
 
     async function signOutSession(session: SessionView) {
         if (session.current) {
-            // Only on this path. Signing the whole device out goes through
-            // revokeDeviceSessions, which reports the batch it ended itself.
-            await noteSignOutAction().catch(() => undefined);
+            // signOut records this one leaving. Signing the whole device out
+            // goes through revokeDeviceSessions, which reports the batch it
+            // ended itself - the session is gone by the time signOut runs there,
+            // so nothing is recorded twice.
             await leaveHere();
             return;
         }

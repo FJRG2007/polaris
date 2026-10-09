@@ -13,6 +13,7 @@
 import { requireUser } from "@/lib/session";
 import { getTranslations } from "@/lib/i18n/request";
 import { SessionsView } from "./sessions-view";
+import { DeviceAccountsCard } from "@/components/device-accounts";
 import { listVaultClients } from "@/lib/vault/devices";
 import { listCliSessions } from "@/lib/cli/sessions";
 import { listExtensionSessions } from "@/lib/extension/sessions";
@@ -54,6 +55,9 @@ export default async function SessionsPage() {
                 </h1>
                 <p className="text-sm text-muted-foreground">{t("sessions.page.intro")}</p>
             </div>
+            {/* First, because it answers the question somebody with two accounts
+                comes here with: which of them is this browser signed in to. */}
+            <DeviceAccountsCard />
             <SessionsView
                 sessions={sessions}
                 trusted={trusted}

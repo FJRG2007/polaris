@@ -19,6 +19,7 @@ import { randomUUID } from "node:crypto";
 import { loadEnv } from "@polaris/config";
 import { passkey } from "@better-auth/passkey";
 import { setSessionCookie } from "better-auth/cookies";
+import { deviceAccountsPlugin } from "./device-accounts.js";
 import { prismaAdapter } from "better-auth/adapters/prisma";
 import { betterAuth, type BetterAuthPlugin } from "better-auth";
 import { APIError, createAuthMiddleware } from "better-auth/api";
@@ -599,6 +600,10 @@ function buildPlugins(options: AuthOptions, address: string): BetterAuthPlugin[]
             }) as BetterAuthPlugin
         );
     }
+    // Last, so its hook sees the session every plugin before it settled on: a
+    // sign-in the second factor is still holding has none, and the QR flow's
+    // cookie is only set by its own hook.
+    plugins.push(deviceAccountsPlugin());
     return plugins;
 }
 

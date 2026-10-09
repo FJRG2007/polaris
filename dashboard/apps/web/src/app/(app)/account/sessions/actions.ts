@@ -17,18 +17,14 @@ import { z } from "zod";
 import { prisma } from "@polaris/db";
 import { revalidatePath } from "next/cache";
 import { requireUser } from "@/lib/session";
-import { sessionName } from "@polaris/core";
 import { recordAudit } from "@/lib/audit-service";
 import { rateLimit } from "@/lib/rate-limit-service";
 import { newDeviceRefusal } from "@/lib/device-grace";
 import { getTranslations } from "@/lib/i18n/request";
-import { translate } from "@/lib/i18n/translate";
-import { getUserLocale } from "@/lib/i18n/locale-service";
 import { localized } from "../security/action-messages";
 import { revokeTrustedDevice, revokeTrustedDevices } from "@polaris/auth";
 import { pinCliSession, revokeCliSession } from "@/lib/cli/sessions";
 import { pinExtensionSession, revokeExtensionSession } from "@/lib/extension/sessions";
-import { notifySessionsClosed } from "@/lib/notifications/session-events";
 import {
     decideLoginApproval,
     revokeDeviceSessions,
@@ -62,36 +58,6 @@ type SessionError =
 /** One of this file's own refusals, in the reader's language. */
 async function refuse(key: SessionError): Promise<{ error: string }> {
     return { error: (await getTranslations("accountSecurity"))(key) };
-}
-
-/**
- * Record that this device is signing itself out, immediately before it does.
- *
- * Sign-out itself is better-auth's, driven from the browser, so there is no
- * server step to hang this on - but an account's history is meant to answer
- * "where is this signed in, and when did that stop", and a sign-out that left no
- * trace was the one gap in it. Called while the session is still valid, which is
- * what lets it be attributed at all.
- */
-export async function noteSignOutAction(): Promise<void> {
-    const user = await requireUser();
-    await recordAudit({
-        actorId: user.id,
-        action: "account.session.signed-out",
-        targetType: "session",
-        targetId: user.sessionId
-    });
-    await notifySessionsClosed({
-        userId: user.id,
-        count: 1,
-        reason: translate(
-            await getUserLocale(user.id),
-            "accountSecurity.sessions.signedItselfOut",
-            {
-                name: sessionName(user.sessionId)
-            }
-        )
-    });
 }
 
 export async function revokeSessionAction(sessionId: unknown): Promise<{ error?: string }> {

@@ -13,7 +13,7 @@
 
 import * as core from "@polaris/core";
 
-const STORE_KEY = "polaris.overview.recent";
+export const STORE_KEY = "polaris.overview.recent";
 
 function readStore(): core.RecentPlace[] {
     if (typeof window === "undefined") return [];

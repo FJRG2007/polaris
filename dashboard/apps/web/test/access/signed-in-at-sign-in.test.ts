@@ -39,7 +39,13 @@ vi.mock("@/lib/session", () => ({ resolveSession: async () => session }));
 vi.mock("@/lib/two-factor-challenge", () => ({
     pendingTwoFactorUserId: async () => pendingChallenge
 }));
-vi.mock("@polaris/auth", () => ({ hasAnyUser: async () => true }));
+vi.mock("@polaris/auth", () => ({
+    hasAnyUser: async () => true,
+    listDeviceAccounts: async () => [],
+    deviceAccountRoom: () => 4
+}));
+vi.mock("@/lib/auth", () => ({ auth: {} }));
+vi.mock("next/headers", () => ({ headers: async () => new Headers() }));
 vi.mock("@/lib/connections/oauth", () => ({ connectionSignInOffered: async () => false }));
 vi.mock("@/lib/two-factor-delivery", () => ({
     challengeOptions: async () => ({
@@ -93,6 +99,12 @@ describe("the sign-in page", () => {
         session = { id: "ada" };
         const params = Promise.resolve({ redirect: "//example.com" });
         expect(await landing(() => LoginPage({ searchParams: params }))).toBe("/");
+    });
+
+    it("stays put for a signed-in visitor adding another account", async () => {
+        session = { id: "ada" };
+        const params = Promise.resolve({ add: "1" });
+        expect(await landing(() => LoginPage({ searchParams: params }))).toBeNull();
     });
 
     it("sends a half-finished sign-in to the challenge, session or no session", async () => {

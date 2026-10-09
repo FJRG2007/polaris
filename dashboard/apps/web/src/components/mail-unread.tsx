@@ -109,7 +109,7 @@ async function fetchArrivals(since: string | null): Promise<Arrivals | null> {
 }
 
 /** Where the device's tabs keep the last moment they announced up to. */
-const SHARED_CURSOR_KEY = "polaris.mail.announced";
+export const SHARED_CURSOR_KEY = "polaris.mail.announced";
 
 /** The device's cursor, or null where storage is missing or refused - a
  *  private window, a browser blocking site data - which only means this tab

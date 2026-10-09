@@ -28,8 +28,6 @@ export function PendingView({ requestedAt }: { requestedAt: string }) {
 
     async function onCancel() {
         await signOut();
-        router.push("/oauth/login");
-        router.refresh();
     }
 
     return (

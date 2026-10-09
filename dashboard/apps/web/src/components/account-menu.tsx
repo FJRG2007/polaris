@@ -11,8 +11,8 @@ import { useDisplayFormat } from "@/components/display-format";
 import type { NamespaceKey, NamespaceTranslator } from "@/lib/i18n/types";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { usePresenceRefresh } from "@/components/presence-store";
+import { AccountSwitcherDialog } from "@/components/device-accounts";
 import { PRESENCE_CHOICE_DOTS } from "@/components/presence-dots";
-import { noteSignOutAction } from "@/app/(app)/account/sessions/actions";
 import {
     presenceNowAction,
     setPresenceAction,
@@ -27,7 +27,8 @@ import {
     Link2,
     LogOut,
     MessageSquareText,
-    UserCog
+    UserCog,
+    Users
 } from "lucide-react";
 import {
     MAX_STATUS,
@@ -138,6 +139,8 @@ export function AccountMenu({
     const format = useDisplayFormat();
     const refreshPresence = usePresenceRefresh();
     const [open, setOpen] = useState(false);
+    /** Whether the list of accounts on this browser is open. */
+    const [switching, setSwitching] = useState(false);
     /**
      * When this face was last pressed, for recognising the second press of a
      * double without the browser's help.
@@ -363,13 +366,8 @@ export function AccountMenu({
     };
 
     async function onSignOut() {
-        // While the session still exists, so the account's own history and its
-        // other devices record that this one left. Never a reason to refuse the
-        // sign-out itself.
-        await noteSignOutAction().catch(() => undefined);
+        // Only this account: any other signed in on this browser takes over.
         await signOut();
-        router.push("/oauth/login");
-        router.refresh();
     }
 
     return (
@@ -591,12 +589,21 @@ export function AccountMenu({
                             {t("account.sharedLinks")}
                         </Link>
                     </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    {/* Where Discord keeps it: beside signing out, since both are
+                    about which account this browser is. */}
+                    <DropdownMenuItem onSelect={() => setSwitching(true)}>
+                        <Users className="size-4" />
+                        {t("account.switchAccounts")}
+                    </DropdownMenuItem>
                     <DropdownMenuItem onSelect={onSignOut}>
                         <LogOut className="size-4" />
                         {t("account.signOut")}
                     </DropdownMenuItem>
                 </DropdownMenuContent>
             </DropdownMenu>
+
+            <AccountSwitcherDialog open={switching} onOpenChange={setSwitching} />
 
             {/* The exact end of a chosen state. Its own dialog rather than a field
             in the menu, because a menu that has to stay open while somebody
