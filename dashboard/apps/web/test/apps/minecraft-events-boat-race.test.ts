@@ -234,6 +234,21 @@ describe("an ice track", () => {
         }
     });
 
+    it("is proved empty in probes one fill each, covering the whole volume", () => {
+        let widest = 0;
+        for (let seed = 0; seed < 300; seed += 1) {
+            const { volume } = trackOf(`probe-${seed}`);
+            widest = Math.max(widest, (volume.x2 - volume.x1 + 1) * (volume.z2 - volume.z1 + 1));
+            const probes = stage.probeBoxes(volume);
+            for (const probe of probes)
+                expect(stage.volumeOf(probe)).toBeLessThanOrEqual(stage.FILL_LIMIT);
+            expect(probes.reduce((sum, probe) => sum + stage.volumeOf(probe), 0)).toBe(
+                stage.volumeOf(volume)
+            );
+        }
+        expect(widest).toBeGreaterThan(stage.FILL_LIMIT);
+    });
+
     it("counts laps and gates from the gates passed", () => {
         const track = trackOf("count", 3);
         const gates = track.gates.length;

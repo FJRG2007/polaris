@@ -250,14 +250,33 @@ export function volumeOf(box: Volume): number {
     );
 }
 
-/** A box cut into horizontal slabs, each within what one `fill` may change. */
+/** A box cut into horizontal slabs, each within what one `fill` may change,
+ *  and a layer too big by itself into tiles. */
 export function slices<T extends Volume>(box: T, limit = FILL_LIMIT): T[] {
-    const layer = (box.x2 - box.x1 + 1) * (box.z2 - box.z1 + 1);
-    const tall = Math.max(1, Math.floor(limit / layer));
+    const depth = box.z2 - box.z1 + 1;
+    const layer = (box.x2 - box.x1 + 1) * depth;
     const cut: T[] = [];
-    for (let y = box.y1; y <= box.y2; y += tall) {
-        cut.push({ ...box, y1: y, y2: Math.min(box.y2, y + tall - 1) });
+    if (layer <= limit) {
+        const tall = Math.max(1, Math.floor(limit / layer));
+        for (let y = box.y1; y <= box.y2; y += tall) {
+            cut.push({ ...box, y1: y, y2: Math.min(box.y2, y + tall - 1) });
+        }
+        return cut;
     }
+    const deep = Math.min(depth, limit);
+    const wide = Math.max(1, Math.floor(limit / deep));
+    for (let y = box.y1; y <= box.y2; y += 1)
+        for (let x = box.x1; x <= box.x2; x += wide)
+            for (let z = box.z1; z <= box.z2; z += deep)
+                cut.push({
+                    ...box,
+                    x1: x,
+                    x2: Math.min(box.x2, x + wide - 1),
+                    y1: y,
+                    y2: y,
+                    z1: z,
+                    z2: Math.min(box.z2, z + deep - 1)
+                });
     return cut;
 }
 
