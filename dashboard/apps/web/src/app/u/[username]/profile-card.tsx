@@ -33,6 +33,7 @@ import { FollowLists } from "./follow-lists";
 import { ProfileActions } from "./profile-actions";
 import { Avatar, OrgAvatar } from "@/components/avatar";
 import { MutualPanel } from "@/components/mutual-panel";
+import { ProfileLink } from "@/components/profile-link";
 import { usePresence } from "@/components/presence-store";
 import { ActivityCards } from "@/components/activity-card";
 import type { PublicProfile } from "@/lib/profile-service";
@@ -216,7 +217,7 @@ export function ProfileCard({
                 {profile.organizations.length > 0 || profile.companies.length > 0 ? (
                     <div className="flex flex-col gap-2 border-t border-border pt-4">
                         {profile.organizations.map((org) => (
-                            <Link
+                            <ProfileLink
                                 key={org.id}
                                 // Its own page, not the screen that runs it: a
                                 // reader following this may not be on its roster
@@ -234,7 +235,7 @@ export function ProfileCard({
                                     className="text-primary size-3.5 shrink-0"
                                     aria-label={t("profile.orgHere")}
                                 />
-                            </Link>
+                            </ProfileLink>
                         ))}
                         {profile.companies.map((company) => (
                             <p

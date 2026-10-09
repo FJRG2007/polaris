@@ -104,6 +104,54 @@ export function quietVerdict(gap: number | null, wasQuiet: boolean): boolean {
     return wasQuiet ? gap >= QUIET_CLEAR_DB : gap >= QUIET_GAP_DB;
 }
 
+/** Where lifting a quiet voice starts, in dB below the room: under this two
+ *  voices are as alike as two good microphones, and nobody is touched. */
+export const LIFT_FROM_DB = 3;
+
+/** The most a voice is lifted on its own, as a multiple of how it arrives: six
+ *  decibels. Enough to bring a laptop microphone across a room back into the
+ *  conversation; past it the noise around the voice comes up with it, and the
+ *  rest is the person's own microphone volume to fix - which they are told. */
+export const LIFT_MAX = 2;
+
+/**
+ * How much louder to play somebody who arrives below everybody else, as a
+ * multiple: 1 for anybody at or above the room's level, rising with the gap past
+ * `LIFT_FROM_DB` and stopping at `LIFT_MAX`.
+ *
+ * Only ever up. A loud voice is somebody's choice of microphone to turn down on
+ * their own speakers; a quiet one is everybody's problem, and lifting it here
+ * spares each listener reaching for the slider. Continuous in the gap, and the
+ * gap itself moves over seconds, so nobody is heard stepping up and down. The
+ * gap is measured on the voice as it arrives, before any volume is applied, so
+ * the lift never feeds back into what it is computed from.
+ */
+export function liftFor(gap: number | null): number {
+    if (gap === null || gap <= LIFT_FROM_DB) return 1;
+    return Math.min(LIFT_MAX, 10 ** ((gap - LIFT_FROM_DB) / 20));
+}
+
+/** How far past 1 the volume has to go before a quiet voice is moved onto the
+ *  graph that can play it louder: about a decibel. Once there it stays until the
+ *  volume is back to 1, so a lift hovering on the line is not handed back and
+ *  forth between the two, which is heard as a click each time. */
+export const BOOST_ENGAGE = 1.12;
+
+/**
+ * Whether somebody is played through the boost graph, given the volume they are
+ * set to (`chosen`), their lift, and whether they are on it already.
+ *
+ * Ducking is left out on purpose: it comes and goes with every sentence this
+ * reader says, and a graph can play quieter than 1 just as well. A volume
+ * somebody picked past 1 engages at once, as it always has; only the lift, which
+ * nobody picked, waits for the dead band.
+ */
+export function boostHeld(chosen: number, lift: number, held: boolean): boolean {
+    const steady = chosen * lift;
+    if (held || chosen > 1) return steady > 1;
+    return steady > BOOST_ENGAGE;
+}
+
 /** How a gap reads in the person menu. */
 export function gapWords(gap: number | null): "unknown" | "quieter" | "louder" | "same" {
     if (gap === null) return "unknown";
@@ -146,5 +194,18 @@ export function useLoudness(): ReadonlyMap<string, Loudness> {
 /** How far one person arrives below everybody else measured here. */
 export function gapFor(all: ReadonlyMap<string, Loudness>, key: string): number | null {
     const others = [...all.entries()].filter(([other]) => other !== key).map(([, level]) => level);
+    return gapBelow(all.get(key), others);
+}
+
+/** How far one person arrives below the other people this browser plays - your
+ *  own microphone left out. It is taken before it is sent, at whatever gain this
+ *  machine has, so it says how this reader's microphone is set rather than how
+ *  the room sounds; and a lift measured against it would turn the only other
+ *  person in a call up or down with it. With nobody else to compare against
+ *  there is no gap, and nobody is lifted. */
+export function liftGapFor(all: ReadonlyMap<string, Loudness>, key: string): number | null {
+    const others = [...all.entries()]
+        .filter(([other]) => other !== key && other !== SELF)
+        .map(([, level]) => level);
     return gapBelow(all.get(key), others);
 }

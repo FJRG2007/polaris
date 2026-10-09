@@ -35,6 +35,7 @@ import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { CallState } from "./use-call";
 import { useCallVolume } from "./call-volumes";
 import { CallLoudnessProbe } from "./call-loudness-probe";
+import { boostHeld, liftFor, liftGapFor, useLoudness } from "./call-loudness";
 import { useVoiceSettings } from "./voice-settings";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { boostStream, resumeBoost, type Boost } from "./call-boost";
@@ -321,16 +322,20 @@ function RemoteAudio({
 }) {
     const element = useRef<HTMLAudioElement>(null);
     const [chosen] = useCallVolume(volumeKey);
-    const volume = chosen * scale;
+    // A voice that arrives well below the rest of the room is lifted on its
+    // own, on top of whatever this reader set - see `liftFor`.
+    const lift = liftFor(liftGapFor(useLoudness(), volumeKey));
+    const volume = chosen * scale * lift;
     // Nothing is attached, and so nothing plays, until what this browser
     // remembers about this sound has been read - see `useSettled`.
     const ready = useSettled();
     const playable = ready ? stream : null;
     /** The graph playing this person, while they are turned up past 1. */
     const boost = useRef<Boost | null>(null);
-    /** Whether this person is boosted at all, which decides which of the two
-     *  things plays them. State rather than a ref: it is read while rendering
-     *  the element that must fall silent when the graph takes over. */
+    /** Whether the graph is playing this person, which decides which of the two
+     *  things plays them: built, and its context actually running. State rather
+     *  than a ref: it is read while rendering the element that must fall silent
+     *  when the graph takes over. */
     const [boosted, setBoosted] = useState(false);
 
     const start = useCallback(() => {
@@ -409,7 +414,7 @@ function RemoteAudio({
      *  rebuilt rather than turned up while it plays the track before it. */
     const built = useRef<MediaStream | null>(null);
     useEffect(() => {
-        if (!playable || wanted <= 1) {
+        if (!playable || muted || !boostHeld(chosen, lift, boost.current !== null)) {
             boost.current?.stop();
             boost.current = null;
             built.current = null;
@@ -418,11 +423,11 @@ function RemoteAudio({
         }
         if (built.current !== playable) {
             boost.current?.stop();
-            boost.current = boostStream(playable, wanted);
+            boost.current = boostStream(playable, wanted, setBoosted);
             built.current = boost.current ? playable : null;
+            if (!boost.current) setBoosted(false);
         } else boost.current?.set(wanted);
-        setBoosted(boost.current !== null);
-    }, [playable, wanted]);
+    }, [playable, wanted, muted, chosen, lift]);
 
     // Let go of the graph with the component. Left running, it goes on playing
     // somebody who has left the call.

@@ -23,7 +23,7 @@
  * line that tells the reader something they did not ask and cannot act on.
  */
 
-import Link from "next/link";
+import { ProfileLink } from "@/components/profile-link";
 import { Hash, Users } from "lucide-react";
 import { AvatarStack } from "@/components/avatar";
 import { useTranslations } from "@/components/i18n/i18n-provider";
@@ -67,15 +67,17 @@ export function MutualPanel({ friends, spaces, compact = false }: MutualPanelPro
                         <p className="min-w-0 flex-1 truncate text-sm">
                             {friends.people.map((person, index) => (
                                 <span key={person.id}>
-                                    {index > 0 ? <span className="text-muted-foreground">, </span> : null}
-                                    <Link
+                                    {index > 0 ? (
+                                        <span className="text-muted-foreground">, </span>
+                                    ) : null}
+                                    <ProfileLink
                                         href={`/u/${person.username}`}
                                         className="transition-colors hover:text-foreground"
                                     >
                                         <PersonRow personId={person.id} as="span">
                                             <PersonName id={person.id} name={person.name} />
                                         </PersonRow>
-                                    </Link>
+                                    </ProfileLink>
                                 </span>
                             ))}
                         </p>

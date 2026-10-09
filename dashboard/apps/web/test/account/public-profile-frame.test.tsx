@@ -17,7 +17,7 @@
  */
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { renderToStaticMarkup } from "react-dom/server";
+import { prerenderToNodeStream } from "react-dom/static";
 import { withMessages } from "../setup/i18n";
 import type { ReactNode } from "react";
 
@@ -32,7 +32,9 @@ vi.mock("@/lib/session", () => ({ guardedUser: async () => viewer }));
 vi.mock("@/lib/profile-service", () => ({
     profilesArePublic: async () => published,
     publicProfile: async (_handle: string) =>
-        exists ? { id: "person-1", name: "Ada Lovelace", standing: {}, mutual: null, follows: null } : null,
+        exists
+            ? { id: "person-1", name: "Ada Lovelace", standing: {}, mutual: null, follows: null }
+            : null,
     orgProfile: async (_handle: string) => (exists ? { id: "org-1", name: "Analytical" } : null)
 }));
 
@@ -43,13 +45,15 @@ vi.mock("@/components/app-chrome", () => ({
     AppChrome: ({ children }: { children: ReactNode }) => <div data-frame="app">{children}</div>
 }));
 vi.mock("@/components/public-chrome", () => ({
-    PublicChrome: ({ children }: { children: ReactNode }) => <div data-frame="public">{children}</div>
+    PublicChrome: ({ children }: { children: ReactNode }) => (
+        <div data-frame="public">{children}</div>
+    )
 }));
 
 // The cards themselves are client components with their own dependencies, and
 // none of that is what this is about.
 vi.mock("@/app/u/[username]/profile-card", () => ({
-    ProfileCard: ({ signedIn }: { signedIn: boolean }) => <p>card signedIn={String(signedIn)}</p>
+    ProfileCard: ({ signedIn }: { signedIn: boolean }) => <p>{`card signedIn=${signedIn}`}</p>
 }));
 vi.mock("@/app/o/[slug]/org-profile-card", () => ({ OrgProfileCard: () => <p>org card</p> }));
 // The catalogs a page hands its cards come from the request; there is none here.
@@ -60,14 +64,18 @@ vi.mock("@/components/i18n/messages", () => ({
 const { default: ProfilePage } = await import("@/app/u/[username]/page");
 const { default: OrganizationPage } = await import("@/app/o/[slug]/page");
 
-/** The frame a page came back in, and the markup inside it. */
+/** The frame a page came back in, and the markup inside it. The bodies are async
+ *  server components, so the render has to wait on them rather than be synchronous. */
 async function drawn(page: Promise<unknown>): Promise<{ frame: string | null; html: string }> {
-    const html = renderToStaticMarkup(withMessages((await page) as never));
+    const { prelude } = await prerenderToNodeStream(withMessages((await page) as never));
+    let html = "";
+    for await (const chunk of prelude) html += chunk;
     return { frame: html.match(/data-frame="(\w+)"/)?.[1] ?? null, html };
 }
 
 const person = () => drawn(ProfilePage({ params: Promise.resolve({ username: "ada" }) }));
-const organization = () => drawn(OrganizationPage({ params: Promise.resolve({ slug: "analytical" }) }));
+const organization = () =>
+    drawn(OrganizationPage({ params: Promise.resolve({ slug: "analytical" }) }));
 
 describe("the frame a public profile is drawn in", () => {
     beforeEach(() => {
