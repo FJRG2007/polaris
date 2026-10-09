@@ -136,7 +136,7 @@ describe("games_event_kinds", () => {
             options: Record<string, unknown>;
             defaults: Record<string, unknown>;
         }[];
-        expect(kinds.map((entry) => entry.kind)).toEqual([...catalog.EVENT_KINDS]);
+        expect(kinds.map((entry) => entry.kind)).toEqual([...catalog.OFFERED_KINDS]);
         const mining = kinds.find((entry) => entry.kind === "mining-rush")!;
         expect(mining).toMatchObject({
             name: "Mining rush",

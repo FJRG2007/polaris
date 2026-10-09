@@ -172,6 +172,10 @@ export interface KitExtras {
     /** Never wears out: a crown, a sword and shield, a tool the event hands out
      *  must last the event however much it is used. */
     readonly unbreakable?: boolean;
+    /** Mines at this speed whatever it may break, dropping it as the right tool
+     *  would. From 1.20.5, which has the tool component; ignored before. What it
+     *  may break is still only `breaks`. */
+    readonly miningSpeed?: number;
 }
 
 /** What every piece of kit that can wear out is given: it lasts the event. */
@@ -185,6 +189,11 @@ export function marked(id: string, marker: Marker, extras: KitExtras = {}): stri
         if (extras.placeOn) parts.push(`minecraft:can_place_on={blocks:${list(extras.placeOn)}}`);
         if (extras.breaks) parts.push(`minecraft:can_break={blocks:${list(extras.breaks)}}`);
         if (extras.unbreakable) parts.push("minecraft:unbreakable={}");
+        // A tag rather than the blocks again: the list twice outgrew one command.
+        if (extras.miningSpeed)
+            parts.push(
+                `minecraft:tool={default_mining_speed:${extras.miningSpeed.toFixed(1)}f,rules:[{blocks:"#minecraft:mineable/pickaxe",speed:${extras.miningSpeed.toFixed(1)}f,correct_for_drops:true}]}`
+            );
         return `${id}[${parts.join(",")}]`;
     }
     const parts = [MARK];
@@ -259,6 +268,20 @@ export function killMarkedDrops(box: Box, marker: Marker): string {
  */
 export function killBrokenDrops(box: Box, marker: Marker): string {
     return `execute in minecraft:overworld as @e[type=minecraft:item,${within(box)},nbt=!{Item:${markedItem(marker)}}] unless data entity @s Thrower run kill @s`;
+}
+
+/**
+ * What a block broken in the box let fall, made kit again: marked and placeable
+ * on `placeOn`, as it was handed out, so it stacks with the rest and is taken
+ * back with it. Never what somebody threw (it has a `Thrower`).
+ */
+export function reclaimBrokenDrops(box: Box, marker: Marker, placeOn: readonly string[]): string {
+    const list = `[${placeOn.map((one) => `"${one}"`).join(",")}]`;
+    const item =
+        marker === "components"
+            ? `{components:{"minecraft:custom_data":{${MARK}},"minecraft:can_place_on":{blocks:${list}}}}`
+            : `{tag:{${MARK},CanPlaceOn:${list}}}`;
+    return `execute in minecraft:overworld as @e[type=minecraft:item,${within(box)},nbt=!{Item:${markedItem(marker)}}] unless data entity @s Thrower run data merge entity @s {Item:${item}}`;
 }
 
 /**

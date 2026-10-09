@@ -66,6 +66,19 @@ export const EVENT_KINDS = [
 
 export type EventKind = (typeof EVENT_KINDS)[number];
 
+/**
+ * Kinds no new event can be: the ice boat race, replaced by the downhill one
+ * (which still builds its track with the same code). Still read, so a run of
+ * one that is under way finishes; left out of the screen, of a server's
+ * defaults, and of what a saved config keeps.
+ */
+export const RETIRED_KINDS: readonly EventKind[] = ["boat-race"];
+
+/** The kinds a new event can be. */
+export const OFFERED_KINDS: readonly EventKind[] = EVENT_KINDS.filter(
+    (kind) => !RETIRED_KINDS.includes(kind)
+);
+
 /** Where the settings live in the install's config. Edited by the screen. */
 export const EVENTS_KEY = "events";
 /** Where what happened lives. Written only by Polaris, so a save from the screen
@@ -1066,6 +1079,14 @@ export const eventsConfigSchema = z
             .default([])
     })
     .superRefine((value, context) => {
+        value.presets.forEach((preset, index) => {
+            if (RETIRED_KINDS.includes(preset.kind))
+                context.addIssue({
+                    code: z.ZodIssueCode.custom,
+                    path: ["presets", index, "kind"],
+                    message: problem("kindRetired")
+                });
+        });
         const ids = new Set(value.presets.map((preset) => preset.id));
         value.schedules.forEach((entry, index) => {
             if (!ids.has(entry.presetId)) {
@@ -1630,7 +1651,7 @@ function mostCommon(values: readonly number[]): number | null {
 export function defaultEventsConfig(language: Language = "en"): EventsConfig {
     return {
         settings: settingsSchema.parse({}),
-        presets: EVENT_KINDS.map((kind) =>
+        presets: OFFERED_KINDS.map((kind) =>
             newPreset(kind, `default-${kind}`, KIND_NAMES[kind][language])
         ),
         schedules: []
@@ -1681,13 +1702,14 @@ export function readEventsConfig(
     // back to its kind's defaults (`repairPreset`), rather than vanishing
     // from the list and the draw with nothing to say so.
     const kept = readPresets(value.presets)
+        .filter(({ preset }) => !RETIRED_KINDS.includes(preset.kind))
         .map(({ preset }) => (saved < KIND_DEFAULTS_SINCE ? toKindDefaults(preset) : preset))
         .map((preset) => (saved < HIDE_SECONDS_SINCE ? toHideSeconds(preset) : preset));
     // Every kind this server's events were saved before, once, named in the
     // language its players read.
     const had = new Set(kept.map((preset) => preset.kind));
     const taken = new Set(kept.map((preset) => preset.id));
-    const added = EVENT_KINDS.filter((kind) => (KIND_SINCE[kind] ?? 1) > saved && !had.has(kind))
+    const added = OFFERED_KINDS.filter((kind) => (KIND_SINCE[kind] ?? 1) > saved && !had.has(kind))
         .slice(0, Math.max(0, EVENTS_AT_MOST - kept.length))
         .map((kind) => {
             let id = `default-${kind}`;

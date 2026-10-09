@@ -84,7 +84,7 @@ const HELD: Readonly<
  *  options as they start. */
 const KINDS_BY_PLACE = catalog.HELD_WHERE.map((where) => ({
     where,
-    kinds: catalog.EVENT_KINDS.filter(
+    kinds: catalog.OFFERED_KINDS.filter(
         (kind) => catalog.heldWhere(catalog.newPreset(kind, "kind")) === where
     )
 }));

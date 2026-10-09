@@ -3452,3 +3452,52 @@ describe("a parkour course's climbs, moving platforms and looks", () => {
         expect(frost.boxes.some((box) => box.block === "minecraft:lime_concrete")).toBe(true);
     });
 });
+
+describe("a build battle's brush and what it breaks", () => {
+    it("mines the material at once from 1.20.5, and keeps to what it may break", () => {
+        const brush = build.kitCommands("Ana", "components", "concrete")[0]!;
+        expect(brush).toContain("minecraft:can_break={blocks:[");
+        expect(brush).toContain("minecraft:tool={default_mining_speed:");
+        expect(brush).toContain("correct_for_drops:true");
+        for (const palette of Object.keys(build.PALETTES) as build.Palette[])
+            for (const marker of ["components", "tag"] as const)
+                expect(
+                    commandBytes(build.kitCommands("Abcdefghijklmnop", marker, palette)[0]!)
+                ).toBeLessThanOrEqual(COMMAND_BYTES_MAX);
+        expect(build.kitCommands("Ana", "tag")[0]).not.toContain("tool");
+    });
+
+    it("turns what it broke back into kit, never what somebody threw", () => {
+        const box = { x1: 0, y1: 60, z1: 0, x2: 20, y2: 70, z2: 20 };
+        for (const marker of ["components", "tag"] as const) {
+            const [line] = build.reclaimLines(box, marker, "glass");
+            expect(line).toContain("unless data entity @s Thrower");
+            expect(line).toContain("polaris_event:1b");
+            expect(line).toContain(`"${build.FLOOR}"`);
+            expect(commandBytes(line!)).toBeLessThanOrEqual(COMMAND_BYTES_MAX);
+        }
+    });
+});
+
+describe("the ice boat race, retired", () => {
+    it("is never offered, nor kept from a saved config, nor saved", () => {
+        expect(catalog.OFFERED_KINDS).not.toContain("boat-race");
+        expect(catalog.OFFERED_KINDS).toContain("downhill-race");
+        const read = catalog.readEventsConfig({
+            [catalog.EVENTS_KEY]: {
+                presets: [
+                    catalog.newPreset("boat-race", "ice"),
+                    catalog.newPreset("trivia", "quiz")
+                ],
+                settings: { random: { enabled: true, pool: [{ presetId: "ice", weight: 1 }] } }
+            }
+        });
+        expect(read.presets.map((one) => one.kind)).not.toContain("boat-race");
+        expect(read.settings.random.pool).toEqual([]);
+        const saved = catalog.eventsConfigSchema.safeParse({
+            ...read,
+            presets: [...read.presets, catalog.newPreset("boat-race", "ice")]
+        });
+        expect(saved.success).toBe(false);
+    });
+});

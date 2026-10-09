@@ -1193,11 +1193,17 @@ export async function owedAtEnd(
 
 /** Whether a kind sends lines between ticks (`quickLines`). */
 export function quickens(preset: catalog.EventPreset): boolean {
-    return Boolean(gameOf(preset.kind)?.quickLines);
+    return preset.kind === "build-battle" || Boolean(gameOf(preset.kind)?.quickLines);
 }
 
 /** What a kind sends between ticks once it is under way: one batch, nothing read. */
 export function quickLines(run: stored.EventRun): string[] {
+    // Before the pick-up delay is out, mostly: what the brush broke is kit again
+    // by the time a builder walks over it.
+    if (run.preset.kind === "build-battle")
+        return run.readyAt === null || !run.arena || !run.marker || run.voting
+            ? []
+            : build.reclaimLines(run.arena.box, run.marker, build.paletteFor(run.id));
     const game = gameOf(run.preset.kind);
     if (!game?.quickLines || run.readyAt === null || !run.arena) return [];
     return game.quickLines(run);
