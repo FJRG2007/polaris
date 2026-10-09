@@ -152,7 +152,8 @@ export function SlidesEditor({
             edits.removeSlide(doc, one.id);
             // The next slide takes its place; the last one's place is taken by
             // the one before it.
-            goTo(Math.max(0, Math.min(index, deckSlides.length - 2)));
+            if (index === at) goTo(Math.max(0, Math.min(index, deckSlides.length - 2)));
+            else if (index < at) setAtIndex(at - 1);
         },
         onMove: (from: number, to: number) => {
             edits.moveSlide(doc, from, to);
@@ -185,10 +186,21 @@ export function SlidesEditor({
     };
 
     const onKeyDown = (event: KeyboardEvent): void => {
-        if (typingIn(event.target) || deckSlides.length === 0) return;
+        if (typingIn(event.target)) return;
         const action = matchShortcut(event, KEYS);
         if (!action) return;
         const handled = ((): boolean => {
+            if (editable) {
+                switch (action) {
+                    case "office.slides.undo":
+                        history.undo();
+                        return true;
+                    case "office.slides.redo":
+                        history.redo();
+                        return true;
+                }
+            }
+            if (deckSlides.length === 0) return false;
             switch (action) {
                 case "office.slides.present":
                     setPresenting(at);
@@ -208,12 +220,6 @@ export function SlidesEditor({
             switch (action) {
                 case "office.slides.newSlide":
                     addSlide();
-                    return true;
-                case "office.slides.undo":
-                    history.undo();
-                    return true;
-                case "office.slides.redo":
-                    history.redo();
                     return true;
             }
             if (!chosenBox || onControl(event.target)) return false;
@@ -322,17 +328,25 @@ export function SlidesEditor({
 
     if (deckSlides.length === 0) {
         return (
-            <div className="flex min-h-0 flex-1 items-center justify-center p-8">
+            <div ref={root} className="flex min-h-0 flex-1 items-center justify-center p-8">
                 <div className="flex flex-col items-center gap-3 text-center">
                     <p className="text-[13px] font-medium">{t("slides.noSlidesYet")}</p>
                     <p className="max-w-sm text-[13px] text-muted-foreground">
                         {t("slides.everythingOnASlideIs")}
                     </p>
                     {editable ? (
-                        <Button onClick={addSlide}>
-                            <Plus className="size-4 shrink-0" aria-hidden />
-                            {t("slides.addTheFirstSlide")}
-                        </Button>
+                        <div className="flex flex-wrap items-center justify-center gap-2">
+                            <Button onClick={addSlide}>
+                                <Plus className="size-4 shrink-0" aria-hidden />
+                                {t("slides.addTheFirstSlide")}
+                            </Button>
+                            {history.canUndo ? (
+                                <Button variant="secondary" onClick={history.undo}>
+                                    <Undo2 className="size-4 shrink-0" aria-hidden />
+                                    {t("slides.undo")}
+                                </Button>
+                            ) : null}
+                        </div>
                     ) : null}
                 </div>
             </div>

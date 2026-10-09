@@ -51,19 +51,15 @@ export function Present({
     const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
     const close = useRef(onClose);
     close.current = onClose;
+    const windowed = useRef(false);
 
     const ended = at >= slides.length;
     const slide = slides[at];
 
     const next = useCallback(() => {
-        setAt((one) => {
-            if (one >= slides.length) {
-                close.current();
-                return one;
-            }
-            return one + 1;
-        });
-    }, [slides.length]);
+        if (at >= slides.length) close.current();
+        else setAt(at + 1);
+    }, [at, slides.length]);
     const previous = useCallback(() => setAt((one) => Math.max(0, one - 1)), []);
 
     const wake = useCallback(() => {
@@ -85,7 +81,8 @@ export function Present({
             if (now) entered = true;
             // Leaving full screen - Escape, which the browser keeps for itself
             // while it is full screen - is leaving the show.
-            else if (entered) close.current();
+            else if (entered && !windowed.current) close.current();
+            if (!now) windowed.current = false;
         };
         document.addEventListener("fullscreenchange", changed);
         one.requestFullscreen?.().catch(() => undefined);
@@ -116,8 +113,12 @@ export function Present({
     const toggleFull = (): void => {
         const one = surface.current;
         if (!one) return;
-        if (document.fullscreenElement) void document.exitFullscreen().catch(() => undefined);
-        else void one.requestFullscreen?.().catch(() => undefined);
+        if (document.fullscreenElement) {
+            windowed.current = true;
+            void document.exitFullscreen().catch(() => {
+                windowed.current = false;
+            });
+        } else void one.requestFullscreen?.().catch(() => undefined);
     };
 
     return (
@@ -170,7 +171,7 @@ export function Present({
                 if (event.button === 0) next();
             }}
             className={cn(
-                "fixed inset-0 z-50 flex select-none flex-col bg-black text-white outline-none",
+                "fixed inset-0 z-50 flex touch-none select-none flex-col bg-black text-white outline-none",
                 !controls && "cursor-none"
             )}
         >

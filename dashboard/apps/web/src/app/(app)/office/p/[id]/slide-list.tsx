@@ -99,6 +99,7 @@ export function SlideList({
 
     const beginDrag = (event: PointerEvent, from: number): void => {
         if (!editable || event.button !== 0 || event.pointerType === "touch") return;
+        dragged.current = false;
         const fromX = event.clientX;
         const fromY = event.clientY;
         let moving = false;
@@ -110,7 +111,7 @@ export function SlideList({
             moving = true;
             const horizontal = across();
             const pointer = horizontal ? at.clientX : at.clientY;
-            let position = thumbs.current.length;
+            let position = slides.length;
             for (const [index, one] of thumbs.current.entries()) {
                 if (!one) continue;
                 const box = one.getBoundingClientRect();
@@ -146,6 +147,9 @@ export function SlideList({
             if (!moving) return;
             // The click that ends a drag is not a click on the slide.
             dragged.current = true;
+            setTimeout(() => {
+                dragged.current = false;
+            });
             if (!commit || landing === null) return;
             const to = landing > from ? landing - 1 : landing;
             if (to !== from) actions.onMove(from, to);
