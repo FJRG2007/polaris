@@ -161,7 +161,8 @@ function layoutAt(run: EventRun, site: { x: number; z: number }, y: number): Lay
             run.preset.options as catalog.EventOptions<"boat-race">,
             run.id,
             site,
-            y
+            y,
+            run.stage?.origin ? run.stage.design : boatRace.DESIGN
         );
         return {
             kind: "boat-race",

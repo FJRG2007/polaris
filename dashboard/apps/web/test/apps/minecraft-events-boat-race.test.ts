@@ -182,6 +182,58 @@ describe("an ice track", () => {
         }
     });
 
+    it("turns in sweeping arcs nine blocks wide, never a square corner", () => {
+        expect(boatRace.WIDTH).toBe(9);
+        expect(boatRace.RADIUS).toBeGreaterThanOrEqual(12);
+        for (let seed = 0; seed < 100; seed += 1) {
+            const layout = boatRace.laidOut(`arcs-${seed}`);
+            const samples = boatRace.centerline(layout.points);
+            // A block along, the track never swings more than a quarter turn
+            // spread over the arc: no corner anywhere.
+            const most = (90 / ((Math.PI / 2) * boatRace.RADIUS)) * 1.2;
+            samples.forEach((one, index) => {
+                const next = samples[(index + 1) % samples.length]!;
+                const swing =
+                    (Math.acos(Math.max(-1, Math.min(1, one.dx * next.dx + one.dz * next.dz))) *
+                        180) /
+                    Math.PI;
+                expect(swing).toBeLessThanOrEqual(most);
+                // A block apart at most, so the ice along it has no gap.
+                expect(Math.hypot(next.x - one.x, next.z - one.z)).toBeLessThanOrEqual(1.01);
+            });
+        }
+    });
+
+    it("keeps a race built on the old square track on it, after an update", () => {
+        // A run stores the design it was built with; the old one still lays out
+        // and keeps its own rules.
+        for (let seed = 0; seed < 200; seed += 1) {
+            const layout = boatRace.laidOut(`old-${seed}`, 1);
+            expect(layout.design).toBe(1);
+            expect(boatRace.trackProblems(layout)).toEqual([]);
+        }
+        const old = boatRace.track({ laps: 2 }, "old-run", { x: 0, z: 0 }, 100, 1);
+        const now = boatRace.track({ laps: 2 }, "old-run", { x: 0, z: 0 }, 100);
+        expect(old.layout.design).toBe(1);
+        expect(old.boxes).not.toEqual(now.boxes);
+        expect(boatRace.track({ laps: 2 }, "old-run", { x: 0, z: 0 }, 100, 1).boxes).toEqual(
+            old.boxes
+        );
+    });
+
+    it("fits the chunks one forceload holds, and every net tile one fill", () => {
+        for (let seed = 0; seed < 300; seed += 1) {
+            const track = trackOf(`size-${seed}`);
+            const area = stage.areaOf(track.volume);
+            const chunks =
+                (Math.floor(area.x2 / 16) - Math.floor(area.x1 / 16) + 1) *
+                (Math.floor(area.z2 / 16) - Math.floor(area.z1 / 16) + 1);
+            expect(chunks).toBeLessThanOrEqual(256);
+            for (const box of track.boxes)
+                expect(stage.volumeOf(box)).toBeLessThanOrEqual(stage.FILL_LIMIT);
+        }
+    });
+
     it("counts laps and gates from the gates passed", () => {
         const track = trackOf("count", 3);
         const gates = track.gates.length;
