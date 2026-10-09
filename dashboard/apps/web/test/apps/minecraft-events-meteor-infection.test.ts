@@ -57,8 +57,8 @@ describe("a meteor's infection", () => {
         let grown = 0;
         for (let seed = 0; seed < 1500; seed += 1) {
             const meteors = [
-                { x: 0, y: 70, z: 0, infected: [] as Point[] },
-                { x: 40, y: 64, z: -30, infected: [] as Point[] }
+                { x: 0, y: 70, z: 0, infected: [] as Point[], missed: [] as Point[] },
+                { x: 40, y: 64, z: -30, infected: [] as Point[], missed: [] as Point[] }
             ];
             const worlds = meteors.map((meteor, index) => world(`w-${seed}-${index}`, meteor));
             const before = worlds.map((one) => new Map(one.blocks));
@@ -71,6 +71,7 @@ describe("a meteor's infection", () => {
                     const meteor = meteors[one.meteor]!;
                     const answer = worlds[one.meteor]!.say(infection.growLine(one.to, one.from));
                     if (infection.grew(answer)) meteor.infected.push(one.to);
+                    else meteor.missed.push(one.to);
                 }
                 // Now and then a player breaks a vein: cleansed.
                 for (const [index, meteor] of meteors.entries())
@@ -83,7 +84,7 @@ describe("a meteor's infection", () => {
             for (const [index, meteor] of meteors.entries()) {
                 const { get } = worlds[index]!;
                 const seen = new Set<string>();
-                if (meteor.infected.length > infection.MAX_CELLS)
+                if (meteor.infected.length + meteor.missed.length > infection.MAX_CELLS)
                     problems.push(`${seed}: too many`);
                 for (const cell of meteor.infected) {
                     if (seen.has(key(cell))) problems.push(`${seed}: infected twice`);
@@ -135,12 +136,38 @@ describe("a meteor's infection", () => {
         expect(infection.creepCells(meteor, [], seeded("none"))).toEqual([]);
     });
 
+    it("stops trying a crater that cannot grow, once its bound is spent", () => {
+        for (const [name, cleansed] of [
+            ["no ground round it", false],
+            ["every vein broken", true]
+        ] as const) {
+            const meteor = {
+                x: 0,
+                y: 64,
+                z: 0,
+                infected: cleansed ? infection.seedCells({ x: 0, y: 64, z: 0 }, seeded(name)) : [],
+                missed: [] as Point[]
+            };
+            const random = seeded(`try-${name}`);
+            let asked = 0;
+            for (let turn = 0; turn < 500; turn += 1)
+                for (const one of infection.plan([meteor], turn, random)) {
+                    asked += 1;
+                    meteor.missed.push(one.to);
+                }
+            expect(asked, name).toBeLessThanOrEqual(infection.MAX_CELLS);
+            expect(infection.plan([meteor], 500, random), name).toEqual([]);
+            expect(new Set(meteor.missed.map(key)).size, name).toBe(meteor.missed.length);
+        }
+    });
+
     it("gives every meteor its turn, however many there are", () => {
         const meteors = Array.from({ length: 30 }, (_, index) => ({
             x: index * 100,
             y: 64,
             z: 0,
-            infected: [] as Point[]
+            infected: [] as Point[],
+            missed: [] as Point[]
         }));
         const reached = new Set<number>();
         for (let turn = 0; turn < 30; turn += 1)
@@ -153,7 +180,7 @@ describe("a meteor's infection", () => {
         const meteor = { x: -300, y: 70, z: 1200 };
         const lines = [
             ...infection.hurtLines(meteor),
-            infection.sporeLine(meteor),
+            infection.sporeLine(meteor, { x: -301, y: 70, z: 1199 }),
             infection.growLine({ x: -301, y: 70, z: 1199 }, { x: -302, y: 70, z: 1199 }),
             infection.removeIfVein({ x: -301, y: 70, z: 1199 })
         ];
@@ -161,6 +188,9 @@ describe("a meteor's infection", () => {
             expect(line).toContain(
                 `positioned -299.5 70 1200.5 as @a[distance=..${infection.RADIUS + 2}]`
             );
+        expect(infection.sporeLine(meteor, { x: -301, y: 70, z: 1199 })).toMatch(
+            /^execute in minecraft:overworld if block -301 70 1199 minecraft:sculk_vein run particle /
+        );
         expect(lines.join("\n")).not.toMatch(/\bweather\b|\bkill\b|\bclear\b/);
         for (const line of lines) expect(commandBytes(line)).toBeLessThanOrEqual(COMMAND_BYTES_MAX);
         expect(infection.grew("Changed the block at -301, 70, 1199")).toBe(true);

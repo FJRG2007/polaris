@@ -3942,8 +3942,9 @@ async function meteorShower(
  * Every meteor's infection a little further on (`meteor-infection.ts`): the
  * crater's ring seeded the first time it is looked at, then a few cells a tick
  * creeping out from a vein still there - each written down before it is
- * placed, kept only once the game answers it changed. And whoever stands in it
- * poisoned and slowed. Only from 1.19, where sculk veins are the game's.
+ * placed, kept only once the game answers it changed, and set aside as missed
+ * otherwise. And whoever stands in it poisoned and slowed. Only from 1.19,
+ * where sculk veins are the game's.
  */
 async function infect(
     installedAppId: string,
@@ -3972,23 +3973,29 @@ async function infect(
         for (const one of tries)
             if (infection.grew(await server.say([infection.growLine(one.to, one.from)])))
                 took.add(one);
+        const of = (at: number, grown: boolean) =>
+            tries
+                .filter((one) => one.meteor === at && took.has(one) === grown)
+                .map((one) => one.to);
         loop.run = {
             ...loop.run,
             meteors: before.map((meteor, at) => ({
                 ...meteor,
-                infected: [
-                    ...meteor.infected,
-                    ...tries
-                        .filter((one) => one.meteor === at && took.has(one))
-                        .map((one) => one.to)
-                ]
+                infected: [...meteor.infected, ...of(at, true)],
+                missed: [...meteor.missed, ...of(at, false)]
             }))
         };
         await persist(installedAppId, loop);
     }
     for (const meteor of loop.run.meteors)
         if (meteor.infected.length > 0)
-            lines.push(...infection.hurtLines(meteor), infection.sporeLine(meteor));
+            lines.push(
+                ...infection.hurtLines(meteor),
+                infection.sporeLine(
+                    meteor,
+                    meteor.infected[Math.floor(Math.random() * meteor.infected.length)]!
+                )
+            );
 }
 
 /**
@@ -4030,7 +4037,7 @@ async function landMeteor(
         ...loop.run,
         meteors: [
             ...loop.run.meteors,
-            { x: found.x, y: found.y, z: found.z, blocks: free, infected: [] }
+            { x: found.x, y: found.y, z: found.z, blocks: free, infected: [], missed: [] }
         ],
         chunks: [...loop.run.chunks, ...added],
         // The place and the column tried are the meteor's now, let go with

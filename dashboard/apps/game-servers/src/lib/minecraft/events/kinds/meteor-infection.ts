@@ -27,7 +27,7 @@ type Point = { readonly x: number; readonly y: number; readonly z: number };
 export const SINCE = [1, 19] as const;
 /** How far from the meteor the infection may creep. */
 export const RADIUS = 7;
-/** The most cells one meteor ever infects, cleansed ones included. */
+/** The most cells one meteor ever tries, cleansed and missed ones included. */
 export const MAX_CELLS = 40;
 /** Cells round the crater infected as the meteor lands. */
 export const SEEDS = 6;
@@ -45,13 +45,20 @@ const at = (point: Point) => `${point.x} ${point.y} ${point.z}`;
 
 /** The crater's ring, two blocks out round where the meteor landed, at the
  *  height of the air over the ground it landed on - shuffled, the first
- *  `SEEDS` of them. */
-export function seedCells(meteor: Point, random: () => number): Point[] {
+ *  `SEEDS` of them not already `missed`. */
+export function seedCells(
+    meteor: Point,
+    random: () => number,
+    missed: readonly Point[] = []
+): Point[] {
+    const tried = new Set(missed.map(at));
     const ring: Point[] = [];
     for (let dx = -2; dx <= 2; dx += 1)
         for (let dz = -2; dz <= 2; dz += 1)
-            if (Math.max(Math.abs(dx), Math.abs(dz)) === 2)
-                ring.push({ x: meteor.x + dx, y: meteor.y, z: meteor.z + dz });
+            if (Math.max(Math.abs(dx), Math.abs(dz)) === 2) {
+                const cell = { x: meteor.x + dx, y: meteor.y, z: meteor.z + dz };
+                if (!tried.has(at(cell))) ring.push(cell);
+            }
     for (let index = ring.length - 1; index > 0; index -= 1) {
         const other = Math.floor(random() * (index + 1));
         [ring[index], ring[other]] = [ring[other]!, ring[index]!];
@@ -61,18 +68,19 @@ export function seedCells(meteor: Point, random: () => number): Point[] {
 
 /**
  * The next cells to try to creep onto: next to an infected cell (one a side,
- * a block up or down), within `RADIUS` of the meteor, not one already infected,
- * and no more than the meteor has left to infect. Each with the cell it grows
- * from, which must still be a vein for it to grow.
+ * a block up or down), within `RADIUS` of the meteor, not one already infected
+ * or `missed`, and no more than the meteor has left to try. Each with the cell
+ * it grows from, which must still be a vein for it to grow.
  */
 export function creepCells(
     meteor: Point,
     infected: readonly Point[],
-    random: () => number
+    random: () => number,
+    missed: readonly Point[] = []
 ): { from: Point; to: Point }[] {
-    const left = Math.min(TRIES_PER_TICK, MAX_CELLS - infected.length);
+    const left = Math.min(TRIES_PER_TICK, MAX_CELLS - infected.length - missed.length);
     if (left <= 0 || infected.length === 0) return [];
-    const taken = new Set(infected.map(at));
+    const taken = new Set([...infected, ...missed].map(at));
     const picked: { from: Point; to: Point }[] = [];
     for (let tries = 0; tries < left * 6 && picked.length < left; tries += 1) {
         const from = infected[Math.floor(random() * infected.length)]!;
@@ -101,11 +109,16 @@ export interface Try {
 
 /**
  * This tick's tries over every meteor, within `BUDGET`: a meteor with nothing
- * infected yet is seeded round its crater, the rest creep. The meteors taken
- * in turn from `turn`, so each gets its go however many there are.
+ * infected yet is seeded round its crater, the rest creep. A cell tried and
+ * `missed` is never tried again and counts towards `MAX_CELLS`, so a crater
+ * that cannot grow stops costing anything. The meteors taken in turn from
+ * `turn`, so each gets its go however many there are.
  */
 export function plan(
-    meteors: readonly (Point & { readonly infected: readonly Point[] })[],
+    meteors: readonly (Point & {
+        readonly infected: readonly Point[];
+        readonly missed?: readonly Point[];
+    })[],
     turn: number,
     random: () => number
 ): Try[] {
@@ -113,10 +126,13 @@ export function plan(
     for (let step = 0; step < meteors.length && tries.length < BUDGET; step += 1) {
         const index = (turn + step) % meteors.length;
         const meteor = meteors[index]!;
+        const missed = meteor.missed ?? [];
         const cells =
             meteor.infected.length === 0
-                ? seedCells(meteor, random).map((to) => ({ to }))
-                : creepCells(meteor, meteor.infected, random);
+                ? seedCells(meteor, random, missed)
+                      .slice(0, Math.max(0, MAX_CELLS - missed.length))
+                      .map((to) => ({ to }))
+                : creepCells(meteor, meteor.infected, random, missed);
         for (const cell of cells.slice(0, BUDGET - tries.length))
             tries.push({ meteor: index, ...cell });
     }
@@ -151,7 +167,9 @@ export function hurtLines(meteor: Point): string[] {
     ];
 }
 
-/** A little spore over the infected ground, so it is seen from a way off. */
-export function sporeLine(meteor: Point): string {
-    return `execute in minecraft:overworld run particle minecraft:sculk_soul ${meteor.x + 0.5} ${meteor.y + 0.5} ${meteor.z + 0.5} ${RADIUS / 2} 0.3 ${RADIUS / 2} 0 6 normal`;
+/** A little spore over the infected ground, so it is seen from a way off -
+ *  only while `vein`, one of its cells, is still a vein: a cleansed crater
+ *  goes quiet. */
+export function sporeLine(meteor: Point, vein: Point): string {
+    return `execute in minecraft:overworld if block ${at(vein)} ${VEIN_ID} run particle minecraft:sculk_soul ${meteor.x + 0.5} ${meteor.y + 0.5} ${meteor.z + 0.5} ${RADIUS / 2} 0.3 ${RADIUS / 2} 0 6 normal`;
 }

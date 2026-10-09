@@ -5287,6 +5287,14 @@ describe("a meteor shower", () => {
             );
         }
         expect(world.sent).toContain(infectionKind.hurtLines(meteor)[0]);
+        const spores = world.sent.filter((line) => line.includes("particle minecraft:sculk_soul"));
+        expect(spores.length).toBeGreaterThan(0);
+        for (const line of spores)
+            expect(
+                state().run!.meteors.some((one) =>
+                    one.infected.some((cell) => line === infectionKind.sporeLine(one, cell))
+                )
+            ).toBe(true);
         // Ana breaks a vein and puts dirt there: hers, never taken away.
         const cleansed = grown[0]!;
         world.blocks.set(cleansed, "minecraft:dirt");

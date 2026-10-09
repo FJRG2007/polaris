@@ -231,7 +231,10 @@ export const runSchema = z.object({
                 /** Every cell its infection was put into air at, or is about to
                  *  be (`meteor-infection.ts`) - cleared at the end only while
                  *  still a vein. */
-                infected: z.array(pointSchema).default([])
+                infected: z.array(pointSchema).default([]),
+                /** Every cell its infection was tried at and did not take -
+                 *  never tried again, and counted towards its bound. */
+                missed: z.array(pointSchema).default([])
             })
         )
         .default([]),
