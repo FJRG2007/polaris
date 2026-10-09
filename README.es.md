@@ -22,6 +22,159 @@ nuevas y las reparaciones se hacen desde la interfaz.
 La guía completa (qué incluye cada app, requisitos, uso y desarrollo) está en el
 [README en inglés](README.md).
 
+## Un vistazo
+
+Cada imagen es la interfaz real, dibujada con sus propios componentes y datos de
+ejemplo, y sigue tu modo claro u oscuro. Las versiones para móvil están junto a
+ellas en [docs/assets/media](docs/assets/media).
+
+<table>
+  <tr>
+    <td width="50%" valign="top">
+      <picture>
+        <source media="(prefers-color-scheme: light)" srcset="docs/assets/media/chat-light-es-desktop.webp">
+        <img src="docs/assets/media/chat-dark-es-desktop.webp" alt="Chat, con el equipo escribiendo y respondiendo">
+      </picture>
+      <br><sub>Chat, con el equipo escribiendo y respondiendo</sub>
+    </td>
+    <td width="50%" valign="top">
+      <picture>
+        <source media="(prefers-color-scheme: light)" srcset="docs/assets/media/call-light-es-desktop.webp">
+        <img src="docs/assets/media/call-dark-es-desktop.webp" alt="Una llamada que suena sobre lo que estés haciendo">
+      </picture>
+      <br><sub>Una llamada que suena sobre lo que estés haciendo</sub>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <picture>
+        <source media="(prefers-color-scheme: light)" srcset="docs/assets/media/in-call-light-es-desktop.webp">
+        <img src="docs/assets/media/in-call-dark-es-desktop.webp" alt="La daily en una sala de voz">
+      </picture>
+      <br><sub>La daily en una sala de voz</sub>
+    </td>
+    <td width="50%" valign="top">
+      <picture>
+        <source media="(prefers-color-scheme: light)" srcset="docs/assets/media/tasks-light-es-desktop.webp">
+        <img src="docs/assets/media/tasks-dark-es-desktop.webp" alt="Tareas: el tablero de una lista a mitad de sprint">
+      </picture>
+      <br><sub>Tareas: el tablero de una lista a mitad de sprint</sub>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <picture>
+        <source media="(prefers-color-scheme: light)" srcset="docs/assets/media/task-panel-light-es-desktop.webp">
+        <img src="docs/assets/media/task-panel-dark-es-desktop.webp" alt="Una tarea abierta junto al tablero">
+      </picture>
+      <br><sub>Una tarea abierta junto al tablero</sub>
+    </td>
+    <td width="50%" valign="top">
+      <picture>
+        <source media="(prefers-color-scheme: light)" srcset="docs/assets/media/deploy-light-es-desktop.webp">
+        <img src="docs/assets/media/deploy-dark-es-desktop.webp" alt="Deploy: tus proyectos">
+      </picture>
+      <br><sub>Deploy: tus proyectos</sub>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <picture>
+        <source media="(prefers-color-scheme: light)" srcset="docs/assets/media/deploy-project-light-es-desktop.webp">
+        <img src="docs/assets/media/deploy-project-dark-es-desktop.webp" alt="Los servicios de un proyecto y cómo se conectan">
+      </picture>
+      <br><sub>Los servicios de un proyecto y cómo se conectan</sub>
+    </td>
+    <td width="50%" valign="top">
+      <picture>
+        <source media="(prefers-color-scheme: light)" srcset="docs/assets/media/deploy-logs-light-es-desktop.webp">
+        <img src="docs/assets/media/deploy-logs-dark-es-desktop.webp" alt="Una versión y sus logs en directo">
+      </picture>
+      <br><sub>Una versión y sus logs en directo</sub>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <picture>
+        <source media="(prefers-color-scheme: light)" srcset="docs/assets/media/drive-light-es-desktop.webp">
+        <img src="docs/assets/media/drive-dark-es-desktop.webp" alt="Drive en todo tu almacenamiento">
+      </picture>
+      <br><sub>Drive en todo tu almacenamiento</sub>
+    </td>
+    <td width="50%" valign="top">
+      <picture>
+        <source media="(prefers-color-scheme: light)" srcset="docs/assets/media/mail-light-es-desktop.webp">
+        <img src="docs/assets/media/mail-dark-es-desktop.webp" alt="Correo: todas las cuentas en una bandeja">
+      </picture>
+      <br><sub>Correo: todas las cuentas en una bandeja</sub>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <picture>
+        <source media="(prefers-color-scheme: light)" srcset="docs/assets/media/mail-thread-light-es-desktop.webp">
+        <img src="docs/assets/media/mail-thread-dark-es-desktop.webp" alt="Una conversación, leída">
+      </picture>
+      <br><sub>Una conversación, leída</sub>
+    </td>
+    <td width="50%" valign="top">
+      <picture>
+        <source media="(prefers-color-scheme: light)" srcset="docs/assets/media/calendar-light-es-desktop.webp">
+        <img src="docs/assets/media/calendar-dark-es-desktop.webp" alt="Calendario: la semana de trabajo">
+      </picture>
+      <br><sub>Calendario: la semana de trabajo</sub>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <picture>
+        <source media="(prefers-color-scheme: light)" srcset="docs/assets/media/office-light-es-desktop.webp">
+        <img src="docs/assets/media/office-dark-es-desktop.webp" alt="Office: documentos, hojas, presentaciones y diagramas">
+      </picture>
+      <br><sub>Office: documentos, hojas, presentaciones y diagramas</sub>
+    </td>
+    <td width="50%" valign="top">
+      <picture>
+        <source media="(prefers-color-scheme: light)" srcset="docs/assets/media/vault-light-es-desktop.webp">
+        <img src="docs/assets/media/vault-dark-es-desktop.webp" alt="Bóveda: contraseñas y códigos de un solo uso">
+      </picture>
+      <br><sub>Bóveda: contraseñas y códigos de un solo uso</sub>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <picture>
+        <source media="(prefers-color-scheme: light)" srcset="docs/assets/media/games-light-es-desktop.webp">
+        <img src="docs/assets/media/games-dark-es-desktop.webp" alt="Servidores de juegos">
+      </picture>
+      <br><sub>Servidores de juegos</sub>
+    </td>
+    <td width="50%" valign="top">
+      <picture>
+        <source media="(prefers-color-scheme: light)" srcset="docs/assets/media/marketplace-light-es-desktop.webp">
+        <img src="docs/assets/media/marketplace-dark-es-desktop.webp" alt="El marketplace de apps para instalar">
+      </picture>
+      <br><sub>El marketplace de apps para instalar</sub>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <picture>
+        <source media="(prefers-color-scheme: light)" srcset="docs/assets/media/launcher-light-es-desktop.webp">
+        <img src="docs/assets/media/launcher-dark-es-desktop.webp" alt="El lanzador de apps, con lo pendiente">
+      </picture>
+      <br><sub>El lanzador de apps, con lo pendiente</sub>
+    </td>
+    <td width="50%" valign="top">
+      <picture>
+        <source media="(prefers-color-scheme: light)" srcset="docs/assets/media/settings-light-es-desktop.webp">
+        <img src="docs/assets/media/settings-dark-es-desktop.webp" alt="Ajustes: una actualización lista para instalar">
+      </picture>
+      <br><sub>Ajustes: una actualización lista para instalar</sub>
+    </td>
+  </tr>
+</table>
+
 ## Instalar
 
 Un comando. Levanta todo: dashboard, base de datos, proxy inverso y el daemon de

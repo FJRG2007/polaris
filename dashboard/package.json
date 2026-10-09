@@ -33,6 +33,7 @@
         "@types/node": "22.10.7",
         "jsdom": "30.0.1",
         "patch-package": "8.0.1",
+        "playwright": "1.62.1",
         "prettier": "3.4.2",
         "react": "19.0.0",
         "react-dom": "19.0.0",

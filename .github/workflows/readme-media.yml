@@ -1,0 +1,112 @@
+name: README media
+
+# Retake the README's screenshots and animations from the dashboard's own
+# components (dashboard/scripts/readme-media): every scene, dark and light,
+# English and Spanish, desktop and phone, saved under docs/assets/media.
+#
+# By hand only. The pictures change when the interface does, and somebody should
+# look at them before they replace the ones in the README - so a run never pushes
+# to main. Run on a branch, it commits the new pictures to that branch. Run on
+# main, it puts them on a branch of their own and opens a pull request for them.
+# Either way they are also kept as an artifact, so a run whose push was refused
+# still has something to show.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: readme-media-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    working-directory: dashboard
+
+env:
+  NEXT_TELEMETRY_DISABLED: "1"
+  NPM_CONFIG_FUND: "false"
+  NPM_CONFIG_AUDIT: "false"
+  # The same two downloads dashboard-ci.yml skips, for the same reasons: nothing
+  # here uses puppeteer's Chrome or the CUDA runtime. The browser the pictures
+  # are taken with is Playwright's, installed below.
+  PUPPETEER_SKIP_DOWNLOAD: "true"
+  ONNXRUNTIME_NODE_INSTALL: "skip"
+
+jobs:
+  capture:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: dashboard/package-lock.json
+
+      - run: npm ci --prefer-offline
+      - run: npm run db:generate
+      - run: npm run build:packages
+
+      - name: Install the browser
+        run: npx playwright install --with-deps chromium
+
+      - name: Bundle the scenes
+        run: node scripts/readme-media/build.mjs
+
+      # Every variant is drawn first and nothing is written: a screen that logged
+      # an error or asked for data its scene does not answer fails the run here,
+      # before any picture is replaced.
+      - name: Check every scene draws
+        run: node scripts/readme-media/capture.mjs --check
+
+      - name: Take the pictures
+        run: node scripts/readme-media/capture.mjs
+
+      # The definitions, and that the README shows every scene from a file that
+      # is now there - the same test CI runs on every change.
+      - name: Check the scenes and the README
+        run: node --test scripts/test/readme-media.test.mjs
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: readme-media
+          path: docs/assets/media/*.webp
+          if-no-files-found: error
+
+      - name: Commit the pictures
+        working-directory: .
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          BRANCH: ${{ github.ref_name }}
+          DEFAULT: ${{ github.event.repository.default_branch }}
+          RUN: ${{ github.run_number }}
+        run: |
+          git add -A docs/assets/media
+          if git diff --cached --quiet; then
+            echo "The pictures are unchanged." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "📝 docs(readme): retake the screenshots"
+          if [ "$BRANCH" != "$DEFAULT" ]; then
+            git push origin "HEAD:$BRANCH"
+            echo "Committed the new pictures to \`$BRANCH\`." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          target="readme-media/$RUN"
+          git push origin "HEAD:refs/heads/$target"
+          if gh pr create --base "$DEFAULT" --head "$target" \
+            --title "📝 docs(readme): retake the screenshots" \
+            --body "The README pictures, retaken by run $RUN of the README media workflow. Look at them before merging."; then
+            echo "Opened a pull request with the new pictures from \`$target\`." >> "$GITHUB_STEP_SUMMARY"
+          else
+            # Actions may not be allowed to open pull requests in this repository.
+            echo "Pushed the new pictures to \`$target\`; open a pull request from it to merge them." >> "$GITHUB_STEP_SUMMARY"
+          fi
