@@ -16,9 +16,13 @@
  * - **The same width all the way** (`WIDTH`, at least 3), **a wall on both sides
  *   with no gap**, two blocks over the ice: a boat cannot climb one, and a player
  *   out of their boat cannot jump one.
- * - **Turns a boat on ice can take**: every turn a right angle, and at least
- *   `STEP` x 2 blocks of straight between two - the outline of a shape drawn at
- *   twice its size never turns twice in a row.
+ * - **Turns a boat on ice can take**: at least `STEP` x 2 blocks between two
+ *   turns - the outline of a shape drawn at twice its size never turns twice in
+ *   a row - and, from design 2, every turn a sweeping arc of `RADIUS` blocks
+ *   rather than a corner. A boat on ice is fast and spins round when it hits a
+ *   wall, so a design 1 track (five blocks wide, square corners) was mostly
+ *   walls: design 2 is nine wide, its steps twice as long, and a turn is taken
+ *   without touching either side.
  * - **Nothing can be skipped**: a gate spans the track from wall to wall, and
  *   taking every gate's box out of the track leaves it in as many pieces as
  *   there are gates, each running from one gate to the next. In the game a
@@ -28,6 +32,9 @@
  * Gates are passed inside the game, by the events data pack (`FUNCTIONS`): a
  * boat on packed ice covers two blocks a tick, and the quickest look over RCON
  * comes round every eight.
+ *
+ * A run keeps the design it was built with (`track`'s `design`), so an update
+ * in the middle of a race never moves the track from under it.
  *
  * Boats by version: a boat is its own entity per wood from 1.21.2
  * (`minecraft:oak_boat`), one `minecraft:boat` with a `Type` before; a player
@@ -42,20 +49,47 @@ import type { Box, Spot, Volume } from "./stage";
 import { seeded } from "../trivia-bank";
 
 /** How tracks are laid out now, written onto the stage when one is built. */
-export const DESIGN = 1;
+export const DESIGN = 2;
+
+/**
+ * Each design's measures: blocks of ice across the track, blocks from one point
+ * of the outline to the next (middle to middle), the radius of a turn along the
+ * middle of the track (0: a square corner), and a lap's length in blocks.
+ */
+interface Geometry {
+    readonly width: number;
+    readonly step: number;
+    readonly radius: number;
+    readonly lap: { readonly least: number; readonly most: number };
+}
+
+const GEOMETRY: Readonly<Record<number, Geometry>> = {
+    1: { width: 5, step: 8, radius: 0, lap: { least: 256, most: 448 } },
+    2: { width: 9, step: 16, radius: 12, lap: { least: 512, most: 896 } }
+};
+
+/** A design's measures; any design this does not know reads as the oldest. */
+function geometryOf(design: number): Geometry {
+    return GEOMETRY[design] ?? GEOMETRY[1]!;
+}
+
+const halfOf = (geometry: Geometry) => (geometry.width - 1) / 2;
 
 /** Blocks of ice across the track. */
-export const WIDTH = 5;
-const HALF = (WIDTH - 1) / 2;
+export const WIDTH = geometryOf(DESIGN).width;
 /** Blocks from one point of the outline to the next, middle to middle. */
-export const STEP = 8;
+export const STEP = geometryOf(DESIGN).step;
+/** How far round a turn sweeps, along the middle of the track. */
+export const RADIUS = geometryOf(DESIGN).radius;
 /** How many squares the shape is grown to, and the most it may spread each way. */
 const CELLS = { least: 8, most: 14 } as const;
 const SPREAD = 6;
 /** The fewest turns a track has: a plain rectangle has four. */
 export const LEAST_TURNS = 8;
 /** A lap's length, in blocks along the middle of the track. */
-export const LAP = { least: 256, most: 448 } as const;
+export const LAP = geometryOf(DESIGN).lap;
+/** The most a net box spans each way: a whole net is too big for one fill. */
+const NET_TILE = 128;
 /** Gates on a lap, the start line included. */
 export const GATES = { least: 4, most: 10 } as const;
 /** How far along the track a gate's box reaches each way from its line. */
@@ -223,6 +257,8 @@ export interface Layout {
     readonly gates: readonly Gate[];
     /** Whether the drawn shape was given up for the plain one (`FALLBACK`). */
     readonly fallback: boolean;
+    /** The design it was laid out for (`DESIGN`). */
+    readonly design: number;
 }
 
 /** A shape that always keeps the rules, should a run's draws all fail them: an
@@ -285,9 +321,9 @@ function gatesFor(points: readonly Point[]): Gate[] {
 
 /** The plain track (`FALLBACK`): what a run gets should none of its draws keep
  *  the rules. */
-export function plainLayout(): Layout {
+export function plainLayout(design = DESIGN): Layout {
     const points = outline(new Set(FALLBACK))!;
-    return { points, gates: gatesFor(points), fallback: true };
+    return { points, gates: gatesFor(points), fallback: true, design };
 }
 
 /** How many layouts are kept: a race, its preview and a few run ids. */
@@ -299,9 +335,11 @@ const layouts = new Map<string, Layout>();
  * every rule (`trackProblems`) - the first that does - or, should none in many
  * tries, the plain fallback.
  */
-export function laidOut(seed: string): Layout {
-    const kept = layouts.get(seed);
+export function laidOut(seed: string, design = DESIGN): Layout {
+    const cached = `${design}:${seed}`;
+    const kept = layouts.get(cached);
     if (kept) return kept;
+    const geometry = geometryOf(design);
     const random = seeded(`boat-race-${seed}`);
     let found: Layout | null = null;
     for (let tries = 0; tries < 200 && !found; tries += 1) {
@@ -309,23 +347,132 @@ export function laidOut(seed: string): Layout {
         const points = outline(grown(random, count));
         if (!points) continue;
         // The quick rules first: most shapes that fail, fail on these.
-        const lap = points.length * STEP;
-        if (lap < LAP.least || lap > LAP.most) continue;
+        const lap = points.length * geometry.step;
+        if (lap < geometry.lap.least || lap > geometry.lap.most) continue;
         if (turnsOf(points).length < LEAST_TURNS) continue;
-        const layout = { points, gates: gatesFor(points), fallback: false };
+        const layout = { points, gates: gatesFor(points), fallback: false, design };
         if (trackProblems(layout).length === 0) found = layout;
     }
-    found ??= plainLayout();
-    layouts.set(seed, found);
+    found ??= plainLayout(design);
+    layouts.set(cached, found);
     if (layouts.size > LAYOUTS_KEPT) layouts.delete(layouts.keys().next().value!);
     return found;
 }
 
 // ------------------------------------------------------------------ the blocks
 
-/** The ice of the track, block by block, by `x,z` from the outline's own origin:
- *  each point a square of `WIDTH`, and each step between two filled in. */
-export function roadCells(points: readonly Point[]): Map<string, number[]> {
+/** One block's worth of the middle of the track: where it is, in the outline's
+ *  own blocks, and the way the track runs there. */
+export interface Sample {
+    readonly x: number;
+    readonly z: number;
+    readonly dx: number;
+    readonly dz: number;
+}
+
+/**
+ * The middle of the track a block at a time, in the order it is raced, from the
+ * first point of the outline: straight along it, and round each turn on an arc
+ * of the design's radius that leaves the straight before the turn's point and
+ * joins the next one after it. With no radius, the outline itself. Each point
+ * of the outline on a straight is a sample of its own (`sampleAt`).
+ */
+export function centerline(points: readonly Point[], design = DESIGN): Sample[] {
+    const { step, radius } = geometryOf(design);
+    const count = points.length;
+    const turns = new Set(turnsOf(points));
+    const samples: Sample[] = [];
+    const at = (index: number) => {
+        const one = points[((index % count) + count) % count]!;
+        return { x: one.u * step, z: one.v * step };
+    };
+    for (let index = 0; index < count; index += 1) {
+        const from = at(index);
+        const to = at(index + 1);
+        const dx = Math.sign(to.x - from.x);
+        const dz = Math.sign(to.z - from.z);
+        // The straight part of this step: cut short by an arc at either end.
+        const start = turns.has(index) ? radius : 0;
+        const end = turns.has((index + 1) % count) ? step - radius : step;
+        for (let along = start; along < end; along += 1)
+            samples.push({ x: from.x + dx * along, z: from.z + dz * along, dx, dz });
+        if (!turns.has((index + 1) % count) || radius === 0) continue;
+        // Round the turn at the next point: from `radius` before it to `radius` after.
+        const next = at(index + 2);
+        const ex = Math.sign(next.x - to.x);
+        const ez = Math.sign(next.z - to.z);
+        const cx = to.x - dx * radius + ex * radius;
+        const cz = to.z - dz * radius + ez * radius;
+        const arc = Math.max(2, Math.round((Math.PI / 2) * radius));
+        for (let piece = 0; piece < arc; piece += 1) {
+            const angle = ((piece / arc) * Math.PI) / 2;
+            // From the centre, out along -e and swinging round to +d.
+            const ox = -ex * Math.cos(angle) + dx * Math.sin(angle);
+            const oz = -ez * Math.cos(angle) + dz * Math.sin(angle);
+            const tx = dx * Math.cos(angle) + ex * Math.sin(angle);
+            const tz = dz * Math.cos(angle) + ez * Math.sin(angle);
+            samples.push({ x: cx + ox * radius, z: cz + oz * radius, dx: tx, dz: tz });
+        }
+    }
+    return samples;
+}
+
+/** The sample at a point of the outline - one on a straight. */
+export function sampleAt(points: readonly Point[], index: number, design = DESIGN): number {
+    const { step } = geometryOf(design);
+    const one = points[index]!;
+    const samples = centerline(points, design);
+    const found = samples.findIndex((s) => s.x === one.u * step && s.z === one.v * step);
+    return found === -1 ? 0 : found;
+}
+
+const roads = new WeakMap<readonly Point[], Map<number, Map<string, number[]>>>();
+
+/** The ice of the track, block by block, by `x,z` from the outline's own origin,
+ *  with the parts of the track each block is on. Design 1: each point a square
+ *  of its width, and each step between two filled in. From design 2: every block
+ *  within half the width of the middle of the track. */
+export function roadCells(points: readonly Point[], design = DESIGN): Map<string, number[]> {
+    const kept = roads.get(points)?.get(design);
+    if (kept) return kept;
+    const cells =
+        geometryOf(design).radius === 0 ? squareRoad(points, design) : roundRoad(points, design);
+    const byDesign = roads.get(points) ?? new Map<number, Map<string, number[]>>();
+    byDesign.set(design, cells);
+    roads.set(points, byDesign);
+    return cells;
+}
+
+/** Design 2 on: every block whose middle is within half the width (and half a
+ *  block) of a sample of the middle of the track - samples are at most a block
+ *  apart, so that is the band along it - by the samples it is near. */
+function roundRoad(points: readonly Point[], design: number): Map<string, number[]> {
+    const reach = halfOf(geometryOf(design)) + 0.5;
+    const samples = centerline(points, design);
+    const cells = new Map<string, number[]>();
+    const span = Math.ceil(reach) + 1;
+    samples.forEach((one, index) => {
+        const bx = Math.round(one.x);
+        const bz = Math.round(one.z);
+        for (let x = bx - span; x <= bx + span; x += 1)
+            for (let z = bz - span; z <= bz + span; z += 1) {
+                const gx = x - one.x;
+                const gz = z - one.z;
+                if (gx * gx + gz * gz > reach * reach + 1e-9) continue;
+                const at = key(x, z);
+                const list = cells.get(at);
+                if (!list) cells.set(at, [index]);
+                else if (list[list.length - 1] !== index) list.push(index);
+            }
+    });
+    return cells;
+}
+
+/** Design 1: each point a square of its width, and each step between two filled in. */
+function squareRoad(points: readonly Point[], design: number): Map<string, number[]> {
+    const geometry = geometryOf(design);
+    const STEP = geometry.step;
+    const HALF = halfOf(geometry);
     const cells = new Map<string, number[]>();
     const add = (x: number, z: number, segment: number) => {
         const at = key(x, z);
@@ -362,11 +509,15 @@ export function wallCells(road: ReadonlyMap<string, unknown>): Set<string> {
 /** A gate's line across the track and its box, in the outline's own blocks. */
 export function gateArea(
     points: readonly Point[],
-    gate: Gate
+    gate: Gate,
+    design = DESIGN
 ): {
     line: { x1: number; z1: number; x2: number; z2: number };
     box: { x1: number; z1: number; x2: number; z2: number };
 } {
+    const geometry = geometryOf(design);
+    const STEP = geometry.step;
+    const HALF = halfOf(geometry);
     const one = points[gate.at]!;
     const x = one.u * STEP;
     const z = one.v * STEP;
@@ -443,10 +594,14 @@ export function track(
     options: Pick<EventOptions<"boat-race">, "laps">,
     seed: string,
     site: { x: number; z: number },
-    y: number
+    y: number,
+    design = DESIGN
 ): Track {
-    const layout = laidOut(seed);
-    const road = roadCells(layout.points);
+    const layout = laidOut(seed, design);
+    const geometry = geometryOf(design);
+    const STEP = geometry.step;
+    const HALF = halfOf(geometry);
+    const road = roadCells(layout.points, design);
     const walls = wallCells(road);
     const all = [...road.keys(), ...walls].map(
         (at) => at.split(",").map(Number) as [number, number]
@@ -464,7 +619,7 @@ export function track(
         z1: box.z1 + dz,
         z2: box.z2 + dz
     });
-    const areas = layout.gates.map((gate) => gateArea(layout.points, gate));
+    const areas = layout.gates.map((gate) => gateArea(layout.points, gate, design));
     const lines = new Set<string>();
     for (const { line } of areas)
         for (let x = line.x1; x <= line.x2; x += 1)
@@ -492,7 +647,7 @@ export function track(
                   { x1: line.x1 - 1, z1: line.z1, x2: line.x1 - 1, z2: line.z1 },
                   { x1: line.x2 + 1, z1: line.z1, x2: line.x2 + 1, z2: line.z1 }
               ];
-        const beam = Array.from({ length: WIDTH }, (_, step) => {
+        const beam = Array.from({ length: geometry.width }, (_, step) => {
             const at = across
                 ? { x1: line.x1, z1: line.z1 + step, x2: line.x1, z2: line.z1 + step }
                 : { x1: line.x1 + step, z1: line.z1, x2: line.x1 + step, z2: line.z1 };
@@ -507,17 +662,23 @@ export function track(
             ...beam
         ];
     });
-    const net = world({
-        x1: lowX,
-        z1: lowZ,
-        x2: highX,
-        z2: highZ,
-        y1: y - NET_DROP,
-        y2: y - NET_DROP,
-        block: NET
-    });
+    // The net in tiles: a big track's whole net is more than one fill takes.
+    const net: Box[] = [];
+    for (let x1 = lowX; x1 <= highX; x1 += NET_TILE)
+        for (let z1 = lowZ; z1 <= highZ; z1 += NET_TILE)
+            net.push(
+                world({
+                    x1,
+                    z1,
+                    x2: Math.min(highX, x1 + NET_TILE - 1),
+                    z2: Math.min(highZ, z1 + NET_TILE - 1),
+                    y1: y - NET_DROP,
+                    y2: y - NET_DROP,
+                    block: NET
+                })
+            );
     const boxes: Box[] = [
-        net,
+        ...net,
         ...layer(ice, y, ICE),
         ...layer(lines, y, LINE),
         ...layer(walls, y, WALL),
@@ -528,6 +689,7 @@ export function track(
     ];
     const respawns = layout.gates.map((gate) => {
         const one = layout.points[gate.at]!;
+        // The point of a gate is always on a straight, so on the middle of the track.
         return {
             x: one.u * STEP + dx + 0.5,
             y: y + 1,
@@ -552,7 +714,10 @@ export function track(
         },
         reach: Math.ceil(Math.hypot(highX - lowX, highZ - lowZ) / 2) + 1,
         origin: { x: dx, z: dz },
-        lap: layout.points.length * STEP
+        lap:
+            geometry.radius === 0
+                ? layout.points.length * STEP
+                : centerline(layout.points, design).length
     };
 }
 
@@ -567,7 +732,9 @@ function yawOf(du: number, dv: number): number {
  * too, for a crowd.
  */
 export function grid(track: Track, count: number): Spot[] {
+    if (geometryOf(track.layout.design).radius > 0) return roundGrid(track, count);
     const { points } = track.layout;
+    const STEP = geometryOf(track.layout.design).step;
     const start = track.layout.gates[0]!;
     const spots: Spot[] = [];
     // Walk back along the outline from the start line, a block at a time.
@@ -603,6 +770,28 @@ export function grid(track: Track, count: number): Spot[] {
     return spots;
 }
 
+/** Where each of `count` racers starts on a track with round turns: three abreast,
+ *  three blocks a row, back from the start line along the middle of the track. */
+function roundGrid(track: Track, count: number): Spot[] {
+    const { points, design } = track.layout;
+    const samples = centerline(points, design);
+    const start = sampleAt(points, track.layout.gates[0]!.at, design);
+    const spots: Spot[] = [];
+    for (let index = 0; index < count; index += 1) {
+        const row = Math.floor(index / 3);
+        const back = GATE_DEPTH + 2 + row * 3;
+        const one = samples[(((start - back) % samples.length) + samples.length) % samples.length]!;
+        const side = ((index % 3) - 1) * 3;
+        spots.push({
+            x: Math.round((one.x - one.dz * side + track.origin.x + 0.5) * 100) / 100,
+            y: track.floor + 1,
+            z: Math.round((one.z + one.dx * side + track.origin.z + 0.5) * 100) / 100,
+            yaw: yawOf(one.dx, one.dz)
+        });
+    }
+    return spots;
+}
+
 /** On the start grid's stretch, at the ice's height: where a racer waits for "Go!". */
 export function onGrid(track: Track, at: { x: number; y: number; z: number }): boolean {
     return at.y >= track.floor + 0.5 && at.y <= track.floor + 3 && onIce(track, at);
@@ -610,7 +799,7 @@ export function onGrid(track: Track, at: { x: number; y: number; z: number }): b
 
 /** Over the track's ice. */
 function onIce(track: Track, at: { x: number; z: number }): boolean {
-    const road = roadCells(track.layout.points);
+    const road = roadCells(track.layout.points, track.layout.design);
     return road.has(key(Math.floor(at.x) - track.origin.x, Math.floor(at.z) - track.origin.z));
 }
 
@@ -622,7 +811,12 @@ function onIce(track: Track, at: { x: number; z: number }): boolean {
  */
 export function trackProblems(layout: Layout): string[] {
     const problems: string[] = [];
-    const { points, gates } = layout;
+    const { points, gates, design } = layout;
+    const geometry = geometryOf(design);
+    const STEP = geometry.step;
+    const HALF = halfOf(geometry);
+    const WIDTH = geometry.width;
+    const LAP = geometry.lap;
     const count = points.length;
     // One closed loop, a step at a time, never through a point twice.
     const seen = new Set<string>();
@@ -642,11 +836,13 @@ export function trackProblems(layout: Layout): string[] {
         const next = turns[(index + 1) % turns.length]!;
         if ((next - turn + count) % count < 2) problems.push(`turns at ${turn} and ${next}`);
     });
+    const road = roadCells(points, design);
+    if (geometry.radius > 0) problems.push(...roundProblems(points, design, road));
     // Never touching itself: the ice of two parts of the loop more than three
     // steps apart is never within three blocks - ice, wall, air, wall at the
     // least. Each step's ice is one rectangle (`roadCells`), so it is enough to
     // hold every two of those rectangles apart.
-    const spans = points.map((one, index) => {
+    const spans = (geometry.radius > 0 ? [] : points).map((one, index) => {
         const to = points[(index + 1) % count]!;
         return {
             x1: Math.min(one.u, to.u) * STEP - HALF,
@@ -662,9 +858,8 @@ export function trackProblems(layout: Layout): string[] {
             if (apart < 3) problems.push(`steps ${i} and ${j} are ${apart} blocks apart`);
         })
     );
-    const road = roadCells(points);
     // The same width all the way: across every straight block, exactly WIDTH of ice.
-    points.forEach((one, index) => {
+    (geometry.radius > 0 ? [] : points).forEach((one, index) => {
         const to = points[(index + 1) % count]!;
         const along = to.u !== one.u;
         for (let step = HALF + 1; step < STEP - HALF; step += 1) {
@@ -676,17 +871,32 @@ export function trackProblems(layout: Layout): string[] {
             if (width !== WIDTH) problems.push(`${width} wide at ${x},${z}`);
         }
     });
-    // A wall all round: every block beside the ice is ice or wall.
-    const walls = wallCells(road);
+    // The blocks as numbers from here on: a track has thousands, and these are
+    // walked many times over.
+    const OFFSET = 1 << 12;
+    const SPAN = 1 << 13;
+    const n = (x: number, z: number) => (x + OFFSET) * SPAN + (z + OFFSET);
+    const ice = new Set<number>();
+    const coords: [number, number][] = [];
     for (const at of road.keys()) {
         const [x, z] = at.split(",").map(Number) as [number, number];
+        ice.add(n(x, z));
+        coords.push([x, z]);
+    }
+    // A wall all round: every block beside the ice is ice or wall.
+    const walls = new Set(
+        [...wallCells(road)].map((at) => {
+            const [x, z] = at.split(",").map(Number) as [number, number];
+            return n(x, z);
+        })
+    );
+    for (const [x, z] of coords)
         for (let dx = -1; dx <= 1; dx += 1)
             for (let dz = -1; dz <= 1; dz += 1) {
-                const near = key(x + dx, z + dz);
-                if (!road.has(near) && !walls.has(near))
-                    problems.push(`a gap in the wall at ${near}`);
+                const near = n(x + dx, z + dz);
+                if (!ice.has(near) && !walls.has(near))
+                    problems.push(`a gap in the wall at ${key(x + dx, z + dz)}`);
             }
-    }
     // Gates: as many as a lap asks for, on straights, apart, in order round it.
     if (gates.length < GATES.least || gates.length > GATES.most)
         problems.push(`${gates.length} gates`);
@@ -699,33 +909,29 @@ export function trackProblems(layout: Layout): string[] {
     });
     // Nothing skipped: with every gate's box out, the ice falls into one piece
     // per stretch between two gates, each touching only those two.
-    const boxes = gates.map((gate) => gateArea(points, gate).box);
-    const inBox = (x: number, z: number) =>
-        boxes.findIndex((box) => x >= box.x1 && x <= box.x2 && z >= box.z1 && z <= box.z2);
-    const left = new Set(
-        [...road.keys()].filter((at) => {
-            const [x, z] = at.split(",").map(Number) as [number, number];
-            return inBox(x, z) === -1;
-        })
-    );
+    const boxes = gates.map((gate) => gateArea(points, gate, design).box);
+    // Which gate's box each block is in, worked out once: the first box that
+    // holds it, as a search through them in order would find.
+    const gateOf = new Map<number, number>();
+    for (let index = boxes.length - 1; index >= 0; index -= 1) {
+        const box = boxes[index]!;
+        for (let x = box.x1; x <= box.x2; x += 1)
+            for (let z = box.z1; z <= box.z2; z += 1) gateOf.set(n(x, z), index);
+    }
+    const left = new Set<number>();
+    for (const [x, z] of coords) if (!gateOf.has(n(x, z))) left.add(n(x, z));
     const pieces: Set<number>[] = [];
-    const done = new Set<string>();
+    const done = new Set<number>();
     for (const at of left) {
         if (done.has(at)) continue;
         const touches = new Set<number>();
         const queue = [at];
         done.add(at);
         while (queue.length > 0) {
-            const [x, z] = queue.pop()!.split(",").map(Number) as [number, number];
-            for (const [dx, dz] of [
-                [1, 0],
-                [-1, 0],
-                [0, 1],
-                [0, -1]
-            ] as const) {
-                const near = key(x + dx, z + dz);
-                const gate = inBox(x + dx, z + dz);
-                if (gate !== -1 && road.has(near)) touches.add(gate);
+            const one = queue.pop()!;
+            for (const near of [one + SPAN, one - SPAN, one + 1, one - 1]) {
+                const gate = gateOf.get(near);
+                if (gate !== undefined && ice.has(near)) touches.add(gate);
                 if (!left.has(near) || done.has(near)) continue;
                 done.add(near);
                 queue.push(near);
@@ -742,6 +948,65 @@ export function trackProblems(layout: Layout): string[] {
             (ids[1]! - ids[0]! === 1 || (ids[0] === 0 && ids[1] === gates.length - 1));
         if (!consecutive) problems.push(`a stretch between gates ${ids.join(" and ")}`);
     }
+    return problems;
+}
+
+/**
+ * The rules a track with round turns keeps besides the rest. Never touching
+ * itself: any two points of the middle of the track more than three steps apart
+ * along it are at least `APART` apart - with the ice reaching half the width and
+ * half a block either side of the middle, that leaves at least four blocks
+ * between the ice of the two, room for wall, air and wall. And exactly its width
+ * across every block of every straight.
+ */
+function roundProblems(
+    points: readonly Point[],
+    design: number,
+    road: ReadonlyMap<string, readonly number[]>
+): string[] {
+    const problems: string[] = [];
+    const geometry = geometryOf(design);
+    const half = halfOf(geometry);
+    const samples = centerline(points, design);
+    const total = samples.length;
+    const far = 3 * geometry.step;
+    const apart = 2 * (half + 0.5) + 4 * Math.SQRT2;
+    // Bucketed by area, so each sample is held only against those near it.
+    const size = Math.ceil(apart);
+    const buckets = new Map<string, number[]>();
+    samples.forEach((one, index) => {
+        const at = key(Math.floor(one.x / size), Math.floor(one.z / size));
+        (buckets.get(at) ?? buckets.set(at, []).get(at)!).push(index);
+    });
+    for (let index = 0; index < total && problems.length === 0; index += 1) {
+        const one = samples[index]!;
+        const bx = Math.floor(one.x / size);
+        const bz = Math.floor(one.z / size);
+        for (let dx = -1; dx <= 1; dx += 1)
+            for (let dz = -1; dz <= 1; dz += 1)
+                for (const other of buckets.get(key(bx + dx, bz + dz)) ?? []) {
+                    const along = Math.abs(other - index);
+                    if (Math.min(along, total - along) <= far) continue;
+                    const near = samples[other]!;
+                    if (Math.hypot(near.x - one.x, near.z - one.z) < apart)
+                        problems.push(
+                            `the track comes within reach of itself at ${one.x},${one.z}`
+                        );
+                }
+    }
+    // Across every straight block, exactly the width: a sample with straight
+    // track for half the width and a block each way.
+    samples.forEach((one, index) => {
+        if (!Number.isInteger(one.dx) || !Number.isInteger(one.dz)) return;
+        for (let offset = -half - 1; offset <= half + 1; offset += 1) {
+            const near = samples[(index + offset + total) % total]!;
+            if (near.dx !== one.dx || near.dz !== one.dz) return;
+        }
+        let width = 0;
+        for (let side = -geometry.width; side <= geometry.width; side += 1)
+            if (road.has(key(one.x - one.dz * side, one.z + one.dx * side))) width += 1;
+        if (width !== geometry.width) problems.push(`${width} wide at ${one.x},${one.z}`);
+    });
     return problems;
 }
 
