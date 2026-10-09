@@ -51,6 +51,7 @@ import {
     Trash2,
     type LucideIcon
 } from "lucide-react";
+import { SUGGESTED_COLORS } from "@polaris/ui";
 
 /** The engine's kinds of menu item. Numbers, as the engine stores them. */
 export const MENU_ITEM = { button: 0, selector: 1, buttonSelector: 2, subitems: 3 } as const;
@@ -325,20 +326,26 @@ export interface TabColor {
     readonly word: "blue" | "teal" | "green" | "yellow" | "orange" | "red" | "pink" | "violet" | "slate" | "black";
 }
 
+/** The catalog name of each of the colour picker's suggestions, in its order. */
+const TAB_COLOR_WORDS: readonly TabColor["word"][] = [
+    "blue",
+    "teal",
+    "green",
+    "yellow",
+    "orange",
+    "red",
+    "pink",
+    "violet",
+    "slate",
+    "black"
+];
+
 /** The colours offered for a sheet tab - the same ten the colour picker
  *  suggests everywhere else in Polaris. */
-export const TAB_COLORS: readonly TabColor[] = [
-    { hex: "#5b8def", word: "blue" },
-    { hex: "#3fd0c9", word: "teal" },
-    { hex: "#7bc47f", word: "green" },
-    { hex: "#e8c26a", word: "yellow" },
-    { hex: "#ff9a3c", word: "orange" },
-    { hex: "#ff5a5f", word: "red" },
-    { hex: "#d94f8a", word: "pink" },
-    { hex: "#a06bff", word: "violet" },
-    { hex: "#4d5561", word: "slate" },
-    { hex: "#20242c", word: "black" }
-];
+export const TAB_COLORS: readonly TabColor[] = SUGGESTED_COLORS.map((hex, index) => ({
+    hex,
+    word: TAB_COLOR_WORDS[index]!
+}));
 
 /** Whether any item of a group can be drawn at all. */
 export function renderable(node: MenuNode): boolean {

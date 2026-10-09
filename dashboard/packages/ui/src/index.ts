@@ -58,7 +58,7 @@ export {
     type ConfirmDeleteDialogProps
 } from "./components/confirm-delete-dialog";
 export { Switch } from "./components/switch";
-export { ColorPicker } from "./components/color-picker";
+export { ColorPicker, SUGGESTED_COLORS } from "./components/color-picker";
 export {
     ToastProvider,
     useToast,

@@ -34,6 +34,8 @@ function stream<T>(value: T): Watchable<T> & { set: (next: T) => void } {
 }
 
 const hiddenProtect = stream(true);
+const insertDisabled = stream(false);
+const colorDisabled = stream(false);
 
 const MENUS: Record<string, MenuNode[]> = {
     "contextMenu.mainArea": [
@@ -46,7 +48,7 @@ const MENUS: Record<string, MenuNode[]> = {
         {
             key: "contextMenu.layout",
             children: [
-                { key: "insert", item: { id: "sheet.menu.cell-insert", type: 3, title: "sheets-ui.rightClick.insert", icon: "InsertDoubleIcon" } }
+                { key: "insert", item: { id: "sheet.menu.cell-insert", type: 3, title: "sheets-ui.rightClick.insert", icon: "InsertDoubleIcon", disabled$: insertDisabled } }
             ]
         },
         {
@@ -82,6 +84,7 @@ const MENUS: Record<string, MenuNode[]> = {
                         id: "sheet.command.set-tab-color",
                         type: 1,
                         title: "sheets-ui.sheetConfig.changeColor",
+                        disabled$: colorDisabled,
                         selections: [{ label: { name: "UI_COLOR_PICKER_COMPONENT", selectable: false, hoverable: false } }]
                     }
                 }
@@ -188,6 +191,34 @@ describe("the spreadsheet's right-click menu", () => {
             fireEvent.click(screen.getByRole("menuitem", { name: "Blue" }));
             expect(run).toHaveBeenCalledWith("sheet.command.set-tab-color", { value: "#5b8def", subUnitId: "sheet-2" });
         } finally {
+            vi.unstubAllGlobals();
+        }
+    });
+
+    it("keeps a disabled submenu's options disabled when they are listed on a phone", async () => {
+        vi.stubGlobal("matchMedia", vi.fn().mockReturnValue({ matches: true }));
+        act(() => {
+            insertDisabled.set(true);
+            colorDisabled.set(true);
+        });
+        try {
+            const { fake, run, open } = engine();
+            render(<SheetContextMenu engine={fake} />, { wrapper: MessagesWrapper });
+            open("contextMenu.mainArea");
+            const field = (await screen.findByRole("spinbutton")) as HTMLInputElement;
+            expect(field.disabled).toBe(true);
+            expect(field.closest("[role=menuitem]")?.getAttribute("aria-disabled")).toBe("true");
+            open("contextMenu.footerTabs", { subUnitId: "sheet-2" });
+            const blue = await screen.findByRole("menuitem", { name: "Blue" });
+            expect(blue.getAttribute("aria-disabled")).toBe("true");
+            fireEvent.click(blue);
+            fireEvent.keyDown(blue, { key: "Enter" });
+            expect(run).not.toHaveBeenCalled();
+        } finally {
+            act(() => {
+                insertDisabled.set(false);
+                colorDisabled.set(false);
+            });
             vi.unstubAllGlobals();
         }
     });

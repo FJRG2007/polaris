@@ -101,6 +101,9 @@ interface MenuContextValue {
 
 const MenuContext = createContext<MenuContextValue | null>(null);
 
+/** Whether the submenu an item is listed under on a narrow screen is disabled. */
+const InheritedDisabled = createContext(false);
+
 function useMenu(): MenuContextValue {
     const value = useContext(MenuContext);
     if (!value) throw new Error("outside the sheet menu");
@@ -252,7 +255,8 @@ function Item({ node }: { node: menu.MenuNode }) {
     const item = node.item!;
     const { engine, session } = useMenu();
     const hidden = useWatch(item.hidden$, false);
-    const disabled = useWatch(item.disabled$, false);
+    const inherited = useContext(InheritedDisabled);
+    const disabled = useWatch(item.disabled$, false) || inherited;
     const value = useWatch(item.value$, undefined as unknown);
     const watched = useWatch(
         Array.isArray(item.selections) ? undefined : item.selections,
@@ -266,11 +270,13 @@ function Item({ node }: { node: menu.MenuNode }) {
     if (children.length > 0 && session.narrow) {
         return (
             <ContextMenuGroup>
-                <ContextMenuLabel className="flex items-center gap-2">
+                <ContextMenuLabel className={cn("flex items-center gap-2", disabled && "opacity-50")}>
                     <ItemFace item={item} value={value} />
                 </ContextMenuLabel>
                 <div className="pl-3">
-                    <Groups nodes={children} />
+                    <InheritedDisabled.Provider value={disabled}>
+                        <Groups nodes={children} />
+                    </InheritedDisabled.Provider>
                 </div>
             </ContextMenuGroup>
         );
@@ -336,6 +342,7 @@ function Choices({
                                     aria-label={t(`sheetMenu.colors.${swatch.word}`)}
                                     title={t(`sheetMenu.colors.${swatch.word}`)}
                                     className="size-7 justify-center p-0"
+                                    disabled={disabled}
                                     onSelect={() => choose(item.selectionsCommandId ?? item.id, undefined, swatch.hex)}
                                 >
                                     <span
@@ -347,7 +354,10 @@ function Choices({
                             ))}
                         </div>
                         <ContextMenuSeparator />
-                        <ContextMenuItem onSelect={() => choose(item.selectionsCommandId ?? item.id, undefined, "")}>
+                        <ContextMenuItem
+                            disabled={disabled}
+                            onSelect={() => choose(item.selectionsCommandId ?? item.id, undefined, "")}
+                        >
                             <span aria-hidden className="size-4 rounded border border-dashed border-border-strong" />
                             {t("sheetMenu.noColor")}
                         </ContextMenuItem>
@@ -366,7 +376,7 @@ function Choices({
                         return (
                             <ContextMenuItem
                                 key={`${String(option.value)}-${index}`}
-                                disabled={option.disabled}
+                                disabled={disabled || option.disabled}
                                 onSelect={() => choose(menu.optionCommand(item, option), undefined, option.value)}
                             >
                                 <Check className={cn("size-4", chosen ? "opacity-100" : "opacity-0")} aria-hidden />
@@ -380,10 +390,10 @@ function Choices({
     if (session.narrow) {
         return (
             <ContextMenuGroup>
-                <ContextMenuLabel className="flex items-center gap-2">
+                <ContextMenuLabel className={cn("flex items-center gap-2", disabled && "opacity-50")}>
                     <ItemFace item={item} value={value} />
                 </ContextMenuLabel>
-                <div className={cn("pl-3", disabled && "pointer-events-none opacity-50")}>{body}</div>
+                <div className="pl-3">{body}</div>
             </ContextMenuGroup>
         );
     }

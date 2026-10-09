@@ -151,12 +151,21 @@ export function SheetEditor({
 
                 // The right-click menu is Polaris' own (`sheet-context-menu`).
                 // Wired once the workbook exists, because that is when the
-                // engine's interface services do.
-                const ui = sheetsCore as unknown as UniverMenuModule;
-                const injector = (univer as unknown as { __getInjector: () => Injector }).__getInjector();
-                const routed = routeContextMenu(injector, ui);
-                const stopRightClicks = takeRightClicks(host.current, injector, ui, ICommandService, routed);
-                setMenuEngine(menuEngineOf(injector, ui, ICommandService, LocaleService, routed));
+                // engine's interface services do. It reaches into the engine's
+                // internals, so a version that moved them keeps the engine's own
+                // menu rather than failing to open the spreadsheet.
+                const unwireMenu: (() => void)[] = [];
+                try {
+                    const ui = sheetsCore as unknown as UniverMenuModule;
+                    const injector = (univer as unknown as { __getInjector: () => Injector }).__getInjector();
+                    const routed = routeContextMenu(injector, ui);
+                    unwireMenu.push(routed.restore);
+                    unwireMenu.push(takeRightClicks(host.current, injector, ui, ICommandService, routed));
+                    setMenuEngine(menuEngineOf(injector, ui, ICommandService, LocaleService, routed));
+                } catch (caught) {
+                    console.error("[office] the spreadsheet keeps the engine's own right-click menu", caught);
+                    unwireMenu.splice(0).reverse().forEach((undo) => undo());
+                }
                 setReady(true);
 
                 /** The workbook as it is now, compared with what is shared, and
@@ -210,8 +219,7 @@ export function SheetEditor({
                 cells.observe(observe);
 
                 stop = () => {
-                    stopRightClicks();
-                    routed.restore();
+                    unwireMenu.splice(0).reverse().forEach((undo) => undo());
                     listener.dispose();
                     cells.unobserve(observe);
                 };
@@ -452,7 +460,10 @@ function takeRightClicks(
         const at = { x: event.clientX, y: event.clientY };
         void commands
             .executeCommand(ui.SetWorksheetActiveOperation.id, { subUnitId: sheetId })
-            .finally(() => routed.slot.handler?.open(at, "contextMenu.footerTabs", { subUnitId: sheetId }));
+            .then(
+                () => routed.slot.handler?.open(at, "contextMenu.footerTabs", { subUnitId: sheetId }),
+                (caught: unknown) => console.error("[office] the sheet tab could not be made active", caught)
+            );
     };
     window.addEventListener("contextmenu", onContextMenu, true);
     return () => window.removeEventListener("contextmenu", onContextMenu, true);
