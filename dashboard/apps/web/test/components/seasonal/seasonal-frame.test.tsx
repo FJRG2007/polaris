@@ -36,10 +36,27 @@ function frame(props: { allowed: boolean; mutedPack: string | null }) {
     );
 }
 
+/** One browser's storage. jsdom's own is not there under every Node the suite
+ *  runs on. */
+function memoryStorage(): Storage {
+    const items = new Map<string, string>();
+    return {
+        get length() {
+            return items.size;
+        },
+        clear: () => items.clear(),
+        getItem: (key) => items.get(key) ?? null,
+        key: (index) => [...items.keys()][index] ?? null,
+        removeItem: (key) => void items.delete(key),
+        setItem: (key, value) => void items.set(key, String(value))
+    };
+}
+
 beforeEach(() => {
     vi.useFakeTimers({ toFake: ["Date"] });
     vi.setSystemTime(new Date(2026, 9, 25, 12));
     save.mockReset();
+    Object.defineProperty(window, "localStorage", { value: memoryStorage(), configurable: true });
 });
 
 afterEach(() => {
@@ -79,6 +96,26 @@ describe("the frame", () => {
         frame({ allowed: true, mutedPack: null });
         expect(document.documentElement.dataset.season).toBeUndefined();
         expect(soundSeason()).toBeNull();
+    });
+
+    it("drifts once a day, ghosts rising for Halloween, and then stops", () => {
+        vi.useFakeTimers({ toFake: ["Date", "setTimeout", "clearTimeout"] });
+        vi.setSystemTime(new Date(2026, 9, 25, 12));
+        const first = frame({ allowed: true, mutedPack: null });
+        expect(document.querySelector(".season-drift[data-rises]")).not.toBeNull();
+        act(() => vi.advanceTimersByTime(23_000));
+        expect(document.querySelector(".season-drift")).toBeNull();
+        // The mark beside the logo stays.
+        expect(screen.getByTitle("Halloween")).toBeDefined();
+        first.unmount();
+        // The same day, another page load: no second pass.
+        frame({ allowed: true, mutedPack: null });
+        expect(document.querySelector(".season-drift")).toBeNull();
+        cleanup();
+        // The next day, once more.
+        vi.setSystemTime(new Date(2026, 9, 26, 12));
+        frame({ allowed: true, mutedPack: null });
+        expect(document.querySelector(".season-drift")).not.toBeNull();
     });
 
     it("takes the decoration and the sounds away when it goes", () => {

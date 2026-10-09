@@ -802,7 +802,9 @@ dialog.pdfSlick-dialog .dialogButton {
     opacity: 0.55;
     animation-name: season-fall;
     animation-timing-function: linear;
-    animation-iteration-count: infinite;
+    /* One pass, then the layer is removed (see seasonal-frame). */
+    animation-iteration-count: 1;
+    animation-fill-mode: both;
 }
 .season-piece[data-shape="confetti"] {
     border-radius: 1px;

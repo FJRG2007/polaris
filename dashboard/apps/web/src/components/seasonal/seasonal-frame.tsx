@@ -12,7 +12,9 @@
  *
  * The drifting layer takes no clicks, sits under every menu and dialog, and is
  * not drawn at all for somebody who asked their system for less motion - the
- * mark beside the logo stays, because it does not move.
+ * mark beside the logo stays, because it does not move. It drifts once, the
+ * first time a device sees the season on a given day, and is gone after: a
+ * decoration that never stops moving at the top of a work tool is a distraction.
  */
 
 import type { ReactNode } from "react";
@@ -20,7 +22,7 @@ import { useTranslations } from "@/components/i18n/i18n-provider";
 import { setSoundSeason } from "@/lib/sound-season";
 import { packOn, seasonOn, type Season } from "@polaris/core";
 import { createContext, useContext, useEffect, useState } from "react";
-import { Ghost, Leaf, PartyPopper, Snowflake, Sparkles, type LucideIcon } from "lucide-react";
+import { Ghost, PartyPopper, Snowflake, Sparkles, type LucideIcon } from "lucide-react";
 
 /** How often the date is looked at again, for a tab left open across midnight. */
 const RECHECK_MS = 30 * 60_000;
@@ -92,7 +94,7 @@ export function SeasonalFrame({
     return (
         <SeasonContext.Provider value={decoration}>
             {children}
-            {decoration ? <Drift season={decoration} /> : null}
+            {decoration ? <DriftOnce key={decoration} season={decoration} /> : null}
         </SeasonContext.Provider>
     );
 }
@@ -107,7 +109,8 @@ export const SEASON_ICONS: Record<Season, LucideIcon> = {
 
 /** What drifts: a shape per season, and whether it falls or rises. */
 const DRIFT: Record<Season, { icon: LucideIcon | null; rises: boolean }> = {
-    halloween: { icon: Leaf, rises: false },
+    // Ghosts float up.
+    halloween: { icon: Ghost, rises: true },
     winter: { icon: Snowflake, rises: false },
     // Confetti is paper, not a picture of anything.
     newYear: { icon: null, rises: false },
@@ -117,6 +120,37 @@ const DRIFT: Record<Season, { icon: LucideIcon | null; rises: boolean }> = {
 
 /** How many things drift at once. Few: it is a decoration on a work tool. */
 const PIECES = 14;
+
+/** How long the one pass lasts, start to last piece out: the longest delay
+ *  plus the longest fall, below. */
+const DRIFT_MS = (5 + 17) * 1000;
+
+/** Whether this device has drifted this season today, kept per device. A
+ *  browser that will not store it drifts on every load, which is the old
+ *  behaviour and harmless. */
+function driftedToday(season: Season): boolean {
+    const key = `polaris.seasonDrift.${season}`;
+    const today = new Date().toDateString();
+    try {
+        if (window.localStorage.getItem(key) === today) return true;
+        window.localStorage.setItem(key, today);
+    } catch {
+        // Storage refused: drift, once for this page.
+    }
+    return false;
+}
+
+/** The drifting layer, for its one pass of the day and then not at all. */
+function DriftOnce({ season }: { season: Season }) {
+    const [on, setOn] = useState(false);
+    useEffect(() => {
+        if (driftedToday(season)) return;
+        setOn(true);
+        const timer = window.setTimeout(() => setOn(false), DRIFT_MS);
+        return () => window.clearTimeout(timer);
+    }, [season]);
+    return on ? <Drift season={season} /> : null;
+}
 
 /** The drifting layer. Positions are worked out from the index rather than at
  *  random, so it looks the same on every render and costs no state. */
@@ -130,7 +164,7 @@ function Drift({ season }: { season: Season }) {
                     left: `${(index * 37 + 11) % 100}%`,
                     width: size,
                     height: size,
-                    animationDelay: `${-((index * 1.9) % 14)}s`,
+                    animationDelay: `${(index * 1.9) % 5}s`,
                     animationDuration: `${10 + ((index * 3) % 8)}s`,
                     color: index % 2 === 0 ? "hsl(var(--season-a))" : "hsl(var(--season-b))"
                 };
