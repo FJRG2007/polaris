@@ -147,7 +147,10 @@ export function onSoundVolumeChange(listener: () => void): () => void {
  * reflects the same alerts read on another device is not news here, and the
  * snapshot taken at first paint must not chime for everything already waiting.
  */
-export function hasNewArrival(seen: Set<string>, rows: Array<{ id: string; read: boolean; }>): boolean {
+export function hasNewArrival(
+    seen: Set<string>,
+    rows: Array<{ id: string; read: boolean }>
+): boolean {
     let arrived = false;
     for (const row of rows) {
         if (seen.has(row.id)) continue;
@@ -170,12 +173,16 @@ export const CHIME: readonly ChimeNote[] = [
  * The chime recast for each season, for an account that asked for the seasonal
  * sounds. The same length and level as the ordinary one - it means the same
  * thing - in the notes the season's ring uses, so a season sounds like one pack
- * rather than several.
+ * rather than several. Every one rises, as the ordinary one does: news arriving
+ * never sounds like something ending.
  */
 export const SEASONAL_CHIMES: Record<Season, readonly ChimeNote[]> = {
+    // A minor arpeggio climbing to the fifth: eerie, but it arrives rather than
+    // falls away - a falling figure is heard as a hang-up or a cancel.
     halloween: [
-        [659.25, 0, 0.16],
-        [466.16, 0.11, 0.26]
+        [440, 0, 0.12],
+        [523.25, 0.08, 0.12],
+        [659.25, 0.16, 0.22]
     ],
     winter: [
         [1174.66, 0, 0.12],
@@ -218,11 +225,16 @@ function playChime(notes: readonly ChimeNote[]): void {
         const audio = context;
         const ring = () => {
             const now = audio.currentTime;
-            for (const [frequency, at, seconds] of notes) note(audio, frequency, now + at, seconds, level);
+            for (const [frequency, at, seconds] of notes)
+                note(audio, frequency, now + at, seconds, level);
         };
         // A context created before the page was interacted with starts suspended,
         // and notes scheduled while it is are dropped, so it is resumed first.
-        if (audio.state === "suspended") void audio.resume().then(ring).catch(() => undefined);
+        if (audio.state === "suspended")
+            void audio
+                .resume()
+                .then(ring)
+                .catch(() => undefined);
         else ring();
     } catch {
         // No audio device, or a browser that will not start one. Nothing to recover.
