@@ -191,8 +191,11 @@ describe("the address", () => {
             channelId: CHANNEL,
             name: "CI"
         });
+        // One character off. Not always an "A": a token that already ends in one
+        // would be the right secret, which made this fail one run in 64.
+        const last = made.token.at(-1) === "A" ? "B" : "A";
         expect(
-            await webhooks.webhookFor(made.webhook.id, `${made.token.slice(0, -1)}A`)
+            await webhooks.webhookFor(made.webhook.id, `${made.token.slice(0, -1)}${last}`)
         ).toBeNull();
         expect(
             await webhooks.webhookFor("0190a000-0000-7000-8000-00000000ffff", made.token)
