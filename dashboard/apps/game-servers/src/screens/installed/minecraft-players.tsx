@@ -166,6 +166,25 @@ export function MinecraftPlayers({
     const [note, setNote] = useState<string | null>(null);
     const [query, setQuery] = useState("");
     const [filter, setFilter] = useState<Filter>("all");
+    // Refusals cleared here, hidden at once and put back if the save fails.
+    const [cleared, setCleared] = useState<ReadonlySet<string>>(new Set());
+    const refusals = (access?.refusals ?? []).filter(
+        (refusal) => !cleared.has("all") && !cleared.has(`${refusal.player}-${refusal.at}`)
+    );
+
+    function clearRefusal(which: { player: string; at: string } | "all") {
+        const key = which === "all" ? "all" : `${which.player}-${which.at}`;
+        setCleared((was) => new Set(was).add(key));
+        run(
+            () => actions.dismissRefusalAction(installedAppId, which),
+            () =>
+                setCleared((was) => {
+                    const next = new Set(was);
+                    next.delete(key);
+                    return next;
+                })
+        );
+    }
     const [confirm, confirmElement] = useConfirm();
     // How this reader has asked for times to be written. Held here as well as in
     // the row below, because the toolbar now says when a remembered roster was
@@ -449,14 +468,26 @@ export function MinecraftPlayers({
                 home connection that changed address on its own overnight, which is
                 why the answer offered is the address they actually arrived from
                 rather than a form to fill in. */}
-            {(access?.refusals?.length ?? 0) > 0 && (
+            {refusals.length > 0 && (
                 <Card className="border-warning-edge bg-warning-soft">
                     <CardBody className="flex flex-col gap-2">
-                        <p className="flex items-center gap-2 text-sm font-medium">
-                            <Users className="size-4 text-warning" />
-                            {t("playersTab.turnedAwayRecently")}
-                        </p>
-                        {(access?.refusals ?? []).map((refusal) => {
+                        <div className="flex items-center justify-between gap-2">
+                            <p className="flex min-w-0 items-center gap-2 text-sm font-medium">
+                                <Users className="size-4 shrink-0 text-warning" />
+                                {t("playersTab.turnedAwayRecently")}
+                            </p>
+                            {refusals.length > 1 && (
+                                <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    disabled={pending}
+                                    onClick={() => clearRefusal("all")}
+                                >
+                                    {t("playersTab.dismissAllRefusals")}
+                                </Button>
+                            )}
+                        </div>
+                        {refusals.map((refusal) => {
                             const from = refusal.address;
                             const linked = followsSignIns(refusal.player);
                             return (
@@ -491,6 +522,19 @@ export function MinecraftPlayers({
                                             {t("playersTab.allowThisAddressToo")}
                                         </Button>
                                     )}
+                                    <Button
+                                        size="sm"
+                                        variant="ghost"
+                                        className="ml-auto"
+                                        disabled={pending}
+                                        aria-label={t("playersTab.dismissRefusal")}
+                                        title={t("playersTab.dismissRefusal")}
+                                        onClick={() =>
+                                            clearRefusal({ player: refusal.player, at: refusal.at })
+                                        }
+                                    >
+                                        <X aria-hidden="true" className="size-3.5" />
+                                    </Button>
                                     {/* Where they may connect from follows their
                                         Polaris sign-ins, so the reason is a
                                         sign-in missing from that connection, not
@@ -505,9 +549,7 @@ export function MinecraftPlayers({
                                 </div>
                             );
                         })}
-                        {(access?.refusals ?? []).some(
-                            (refusal) => !followsSignIns(refusal.player)
-                        ) && (
+                        {refusals.some((refusal) => !followsSignIns(refusal.player)) && (
                             <p className="text-xs text-muted-foreground">
                                 {t("playersTab.aHomeConnectionIsGiven")}
                             </p>

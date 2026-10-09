@@ -209,6 +209,40 @@ export async function noteRefusal(
     await patchInstallConfig(installedAppId, { [REFUSALS_KEY]: kept }).catch(() => undefined);
 }
 
+/** Take off the list every refusal `drop` picks. Nothing is written when none is. */
+async function dropRefusals(
+    installedAppId: string,
+    drop: (one: PlayerRefusal) => boolean
+): Promise<void> {
+    const row = await prisma.installedApp.findUnique({
+        where: { id: installedAppId },
+        select: { config: true }
+    });
+    const held = readRefusals(readInstallConfig(row?.config));
+    const kept = held.filter((one) => !drop(one));
+    if (kept.length === held.length) return;
+    await patchInstallConfig(installedAppId, { [REFUSALS_KEY]: kept });
+}
+
+/**
+ * The owner done with a refusal - one, by who and when, or every one. Read, or
+ * dealt with somewhere else, a refusal left on the screen is a warning about
+ * nothing.
+ */
+export async function dismissRefusals(
+    ownerId: string,
+    installedAppId: string,
+    which: { player: string; at: string } | "all"
+): Promise<void> {
+    await resolve(ownerId, installedAppId);
+    await dropRefusals(
+        installedAppId,
+        (one) =>
+            which === "all" ||
+            (one.player.toLowerCase() === which.player.toLowerCase() && one.at === which.at)
+    );
+}
+
 export interface PlayerAccessView {
     readonly rules: readonly PlayerAccessRule[];
     /** The last few people this server turned away. */
@@ -955,6 +989,11 @@ export async function grantPlayerAccess(
         // somebody is only adding an address.
         update: input.note?.trim() ? { note: input.note.trim() } : {}
     });
+    // A refusal from the address just allowed has been answered.
+    await dropRefusals(
+        installedAppId,
+        (one) => one.player.toLowerCase() === username.toLowerCase() && one.address === address
+    ).catch(() => undefined);
     if (install.edition !== "java") return;
     // A server that is not answering must not fail the grant: the row is the
     // record, and `reconcileWhitelist` hands it over the next time the server is
