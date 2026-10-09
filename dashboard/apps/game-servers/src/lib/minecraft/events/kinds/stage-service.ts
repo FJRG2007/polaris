@@ -25,6 +25,8 @@ import * as netherMazeSaid from "./nether-maze-messages";
 import * as radar from "./radar";
 import * as acidRain from "./acid-rain";
 import * as acidRainSaid from "./acid-rain-messages";
+import * as elytraRace from "./elytra-race";
+import * as elytraRaceSaid from "./elytra-race-messages";
 import * as stash from "./stash";
 import * as arrival from "./arrival";
 import * as stashService from "./stash-service";
@@ -44,6 +46,7 @@ const dropperMessages = speech.spoken(dropperSaid);
 const boatMessages = speech.spoken(boatRaceSaid);
 const mazeMessages = speech.spoken(netherMazeSaid);
 const acidMessages = speech.spoken(acidRainSaid);
+const elytraMessages = speech.spoken(elytraRaceSaid);
 
 /** The event cannot go ahead - too few joined, the structure would not stand -
  *  and ends as called off, with everything undone. */
@@ -65,6 +68,9 @@ export interface StageLoop {
     present?: Set<string>;
     /** How many top-ups of cobblestone an acid rain has handed out since "Go!". */
     acidTopUps?: number;
+    /** How this server's version writes items, once asked: what the quick look
+     *  hands an elytra race's rockets out with. */
+    items?: stage.Flavour["items"];
 }
 
 export interface StageTools {
@@ -163,6 +169,13 @@ type Layout =
           readonly boxes: readonly stage.Box[];
           readonly volume: stage.Volume;
           readonly reach: number;
+      }
+    | {
+          readonly kind: "elytra-race";
+          readonly course: elytraRace.Course;
+          readonly boxes: readonly stage.Box[];
+          readonly volume: stage.Volume;
+          readonly reach: number;
       };
 
 function layoutAt(run: EventRun, site: { x: number; z: number }, y: number): Layout {
@@ -212,6 +225,21 @@ function layoutAt(run: EventRun, site: { x: number; z: number }, y: number): Lay
             boxes: maze.boxes,
             volume: maze.volume,
             reach: maze.reach
+        };
+    }
+    if (run.preset.kind === "elytra-race") {
+        const course = elytraRace.course(
+            run.preset.options as catalog.EventOptions<"elytra-race">,
+            run.id,
+            site,
+            y
+        );
+        return {
+            kind: "elytra-race",
+            course,
+            boxes: course.boxes,
+            volume: course.volume,
+            reach: course.reach
         };
     }
     if (run.preset.kind === "acid-rain") {
@@ -405,6 +433,18 @@ export async function stageTick(
             );
         case "acid-rain":
             return acidTick(loop, server, tools, layout.acid, layout.volume, heard, now, lines);
+        case "elytra-race":
+            loop.items ??= (await tools.flavour()).items;
+            return packRaceTick(
+                loop,
+                server,
+                tools,
+                layout.volume,
+                heard,
+                now,
+                lines,
+                elytraRaceOf(loop, server, layout.course)
+            );
         default:
             return spleefTick(loop, server, tools, layout.arena, layout.volume, heard, now, lines);
     }
@@ -460,7 +500,9 @@ async function raise(
                                 ? mazeMessages.cannotPlay(language)
                                 : preset.kind === "acid-rain"
                                   ? acidMessages.cannotPlay(language)
-                                  : tntRunMessages.cannotPlay(language))
+                                  : preset.kind === "elytra-race"
+                                    ? elytraMessages.cannotPlay(language)
+                                    : tntRunMessages.cannotPlay(language))
                 )
             ]);
             throw new CalledOff("Its data pack could not be put on");
@@ -494,7 +536,9 @@ async function raise(
                       ? boatRace.DESIGN
                       : preset.kind === "nether-maze"
                         ? netherMaze.DESIGN
-                        : parkour.DESIGN,
+                        : preset.kind === "elytra-race"
+                          ? elytraRace.DESIGN
+                          : parkour.DESIGN,
             area,
             waits: 0
         });
@@ -606,6 +650,8 @@ function readySubtitle(loop: StageLoop, layout: Layout): string {
             return mazeMessages.readySubtitle(language);
         case "acid-rain":
             return acidMessages.readySubtitle(language);
+        case "elytra-race":
+            return elytraMessages.readySubtitle(language);
         case "spleef":
             return messages.spleefReadySubtitle(
                 spleef.variantFor(
@@ -701,12 +747,24 @@ async function admit(
                     netherMaze.spots(layout.maze, fresh.length)
                   : layout.kind === "acid-rain"
                     ? acidRain.spots(layout.acid, fresh.length)
-                    : [];
+                    : layout.kind === "elytra-race"
+                      ? // On the pad before "Go!"; a late racer is put in the
+                        // air behind the start ring, wings on.
+                        holding(loop)
+                          ? elytraRace.spots(layout.course, fresh.length)
+                          : fresh.map(() => layout.course.start)
+                      : [];
     if (layout.kind === "parkour") await server.sayAll(parkour.SCORES_ADDED);
     if (layout.kind === "dropper") await server.sayAll(dropper.SCORES_ADDED);
     if (layout.kind === "boat-race") await server.sayAll(boatRace.SCORES_ADDED);
     if (layout.kind === "nether-maze") await server.sayAll(netherMaze.SCORES_ADDED);
     if (layout.kind === "acid-rain") await server.sayAll(acidRain.SCORES_ADDED);
+    if (layout.kind === "elytra-race") await server.sayAll(elytraRace.SCORES_ADDED);
+    // A late racer in an elytra race already on flies at once.
+    const flyNow =
+        layout.kind === "elytra-race" && !holding(loop)
+            ? (loop.items ??= (await tools.flavour()).items)
+            : null;
     // A late racer in a race already on gets a boat on the spot.
     const way =
         layout.kind === "boat-race" && !holding(loop)
@@ -749,7 +807,8 @@ async function admit(
                 (layout.kind === "parkour" ||
                     layout.kind === "dropper" ||
                     layout.kind === "boat-race" ||
-                    layout.kind === "nether-maze") &&
+                    layout.kind === "nether-maze" ||
+                    layout.kind === "elytra-race") &&
                     !holding(loop)
                     ? messages.goTitle(loop.language)
                     : messages.spleefReadyTitle(loop.language)
@@ -773,7 +832,13 @@ async function admit(
                       radar.radarLine(one.name, radar.RADAR_OFF, mazeMessages.radarOff)
                   ]
                 : []),
-            ...(layout.kind === "acid-rain" ? acidRain.racerScores(one.name) : [])
+            ...(layout.kind === "acid-rain" ? acidRain.racerScores(one.name) : []),
+            ...(layout.kind === "elytra-race"
+                ? [
+                      ...elytraRace.racerScores(one.name),
+                      ...(flyNow ? elytraRace.flyLines(one.name, flyNow) : [])
+                  ]
+                : [])
         );
         brought.push(one.name);
     }
@@ -1027,6 +1092,7 @@ function inPlace(layout: Layout, at: { x: number; y: number; z: number }): boole
     if (layout.kind === "boat-race") return boatRace.onGrid(layout.track, at);
     if (layout.kind === "nether-maze") return netherMaze.inStart(layout.maze, at);
     if (layout.kind === "acid-rain") return acidRain.inside(layout.acid, at);
+    if (layout.kind === "elytra-race") return elytraRace.onPad(layout.course, at);
     const { center, size, floor } = layout.arena;
     return (
         at.y >= floor + 0.5 &&
@@ -1189,6 +1255,28 @@ async function holdTick(
             )
         );
         lines.push(netherMaze.doorGone(layout.maze), ...netherMaze.armLines(layout.maze));
+        change(loop, {
+            racers: state(loop).racers.map((one) =>
+                one.outAt === null ? { ...one, since: go, best: 0 } : one
+            )
+        });
+    } else if (layout.kind === "elytra-race") {
+        // Everybody on their own spot of the pad, wings on and rockets in
+        // hand, then the floor gone and the pack counting rings.
+        const items = (loop.items ??= (await tools.flavour()).items);
+        const places = elytraRace.spots(layout.course, racing.length);
+        racing.forEach((racer, index) =>
+            lines.push(
+                stage.moveLine(racer.name, places[index]!),
+                ...elytraRace.racerScores(racer.name),
+                ...elytraRace.flyLines(racer.name, items),
+                `title ${racer.name} times 5 40 10`,
+                `title ${racer.name} subtitle ${commands.text(elytraMessages.goSubtitle(language))}`,
+                `title ${racer.name} title ${commands.text(messages.goTitle(language))}`,
+                soundFor(racer.name, commands.SOUNDS.start)
+            )
+        );
+        lines.push(elytraRace.padGone(layout.course), ...elytraRace.armLines(layout.course));
         change(loop, {
             racers: state(loop).racers.map((one) =>
                 one.outAt === null ? { ...one, since: go, best: 0 } : one
@@ -1426,6 +1514,16 @@ export function quickLines(loop: StageLoop): string[] {
             : netherMaze.backLines(
                   commands.text(messages.tag(loop.language) + mazeMessages.burned(loop.language))
               );
+    // An elytra race: whoever fell, landed or cut a ring, put back, and the
+    // rockets they earned handed out.
+    if (layout.kind === "elytra-race") {
+        if (holding(loop)) return [];
+        const told = (line: string) => commands.text(messages.tag(loop.language) + line);
+        return elytraRace.quickLines(layout.course, loop.items ?? null, {
+            fell: told(elytraMessages.fell(loop.language)),
+            cut: told(elytraMessages.cut(loop.language))
+        });
+    }
     // A boat race: whoever fell, cut a corner or left their boat, put back.
     if (layout.kind === "boat-race") {
         if (holding(loop) || !loop.boatWay) return [];
@@ -1483,7 +1581,8 @@ function needsPack(kind: catalog.EventKind): boolean {
         kind === "dropper" ||
         kind === "boat-race" ||
         kind === "nether-maze" ||
-        kind === "acid-rain"
+        kind === "acid-rain" ||
+        kind === "elytra-race"
     );
 }
 
@@ -1685,6 +1784,41 @@ function boatRaceOf(loop: StageLoop, server: ServerContainer, track: boatRace.Tr
         },
         readFinished: boatRace.READ_FINISHED,
         stop: boatRace.stopLines(track.boxes)
+    };
+}
+
+/** An elytra race: the pack counts the rings; progress is the rings passed. */
+function elytraRaceOf(
+    loop: StageLoop,
+    server: ServerContainer,
+    course: elytraRace.Course
+): PackRace {
+    const language = loop.language;
+    const rings = course.rings.length;
+    return {
+        async progress() {
+            const passed = lowered(commands.readScores(await server.say([elytraRace.READ_PASSED])));
+            return (racer) => passed.get(racer.name.toLowerCase());
+        },
+        whole: course.laps * rings + 1,
+        finishTitle: messages.checkpointTitle(rings, rings, language),
+        // Over the line: let down gently, never left to fall out of the sky.
+        finished: (name) => [`effect give ${name} minecraft:slow_falling 60 0 true`],
+        bar: (racer, at) => {
+            const progress = elytraRace.progressOf(course, racer.best);
+            const next = elytraRace.nextRing(course, racer.best).center;
+            return elytraMessages.bar(
+                progress.lap,
+                course.laps,
+                progress.ring,
+                rings,
+                Math.round(Math.hypot(next.x + 0.5 - at.x, next.z + 0.5 - at.z)),
+                Math.round(next.y - at.y),
+                language
+            );
+        },
+        readFinished: elytraRace.READ_FINISHED,
+        stop: elytraRace.stopLines(course.boxes)
     };
 }
 
@@ -2110,7 +2244,8 @@ export async function settle(
             ...dropper.stopLines(boxes),
             ...boatRace.stopLines(boxes),
             ...netherMaze.stopLines(boxes),
-            ...acidRain.stopLines(boxes)
+            ...acidRain.stopLines(boxes),
+            ...elytraRace.stopLines(boxes)
         ];
         if (area || stop.length > 0)
             await server.sayAll([...(area ? [stage.holdArea(area)] : []), ...stop]);
@@ -2167,7 +2302,8 @@ export function results(run: EventRun): { scores: Map<string, number>; took: str
             run.preset.kind === "parkour" ||
             run.preset.kind === "dropper" ||
             run.preset.kind === "boat-race" ||
-            run.preset.kind === "nether-maze"
+            run.preset.kind === "nether-maze" ||
+            run.preset.kind === "elytra-race"
         ) {
             // A time to the finish, then how far they got: jumps, floors, gates or rooms.
             scores.set(
@@ -2198,7 +2334,8 @@ export function standings(run: EventRun): { name: string; score: number }[] {
     const course =
         run.preset.kind === "parkour" ||
         run.preset.kind === "boat-race" ||
-        run.preset.kind === "nether-maze"
+        run.preset.kind === "nether-maze" ||
+        run.preset.kind === "elytra-race"
             ? built(run)
             : null;
     // A finish counts as every jump, floor or gate there is.
@@ -2207,11 +2344,13 @@ export function standings(run: EventRun): { name: string; score: number }[] {
             ? course.course.platforms.length - 1
             : course?.kind === "boat-race"
               ? course.track.laps * course.track.gates.length + 1
-              : course?.kind === "nether-maze"
-                ? netherMaze.roomsToGo(course.maze)
-                : run.preset.kind === "dropper"
-                  ? (run.preset.options as catalog.EventOptions<"dropper">).levels
-                  : 0;
+              : course?.kind === "elytra-race"
+                ? course.course.laps * course.course.rings.length + 1
+                : course?.kind === "nether-maze"
+                  ? netherMaze.roomsToGo(course.maze)
+                  : run.preset.kind === "dropper"
+                    ? (run.preset.options as catalog.EventOptions<"dropper">).levels
+                    : 0;
     return (run.stage?.racers ?? [])
         .map((one) => ({
             name: one.name,
@@ -2219,7 +2358,8 @@ export function standings(run: EventRun): { name: string; score: number }[] {
                 run.preset.kind === "parkour" ||
                 run.preset.kind === "dropper" ||
                 run.preset.kind === "boat-race" ||
-                run.preset.kind === "nether-maze"
+                run.preset.kind === "nether-maze" ||
+                run.preset.kind === "elytra-race"
                     ? one.finishedAt !== null
                         ? jumps
                         : one.best
@@ -2251,6 +2391,16 @@ export function scoreText(
             {
                 en: `${score} ${score === 1 ? "gate" : "gates"}`,
                 es: `${score} ${score === 1 ? "puerta" : "puertas"}`
+            },
+            language
+        );
+    }
+    if (kind === "elytra-race") {
+        if (parkour.isFinish(score)) return messages.clock(parkour.FINISH_BASE - score);
+        return speech.pickIn(
+            {
+                en: `${score} ${score === 1 ? "ring" : "rings"}`,
+                es: `${score} ${score === 1 ? "aro" : "aros"}`
             },
             language
         );

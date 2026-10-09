@@ -89,7 +89,8 @@ export const ARENA_BLOCKS = [
     "minecraft:fire",
     "minecraft:barrier",
     "minecraft:cobblestone",
-    "minecraft:mossy_cobblestone"
+    "minecraft:mossy_cobblestone",
+    "minecraft:orange_concrete"
 ] as const;
 
 export type ArenaBlock = (typeof ARENA_BLOCKS)[number];
@@ -589,7 +590,9 @@ export function clearMarked(name: string, items: Flavour["items"]): string[] {
               `clear ${name} minecraft:iron_shovel{polaris_event:1b}`,
               `clear ${name} minecraft:snowball{polaris_event:1b}`,
               `clear ${name} minecraft:oak_boat{polaris_event:1b}`,
-              `clear ${name} minecraft:cobblestone{polaris_event:1b}`
+              `clear ${name} minecraft:cobblestone{polaris_event:1b}`,
+              `clear ${name} minecraft:elytra{polaris_event:1b}`,
+              `clear ${name} minecraft:firework_rocket{polaris_event:1b}`
           ];
 }
 

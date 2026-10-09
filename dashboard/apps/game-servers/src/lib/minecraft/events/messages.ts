@@ -178,6 +178,10 @@ const RULES: Readonly<Record<EventKind, Text>> = {
     "acid-rain": {
         en: "Keep something over your head: the rain fills your acid bar, and full you are out. Build with the cobblestone you are given; the rain eats it.",
         es: "Ten algo sobre la cabeza: la lluvia llena tu barra de ácido y, llena, quedas fuera. Construye con la piedra que recibes; la lluvia se la come."
+    },
+    "elytra-race": {
+        en: "Fly through every ring in order, lap after lap. Rings and boosters give rockets; falling, landing or missing a ring sends you back to your last one.",
+        es: "Cruza cada aro en orden, vuelta tras vuelta. Los aros y los propulsores dan cohetes; caer, aterrizar o saltarte un aro te devuelve al último."
     }
 };
 
