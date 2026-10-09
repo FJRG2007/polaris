@@ -234,6 +234,95 @@ export const ANNOUNCERS: readonly Announcer[] = [
     }
 ];
 
+/**
+ * A data pack shipped inside a mod jar that announces itself from a function the
+ * game runs on every data reload - `tellraw @a` from its load function - so the
+ * whole server reads it each time the data is reloaded, which includes every
+ * time a data pack is switched on or off (Polaris's own events pack among them).
+ *
+ * There is no setting to change. What stops it is a function of the same name in
+ * a pack ranked above the mod's: Polaris's own `polaris-quiet` pack, holding an
+ * empty function at that address. A data pack's function is replaced whole by a
+ * higher pack's, so this only lists functions that do nothing but announce -
+ * read in the jar - never one that also sets something up.
+ */
+export interface PackAnnouncer {
+    readonly id: string;
+    readonly name: string;
+    readonly jar: RegExp;
+    /** The functions that only announce, as `namespace:path`. */
+    readonly functions: readonly string[];
+    /** Where they were read. */
+    readonly source: string;
+}
+
+/**
+ * Dynamic Lights by CreepermeYT: `config/load` is a single `tellraw @a` ("-> LOADED:
+ * < Dynamic Lights By CreepermeYT > v1.4.6"), run from `internal/load` on every
+ * reload. Read in `dynamic-lights-creepermeyt-v1.4.6-mc1.17.x-26.3.jar`, where it
+ * is the same one line in the base pack and in every overlay that carries it.
+ */
+export const PACK_ANNOUNCERS: readonly PackAnnouncer[] = [
+    {
+        id: "dynamic_lights_creepermeyt",
+        name: "Dynamic Lights",
+        jar: /dynamic[-_]?lights[-_]?creepermeyt/i,
+        functions: ["dynamic_lights_by_creepermeyt:config/load"],
+        source: `${GITHUB}/CreepermeYT/Dynamic-Lights-By-CreepermeYT`
+    }
+];
+
+/** The folder of Polaris's quieting pack in a world's `datapacks`, and the id the
+ *  game knows it by. */
+export const QUIET_PACK_DIR = "polaris-quiet";
+export const QUIET_PACK_ID = `file/${QUIET_PACK_DIR}`;
+
+/** Whether an id is one the operator can choose about, of either kind. */
+export function isAnnouncerId(id: string): boolean {
+    return ANNOUNCERS.some((one) => one.id === id) || PACK_ANNOUNCERS.some((one) => one.id === id);
+}
+
+/** The pack announcers whose jar is in the mods folder. */
+export function installedPackAnnouncers(modFiles: readonly string[]): PackAnnouncer[] {
+    const jars = modFiles.filter((file) => /\.jar$/i.test(file));
+    return PACK_ANNOUNCERS.filter((one) => jars.some((file) => one.jar.test(file)));
+}
+
+/**
+ * The quieting pack's files, relative to its folder: its description and an
+ * empty function for every announcing function of each blocked pack. Written
+ * under both `function` (1.21 on) and `functions` (before it), since one pack
+ * serves every release. A format range as wide as the events pack's, so no
+ * release turns it away.
+ */
+export function quietPackFiles(blocked: readonly PackAnnouncer[]): Map<string, string> {
+    const files = new Map<string, string>();
+    files.set(
+        "pack.mcmeta",
+        `${JSON.stringify({
+            pack: {
+                description: "Polaris: quiets data pack announcements",
+                pack_format: 4,
+                supported_formats: [4, 1000],
+                min_format: 4,
+                max_format: 1000
+            }
+        })}\n`
+    );
+    for (const announcer of blocked) {
+        for (const name of announcer.functions) {
+            const [namespace, path] = name.split(":");
+            for (const folder of ["function", "functions"]) {
+                files.set(
+                    `data/${namespace}/${folder}/${path}.mcfunction`,
+                    "# Quieted by Polaris (Moderation > Mod announcements).\n"
+                );
+            }
+        }
+    }
+    return files;
+}
+
 /** The operator's choices on one server: the mods whose announcements are let
  *  through. Everything else found is blocked. */
 export const announcementsSchema = z.object({
@@ -246,7 +335,7 @@ export type AnnouncementChoices = z.infer<typeof announcementsSchema>;
 export function readAnnouncementChoices(config: Record<string, unknown>): AnnouncementChoices {
     const parsed = announcementsSchema.safeParse(config[ANNOUNCEMENTS_KEY] ?? {});
     return parsed.success
-        ? { allowed: parsed.data.allowed.filter((id) => ANNOUNCERS.some((one) => one.id === id)) }
+        ? { allowed: parsed.data.allowed.filter(isAnnouncerId) }
         : { allowed: [] };
 }
 

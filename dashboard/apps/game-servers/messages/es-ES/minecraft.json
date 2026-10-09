@@ -2466,6 +2466,7 @@
             "unreadable": "Ilegible",
             "appliesOnJoin": "Se aplica la próxima vez que entre cada jugador. Sin reiniciar.",
             "appliesOnRestart": "Se aplica tras reiniciar.",
+            "appliesOnReload": "Un data pack que habla en cada recarga de datos. Se aplica desde la siguiente; sin reiniciar.",
             "allow": "Permitir",
             "allowNamed": "Permitir los anuncios de {name}",
             "stopped": "Arranca el servidor para revisar sus mods.",

@@ -24,6 +24,7 @@ import {
     listContainerDir,
     readContainerFile,
     readContainerFileState,
+    readContainerFiles,
     writeContainerFile
 } from "../container-files";
 import * as announcements from "./mod-announcements";
@@ -52,7 +53,9 @@ export interface AnnouncerState {
     readonly name: string;
     readonly allowed: boolean;
     readonly status: AnnouncerStatus;
-    readonly applies: announcements.Announcer["applies"];
+    /** When a change reaches the players: "reload" for a data pack's
+     *  announcement, which only ever speaks on a data reload. */
+    readonly applies: announcements.Announcer["applies"] | "reload";
 }
 
 export interface AnnouncementsState {
@@ -119,6 +122,59 @@ async function keep(
 }
 
 /**
+ * The data packs inside mod jars that announce themselves on every reload, kept
+ * quiet by Polaris's own `polaris-quiet` pack (see `PackAnnouncer`).
+ *
+ * The blocked ones' empty functions are written where they differ, the allowed
+ * ones' removed, and the pack switched on if it is not yet. Switching it on is a
+ * data reload, once per server; a later change is read at the next reload,
+ * which is the only moment the announcement would speak anyway.
+ */
+async function keepPacks(
+    server: ServerContainer,
+    choices: announcements.AnnouncementChoices,
+    modFiles: readonly string[],
+    level: string | null
+): Promise<AnnouncerState[]> {
+    const found = announcements.installedPackAnnouncers(modFiles);
+    if (found.length === 0) return [];
+    const isAllowed = (one: announcements.PackAnnouncer) => choices.allowed.includes(one.id);
+    const states = (status: AnnouncerStatus): AnnouncerState[] =>
+        found.map((one) => ({
+            id: one.id,
+            name: one.name,
+            allowed: isAllowed(one),
+            status: status === "blocked" && isAllowed(one) ? "allowed" : status,
+            applies: "reload"
+        }));
+    if (level === null) return states("unreadable");
+    const root = `${DATA_DIR}/${level}/datapacks/${announcements.QUIET_PACK_DIR}`;
+    const files = announcements.quietPackFiles(found.filter((one) => !isAllowed(one)));
+    const there = await readContainerFiles(
+        server,
+        [...files.keys()].map((path) => `${root}/${path}`)
+    );
+    for (const [path, content] of files) {
+        if (there.get(`${root}/${path}`) === content) continue;
+        await writeContainerFile(server, `${root}/${path}`, content);
+    }
+    const letThrough = [...announcements.quietPackFiles(found.filter(isAllowed)).keys()]
+        .filter((path) => path !== "pack.mcmeta")
+        .map((path) => `${root}/${path}`);
+    if (letThrough.length > 0) await server.run(["rm", "-f", "--", ...letThrough]);
+    const enabled = (said: string) =>
+        said.includes(`[${announcements.QUIET_PACK_ID}`) ||
+        said.includes(`${announcements.QUIET_PACK_ID} (`);
+    if (!enabled(await server.say(["datapack list enabled"]))) {
+        await server.say(["datapack list available"]);
+        await server.say([`datapack enable "${announcements.QUIET_PACK_ID}"`]);
+        if (!enabled(await server.say(["datapack list enabled"]))) return states("waiting");
+        console.info(`[minecraft-announcements] ${server.installedAppId}: quiet pack switched on`);
+    }
+    return states("blocked");
+}
+
+/**
  * Every known announcer in the server's mods folder, each put right.
  *
  * A blocked one is set every time. One the operator let through is written only
@@ -139,7 +195,10 @@ async function keepAll(
         return { reachable: false, mods: [], needsRestart: false };
     }
     const found = announcements.installedAnnouncers(files);
-    if (found.length === 0) return { reachable: true, mods: [], needsRestart: false };
+    const packs = announcements.installedPackAnnouncers(files);
+    if (found.length === 0 && packs.length === 0) {
+        return { reachable: true, mods: [], needsRestart: false };
+    }
     const level = await levelOf(server);
     const mods: AnnouncerState[] = [];
     let needsRestart = false;
@@ -166,6 +225,7 @@ async function keepAll(
             applies: announcer.applies
         });
     }
+    mods.push(...(await keepPacks(server, choices, files, level)));
     return { reachable: true, mods, needsRestart };
 }
 
@@ -193,7 +253,7 @@ export async function setAnnouncementAllowed(
     id: string,
     allow: boolean
 ): Promise<AnnouncementsState> {
-    if (!announcements.ANNOUNCERS.some((one) => one.id === id)) {
+    if (!announcements.isAnnouncerId(id)) {
         throw new Error(gameMessage("games", "errors.serverNotFound"));
     }
     const choices = announcements.withChoice(await choicesOf(installedAppId), id, allow);

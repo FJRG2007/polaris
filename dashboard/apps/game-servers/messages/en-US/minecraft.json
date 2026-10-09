@@ -2466,6 +2466,7 @@
             "unreadable": "Unreadable",
             "appliesOnJoin": "Takes effect as each player next joins. No restart needed.",
             "appliesOnRestart": "Takes effect after a restart.",
+            "appliesOnReload": "A data pack that speaks on every data reload. Applies from the next one; no restart needed.",
             "allow": "Allow",
             "allowNamed": "Allow {name} announcements",
             "stopped": "Start the server to check its mods.",

@@ -181,7 +181,9 @@ function ModAnnouncementsCard({
                                         <p className="text-xs text-muted-foreground">
                                             {mod.applies === "join"
                                                 ? t("moderation.announcements.appliesOnJoin")
-                                                : t("moderation.announcements.appliesOnRestart")}
+                                                : mod.applies === "reload"
+                                                  ? t("moderation.announcements.appliesOnReload")
+                                                  : t("moderation.announcements.appliesOnRestart")}
                                         </p>
                                     </div>
                                     <div className="flex shrink-0 items-center gap-2">

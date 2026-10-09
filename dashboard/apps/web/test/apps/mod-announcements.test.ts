@@ -228,3 +228,47 @@ describe("mods that announce themselves", () => {
         );
     });
 });
+
+describe("data packs that announce themselves on every reload", () => {
+    const JAR = "dynamic-lights-creepermeyt-v1.4.6-mc1.17.x-26.3.jar";
+
+    it("finds Dynamic Lights by its jar, and nothing else", () => {
+        expect(
+            announcements.installedPackAnnouncers([JAR, "sodium-0.6.jar"]).map((one) => one.id)
+        ).toEqual(["dynamic_lights_creepermeyt"]);
+        expect(announcements.installedPackAnnouncers(["dynamic-lights.txt"])).toEqual([]);
+    });
+
+    it("quiets a blocked one with an empty function where both releases look for it", () => {
+        const files = announcements.quietPackFiles(announcements.PACK_ANNOUNCERS);
+        const meta = JSON.parse(files.get("pack.mcmeta") ?? "{}") as {
+            pack: { min_format: number; max_format: number };
+        };
+        expect(meta.pack.min_format).toBeLessThanOrEqual(4);
+        expect(meta.pack.max_format).toBeGreaterThanOrEqual(121);
+        for (const folder of ["function", "functions"]) {
+            const body = files.get(
+                `data/dynamic_lights_by_creepermeyt/${folder}/config/load.mcfunction`
+            );
+            expect(body).toBeDefined();
+            // Nothing that runs: every line is a comment.
+            expect(body!.split("\n").every((line) => line === "" || line.startsWith("#"))).toBe(
+                true
+            );
+        }
+    });
+
+    it("writes only the description when everything is let through", () => {
+        expect([...announcements.quietPackFiles([]).keys()]).toEqual(["pack.mcmeta"]);
+    });
+
+    it("remembers a choice about a pack like one about a mod", () => {
+        const id = "dynamic_lights_creepermeyt";
+        expect(announcements.isAnnouncerId(id)).toBe(true);
+        expect(
+            announcements.readAnnouncementChoices({
+                [announcements.ANNOUNCEMENTS_KEY]: { allowed: [id, "not-a-mod"] }
+            })
+        ).toEqual({ allowed: [id] });
+    });
+});
