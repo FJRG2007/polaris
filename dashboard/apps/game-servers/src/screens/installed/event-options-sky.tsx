@@ -43,6 +43,19 @@ const MAZE_HAZARD_LABELS: Readonly<
     many: "editor.labels.mazeHazards.many"
 };
 
+const ACID_SIZE_LABELS: Readonly<
+    Record<(typeof catalog.ACID_SIZES)[number], GameKey<"minecraft">>
+> = {
+    small: "editor.labels.acidSize.small",
+    medium: "editor.labels.acidSize.medium",
+    large: "editor.labels.acidSize.large"
+};
+
+const ACIDITY_LABELS: Readonly<Record<(typeof catalog.ACIDITIES)[number], GameKey<"minecraft">>> = {
+    mild: "editor.labels.acidity.mild",
+    harsh: "editor.labels.acidity.harsh"
+};
+
 const LOOT_LABELS: Readonly<Record<(typeof catalog.SKY_WARS_LOOT)[number], GameKey<"minecraft">>> =
     {
         normal: "editor.labels.skyWarsLoot.normal",
@@ -286,6 +299,56 @@ export function NetherMazeFields({
                         }
                         options={options(t, MAZE_HAZARD_LABELS)}
                         aria-label={t("editor.mazeHazards")}
+                    />
+                </Field>
+                <HeightField
+                    value={value.height}
+                    onChange={(height) => onChange({ ...value, height })}
+                    issues={issues}
+                />
+            </div>
+        </>
+    );
+}
+
+export function AcidRainFields({
+    value,
+    onChange,
+    issues
+}: {
+    value: catalog.EventOptions<"acid-rain">;
+    onChange: (options: catalog.EventOptions<"acid-rain">) => void;
+    issues: Issues;
+}) {
+    const t = useGameText("minecraft");
+    return (
+        <>
+            <PlaceField
+                value={value.place}
+                onChange={(place) => onChange({ ...value, place })}
+                what={t("editor.place.acid")}
+                issues={issues}
+                path={["options", "place"]}
+            />
+            <div className="grid grid-cols-2 gap-3">
+                <Field label={t("editor.acidSize")}>
+                    <Select
+                        value={value.size}
+                        onValueChange={(size) =>
+                            onChange({ ...value, size: size as typeof value.size })
+                        }
+                        options={options(t, ACID_SIZE_LABELS)}
+                        aria-label={t("editor.acidSize")}
+                    />
+                </Field>
+                <Field label={t("editor.acidity")} hint={t("editor.acidityHint")}>
+                    <Select
+                        value={value.acidity}
+                        onValueChange={(acidity) =>
+                            onChange({ ...value, acidity: acidity as typeof value.acidity })
+                        }
+                        options={options(t, ACIDITY_LABELS)}
+                        aria-label={t("editor.acidity")}
                     />
                 </Field>
                 <HeightField

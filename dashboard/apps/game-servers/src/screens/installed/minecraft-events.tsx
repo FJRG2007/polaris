@@ -427,6 +427,16 @@ function stageFacts(t: GameText<"minecraft">, preset: catalog.EventPreset): stri
                 })
             ];
         }
+        case "acid-rain": {
+            const options = preset.options as catalog.EventOptions<"acid-rain">;
+            return [
+                t("events.facts.acidRain", {
+                    size: t(`events.acidSizes.${options.size}` as GameKey<"minecraft">),
+                    acidity: t(`events.acidities.${options.acidity}` as GameKey<"minecraft">),
+                    height: options.height
+                })
+            ];
+        }
         case "tnt-run": {
             const options = preset.options as catalog.EventOptions<"tnt-run">;
             return [
@@ -459,6 +469,8 @@ function stageItemsFact(t: GameText<"minecraft">, preset: catalog.EventPreset): 
             return t("events.facts.boatRaceBoats");
         case "nether-maze":
             return t("events.facts.netherMazeSafe");
+        case "acid-rain":
+            return t("events.facts.acidRainSafe");
         default:
             return t("events.facts.parkourItems");
     }

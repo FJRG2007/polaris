@@ -2200,6 +2200,7 @@ describe("a spleef floor", () => {
                     "polaris:dropper/tick",
                     "polaris:boat/tick",
                     "polaris:maze/tick",
+                    "polaris:acid/tick",
                     "polaris:door/tick",
                     "polaris:panel/tick"
                 ]
@@ -2548,7 +2549,8 @@ describe("what an arena sends", () => {
         expect(stage.clearMarked("Ana", "nbt")).toEqual([
             "clear Ana minecraft:iron_shovel{polaris_event:1b}",
             "clear Ana minecraft:snowball{polaris_event:1b}",
-            "clear Ana minecraft:oak_boat{polaris_event:1b}"
+            "clear Ana minecraft:oak_boat{polaris_event:1b}",
+            "clear Ana minecraft:cobblestone{polaris_event:1b}"
         ]);
         expect(stage.markedSnowballs("Ana", "components", 16)).toEqual([
             "clear Ana minecraft:snowball[minecraft:custom_data={polaris_event:1b}]",

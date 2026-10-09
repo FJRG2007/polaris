@@ -1768,6 +1768,11 @@
                 "label": "Laberintos mortales",
                 "summary": "Se construye en el aire un laberinto techado de netherrack, distinto cada vez. Se sale desde su puerta y gana quien llegue antes a la sala iluminada del centro. El fuego, el magma y la lava no hacen daño, pero tocarlos te devuelve a la salida.",
                 "unit": "salas"
+            },
+            "acid-rain": {
+                "label": "Lluvia ácida",
+                "summary": "Se construye en el aire una arena abierta, y sobre ella sola cae una lluvia ácida. Estar sin nada sobre la cabeza llena tu barra de ácido; llena, quedas fuera. Refúgiate en las chozas o construye la tuya con la piedra que se reparte, mientras la lluvia la va comiendo. Gana el último en pie.",
+                "unit": "puntos"
             }
         },
         "triggers": {
@@ -1872,7 +1877,9 @@
             "gatheringRounds": "{rounds} {rounds, plural, one {ronda} other {rondas}} de {minutes} {minutes, plural, one {minuto} other {minutos}}. Cada objeto vale puntos según lo que cuesta conseguirlo - una piedra 1, un tronco 4, un lingote de hierro 12 - y gana quien más puntos sume en todas las rondas.",
             "world": "{time, select, day {Mantiene el mediodía} night {Mantiene la medianoche} other {No toca la hora}}{weather, select, clear { y el cielo despejado} rain { y la lluvia} other {}} mientras dura, y luego devuelve la hora y deja que el tiempo vuelva a cambiar.",
             "netherMaze": "Un laberinto {size} a unos {height} bloques de altura, con {hazards} de sus salas con fuego, magma o un foso de lava. Muros de dos bloques y techo macizo: no se puede escalar ni ver por encima, y todas las salas se alcanzan sin tocar un peligro.",
-            "netherMazeSafe": "No se tocan los objetos de nadie y nadie recibe daño. La vista de cuevas y el radar del minimapa se apagan para quien juega. Los peligros los vigila un pequeño data pack que Polaris añade al mundo."
+            "netherMazeSafe": "No se tocan los objetos de nadie y nadie recibe daño. La vista de cuevas y el radar del minimapa se apagan para quien juega. Los peligros los vigila un pequeño data pack que Polaris añade al mundo.",
+            "acidRain": "Una arena {size} a unos {height} bloques de altura, con lluvia {acidity}. El tiempo del mundo nunca cambia: la lluvia cae solo sobre la arena.",
+            "acidRainSafe": "No se tocan los objetos de nadie y nadie recibe daño. Se reparte piedra marcada que solo se coloca en la arena y se retira al salir. La lluvia la calcula un pequeño data pack que Polaris añade al mundo. Necesita Minecraft 1.17 o posterior."
         },
         "errors": {
             "read": "No se pudieron leer los eventos",
@@ -1902,7 +1909,8 @@
             "anotherOn": "Ya hay otro evento en marcha. Deja que acabe o cancélalo antes.",
             "noneOn": "Nada en marcha",
             "alreadyStarted": "Ya ha empezado",
-            "tooFewPlayers": "{count, plural, one {Solo hay # jugador conectado} other {Solo hay # jugadores conectados}}; este evento necesita {needed}"
+            "tooFewPlayers": "{count, plural, one {Solo hay # jugador conectado} other {Solo hay # jugadores conectados}}; este evento necesita {needed}",
+            "needsVersion": "{kind} necesita Minecraft {version} o posterior, y este servidor usa una más antigua."
         },
         "starting": "{name} está empezando.",
         "deleteTitle": "¿Borrar {name}?",
@@ -2066,6 +2074,15 @@
             "few": "pocas",
             "some": "algunas",
             "many": "muchas"
+        },
+        "acidSizes": {
+            "small": "pequeña",
+            "medium": "mediana",
+            "large": "grande"
+        },
+        "acidities": {
+            "mild": "suave",
+            "harsh": "fuerte"
         }
     },
     "editor": {
@@ -2283,6 +2300,15 @@
                 "few": "Pocos",
                 "some": "Algunos",
                 "many": "Muchos"
+            },
+            "acidSize": {
+                "small": "Pequeña: 17 por 17",
+                "medium": "Mediana: 23 por 23",
+                "large": "Grande: 29 por 29"
+            },
+            "acidity": {
+                "mild": "Suave",
+                "harsh": "Fuerte"
             }
         },
         "place": {
@@ -2299,7 +2325,8 @@
             "shaft": "El pozo se construye en el aire, a unos 30 bloques de un jugador que esté en el mundo normal cuando empiece.",
             "islands": "Las islas se construyen 30 bloques en alto, a unos 30 bloques de un jugador que esté en el mundo normal cuando empiece.",
             "villager": "El aldeano se coloca a unos 50 bloques de un jugador que esté en el mundo normal cuando empiece.",
-            "maze": "El laberinto se construye a 30 bloques de altura, a unos 30 bloques de un jugador que esté en el mundo normal cuando empiece."
+            "maze": "El laberinto se construye a 30 bloques de altura, a unos 30 bloques de un jugador que esté en el mundo normal cuando empiece.",
+            "acid": "La arena se construye a 30 bloques de altura, a unos 30 bloques de un jugador que esté en el mundo normal cuando empiece."
         },
         "floorSizeHint": "De 5 a 15: este mide {size} por {size}.",
         "range": "De {min} a {max}",
@@ -2374,7 +2401,10 @@
         "fishCatchesHint": "De 3 a 30 por cada jugador que pesca: más jugadores, pez más grande.",
         "mazeSize": "Tamaño",
         "mazeHazards": "Peligros",
-        "mazeHazardsHint": "Cuántas salas tienen fuego, magma o un foso de lava."
+        "mazeHazardsHint": "Cuántas salas tienen fuego, magma o un foso de lava.",
+        "acidSize": "Tamaño",
+        "acidity": "Acidez",
+        "acidityHint": "Lo rápido que la lluvia llena la barra y come un refugio."
     },
     "moderation": {
         "announcements": {

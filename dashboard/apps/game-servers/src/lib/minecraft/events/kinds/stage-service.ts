@@ -23,6 +23,8 @@ import * as boatRaceSaid from "./boat-race-messages";
 import * as netherMaze from "./nether-maze";
 import * as netherMazeSaid from "./nether-maze-messages";
 import * as radar from "./radar";
+import * as acidRain from "./acid-rain";
+import * as acidRainSaid from "./acid-rain-messages";
 import * as stash from "./stash";
 import * as arrival from "./arrival";
 import * as stashService from "./stash-service";
@@ -41,6 +43,7 @@ const tntRunMessages = speech.spoken(tntRunSaid);
 const dropperMessages = speech.spoken(dropperSaid);
 const boatMessages = speech.spoken(boatRaceSaid);
 const mazeMessages = speech.spoken(netherMazeSaid);
+const acidMessages = speech.spoken(acidRainSaid);
 
 /** The event cannot go ahead - too few joined, the structure would not stand -
  *  and ends as called off, with everything undone. */
@@ -60,6 +63,8 @@ export interface StageLoop {
     /** The racers seen on the last tick: one seen again after missing it has
      *  just come back on (`PackRace.rejoined`). */
     present?: Set<string>;
+    /** How many top-ups of cobblestone an acid rain has handed out since "Go!". */
+    acidTopUps?: number;
 }
 
 export interface StageTools {
@@ -151,6 +156,13 @@ type Layout =
           readonly boxes: readonly stage.Box[];
           readonly volume: stage.Volume;
           readonly reach: number;
+      }
+    | {
+          readonly kind: "acid-rain";
+          readonly acid: acidRain.Acid;
+          readonly boxes: readonly stage.Box[];
+          readonly volume: stage.Volume;
+          readonly reach: number;
       };
 
 function layoutAt(run: EventRun, site: { x: number; z: number }, y: number): Layout {
@@ -200,6 +212,21 @@ function layoutAt(run: EventRun, site: { x: number; z: number }, y: number): Lay
             boxes: maze.boxes,
             volume: maze.volume,
             reach: maze.reach
+        };
+    }
+    if (run.preset.kind === "acid-rain") {
+        const acid = acidRain.arena(
+            run.preset.options as catalog.EventOptions<"acid-rain">,
+            run.id,
+            site,
+            y
+        );
+        return {
+            kind: "acid-rain",
+            acid,
+            boxes: acid.boxes,
+            volume: acid.volume,
+            reach: acid.reach
         };
     }
     if (run.preset.kind === "dropper") {
@@ -376,6 +403,8 @@ export async function stageTick(
                 lines,
                 mazeRace(loop, layout.maze)
             );
+        case "acid-rain":
+            return acidTick(loop, server, tools, layout.acid, layout.volume, heard, now, lines);
         default:
             return spleefTick(loop, server, tools, layout.arena, layout.volume, heard, now, lines);
     }
@@ -429,7 +458,9 @@ async function raise(
                               ? boatMessages.cannotPlay(language)
                               : preset.kind === "nether-maze"
                                 ? mazeMessages.cannotPlay(language)
-                                : tntRunMessages.cannotPlay(language))
+                                : preset.kind === "acid-rain"
+                                  ? acidMessages.cannotPlay(language)
+                                  : tntRunMessages.cannotPlay(language))
                 )
             ]);
             throw new CalledOff("Its data pack could not be put on");
@@ -573,6 +604,8 @@ function readySubtitle(loop: StageLoop, layout: Layout): string {
             return boatMessages.readySubtitle(language);
         case "nether-maze":
             return mazeMessages.readySubtitle(language);
+        case "acid-rain":
+            return acidMessages.readySubtitle(language);
         case "spleef":
             return messages.spleefReadySubtitle(
                 spleef.variantFor(
@@ -666,11 +699,14 @@ async function admit(
                   ? // In the starting room; a late racer goes in with the door
                     // already open.
                     netherMaze.spots(layout.maze, fresh.length)
-                  : [];
+                  : layout.kind === "acid-rain"
+                    ? acidRain.spots(layout.acid, fresh.length)
+                    : [];
     if (layout.kind === "parkour") await server.sayAll(parkour.SCORES_ADDED);
     if (layout.kind === "dropper") await server.sayAll(dropper.SCORES_ADDED);
     if (layout.kind === "boat-race") await server.sayAll(boatRace.SCORES_ADDED);
     if (layout.kind === "nether-maze") await server.sayAll(netherMaze.SCORES_ADDED);
+    if (layout.kind === "acid-rain") await server.sayAll(acidRain.SCORES_ADDED);
     // A late racer in a race already on gets a boat on the spot.
     const way =
         layout.kind === "boat-race" && !holding(loop)
@@ -736,7 +772,8 @@ async function admit(
                       ...netherMaze.racerScores(one.name),
                       radar.radarLine(one.name, radar.RADAR_OFF, mazeMessages.radarOff)
                   ]
-                : [])
+                : []),
+            ...(layout.kind === "acid-rain" ? acidRain.racerScores(one.name) : [])
         );
         brought.push(one.name);
     }
@@ -989,6 +1026,7 @@ function inPlace(layout: Layout, at: { x: number; y: number; z: number }): boole
     if (layout.kind === "dropper") return dropper.onLid(layout.shaft, at);
     if (layout.kind === "boat-race") return boatRace.onGrid(layout.track, at);
     if (layout.kind === "nether-maze") return netherMaze.inStart(layout.maze, at);
+    if (layout.kind === "acid-rain") return acidRain.inside(layout.acid, at);
     const { center, size, floor } = layout.arena;
     return (
         at.y >= floor + 0.5 &&
@@ -1156,6 +1194,9 @@ async function holdTick(
                 one.outAt === null ? { ...one, since: go, best: 0 } : one
             )
         });
+    } else if (layout.kind === "acid-rain") {
+        const places = acidRain.spots(layout.acid, racing.length);
+        racing.forEach((racer, index) => lines.push(stage.moveLine(racer.name, places[index]!)));
     } else {
         const places = spleef.spots(layout.arena, racing.length);
         racing.forEach((racer, index) => lines.push(stage.moveLine(racer.name, places[index]!)));
@@ -1166,6 +1207,8 @@ async function holdTick(
     await tools.persist();
     if (layout.kind === "spleef" || layout.kind === "tnt-run")
         return spleefTick(loop, server, tools, layout.arena, layout.volume, [], now, lines);
+    if (layout.kind === "acid-rain")
+        return acidTick(loop, server, tools, layout.acid, layout.volume, [], now, lines);
     return null;
 }
 
@@ -1436,7 +1479,11 @@ export function quickLines(loop: StageLoop): string[] {
 /** The kinds the events data pack plays a part of (`snowball-pack.ts`). */
 function needsPack(kind: catalog.EventKind): boolean {
     return (
-        kind === "tnt-run" || kind === "dropper" || kind === "boat-race" || kind === "nether-maze"
+        kind === "tnt-run" ||
+        kind === "dropper" ||
+        kind === "boat-race" ||
+        kind === "nether-maze" ||
+        kind === "acid-rain"
     );
 }
 
@@ -1856,6 +1903,156 @@ async function spleefTick(
     return `${winner.name} was the last one standing`;
 }
 
+// ------------------------------------------------------------------ acid rain
+
+/**
+ * One tick of an acid rain: at "Go!" the rain switched on and the cobblestone
+ * handed out, a top-up every while after, the rain eating at the shelters, and
+ * whoever's acid is full, who left or who strayed, out - in the order they went,
+ * as a spleef's players. The last one left wins; at the end of the time, those
+ * still in are ranked by how dry they stayed (`results`).
+ */
+async function acidTick(
+    loop: StageLoop,
+    server: ServerContainer,
+    tools: StageTools,
+    acid: acidRain.Acid,
+    volume: stage.Volume,
+    heard: readonly { name: string; call: stage.Call }[],
+    now: number,
+    lines: string[]
+): Promise<string | null> {
+    const language = loop.language;
+    const leaving = new Set<string>();
+    for (const { name, call } of heard) {
+        const racer = state(loop).racers.find((one) => same(one.name, name));
+        if (call === "leave" && racer && racer.outAt === null)
+            leaving.add(racer.name.toLowerCase());
+        else if (call === "join" && !racer)
+            lines.push(tell(name, messages.tag(language) + messages.tooLate(language)));
+    }
+    const where = commands.readWhere(await server.say([stage.ARENA_WHERE]));
+    const dimensions = commands.readDimensions(await server.say([stage.ARENA_DIMENSIONS]));
+    let dirty = false;
+
+    const current = state(loop);
+    if (!current.armed && current.goAt !== null && now >= current.goAt) {
+        const { items } = await tools.flavour();
+        // Whatever players place and whatever the rain leaves of it is the
+        // arena's too: written down before the first block is handed out.
+        change(loop, { boxes: [...current.boxes, ...acidRain.sweepBoxes(acid)] });
+        for (const racer of current.racers) {
+            if (racer.outAt !== null) continue;
+            lines.push(
+                acidRain.cobblestoneLine(racer.name, items, acidRain.START_BLOCKS),
+                `title ${racer.name} subtitle ${commands.text(acidMessages.goSubtitle(language))}`,
+                `title ${racer.name} title ${commands.text(acidMessages.goTitle(language))}`,
+                soundFor(racer.name, commands.SOUNDS.start)
+            );
+        }
+        lines.push(...acidRain.armLines(acid));
+        loop.acidTopUps = 0;
+        change(loop, { armed: true });
+        dirty = true;
+    } else if (current.armed && current.goAt !== null) {
+        // More cobblestone every while: a shelter can always be patched.
+        const due = Math.floor((now - current.goAt) / acidRain.TOP_UP_MS);
+        loop.acidTopUps ??= due;
+        if (due > loop.acidTopUps) {
+            loop.acidTopUps = due;
+            const { items } = await tools.flavour();
+            for (const racer of current.racers)
+                if (racer.outAt === null)
+                    lines.push(
+                        acidRain.cobblestoneLine(racer.name, items, acidRain.TOP_UP_BLOCKS),
+                        tell(
+                            racer.name,
+                            messages.tag(language) +
+                                acidMessages.topUp(acidRain.TOP_UP_BLOCKS, language)
+                        )
+                    );
+        }
+        lines.push(...acidRain.dripLines(acid));
+    }
+
+    // Everybody's acid as the pack has it: kept as how dry they stayed, for
+    // the end of the time.
+    const acidOf = state(loop).armed
+        ? lowered(commands.readScores(await server.say([acidRain.READ_ACID])))
+        : new Map<string, number>();
+    change(loop, {
+        racers: state(loop).racers.map((one) => {
+            const taken = acidOf.get(one.name.toLowerCase());
+            if (one.outAt !== null || taken === undefined) return one;
+            const dry = acidRain.dryOf(taken);
+            if (dry !== one.best) dirty = true;
+            return dry === one.best ? one : { ...one, best: dry };
+        })
+    });
+
+    const out: string[] = [];
+    const soaked = new Set<string>();
+    for (const racer of state(loop).racers) {
+        if (racer.outAt !== null) continue;
+        const at = where.find((one) => same(one.name, racer.name));
+        const taken = acidOf.get(racer.name.toLowerCase()) ?? 0;
+        if (taken >= acidRain.ACID_MAX) soaked.add(racer.name);
+        if (
+            leaving.has(racer.name.toLowerCase()) ||
+            !at ||
+            strayed(at, dimensions.get(at.name), volume) ||
+            taken >= acidRain.ACID_MAX
+        )
+            out.push(racer.name);
+    }
+    if (out.length > 0) {
+        // Everybody out on the same look shares the place, as in a spleef.
+        const points = state(loop).racers.filter((one) => one.outAt !== null).length + 1;
+        for (const name of out) markOut(loop, name, now, points);
+        const left = state(loop).racers.filter((one) => one.outAt === null).length;
+        for (const name of out) {
+            await sendHome(loop, server, tools, name);
+            lines.push(
+                commands.say(
+                    messages.tag(language) +
+                        (soaked.has(name)
+                            ? acidMessages.dissolved(name, left, language)
+                            : messages.spleefOut(name, left, language))
+                ),
+                `title ${name} subtitle ${commands.text(" ")}`,
+                `title ${name} title ${commands.text(messages.spleefOutTitle(language))}`,
+                ...acidRain.racerOutLines(name)
+            );
+        }
+        dirty = true;
+    }
+
+    const standing = state(loop).racers.filter((one) => one.outAt === null);
+    for (const racer of standing)
+        lines.push(
+            commands.actionbarFor(
+                racer.name,
+                !state(loop).armed
+                    ? messages.spleefReadyTitle(language)
+                    : acidMessages.bar(
+                          acidRain.gauge(acidOf.get(racer.name.toLowerCase()) ?? 0),
+                          standing.length,
+                          language
+                      )
+            )
+        );
+    if (dirty) await tools.persist();
+    if (!state(loop).armed || standing.length > 1) return null;
+    lines.push(...acidRain.stopLines(acid.boxes));
+    const winner = standing[0];
+    if (!winner) {
+        lines.push(commands.say(messages.tag(language) + messages.nobodyStanding(language)));
+        return "Nobody was left standing";
+    }
+    lines.push(commands.say(messages.tag(language) + messages.lastStanding(winner.name, language)));
+    return `${winner.name} was the last one standing`;
+}
+
 /** The marked shovel, in the syntax this server takes - the other tried once if
  *  the version's guess was wrong, and remembered. */
 async function handShovel(
@@ -1912,7 +2109,8 @@ export async function settle(
             ...tntRun.stopLines(boxes),
             ...dropper.stopLines(boxes),
             ...boatRace.stopLines(boxes),
-            ...netherMaze.stopLines(boxes)
+            ...netherMaze.stopLines(boxes),
+            ...acidRain.stopLines(boxes)
         ];
         if (area || stop.length > 0)
             await server.sayAll([...(area ? [stage.holdArea(area)] : []), ...stop]);
@@ -1978,6 +2176,16 @@ export function results(run: EventRun): { scores: Map<string, number>; took: str
                     ? parkour.finishScore((one.finishedAt - one.since) / 1000)
                     : one.best
             );
+        } else if (run.preset.kind === "acid-rain") {
+            // The order they went out in, then - among those still in at the
+            // end - who stayed driest.
+            scores.set(
+                one.name,
+                acidRain.scoreOf(
+                    one.outAt === null ? racers.length : one.points,
+                    one.outAt === null ? one.best : null
+                )
+            );
         } else {
             scores.set(one.name, one.outAt === null ? racers.length : one.points);
         }
@@ -2015,9 +2223,14 @@ export function standings(run: EventRun): { name: string; score: number }[] {
                     ? one.finishedAt !== null
                         ? jumps
                         : one.best
-                    : one.outAt === null
-                      ? (run.stage?.racers.length ?? 0)
-                      : one.points
+                    : run.preset.kind === "acid-rain"
+                      ? acidRain.scoreOf(
+                            one.outAt === null ? (run.stage?.racers.length ?? 0) : one.points,
+                            one.outAt === null ? one.best : null
+                        )
+                      : one.outAt === null
+                        ? (run.stage?.racers.length ?? 0)
+                        : one.points
         }))
         .sort((left, right) => right.score - left.score);
 }
@@ -2059,6 +2272,18 @@ export function scoreText(
                 en: `${score} ${score === 1 ? "floor" : "floors"}`,
                 es: `${score} ${score === 1 ? "piso" : "pisos"}`
             },
+            language
+        );
+    }
+    if (kind === "acid-rain") {
+        const { place, dry } = acidRain.scoreParts(score);
+        return speech.pickIn(
+            dry > 0
+                ? {
+                      en: `${place} ${place === 1 ? "point" : "points"}, ${dry}% dry`,
+                      es: `${place} puntos, ${dry}% seco`
+                  }
+                : { en: `${place} ${place === 1 ? "point" : "points"}`, es: `${place} puntos` },
             language
         );
     }

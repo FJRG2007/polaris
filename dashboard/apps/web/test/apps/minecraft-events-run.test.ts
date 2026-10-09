@@ -474,7 +474,8 @@ function quickAnswer(line: string): string | null {
  * score range for everybody inside, and set for everybody in a range.
  */
 function stageScoreAnswer(line: string): string | null {
-    const objectives = /^(pe_(drop|low|back|gate|next|last|fin|cut|mfin|mback)|polaris_tntrun)$/;
+    const objectives =
+        /^(pe_(drop|low|back|gate|next|last|fin|cut|mfin|mback|acid)|polaris_tntrun)$/;
     const set = /^scoreboard players set (\w+) (\w+) (-?\d+)$/.exec(line);
     if (set && objectives.test(set[2]!)) {
         (world.stageScores[set[2]!] ??= {})[set[1]!] = Number(set[3]);
@@ -12072,6 +12073,92 @@ describe("a deadly nether maze", () => {
         for (const line of mazeKind.SCORES_REMOVED) expect(world.sent).toContain(line);
         expect(world.inside.size).toBe(0);
         keptTheRules(["lava", "fire"]);
+        expect(after.stageLeftovers).toEqual([]);
+    });
+});
+
+const acidKind = await import("@polaris-app/game-servers/src/lib/minecraft/events/kinds/acid-rain");
+
+describe("an acid rain", () => {
+    const run = () => ({
+        ...newPreset("acid-rain", "acid"),
+        minutes: 6,
+        options: {
+            place: { mode: "players" as const },
+            size: "small" as const,
+            acidity: "mild" as const,
+            height: 30
+        }
+    });
+    const arenaNow = () => {
+        const current = state().run!;
+        const origin = current.stage!.origin!;
+        return acidKind.arena(run().options, current.id, origin, origin.y);
+    };
+    const scores = (objective: string) => (world.stageScores[objective] ??= {});
+
+    it("hands out cobblestone at Go and again later, puts out whoever the rain filled, and never touches the weather", async () => {
+        world.online = ["Ana", "Ben", "Cy"];
+        setUp([run()]);
+        await startArena("acid");
+        await play(2_100);
+        chat(["Ana", "join"], ["Ben", "join"], ["Cy", "unirse"]);
+        await play(44_000);
+        expect(state().run!.stage?.racers.map((one) => one.name)).toEqual(["Ana", "Ben", "Cy"]);
+        await play(8_000);
+        const built = arenaNow();
+        const one = world.sent.findIndex(
+            (line) => line.includes(" title ") && visible(line).endsWith(" title 1")
+        );
+        const given = (name: string) =>
+            world.sent.filter((line) => line.startsWith(`give ${name} minecraft:cobblestone[`));
+        expect(one).toBeGreaterThan(-1);
+        expect(given("Ana")).toHaveLength(1);
+        expect(given("Ana")[0]).toContain("minecraft:can_place_on=");
+        expect(world.sent.indexOf(given("Ana")[0]!)).toBeGreaterThan(one);
+        for (const line of acidKind.armLines(built)) expect(world.sent).toContain(line);
+        // What players place, and what the rain leaves of it, is the arena's.
+        for (const box of acidKind.sweepBoxes(built))
+            expect(state().run!.stage!.boxes).toContainEqual(box);
+        await play(2_100);
+        for (const line of acidKind.dripLines(built)) expect(world.sent).toContain(line);
+
+        // The rain filled Ben's bar; Ana has had some.
+        scores("pe_acid").Ben = acidKind.ACID_MAX;
+        scores("pe_acid").Ana = 30;
+        await play(2_100);
+        expect(world.inside.has("Ben")).toBe(false);
+        expect(
+            world.sent.some(
+                (line) =>
+                    line.startsWith("tellraw @a") &&
+                    visible(line).includes("could not take the rain")
+            )
+        ).toBe(true);
+        expect(world.sent).toContain("scoreboard players reset Ben pe_acid");
+
+        // A top-up, once.
+        await play(40_000);
+        expect(given("Ana")).toHaveLength(2);
+        expect(given("Ben")).toHaveLength(1);
+
+        chat(["Cy", "leave"]);
+        await play(4_100);
+        const after = state();
+        expect(after.run).toBeNull();
+        expect(after.history[0]?.note).toBe("Ana was the last one standing");
+        expect(after.history[0]?.podium).toEqual([
+            { place: 1, name: "Ana", score: acidKind.scoreOf(3, 70) },
+            { place: 2, name: "Cy", score: acidKind.scoreOf(2, null) },
+            { place: 3, name: "Ben", score: acidKind.scoreOf(1, null) }
+        ]);
+        for (const line of acidKind.stopLines(built.boxes)) expect(world.sent).toContain(line);
+        for (const line of acidKind.SCORES_REMOVED) expect(world.sent).toContain(line);
+        expect(world.sent).toContain("clear Ana *[minecraft:custom_data={polaris_event:1b}]");
+        // The rain is the event's own: the world's weather left alone.
+        expect(world.sent.filter((line) => /^weather /.test(line))).toEqual([]);
+        expect(world.inside.size).toBe(0);
+        keptTheRules();
         expect(after.stageLeftovers).toEqual([]);
     });
 });

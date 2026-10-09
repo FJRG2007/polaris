@@ -58,7 +58,8 @@ export const EVENT_KINDS = [
     "village-defense",
     "bingo",
     "boss-fishing",
-    "nether-maze"
+    "nether-maze",
+    "acid-rain"
 ] as const;
 
 export type EventKind = (typeof EVENT_KINDS)[number];
@@ -223,12 +224,16 @@ export const THEME_MODES = ["random", "mine"] as const;
 export const BINGO_GOALS = ["line", "card"] as const;
 /** What a SkyWars island's chests hold: plain survival gear, or rich. */
 export const SKY_WARS_LOOT = ["normal", "rich"] as const;
-/** How big hide and seek's house is: by how many play, or three, four or five
- *  rooms along a side. */
 /** A nether maze's rooms a side, and how many of them are deadly. */
 export const MAZE_SIZES = ["small", "medium", "large"] as const;
 export const MAZE_HAZARDS = ["few", "some", "many"] as const;
+/** How big an acid rain's arena is, and how fast its rain fills a player's
+ *  bar and eats their shelter. */
+export const ACID_SIZES = ["small", "medium", "large"] as const;
+export const ACIDITIES = ["mild", "harsh"] as const;
 
+/** How big hide and seek's house is: by how many play, or three, four or five
+ *  rooms along a side. */
 export const HOUSE_SIZES = ["auto", "small", "medium", "large"] as const;
 
 export type Language = (typeof LANGUAGES)[number];
@@ -709,6 +714,19 @@ export const optionsSchemas = {
             .min(25, problem("atLeast", { count: 25 }))
             .max(40, problem("atMost", { count: 40 }))
             .default(30)
+    }),
+    "acid-rain": z.object({
+        place: placeSchema.default({ mode: "players" }),
+        /** The arena's floor: 17, 23 or 29 blocks a side inside its walls. */
+        size: z.enum(ACID_SIZES).default("medium"),
+        /** How fast the rain fills a player's bar and eats a shelter. */
+        acidity: z.enum(ACIDITIES).default("mild"),
+        height: z
+            .number()
+            .int()
+            .min(25, problem("atLeast", { count: 25 }))
+            .max(40, problem("atMost", { count: 40 }))
+            .default(30)
     })
 } as const satisfies Record<EventKind, z.ZodTypeAny>;
 
@@ -845,7 +863,8 @@ export const presetSchema = z
         presetBase.extend({
             kind: z.literal("nether-maze"),
             options: optionsSchemas["nether-maze"]
-        })
+        }),
+        presetBase.extend({ kind: z.literal("acid-rain"), options: optionsSchemas["acid-rain"] })
     ])
     .transform((value) => value as EventPreset);
 
@@ -915,7 +934,7 @@ export type RandomEvents = z.infer<typeof randomSchema>;
  * value an operator chooses later, even one that happens to be an old default,
  * is theirs.
  */
-export const DEFAULTS_VERSION = 4;
+export const DEFAULTS_VERSION = 5;
 
 /** Events saved before this were brought up to their kind's defaults once
  *  (`toKindDefaults`). */
@@ -940,7 +959,8 @@ const KIND_SINCE: Partial<Readonly<Record<EventKind, number>>> = {
     "village-defense": 3,
     bingo: 3,
     "boss-fishing": 3,
-    "nether-maze": 4
+    "nether-maze": 4,
+    "acid-rain": 5
 };
 
 export const settingsSchema = z.object({
@@ -1028,7 +1048,8 @@ export const KIND_NAMES: Readonly<Record<EventKind, Readonly<Record<Language, st
     "village-defense": { en: "Villager defense", es: "Defensa del aldeano" },
     bingo: { en: "Bingo rush", es: "Bingo exprés" },
     "boss-fishing": { en: "Boss fishing", es: "Pesca del jefe" },
-    "nether-maze": { en: "Deadly nether maze", es: "Laberintos mortales" }
+    "nether-maze": { en: "Deadly nether maze", es: "Laberintos mortales" },
+    "acid-rain": { en: "Acid rain", es: "Lluvia ácida" }
 };
 
 /** What an event of each kind is. Its name and summary on a screen are the
@@ -1164,6 +1185,10 @@ export const KIND_INFO: Readonly<Record<EventKind, KindInfo>> = {
     "nether-maze": {
         unit: "rooms",
         competitive: true
+    },
+    "acid-rain": {
+        unit: "points",
+        competitive: true
     }
 };
 
@@ -1281,7 +1306,8 @@ export const DEFAULT_PRIZES: Readonly<Record<EventKind, Rewards>> = {
     "village-defense": EPIC,
     bingo: STANDARD,
     "boss-fishing": STANDARD,
-    "nether-maze": STANDARD
+    "nether-maze": STANDARD,
+    "acid-rain": STANDARD
 };
 
 /** The names a king of the ring was given by default while it was a hill, and
@@ -1330,7 +1356,8 @@ export const DEFAULT_MINUTES: Readonly<Record<EventKind, number>> = {
     "village-defense": 10,
     bingo: 15,
     "boss-fishing": 10,
-    "nether-maze": 6
+    "nether-maze": 6,
+    "acid-rain": 6
 };
 
 /** What every kind ran for before `DEFAULT_MINUTES`: an event still on exactly
@@ -1685,7 +1712,8 @@ export const DEFAULT_MIN_SCORE: Readonly<Record<EventKind, number>> = {
     "village-defense": 3,
     bingo: 3,
     "boss-fishing": 2,
-    "nether-maze": 1
+    "nether-maze": 1,
+    "acid-rain": 1
 };
 
 /** Whether the minimum is something an operator can set for this event. A
@@ -1726,6 +1754,7 @@ export function needsOverworld(preset: EventPreset): boolean {
         case "boat-race":
         case "dropper":
         case "nether-maze":
+        case "acid-rain":
         case "village-defense":
             return true;
         case "explorer":
@@ -1815,6 +1844,7 @@ export function readyToPlay(run: {
         case "boat-race":
         case "dropper":
         case "nether-maze":
+        case "acid-rain":
             // Once everybody brought in is there and the start given (`arrival`).
             return (run.stage?.racers.length ?? 0) > 0 && (run.stage?.goAt ?? null) !== null;
         case "team-duel":
@@ -1901,7 +1931,8 @@ export function playsOnStage(preset: EventPreset): boolean {
         preset.kind === "tnt-run" ||
         preset.kind === "boat-race" ||
         preset.kind === "dropper" ||
-        preset.kind === "nether-maze"
+        preset.kind === "nether-maze" ||
+        preset.kind === "acid-rain"
     );
 }
 
@@ -1995,6 +2026,8 @@ export function incompatibility(
     const lacks = (since: readonly number[] | undefined) =>
         since !== undefined && !versionAtLeast(version, since);
     if (stashesFirst(preset) && lacks([1, 17])) return { why: "items", needs: "1.17" };
+    const since = needsVersion(preset);
+    if (since && lacks(since)) return { why: "arena", needs: written(since) };
     if (playsInArena(preset) && lacks([1, 16])) return { why: "arena", needs: "1.16" };
     const options = preset.options as {
         loot?: (typeof LOOT_TABLES)[number];
@@ -2017,6 +2050,13 @@ export function incompatibility(
     )
         return { why: "material", needs: written(MATERIAL_SINCE[options.material]!) };
     return null;
+}
+
+/** The version a kind needs of the game itself, beyond what every event of its
+ *  sort does: an acid rain's drops land on the highest block under its roof,
+ *  which `spreadplayers` can only be told from 1.17. Null when none. */
+export function needsVersion(preset: EventPreset): readonly number[] | null {
+    return preset.kind === "acid-rain" ? [1, 17] : null;
 }
 
 /** Played in an arena until one player is left: ranked by the order they went
@@ -2119,7 +2159,11 @@ export const WORLD_NEEDS: Readonly<Record<EventKind, WorldNeeds>> = {
     "village-defense": { time: "night", weather: "clear" },
     bingo: { time: null, weather: null },
     "boss-fishing": { time: null, weather: null },
-    "nether-maze": { time: "day", weather: "clear" }
+    "nether-maze": { time: "day", weather: "clear" },
+    // Its rain is the event's own, over its arena alone: the world's weather
+    // is every player's, and is left as it is. Held in the day like every
+    // stage, so the arena can be seen.
+    "acid-rain": { time: "day", weather: null }
 };
 
 export function worldNeeds(preset: Pick<EventPreset, "kind">): WorldNeeds {
@@ -2149,6 +2193,7 @@ export function joinersNeeded(preset: EventPreset): number {
     const floor =
         preset.kind === "spleef" ||
         preset.kind === "tnt-run" ||
+        preset.kind === "acid-rain" ||
         playsInArena(preset) ||
         awardsPrizes(preset)
             ? PRIZE_COMPETITION_FLOOR

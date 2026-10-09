@@ -669,8 +669,9 @@ export function inStart(built: Maze, at: { x: number; y: number; z: number }): b
 
 /**
  * How many rooms closer to the middle a racer standing at `at` is than the
- * door's room: their progress, for whoever has not finished. Null outside the
- * rooms - a doorway, the starting room.
+ * door's room: their progress, for whoever has not finished. A room's east
+ * and south doorways count as that room; null outside the maze's rooms - the
+ * starting room, and past its walls.
  */
 export function progressAt(built: Maze, at: { x: number; z: number }): number | null {
     const x = Math.floor(at.x) - built.origin.x;

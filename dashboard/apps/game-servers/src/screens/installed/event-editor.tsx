@@ -35,6 +35,7 @@ import { BuildBattleFields, TeamDuelFields } from "./event-options-arena";
 import { ItemSlots } from "./item-slots";
 import { WorldBossOptions } from "./event-options-world-boss";
 import {
+    AcidRainFields,
     BoatRaceFields,
     CaptureTheFlagFields,
     DropperFields,
@@ -1116,6 +1117,14 @@ function OptionsFields({
             return (
                 <NetherMazeFields
                     value={preset.options as catalog.EventOptions<"nether-maze">}
+                    onChange={onChange}
+                    issues={issues}
+                />
+            );
+        case "acid-rain":
+            return (
+                <AcidRainFields
+                    value={preset.options as catalog.EventOptions<"acid-rain">}
                     onChange={onChange}
                     issues={issues}
                 />
