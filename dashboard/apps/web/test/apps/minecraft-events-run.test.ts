@@ -11145,7 +11145,15 @@ describe("hide and seek", () => {
     };
     const kind = () =>
         import("@polaris-app/game-servers/src/lib/minecraft/events/kinds/hide-and-seek");
+    const manorKind = () =>
+        import("@polaris-app/game-servers/src/lib/minecraft/events/kinds/seek-manor");
     const names = ["Ana", "Ben", "Cy"];
+    /** The manor a run was built as: its rooms and what its server could show. */
+    const houseOf = async (run: { id: string; game?: unknown }) => {
+        const manor = await manorKind();
+        const game = run.game as { rooms: number; era: Parameters<typeof manor.manorFor>[2] };
+        return manor.manorFor(run.id, game.rooms, game.era);
+    };
 
     /** A hit as the events data pack sees it, and the game remembering who hurt whom. */
     const hit = (by: string, victim: string) => {
@@ -11205,7 +11213,8 @@ describe("hide and seek", () => {
         await events.cancelEvent("owner", SERVER);
         await play(2_100);
         expect(state().owedLines.map((one) => [one.player, one.reason])).toEqual([
-            ["Ben", "radar"]
+            ["Ben", "radar"],
+            ["Ben", "effects"]
         ]);
         const told = (name: string) =>
             world.sent.filter(
@@ -11219,6 +11228,8 @@ describe("hide and seek", () => {
         await events.sweepEvents();
         expect(told("Ben")).toHaveLength(1);
         expect(told("Ana")).toEqual([]);
+        // What the game gave Ben is taken off too, and only if it gave it.
+        for (const line of hs.effectsOff("Ben")) expect(world.sent).toContain(line);
         expect(state().owedLines).toEqual([]);
         await events.sweepEvents();
         expect(told("Ben")).toHaveLength(1);
@@ -11233,7 +11244,7 @@ describe("hide and seek", () => {
         world.online = ["Ana", "Cy"];
         await events.cancelEvent("owner", SERVER);
         await play(2_100);
-        expect(state().owedLines).toHaveLength(1);
+        expect(state().owedLines).toHaveLength(2);
         vi.setSystemTime(Date.now() + stored.PENDING_KEPT_MS + 1);
         world.sent = [];
         world.online = [...names];
@@ -11265,9 +11276,11 @@ describe("hide and seek", () => {
         expect(world.sent).toContain(`effect give ${seeker} minecraft:blindness 3 0 true`);
         expect(world.sent).toContain(`effect give ${hiders[0]} minecraft:weakness 3 100 true`);
         expect(fills().every((line) => line.endsWith(" keep"))).toBe(true);
-        const layout = hs.layoutFor(run.id);
-        const cageDown = hs.cageDown(run.arena!.box, layout);
+        const cageDown = (await manorKind()).cageDown(run.arena!.box, await houseOf(run));
         expect(world.sent).not.toContain(cageDown);
+        // Hiders can cross the manor's lava; the seeker cannot.
+        for (const line of hs.fireproofLines(hiders[0])) expect(world.sent).toContain(line);
+        expect(world.sent).not.toContain(hs.fireproofLines(seeker)[1]);
         expect(hs.stateOf(state().run!.game)?.seekers).toEqual([seeker]);
 
         // Let out once the hiding time is up, the cage down by its barrier alone.
@@ -11286,6 +11299,8 @@ describe("hide and seek", () => {
             `execute if entity @a[name=${hiders[0]},team=pe_hs_hide] run team join pe_hs_seek ${hiders[0]}`
         );
         expect(saidToAll(`${seeker} found ${hiders[0]}`)).toBe(true);
+        // Found: what the game gave them taken off, and only from them.
+        for (const line of hs.effectsOff(hiders[0])) expect(world.sent).toContain(line);
         // The side panel keeps up: a find is worth its points at once.
         expect(world.sent).toContain(`scoreboard players set ${seeker} pe_score ${hs.FIND_POINTS}`);
         // A seeker strikes beside a hider who was not hit: nobody found.
@@ -11316,6 +11331,7 @@ describe("hide and seek", () => {
         expect(score(seeker)).toBe(hs.FIND_POINTS);
         expect(world.sent).toContain("team remove pe_hs_hide");
         expect(world.sent).toContain("scoreboard objectives remove pe_hsd");
+        for (const line of hs.effectsOff()) expect(world.sent).toContain(line);
         expect(done.arenaLeftovers).toEqual([]);
         onlyOurBlocks();
     });
@@ -11345,6 +11361,8 @@ describe("hide and seek", () => {
         const finds = hs.stateOf(state().run!.game)!.finds;
         // The seeker's first hit of the game counted, and only on whom they hit.
         expect(finds.map((one) => [one.hider, one.by])).toEqual([[first, seeker]]);
+        // No pack to send a seeker out of the lava: they cross it unhurt too.
+        expect(world.sent).toContain(hs.fireproofLines(seeker)[1]);
     });
 
     it("picked up after a restart, neither lets the seekers out early nor builds the cage again", async () => {
@@ -11369,35 +11387,120 @@ describe("hide and seek", () => {
         const releaseAt = saved.readyAt! + 60_000;
         await play(releaseAt - Date.now() + 2_100);
         expect(hs.stateOf(state().run!.game)!.released).toBe(true);
-        expect(world.sent).toContain(hs.cageDown(saved.arena!.box, hs.layoutFor(saved.id)));
+        expect(world.sent).toContain(
+            (await manorKind()).cageDown(saved.arena!.box, await houseOf(saved))
+        );
     });
 
-    it("puts the secret doors to work at Go, and leaves them open and unworked at the end", async () => {
+    it("builds a manor for the players, works its panels at Go, and takes them down first at the end", async () => {
         const hs = await kind();
+        const manor = await manorKind();
+        const panels = await import(
+            "@polaris-app/game-servers/src/lib/minecraft/events/kinds/secret-panels"
+        );
         world.online = [...names];
         setUp([hideOf(60)]);
         await joinAndStart("hide", names);
         const run = state().run!;
-        expect((run.game as { design?: number }).design).toBe(hs.DESIGN);
+        const game = run.game as { design?: number; rooms?: number; era?: unknown };
+        expect(game.design).toBe(manor.DESIGN);
+        // Three players: three rooms a side, 58 across; a 1.21.4 server shows everything.
+        expect(game.rooms).toBe(3);
+        expect(game.era).toEqual({ scaffold: true, snow: true, display: true });
         const box = run.arena!.box;
-        const arm = hs.doorLines(box, hs.layoutFor(run.id));
+        expect(box.x2 - box.x1 + 1).toBe(58);
+        const house = await houseOf(run);
+        expect(house.bare).toBe(false);
+        expect(manor.manorProblems(house)).toEqual([]);
+        // Its paintings and display blocks, once it is built.
+        for (const line of manor.decorLines(box, house)) expect(world.sent).toContain(line);
+        // At Go: every panel and key marked, and the seekers' way home.
+        const arm = manor.armLines(box, house, run.id);
         expect(arm.filter((line) => line.includes("summon minecraft:armor_stand"))).toHaveLength(
-            hs.hidingPlaces(hs.layoutFor(run.id)).secret
+            house.panels.length + house.keys.length + 1
         );
         for (const line of arm) expect(world.sent).toContain(line);
         await events.cancelEvent("owner", SERVER);
         await play(2_100);
-        for (const line of [...hs.doorsOff(box), ...hs.doorsStill(box)])
-            expect(world.sent).toContain(line);
-        expect(world.sent).toContain("scoreboard objectives remove polaris_door");
-        // Stopped before the house came down, which took their power with it.
-        const stopped = world.sent.lastIndexOf(hs.doorsStill(box)[0]!);
-        const teardown = world.sent
-            .map((line) => line.endsWith("minecraft:air replace minecraft:redstone_block"))
+        for (const line of manor.closeLines(box)) expect(world.sent).toContain(line);
+        expect(world.sent).toContain("scoreboard objectives remove polaris_pnl");
+        // Markers, paintings, lava and water gone before the walls round them.
+        const stopped = world.sent.lastIndexOf(panels.decorOff(box));
+        const fluids = world.sent.lastIndexOf(manor.closeLines(box).at(-1)!);
+        const walls = world.sent
+            .map((line) => / minecraft:air replace minecraft:stone_bricks$/.test(line))
             .lastIndexOf(true);
         expect(stopped).toBeGreaterThanOrEqual(0);
-        expect(teardown).toBeGreaterThan(stopped);
+        expect(fluids).toBeGreaterThan(stopped);
+        expect(walls).toBeGreaterThan(fluids);
+        for (const line of hs.effectsOff()) expect(world.sent).toContain(line);
         onlyOurBlocks();
+    });
+
+    it("gives the hiders a power-up every few minutes once the seekers are out", async () => {
+        const hs = await kind();
+        world.online = [...names];
+        const preset = hideOf(60, 10);
+        setUp([{ ...preset, options: { ...preset.options, powerUpMinutes: 1 } }]);
+        await joinAndStart("hide", names);
+        const run = state().run!;
+        const [seeker] = hs.seekersFor(run.id, names, 1) as [string];
+        const hiders = names.filter((name) => name !== seeker);
+        await play(run.readyAt! + 60_000 - Date.now() + 2_100);
+        expect(hs.stateOf(state().run!.game)?.released).toBe(true);
+        const given = (name: string) =>
+            world.sent.filter(
+                (line) =>
+                    line.startsWith(`effect give ${name} minecraft:invisibility`) ||
+                    line.startsWith(`effect give ${name} minecraft:speed`)
+            );
+        for (const name of hiders) expect(given(name)).toEqual([]);
+        await play(60_000);
+        for (const name of hiders) {
+            const power = hs.powerFor(run.id, name, 1);
+            expect(given(name)).toEqual([hs.powerLines(name, power)[1]]);
+        }
+        expect(given(seeker)).toEqual([]);
+        // Called off: everything the game gave anybody taken off.
+        await events.cancelEvent("owner", SERVER);
+        await play(2_100);
+        for (const line of hs.effectsOff()) expect(world.sent).toContain(line);
+    });
+
+    it("on a 1.16 server builds the manor of what that release has, and nothing newer", async () => {
+        const hs = await kind();
+        world.version = "1.16.5";
+        world.online = [...names];
+        setUp([hideOf(15)]);
+        await joinAndStart("hide", names);
+        const run = state().run!;
+        expect((run.game as { era?: unknown }).era).toEqual({
+            scaffold: true,
+            snow: false,
+            display: false
+        });
+        await play(Math.max(100, run.readyAt! + 15_000 - Date.now() + 2_100));
+        expect(hs.stateOf(state().run!.game)!.released).toBe(true);
+        expect(world.sent.some((line) => /block_display|powder_snow/.test(line))).toBe(false);
+        await events.cancelEvent("owner", SERVER);
+        await play(2_100);
+        expect(state().arenaLeftovers).toEqual([]);
+        onlyOurBlocks();
+    });
+
+    it("plays a hall built by design 3 after an update in that design's own house", async () => {
+        const hs = await kind();
+        world.online = [...names];
+        setUp([hideOf(60)]);
+        await joinAndStart("hide", names);
+        const saved = state().run!;
+        const old = { ...saved, game: { ...(saved.game as object), design: 3 } };
+        const at = { ...world.at };
+        await restartedWith(old, tagsNow());
+        world.at = at;
+        await play(saved.readyAt! + 60_000 - Date.now() + 2_100);
+        expect(hs.stateOf(state().run!.game)!.released).toBe(true);
+        expect(world.sent).toContain(hs.cageDown(saved.arena!.box, hs.layoutFor(saved.id, 3), 3));
     });
 
     it("plays a hall built by design 2 after an update in that design's own house", async () => {

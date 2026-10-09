@@ -20,6 +20,13 @@ const KIT_LABELS: Readonly<Record<(typeof catalog.DUEL_KITS)[number], GameKey<"m
     iron: "editor.labels.kit.iron"
 };
 
+const HOUSE_LABELS: Readonly<Record<(typeof catalog.HOUSE_SIZES)[number], GameKey<"minecraft">>> = {
+    auto: "editor.labels.house.auto",
+    small: "editor.labels.house.small",
+    medium: "editor.labels.house.medium",
+    large: "editor.labels.house.large"
+};
+
 const LOOT_LABELS: Readonly<Record<(typeof catalog.SKY_WARS_LOOT)[number], GameKey<"minecraft">>> =
     {
         normal: "editor.labels.skyWarsLoot.normal",
@@ -310,6 +317,26 @@ export function HideAndSeekFields({
                     onChange={(seekers) => onChange({ ...value, seekers })}
                     issues={issues}
                     field="seekers"
+                />
+                <Field label={t("editor.house")}>
+                    <Select
+                        value={value.house}
+                        onValueChange={(house) =>
+                            onChange({ ...value, house: house as typeof value.house })
+                        }
+                        options={options(t, HOUSE_LABELS)}
+                        aria-label={t("editor.house")}
+                    />
+                </Field>
+                <NumberField
+                    label={t("editor.powerUpMinutes")}
+                    hint={t("editor.powerUpMinutesHint")}
+                    min={0}
+                    max={10}
+                    value={value.powerUpMinutes}
+                    onChange={(powerUpMinutes) => onChange({ ...value, powerUpMinutes })}
+                    issues={issues}
+                    field="powerUpMinutes"
                 />
             </div>
             <PlaceField

@@ -274,7 +274,7 @@ async function raise(ctx: KindContext): Promise<void> {
         await hillService.raiseHill(ctx);
         return;
     }
-    const run = ctx.run;
+    let run = ctx.run;
     const place = run.place;
     if (!place) {
         const game = gameOf(run.preset.kind);
@@ -320,10 +320,18 @@ async function raise(ctx: KindContext): Promise<void> {
         return;
     }
     // Nothing but air: ours to build in, and written down as ours before a
-    // single block goes in.
+    // single block goes in. What the kind needs to know of the server first
+    // is asked now, and kept with the run.
+    const game = gameOf(run.preset.kind);
+    if (game?.prepare) {
+        const prepared = await game.prepare(ctx);
+        run = {
+            ...run,
+            game: { ...((run.game as Record<string, unknown> | null) ?? {}), ...prepared }
+        };
+    }
     const fills = fillsFor(run, box);
     const built: stored.Arena = { box, blocks: blocksFor(run, box, fills) };
-    const game = gameOf(run.preset.kind);
     // What a kind puts in its chests is marked the way the kit is, so it is
     // read before anything is built - and kept for the kit.
     const marker = game?.decorate ? (run.marker ?? (await kitMarker(ctx))) : run.marker;

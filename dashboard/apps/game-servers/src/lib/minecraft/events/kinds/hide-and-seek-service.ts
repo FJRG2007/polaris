@@ -20,6 +20,8 @@
 import * as hits from "./hits";
 import * as arena from "./arena";
 import * as hs from "./hide-and-seek";
+import * as manor from "./seek-manor";
+import * as model from "./seek-grid";
 import * as catalog from "../catalog";
 import * as speech from "../../speech";
 import * as written from "../messages";
@@ -52,6 +54,41 @@ function layoutOf(runId: string, design = hs.DESIGN): hs.Layout {
         layouts.set(key, layout);
     }
     return layout;
+}
+
+/** A run's manor (design 4 on), drawn once and kept, by what it was built
+ *  for: its rooms along a side and what the server could show. */
+const manors = new Map<string, manor.Manor>();
+
+function gameOf(run: stored.EventRun): Partial<hs.SeekState> {
+    const parsed = hs.stateSchema.partial().safeParse(run.game ?? {});
+    return parsed.success ? parsed.data : {};
+}
+
+/** Rooms along a side: as built, or - before it is - as it will be. */
+function roomsOf(run: stored.EventRun): number {
+    const game = gameOf(run);
+    if (game.rooms) return game.rooms;
+    if (run.arena) return manor.countOf(run.arena.box);
+    return manor.roomsFor(run.joined.length, optionsOf(run).house);
+}
+
+function manorOf(run: stored.EventRun): manor.Manor {
+    const rooms = roomsOf(run);
+    const era = gameOf(run).era ?? model.OLDEST;
+    const key = `${run.id}:${rooms}:${era.scaffold}:${era.snow}:${era.display}`;
+    let built = manors.get(key);
+    if (!built) {
+        if (manors.size >= 8) manors.delete(manors.keys().next().value!);
+        built = manor.manorFor(run.id, rooms, era);
+        manors.set(key, built);
+    }
+    return built;
+}
+
+/** Whether a run plays in a manor. */
+function inManor(run: stored.EventRun): boolean {
+    return designOf(run) >= manor.DESIGN;
 }
 
 /** What one run keeps between ticks: nothing that must survive a restart. */
@@ -98,6 +135,7 @@ function designOf(run: stored.EventRun): number {
 async function mirrorOf(ctx: KindContext): Promise<hs.Mirror> {
     const run = ctx.run;
     const design = designOf(run);
+    if (design >= manor.DESIGN) return { flipX: false, flipZ: false };
     if (design >= hs.HOUSE) return layoutOf(run.id, design);
     for (const test of hs.mirrorTests(run.arena!.box, design))
         if (commands.readTest(await ctx.server.say([test.line])) === "passed") return test.mirror;
@@ -107,23 +145,25 @@ async function mirrorOf(ctx: KindContext): Promise<hs.Mirror> {
 function spotOf(
     run: stored.EventRun,
     entrant: stored.Entrant,
-    mirror: hs.Mirror = layoutOf(run.id, designOf(run))
+    mirror: hs.Mirror = inManor(run)
+        ? { flipX: false, flipZ: false }
+        : layoutOf(run.id, designOf(run))
 ): arena.Spot {
     const box = run.arena!.box;
     const design = designOf(run);
     const seekers = firstSeekers(run).map(lower);
     const at = seekers.indexOf(lower(entrant.name));
-    if (at >= 0) return hs.seekerSpot(box, mirror, at, design);
     const hiders = run.entrants.filter((one) => !seekers.includes(lower(one.name)));
-    return hs.hiderSpot(
-        box,
-        mirror,
-        Math.max(
-            0,
-            hiders.findIndex((one) => one.name === entrant.name)
-        ),
-        design
+    const index = Math.max(
+        0,
+        hiders.findIndex((one) => one.name === entrant.name)
     );
+    if (design >= manor.DESIGN) {
+        const house = manorOf(run);
+        return at >= 0 ? manor.seekerSpot(box, house, at) : manor.hiderSpot(box, house, index);
+    }
+    if (at >= 0) return hs.seekerSpot(box, mirror, at, design);
+    return hs.hiderSpot(box, mirror, index, design);
 }
 
 /**
@@ -158,7 +198,18 @@ async function goLines(ctx: KindContext): Promise<string[]> {
     // The secret doors worked by the pack, where it is on: elsewhere they stay
     // open as they were built, still a way in.
     const design = designOf(run);
-    const layout = design >= hs.HOUSE ? layoutOf(run.id, design) : null;
+    const house = design >= manor.DESIGN ? manorOf(run) : null;
+    const layout = !house && design >= hs.HOUSE ? layoutOf(run.id, design) : null;
+    const packOn = house ? await hitsService.ensure(ctx) : false;
+    if (house)
+        out.push(
+            ...(packOn
+                ? manor.armLines(run.arena!.box, house, run.id)
+                : manor.openLines(run.arena!.box, house)),
+            `tellraw @a[tag=${arena.IN_ARENA}] ${commands.text(
+                messages.tag(language) + seekMessages.manorTip(language, packOn)
+            )}`
+        );
     if (layout && (await hitsService.ensure(ctx)))
         out.push(...hs.doorLines(run.arena!.box, layout));
     // Where else to look, in a house that has more than the floor.
@@ -185,11 +236,14 @@ async function goLines(ctx: KindContext): Promise<string[]> {
                           seekMessages.seekSubtitle(seconds, language)
                       )
                   ]
-                : arena.titleTo(
-                      one.name,
-                      seekMessages.hideTitle(language),
-                      seekMessages.hideSubtitle(seconds, language)
-                  ))
+                : [
+                      ...arena.titleTo(
+                          one.name,
+                          seekMessages.hideTitle(language),
+                          seekMessages.hideSubtitle(seconds, language)
+                      ),
+                      ...(house ? hs.fireproofLines(one.name) : [])
+                  ])
         );
     }
     return out;
@@ -200,7 +254,8 @@ async function tick(ctx: KindContext, lines: string[]): Promise<string | null> {
     const language = ctx.language;
     const options = optionsOf(run);
     const box = run.arena!.box;
-    const layout = layoutOf(run.id, designOf(run));
+    const house = inManor(run) ? manorOf(run) : null;
+    const layout = house ? null : layoutOf(run.id, designOf(run));
     const now = ctx.now;
     const memory = memoryOf(run.id);
     const say = (line: string) => ctx.server.say([line]);
@@ -239,7 +294,7 @@ async function tick(ctx: KindContext, lines: string[]): Promise<string | null> {
     if (!state.released && now >= releaseAt) {
         state.released = true;
         lines.push(
-            hs.cageDown(box, layout, state.design),
+            house ? manor.cageDown(box, house) : hs.cageDown(box, layout!, state.design),
             ...state.seekers.flatMap(hs.releasedLines),
             ...arena.titleTo(`@a[tag=${arena.IN_ARENA}]`, seekMessages.releasedTitle(language), ""),
             commands.sound(commands.SOUNDS.horn)
@@ -282,10 +337,12 @@ async function tick(ctx: KindContext, lines: string[]): Promise<string | null> {
             );
             if (!by) continue;
             state.finds.push({ hider: one.name, by, at: now });
+            delete state.powers[one.name];
             const left = run.entrants.filter((each) => !hs.seeks(state, each.name)).length;
             lines.push(
                 ...hs.joinSide(one.name, true),
                 `effect clear ${one.name} minecraft:weakness`,
+                ...hs.effectsOff(one.name),
                 ...arena.titleTo(
                     one.name,
                     seekMessages.foundTitle(language),
@@ -302,14 +359,43 @@ async function tick(ctx: KindContext, lines: string[]): Promise<string | null> {
     // Nobody hurt; hiders unable to strike; seekers waiting kept in the cage,
     // blind; anybody out of the hall back on their spot.
     const hiders = run.entrants.filter((one) => !hs.seeks(state, one.name));
+    // Power-ups: every few minutes once the seekers are out, one short boost
+    // for each hider on the server, drawn from the run's id.
+    const every = options.powerUpMinutes * 60_000;
+    if (state.released && every > 0) {
+        state.powerAt ??= releaseAt + every;
+        if (now >= state.powerAt) {
+            const round = Math.round((state.powerAt - releaseAt) / every);
+            for (const one of hiders) {
+                if (!here.has(lower(one.name))) continue;
+                const power = hs.powerFor(run.id, one.name, round);
+                lines.push(...hs.powerLines(one.name, power));
+                state.powers[one.name] = {
+                    kind: power,
+                    until: now + hs.POWER_SECONDS[power] * 1000
+                };
+            }
+            state.powerAt += every * Math.max(1, Math.ceil((now - state.powerAt + 1) / every));
+        }
+    }
+    // The manor's lava: hiders cross it; a seeker who steps in is sent back by
+    // the pack - and where the pack is not on, nobody is, so seekers cross it
+    // too rather than burn.
+    const packOn = house ? await hitsService.ensure(ctx) : true;
     for (const one of run.entrants) {
         const at = here.get(lower(one.name));
         if (!at) continue;
         const seeking = hs.seeks(state, one.name);
         lines.push(...hs.unhurtLines(one.name));
         if (!arena.contains(box, at)) lines.push(arena.moveTo(one.name, spotOf(run, one)));
+        if (house && (!seeking || !packOn)) lines.push(...hs.fireproofLines(one.name));
         if (!seeking) lines.push(hs.hiderLine(one.name));
         else if (!state.released) lines.push(...hs.waitingLines(one.name));
+        const power = !seeking ? state.powers[one.name] : undefined;
+        const boost =
+            power && power.until > now
+                ? ` ${seekMessages.powerBar(power.kind, (power.until - now) / 1000, language)}`
+                : "";
         lines.push(
             arena.actionbarTo(
                 one.name,
@@ -318,7 +404,7 @@ async function tick(ctx: KindContext, lines: string[]): Promise<string | null> {
                           (state.hidden[one.name] ?? 0) / 1000,
                           hiders.length,
                           language
-                      )
+                      ) + boost
                     : state.released
                       ? seekMessages.seekBar(hiders.length, language)
                       : seekMessages.waitBar((releaseAt - now) / 1000, language)
@@ -343,13 +429,33 @@ async function tick(ctx: KindContext, lines: string[]): Promise<string | null> {
     return hiders.length === 0 ? said.ALL_FOUND : null;
 }
 
+/** What the server can show, asked once before the house is built. */
+async function prepare(ctx: KindContext): Promise<Record<string, unknown>> {
+    const era: model.Era = {
+        scaffold: await ctx.atLeast([1, 14]),
+        snow: await ctx.atLeast([1, 17]),
+        display: await ctx.atLeast([1, 19, 4])
+    };
+    return {
+        design: manor.DESIGN,
+        era,
+        rooms: manor.roomsFor(ctx.run.joined.length, optionsOf(ctx.run).house)
+    };
+}
+
 export const hideAndSeek: ArenaGame = {
-    most: () => hs.MOST,
-    reach: () => hs.REACH,
-    box: (_run, place) => hs.hallBox(place, place.y + arena.ALTITUDE),
-    built: () => ({ design: hs.DESIGN }),
-    fills: (run, box) => hs.hallFills(box, layoutOf(run.id, hs.DESIGN)),
-    blocks: () => [...hs.HALL_BLOCKS],
+    most: () => manor.MOST,
+    reach: (run) => manor.reachOf(roomsOf(run)),
+    box: (run, place) => manor.hallBox(place, place.y + arena.ALTITUDE, roomsOf(run)),
+    prepare,
+    built: (run) => ({
+        design: manor.DESIGN,
+        era: gameOf(run).era ?? model.OLDEST,
+        rooms: roomsOf(run)
+    }),
+    fills: (run, box) => manor.manorFills(box, manorOf(run)),
+    blocks: (run) => manor.manorBlocks(manorOf(run)),
+    decorate: (run, box) => manor.decorLines(box, manorOf(run)),
     kit: () => [],
     hits: true,
     side: (_run, index) => index,
@@ -373,12 +479,16 @@ export const hideAndSeek: ArenaGame = {
     // entrant's minimap given back what the server allows.
     endLines: (run) => [
         ...(run.arena ? hs.doorsOff(run.arena.box) : []),
+        ...hs.effectsOff(),
         ...hs.TEARDOWN,
         ...run.entrants.map((one) => radarLine(one.name, hs.RADAR_RESET))
     ],
     // Nothing works the doors once the house is coming down, for a run that
     // never reached its end too.
-    closeLines: (box) => hs.doorsStill(box),
-    // Not on at the end: the radar is given back when they are next.
-    owedLines: (_run, name) => [{ reason: "radar", lines: [radarLine(name, hs.RADAR_RESET)] }]
+    closeLines: (box) => [...hs.doorsStill(box), ...manor.closeLines(box), ...hs.effectsOff()],
+    // Not on at the end: the radar and what the game gave them are taken off when they are next.
+    owedLines: (_run, name) => [
+        { reason: "radar", lines: [radarLine(name, hs.RADAR_RESET)] },
+        { reason: "effects", lines: hs.effectsOff(name) }
+    ]
 };
