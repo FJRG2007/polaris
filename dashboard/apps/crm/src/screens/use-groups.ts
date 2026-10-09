@@ -38,8 +38,13 @@ export interface GroupsState extends RowStore {
     readonly loadingGroup: string | null;
     readonly loadMore: (value: string) => void;
     /** Put a record in a group, before the row with `beforeId` (null: at the
-     *  end). Returns the place it was given between its new neighbours. */
-    readonly move: (record: CrmRecord, value: string, beforeId: string | null) => number;
+     *  end). Returns the place it was given between its new neighbours, and
+     *  whether it went after a group whose last cards are not loaded yet. */
+    readonly move: (
+        record: CrmRecord,
+        value: string,
+        beforeId: string | null
+    ) => { readonly position: number; readonly last: boolean };
 }
 
 type Kept = { groups: { value: string; records: CrmRecord[]; total: number }[] };
@@ -294,15 +299,17 @@ export function useGroups(
     );
 
     const move = useCallback(
-        (record: CrmRecord, value: string, beforeId: string | null): number => {
+        (record: CrmRecord, value: string, beforeId: string | null) => {
             const listed = current.current;
-            if (!listed || !groupKey) return record.position;
+            if (!listed || !groupKey) return { position: record.position, last: false };
             const target = listed.find((group) => group.value === value);
             const others = (target?.rows ?? []).filter((row) => row.id !== record.id);
             const at =
                 beforeId === null ? others.length : others.findIndex((row) => row.id === beforeId);
             const index = at < 0 ? others.length : at;
             const position = placeBetween(others[index - 1]?.position, others[index]?.position);
+            const unloaded = (target?.total ?? 0) - (target?.rows.length ?? 0);
+            const last = index === others.length && unloaded > 0;
             const moved: CrmRecord = {
                 ...record,
                 position,
@@ -324,7 +331,7 @@ export function useGroups(
                     };
                 })
             );
-            return position;
+            return { position, last };
         },
         [commit, groupKey]
     );

@@ -112,15 +112,21 @@ export async function moveRecord(
     actor: CrmActor,
     object: CrmObject,
     id: string,
-    move: { readonly key: string; readonly value: string; readonly position: number }
+    move: {
+        readonly key: string;
+        readonly value: string;
+        readonly position: number;
+        readonly last?: boolean;
+    }
 ): Promise<CrmRecord> {
     await requireCan(actor, object, "edit");
     requireGroupable(object, move.key);
     const data = await prepare(actor, object, { [move.key]: move.value });
     const where = { id, ...shelfWhere(actor.shelf), deletedAt: null };
+    const position = move.last ? await pastLast(actor, object, id, move) : move.position;
     const result = await table(object).updateMany({
         where,
-        data: { ...data, position: move.position }
+        data: { ...data, position }
     });
     const row =
         result.count > 0
@@ -131,6 +137,25 @@ export async function moveRecord(
         throw new CrmRefusal(t("errors.notFound"));
     }
     return toRecord(object, row as Record<string, unknown>);
+}
+
+/** A place after every other card of the group, even the ones the board has
+ *  not loaded yet. */
+async function pastLast(
+    actor: CrmActor,
+    object: CrmObject,
+    id: string,
+    move: { readonly key: string; readonly value: string; readonly position: number }
+): Promise<number> {
+    const top = (await table(object).findFirst({
+        where: {
+            ...listWhere(object, actor.shelf, { group: { key: move.key, value: move.value } }),
+            id: { not: id }
+        },
+        orderBy: { position: "desc" },
+        select: { position: true }
+    })) as { position: number } | null;
+    return top ? Math.max(move.position, top.position + 1) : move.position;
 }
 
 /** One record on the reader's shelf, or null. */

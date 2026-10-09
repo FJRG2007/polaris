@@ -503,7 +503,7 @@ export function ListScreen({ object }: { object: CrmObject }) {
         (record: CrmRecord, value: string, beforeId: string | null) => {
             if (!groupField) return;
             const kept = grouped.snapshot();
-            const position = grouped.move(record, value, beforeId);
+            const { position, last } = grouped.move(record, value, beforeId);
             unwrap(
                 () =>
                     actions.moveRecordAction({
@@ -511,7 +511,8 @@ export function ListScreen({ object }: { object: CrmObject }) {
                         id: record.id,
                         key: groupField.key,
                         value,
-                        position
+                        position,
+                        last
                     }),
                 t("errors.generic")
             )

@@ -210,7 +210,7 @@
         "notSaved": "El cambio no se guardó",
         "notCreated": "No se creó el registro",
         "notTrashed": "No se borró nada",
-        "viewNotSaved": "Las columnas no se guardaron",
+        "viewNotSaved": "La vista no se guardó",
         "viewNameTaken": "Ya hay una vista con este nombre.",
         "viewName": "Pon a la vista un nombre de hasta {length} caracteres.",
         "viewDefault": "La vista por defecto no se puede renombrar ni borrar.",

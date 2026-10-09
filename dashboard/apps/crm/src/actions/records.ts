@@ -214,7 +214,8 @@ export async function moveRecordAction(input: unknown): Promise<Outcome<{ record
             id,
             key: fieldKey,
             value: z.string().max(64),
-            position: z.number().finite().min(-1e15).max(1e15)
+            position: z.number().finite().min(-1e15).max(1e15),
+            last: z.boolean().optional()
         })
         .safeParse(input);
     if (!parsed.success) return invalid();

@@ -210,7 +210,7 @@
         "notSaved": "The change was not saved",
         "notCreated": "The record was not created",
         "notTrashed": "Nothing was deleted",
-        "viewNotSaved": "The columns were not saved",
+        "viewNotSaved": "The view was not saved",
         "viewNameTaken": "A view with this name already exists.",
         "viewName": "Give the view a name of up to {length} characters.",
         "viewDefault": "The default view cannot be renamed or deleted.",
