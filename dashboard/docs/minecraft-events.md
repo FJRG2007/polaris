@@ -426,11 +426,21 @@ left out.
   Nothing repeats inside a game, and the questions asked in the last games
   (`RECENT_KEPT`) come after all the others.
 - **Parkour** is laid out from the run's id, so every run is a new course,
-  30 jumps by default (10 to 60). It takes one of two shapes, drawn among
-  those switched on (`shapes`, both by default): rows climbing back and forth,
-  or a tower climbed round its four sides (`parkour-layout.TOWER_SIDE`). From
-  any platform only the next one is within a jump (see "Building a map"
-  below), and a checkpoint counts only straight after the one before it.
+  30 jumps by default (10 to 60). It takes one of five shapes, drawn among
+  those switched on (`shapes`; every one on a new event, rows and tower on
+  one saved before the others existed): rows climbing back and forth, a tower
+  climbed round its four sides (`parkour-layout.TOWER_SIDE`), a line of long
+  rows (`LINE_ROW`), a snake winding across its way and on
+  (`SNAKE_WIDTH`, `SNAKE_STEP`), or a spiral winding outward, each lap
+  `SPIRAL_LAP` further out. The last three run mostly level. From any
+  platform only the next one is within a jump (see "Building a map" below),
+  every jump is one a player makes without a perfect run
+  (`parkour-layout.jumpProblems`: within half a block of a sprint jump's
+  reach, edge to edge, a corner's diagonal included; checked over thousands
+  of courses of every shape), no platform is under the start, and a
+  checkpoint counts only straight after the one before it. Courses built
+  before that rule (design 4) keep their layout; a tower then could leave a
+  corner jump three across, two aside and a block up.
   Past easy, some plain jumps are traps: slime pads that throw the player up
   again, and orange platforms that vanish for two seconds in every six
   (`parkour.blinkLines`). Never two in a row, never a checkpoint; a fall is only

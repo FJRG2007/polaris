@@ -11,7 +11,7 @@ import { z } from "zod";
 import {
     EVENT_KINDS,
     EVENT_STATE_KEY,
-    PARKOUR_SHAPES,
+    PARKOUR_SHAPES_BEFORE,
     presetSchema,
     rewardSchema,
     type EventPreset
@@ -117,7 +117,7 @@ function asBegun(value: unknown): unknown {
     const { kind, options } = value as { kind?: unknown; options?: unknown };
     if (kind !== "parkour" || typeof options !== "object" || options === null) return value;
     if ("shapes" in options) return value;
-    return { ...value, options: { ...options, shapes: [...PARKOUR_SHAPES] } };
+    return { ...value, options: { ...options, shapes: [...PARKOUR_SHAPES_BEFORE] } };
 }
 
 export const runSchema = z.object({

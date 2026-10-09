@@ -2273,7 +2273,10 @@
             },
             "parkourShape": {
                 "rows": "Rows climbing back and forth",
-                "tower": "A tower climbed round and round"
+                "tower": "A tower climbed round and round",
+                "line": "One long line",
+                "snake": "A snake winding on",
+                "spiral": "A spiral winding out"
             },
             "course": {
                 "random": "A different one each time",

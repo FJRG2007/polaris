@@ -214,8 +214,13 @@ export const METEOR_ORES = ["common", "precious", "diamond", "debris"] as const;
 export const PARKOUR_DIFFICULTIES = ["easy", "medium", "hard"] as const;
 /** How a parkour course looks: its blocks, and whether it is climbed by ladder or vine. */
 export const PARKOUR_THEMES = ["classic", "frost", "jungle", "nether"] as const;
-/** The shapes a parkour course takes: rows snaking up, or a tower climbed round. */
-export const PARKOUR_SHAPES = ["rows", "tower"] as const;
+/** The shapes a parkour course takes: rows snaking up, a tower climbed round,
+ *  one long line, a snake winding on, or a spiral winding outward. */
+export const PARKOUR_SHAPES = ["rows", "tower", "line", "snake", "spiral"] as const;
+/** The shapes there were before a line, a snake and a spiral: what a parkour
+ *  saved without any reads as, so a race already running keeps its course. A
+ *  new event has every shape on (`newPreset`). */
+export const PARKOUR_SHAPES_BEFORE = ["rows", "tower"] as const;
 /** The sword a team duel hands everybody, alike for all. */
 export const DUEL_KITS = ["wood", "stone", "iron"] as const;
 /** Where a build battle's theme comes from: the built-in list or the operator's. */
@@ -491,7 +496,7 @@ export const optionsSchemas = {
                 .min(1, problem("chooseParkourShape"))
                 .max(PARKOUR_SHAPES.length)
                 .transform((shapes) => PARKOUR_SHAPES.filter((shape) => shapes.includes(shape)))
-                .default([...PARKOUR_SHAPES]),
+                .default([...PARKOUR_SHAPES_BEFORE]),
             difficulty: z.enum(PARKOUR_DIFFICULTIES).default("medium"),
             /** Drawn for each run, or always one. */
             theme: z.enum(["random", ...PARKOUR_THEMES]).default("random"),
@@ -1398,7 +1403,9 @@ export function migratePreset(entry: unknown): unknown {
 
 /** A new event of one kind, as the screen adds it. */
 export function newPreset(kind: EventKind, id: string, name = KIND_NAMES[kind].en): EventPreset {
-    const options = optionsSchemas[kind].parse({}) as EventOptions<EventKind>;
+    const options = optionsSchemas[kind].parse(
+        kind === "parkour" ? { shapes: [...PARKOUR_SHAPES] } : {}
+    ) as EventOptions<EventKind>;
     return {
         id,
         kind,

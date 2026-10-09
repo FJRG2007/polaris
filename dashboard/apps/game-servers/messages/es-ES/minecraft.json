@@ -2273,7 +2273,10 @@
             },
             "parkourShape": {
                 "rows": "Filas que suben en zigzag",
-                "tower": "Torre en espiral"
+                "tower": "Torre en espiral",
+                "line": "Una línea larga",
+                "snake": "Serpiente que avanza",
+                "spiral": "Espiral hacia fuera"
             },
             "course": {
                 "random": "Distinto cada vez",
