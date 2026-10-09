@@ -48,6 +48,10 @@ export function Present({
     const [at, setAt] = useState(Math.max(0, Math.min(from, slides.length - 1)));
     const [controls, setControls] = useState(true);
     const [full, setFull] = useState(false);
+    /** Whether this browser lets a page go full screen at all - an iPhone does
+     *  not - read after mount. Where it cannot, the show fills the window and
+     *  no button offers what would do nothing. */
+    const [canFull, setCanFull] = useState(false);
     const hideTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
     const close = useRef(onClose);
     close.current = onClose;
@@ -85,6 +89,9 @@ export function Present({
             if (!now) windowed.current = false;
         };
         document.addEventListener("fullscreenchange", changed);
+        setCanFull(
+            document.fullscreenEnabled === true && typeof one.requestFullscreen === "function"
+        );
         one.requestFullscreen?.().catch(() => undefined);
         wake();
         return () => {
@@ -215,16 +222,18 @@ export function Present({
                 <PresentButton label={t("slides.next")} onClick={next}>
                     <ChevronRight className="size-4 shrink-0" aria-hidden />
                 </PresentButton>
-                <PresentButton
-                    label={full ? t("slides.exitFullScreen") : t("slides.fullScreen")}
-                    onClick={toggleFull}
-                >
-                    {full ? (
-                        <Minimize className="size-4 shrink-0" aria-hidden />
-                    ) : (
-                        <Maximize className="size-4 shrink-0" aria-hidden />
-                    )}
-                </PresentButton>
+                {canFull ? (
+                    <PresentButton
+                        label={full ? t("slides.exitFullScreen") : t("slides.fullScreen")}
+                        onClick={toggleFull}
+                    >
+                        {full ? (
+                            <Minimize className="size-4 shrink-0" aria-hidden />
+                        ) : (
+                            <Maximize className="size-4 shrink-0" aria-hidden />
+                        )}
+                    </PresentButton>
+                ) : null}
                 <PresentButton label={t("slides.stopPresenting")} onClick={onClose}>
                     <X className="size-4 shrink-0" aria-hidden />
                 </PresentButton>
