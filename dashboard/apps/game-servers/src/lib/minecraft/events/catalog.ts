@@ -57,7 +57,8 @@ export const EVENT_KINDS = [
     "sky-wars",
     "village-defense",
     "bingo",
-    "boss-fishing"
+    "boss-fishing",
+    "nether-maze"
 ] as const;
 
 export type EventKind = (typeof EVENT_KINDS)[number];
@@ -224,6 +225,10 @@ export const BINGO_GOALS = ["line", "card"] as const;
 export const SKY_WARS_LOOT = ["normal", "rich"] as const;
 /** How big hide and seek's house is: by how many play, or three, four or five
  *  rooms along a side. */
+/** A nether maze's rooms a side, and how many of them are deadly. */
+export const MAZE_SIZES = ["small", "medium", "large"] as const;
+export const MAZE_HAZARDS = ["few", "some", "many"] as const;
+
 export const HOUSE_SIZES = ["auto", "small", "medium", "large"] as const;
 
 export type Language = (typeof LANGUAGES)[number];
@@ -691,6 +696,19 @@ export const optionsSchemas = {
             .min(3, problem("atLeast", { count: 3 }))
             .max(30, problem("atMost", { count: 30 }))
             .default(10)
+    }),
+    "nether-maze": z.object({
+        place: placeSchema.default({ mode: "players" }),
+        /** Rooms a side: 7, 11 or 15. */
+        size: z.enum(MAZE_SIZES).default("medium"),
+        /** How many rooms carry fire, magma or a lava pit. */
+        hazards: z.enum(MAZE_HAZARDS).default("some"),
+        height: z
+            .number()
+            .int()
+            .min(25, problem("atLeast", { count: 25 }))
+            .max(40, problem("atMost", { count: 40 }))
+            .default(30)
     })
 } as const satisfies Record<EventKind, z.ZodTypeAny>;
 
@@ -823,6 +841,10 @@ export const presetSchema = z
         presetBase.extend({
             kind: z.literal("boss-fishing"),
             options: optionsSchemas["boss-fishing"]
+        }),
+        presetBase.extend({
+            kind: z.literal("nether-maze"),
+            options: optionsSchemas["nether-maze"]
         })
     ])
     .transform((value) => value as EventPreset);
@@ -893,7 +915,7 @@ export type RandomEvents = z.infer<typeof randomSchema>;
  * value an operator chooses later, even one that happens to be an old default,
  * is theirs.
  */
-export const DEFAULTS_VERSION = 3;
+export const DEFAULTS_VERSION = 4;
 
 /** Events saved before this were brought up to their kind's defaults once
  *  (`toKindDefaults`). */
@@ -917,7 +939,8 @@ const KIND_SINCE: Partial<Readonly<Record<EventKind, number>>> = {
     "sky-wars": 3,
     "village-defense": 3,
     bingo: 3,
-    "boss-fishing": 3
+    "boss-fishing": 3,
+    "nether-maze": 4
 };
 
 export const settingsSchema = z.object({
@@ -1004,7 +1027,8 @@ export const KIND_NAMES: Readonly<Record<EventKind, Readonly<Record<Language, st
     "sky-wars": { en: "SkyWars", es: "SkyWars" },
     "village-defense": { en: "Villager defense", es: "Defensa del aldeano" },
     bingo: { en: "Bingo rush", es: "Bingo exprés" },
-    "boss-fishing": { en: "Boss fishing", es: "Pesca del jefe" }
+    "boss-fishing": { en: "Boss fishing", es: "Pesca del jefe" },
+    "nether-maze": { en: "Deadly nether maze", es: "Laberintos mortales" }
 };
 
 /** What an event of each kind is. Its name and summary on a screen are the
@@ -1136,6 +1160,10 @@ export const KIND_INFO: Readonly<Record<EventKind, KindInfo>> = {
     "boss-fishing": {
         unit: "catches",
         competitive: true
+    },
+    "nether-maze": {
+        unit: "rooms",
+        competitive: true
     }
 };
 
@@ -1252,7 +1280,8 @@ export const DEFAULT_PRIZES: Readonly<Record<EventKind, Rewards>> = {
     "sky-wars": HARD,
     "village-defense": EPIC,
     bingo: STANDARD,
-    "boss-fishing": STANDARD
+    "boss-fishing": STANDARD,
+    "nether-maze": STANDARD
 };
 
 /** The names a king of the ring was given by default while it was a hill, and
@@ -1300,7 +1329,8 @@ export const DEFAULT_MINUTES: Readonly<Record<EventKind, number>> = {
     "sky-wars": 8,
     "village-defense": 10,
     bingo: 15,
-    "boss-fishing": 10
+    "boss-fishing": 10,
+    "nether-maze": 6
 };
 
 /** What every kind ran for before `DEFAULT_MINUTES`: an event still on exactly
@@ -1654,7 +1684,8 @@ export const DEFAULT_MIN_SCORE: Readonly<Record<EventKind, number>> = {
     "sky-wars": 1,
     "village-defense": 3,
     bingo: 3,
-    "boss-fishing": 2
+    "boss-fishing": 2,
+    "nether-maze": 1
 };
 
 /** Whether the minimum is something an operator can set for this event. A
@@ -1694,6 +1725,7 @@ export function needsOverworld(preset: EventPreset): boolean {
         case "tnt-run":
         case "boat-race":
         case "dropper":
+        case "nether-maze":
         case "village-defense":
             return true;
         case "explorer":
@@ -1782,6 +1814,7 @@ export function readyToPlay(run: {
         case "tnt-run":
         case "boat-race":
         case "dropper":
+        case "nether-maze":
             // Once everybody brought in is there and the start given (`arrival`).
             return (run.stage?.racers.length ?? 0) > 0 && (run.stage?.goAt ?? null) !== null;
         case "team-duel":
@@ -1867,7 +1900,8 @@ export function playsOnStage(preset: EventPreset): boolean {
         preset.kind === "spleef" ||
         preset.kind === "tnt-run" ||
         preset.kind === "boat-race" ||
-        preset.kind === "dropper"
+        preset.kind === "dropper" ||
+        preset.kind === "nether-maze"
     );
 }
 
@@ -1892,7 +1926,7 @@ export function playsInArena(preset: EventPreset): boolean {
 export const FINISH_BASE = 100_000;
 
 /** The races scored that way: a finish as its time, short of it as progress. */
-const RACES: readonly EventKind[] = ["parkour", "boat-race", "dropper"];
+const RACES: readonly EventKind[] = ["parkour", "boat-race", "dropper", "nether-maze"];
 
 /** How long a race took, in seconds, when the score is a finish; null for a
  *  score that is progress, or a kind that is not a race. */
@@ -2084,7 +2118,8 @@ export const WORLD_NEEDS: Readonly<Record<EventKind, WorldNeeds>> = {
     "sky-wars": { time: "day", weather: "clear" },
     "village-defense": { time: "night", weather: "clear" },
     bingo: { time: null, weather: null },
-    "boss-fishing": { time: null, weather: null }
+    "boss-fishing": { time: null, weather: null },
+    "nether-maze": { time: "day", weather: "clear" }
 };
 
 export function worldNeeds(preset: Pick<EventPreset, "kind">): WorldNeeds {

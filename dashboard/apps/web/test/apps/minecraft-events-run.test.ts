@@ -474,7 +474,7 @@ function quickAnswer(line: string): string | null {
  * score range for everybody inside, and set for everybody in a range.
  */
 function stageScoreAnswer(line: string): string | null {
-    const objectives = /^(pe_(drop|low|back|gate|next|last|fin|cut)|polaris_tntrun)$/;
+    const objectives = /^(pe_(drop|low|back|gate|next|last|fin|cut|mfin|mback)|polaris_tntrun)$/;
     const set = /^scoreboard players set (\w+) (\w+) (-?\d+)$/.exec(line);
     if (set && objectives.test(set[2]!)) {
         (world.stageScores[set[2]!] ??= {})[set[1]!] = Number(set[3]);
@@ -5505,7 +5505,7 @@ function builtAndRemoved(): { built: string[]; removed: string[] } {
  *  into air and come down only where they are still the event's; nothing is
  *  cleared but the event's marked items; nothing that burns or floods - but for
  *  what a kind is made of (`allowed`: a TNT run's floors, a dropper's pool). */
-function keptTheRules(allowed: readonly ("tnt" | "water")[] = []): void {
+function keptTheRules(allowed: readonly ("tnt" | "water" | "lava" | "fire")[] = []): void {
     const fills = world.sent.filter((line) => line.includes(" fill "));
     // The ring is drawn again as it shrinks and moves: its floor's own block
     // painted over its own ring block and back, never anything else.
@@ -5551,7 +5551,7 @@ function keptTheRules(allowed: readonly ("tnt" | "water")[] = []): void {
         world.sent.filter(
             (line) =>
                 [...line.matchAll(/minecraft:(lava|fire|tnt|water)\b/g)].some(
-                    (found) => !allowed.includes(found[1] as "tnt" | "water")
+                    (found) => !allowed.includes(found[1] as "tnt" | "water" | "lava" | "fire")
                 ) &&
                 !/ if block -?\d+ -?\d+ -?\d+ minecraft:water$/.test(line) &&
                 !/ if block ~ ~-1 ~ minecraft:water run data get entity @s Pos$/.test(line)
@@ -11947,5 +11947,131 @@ describe("the pace of an event", () => {
         expect(builds.length).toBeLessThanOrEqual(4);
         expect(world.inv.Ana!.get(0)).toEqual({ id: "minecraft:bread", count: 5 });
         onlyOurBlocks();
+    });
+});
+
+const mazeKind = await import(
+    "@polaris-app/game-servers/src/lib/minecraft/events/kinds/nether-maze"
+);
+const radarKit = await import("@polaris-app/game-servers/src/lib/minecraft/events/kinds/radar");
+
+describe("a deadly nether maze", () => {
+    const run = () => ({
+        ...newPreset("nether-maze", "maze"),
+        minutes: 6,
+        options: {
+            place: { mode: "players" as const },
+            size: "small" as const,
+            hazards: "some" as const,
+            height: 30
+        }
+    });
+    const mazeNow = () => {
+        const current = state().run!;
+        const origin = current.stage!.origin!;
+        return mazeKind.maze(run().options, current.id, origin, origin.y);
+    };
+    const scores = (objective: string) => (world.stageScores[objective] ??= {});
+
+    it("opens the door at Go, sends the burned back, ranks the finish, then the rooms, and gives minimaps back", async () => {
+        setUp([run()]);
+        await startArena("maze");
+        await play(2_100);
+        chat(["Ana", "join"], ["Ben", "unirse"]);
+        await play(44_000);
+        const built = mazeNow();
+        // The pack on before anything is built; the door built before the roof.
+        const enabled = world.sent.indexOf(`datapack enable "${snowballPack.PACK_ID}"`);
+        const firstRock = world.sent.findIndex(
+            (line) => line.includes(" fill ") && line.endsWith(" minecraft:netherrack keep")
+        );
+        expect(enabled).toBeGreaterThan(-1);
+        expect(firstRock).toBeGreaterThan(enabled);
+        // Each racer told the minimap is off, with Xaero's fair-play code.
+        const told = (name: string, code: string) =>
+            world.sent.filter(
+                (line) => line.startsWith(`tellraw ${name} `) && visible(line).includes(code)
+            );
+        for (const name of ["Ana", "Ben"]) {
+            const [line] = told(name, radarKit.RADAR_OFF);
+            expect(line).toBeDefined();
+            expect(visible(line!)).toContain("Minimap cave view and radar are switched off");
+        }
+        await play(8_000);
+        const one = world.sent.findIndex(
+            (line) => line.includes(" title ") && visible(line).endsWith(" title 1")
+        );
+        const armed = world.sent.indexOf("scoreboard players set #on polaris_maze 1");
+        expect(one).toBeGreaterThan(-1);
+        expect(armed).toBeGreaterThan(one);
+        expect(world.sent).toContain(mazeKind.doorGone(built));
+        expect(world.sent.indexOf(mazeKind.doorGone(built))).toBeLessThan(armed);
+        for (const line of mazeKind.armLines(built)) expect(world.sent).toContain(line);
+        expect(world.sent).toContain(mazeKind.COOL_INSIDE);
+        expect(state().run!.readyAt).not.toBeNull();
+
+        // The pack burned Ben: the quick look tells him, once.
+        scores("pe_mback").Ben = 1;
+        await play(500);
+        expect(
+            world.sent.some(
+                (line) =>
+                    line.startsWith(
+                        "execute as @a[tag=pe_in,scores={pe_mback=1..}] run tellraw @s"
+                    ) && visible(line).includes("back to the starting room")
+            )
+        ).toBe(true);
+        expect(scores("pe_mback").Ben).toBe(0);
+
+        // Ben drops off and comes back on: told again, Ana not.
+        await play(2_100);
+        world.online = ["Ana"];
+        await play(2_100);
+        world.sent = [];
+        world.online = ["Ana", "Ben"];
+        await play(2_100);
+        expect(told("Ben", radarKit.RADAR_OFF)).toHaveLength(1);
+        expect(told("Ana", radarKit.RADAR_OFF)).toEqual([]);
+
+        // Ana in the middle, finished.
+        const middle = { x: built.goal.x1 + 1.5, z: built.goal.z1 + 1.5 };
+        world.at.Ana = [middle.x, built.floor + 1, middle.z];
+        // Ben made it to the middle's door, not finished: every room counts.
+        world.at.Ben = [middle.x + 1, built.floor + 1, middle.z];
+        scores("pe_mfin").Ana = Math.floor(Date.now() / 50) % 2147483647;
+        const rooms = mazeKind.roomsToGo(built);
+        await play(2_100);
+        expect(
+            world.sent.some(
+                (line) =>
+                    line.startsWith("tellraw @a") &&
+                    visible(line).includes("Ana reached the finish")
+            )
+        ).toBe(true);
+        const beforeLeaving = world.sent.length;
+        chat(["Ben", "leave"]);
+        await play(4_100);
+
+        const after = state();
+        expect(after.run).toBeNull();
+        expect(after.history[0]?.note).toBe("Everybody finished or dropped out");
+        expect(after.history[0]?.podium?.[0]).toMatchObject({ place: 1, name: "Ana" });
+        expect(after.history[0]?.podium?.[1]).toEqual({ place: 2, name: "Ben", score: rooms });
+        // Minimaps given back on the way home.
+        expect(
+            world.sent
+                .slice(beforeLeaving)
+                .some(
+                    (line) =>
+                        line.startsWith("tellraw Ben ") &&
+                        visible(line).includes(radarKit.RADAR_RESET)
+                )
+        ).toBe(true);
+        expect(told("Ana", radarKit.RADAR_RESET)).toHaveLength(1);
+        for (const line of mazeKind.stopLines(built.boxes)) expect(world.sent).toContain(line);
+        for (const line of mazeKind.SCORES_REMOVED) expect(world.sent).toContain(line);
+        expect(world.inside.size).toBe(0);
+        keptTheRules(["lava", "fire"]);
+        expect(after.stageLeftovers).toEqual([]);
     });
 });

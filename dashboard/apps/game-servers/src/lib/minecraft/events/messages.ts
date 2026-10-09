@@ -170,6 +170,10 @@ const RULES: Readonly<Record<EventKind, Text>> = {
     "boss-fishing": {
         en: "A legendary fish is on the line. Every catch wears it down; whoever caught the most when it is landed wins.",
         es: "Hay un pez legendario enganchado. Cada captura lo agota; gana quien más haya pescado cuando lo saquéis."
+    },
+    "nether-maze": {
+        en: "Find the room in the middle of the maze. Fire, magma and lava send you back to the start.",
+        es: "Encuentra la sala del centro del laberinto. El fuego, el magma y la lava te devuelven a la salida."
     }
 };
 

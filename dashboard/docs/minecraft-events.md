@@ -136,7 +136,7 @@ Rare catch, Bingo rush, Boss fishing) leave the world alone.
 | Hot potato                                                     | day   | clear   |
 | Hide and seek                                                  | day   | clear   |
 | SkyWars                                                        | day   | clear   |
-| TNT run, Dropper, Ice boat race                                | day   | clear   |
+| TNT run, Dropper, Ice boat race, Nether maze                   | day   | clear   |
 | Treasure hunt, Supply drop, Explorer, Gathering                | day   | clear   |
 | Horde defense, Villager defense, Mob hunt, Meteor shower       | night | clear   |
 | Blood moon                                                     | night | rain    |
@@ -239,6 +239,22 @@ left out.
   they made (`boat-race.resumeSpot`, `racerScores`); their clock never
   stopped. Somebody past the four boats one quick look hands out is seated
   on the next without being told they left theirs.
+- **Deadly nether maze** (`nether-maze`) is a roofed maze of netherrack, 7, 11
+  or 15 rooms a side, carved from the run's id with hide and seek's carver
+  (`nether-maze.plan`, `seek-maze.carve`). Racers wait in a room outside its
+  wall behind a glass door that goes at "Go!"; the first into the lit room in
+  the middle wins, then whoever got most rooms closer. Fire on netherrack,
+  magma and one-block lava pits across doorways are watched by the events data
+  pack every tick: touching one sends the racer back to the starting room's
+  stand (nobody is hurt - Resistance V and Fire Resistance as on every stage).
+  `mazeProblems` holds every plan to: walls at least two blocks thick, a solid
+  roof over every column, no hazard at the goal or by the start, lava one block
+  across, and every safe block reachable from the start stepping on safe blocks
+  or jumping one lava block (tested over thousands of runs, and walked again
+  over the built blocks). Xaero's fair-play code (`radar.ts`) turns minimap cave
+  view and radar off for each racer as they come in and again when they come
+  back on; the reset goes with them home. An X-ray resource pack still shows
+  the corridors: Polaris's anti-xray hides ores, never air.
 - **King of the ring** (`king-of-the-hill` in code and saved settings; it was
   called King of the hill before it moved into the air) with fists only is a
   platform floating `hill.LIFT` over whatever is under it. Off the ring Poison
@@ -743,6 +759,7 @@ Everything below is part of the arena's own boxes: built into air with
 | TNT run          | TNT floors, a rim in its own color at each one, glass walls, corner lanterns                                                                                                                                                    |
 | Dropper          | white walls banded by each floor's color, a ring of light round every hole                                                                                                                                                      |
 | Ice boat race    | packed ice, white walls with a glass rail and lights, an arch over each gate                                                                                                                                                    |
+| Nether maze      | netherrack walls and roof, glowstone over every other room, a nether-brick starting room and a quartz floor at the goal                                                                                                         |
 | Parkour          | the course's theme, a light under every checkpoint                                                                                                                                                                              |
 | King of the ring | polished stone edge, sea lanterns at the corners, the circle drawn in yellow                                                                                                                                                    |
 | Build battle     | a stone curb between plots and glowstone where the lines meet, at floor level                                                                                                                                                   |

@@ -82,7 +82,11 @@ export const ARENA_BLOCKS = [
     "minecraft:purple_concrete",
     "minecraft:pink_concrete",
     "minecraft:water",
-    "minecraft:black_concrete"
+    "minecraft:black_concrete",
+    "minecraft:netherrack",
+    "minecraft:magma_block",
+    "minecraft:lava",
+    "minecraft:fire"
 ] as const;
 
 export type ArenaBlock = (typeof ARENA_BLOCKS)[number];

@@ -20,6 +20,7 @@
 import * as hits from "./hits";
 import * as arena from "./arena";
 import * as hs from "./hide-and-seek";
+import { radarLine } from "./radar";
 import * as manor from "./seek-manor";
 import * as model from "./seek-grid";
 import * as catalog from "../catalog";
@@ -164,22 +165,6 @@ function spotOf(
     }
     if (at >= 0) return hs.seekerSpot(box, mirror, at, design);
     return hs.hiderSpot(box, mirror, index, design);
-}
-
-/**
- * A line to one player carrying one of Xaero's Minimap codes (`hs.RADAR_OFF`,
- * `hs.RADAR_RESET`), after the sentence in their language when there is one.
- */
-function radarLine(name: string, code: string, sentence?: (language: speech.Language) => string) {
-    const each = Object.fromEntries(
-        speech.LANGUAGES.map((language) => {
-            const parts: unknown[] = [""];
-            if (sentence) parts.push(JSON.parse(commands.text(sentence(language))) as unknown);
-            parts.push({ text: code });
-            return [language, commands.asciiJson(JSON.stringify(parts))];
-        })
-    ) as Record<speech.Language, string>;
-    return `tellraw ${name} ${speech.perLanguage(each)}`;
 }
 
 /** Every minimap radar off for one player, and why. */

@@ -417,6 +417,16 @@ function stageFacts(t: GameText<"minecraft">, preset: catalog.EventPreset): stri
                 })
             ];
         }
+        case "nether-maze": {
+            const options = preset.options as catalog.EventOptions<"nether-maze">;
+            return [
+                t("events.facts.netherMaze", {
+                    size: t(`events.mazeSizes.${options.size}` as GameKey<"minecraft">),
+                    hazards: t(`events.mazeHazards.${options.hazards}` as GameKey<"minecraft">),
+                    height: options.height
+                })
+            ];
+        }
         case "tnt-run": {
             const options = preset.options as catalog.EventOptions<"tnt-run">;
             return [
@@ -447,6 +457,8 @@ function stageItemsFact(t: GameText<"minecraft">, preset: catalog.EventPreset): 
             return t("events.facts.dropperSafe");
         case "boat-race":
             return t("events.facts.boatRaceBoats");
+        case "nether-maze":
+            return t("events.facts.netherMazeSafe");
         default:
             return t("events.facts.parkourItems");
     }

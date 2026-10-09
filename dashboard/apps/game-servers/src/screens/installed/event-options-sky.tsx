@@ -2,7 +2,7 @@
 
 /**
  * The options of the newer events played on a map built in the sky: a TNT
- * run's floors, an ice track's laps, a dropper's shaft, a flag game, hide and
+ * run's floors, an ice track's laps, a dropper's shaft, a nether maze, a flag game, hide and
  * seek, a hot potato and SkyWars.
  */
 
@@ -25,6 +25,22 @@ const HOUSE_LABELS: Readonly<Record<(typeof catalog.HOUSE_SIZES)[number], GameKe
     small: "editor.labels.house.small",
     medium: "editor.labels.house.medium",
     large: "editor.labels.house.large"
+};
+
+const MAZE_SIZE_LABELS: Readonly<
+    Record<(typeof catalog.MAZE_SIZES)[number], GameKey<"minecraft">>
+> = {
+    small: "editor.labels.mazeSize.small",
+    medium: "editor.labels.mazeSize.medium",
+    large: "editor.labels.mazeSize.large"
+};
+
+const MAZE_HAZARD_LABELS: Readonly<
+    Record<(typeof catalog.MAZE_HAZARDS)[number], GameKey<"minecraft">>
+> = {
+    few: "editor.labels.mazeHazards.few",
+    some: "editor.labels.mazeHazards.some",
+    many: "editor.labels.mazeHazards.many"
 };
 
 const LOOT_LABELS: Readonly<Record<(typeof catalog.SKY_WARS_LOOT)[number], GameKey<"minecraft">>> =
@@ -227,6 +243,56 @@ export function DropperFields({
                         aria-label={t("editor.difficulty")}
                     />
                 </Field>
+            </div>
+        </>
+    );
+}
+
+export function NetherMazeFields({
+    value,
+    onChange,
+    issues
+}: {
+    value: catalog.EventOptions<"nether-maze">;
+    onChange: (options: catalog.EventOptions<"nether-maze">) => void;
+    issues: Issues;
+}) {
+    const t = useGameText("minecraft");
+    return (
+        <>
+            <PlaceField
+                value={value.place}
+                onChange={(place) => onChange({ ...value, place })}
+                what={t("editor.place.maze")}
+                issues={issues}
+                path={["options", "place"]}
+            />
+            <div className="grid grid-cols-2 gap-3">
+                <Field label={t("editor.mazeSize")}>
+                    <Select
+                        value={value.size}
+                        onValueChange={(size) =>
+                            onChange({ ...value, size: size as typeof value.size })
+                        }
+                        options={options(t, MAZE_SIZE_LABELS)}
+                        aria-label={t("editor.mazeSize")}
+                    />
+                </Field>
+                <Field label={t("editor.mazeHazards")} hint={t("editor.mazeHazardsHint")}>
+                    <Select
+                        value={value.hazards}
+                        onValueChange={(hazards) =>
+                            onChange({ ...value, hazards: hazards as typeof value.hazards })
+                        }
+                        options={options(t, MAZE_HAZARD_LABELS)}
+                        aria-label={t("editor.mazeHazards")}
+                    />
+                </Field>
+                <HeightField
+                    value={value.height}
+                    onChange={(height) => onChange({ ...value, height })}
+                    issues={issues}
+                />
             </div>
         </>
     );

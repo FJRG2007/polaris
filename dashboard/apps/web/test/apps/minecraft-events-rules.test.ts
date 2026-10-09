@@ -49,9 +49,11 @@ describe("a kind added in an update", () => {
             "sky-wars",
             "village-defense",
             "bingo",
-            "boss-fishing"
+            "boss-fishing",
+            "nether-maze"
         ]);
         expect(added.find((one) => one.kind === "hot-potato")?.name).toBe("Patata bomba");
+        expect(added.find((one) => one.kind === "nether-maze")?.name).toBe("Laberintos mortales");
         expect(read.settings.defaults).toBe(catalog.DEFAULTS_VERSION);
         // Saved since: one deleted after that stays deleted.
         expect(
@@ -61,6 +63,13 @@ describe("a kind added in an update", () => {
         ).toEqual(["fish", "quiz"]);
     });
 
+    it("gives a server saved at the last version only the kinds added since", () => {
+        const read = catalog.readEventsConfig(saved(3, []));
+        expect(
+            read.presets.filter((one) => one.id.startsWith("default-")).map((one) => one.kind)
+        ).toEqual(["nether-maze"]);
+    });
+
     it("joins the draw only where the draw took every event the server had", () => {
         const all = catalog.readEventsConfig(
             saved(2, [
@@ -68,7 +77,7 @@ describe("a kind added in an update", () => {
                 { presetId: "quiz", weight: 2 }
             ])
         );
-        expect(all.settings.random.pool).toHaveLength(12);
+        expect(all.settings.random.pool).toHaveLength(13);
         expect(all.settings.random.pool.every((entry) => entry.weight === 2)).toBe(true);
         const some = catalog.readEventsConfig(saved(2, [{ presetId: "fish", weight: 1 }]));
         expect(some.settings.random.pool).toEqual([{ presetId: "fish", weight: 1 }]);

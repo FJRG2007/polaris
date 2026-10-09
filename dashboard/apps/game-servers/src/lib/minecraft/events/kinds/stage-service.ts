@@ -20,6 +20,9 @@ import * as dropper from "./dropper";
 import * as dropperSaid from "./dropper-messages";
 import * as boatRace from "./boat-race";
 import * as boatRaceSaid from "./boat-race-messages";
+import * as netherMaze from "./nether-maze";
+import * as netherMazeSaid from "./nether-maze-messages";
+import * as radar from "./radar";
 import * as stash from "./stash";
 import * as arrival from "./arrival";
 import * as stashService from "./stash-service";
@@ -37,6 +40,7 @@ const messages = speech.spoken(written);
 const tntRunMessages = speech.spoken(tntRunSaid);
 const dropperMessages = speech.spoken(dropperSaid);
 const boatMessages = speech.spoken(boatRaceSaid);
+const mazeMessages = speech.spoken(netherMazeSaid);
 
 /** The event cannot go ahead - too few joined, the structure would not stand -
  *  and ends as called off, with everything undone. */
@@ -53,6 +57,9 @@ export interface StageLoop {
     shrinkTold?: boolean;
     /** How a boat race hands out boats on this server, once looked at. */
     boatWay?: boatRace.BoatWay;
+    /** The racers seen on the last tick: one seen again after missing it has
+     *  just come back on (`PackRace.rejoined`). */
+    present?: Set<string>;
 }
 
 export interface StageTools {
@@ -137,6 +144,13 @@ type Layout =
           readonly boxes: readonly stage.Box[];
           readonly volume: stage.Volume;
           readonly reach: number;
+      }
+    | {
+          readonly kind: "nether-maze";
+          readonly maze: netherMaze.Maze;
+          readonly boxes: readonly stage.Box[];
+          readonly volume: stage.Volume;
+          readonly reach: number;
       };
 
 function layoutAt(run: EventRun, site: { x: number; z: number }, y: number): Layout {
@@ -170,6 +184,22 @@ function layoutAt(run: EventRun, site: { x: number; z: number }, y: number): Lay
             boxes: track.boxes,
             volume: track.volume,
             reach: track.reach
+        };
+    }
+    if (run.preset.kind === "nether-maze") {
+        const maze = netherMaze.maze(
+            run.preset.options as catalog.EventOptions<"nether-maze">,
+            run.id,
+            site,
+            y,
+            run.stage?.origin ? run.stage.design : netherMaze.DESIGN
+        );
+        return {
+            kind: "nether-maze",
+            maze,
+            boxes: maze.boxes,
+            volume: maze.volume,
+            reach: maze.reach
         };
     }
     if (run.preset.kind === "dropper") {
@@ -295,6 +325,8 @@ export async function stageTick(
     if (!layout) return null;
     // A dropper is played under Slow Falling, given again like Resistance.
     if (layout.kind === "dropper") lines.push(dropper.SLOW_INSIDE);
+    // A maze's fire never leaves anybody burning.
+    if (layout.kind === "nether-maze") lines.push(netherMaze.COOL_INSIDE);
     lines.push(stage.floatDown(layout.volume, 10), ...commands.hostilesOut(layout.volume));
     // Nothing starts until everybody brought in is there (`arrival`).
     if (holding(loop)) return holdTick(loop, server, tools, layout, heard, now, lines);
@@ -311,9 +343,39 @@ export async function stageTick(
                 lines
             );
         case "dropper":
-            return dropperTick(loop, server, tools, layout.shaft, layout.volume, heard, now, lines);
+            return packRaceTick(
+                loop,
+                server,
+                tools,
+                layout.volume,
+                heard,
+                now,
+                lines,
+                dropperRace(loop, server, layout.shaft)
+            );
         case "boat-race":
-            return boatTick(loop, server, tools, layout.track, layout.volume, heard, now, lines);
+            loop.boatWay ??= await tools.boatWay();
+            return packRaceTick(
+                loop,
+                server,
+                tools,
+                layout.volume,
+                heard,
+                now,
+                lines,
+                boatRaceOf(loop, server, layout.track)
+            );
+        case "nether-maze":
+            return packRaceTick(
+                loop,
+                server,
+                tools,
+                layout.volume,
+                heard,
+                now,
+                lines,
+                mazeRace(loop, layout.maze)
+            );
         default:
             return spleefTick(loop, server, tools, layout.arena, layout.volume, heard, now, lines);
     }
@@ -365,7 +427,9 @@ async function raise(
                             ? dropperMessages.cannotPlay(language)
                             : preset.kind === "boat-race"
                               ? boatMessages.cannotPlay(language)
-                              : tntRunMessages.cannotPlay(language))
+                              : preset.kind === "nether-maze"
+                                ? mazeMessages.cannotPlay(language)
+                                : tntRunMessages.cannotPlay(language))
                 )
             ]);
             throw new CalledOff("Its data pack could not be put on");
@@ -397,7 +461,9 @@ async function raise(
                     ? dropper.DESIGN
                     : preset.kind === "boat-race"
                       ? boatRace.DESIGN
-                      : parkour.DESIGN,
+                      : preset.kind === "nether-maze"
+                        ? netherMaze.DESIGN
+                        : parkour.DESIGN,
             area,
             waits: 0
         });
@@ -505,6 +571,8 @@ function readySubtitle(loop: StageLoop, layout: Layout): string {
             return dropperMessages.readySubtitle(language);
         case "boat-race":
             return boatMessages.readySubtitle(language);
+        case "nether-maze":
+            return mazeMessages.readySubtitle(language);
         case "spleef":
             return messages.spleefReadySubtitle(
                 spleef.variantFor(
@@ -594,10 +662,15 @@ async function admit(
                   boatRace
                       .grid(layout.track, current.racers.length + fresh.length)
                       .slice(current.racers.length)
-                : [];
+                : layout.kind === "nether-maze"
+                  ? // In the starting room; a late racer goes in with the door
+                    // already open.
+                    netherMaze.spots(layout.maze, fresh.length)
+                  : [];
     if (layout.kind === "parkour") await server.sayAll(parkour.SCORES_ADDED);
     if (layout.kind === "dropper") await server.sayAll(dropper.SCORES_ADDED);
     if (layout.kind === "boat-race") await server.sayAll(boatRace.SCORES_ADDED);
+    if (layout.kind === "nether-maze") await server.sayAll(netherMaze.SCORES_ADDED);
     // A late racer in a race already on gets a boat on the spot.
     const way =
         layout.kind === "boat-race" && !holding(loop)
@@ -639,7 +712,8 @@ async function admit(
             `title ${one.name} title ${commands.text(
                 (layout.kind === "parkour" ||
                     layout.kind === "dropper" ||
-                    layout.kind === "boat-race") &&
+                    layout.kind === "boat-race" ||
+                    layout.kind === "nether-maze") &&
                     !holding(loop)
                     ? messages.goTitle(loop.language)
                     : messages.spleefReadyTitle(loop.language)
@@ -655,11 +729,20 @@ async function admit(
             ...(layout.kind === "boat-race"
                 ? boatRace.racerScores(one.name, resumed, layout.track.gates.length)
                 : []),
-            ...(way ? boatRace.boatLines(one.name, way, spot.yaw) : [])
+            ...(way ? boatRace.boatLines(one.name, way, spot.yaw) : []),
+            // The maze's corridors kept off minimaps (`radar.ts`).
+            ...(layout.kind === "nether-maze"
+                ? [
+                      ...netherMaze.racerScores(one.name),
+                      radar.radarLine(one.name, radar.RADAR_OFF, mazeMessages.radarOff)
+                  ]
+                : [])
         );
         brought.push(one.name);
     }
     if (going.length > 0) await server.sayAll(going);
+    // Seen in already: not taken for somebody coming back on.
+    for (const name of brought) loop.present?.add(name.toLowerCase());
     // And once in, a last look: whatever turned up on them on the way is put
     // away with the rest; anybody it cannot be taken from is sent back out.
     if (!stashing) return brought.length;
@@ -756,7 +839,10 @@ async function sendHome(
         });
         await tools.persist();
     };
-    if (!(await returnOne(server, saved, (await tools.flavour()).items, loop.language, keep)))
+    const after = built(loop.run)?.kind === "nether-maze" ? radarBack : undefined;
+    if (
+        !(await returnOne(server, saved, (await tools.flavour()).items, loop.language, keep, after))
+    )
         return false;
     change(loop, { saved: state(loop).saved.filter((one) => !same(one.name, name)) });
     return true;
@@ -767,10 +853,16 @@ async function returnOne(
     saved: stage.Saved,
     items: stage.Flavour["items"],
     language: speech.Speech,
-    keep: (kept: stash.Stash | null) => Promise<void>
+    keep: (kept: stash.Stash | null) => Promise<void>,
+    after?: (name: string) => string[]
 ): Promise<boolean> {
-    const still = await returnAll(server, [saved], items, language, (_, kept) => keep(kept));
+    const still = await returnAll(server, [saved], items, language, (_, kept) => keep(kept), after);
     return still.length === 0;
+}
+
+/** A maze's racer's minimap given back what the server allows, on their way home. */
+function radarBack(name: string): string[] {
+    return [radar.radarLine(name, radar.RADAR_RESET)];
 }
 
 /**
@@ -784,7 +876,9 @@ async function returnAll(
     saved: readonly stage.Saved[],
     items: stage.Flavour["items"],
     language: speech.Speech,
-    keep: (name: string, kept: stash.Stash | null) => Promise<void> = async () => undefined
+    keep: (name: string, kept: stash.Stash | null) => Promise<void> = async () => undefined,
+    /** More for each of them once home: what the event switched off for them. */
+    after: (name: string) => string[] = () => []
 ): Promise<stage.Saved[]> {
     if (saved.length === 0) return [];
     // Nothing from here on can make them fall to their death.
@@ -801,7 +895,9 @@ async function returnAll(
     for (const [index, one] of saved.entries()) if (wereBack[index]) back.add(one);
     // Their own gravity too, should that end have stopped before it.
     if (back.size > 0)
-        await server.sayAll([...back].flatMap((one) => stage.normalFallLines(one.name)));
+        await server.sayAll(
+            [...back].flatMap((one) => [...stage.normalFallLines(one.name), ...after(one.name)])
+        );
     const going = saved.filter((one) => !back.has(one));
     // The event's items off, then home - everybody at once - then, there,
     // their own game mode.
@@ -816,7 +912,9 @@ async function returnAll(
     });
     const note = messages.tag(language) + messages.backWhereYouWere(language);
     if (home.length > 0)
-        await server.sayAll(home.flatMap((one) => stage.afterReturnLines(one, items, note)));
+        await server.sayAll(
+            home.flatMap((one) => [...stage.afterReturnLines(one, items, note), ...after(one.name)])
+        );
     // Their own things back only once they are home and down: nothing is given
     // back to a player who could still fall with it. Everybody is home by now,
     // and they are seen to side by side: each one's wait overlaps everybody
@@ -890,6 +988,7 @@ function inPlace(layout: Layout, at: { x: number; y: number; z: number }): boole
     if (layout.kind === "parkour") return parkour.onStart(layout.course, at);
     if (layout.kind === "dropper") return dropper.onLid(layout.shaft, at);
     if (layout.kind === "boat-race") return boatRace.onGrid(layout.track, at);
+    if (layout.kind === "nether-maze") return netherMaze.inStart(layout.maze, at);
     const { center, size, floor } = layout.arena;
     return (
         at.y >= floor + 0.5 &&
@@ -1032,6 +1131,26 @@ async function holdTick(
                 soundFor(racer.name, commands.SOUNDS.start)
             );
         lines.push(dropper.lidGone(layout.shaft), ...dropper.armLines(layout.shaft));
+        change(loop, {
+            racers: state(loop).racers.map((one) =>
+                one.outAt === null ? { ...one, since: go, best: 0 } : one
+            )
+        });
+    } else if (layout.kind === "nether-maze") {
+        // Everybody back on their own spot of the starting room, the door
+        // gone, the pack watching the hazards and the middle room.
+        const places = netherMaze.spots(layout.maze, racing.length);
+        racing.forEach((racer, index) =>
+            lines.push(
+                stage.moveLine(racer.name, places[index]!),
+                ...netherMaze.racerScores(racer.name),
+                `title ${racer.name} times 5 40 10`,
+                `title ${racer.name} subtitle ${commands.text(mazeMessages.goSubtitle(language))}`,
+                `title ${racer.name} title ${commands.text(messages.goTitle(language))}`,
+                soundFor(racer.name, commands.SOUNDS.start)
+            )
+        );
+        lines.push(netherMaze.doorGone(layout.maze), ...netherMaze.armLines(layout.maze));
         change(loop, {
             racers: state(loop).racers.map((one) =>
                 one.outAt === null ? { ...one, since: go, best: 0 } : one
@@ -1257,6 +1376,13 @@ export function quickLines(loop: StageLoop): string[] {
                       messages.tag(loop.language) + dropperMessages.backToTop(loop.language)
                   )
               );
+    // A maze: whoever the pack sent back out of a hazard is told so.
+    if (layout.kind === "nether-maze")
+        return holding(loop)
+            ? []
+            : netherMaze.backLines(
+                  commands.text(messages.tag(loop.language) + mazeMessages.burned(loop.language))
+              );
     // A boat race: whoever fell, cut a corner or left their boat, put back.
     if (layout.kind === "boat-race") {
         if (holding(loop) || !loop.boatWay) return [];
@@ -1309,7 +1435,9 @@ export function quickLines(loop: StageLoop): string[] {
 
 /** The kinds the events data pack plays a part of (`snowball-pack.ts`). */
 function needsPack(kind: catalog.EventKind): boolean {
-    return kind === "tnt-run" || kind === "dropper" || kind === "boat-race";
+    return (
+        kind === "tnt-run" || kind === "dropper" || kind === "boat-race" || kind === "nether-maze"
+    );
 }
 
 /** Whether an event can need the events data pack when it runs: a kind
@@ -1322,21 +1450,46 @@ export function usesPack(preset: catalog.EventPreset): boolean {
 }
 
 /**
- * One tick of a dropper. The pack does the play - it sends a racer who lands on
- * a floor back to the top, and notes how low each has been and when they
- * reached the water - and this reads what it noted: each racer's deepest floor,
- * their finish to the tick, and who strayed. A late joiner is let go from the
- * top, their time counted from then.
+ * What one race played by the pack reads and says each tick: how far each racer
+ * has got (from what the pack noted and from where they stand), the title at
+ * their finish, and the bar while they race.
  */
-async function dropperTick(
+interface PackRace {
+    /** Read once a tick: each racer's progress so far, or undefined. */
+    progress(): Promise<
+        (racer: stage.Racer, at: { x: number; y: number; z: number }) => number | undefined
+    >;
+    /** Progress at the finish. */
+    readonly whole: number;
+    /** The title a finish is shown under. */
+    readonly finishTitle: string;
+    /** More for a racer the tick they finish (their own gravity back). */
+    finished?(name: string): string[];
+    bar(racer: stage.Racer, at: { x: number; y: number; z: number }): string;
+    /** For a racer back on after being away: what their game forgot. */
+    rejoined?(name: string): string[];
+    /** The finish ticks, as the pack has them. */
+    readonly readFinished: string;
+    /** Nothing left for the pack to watch. */
+    readonly stop: readonly string[];
+}
+
+/**
+ * One tick of a race the pack plays a part of - a dropper, a boat race, a
+ * maze. The pack does the play (sends a racer back, counts gates, notes each
+ * finish to the tick) and this reads what it noted: each racer's progress, their
+ * finish, and who strayed. A late joiner starts from the start, their time
+ * counted from then.
+ */
+async function packRaceTick(
     loop: StageLoop,
     server: ServerContainer,
     tools: StageTools,
-    shaft: dropper.Shaft,
     volume: stage.Volume,
     heard: readonly { name: string; call: stage.Call }[],
     now: number,
-    lines: string[]
+    lines: string[],
+    race: PackRace
 ): Promise<string | null> {
     const language = loop.language;
     let dirty = false;
@@ -1355,15 +1508,19 @@ async function dropperTick(
     }
     const where = commands.readWhere(await server.say([stage.ARENA_WHERE]));
     const dimensions = commands.readDimensions(await server.say([stage.ARENA_DIMENSIONS]));
-    const lowest = lowered(commands.readScores(await server.say([dropper.READ_LOWEST])));
-    const finished = lowered(commands.readScores(await server.say([dropper.READ_FINISHED])));
-    // The game's own tick, asked only when somebody has reached the water.
+    const progress = await race.progress();
+    const finished = lowered(commands.readScores(await server.say([race.readFinished])));
+    // The game's own tick, asked only when somebody has finished.
     let gameNow: number | null | undefined;
-    const levels = shaft.floors.length;
+    // Who is back on since the last tick; after a restart, nobody is.
+    const before = loop.present;
+    loop.present = new Set(where.map((one) => one.name.toLowerCase()));
     for (const racer of byFinish(state(loop).racers, finished)) {
         if (racer.outAt !== null) continue;
         const at = where.find((one) => same(one.name, racer.name));
         if (!at) continue;
+        if (before && !before.has(racer.name.toLowerCase()) && race.rejoined)
+            lines.push(...race.rejoined(racer.name));
         if (strayed(at, dimensions.get(at.name), volume)) {
             await sendHome(loop, server, tools, racer.name);
             markOut(loop, racer.name, now, 0);
@@ -1383,13 +1540,9 @@ async function dropperTick(
             continue;
         }
         let next = racer;
-        // The deepest they have been: from the pack, and from where they are.
-        const low = lowest.get(racer.name.toLowerCase());
-        const deepest = Math.max(
-            dropper.floorsPassed(shaft, low === undefined ? at.y : dropper.lowestOf(low)),
-            dropper.floorsPassed(shaft, at.y)
-        );
-        if (deepest > next.best) next = { ...next, best: deepest };
+        const got = progress(racer, at);
+        if (got !== undefined && got > next.best)
+            next = { ...next, best: Math.min(got, race.whole) };
         const tick = finished.get(racer.name.toLowerCase());
         if (tick !== undefined) {
             if (gameNow === undefined)
@@ -1398,9 +1551,8 @@ async function dropperTick(
                 gameNow === null
                     ? now
                     : Math.max(racer.since, Math.min(now, now - Math.max(0, gameNow - tick) * 50));
-            next = { ...next, best: levels, finishedAt: when };
-            // In the water: their own gravity back, so a jump is a jump.
-            lines.push(...stage.normalFallLines(racer.name));
+            next = { ...next, best: race.whole, finishedAt: when };
+            lines.push(...(race.finished?.(racer.name) ?? []));
             const place = state(loop).racers.filter((one) => one.finishedAt !== null).length + 1;
             lines.push(
                 commands.say(
@@ -1414,22 +1566,10 @@ async function dropperTick(
                 ),
                 `title ${racer.name} times 5 40 10`,
                 `title ${racer.name} subtitle ${commands.text(" ")}`,
-                `title ${racer.name} title ${commands.text(messages.checkpointTitle(levels, levels, language))}`,
+                `title ${racer.name} title ${commands.text(race.finishTitle)}`,
                 soundFor(racer.name, commands.SOUNDS.win)
             );
-        } else {
-            lines.push(
-                commands.actionbarFor(
-                    racer.name,
-                    dropperMessages.bar(
-                        Math.min(levels, dropper.floorsPassed(shaft, at.y) + 1),
-                        next.best,
-                        levels,
-                        language
-                    )
-                )
-            );
-        }
+        } else lines.push(commands.actionbarFor(racer.name, race.bar(next, at)));
         if (next !== racer) {
             change(loop, {
                 racers: state(loop).racers.map((one) => (same(one.name, racer.name) ? next : one))
@@ -1441,133 +1581,88 @@ async function dropperTick(
     if (dirty) await tools.persist();
     const racers = state(loop).racers;
     if (racers.length > 0 && racers.every((one) => one.finishedAt !== null || one.outAt !== null)) {
-        // Nothing left for the pack to watch.
-        lines.push(...dropper.stopLines(shaft.boxes));
+        lines.push(...race.stop);
         lines.push(commands.say(messages.tag(language) + messages.everybodyDone(language)));
         return "Everybody finished or dropped out";
     }
     return null;
 }
-// ------------------------------------------------------------------ boat race
 
-/**
- * One tick of a boat race. The pack counts the gates and notes each finish to
- * the tick, and the quick look puts back whoever fell, cut a corner or left
- * their boat; this reads what the pack counted - each racer's gates and lap,
- * their finish - and who strayed. A late joiner starts at the back of the grid,
- * their time counted from then.
- */
-async function boatTick(
-    loop: StageLoop,
-    server: ServerContainer,
-    tools: StageTools,
-    track: boatRace.Track,
-    volume: stage.Volume,
-    heard: readonly { name: string; call: stage.Call }[],
-    now: number,
-    lines: string[]
-): Promise<string | null> {
+/** A dropper: the pack sends a racer who lands on a floor back to the top and
+ *  notes how low each has been; progress is the deepest floor. */
+function dropperRace(loop: StageLoop, server: ServerContainer, shaft: dropper.Shaft): PackRace {
     const language = loop.language;
-    loop.boatWay ??= await tools.boatWay();
-    let dirty = false;
-    for (const { name, call } of heard) {
-        const racer = state(loop).racers.find((one) => same(one.name, name));
-        const inside = racer !== undefined && racer.outAt === null;
-        if (call === "join" && !inside) {
-            if (racer?.finishedAt) continue;
-            await admit(loop, server, tools, [name], now, lines);
-        } else if (call === "leave" && inside) {
-            await sendHome(loop, server, tools, name);
-            markOut(loop, name, now, 0);
-            lines.push(tell(name, messages.tag(language) + messages.leftYou(language)));
-            dirty = true;
-        }
-    }
-    const where = commands.readWhere(await server.say([stage.ARENA_WHERE]));
-    const dimensions = commands.readDimensions(await server.say([stage.ARENA_DIMENSIONS]));
-    const passed = lowered(commands.readScores(await server.say([boatRace.READ_PASSED])));
-    const finished = lowered(commands.readScores(await server.say([boatRace.READ_FINISHED])));
-    // The game's own tick, asked only when somebody has finished.
-    let gameNow: number | null | undefined;
+    const levels = shaft.floors.length;
+    return {
+        async progress() {
+            const lowest = lowered(commands.readScores(await server.say([dropper.READ_LOWEST])));
+            // The deepest they have been: from the pack, and from where they are.
+            return (racer, at) => {
+                const low = lowest.get(racer.name.toLowerCase());
+                return Math.max(
+                    dropper.floorsPassed(shaft, low === undefined ? at.y : dropper.lowestOf(low)),
+                    dropper.floorsPassed(shaft, at.y)
+                );
+            };
+        },
+        whole: levels,
+        finishTitle: messages.checkpointTitle(levels, levels, language),
+        // In the water: their own gravity back, so a jump is a jump.
+        finished: (name) => stage.normalFallLines(name),
+        bar: (racer, at) =>
+            dropperMessages.bar(
+                Math.min(levels, dropper.floorsPassed(shaft, at.y) + 1),
+                racer.best,
+                levels,
+                language
+            ),
+        readFinished: dropper.READ_FINISHED,
+        stop: dropper.stopLines(shaft.boxes)
+    };
+}
+
+/** A boat race: the pack counts the gates; progress is the gates passed. */
+function boatRaceOf(loop: StageLoop, server: ServerContainer, track: boatRace.Track): PackRace {
+    const language = loop.language;
     const gates = track.gates.length;
-    const total = track.laps * gates + 1;
-    for (const racer of byFinish(state(loop).racers, finished)) {
-        if (racer.outAt !== null) continue;
-        const at = where.find((one) => same(one.name, racer.name));
-        if (!at) continue;
-        if (strayed(at, dimensions.get(at.name), volume)) {
-            await sendHome(loop, server, tools, racer.name);
-            markOut(loop, racer.name, now, 0);
-            dirty = true;
-            continue;
-        }
-        if (racer.finishedAt !== null) {
-            lines.push(
-                commands.actionbarFor(
-                    racer.name,
-                    messages.finishedBar(
-                        messages.clock((racer.finishedAt - racer.since) / 1000),
-                        language
-                    )
-                )
-            );
-            continue;
-        }
-        let next = racer;
-        const count = passed.get(racer.name.toLowerCase());
-        if (count !== undefined && count > next.best)
-            next = { ...next, best: Math.min(count, total) };
-        const tick = finished.get(racer.name.toLowerCase());
-        if (tick !== undefined) {
-            if (gameNow === undefined)
-                gameNow = commands.readDaytime(await server.say([parkour.READ_GAME_TIME]));
-            const when =
-                gameNow === null
-                    ? now
-                    : Math.max(racer.since, Math.min(now, now - Math.max(0, gameNow - tick) * 50));
-            next = { ...next, best: total, finishedAt: when };
-            const place = state(loop).racers.filter((one) => one.finishedAt !== null).length + 1;
-            lines.push(
-                commands.say(
-                    messages.tag(language) +
-                        messages.finishedLine(
-                            racer.name,
-                            messages.clock((when - racer.since) / 1000),
-                            place,
-                            language
-                        )
-                ),
-                `title ${racer.name} times 5 40 10`,
-                `title ${racer.name} subtitle ${commands.text(" ")}`,
-                `title ${racer.name} title ${commands.text(messages.checkpointTitle(gates, gates, language))}`,
-                soundFor(racer.name, commands.SOUNDS.win)
-            );
-        } else {
-            const progress = boatRace.progressOf(track, next.best);
-            lines.push(
-                commands.actionbarFor(
-                    racer.name,
-                    boatMessages.bar(progress.lap, track.laps, progress.gate, gates, language)
-                )
-            );
-        }
-        if (next !== racer) {
-            change(loop, {
-                racers: state(loop).racers.map((one) => (same(one.name, racer.name) ? next : one))
-            });
-            lines.push(commands.setScore(racer.name, next.best));
-            dirty = true;
-        }
-    }
-    if (dirty) await tools.persist();
-    const racers = state(loop).racers;
-    if (racers.length > 0 && racers.every((one) => one.finishedAt !== null || one.outAt !== null)) {
-        // Nothing left for the pack to count.
-        lines.push(...boatRace.stopLines(track.boxes));
-        lines.push(commands.say(messages.tag(language) + messages.everybodyDone(language)));
-        return "Everybody finished or dropped out";
-    }
-    return null;
+    return {
+        async progress() {
+            const passed = lowered(commands.readScores(await server.say([boatRace.READ_PASSED])));
+            return (racer) => passed.get(racer.name.toLowerCase());
+        },
+        whole: track.laps * gates + 1,
+        finishTitle: messages.checkpointTitle(gates, gates, language),
+        bar: (racer) => {
+            const progress = boatRace.progressOf(track, racer.best);
+            return boatMessages.bar(progress.lap, track.laps, progress.gate, gates, language);
+        },
+        readFinished: boatRace.READ_FINISHED,
+        stop: boatRace.stopLines(track.boxes)
+    };
+}
+
+/** A maze: the pack sends the burned back and notes the finish; progress is
+ *  how many rooms closer to the middle they have been. */
+function mazeRace(loop: StageLoop, built: netherMaze.Maze): PackRace {
+    const language = loop.language;
+    const rooms = netherMaze.roomsToGo(built);
+    return {
+        async progress() {
+            return (_racer, at) => netherMaze.progressAt(built, at) ?? undefined;
+        },
+        whole: rooms,
+        finishTitle: messages.checkpointTitle(rooms, rooms, language),
+        bar: (racer, at) =>
+            mazeMessages.bar(
+                Math.max(racer.best, netherMaze.progressAt(built, at) ?? 0),
+                rooms,
+                language
+            ),
+        // A minimap forgets the fair-play code on a fresh join.
+        rejoined: (name) => [radar.radarLine(name, radar.RADAR_OFF, mazeMessages.radarOff)],
+        readFinished: netherMaze.READ_FINISHED,
+        stop: netherMaze.stopLines(built.boxes)
+    };
 }
 function markOut(loop: StageLoop, name: string, now: number, points: number): void {
     change(loop, {
@@ -1798,7 +1893,9 @@ export async function settle(
                 .map((one) => one.name.toLowerCase())
         );
         const here = saved.filter((one) => online.has(one.name.toLowerCase()));
-        const owed = await returnAll(server, here, flavour.items, language);
+        // A maze's racers' minimaps given back too, whenever they come home.
+        const after = netherMaze.isMaze(leftover.boxes) ? radarBack : undefined;
+        const owed = await returnAll(server, here, flavour.items, language, undefined, after);
         // Kept in the order they were, offline or not.
         saved = saved.flatMap((one) =>
             !here.includes(one) ? [one] : owed.filter((each) => each.name === one.name)
@@ -1814,7 +1911,8 @@ export async function settle(
             ...snowballPack.stopLines(boxes),
             ...tntRun.stopLines(boxes),
             ...dropper.stopLines(boxes),
-            ...boatRace.stopLines(boxes)
+            ...boatRace.stopLines(boxes),
+            ...netherMaze.stopLines(boxes)
         ];
         if (area || stop.length > 0)
             await server.sayAll([...(area ? [stage.holdArea(area)] : []), ...stop]);
@@ -1870,9 +1968,10 @@ export function results(run: EventRun): { scores: Map<string, number>; took: str
         if (
             run.preset.kind === "parkour" ||
             run.preset.kind === "dropper" ||
-            run.preset.kind === "boat-race"
+            run.preset.kind === "boat-race" ||
+            run.preset.kind === "nether-maze"
         ) {
-            // A time to the finish, then how far they got: jumps, floors or gates.
+            // A time to the finish, then how far they got: jumps, floors, gates or rooms.
             scores.set(
                 one.name,
                 one.finishedAt !== null
@@ -1889,23 +1988,30 @@ export function results(run: EventRun): { scores: Map<string, number>; took: str
 /** The standings for the screen while it runs: jumps made, or points so far. */
 export function standings(run: EventRun): { name: string; score: number }[] {
     const course =
-        run.preset.kind === "parkour" || run.preset.kind === "boat-race" ? built(run) : null;
+        run.preset.kind === "parkour" ||
+        run.preset.kind === "boat-race" ||
+        run.preset.kind === "nether-maze"
+            ? built(run)
+            : null;
     // A finish counts as every jump, floor or gate there is.
     const jumps =
         course?.kind === "parkour"
             ? course.course.platforms.length - 1
             : course?.kind === "boat-race"
               ? course.track.laps * course.track.gates.length + 1
-              : run.preset.kind === "dropper"
-                ? (run.preset.options as catalog.EventOptions<"dropper">).levels
-                : 0;
+              : course?.kind === "nether-maze"
+                ? netherMaze.roomsToGo(course.maze)
+                : run.preset.kind === "dropper"
+                  ? (run.preset.options as catalog.EventOptions<"dropper">).levels
+                  : 0;
     return (run.stage?.racers ?? [])
         .map((one) => ({
             name: one.name,
             score:
                 run.preset.kind === "parkour" ||
                 run.preset.kind === "dropper" ||
-                run.preset.kind === "boat-race"
+                run.preset.kind === "boat-race" ||
+                run.preset.kind === "nether-maze"
                     ? one.finishedAt !== null
                         ? jumps
                         : one.best
@@ -1932,6 +2038,16 @@ export function scoreText(
             {
                 en: `${score} ${score === 1 ? "gate" : "gates"}`,
                 es: `${score} ${score === 1 ? "puerta" : "puertas"}`
+            },
+            language
+        );
+    }
+    if (kind === "nether-maze") {
+        if (parkour.isFinish(score)) return messages.clock(parkour.FINISH_BASE - score);
+        return speech.pickIn(
+            {
+                en: `${score} ${score === 1 ? "room" : "rooms"} closer`,
+                es: `${score} ${score === 1 ? "sala" : "salas"} más cerca`
             },
             language
         );

@@ -534,7 +534,7 @@ export function gateArea(
 
 /** Cells in a set, as the fewest-ish boxes that hold them and nothing else:
  *  runs along x, stacked along z where they match. */
-function rectangles(
+export function rectangles(
     cells: ReadonlySet<string>
 ): { x1: number; z1: number; x2: number; z2: number }[] {
     const byRow = new Map<number, number[]>();

@@ -2199,6 +2199,7 @@ describe("a spleef floor", () => {
                     "polaris:tntrun/tick",
                     "polaris:dropper/tick",
                     "polaris:boat/tick",
+                    "polaris:maze/tick",
                     "polaris:door/tick",
                     "polaris:panel/tick"
                 ]
