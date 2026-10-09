@@ -880,6 +880,19 @@ function OptionsFields({
                             aria-label={t("editor.madeOf")}
                         />
                     </Field>
+                    <label className="flex items-center justify-between gap-3 text-sm">
+                        <span className="min-w-0">
+                            <span className="font-medium">{t("editor.meteorInfection")}</span>
+                            <span className="block text-xs text-muted-foreground">
+                                {t("editor.meteorInfectionHint")}
+                            </span>
+                        </span>
+                        <Switch
+                            checked={value.infection}
+                            onChange={(infection) => onChange({ ...value, infection })}
+                            aria-label={t("editor.meteorInfection")}
+                        />
+                    </label>
                 </>
             );
         }

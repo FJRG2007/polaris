@@ -1882,7 +1882,8 @@
             "netherMaze": "Un laberinto {size} a unos {height} bloques de altura, con {hazards} de sus salas con fuego, magma o un foso de lava. Muros de dos bloques y techo macizo: no se puede escalar ni ver por encima, y todas las salas se alcanzan sin tocar un peligro.",
             "netherMazeSafe": "No se tocan los objetos de nadie y nadie recibe daño. La vista de cuevas y el radar del minimapa se apagan para quien juega. Los peligros los vigila un pequeño data pack que Polaris añade al mundo.",
             "acidRain": "Una arena {size} a unos {height} bloques de altura, con lluvia {acidity}. El tiempo del mundo nunca cambia: la lluvia cae solo sobre la arena.",
-            "acidRainSafe": "No se tocan los objetos de nadie y nadie recibe daño. Se reparte piedra marcada que solo se coloca en la arena y se retira al salir. La lluvia la calcula un pequeño data pack que Polaris añade al mundo. Necesita Minecraft 1.17 o posterior."
+            "acidRainSafe": "No se tocan los objetos de nadie y nadie recibe daño. Se reparte piedra marcada que solo se coloca en la arena y se retira al salir. La lluvia la calcula un pequeño data pack que Polaris añade al mundo. Necesita Minecraft 1.17 o posterior.",
+            "meteorInfection": "El suelo de cada cráter cría sculk que se extiende despacio, unos pocos bloques como mucho; pisarlo envenena y ralentiza, y romperlo limpia el suelo. Nunca crece sobre lo que construyen los jugadores y lo que quede se quita al final. Desde Minecraft 1.19; en servidores más antiguos los cráteres quedan limpios."
         },
         "errors": {
             "read": "No se pudieron leer los eventos",
@@ -2408,7 +2409,9 @@
         "mazeHazardsHint": "Cuántas salas tienen fuego, magma o un foso de lava.",
         "acidSize": "Tamaño",
         "acidity": "Acidez",
-        "acidityHint": "Lo rápido que la lluvia llena la barra y come un refugio."
+        "acidityHint": "Lo rápido que la lluvia llena la barra y come un refugio.",
+        "meteorInfection": "Cráteres infectados",
+        "meteorInfectionHint": "El sculk se extiende desde cada cráter; envenena y ralentiza, y se puede romper para limpiarlo."
     },
     "moderation": {
         "announcements": {

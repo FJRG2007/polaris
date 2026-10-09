@@ -577,6 +577,7 @@ function EventExplained({
                 )
             }),
             t("events.facts.meteorsLand"),
+            ...(options.infection ? [t("events.facts.meteorInfection")] : []),
             t("events.facts.pickaxes")
         );
     }

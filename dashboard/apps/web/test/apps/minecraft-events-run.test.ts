@@ -1061,6 +1061,22 @@ function answer(sent: string): string {
         world.plants.set(at, plantBack[2]!);
         return "Changed the block";
     }
+    // A meteor's infection creeping: into air, over the ground - which is any
+    // block the world does not know of below y 70 - from a cell still a vein.
+    const grow =
+        /^execute in minecraft:overworld (?:if block (-?\d+ -?\d+ -?\d+) minecraft:sculk_vein )?if block (-?\d+ -?\d+ -?\d+) minecraft:air if block (-?\d+) (-?\d+) (-?\d+) #minecraft:sculk_replaceable run setblock \2 minecraft:sculk_vein\[down=true\] keep$/.exec(
+            line
+        );
+    if (grow) {
+        const below = `${grow[3]} ${grow[4]} ${grow[5]}`;
+        const ground =
+            world.blocks.get(below) ?? (Number(grow[4]) < 70 ? "minecraft:grass_block" : "");
+        if (grow[1] && world.blocks.get(grow[1]) !== "minecraft:sculk_vein") return "";
+        const taken = world.blocks.has(grow[2]!) || Number(grow[2]!.split(" ")[1]) < 70;
+        if (taken || !/(grass_block|dirt|stone)$/.test(ground)) return "";
+        world.blocks.set(grow[2]!, "minecraft:sculk_vein");
+        return `Changed the block at ${grow[2]}`;
+    }
     const put = /^execute in minecraft:overworld run setblock (-?\d+ -?\d+ -?\d+) (\S+) keep$/.exec(
         line
     );
@@ -5157,6 +5173,10 @@ describe("a horde defense", () => {
     });
 });
 
+const infectionKind = await import(
+    "@polaris-app/game-servers/src/lib/minecraft/events/kinds/meteor-infection"
+);
+
 describe("a meteor shower", () => {
     const start = () =>
         events.startEvent({
@@ -5175,7 +5195,8 @@ describe("a meteor shower", () => {
             options: {
                 ...(made.options as catalog.EventOptions<"meteor-shower">),
                 meteors: 4,
-                size: 6
+                size: 6,
+                infection: false
             }
         };
     };
@@ -5238,6 +5259,58 @@ describe("a meteor shower", () => {
         ).toBe(false);
         expect(world.sent).toContain("scoreboard objectives remove pe_mtot");
         expect(world.sent).toContain("execute in minecraft:overworld run forceload remove 288 0");
+    });
+
+    it("grows an infection round each crater that poisons and slows, and takes back what is still a vein", async () => {
+        setUp([{ ...shower(), options: { ...shower().options, infection: true } }]);
+        await start();
+        await play(8_100);
+        expect(
+            world.sent.some(
+                (line) =>
+                    line.startsWith("tellraw @a") && visible(line).includes("crater is infected")
+            )
+        ).toBe(true);
+        await play(20_000);
+        const veins = () =>
+            [...world.blocks.entries()]
+                .filter(([, block]) => block === "minecraft:sculk_vein")
+                .map(([key]) => key);
+        const grown = veins();
+        expect(grown.length).toBeGreaterThan(3);
+        const meteor = state().run!.meteors[0]!;
+        for (const key of grown) {
+            const [x, y, z] = key.split(" ").map(Number) as [number, number, number];
+            expect(y).toBe(meteor.y);
+            expect(Math.max(Math.abs(x - meteor.x), Math.abs(z - meteor.z))).toBeLessThanOrEqual(
+                infectionKind.RADIUS
+            );
+        }
+        expect(world.sent).toContain(infectionKind.hurtLines(meteor)[0]);
+        const spores = world.sent.filter((line) => line.includes("particle minecraft:sculk_soul"));
+        expect(spores.length).toBeGreaterThan(0);
+        for (const line of spores)
+            expect(
+                state().run!.meteors.some((one) =>
+                    one.infected.some((cell) => line === infectionKind.sporeLine(one, cell))
+                )
+            ).toBe(true);
+        // Ana breaks a vein and puts dirt there: hers, never taken away.
+        const cleansed = grown[0]!;
+        world.blocks.set(cleansed, "minecraft:dirt");
+        await play(10 * 60_000);
+        expect(state().run).toBeNull();
+        expect(veins()).toEqual([]);
+        expect(world.blocks.get(cleansed)).toBe("minecraft:dirt");
+    });
+
+    it("leaves plain craters on a server older than sculk", async () => {
+        world.version = "1.18.2";
+        setUp([{ ...shower(), options: { ...shower().options, infection: true } }]);
+        await start();
+        await play(30_000);
+        expect(world.sent.some((line) => line.includes("sculk"))).toBe(false);
+        expect(state().run!.meteors[0]?.infected).toEqual([]);
     });
 
     it("called off mid-way, takes back exactly what it placed", async () => {

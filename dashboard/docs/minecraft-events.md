@@ -172,6 +172,15 @@ left out.
   other build. Each round is built in one material drawn for it
   (`build-battle.PALETTES`: glass, wool, concrete, terracotta and quartz),
   said in the theme title and the chat; the brush breaks only that material.
+- **Meteor shower** craters are infected by default (`infection`): sculk veins
+  grow round each one and creep outwards (`meteor-infection.ts`). A vein goes
+  only into air over the game's own ground (`#minecraft:sculk_replaceable`)
+  with `setblock ... keep`, and only one the game answers it changed is kept.
+  Bounded: six cells tried a tick over every meteor together, taken in turn,
+  at most 40 a meteor, never further than 7 blocks out. Standing in one poisons
+  and slows; breaking it cleanses the ground, and that cell is never touched
+  again. At the end each cell is cleared only while it is still a vein. From
+  1.19; older servers get plain craters.
 - **World boss** health grows with every fighter:
   `effective = base x level.health x (1 + level.perFighter x (fighters - 1))`,
   with `level` Normal (1.25, 0.5), Hard (1.75, 0.65) or Epic (2.5, 0.8)

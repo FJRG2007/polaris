@@ -796,6 +796,14 @@ export function meteorAt(
         : `${WARN}A meteor of ${mark(blocks, WARN)} ore blocks landed at ${mark(`X ${x} Y ${y} Z ${z}`, WARN)}. Look for the beam of light.`;
 }
 
+/** Said as an infected meteor lands: what the sculk round it does, and how
+ *  to be rid of it. */
+export function meteorInfected(language: Language): string {
+    return language === "es"
+        ? `${INFO}Su cráter está infectado: el sculk se extiende, envenena y ralentiza. Rómpelo para limpiar el suelo.`
+        : `${INFO}Its crater is infected: the sculk creeps out, poisons and slows. Break it to cleanse the ground.`;
+}
+
 /** How far the latest meteor still unmined is from a player, and which way. */
 export function meteorGuide(
     meters: number,
