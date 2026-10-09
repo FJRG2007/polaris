@@ -49,7 +49,10 @@ export interface ChatChange {
      *      the person they were reading, whose ticks have just moved. Addressed
      *      through `audience`, because who may know is a setting.
      *  pins - a message was pinned or unpinned here; the bar above the
-     *      conversation reads its pins again. */
+     *      conversation reads its pins again.
+     *  emoji - a space's own emoji were added, renamed or removed. Carries the
+     *      space and its rooms, never an emoji: a tab that reaches one of the
+     *      rooms asks for the list again through the same check. */
     readonly kind:
         | "posted"
         | "channels"
@@ -58,13 +61,16 @@ export interface ChatChange {
         | "appearance"
         | "read"
         | "activity"
-        | "pins";
+        | "pins"
+        | "emoji";
     /** Only on `read`: the mark moved BACKWARDS - somebody put a conversation
      *  back to unread. The same fact changing, so it is the same frame, but the
      *  opposite instruction for anything that withdraws a notice about it. */
     readonly unread?: true;
     /** Who caused it. A tab does not need waking for its own write. */
     readonly actorId: string;
+    /** Only on `emoji`: whose list changed. */
+    readonly spaceId?: string;
     /** Only on `typing` and `call`: what to draw beside the dots, or who is
      *  calling. */
     readonly actorName?: string;
@@ -94,7 +100,8 @@ export interface ChatChange {
      */
     readonly movedTo?: { readonly meetingId: string; readonly channelId: string };
     /**
-     * Only on `appearance` and `activity`: the conversations the person is in.
+     * Only on `appearance`, `activity` and `emoji`: the conversations the
+     * person is in, or the ones in the space whose emoji changed.
      *
      * How the fan-out is kept honest. Somebody changing their decoration is
      * news to the people who might be looking at their face, which is the people

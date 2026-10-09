@@ -1333,5 +1333,8 @@
         "updating": "Polaris se está actualizando. Volverá en un momento.",
         "polarisBack": "Polaris ha vuelto",
         "retry": "Reintentar"
+    },
+    "customEmoji": {
+        "from": "De {space}"
     }
 }

@@ -27,6 +27,9 @@ vi.mock("next/navigation", () => ({
     useSearchParams: () => new URLSearchParams()
 }));
 
+vi.mock("@/app/(app)/chat/emoji-actions", () => ({
+    spaceEmojiAction: async () => ({ list: { emoji: [], manages: false } })
+}));
 vi.mock("@/app/(app)/chat/actions", () => ({
     listScheduledAction: async () => ({ scheduled: [] }),
     readChannelAction: async () => ({ page: { messages: [], olderThan: null, newerThan: null } }),

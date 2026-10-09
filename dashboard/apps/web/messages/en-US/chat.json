@@ -182,7 +182,22 @@
         "inviteChannelNotOpen": "A link can only open on a public channel of this space that is still open.",
         "tooManyWebhooks": "A channel holds up to {count} webhooks.",
         "webhookGone": "That webhook no longer exists.",
-        "webhookName": "Give the webhook a name of up to 80 characters."
+        "webhookName": "Give the webhook a name of up to 80 characters.",
+        "emojiFileEmpty": "That file is empty",
+        "emojiFileSize": "An emoji can be up to 256 KB",
+        "emojiFileType": "Use a PNG, JPG, GIF or WEBP image",
+        "emojiFileDimensions": "That image is too big. Use one up to 2048 pixels a side",
+        "emojiFileUnreadable": "That image could not be read",
+        "emojiNameShort": "A name needs at least 2 characters",
+        "emojiNameLong": "A name can be up to 32 characters",
+        "emojiNameCharacters": "Use only letters, digits and _",
+        "emojiNameEdges": "A name cannot start or end with _",
+        "emojiNameTaken": "This space already has an emoji with that name",
+        "emojiSlotsStatic": "This space has used all 50 emoji slots",
+        "emojiSlotsAnimated": "This space has used all 50 animated emoji slots",
+        "emojiNotStored": "The emoji could not be saved. Try again",
+        "emojiGone": "That emoji no longer exists",
+        "emojiNotHere": "That emoji belongs to another space"
     },
     "media": {
         "refused": {
@@ -502,7 +517,8 @@
         "starred": "Starred",
         "pinnedHere": "Pinned",
         "app": "APP",
-        "webhookHint": "Posted by an app through a webhook, not by a person"
+        "webhookHint": "Posted by an app through a webhook, not by a person",
+        "addReaction": "Add reaction"
     },
     "composer": {
         "replyingTo": "Replying to",
@@ -582,7 +598,8 @@
         "moreFor": "More for {name}",
         "placesTaken": "{places} places taken",
         "of": " of ",
-        "editChannelNamed": "Edit {name}"
+        "editChannelNamed": "Edit {name}",
+        "emoji": "Emoji"
     },
     "channelView": {
         "thisConversationIsNotYours": "This conversation is not yours to open.",
@@ -695,7 +712,22 @@
         "stopKeepingThisPicture": "Stop keeping this picture",
         "keepThisPicture": "Keep this picture",
         "keptItIsInYour": "Kept. It is in your picker.",
-        "keepThis": "Keep this"
+        "keepThis": "Keep this",
+        "tabEmoji": "Emoji",
+        "tabKept": "Kept",
+        "tabGifs": "GIFs",
+        "tabStickers": "Stickers",
+        "groupSmileys": "Smileys",
+        "groupGestures": "Gestures",
+        "groupHearts": "Hearts",
+        "groupObjects": "Objects",
+        "groupSigns": "Signs",
+        "groupNature": "Nature",
+        "groupFood": "Food",
+        "groupTravel": "Travel",
+        "addEmoji": "Add emoji",
+        "noSpaceEmoji": "This space has no emoji of its own yet.",
+        "noSpaceEmojiYouCanAdd": "No emoji of its own yet. Add some with +."
     },
     "memberMenu": {
         "profile": "Profile",
@@ -1212,7 +1244,8 @@
         "spacePicture": "Space picture",
         "teamsAndRoles": "Teams and roles",
         "keptOut": "Kept out",
-        "leaveThisSpace": "Leave this space"
+        "leaveThisSpace": "Leave this space",
+        "emoji": "Emoji"
     },
     "leave": {
         "leaveQuietly": "Leave quietly",
@@ -1556,5 +1589,42 @@
         "description": "#{name} is marked as holding adult content. Continue only if you are at least 18.",
         "goBack": "Go back",
         "continue": "Continue"
+    },
+    "spaceEmoji": {
+        "title": "Emoji",
+        "back": "Back to conversations",
+        "intro": "Emoji everybody in {space} can use in its conversations and reactions.",
+        "introNoName": "Emoji everybody in this space can use in its conversations and reactions.",
+        "rulesTitle": "Upload rules",
+        "ruleFiles": "PNG, JPG, GIF or WEBP, up to 256 KB. 128 x 128 looks best.",
+        "ruleNames": "Names use letters, digits and _, from 2 to 32 characters.",
+        "ruleSlots": "Up to {total} emoji and {total} animated ones.",
+        "upload": "Upload emoji",
+        "full": "Both lists are full.",
+        "readOnly": "Only the owner and administrators of this space can add, rename or delete emoji.",
+        "tray": "Files being uploaded",
+        "name": "Name",
+        "uploading": "Uploading",
+        "uploadFailed": "The upload did not finish. Try again.",
+        "tryAgain": "Try again",
+        "dismiss": "Dismiss",
+        "loadFailed": "The emoji could not be loaded.",
+        "retry": "Try again",
+        "ordinary": "Emoji",
+        "animated": "Animated emoji",
+        "noOrdinary": "No emoji yet",
+        "noAnimated": "No animated emoji yet",
+        "slots": "{count} of {total}",
+        "addedBy": "Added by {name}",
+        "formerMember": "a former member",
+        "renameLabel": "Rename {name}",
+        "renameFailed": "The name could not be changed. Try again.",
+        "delete": "Delete",
+        "deleteLabel": "Delete {name}",
+        "deleteTitle": "Delete emoji",
+        "deleteQuestion": "Delete {name}?",
+        "deleteBody": "Messages that used it will show its name instead.",
+        "deleteFailed": "The emoji could not be deleted. Try again.",
+        "cancel": "Cancel"
     }
 }

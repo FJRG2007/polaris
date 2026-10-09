@@ -14,6 +14,7 @@
  * same shape so a screen never has to know the difference.
  */
 
+import { guardChat } from "@/lib/chat/chat-guard";
 import { z } from "zod";
 import { can } from "@polaris/auth";
 import * as core from "@polaris/core";
@@ -29,7 +30,7 @@ import * as webhooks from "@/lib/chat/webhooks";
 import { confirmAge } from "@/lib/chat/age-gate";
 import { allChatRules } from "@/lib/chat/rules";
 import { requirePermission } from "@/lib/session";
-import { getLocale, getTranslations } from "@/lib/i18n/request";
+import { getTranslations } from "@/lib/i18n/request";
 import { storeAttachment } from "@/lib/chat/attachments";
 import type { SavedMediaView } from "@/lib/chat/saved-media";
 import type { LinkPreviewView } from "@/lib/chat/link-preview";
@@ -79,21 +80,8 @@ async function actor(): Promise<{ id: string; name: string }> {
     return { id: user.id, name: user.name };
 }
 
-/**
- * Run one write and turn a refusal into a sentence.
- *
- * A refusal from the access layer is not an exception in the sense a screen
- * cares about - it is an answer - so it becomes `{ error }` like a failed
- * validation does. Anything else is a real fault and is left to throw.
- */
-async function guard<T>(run: () => Promise<T>): Promise<{ value?: T; error?: string }> {
-    try {
-        return { value: await run() };
-    } catch (caught) {
-        if (caught instanceof ChatAccessError) return { error: caught.textIn(await getLocale()) };
-        throw caught;
-    }
-}
+/** Run one write and turn a refusal into a sentence - see `guardChat`. */
+const guard = guardChat;
 
 // ---------------------------------------------------------------------------
 // Reading

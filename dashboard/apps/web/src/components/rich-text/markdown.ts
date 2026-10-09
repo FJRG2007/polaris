@@ -17,6 +17,7 @@ import { marked } from "marked";
 import * as refs from "./references";
 import type { Token, Tokens } from "marked";
 import type { JSONContent } from "@tiptap/core";
+import { CUSTOM_EMOJI_NODE, customEmojiNodeToken } from "./custom-emoji-doc";
 
 /**
  * The language on a line that is only a code fence, or null when the line is
@@ -336,7 +337,7 @@ export function isBlankMarkdown(markdown: string): boolean {
     const solid = (node: JSONContent): boolean => {
         if (node.type === "text") return (node.text ?? "").trim().length > 0;
         if (node.type === "hardBreak") return false;
-        if (node.type === "image" || node.type === REFERENCE) return true;
+        if (node.type === "image" || node.type === REFERENCE || node.type === CUSTOM_EMOJI_NODE) return true;
         if (node.type === "horizontalRule" || node.type === "codeBlock") return true;
         if (node.type === MARKDOWN_BLOCK) return (node.content ?? []).length > 0;
         return (node.content ?? []).some(solid);
@@ -449,7 +450,12 @@ function renderInlineNode(node: JSONContent): string {
     }
 
     let text: string;
-    if (node.type === REFERENCE) {
+    const emoji = customEmojiNodeToken(node);
+    if (emoji !== null) {
+        // Written as it is stored, unescaped: the token's characters are the
+        // point, and none of them is one Markdown reads as formatting.
+        text = emoji;
+    } else if (node.type === REFERENCE) {
         const kind = node.attrs?.kind as refs.ReferenceKind;
         const id = String(node.attrs?.id ?? "");
         const label = String(node.attrs?.label ?? "");

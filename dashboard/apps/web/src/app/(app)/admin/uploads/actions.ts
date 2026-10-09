@@ -23,6 +23,7 @@ import { uploadSettings } from "@/lib/tasks/attachment-service";
 import { setUploadSettings } from "@/lib/tasks/attachment-service";
 import { footageSettings, setFootageTarget } from "@/lib/footage-storage";
 import { setChatStorageTarget, tidyChatStorage } from "@/lib/chat/attachments";
+import { tidyEmojiStorage } from "@/lib/chat/custom-emoji";
 
 /** A storage connection id, `local`, or `auto`. */
 const target = z.string().trim().min(1).max(128);
@@ -150,7 +151,10 @@ export async function tidyChatStorageAction(): Promise<{
 }> {
     const admin = await requireAdmin();
     try {
-        const result = await tidyChatStorage();
+        // The space emoji's root as well: a space removed with its owner's
+        // account leaves that folder behind the same way.
+        const [files, emoji] = await Promise.all([tidyChatStorage(), tidyEmojiStorage()]);
+        const result = { removed: files.removed + emoji.removed, failed: files.failed + emoji.failed };
         await recordAudit({
             actorId: admin.id,
             action: "settings.chat.uploads.tidy",

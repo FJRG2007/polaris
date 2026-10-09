@@ -316,6 +316,7 @@ model User {
     chatSpacePreferences ChatSpacePreference[]
     chatSpaceBans       ChatSpaceBan[] @relation("ChatSpaceBanUser")
     chatSpaceBansMade   ChatSpaceBan[] @relation("ChatSpaceBanBy")
+    chatEmojiUploaded   ChatSpaceEmoji[] @relation("ChatSpaceEmojiUploader")
     chatSpaceInvites     ChatSpaceInvite[]
     chatSavedMedia       ChatSavedMedia[]
     chatChannelMemberships ChatChannelMember[]
@@ -8284,6 +8285,7 @@ model ChatSpace {
     channels   ChatChannel[]
     categories ChatCategory[]
     invites    ChatSpaceInvite[]
+    emoji      ChatSpaceEmoji[]
 
     @@index([ownerId])
     @@index([orgId])
@@ -8302,6 +8304,43 @@ model ChatSpace {
 // membership row, and a second list of it would be a second thing to keep right.
 // A revoked invite is kept rather than deleted so a link that stops working can
 // say it was withdrawn instead of pretending it never existed.
+/// A space's own emoji, usable in that space and nowhere else.
+///
+/// A message names one by id (`<:name:id>`, see `chat-emoji.ts` in core), so the
+/// name can change without breaking anything already sent. The file is kept the
+/// way a chat attachment is - the storage chat writes to, recorded per row - and
+/// it never changes under its id: replacing a picture is deleting one emoji and
+/// uploading another, which is what lets a browser keep it for good.
+model ChatSpaceEmoji {
+    id           String   @id @default(uuid(7)) @db.Uuid
+    spaceId      String   @db.Uuid
+    // As its uploader wrote it. Case is kept; uniqueness is on `nameKey`.
+    name         String
+    // The name lowercased, so `Wave` and `wave` cannot both exist in one space.
+    nameKey      String
+    // Whether it moves. Decided from the bytes, never from the extension: the
+    // two kinds have separate slots, and a GIF of one frame is a still.
+    animated     Boolean  @default(false)
+    mime         String
+    size         Int
+    width        Int
+    height       Int
+    // The storage connection it was written to, or null for this server's disk.
+    connectionId String?  @db.Uuid
+    path         String
+    // Who put it here. Kept past them leaving: the emoji is the space's.
+    uploaderId   String?  @db.Uuid
+    createdAt    DateTime @default(now())
+    updatedAt    DateTime @updatedAt
+
+    space    ChatSpace @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+    uploader User?     @relation("ChatSpaceEmojiUploader", fields: [uploaderId], references: [id], onDelete: SetNull)
+
+    @@unique([spaceId, nameKey])
+    @@index([spaceId, animated, createdAt])
+    @@index([uploaderId])
+}
+
 model ChatSpaceInvite {
     id          String    @id @default(uuid(7)) @db.Uuid
     spaceId     String    @db.Uuid

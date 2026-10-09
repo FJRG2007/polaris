@@ -43,6 +43,7 @@ import { ChatPictureDialog } from "./picture-dialog";
 import { NewChannelDialog } from "./new-channel-dialog";
 import { NotifyOptions } from "./notify-menu";
 import type { MenuParts } from "./mute-menu";
+import { spaceEmojiHref } from "./space-emoji";
 import type { ChatSpaceView } from "@/lib/chat/chat-service";
 import { ShareDialog } from "@/components/access/share-dialog";
 import {
@@ -52,6 +53,7 @@ import {
     LogOut,
     MessageSquare,
     Plus,
+    Smile,
     UserPlus,
     Users
 } from "lucide-react";
@@ -202,6 +204,7 @@ export function ServerRail() {
                         onBans={() => setShowingBans(space)}
                         onShare={() => setSharing(space)}
                         onPicture={() => setPicturing(space)}
+                        onEmoji={() => router.push(spaceEmojiHref(space.id))}
                         onLeave={() => setLeaving(space)}
                         onNotify={(level) => void setNotify(space.id, level)}
                     >
@@ -419,6 +422,7 @@ function SpaceMenu({
     onNewChannel,
     onInvite,
     onPicture,
+    onEmoji,
     onBans,
     onShare,
     onLeave,
@@ -429,6 +433,8 @@ function SpaceMenu({
     onNewChannel: () => void;
     onInvite: () => void;
     onPicture: () => void;
+    /** The space's own emoji, on their page. */
+    onEmoji: () => void;
     onBans: () => void;
     /** Hand the whole space to a team or a role. */
     onShare: () => void;
@@ -477,6 +483,12 @@ function SpaceMenu({
                     <ContextMenuItem onSelect={onPicture}>
                         <ImageIcon className="size-3.5" />
                         {t("serverRail.spacePicture")}
+                    </ContextMenuItem>
+                )}
+                {administers && (
+                    <ContextMenuItem onSelect={onEmoji}>
+                        <Smile className="size-3.5" />
+                        {t("serverRail.emoji")}
                     </ContextMenuItem>
                 )}
                 {/* The one moderation decision that never ends on its own and

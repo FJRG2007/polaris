@@ -13,12 +13,12 @@
  */
 
 import Link from "next/link";
-import { Fragment } from "react";
 import { cn } from "@polaris/ui";
 import { CodeBlock } from "./code-block";
 import { RICH_TEXT_PROSE } from "./prose";
 import { Chip, TaskBox } from "./rich-text-client";
-import { splitSpoilers } from "@polaris/core";
+import { customEmojiAsText, emojiOnlyCount, JUMBO_EMOJI_MOST, splitSpoilers } from "@polaris/core";
+import { EmojiRun, type CustomEmojiSet } from "./custom-emoji";
 import { Spoiler } from "@/app/(app)/chat/spoiler";
 import type { JSONContent } from "@tiptap/core";
 import { markdownToDoc, splitChannelMentions, MARKDOWN_BLOCK, REFERENCE } from "./markdown";
@@ -57,7 +57,9 @@ export function RichText({
     value,
     className,
     origin = null,
-    references
+    references,
+    customEmoji = null,
+    jumboEmoji = false
 }: {
     value: string;
     className?: string;
@@ -69,13 +71,70 @@ export function RichText({
     /** Resolutions for the references in this text, by `kind/id`. Anything not
      *  in the map keeps the label it was written with. */
     references?: ReadonlyMap<string, ResolvedReference>;
+    /**
+     * The space's own emoji this text may draw.
+     *
+     * Only the conversation a message was written in knows which those are, so
+     * it hands them in; everywhere else this is left out, and every
+     * `<:name:id>` in the text reads as `:name:` - which is also what one from
+     * another space, or one deleted since, reads as here.
+     */
+    customEmoji?: CustomEmojiSet | null;
+    /** Draw a line that is nothing but emoji large, the way a chat does. */
+    jumboEmoji?: boolean;
 }) {
     if (!value.trim()) return null;
     const doc = references ? resolve(markdownToDoc(value, origin), references) : markdownToDoc(value, origin);
     // Everything it said was an address that is drawn underneath instead. The
     // blank line that would otherwise sit above the card is not worth a div.
     if ((doc.content ?? []).length === 0) return null;
-    return <div className={cn(RICH_TEXT_PROSE, className)}>{blocks(doc.content)}</div>;
+    const jumbo = jumboEmoji && onlyEmoji(doc);
+    return (
+        <div className={cn(RICH_TEXT_PROSE, className, jumbo && "text-[2.75rem] leading-[1.15]")}>
+            {blocks(doc.content, { set: customEmoji, jumbo })}
+        </div>
+    );
+}
+
+/**
+ * What the text nodes below may draw. Handed down the walk as an argument
+ * rather than a context: this module also renders inside server components,
+ * where a context cannot be created.
+ */
+interface EmojiScope {
+    readonly set: CustomEmojiSet | null;
+    readonly jumbo: boolean;
+}
+
+const NO_EMOJI: EmojiScope = { set: null, jumbo: false };
+
+/**
+ * Whether the message is one line of nothing but emoji, at most Discord's
+ * twenty-seven of them - the message a chat draws large.
+ */
+function onlyEmoji(doc: JSONContent): boolean {
+    const blocks = doc.content ?? [];
+    if (blocks.length !== 1 || blocks[0]?.type !== "paragraph") return false;
+    let text = "";
+    for (const node of blocks[0].content ?? []) {
+        if (node.type === "hardBreak") continue;
+        if (node.type !== "text" || (node.marks ?? []).length > 0) return false;
+        text += node.text ?? "";
+    }
+    const count = emojiOnlyCount(text);
+    return count > 0 && count <= JUMBO_EMOJI_MOST;
+}
+
+/**
+ * Plain text with a space's emoji in it: drawn from the set when there is one,
+ * and said as names when there is not - on the server too, without crossing
+ * into a client component for a sentence that has none.
+ */
+function WithEmoji({ text, scope }: { text: string; scope: EmojiScope }) {
+    const { set, jumbo } = scope;
+    if (!text.includes("<")) return <>{text}</>;
+    if (!set) return <>{customEmojiAsText(text)}</>;
+    return <EmojiRun text={text} set={set} jumbo={jumbo} />;
 }
 
 /**
@@ -117,29 +176,29 @@ function resolve(doc: JSONContent, references: ReadonlyMap<string, ResolvedRefer
     return walk(doc) ?? { type: "doc", content: [] };
 }
 
-function blocks(nodes: readonly JSONContent[] | undefined): React.ReactNode {
-    return (nodes ?? []).map((node, index) => <Block key={index} node={node} />);
+function blocks(nodes: readonly JSONContent[] | undefined, scope: EmojiScope = NO_EMOJI): React.ReactNode {
+    return (nodes ?? []).map((node, index) => <Block key={index} node={node} scope={scope} />);
 }
 
-function Block({ node }: { node: JSONContent }) {
+function Block({ node, scope }: { node: JSONContent; scope: EmojiScope }) {
     switch (node.type) {
         case "heading": {
             const level = Number(node.attrs?.level ?? 1);
             const Tag = (level === 1 ? "h1" : level === 2 ? "h2" : "h3") as "h1" | "h2" | "h3";
-            return <Tag>{inline(node.content)}</Tag>;
+            return <Tag>{inline(node.content, scope)}</Tag>;
         }
         case "paragraph":
-            return <p>{inline(node.content)}</p>;
+            return <p>{inline(node.content, scope)}</p>;
         case "blockquote":
-            return <blockquote>{blocks(node.content)}</blockquote>;
+            return <blockquote>{blocks(node.content, scope)}</blockquote>;
         case "bulletList":
-            return <ul>{listItems(node.content)}</ul>;
+            return <ul>{listItems(node.content, scope)}</ul>;
         case "orderedList":
-            return <ol start={Number(node.attrs?.start ?? 1) || 1}>{listItems(node.content)}</ol>;
+            return <ol start={Number(node.attrs?.start ?? 1) || 1}>{listItems(node.content, scope)}</ol>;
         case "taskList":
             // The same attribute the editor's own list carries, so one rule in
             // the shared type styles reaches both.
-            return <ul data-type="taskList">{taskItems(node.content)}</ul>;
+            return <ul data-type="taskList">{taskItems(node.content, scope)}</ul>;
         case "codeBlock":
             return (
                 <CodeBlock
@@ -163,22 +222,22 @@ function Block({ node }: { node: JSONContent }) {
         case "image":
             return <Media node={node} />;
         default:
-            return <>{blocks(node.content)}</>;
+            return <>{blocks(node.content, scope)}</>;
     }
 }
 
-function listItems(nodes: readonly JSONContent[] | undefined): React.ReactNode {
-    return (nodes ?? []).map((item, index) => <li key={index}>{blocks(item.content)}</li>);
+function listItems(nodes: readonly JSONContent[] | undefined, scope: EmojiScope): React.ReactNode {
+    return (nodes ?? []).map((item, index) => <li key={index}>{blocks(item.content, scope)}</li>);
 }
 
 /** A checklist is read, not ticked: the box says what the state is, and the
  *  place to change it is the editor. */
-function taskItems(nodes: readonly JSONContent[] | undefined): React.ReactNode {
+function taskItems(nodes: readonly JSONContent[] | undefined, scope: EmojiScope): React.ReactNode {
     return (nodes ?? []).map((item, index) => (
         <li key={index} className="flex items-start gap-2">
             <TaskBox checked={item.attrs?.checked === true} />
             <span className={cn("min-w-0", item.attrs?.checked === true && "text-muted-foreground line-through")}>
-                {blocks(item.content)}
+                {blocks(item.content, scope)}
             </span>
         </li>
     ));
@@ -203,15 +262,15 @@ function text(node: JSONContent): string {
     return (node.content ?? []).map((child) => child.text ?? "").join("");
 }
 
-function inline(nodes: readonly JSONContent[] | undefined): React.ReactNode {
-    return (nodes ?? []).map((node, index) => <Inline key={index} node={node} />);
+function inline(nodes: readonly JSONContent[] | undefined, scope: EmojiScope): React.ReactNode {
+    return (nodes ?? []).map((node, index) => <Inline key={index} node={node} scope={scope} />);
 }
 
-function Inline({ node }: { node: JSONContent }) {
+function Inline({ node, scope }: { node: JSONContent; scope: EmojiScope }) {
     if (node.type === "hardBreak") return <br />;
     if (node.type === "image") return <Media node={node} />;
     if (node.type === REFERENCE) return <Chip node={node} />;
-    if (node.type !== "text") return <>{inline(node.content)}</>;
+    if (node.type !== "text") return <>{inline(node.content, scope)}</>;
 
     // `@everyone` and `@here` are stored as the text somebody typed - there is
     // nothing to point at, since they mean "this conversation" - so they are
@@ -231,10 +290,10 @@ function Inline({ node }: { node: JSONContent }) {
             content = covers.map((part, index) =>
                 part.covered ? (
                     <Spoiler key={index} kind="text">
-                        {part.text}
+                        <WithEmoji text={part.text} scope={scope} />
                     </Spoiler>
                 ) : (
-                    <Fragment key={index}>{part.text}</Fragment>
+                    <WithEmoji key={index} text={part.text} scope={scope} />
                 )
             );
             for (const mark of marks) {
@@ -258,9 +317,11 @@ function Inline({ node }: { node: JSONContent }) {
                         {part.text}
                     </span>
                 ) : (
-                    <Fragment key={index}>{part.text}</Fragment>
+                    <WithEmoji key={index} text={part.text} scope={scope} />
                 )
             );
+        } else {
+            content = <WithEmoji text={node.text ?? ""} scope={scope} />;
         }
     }
     for (const mark of marks) {

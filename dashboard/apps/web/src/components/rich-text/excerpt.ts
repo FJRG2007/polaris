@@ -23,6 +23,7 @@
  */
 
 import { chipLabel } from "./chip";
+import { customEmojiAsText } from "@polaris/core";
 import type { JSONContent } from "@tiptap/core";
 import type { ReferenceKind } from "./references";
 import { markdownToDoc, MARKDOWN_BLOCK, REFERENCE } from "./markdown";
@@ -69,7 +70,7 @@ export function plainText(markdown: string): string {
 const STACKED = new Set(["doc", "bulletList", "orderedList", "listItem", "blockquote", "taskList", "taskItem"]);
 
 function blocksOf(node: JSONContent): string {
-    if (node.type === "text") return node.text ?? "";
+    if (node.type === "text") return spoken(node);
     if (node.type === REFERENCE) {
         return chipLabel(node.attrs?.kind as ReferenceKind, String(node.attrs?.label ?? ""));
     }
@@ -90,8 +91,21 @@ function collapse(text: string): string {
     return text.replace(/\s+/g, " ").trim();
 }
 
+/**
+ * A run of text as it reads, with a space's own emoji said as their names.
+ *
+ * `<:wave:0193...>` is how a message stores one; nobody reading a quote, a
+ * notification or a copied line wants the id. Inside code the characters are
+ * what somebody wrote on purpose, so they are left alone there.
+ */
+function spoken(node: JSONContent): string {
+    const text = node.text ?? "";
+    if ((node.marks ?? []).some((mark) => mark.type === "code")) return text;
+    return customEmojiAsText(text);
+}
+
 function textOf(node: JSONContent): string {
-    if (node.type === "text") return node.text ?? "";
+    if (node.type === "text") return spoken(node);
     // A mention reads as the name it carries, not as the address behind it, and
     // through the same function the chip uses so it reads the same in the quote
     // as it does in the message - the @ included.

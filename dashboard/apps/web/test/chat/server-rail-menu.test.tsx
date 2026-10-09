@@ -56,6 +56,9 @@ vi.mock("@/app/(app)/chat/chat-context", () => ({
         may: { spaces: false }
     })
 }));
+vi.mock("@/app/(app)/chat/emoji-actions", () => ({
+    spaceEmojiAction: async () => ({ list: { emoji: [], manages: false } })
+}));
 vi.mock("@/app/(app)/chat/actions", () => ({
     leaveSpaceAction: async () => ({}),
     setSpaceNotifyAction: async () => ({})

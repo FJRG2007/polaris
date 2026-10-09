@@ -33,7 +33,7 @@ export interface SuggestionHandle {
 }
 
 /**
- * The three lists that can be open under the caret, named once.
+ * The lists that can be open under the caret, named once.
  *
  * Kept here rather than beside each plugin because something outside them needs
  * to ask whether any is open: a composer where Enter sends is a direct editor
@@ -43,11 +43,15 @@ export interface SuggestionHandle {
 const POPUP_KEYS = {
     people: new PluginKey("polarisMentionPeople"),
     work: new PluginKey("polarisMentionWork"),
-    blocks: new PluginKey("polarisBlockMenu")
+    blocks: new PluginKey("polarisBlockMenu"),
+    emoji: new PluginKey("polarisEmojiMenu")
 } as const;
 
 /** The block menu's own key, so it registers as the one asked about below. */
 export const BLOCK_MENU_KEY = POPUP_KEYS.blocks;
+
+/** The `:` list's key, for the same reason. */
+export const EMOJI_MENU_KEY = POPUP_KEYS.emoji;
 
 /** Whether a list is open under the caret and owns the keys that drive it. */
 export function popupOpen(state: EditorState): boolean {

@@ -26,6 +26,7 @@ const frameSchema = z.discriminatedUnion("kind", [
     z.object({ kind: z.literal("channels") }),
     // A message was pinned or unpinned in a conversation this reader reaches.
     z.object({ kind: z.literal("pins"), channelId: z.string() }),
+    z.object({ kind: z.literal("emoji"), spaceId: z.string() }),
     // Somebody caught up. Theirs to take an unread count down with, and the
     // other side's to move the ticks under their own messages.
     z.object({

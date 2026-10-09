@@ -13,6 +13,7 @@
  * conversation. There is no third way in.
  */
 
+import { guardChat } from "@/lib/chat/chat-guard";
 import { z } from "zod";
 import { can } from "@polaris/auth";
 import * as core from "@polaris/core";
@@ -23,13 +24,13 @@ import * as room from "@/lib/chat/meeting-chat";
 import * as calls from "@/lib/chat/call-server";
 import { mayRing } from "@/lib/privacy-service";
 import { requirePermission } from "@/lib/session";
-import { getLocale, getTranslations } from "@/lib/i18n/request";
+import { getTranslations } from "@/lib/i18n/request";
 import { translatorFor } from "@/lib/i18n/translate";
 import { getUserLocale } from "@/lib/i18n/locale-service";
 import * as moderation from "@/lib/chat/call-moderation";
 import { createNotification } from "@/lib/notification-service";
 import { callModerationSchema } from "@/lib/chat/voice-moderation";
-import { ChatAccessError, requireChannel } from "@/lib/chat/access";
+import { requireChannel } from "@/lib/chat/access";
 import type { MeetingView, VoicePresence } from "@/lib/chat/meetings";
 import { MAX_MEETING_LINE, MAX_MEETING_TITLE } from "@/lib/chat/meeting-limits";
 import { GUEST_COOKIE, GUEST_COOKIE_MAX_AGE, resolveSeat } from "@/lib/chat/meeting-seat";
@@ -45,14 +46,8 @@ import { GUEST_COOKIE, GUEST_COOKIE_MAX_AGE, resolveSeat } from "@/lib/chat/meet
  */
 const NO_CALLS = "You are not allowed to be in calls here";
 
-async function guard<T>(run: () => Promise<T>): Promise<{ value?: T; error?: string }> {
-    try {
-        return { value: await run() };
-    } catch (caught) {
-        if (caught instanceof ChatAccessError) return { error: caught.textIn(await getLocale()) };
-        throw caught;
-    }
-}
+/** Run one write and turn a refusal into a sentence - see `guardChat`. */
+const guard = guardChat;
 
 /**
  * Why a call cannot be started here, or null when one can.

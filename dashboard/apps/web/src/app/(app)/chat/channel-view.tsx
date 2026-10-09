@@ -36,6 +36,7 @@ import { posterFor } from "./video-poster";
 import { ThreadPanel } from "./thread-panel";
 import { SearchPanel } from "./search-panel";
 import { MessageList } from "./message-list";
+import { useComposerEmoji, useSpaceEmojiScope } from "./space-emoji";
 import { runAction } from "@/lib/run-action";
 import { useCallHold } from "./call-session";
 import { useCallHidden } from "./call-hidden";
@@ -209,7 +210,8 @@ export function ChannelView({
     const t = useTranslations("chat");
     const router = useRouter();
     const params = useSearchParams();
-    const { viewerId, viewerName, channels, loaded, refresh, rulesFor, may, callsOff } = useChat();
+    const { viewerId, viewerName, channels, spaces, loaded, refresh, rulesFor, may, callsOff } =
+        useChat();
     const [unblocking, setUnblocking] = useState(false);
     const [messages, setMessages] = useState<readonly ChatMessageView[] | null>(null);
     const [pending, setPending] = useState<readonly ChatMessageView[]>([]);
@@ -414,6 +416,12 @@ export function ChannelView({
             (described?.id === channelId ? described : null),
         [channels, channelId, described]
     );
+    const spaceId = channel?.spaceId ?? null;
+    const emojiScope = useSpaceEmojiScope(
+        spaceId,
+        spaces.find((space) => space.id === spaceId)?.name ?? ""
+    );
+    const composerEmoji = useComposerEmoji(emojiScope);
     // Whichever of the two was read last decides. A list that arrives without
     // the conversation is one this reader has left or been removed from, and a
     // first page read a moment earlier does not overrule that; a page read after
@@ -1896,6 +1904,7 @@ export function ChannelView({
                     </div>
                 ) : (
                     <MessageList
+                        emoji={emojiScope}
                         messages={shown}
                         coverMedia={channel?.contentMode === "spoiler"}
                         viewerId={viewerId}
@@ -2060,6 +2069,7 @@ export function ChannelView({
                     />
                     <Composer
                         channelId={channelId}
+                        emoji={composerEmoji}
                         // The chat's own announcement, handed in: the box is also
                         // the one under a task, where there is nobody to tell.
                         onTyping={(kind) => void actions.typingAction(channelId, kind)}
@@ -2443,6 +2453,7 @@ export function ChannelView({
             {thread && (
                 <ThreadPanel
                     root={thread}
+                    emoji={emojiScope}
                     rules={rules}
                     viewerId={viewerId}
                     canPost={canPost}
