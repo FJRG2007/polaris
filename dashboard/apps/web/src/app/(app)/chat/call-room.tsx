@@ -80,6 +80,7 @@ import { CombineRequestDialog, CombineStrip } from "./call-combine-panel";
 import type { PickedPerson } from "@/components/people-picker";
 import {
     arrivedKeys,
+    canShareScreen,
     LOCAL_SCREEN_KEY,
     putAwayOf,
     stagesOf,
@@ -213,6 +214,10 @@ export function CallRoom({
         deafenKey ? ts("withKey", { action: label, keys: deafenKey }) : label;
     const [inviting, setInviting] = useState(false);
     const [asking, setAsking] = useState(false);
+    /** Whether this browser can share a screen. Asked after mounting, as the
+     *  composer asks about clips: the server has no browser to ask. */
+    const [screenShareable, setScreenShareable] = useState(false);
+    useEffect(() => setScreenShareable(canShareScreen()), []);
 
     const canShare = Boolean(viewerId) && call.meeting?.hostId === viewerId;
     const admitted = call.meeting?.participants.filter((person) => person.admission === "admitted");
@@ -1189,31 +1194,36 @@ export function CallRoom({
                     onLook={call.setLook}
                 />
 
-                <Split
-                    label={call.sharing ? t("callRoom.stopSharing") : t("callRoom.shareScreen")}
-                    icon={
-                        call.sharing ? (
-                            <MonitorX className="size-4" />
-                        ) : (
-                            <MonitorUp className="size-4" />
-                        )
-                    }
-                    variant={call.sharing ? "primary" : "secondary"}
-                    pressed={call.sharing}
-                    onClick={call.toggleShare}
-                    // A screen is not a device to pick between: the browser's own
-                    // picker does that, every time, and it is the only thing
-                    // allowed to.
-                    devices={[]}
-                    chosenId={null}
-                    devicesLabel={t("callRoom.devices.screen")}
-                    onChoose={() => undefined}
-                    ladder={SCREEN_LADDER}
-                    quality={call.screenQuality}
-                    level={call.screenLevel}
-                    onQuality={call.setScreenQuality}
-                    qualityLabel="Screen quality"
-                />
+                {/* Left out where it could only fail - every phone - rather
+                    than offered and answered with an error. A share already
+                    running is always given its stop. */}
+                {(screenShareable || call.sharing) && (
+                    <Split
+                        label={call.sharing ? t("callRoom.stopSharing") : t("callRoom.shareScreen")}
+                        icon={
+                            call.sharing ? (
+                                <MonitorX className="size-4" />
+                            ) : (
+                                <MonitorUp className="size-4" />
+                            )
+                        }
+                        variant={call.sharing ? "primary" : "secondary"}
+                        pressed={call.sharing}
+                        onClick={call.toggleShare}
+                        // A screen is not a device to pick between: the browser's own
+                        // picker does that, every time, and it is the only thing
+                        // allowed to.
+                        devices={[]}
+                        chosenId={null}
+                        devicesLabel={t("callRoom.devices.screen")}
+                        onChoose={() => undefined}
+                        ladder={SCREEN_LADDER}
+                        quality={call.screenQuality}
+                        level={call.screenLevel}
+                        onQuality={call.setScreenQuality}
+                        qualityLabel="Screen quality"
+                    />
+                )}
 
                 {/* The one device that had no picker. A headset plugged in after
                     the tab was opened, or a call coming out of a laptop lid in a
