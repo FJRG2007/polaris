@@ -29,7 +29,10 @@ import { cn } from "@polaris/ui";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { createPortal } from "react-dom";
 import type { TenorResult } from "@/lib/chat/tenor";
-import { Loader2, Search, Smile, Star } from "lucide-react";
+import Link from "next/link";
+import * as core from "@polaris/core";
+import { Loader2, Plus, Search, Smile, Star } from "lucide-react";
+import { EmojiPicture, type CustomEmojiEntry } from "@/components/rich-text/custom-emoji";
 import { EMOJI_GROUPS, searchEmoji } from "@/lib/chat/emoji";
 import type { SavedMediaView } from "@/lib/chat/saved-media";
 import {
@@ -172,14 +175,58 @@ function place(button: DOMRect): Placement {
 /** How many emoji groups are built on the frame the picker opens. */
 const FIRST_GROUPS = 2;
 
+/**
+ * The space's own emoji, for a picker opened inside a conversation in it.
+ *
+ * Only ever the space the conversation is in: that is the only place they can
+ * be used, and a picker that offered another space's would be offering
+ * something the send turns back into a word.
+ */
+export interface PickerCustomEmoji {
+    readonly spaceName: string;
+    /** Null while the list is still on its way. */
+    readonly entries: readonly CustomEmojiEntry[] | null;
+    /** Where whoever runs the space adds them, or null for everybody else. */
+    readonly manageHref: string | null;
+}
+
+/** The picker's tab labels, by tab. */
+const TAB_KEYS = {
+    emoji: "emojiPicker.tabEmoji",
+    saved: "emojiPicker.tabKept",
+    gif: "emojiPicker.tabGifs",
+    sticker: "emojiPicker.tabStickers"
+} as const;
+
+/** The emoji groups' headings, by the name the list gives them. */
+const GROUP_KEYS = {
+    Smileys: "emojiPicker.groupSmileys",
+    Gestures: "emojiPicker.groupGestures",
+    Hearts: "emojiPicker.groupHearts",
+    Objects: "emojiPicker.groupObjects",
+    Signs: "emojiPicker.groupSigns",
+    Nature: "emojiPicker.groupNature",
+    Food: "emojiPicker.groupFood",
+    Travel: "emojiPicker.groupTravel"
+} as const;
+
 export function EmojiPicker({
     disabled,
     media = true,
+    custom = null,
+    label,
+    icon,
     onEmoji,
     onMedia,
     onSaved
 }: {
     disabled: boolean;
+    /** The space's own emoji, offered in a section of their own. */
+    custom?: PickerCustomEmoji | null;
+    /** What the button is called, when it is not the composer's. */
+    label?: string;
+    /** What the button shows, when it is not the composer's face. */
+    icon?: React.ReactNode;
     /**
      * Whether there is anything here but emoji.
      *
@@ -189,6 +236,7 @@ export function EmojiPicker({
      * three ways of finding out you cannot use them.
      */
     media?: boolean;
+    /** An ordinary emoji as itself, or one of the space's as its token. */
     onEmoji: (char: string) => void;
     /** A chosen GIF or sticker, by address. The caller sends it. */
     onMedia?: (address: string) => void;
@@ -406,9 +454,38 @@ export function EmojiPicker({
     const groups = restDrawn ? EMOJI_GROUPS : EMOJI_GROUPS.slice(0, FIRST_GROUPS);
     /** The same for the row above them: a fresh array every render would defeat
      *  the memo on the grid that draws it. */
+    const customEntries = custom?.entries ?? null;
+    const byId = useMemo(
+        () => new Map((customEntries ?? []).map((entry) => [entry.id, entry])),
+        [customEntries]
+    );
+    /**
+     * The recent row, a space's emoji included - but only this space's, and
+     * only while it still exists. One used in another space is not usable here,
+     * and the row is for reaching things, not a record of them.
+     */
     const recentEntries = useMemo(
-        () => recent.emoji.map((char) => ({ char, words: "" })),
-        [recent.emoji]
+        () =>
+            recent.emoji.flatMap((char): PickerEntry[] => {
+                const ref = core.parseCustomEmojiToken(char);
+                if (!ref) return [{ char, words: "" }];
+                const entry = byId.get(ref.id);
+                return entry
+                    ? [{ char: core.customEmojiToken(entry), words: entry.name, entry }]
+                    : [];
+            }),
+        [recent.emoji, byId]
+    );
+    const customGrid = useMemo(
+        () =>
+            (customEntries ?? []).map(
+                (entry): PickerEntry => ({
+                    char: core.customEmojiToken(entry),
+                    words: entry.name,
+                    entry
+                })
+            ),
+        [customEntries]
     );
 
     /**
@@ -427,20 +504,29 @@ export function EmojiPicker({
         [onEmoji]
     );
 
-    const found = useMemo(() => searchEmoji(query), [query]);
+    const found = useMemo((): PickerEntry[] => {
+        const needle = core.normalizeEmojiName(query).toLowerCase();
+        const own = needle
+            ? customGrid.filter((entry) => entry.words.toLowerCase().includes(needle))
+            : [];
+        return [...own, ...searchEmoji(query)];
+    }, [query, customGrid]);
 
     const button = (
         <button
             ref={trigger}
             type="button"
             disabled={disabled}
-            aria-label={t("emojiPicker.emojiGifsAndStickers")}
-            title={t("emojiPicker.emojiGifsAndStickers")}
+            aria-label={label ?? t("emojiPicker.emojiGifsAndStickers")}
+            title={label ?? t("emojiPicker.emojiGifsAndStickers")}
             aria-expanded={open}
             onClick={() => setOpen((current) => !current)}
-            className="rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50"
+            className={cn(
+                "rounded text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50",
+                icon ? "p-1" : "p-1.5"
+            )}
         >
-            <Smile className="size-4" />
+            {icon ?? <Smile className="size-4" />}
         </button>
     );
 
@@ -456,7 +542,7 @@ export function EmojiPicker({
                     data-state="open"
                     // Pointer events back on, for a composer inside a dialog: a
                     // modal dialog turns them off on the body, where this is drawn.
-                    aria-label={t("emojiPicker.emojiGifsAndStickers")}
+                    aria-label={label ?? t("emojiPicker.emojiGifsAndStickers")}
                     style={{
                         left: at.left,
                         top: at.top,
@@ -467,14 +553,7 @@ export function EmojiPicker({
                     className="pointer-events-auto fixed z-50 flex flex-col overflow-hidden rounded-lg border border-border-strong bg-elevated shadow-popover"
                 >
                     <div className={cn("flex shrink-0 border-b border-border", !media && "hidden")}>
-                        {(
-                            [
-                                ["emoji", "Emoji"],
-                                ["saved", "Kept"],
-                                ["gif", "GIFs"],
-                                ["sticker", "Stickers"]
-                            ] as const
-                        ).map(([value, label]) => (
+                        {(["emoji", "saved", "gif", "sticker"] as const).map((value) => (
                             <button
                                 key={value}
                                 type="button"
@@ -493,7 +572,7 @@ export function EmojiPicker({
                                         : "text-muted-foreground hover:text-foreground"
                                 )}
                             >
-                                {label}
+                                {t(TAB_KEYS[value])}
                             </button>
                         ))}
                     </div>
@@ -545,7 +624,7 @@ export function EmojiPicker({
                                         thousand are almost everything anybody
                                         sends - and they are not the same nine
                                         for any two people. */}
-                                    {recent.emoji.length > 0 && (
+                                    {recentEntries.length > 0 && (
                                         <section className="mb-2">
                                             <h3 className="px-1 pb-1 text-[0.625rem] font-medium uppercase tracking-[0.04em] text-foreground-subtle">
                                                 {t("emojiPicker.recent")}
@@ -553,10 +632,53 @@ export function EmojiPicker({
                                             <Grid entries={recentEntries} onPick={pick} />
                                         </section>
                                     )}
+                                    {custom && (
+                                        <section className="mb-2">
+                                            <h3 className="flex items-center gap-1 px-1 pb-1 text-[0.625rem] font-medium uppercase tracking-[0.04em] text-foreground-subtle">
+                                                <span
+                                                    className="min-w-0 flex-1 truncate"
+                                                    title={custom.spaceName}
+                                                >
+                                                    {custom.spaceName}
+                                                </span>
+                                                {custom.manageHref && (
+                                                    <Link
+                                                        href={custom.manageHref}
+                                                        onClick={() => setOpen(false)}
+                                                        aria-label={t("emojiPicker.addEmoji")}
+                                                        title={t("emojiPicker.addEmoji")}
+                                                        className="shrink-0 rounded p-0.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                                                    >
+                                                        <Plus className="size-3.5" />
+                                                    </Link>
+                                                )}
+                                            </h3>
+                                            {customEntries === null ? (
+                                                <p className="flex items-center gap-2 px-1 py-2 text-xs text-muted-foreground">
+                                                    <Loader2 className="size-3.5 animate-spin" />
+                                                    {t("emojiPicker.looking")}
+                                                </p>
+                                            ) : customGrid.length === 0 ? (
+                                                <p className="px-1 py-2 text-xs text-muted-foreground">
+                                                    {custom.manageHref
+                                                        ? t("emojiPicker.noSpaceEmojiYouCanAdd")
+                                                        : t("emojiPicker.noSpaceEmoji")}
+                                                </p>
+                                            ) : (
+                                                <Grid entries={customGrid} onPick={pick} />
+                                            )}
+                                        </section>
+                                    )}
                                     {groups.map((group) => (
                                         <section key={group.name} className="mb-2">
                                             <h3 className="px-1 pb-1 text-[0.625rem] font-medium uppercase tracking-[0.04em] text-foreground-subtle">
-                                                {group.name}
+                                                {group.name in GROUP_KEYS
+                                                    ? t(
+                                                          GROUP_KEYS[
+                                                              group.name as keyof typeof GROUP_KEYS
+                                                          ]
+                                                      )
+                                                    : group.name}
                                             </h3>
                                             <Grid entries={group.emoji} onPick={pick} />
                                         </section>
@@ -799,7 +921,11 @@ function Tile({
             <button
                 type="button"
                 aria-pressed={kept}
-                aria-label={kept ? t("emojiPicker.stopKeepingThisPicture") : t("emojiPicker.keepThisPicture")}
+                aria-label={
+                    kept
+                        ? t("emojiPicker.stopKeepingThisPicture")
+                        : t("emojiPicker.keepThisPicture")
+                }
                 title={kept ? t("emojiPicker.keptItIsInYour") : t("emojiPicker.keepThis")}
                 onClick={(event) => {
                     // The tile under it sends. Keeping is not the first half of
@@ -826,28 +952,43 @@ function Tile({
  * changes most often - the search box, a tab, a GIF search coming back - belongs
  * to the panel above them and changes nothing about any button in them.
  */
+/** One cell of an emoji grid: an ordinary emoji, or one of the space's with
+ *  its picture. `char` is what picking it hands on. */
+interface PickerEntry {
+    readonly char: string;
+    readonly words: string;
+    readonly entry?: CustomEmojiEntry;
+}
+
 const Grid = memo(function Grid({
     entries,
     onPick
 }: {
-    entries: readonly { char: string; words: string }[];
+    entries: readonly PickerEntry[];
     onPick: (char: string) => void;
 }) {
     return (
         <ul className="grid grid-cols-8 gap-0.5">
-            {entries.map((entry) => (
-                <li key={entry.char}>
-                    <button
-                        type="button"
-                        title={entry.words}
-                        aria-label={entry.words}
-                        onClick={() => onPick(entry.char)}
-                        className="flex size-8 items-center justify-center rounded text-lg transition-colors hover:bg-muted"
-                    >
-                        {entry.char}
-                    </button>
-                </li>
-            ))}
+            {entries.map((item) => {
+                const label = item.entry ? core.customEmojiFallback(item.entry) : item.words;
+                return (
+                    <li key={item.char}>
+                        <button
+                            type="button"
+                            title={label}
+                            aria-label={label}
+                            onClick={() => onPick(item.char)}
+                            className="flex size-8 items-center justify-center rounded text-lg transition-colors hover:bg-muted"
+                        >
+                            {item.entry ? (
+                                <EmojiPicture entry={item.entry} className="size-6" />
+                            ) : (
+                                item.char
+                            )}
+                        </button>
+                    </li>
+                );
+            })}
         </ul>
     );
 });

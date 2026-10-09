@@ -22,6 +22,11 @@ describe("the conversation column on a phone", () => {
         expect(conversationOnScreen("/chat/with/abc")).toBe(true);
     });
 
+    it("is shown for the pages with a back arrow of their own", () => {
+        expect(conversationOnScreen("/chat/saved")).toBe(true);
+        expect(conversationOnScreen("/chat/s/abc/emoji")).toBe(true);
+    });
+
     it("steps aside for the list", () => {
         expect(conversationOnScreen("/chat")).toBe(false);
     });

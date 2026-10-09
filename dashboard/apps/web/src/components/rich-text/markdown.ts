@@ -17,6 +17,7 @@ import { marked } from "marked";
 import * as refs from "./references";
 import type { Token, Tokens } from "marked";
 import type { JSONContent } from "@tiptap/core";
+import { CUSTOM_EMOJI_NODE, customEmojiNodeToken } from "./custom-emoji-doc";
 
 /**
  * The language on a line that is only a code fence, or null when the line is
@@ -143,7 +144,9 @@ function list(token: Tokens.List, origin: string | null): JSONContent {
     }
     return {
         type: token.ordered ? "orderedList" : "bulletList",
-        attrs: token.ordered ? { start: typeof token.start === "number" ? token.start : 1 } : undefined,
+        attrs: token.ordered
+            ? { start: typeof token.start === "number" ? token.start : 1 }
+            : undefined,
         content: token.items.map((item) => ({ type: "listItem", content: listBody(item, origin) }))
     };
 }
@@ -181,11 +184,17 @@ function inlineNodes(token: Token, origin: string | null): JSONContent[] {
             return [{ type: "hardBreak" }];
         case "image": {
             const image = token as Tokens.Image;
-            return [{ type: "image", attrs: { src: image.href, alt: image.text || null, title: image.title } }];
+            return [
+                {
+                    type: "image",
+                    attrs: { src: image.href, alt: image.text || null, title: image.title }
+                }
+            ];
         }
         case "link": {
             const link = token as Tokens.Link;
-            const target = refs.parseReferenceAddress(link.href) ?? refs.referenceFromUrl(link.href, origin);
+            const target =
+                refs.parseReferenceAddress(link.href) ?? refs.referenceFromUrl(link.href, origin);
             const label = link.text || link.href;
             if (target) {
                 return [
@@ -268,7 +277,10 @@ export function decodeEntities(text: string): string {
 }
 
 /** Adds a mark to every node that can carry one. */
-function withMark(nodes: readonly JSONContent[], mark: { type: string; attrs?: Record<string, unknown> }): JSONContent[] {
+function withMark(
+    nodes: readonly JSONContent[],
+    mark: { type: string; attrs?: Record<string, unknown> }
+): JSONContent[] {
     return nodes.map((node) =>
         node.type === "text" || node.type === REFERENCE
             ? { ...node, marks: [...(node.marks ?? []), mark] }
@@ -336,7 +348,8 @@ export function isBlankMarkdown(markdown: string): boolean {
     const solid = (node: JSONContent): boolean => {
         if (node.type === "text") return (node.text ?? "").trim().length > 0;
         if (node.type === "hardBreak") return false;
-        if (node.type === "image" || node.type === REFERENCE) return true;
+        if (node.type === "image" || node.type === REFERENCE || node.type === CUSTOM_EMOJI_NODE)
+            return true;
         if (node.type === "horizontalRule" || node.type === "codeBlock") return true;
         if (node.type === MARKDOWN_BLOCK) return (node.content ?? []).length > 0;
         return (node.content ?? []).some(solid);
@@ -354,7 +367,9 @@ const NESTED_LISTS = ["bulletList", "orderedList", "taskList"];
  *   would end the item and start a second list at the outer level.
  */
 function renderBlocks(nodes: readonly JSONContent[], tight = false): string {
-    const written = nodes.map((node) => ({ node, text: renderBlock(node) })).filter((entry) => entry.text.length > 0);
+    const written = nodes
+        .map((node) => ({ node, text: renderBlock(node) }))
+        .filter((entry) => entry.text.length > 0);
     return written
         .map((entry, index) => {
             if (index === 0) return entry.text;
@@ -408,7 +423,10 @@ function plainText(node: JSONContent): string {
 }
 
 /** Items are indented by the width of their own marker so nesting survives. */
-function renderList(node: JSONContent, marker: (index: number, item: JSONContent) => string): string {
+function renderList(
+    node: JSONContent,
+    marker: (index: number, item: JSONContent) => string
+): string {
     return (node.content ?? [])
         .map((item, index) => {
             const bullet = marker(index, item);
@@ -449,7 +467,12 @@ function renderInlineNode(node: JSONContent): string {
     }
 
     let text: string;
-    if (node.type === REFERENCE) {
+    const emoji = customEmojiNodeToken(node);
+    if (emoji !== null) {
+        // Written as it is stored, unescaped: the token's characters are the
+        // point, and none of them is one Markdown reads as formatting.
+        text = emoji;
+    } else if (node.type === REFERENCE) {
         const kind = node.attrs?.kind as refs.ReferenceKind;
         const id = String(node.attrs?.id ?? "");
         const label = String(node.attrs?.label ?? "");
@@ -472,7 +495,10 @@ function renderInlineNode(node: JSONContent): string {
     return text;
 }
 
-function applyMark(text: string, mark: { type: string; attrs?: Record<string, unknown> | null }): string {
+function applyMark(
+    text: string,
+    mark: { type: string; attrs?: Record<string, unknown> | null }
+): string {
     switch (mark.type) {
         case "bold":
             return `**${text}**`;
@@ -486,7 +512,10 @@ function applyMark(text: string, mark: { type: string; attrs?: Record<string, un
             return `\`${text.replace(/\\([\\`*_[\]#>~])/g, "$1")}\``;
         case "link": {
             const href = String(mark.attrs?.href ?? "");
-            const title = typeof mark.attrs?.title === "string" && mark.attrs.title ? ` "${mark.attrs.title}"` : "";
+            const title =
+                typeof mark.attrs?.title === "string" && mark.attrs.title
+                    ? ` "${mark.attrs.title}"`
+                    : "";
             return `[${text}](${href}${title})`;
         }
         default:

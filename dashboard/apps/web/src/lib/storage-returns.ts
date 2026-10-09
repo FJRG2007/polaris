@@ -46,6 +46,7 @@ type Db = Pick<
     | "chatScheduledFile"
     | "meetingAttachment"
     | "chatReportFile"
+    | "chatSpaceEmoji"
     | "taskAttachment"
     | "mailUpload"
     | "mailAttachment"
@@ -88,7 +89,8 @@ const REPOINT: Record<string, (db: Db, path: string, to: string) => Promise<numb
             db.chatScheduledFile.updateMany({ where, data }),
             db.chatScheduledFile.updateMany(poster),
             db.meetingAttachment.updateMany({ where, data }),
-            db.chatReportFile.updateMany({ where, data })
+            db.chatReportFile.updateMany({ where, data }),
+            db.chatSpaceEmoji.updateMany({ where, data })
         ]);
         return total(counts);
     },

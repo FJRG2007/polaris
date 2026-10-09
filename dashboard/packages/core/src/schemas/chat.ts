@@ -13,6 +13,7 @@
  */
 
 import { z } from "zod";
+import { parseCustomEmojiToken } from "../chat-emoji.js";
 
 /** Who a space is open to. The same two words a task space uses, and the same
  *  meanings - `internal` is everybody who can see the owner, which on an
@@ -211,7 +212,12 @@ export const chatMessageBody = z
 export const chatEmoji = z
     .string()
     .min(1)
-    .refine((value) => [...value].length <= 8, "That is not a single emoji");
+    .refine(
+        // Or one of the space's own, by its token - which is longer than eight
+        // and is checked against the space by the service, not here.
+        (value) => parseCustomEmojiToken(value) !== null || [...value].length <= 8,
+        "That is not a single emoji"
+    );
 
 export const chatSpaceCreateSchema = z.object({
     name: spaceName,

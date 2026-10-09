@@ -42,6 +42,7 @@ import { useChatStream } from "./use-chat-stream";
 import { NewChannelDialog } from "./new-channel-dialog";
 import { PersonName, PersonRow } from "@/components/person-name";
 import { useParams, usePathname, useRouter } from "next/navigation";
+import { spaceEmojiHref } from "./space-emoji";
 import type { VoicePresence } from "@/lib/chat/meetings";
 import { NotifyOptions } from "./notify-menu";
 import { GameLinkMark } from "./game-link-badge";
@@ -80,6 +81,7 @@ import {
     Search,
     Settings2,
     ShieldOff,
+    Smile,
     Star,
     Trash2,
     UserMinus,
@@ -135,8 +137,9 @@ const PRESENCE_EVERY_MS = 8000;
 export function ChatSidebar() {
     const { channels, spaces, categories, activeSpaceId, setActiveSpaceId, refresh, loaded } =
         useChat();
-    const params = useParams<{ channelId?: string }>();
+    const params = useParams<{ channelId?: string; spaceId?: string }>();
     const open = params.channelId ?? null;
+    const spacePage = params.spaceId ?? null;
     const here = usePathname();
     const saved = here === "/chat/saved";
     const meetings = here.startsWith("/chat/meetings");
@@ -174,6 +177,12 @@ export function ChatSidebar() {
         // are remembered the same way, under a key of their own.
         rememberChannel(channel.spaceId, channel.id);
     }, [open, channels, setActiveSpaceId]);
+
+    // A space's own page - its emoji - moves the rail to that space too, so the
+    // list beside it is the space whose page this is.
+    useEffect(() => {
+        if (spacePage) setActiveSpaceId(spacePage);
+    }, [spacePage, setActiveSpaceId]);
 
     // Pinned first, then whatever happened most recently. Pinning is why the
     // list is not simply sorted by time: the point of it is a conversation that
@@ -345,6 +354,13 @@ export function ChatSidebar() {
                                     <DropdownMenuItem onSelect={() => setNewCategory(true)}>
                                         <FolderPlus className="size-3.5" />
                                         {t("sidebar.newCategory")}
+                                    </DropdownMenuItem>
+                                    <DropdownMenuSeparator />
+                                    <DropdownMenuItem
+                                        onSelect={() => router.push(spaceEmojiHref(space.id))}
+                                    >
+                                        <Smile className="size-3.5" />
+                                        {t("sidebar.emoji")}
                                     </DropdownMenuItem>
                                 </DropdownMenuContent>
                             </DropdownMenu>

@@ -126,6 +126,7 @@ const db = {
     chatScheduledFile: none,
     meetingAttachment: none,
     chatReportFile: none,
+    chatSpaceEmoji: none,
     $transaction: async <T>(work: (tx: unknown) => Promise<T>) => work(db)
 };
 

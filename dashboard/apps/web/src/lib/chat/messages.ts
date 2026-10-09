@@ -36,6 +36,7 @@ import { requireNotSpam, requireRoomMentionAllowed } from "./spam-guard";
 import { allowedBy, maySee, receiptsBetween } from "@/lib/privacy-service";
 import { channelMentions, isBlankMarkdown } from "@/components/rich-text/markdown";
 import { discardAttachments, isInlineImage, type StoredAttachment } from "./attachments";
+import { confineCustomEmoji, reactionEmoji } from "./custom-emoji";
 import { knownPreviews, unfurl, type KnownPreview, type LinkPreviewView } from "./link-preview";
 import {
     ChatAccessError,
@@ -393,6 +394,9 @@ export async function send(
     } | null = null
 ): Promise<string> {
     const access = await requirePostable(actor, input.channelId);
+    // A space's emoji only inside that space: anything else the text names is
+    // written down as its name - see `confineCustomEmoji`.
+    input = { ...input, body: await confineCustomEmoji(input.body, access.spaceId) };
     await requireSendable(actor, access, input.body);
     await refuseRoomMention(actor, access, input.body);
     await refuseIfBlocked(actor, access);
@@ -695,6 +699,8 @@ export async function edit(actor: ChatActor, input: core.ChatEditInput): Promise
     if (!message) throw new ChatAccessError({ key: "errors.messageGone" });
     const editable = await requirePostable(actor, message.channelId);
     if (message.authorId !== actor.id) throw new ChatAccessError({ key: "errors.editOwnOnly" });
+    // Held to the space's emoji like a send is, or an edit would be the way in.
+    input = { ...input, body: await confineCustomEmoji(input.body, editable.spaceId) };
     if (message.deletedAt) throw new ChatAccessError({ key: "errors.messageDeleted" });
     // A poll's body is the question people answered. Changing it after the fact
     // would leave every vote already cast standing behind something nobody
@@ -1021,23 +1027,40 @@ export async function react(actor: ChatActor, input: core.ChatReactInput): Promi
         select: { channelId: true }
     });
     if (!message) throw new ChatAccessError({ key: "errors.messageGone" });
-    await requirePostable(actor, message.channelId);
+    const access = await requirePostable(actor, message.channelId);
 
-    const existing = await prisma.chatReaction.findUnique({
-        where: {
-            messageId_userId_emoji: {
-                messageId: input.messageId,
-                userId: actor.id,
-                emoji: input.emoji
-            }
-        },
-        select: { id: true }
-    });
+    // A space's own emoji is one reaction whatever it was called when it was
+    // pressed, so a custom one is found by its id rather than by its text - a
+    // rename between two presses must take the reaction back, not add a second.
+    const custom = core.parseCustomEmojiToken(input.emoji);
+    const existing = custom
+        ? await prisma.chatReaction.findFirst({
+              where: {
+                  messageId: input.messageId,
+                  userId: actor.id,
+                  emoji: { endsWith: `:${custom.id}>` }
+              },
+              select: { id: true }
+          })
+        : await prisma.chatReaction.findUnique({
+              where: {
+                  messageId_userId_emoji: {
+                      messageId: input.messageId,
+                      userId: actor.id,
+                      emoji: input.emoji
+                  }
+              },
+              select: { id: true }
+          });
+    // Only one of this space's, and checked here rather than trusted from the
+    // picker that offered it. Taking one back is allowed even once the emoji is
+    // gone: it is the one thing still worth doing with it.
+    const { stored } = await reactionEmoji(access.spaceId, input.emoji, existing !== null);
 
     if (existing) await prisma.chatReaction.delete({ where: { id: existing.id } });
     else
         await prisma.chatReaction.create({
-            data: { messageId: input.messageId, userId: actor.id, emoji: input.emoji }
+            data: { messageId: input.messageId, userId: actor.id, emoji: stored }
         });
 
     publishChatChange({ channelId: message.channelId, kind: "posted", actorId: actor.id });
@@ -1775,13 +1798,20 @@ export async function decorateMessages(
         });
         onMessageFiles.set(file.messageId, bucket);
     }
-    const onMessage = new Map<string, Map<string, { count: number; mine: boolean }>>();
+    const onMessage = new Map<
+        string,
+        Map<string, { emoji: string; count: number; mine: boolean }>
+    >();
     for (const reaction of reactions) {
         const bucket = onMessage.get(reaction.messageId) ?? new Map();
-        const tally = bucket.get(reaction.emoji) ?? { count: 0, mine: false };
+        // A space's emoji is counted by its id, so two presses either side of a
+        // rename are one reaction. The text kept is the newest one seen.
+        const key = core.parseCustomEmojiToken(reaction.emoji)?.id ?? reaction.emoji;
+        const tally = bucket.get(key) ?? { emoji: reaction.emoji, count: 0, mine: false };
         tally.count += 1;
+        tally.emoji = reaction.emoji;
         if (reaction.userId === actor.id) tally.mine = true;
-        bucket.set(reaction.emoji, tally);
+        bucket.set(key, tally);
         onMessage.set(reaction.messageId, bucket);
     }
 
@@ -1809,7 +1839,7 @@ export async function decorateMessages(
             edited: row.editedAt !== null,
             deleted: row.deletedAt !== null,
             reactions: [...(onMessage.get(row.id) ?? new Map())]
-                .map(([emoji, tally]) => ({ emoji, count: tally.count, mine: tally.mine }))
+                .map(([, tally]) => ({ emoji: tally.emoji, count: tally.count, mine: tally.mine }))
                 // Most-reacted first, then by emoji so the order is stable between
                 // renders when two have the same count.
                 .sort(

@@ -40,10 +40,17 @@ const LIST_PANE = { min: 208, max: 480, fallback: 256 };
 /**
  * Whether this address is a conversation, which on a phone takes the whole
  * screen. Opening one with somebody counts: that page either becomes the
- * conversation or says why it cannot, and a hidden column says nothing.
+ * conversation or says why it cannot, and a hidden column says nothing. So do
+ * the pages drawn in that column with a back arrow of their own - the saved
+ * messages and a space's emoji - which on a phone were a hidden column too.
  */
 export function conversationOnScreen(pathname: string): boolean {
-    return pathname.startsWith("/chat/c/") || pathname.startsWith("/chat/with/");
+    return (
+        pathname.startsWith("/chat/c/") ||
+        pathname.startsWith("/chat/with/") ||
+        pathname.startsWith("/chat/s/") ||
+        pathname === "/chat/saved"
+    );
 }
 
 export function ChatShell({

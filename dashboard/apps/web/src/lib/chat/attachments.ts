@@ -38,7 +38,8 @@ import {
 export const CHAT_TARGET_KEY = "chat.attachments.target";
 
 /** Under POLARIS_DATA_DIR, when the target is this server. */
-const LOCAL_FOLDER = "chat";
+export const CHAT_LOCAL_FOLDER = "chat";
+const LOCAL_FOLDER = CHAT_LOCAL_FOLDER;
 
 /** Inside whichever storage, so a NAS shared with everything else stays legible
  *  from a file browser. */

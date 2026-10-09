@@ -35,6 +35,9 @@ vi.mock("next/navigation", () => ({
     useSearchParams: () => params
 }));
 
+vi.mock("@/app/(app)/chat/emoji-actions", () => ({
+    spaceEmojiAction: async () => ({ list: { emoji: [], manages: false } })
+}));
 vi.mock("@/app/(app)/chat/actions", () => ({
     // The conversation asks what this reader has waiting the moment it
     // opens. Nothing, here - but the module is mocked, so it has to be

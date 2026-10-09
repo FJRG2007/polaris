@@ -47,6 +47,10 @@ import {
     useState
 } from "react";
 import { recentEmoji, rememberEmoji } from "./recents";
+import * as core from "@polaris/core";
+import { EmojiPicker } from "./emoji-picker";
+import type { SpaceEmojiScope } from "./space-emoji";
+import { EmojiFace } from "@/components/rich-text/custom-emoji";
 import { embedFor } from "@/lib/chat/embeds";
 import { LinkCard } from "./link-card";
 import { EditHistoryDialog } from "./edit-history-dialog";
@@ -214,9 +218,19 @@ const DEFAULT_QUICK_EMOJI = ["👍", "❤️", "😄"] as const;
  *  put them on the hover rather than behind a picker. */
 const QUICK_COUNT = 3;
 
-/** The last few, padded from the defaults so there are always three. */
-function quickEmoji(recent: readonly string[]): string[] {
-    const chosen = [...recent.slice(0, QUICK_COUNT)];
+/**
+ * The last few, padded from the defaults so there are always three.
+ *
+ * A space's own emoji is one of them only inside that space while it still
+ * exists: anywhere else it cannot be reacted with, and the server would refuse
+ * the press.
+ */
+function quickEmoji(recent: readonly string[], scope: SpaceEmojiScope | null): string[] {
+    const usable = recent.filter((emoji) => {
+        const ref = core.parseCustomEmojiToken(emoji);
+        return ref === null || (scope?.set.entries.has(ref.id) ?? false);
+    });
+    const chosen = [...usable.slice(0, QUICK_COUNT)];
     for (const fallback of DEFAULT_QUICK_EMOJI) {
         if (chosen.length >= QUICK_COUNT) break;
         if (!chosen.includes(fallback)) chosen.push(fallback);
@@ -281,6 +295,9 @@ export interface MessageListProps {
      * it; absent inside a thread, where the link still navigates.
      */
     onJumpTo?: (messageId: string) => void;
+    /** The space's own emoji, to draw in the text and offer for reactions.
+     *  Null outside a space, where every token reads as its name. */
+    emoji?: SpaceEmojiScope | null;
 }
 
 export function MessageList({
@@ -302,6 +319,7 @@ export function MessageList({
     onEdit,
     onDelete,
     onMention,
+    emoji = null,
     coverMedia = false
 }: MessageListProps) {
     useMessageKeys({ messages, viewerId, canPost, canModerate, onReply, onEdit, onDelete });
@@ -332,7 +350,7 @@ export function MessageList({
      */
     const [recent, setRecent] = useState<readonly string[]>([]);
     useEffect(() => setRecent(recentEmoji()), []);
-    const quick = useMemo(() => quickEmoji(recent), [recent]);
+    const quick = useMemo(() => quickEmoji(recent, emoji), [recent, emoji]);
 
     /** React, and remember it. The picker records what is chosen through it; the
      *  hover row did not, so pressing the same emoji forty times never made it
@@ -427,6 +445,7 @@ export function MessageList({
                             {newDay && <DaySeparator iso={message.createdAt} />}
                             <Message
                                 quick={quick}
+                                emoji={emoji}
                                 message={message}
                                 grouped={grouped}
                                 // The ticks go under the last message of a block and
@@ -589,7 +608,12 @@ function useMessageKeys({
             // only with exactly its modifiers, which is what keeps AltGr+C (Ctrl+Alt
             // on Windows) typing its character and Ctrl+Shift+C opening the
             // developer tools instead of copying a message.
-            const matched = matchShortcut(event, ["chat.copy", "chat.edit", "chat.delete", "chat.reply"]);
+            const matched = matchShortcut(event, [
+                "chat.copy",
+                "chat.edit",
+                "chat.delete",
+                "chat.reply"
+            ]);
             const wanted = matched
                 ? (matched.slice("chat.".length) as "copy" | "edit" | "delete" | "reply")
                 : null;
@@ -684,7 +708,8 @@ function Message({
     onMention,
     onNickname,
     onError,
-    quick
+    quick,
+    emoji
 }: {
     message: ChatMessageView;
     grouped: boolean;
@@ -729,9 +754,12 @@ function Message({
     /** The three the hover offers, decided once by the list so every row's bar
      *  shows the same ones and they all change together. */
     quick: readonly string[];
+    /** The space's own emoji - see `MessageListProps`. */
+    emoji: SpaceEmojiScope | null;
 }) {
     const t = useTranslations("chat");
     const format = useDisplayFormat();
+    const emojiSet = emoji?.set ?? null;
     const baseUrl = useAppUrl();
     const [showingHistory, setShowingHistory] = useState(false);
     // Per message and not remembered. Looking at one thing somebody blocked said
@@ -1019,6 +1047,8 @@ function Message({
                                     value={message.body}
                                     origin={baseUrl}
                                     references={referenced(message)}
+                                    customEmoji={emojiSet}
+                                    jumboEmoji
                                 />
                                 {/* Under the last message of a block only. Five ticks
                             down a run of five messages say the same thing five
@@ -1165,7 +1195,7 @@ function Message({
                                                     : "border-border bg-muted text-muted-foreground hover:border-border-strong"
                                             )}
                                         >
-                                            <span>{reaction.emoji}</span>
+                                            <EmojiFace value={reaction.emoji} set={emojiSet} />
                                             <span>{reaction.count}</span>
                                         </button>
                                     </li>
@@ -1192,18 +1222,38 @@ function Message({
 
                     {canPost && !message.deleted && (
                         <div className="absolute right-3 top-0 hidden -translate-y-1/2 items-center gap-0.5 rounded-md border border-border bg-elevated p-0.5 shadow-popover group-focus-within:flex group-hover:flex group-data-[state=open]:flex">
-                            {quick.map((emoji) => (
-                                <button
-                                    key={emoji}
-                                    type="button"
-                                    aria-label={t("messageList.reactWith", { emoji })}
-                                    title={t("messageList.reactWith", { emoji })}
-                                    onClick={() => onReact(message.id, emoji)}
-                                    className="rounded px-1 py-0.5 text-sm transition-colors hover:bg-muted"
-                                >
-                                    {emoji}
-                                </button>
-                            ))}
+                            {quick.map((choice) => {
+                                const ref = core.parseCustomEmojiToken(choice);
+                                const named = ref ? core.customEmojiFallback(ref) : choice;
+                                return (
+                                    <button
+                                        key={choice}
+                                        type="button"
+                                        aria-label={t("messageList.reactWith", { emoji: named })}
+                                        title={t("messageList.reactWith", { emoji: named })}
+                                        onClick={() => onReact(message.id, choice)}
+                                        className="flex items-center rounded px-1 py-0.5 text-sm transition-colors hover:bg-muted"
+                                    >
+                                        <EmojiFace value={choice} set={emojiSet} />
+                                    </button>
+                                );
+                            })}
+                            <EmojiPicker
+                                disabled={false}
+                                media={false}
+                                custom={
+                                    emoji
+                                        ? {
+                                              spaceName: emoji.spaceName,
+                                              entries: emoji.entries,
+                                              manageHref: null
+                                          }
+                                        : null
+                                }
+                                label={t("messageList.addReaction")}
+                                icon={<SmilePlus className="size-3.5" />}
+                                onEmoji={(choice) => onReact(message.id, choice)}
+                            />
                             {/* The reactions are one kind of thing and everything to
                             the right of this is another. Without the rule they
                             read as one row of seven controls where three of them
@@ -1290,6 +1340,7 @@ function Message({
                     )}
 
                     <EditHistoryDialog
+                        emoji={emojiSet}
                         message={showingHistory ? message : null}
                         onOpenChange={(open) => setShowingHistory(open)}
                     />

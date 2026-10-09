@@ -22,6 +22,7 @@ import { readsOrgWhere } from "@/lib/orgs/org-service";
 import { postNotice, postSpaceNotice } from "./notices";
 import { refuseGroupStrangers } from "./group-reach";
 import { blockedBetween, blockedBy } from "@/lib/blocks";
+import { discardSpaceEmoji } from "./custom-emoji";
 import { currentChatOrgId, orgChatPeople, readableChatScopes } from "./isolation";
 import {
     // enigma: predates the namespace-import rule; converting its call sites is its own change.
@@ -328,6 +329,8 @@ export async function deleteSpace(actor: ChatActor, spaceId: string): Promise<vo
     // cascade with the space, and a cascade takes rows, not bytes.
     for (const channel of channels) await discardAvatars("channel", channel.id);
     await discardAvatars("space", spaceId);
+    // Its emoji's files too: the rows cascade, the bytes would not.
+    await discardSpaceEmoji(spaceId);
     // And the shares, for the same reason as the bytes: a grant addresses its
     // subject by kind and id rather than by foreign key, so nothing takes them
     // away on the space's behalf.

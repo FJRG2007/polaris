@@ -133,6 +133,17 @@ export async function GET(request: Request): Promise<Response> {
                 // on their own profile is how they see what is being shown, and
                 // it is not the tab that changed it - a desktop app or a music
                 // service did.
+                // A space's emoji changed. Every tab that reaches a room in it -
+                // the uploader's own other tabs included - asks for the list
+                // again; nothing about the emoji travels.
+                if (change.kind === "emoji") {
+                    if (!change.spaceId) return;
+                    const mine = change.actorId === actor.id;
+                    if (!mine && !change.channels?.some((id) => scope.reachable().has(id))) return;
+                    send({ kind: "emoji", spaceId: change.spaceId });
+                    return;
+                }
+
                 if (change.kind === "activity") {
                     const mine = change.actorId === actor.id;
                     if (!mine && !change.channels?.some((id) => scope.reachable().has(id))) return;

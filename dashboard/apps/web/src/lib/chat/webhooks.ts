@@ -17,6 +17,7 @@
  * text rather than notifications.
  */
 
+import { confineCustomEmoji } from "./custom-emoji";
 import { prisma } from "@polaris/db";
 import * as core from "@polaris/core";
 import { unfurlLater } from "./messages";
@@ -149,11 +150,13 @@ export async function postThroughWebhook(
 ): Promise<string> {
     const channel = await prisma.chatChannel.findUnique({
         where: { id: webhook.channelId },
-        select: { archived: true, space: { select: { archived: true } } }
+        select: { archived: true, spaceId: true, space: { select: { archived: true } } }
     });
     if (!channel || channel.archived || channel.space?.archived) {
         throw new ChatAccessError({ key: "errors.conversationArchived" });
     }
+    // The room's space's emoji and no other, the same as a person's message.
+    const body = await confineCustomEmoji(input.content, channel.spaceId);
 
     const label = input.username?.trim() || webhook.name;
     const id = await prisma.$transaction(async (tx) => {
@@ -162,7 +165,7 @@ export async function postThroughWebhook(
                 channelId: webhook.channelId,
                 authorId: null,
                 kind: "text",
-                body: input.content,
+                body,
                 webhookId: webhook.id,
                 authorLabel: label
             },

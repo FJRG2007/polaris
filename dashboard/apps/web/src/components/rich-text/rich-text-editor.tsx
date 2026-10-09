@@ -29,6 +29,9 @@ import { mentionExtension, popupOpen } from "./suggestion";
 import { EditorMenu, type ListAction } from "./editor-menu";
 import { useCallback, useEffect, useMemo, useRef } from "react";
 import { EditorContent, useEditor, type Editor } from "@tiptap/react";
+import type { CustomEmojiEntry } from "./custom-emoji";
+import { withCustomEmojiNodes } from "./custom-emoji-doc";
+import { CustomEmojiNode, emojiExtension } from "./emoji-suggestion";
 import { resolveReferencesAction, searchMentionsAction } from "@/app/(app)/mention-actions";
 
 export interface RichTextEditorProps {
@@ -164,6 +167,15 @@ export interface RichTextEditorProps {
      * everywhere else, and then the menu simply does not carry it.
      */
     listAction?: ListAction;
+    /**
+     * Emoji for a box writing into a conversation: `:` opens the list, and the
+     * space's own emoji - `custom`, empty outside a space - are drawn as
+     * pictures and offered first.
+     *
+     * Left out everywhere else. `:` is punctuation in a task or a note, and a
+     * space's emoji mean nothing outside it.
+     */
+    emoji?: { readonly custom: readonly CustomEmojiEntry[] } | null;
     /** Draw the border and background of a form field. Off by default: a
      *  description should read as part of the panel, not as an input. */
     bordered?: boolean;
@@ -222,6 +234,7 @@ export function RichTextEditor({
     slashCommands,
     mentionSource = null,
     listAction,
+    emoji = null,
     bordered = false,
     className
 }: RichTextEditorProps) {
@@ -238,6 +251,13 @@ export function RichTextEditor({
     const commands = useRef(slashCommands);
     commands.current = slashCommands;
     // And for the words the menus say, which follow the page's language.
+    // Read through a ref, like the commands: the list changes while somebody is
+    // writing - an emoji added in another tab - and rebuilding the editor for it
+    // would throw away what they were writing.
+    const customEmoji = useRef(emoji?.custom ?? []);
+    customEmoji.current = emoji?.custom ?? [];
+    const writesEmoji = emoji !== null;
+
     const t = useTranslations("components");
     const words = useRef(t);
     words.current = t;
@@ -279,16 +299,31 @@ export function RichTextEditor({
                 commands: () => commands.current ?? [],
                 say: () => (id) => words.current(`editor.blocks.${id}`)
             }),
-            mentionExtension(search, mentionsIn !== null && roomMentions)
+            mentionExtension(search, mentionsIn !== null && roomMentions),
+            ...(writesEmoji ? [CustomEmojiNode, emojiExtension(() => customEmoji.current)] : [])
         ],
-        [hint, search, mentionsIn, roomMentions]
+        [hint, search, mentionsIn, roomMentions, writesEmoji]
+    );
+
+    /** A document with the space's emoji drawn as pictures, where this box
+     *  draws them at all. */
+    const withEmoji = useCallback(
+        (doc: JSONContent): JSONContent =>
+            writesEmoji
+                ? withCustomEmojiNodes(
+                      doc,
+                      new Map(customEmoji.current.map((entry) => [entry.id, entry]))
+                  )
+                : doc,
+        [writesEmoji]
     );
 
     /** What goes into the editor for a value: the document, with a line to write
      *  on at the top where the caller asked for one. */
     const opened = useCallback(
-        (doc: JSONContent): JSONContent => (leadingBlankLine ? md.withLeadingBlankLine(doc) : doc),
-        [leadingBlankLine]
+        (doc: JSONContent): JSONContent =>
+            withEmoji(leadingBlankLine ? md.withLeadingBlankLine(doc) : doc),
+        [leadingBlankLine, withEmoji]
     );
 
     const editor = useEditor({
@@ -403,6 +438,23 @@ export function RichTextEditor({
     }, [editor, disabled]);
 
     /**
+     * The space's emoji arrived, or changed, after the text was put in.
+     *
+     * A draft opens before the list does, so its emoji are text until this runs.
+     * Redrawn only while nobody is writing - a redraw moves the caret - and only
+     * when it changes something; what is stored is the same either way.
+     */
+    const emojiList = emoji?.custom;
+    useEffect(() => {
+        if (!editor || editor.isDestroyed || editor.isFocused || !emojiList) return;
+        const current = editor.getJSON();
+        const drawn = withEmoji(current);
+        if (JSON.stringify(drawn) !== JSON.stringify(current)) {
+            editor.commands.setContent(drawn, { emitUpdate: false });
+        }
+    }, [editor, emojiList, withEmoji]);
+
+    /**
      * Somebody asked for the caret.
      *
      * On a timer of zero rather than straight away. Most of the things that ask
@@ -468,7 +520,7 @@ export function RichTextEditor({
         if (!insertToken || !editor || disabled || !text) return;
         const timer = window.setTimeout(() => {
             if (editor.isDestroyed) return;
-            const doc = md.markdownToDoc(text, origin());
+            const doc = withEmoji(md.markdownToDoc(text, origin()));
             const pending = collectReferences(doc);
             editor.chain().focus().insertContent(inlineIfOneLine(doc)).insertContent(" ").run();
             if (pending.length > 0) void nameReferences(editor, pending);

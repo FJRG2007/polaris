@@ -25,17 +25,21 @@ import { RelativeTime } from "@/components/relative-time";
 import type { ChatMessageView } from "@/lib/chat/messages";
 import type { ChatEditHistory } from "@/lib/chat/messages";
 import { RichText } from "@/components/rich-text/rich-text";
+import type { CustomEmojiSet } from "@/components/rich-text/custom-emoji";
 import { useDisplayFormat } from "@/components/display-format";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@polaris/ui";
 
 export function EditHistoryDialog({
     message,
-    onOpenChange
+    onOpenChange,
+    emoji = null
 }: {
     /** The message whose history to show. Null closes it - one prop rather than
      *  a boolean beside it, so the two cannot disagree. */
     message: ChatMessageView | null;
     onOpenChange: (open: boolean) => void;
+    /** The space's own emoji, drawn the way the message itself draws them. */
+    emoji?: CustomEmojiSet | null;
 }) {
     const t = useTranslations("chat");
     const format = useDisplayFormat();
@@ -88,7 +92,7 @@ export function EditHistoryDialog({
                                 {t("editHistory.now")}
                             </p>
                             <div className="text-sm">
-                                <RichText value={message?.body ?? ""} />
+                                <RichText value={message?.body ?? ""} customEmoji={emoji} />
                             </div>
                         </li>
 
@@ -102,11 +106,13 @@ export function EditHistoryDialog({
                                     title={format.dateTime(version.replacedAt)}
                                 >
                                     {t.rich("editHistory.until", {
-                                        time: () => <RelativeTime key="time" iso={version.replacedAt} />
+                                        time: () => (
+                                            <RelativeTime key="time" iso={version.replacedAt} />
+                                        )
                                     })}
                                 </p>
                                 <div className="text-sm text-muted-foreground">
-                                    <RichText value={version.body} />
+                                    <RichText value={version.body} customEmoji={emoji} />
                                 </div>
                             </li>
                         ))}

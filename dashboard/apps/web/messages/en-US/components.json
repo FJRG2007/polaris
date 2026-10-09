@@ -1333,5 +1333,8 @@
         "updating": "Polaris is updating. It will be back in a moment.",
         "polarisBack": "Polaris is back",
         "retry": "Try now"
+    },
+    "customEmoji": {
+        "from": "From {space}"
     }
 }

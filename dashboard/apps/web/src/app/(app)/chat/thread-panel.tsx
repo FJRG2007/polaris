@@ -12,6 +12,7 @@
  * three levels down a conversation nobody can find again.
  */
 
+import { useComposerEmoji, type SpaceEmojiScope } from "./space-emoji";
 import { X } from "lucide-react";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import * as actions from "./actions";
@@ -47,6 +48,7 @@ export function ThreadPanel({
     canModerate,
     roomMentions = true,
     highlightId = null,
+    emoji = null,
     onClose,
     onChanged
 }: {
@@ -67,9 +69,12 @@ export function ThreadPanel({
     /** Called after a write, so the channel behind can update the reply count
      *  on the message this thread hangs off. */
     onChanged: () => void;
+    /** The space's own emoji, from the conversation the thread hangs off. */
+    emoji?: SpaceEmojiScope | null;
 }) {
     const t = useTranslations("chat");
     const { may } = useChat();
+    const composerEmoji = useComposerEmoji(emoji);
     // Held to what the row can spare: a remembered width from a wider window, or
     // a second panel opened beside this one, is how the conversation gets
     // squeezed to nothing.
@@ -169,6 +174,7 @@ export function ThreadPanel({
                         </div>
                     ) : (
                         <MessageList
+                            emoji={emoji}
                             messages={messages}
                             viewerId={viewerId}
                             canPost={canPost}
@@ -217,6 +223,7 @@ export function ThreadPanel({
 
                 <Composer
                     channelId={root.channelId}
+                    emoji={composerEmoji}
                     onTyping={(kind) => void actions.typingAction(root.channelId, kind)}
                     // Its own, under the message it answers: a half-written reply
                     // to a thread belongs to that thread and not to the channel it

@@ -23,7 +23,8 @@
 
 import * as core from "@polaris/core";
 import { useTranslations } from "@/components/i18n/i18n-provider";
-import { EmojiPicker } from "./emoji-picker";
+import { EmojiPicker, type PickerCustomEmoji } from "./emoji-picker";
+import type { CustomEmojiEntry } from "@/components/rich-text/custom-emoji";
 import { asFiles, type KeptPick } from "@/components/file-picker/as-files";
 import type { PickedFile } from "@/components/file-picker/picked-file";
 import { FilePickerDialog } from "@/components/file-picker/file-picker-dialog";
@@ -77,6 +78,10 @@ import {
     type SendProgress
 } from "./outgoing";
 
+/** The space's emoji where there are none, as one value rather than a fresh
+ *  empty list on every render. */
+const NO_CUSTOM_EMOJI: readonly CustomEmojiEntry[] = [];
+
 /** How often, at most, the server is told somebody is typing. */
 const TYPING_EVERY_MS = 2500;
 
@@ -110,6 +115,7 @@ export function Composer({
     onSaved,
     onSaveEdit,
     onCancelEdit,
+    emoji = null,
     divided = true
 }: {
     /**
@@ -282,6 +288,15 @@ export function Composer({
      * comment from its own answer.
      */
     divided?: boolean;
+    /**
+     * Emoji for a box that writes into a conversation: `:` opens the list, and
+     * `custom` is the space's own - null in a direct message or a group, where
+     * none can be used.
+     *
+     * Handed in by the chat's callers and left null under a task, which is the
+     * same box and must never reach into the chat for anything.
+     */
+    emoji?: { readonly custom: PickerCustomEmoji | null } | null;
 }) {
     const t = useTranslations("chat");
     const [body, setBody] = useState("");
@@ -298,6 +313,14 @@ export function Composer({
      *  that does not hold it is how a mark lands on the wrong file. */
     const [coveredKept, setCoveredKept] = useState<ReadonlySet<number>>(() => new Set());
     const [refused, setRefused] = useState("");
+    /** What the editor draws and offers for `:`, kept to one object per list so
+     *  the editor is not told the list changed on every keystroke. */
+    const customEntries = emoji?.custom?.entries ?? NO_CUSTOM_EMOJI;
+    const writesEmoji = emoji !== null;
+    const editorEmoji = useMemo(
+        () => (writesEmoji ? { custom: customEntries } : null),
+        [writesEmoji, customEntries]
+    );
     /** Messages with files in them that have left the box and not yet landed,
      *  or that failed and are waiting to be tried again or given up on. Keyed by
      *  the box rather than held in it - see `useOutgoing`. A box with no key of
@@ -1101,6 +1124,7 @@ export function Composer({
                             if (!disabled) announce();
                         }}
                         onSubmit={(next) => void submit(next)}
+                        emoji={editorEmoji}
                     />
                 </div>
 
@@ -1204,6 +1228,7 @@ export function Composer({
                             )}
                             <EmojiPicker
                                 disabled={disabled}
+                                custom={emoji?.custom ?? null}
                                 // Emoji everywhere; pictures only where there is
                                 // somewhere for one to go. A comment box takes no
                                 // media, and a picker offering a GIF that lands
