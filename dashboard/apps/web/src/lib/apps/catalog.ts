@@ -16,6 +16,7 @@ import {
     Bot,
     CalendarDays,
     Gamepad2,
+    Handshake,
     House,
     Mails,
     MessagesSquare,
@@ -279,6 +280,25 @@ export const POLARIS_APP_CATALOG: readonly AppManifest[] = [
         summary: "Your calendars and the ones you link, with invitations and booking pages.",
         description:
             "Keep calendars in Polaris and see Google, Outlook, iCloud and any CalDAV calendar beside them, synced both ways. Day, week, month, year and agenda views, repeating events, reminders, invitations people answer from their inbox, finding a time that suits everybody, sharing with people and teams, public links, and booking pages for anybody outside Polaris.", // i18n-ignore
+        installMethod: "builtin",
+        capabilities: ["tool"],
+        dashboard: "builtin",
+        singleton: true,
+        instanceWide: true
+    },
+    {
+        // Companies, people and opportunities, for one person or for an
+        // organization. Installing it runs nothing: it is the app's screens,
+        // served by the dashboard, and uninstalling leaves every record where it
+        // was for the day it comes back.
+        id: "crm",
+        name: "CRM",
+        category: "Productivity",
+        icon: Handshake,
+        opensAt: "/crm",
+        summary: "Companies, people and the deals you are working, in one pipeline.",
+        description:
+            "Keep the companies you work with, the people at them and every opportunity from first call to signed deal, in tables you edit in place, with totals under each column. A personal CRM for yourself, or a shared one for an organization with its own roles. Installing it runs nothing; uninstalling keeps every record for when it comes back.", // i18n-ignore
         installMethod: "builtin",
         capabilities: ["tool"],
         dashboard: "builtin",

@@ -121,6 +121,10 @@
             "name": "Asistente Hermes",
             "summary": "Un agente de IA de Hermes para tus canales de mensajería.",
             "description": "Despliega un agente de IA de Hermes que usa el puente de mensajería para llevar conversaciones por su cuenta y pasar a una persona cuando hace falta."
+        },
+        "crm": {
+            "summary": "Empresas, personas y los tratos que llevas, en un solo embudo.",
+            "description": "Guarda las empresas con las que trabajas, las personas que hay en ellas y cada oportunidad desde la primera llamada hasta el trato firmado, en tablas que se editan en el sitio y con totales bajo cada columna. Un CRM personal para ti, o uno compartido para una organización con sus propios roles. Instalarlo no ejecuta nada; desinstalarlo conserva cada registro para cuando vuelva."
         }
     },
     "help": {

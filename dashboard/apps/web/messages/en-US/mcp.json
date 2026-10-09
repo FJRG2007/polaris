@@ -58,6 +58,7 @@
         "mail_send": "Send mail as you",
         "mailserver_manage": "Run mail servers",
         "calendar_use": "See upcoming calendar events",
+        "crm_use": "Read and change CRM records",
         "calendar_read": "See your calendars and events",
         "calendar_manage": "Create, change and delete events",
         "chat_use": "Read and post in your conversations",

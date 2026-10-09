@@ -75,7 +75,13 @@ const PERMISSION_LABELS: Readonly<Record<core.OrgPermission, NamespaceKey<"accou
     "domains.manage": "roles.permissions.domainsManage",
     "vault.manage": "roles.permissions.vaultManage",
     "drive.manage": "roles.permissions.driveManage",
-    "mail.manage": "roles.permissions.mailManage"
+    "mail.manage": "roles.permissions.mailManage",
+    "crm.companies.edit": "roles.permissions.crmCompaniesEdit",
+    "crm.companies.delete": "roles.permissions.crmCompaniesDelete",
+    "crm.people.edit": "roles.permissions.crmPeopleEdit",
+    "crm.people.delete": "roles.permissions.crmPeopleDelete",
+    "crm.opportunities.edit": "roles.permissions.crmOpportunitiesEdit",
+    "crm.opportunities.delete": "roles.permissions.crmOpportunitiesDelete"
 };
 
 /** The areas the grid is grouped by, by the name core gives them. An area core
@@ -83,7 +89,8 @@ const PERMISSION_LABELS: Readonly<Record<core.OrgPermission, NamespaceKey<"accou
 const AREA_LABELS: Readonly<Record<string, NamespaceKey<"accountOrgs">>> = {
     General: "roles.areas.general",
     People: "roles.areas.people",
-    Work: "roles.areas.work"
+    Work: "roles.areas.work",
+    CRM: "roles.areas.crm"
 };
 
 function sameSet(held: Set<string>, saved: readonly string[]): boolean {

@@ -121,6 +121,10 @@
             "name": "Hermes assistant",
             "summary": "A Hermes AI agent for your messaging channels.",
             "description": "Deploys a Hermes AI agent that reuses the messaging bridge to handle conversations autonomously, escalating to a human when needed."
+        },
+        "crm": {
+            "summary": "Companies, people and the deals you are working, in one pipeline.",
+            "description": "Keep the companies you work with, the people at them and every opportunity from first call to signed deal, in tables you edit in place, with totals under each column. A personal CRM for yourself, or a shared one for an organization with its own roles. Installing it runs nothing; uninstalling keeps every record for when it comes back."
         }
     },
     "help": {

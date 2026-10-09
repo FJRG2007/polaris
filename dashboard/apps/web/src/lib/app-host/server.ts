@@ -72,6 +72,7 @@ import type {
     CalendarTeam,
     SealedSecret
 } from "@/lib/calendar-host";
+import type { CrmShelf, CrmShelfPerson } from "@/lib/crm-host";
 
 /** A service that is loaded when it is first called, so it always answers later. */
 type Later<F> = F extends (...args: infer A) => infer R
@@ -107,6 +108,7 @@ const load = {
     auditService: once(() => import("@/lib/audit-service")),
     backupsManage: once(() => import("@/lib/backups/manage")),
     calendarHost: once(() => import("@/lib/calendar-host")),
+    crmHost: once(() => import("@/lib/crm-host")),
     chatGameLinks: once(() => import("@/lib/chat/game-links")),
     chatLive: once(() => import("@/lib/chat/live")),
     chatMeetingEvents: once(() => import("@/lib/chat/meeting-events")),
@@ -278,6 +280,15 @@ export const serverHost = {
         teamIdsOf: later(load.calendarHost, "teamIdsOf"),
         teamMemberIds: later(load.calendarHost, "teamMemberIds"),
         teamsOf: later(load.calendarHost, "teamsOf")
+    },
+    // What the CRM reaches beyond the other apps: the shelf the reader works
+    // from, what their organization's role lets them do there, and who on it
+    // may own a record.
+    crmHost: {
+        crmOrgPeople: later(load.crmHost, "crmOrgPeople"),
+        crmOrgPermissions: later(load.crmHost, "crmOrgPermissions"),
+        crmShelf: later(load.crmHost, "crmShelf"),
+        peopleByIds: later(load.calendarHost, "peopleByIds")
     },
     // What a game server may be linked to in Chat, and the line it writes into
     // the linked channel when an announcement is repeated there.
@@ -471,6 +482,8 @@ declare module "@polaris/app-host" {
         CalendarTask: CalendarTask;
         CalendarTeam: CalendarTeam;
         ChatGameLink: ChatGameLink;
+        CrmShelf: CrmShelf;
+        CrmShelfPerson: CrmShelfPerson;
         DiscoveredTarget: DiscoveredTarget;
         GamePort: GamePort;
         GamePortRow: GamePortRow;

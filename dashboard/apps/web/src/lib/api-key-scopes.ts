@@ -27,6 +27,7 @@ export const SCOPE_LABELS: Readonly<Record<Permission, string>> = {
     "office.use": "Write documents",
     "mail.use": "Read and send mail",
     "calendar.use": "Read and change calendars",
+    "crm.use": "Read and change CRM records",
     "mailserver.manage": "Run mail servers",
     "chat.use": "Use chat",
     "chat.spaces": "Create chat servers",
@@ -77,6 +78,7 @@ export const SCOPE_HINTS: Readonly<Record<Permission, string>> = {
         "Read and write the documents, spreadsheets, slides and diagrams the owner can reach.",
     "mail.use": "Read the owner's linked mailboxes and send from them.",
     "calendar.use": "Read and change the calendars the owner reaches, and their booking pages.",
+    "crm.use": "List, create, change and delete companies, people and opportunities in the CRM.",
     "mailserver.manage":
         "Set up the mail servers the owner runs, and manage their domains, mailboxes and records.",
     "chat.use": "Read and post in the channels the owner is in.",

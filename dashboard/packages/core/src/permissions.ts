@@ -24,6 +24,7 @@ export const PERMISSIONS = [
     "mail.use",
     "mailserver.manage",
     "calendar.use",
+    "crm.use",
     "chat.use",
     "chat.spaces",
     "chat.groups",
@@ -101,6 +102,7 @@ export const DEFAULT_ROLES: Record<string, readonly GrantedPermission[]> = {
         "office.use",
         "mail.use",
         "calendar.use",
+        "crm.use",
         "chat.use",
         "chat.spaces",
         "chat.groups",
@@ -150,6 +152,10 @@ export const DEFAULT_ROLES: Record<string, readonly GrantedPermission[]> = {
         // no bearing on whether somebody may read their own mail.
         "mail.use",
         "calendar.use",
+        // The same again: a personal CRM is the account's own list of contacts.
+        // What an organization's CRM lets somebody do is the organization's
+        // roles, never this.
+        "crm.use",
         "chat.use",
         "chat.spaces",
         "chat.groups",
@@ -209,6 +215,9 @@ export const PERMISSION_META: Readonly<Record<Permission, { area: string; label:
         area: "Calendar",
         label: "Keep calendars, link outside ones and take bookings"
     },
+    // Opening the CRM at all. A personal CRM is reached by this alone; an
+    // organization's records are governed by that organization's roles.
+    "crm.use": { area: "CRM", label: "Keep companies, people and deals" },
     "chat.use": { area: "Chat", label: "Talk in channels and direct messages" },
     // The four things somebody with the chat can do beyond talking in it. Split
     // out because "has the chat" and "may start a server in it" are different

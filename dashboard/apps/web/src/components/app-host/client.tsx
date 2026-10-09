@@ -53,6 +53,12 @@ const ShareDialog = dynamic(
     { ssr: false }
 );
 
+/** A face: its module brings the presence store, the photo viewer and the
+ *  profile styles, which a screen that draws no face should not load. */
+const Avatar = dynamic(() => import("@/components/avatar").then((module) => module.Avatar), {
+    ssr: false
+});
+
 const MediaPlayer = dynamic(
     () => import("@/components/media-player").then((module) => module.MediaPlayer),
     { ssr: false }
@@ -123,6 +129,7 @@ export const clientHost = {
         visibleGameTabs
     },
     appAppsInstalledIdUseRuntimeLog: { useRuntimeLog },
+    avatar: { Avatar },
     brandIcons: { TpLinkMark },
     confirmDialog: { useConfirm },
     copyButton: { CopyButton },
