@@ -786,17 +786,23 @@ async function admit(
     const going: string[] = [];
     for (const { index, one } of ready) {
         const racer = state(loop).racers.find((each) => same(each.name, one.name))!;
-        // Back in a boat race already on, after leaving it: from the last gate
+        // Back in a boat or elytra race already on, after leaving it: from the last gate
         // they passed, with every pass they made - not from nothing, on a clock
         // that kept running while they were away.
         const resumed =
-            layout.kind === "boat-race" && !holding(loop) && racer.best > 0 ? racer.best : 0;
+            (layout.kind === "boat-race" || layout.kind === "elytra-race") &&
+            !holding(loop) &&
+            racer.best > 0
+                ? racer.best
+                : 0;
         const spot =
             layout.kind === "parkour"
                 ? parkour.spotOn(layout.course, racer.checkpoint)
                 : resumed > 0 && layout.kind === "boat-race"
                   ? boatRace.resumeSpot(layout.track, resumed)
-                  : places[index]!;
+                  : resumed > 0 && layout.kind === "elytra-race"
+                    ? elytraRace.resumeSpot(layout.course, resumed)
+                    : places[index]!;
         going.push(
             ...stage.admitLines(one.name, spot),
             `title ${one.name} times 5 50 15`,
@@ -835,7 +841,7 @@ async function admit(
             ...(layout.kind === "acid-rain" ? acidRain.racerScores(one.name) : []),
             ...(layout.kind === "elytra-race"
                 ? [
-                      ...elytraRace.racerScores(one.name),
+                      ...elytraRace.racerScores(one.name, resumed, layout.course.rings.length),
                       ...(flyNow ? elytraRace.flyLines(one.name, flyNow) : [])
                   ]
                 : [])

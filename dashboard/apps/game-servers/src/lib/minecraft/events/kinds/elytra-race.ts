@@ -596,7 +596,7 @@ export function padGone(built: Course): string {
     return `execute in minecraft:overworld run fill ${pad.x1} ${pad.y1} ${pad.z1} ${pad.x2} ${pad.y2} ${pad.z2} minecraft:air replace ${PAD_BLOCK}`;
 }
 
-/** Whether boxes are an elytra course's: its pillars, or its boosters. */
+/** Whether boxes are an elytra course's: it has boosters. */
 export function isCourse(boxes: readonly Pick<Box, "block">[]): boolean {
     return boxes.some((one) => one.block === BOOST_BLOCK);
 }

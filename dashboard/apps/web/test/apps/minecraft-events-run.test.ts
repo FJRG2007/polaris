@@ -12236,7 +12236,9 @@ describe("an acid rain", () => {
     });
 });
 
-const elytraKind = await import("@polaris-app/game-servers/src/lib/minecraft/events/kinds/elytra-race");
+const elytraKind = await import(
+    "@polaris-app/game-servers/src/lib/minecraft/events/kinds/elytra-race"
+);
 
 describe("an elytra race", () => {
     const run = () => ({
@@ -12319,9 +12321,36 @@ describe("an elytra race", () => {
         for (const line of elytraKind.SCORES_REMOVED) expect(world.sent).toContain(line);
         // The wings and rockets were the event's: taken back from both.
         for (const name of ["Ana", "Ben"])
-            expect(world.sent).toContain(`clear ${name} *[minecraft:custom_data={polaris_event:1b}]`);
+            expect(world.sent).toContain(
+                `clear ${name} *[minecraft:custom_data={polaris_event:1b}]`
+            );
         expect(world.inside.size).toBe(0);
         keptTheRules();
         expect(after.stageLeftovers).toEqual([]);
+    });
+
+    it("takes a racer who left back in behind their last ring, with the rings they passed", async () => {
+        world.online = ["Ana", "Ben"];
+        setUp([run()]);
+        await startArena("wings");
+        await play(2_100);
+        chat(["Ana", "join"], ["Ben", "join"]);
+        await play(52_000);
+        const built = courseNow();
+        scores("pe_epass").Ben = 3;
+        await play(2_100);
+        expect(state().run!.stage!.racers.find((one) => one.name === "Ben")!.best).toBe(3);
+        chat(["Ben", "leave"]);
+        await play(2_100);
+        world.sent = [];
+        chat(["Ben", "join"]);
+        await play(2_100);
+        expect(world.sent).toContain("scoreboard players set Ben pe_epass 3");
+        expect(world.sent).not.toContain("scoreboard players set Ben pe_epass 0");
+        const spot = elytraKind.resumeSpot(built, 3);
+        expect(spot).toBe(built.respawns[2]);
+        expect(world.sent).toContain(
+            `execute in minecraft:overworld run tp Ben ${spot.x.toFixed(3)} ${spot.y.toFixed(3)} ${spot.z.toFixed(3)} ${spot.yaw.toFixed(1)} 0.0`
+        );
     });
 });
