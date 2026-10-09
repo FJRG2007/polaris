@@ -198,11 +198,12 @@ async function goLines(ctx: KindContext): Promise<string[]> {
     const design = designOf(run);
     const house = design >= manor.DESIGN ? manorOf(run) : null;
     const layout = !house && design >= hs.HOUSE ? layoutOf(run.id, design) : null;
-    if (house && (await hitsService.ensure(ctx))) out.push(...manor.armLines(run.arena!.box, house, run.id));
+    const packOn = house ? await hitsService.ensure(ctx) : false;
     if (house)
         out.push(
+            ...(packOn ? manor.armLines(run.arena!.box, house, run.id) : manor.openLines(run.arena!.box, house)),
             `tellraw @a[tag=${arena.IN_ARENA}] ${commands.text(
-                messages.tag(language) + seekMessages.manorTip(language)
+                messages.tag(language) + seekMessages.manorTip(language, packOn)
             )}`
         );
     if (layout && (await hitsService.ensure(ctx)))

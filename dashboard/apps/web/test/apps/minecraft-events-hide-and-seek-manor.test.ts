@@ -254,6 +254,16 @@ describe("hide and seek's manor in the world", () => {
             expect(spot.y).toBe(box.y1 + model.BASE + 1);
         }
     });
+
+    it("leaves every panel open where the pack is not on to work it", () => {
+        const lines = manor.openLines(box, house);
+        const walls = house.panels.filter((panel) => panel.shape === "wall").length;
+        const floors = house.panels.length - walls;
+        expect(house.panels.length).toBeGreaterThan(0);
+        expect(lines.filter((line) => / run setblock -?\d+ -?\d+ -?\d+ minecraft:air$/.test(line))).toHaveLength(walls * 2);
+        expect(lines.filter((line) => / minecraft:ladder\[facing=\w+\]$/.test(line))).toHaveLength(floors);
+        for (const line of lines) expect(line).toMatch(/^execute in minecraft:overworld if block -?\d+ -?\d+ -?\d+ minecraft:\w+ run setblock /);
+    });
 });
 
 describe("the manor's data pack", () => {

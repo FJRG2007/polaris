@@ -91,10 +91,14 @@ export function secretTip(language: Language): string {
 }
 
 /** Told at "Go!" in a manor (design 4): how its secrets open. */
-export function manorTip(language: Language): string {
+export function manorTip(language: Language, panels = true): string {
+    if (!panels)
+        return language === "es"
+            ? `${INFO}Hay cuadros que son puertas, y huecos en paredes y suelos que llevan a escondites.`
+            : `${INFO}Some paintings are doors, and gaps in walls and floors lead to hiding places.`;
     return language === "es"
         ? `${INFO}Hay cuadros que son puertas y paneles que se abren desde lejos: un botón, agacharte 3 veces en una alfombra, mirar arriba en una alfombra blanca o mirar fijo una calavera o una calabaza. La lava quema a los buscadores.`
-        : `${INFO}Some paintings are doors, and panels open from across the room: a button, crouching 3 times on a rug, looking up from a white rug, or staring at a skull or a lantern. Lava burns seekers.`;
+        : `${INFO}Some paintings are doors, and panels open from across the room: a button, crouching 3 times on a rug, looking up from a white rug, or staring at a skull or a jack o'lantern. Lava burns seekers.`;
 }
 
 /** A hider's power-up, on their own action bar while it lasts. */

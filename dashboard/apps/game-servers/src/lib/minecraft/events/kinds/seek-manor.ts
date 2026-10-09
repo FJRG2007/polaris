@@ -1101,6 +1101,20 @@ export function armLines(box: Box, manor: Manor, seed: string): string[] {
     );
 }
 
+/** Where the pack is not on to work them: every panel left open at "Go!",
+ *  a wall's to air and a floor's to the ladder that goes on down, still a
+ *  way in. */
+export function openLines(box: Box, manor: Manor): string[] {
+    return manor.panels.flatMap((panel) => {
+        const at = worldOf(box, panel.x, panel.level, panel.z);
+        const set = (y: number, block: string) =>
+            `execute in minecraft:overworld if block ${at.x} ${y} ${at.z} ${panel.material} run setblock ${at.x} ${y} ${at.z} ${block}`;
+        return panel.shape === "wall"
+            ? [set(at.y, "minecraft:air"), set(at.y + 1, "minecraft:air")]
+            : [set(at.y, `minecraft:ladder[facing=${panel.facing ?? "north"}]`)];
+    });
+}
+
 export function cageBox(box: Box, manor: Manor): Box {
     const a = worldOf(box, manor.middle.x - 2, 1, manor.middle.z - 2);
     const b = worldOf(box, manor.middle.x + 2, 4, manor.middle.z + 2);

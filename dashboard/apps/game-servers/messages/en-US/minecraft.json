@@ -2244,7 +2244,7 @@
                 "nether": "Nether"
             },
             "house": {
-                "auto": "By how many play",
+                "auto": "By player count",
                 "small": "Small: 3 by 3 rooms",
                 "medium": "Medium: 4 by 4 rooms",
                 "large": "Large: 5 by 5 rooms"
