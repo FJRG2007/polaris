@@ -32,7 +32,7 @@ import { useUiStrings } from "../lib/ui-strings";
 
 /** A handful of colours that look right on a dashboard, so the common case is
  *  one press rather than a drag. */
-const SUGGESTED = [
+export const SUGGESTED_COLORS = [
     "#5b8def",
     "#3fd0c9",
     "#7bc47f",
@@ -215,7 +215,7 @@ export function ColorPicker({
                     className="h-7 w-24 rounded-md border border-border bg-surface px-2 font-mono text-xs text-foreground outline-none focus-visible:border-border-strong"
                 />
                 <div className="flex min-w-0 flex-1 flex-wrap justify-end gap-1">
-                    {SUGGESTED.map((suggestion) => (
+                    {SUGGESTED_COLORS.map((suggestion) => (
                         <button
                             key={suggestion}
                             type="button"
