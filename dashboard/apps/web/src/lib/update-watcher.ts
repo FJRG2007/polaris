@@ -244,7 +244,10 @@ async function install(sha: string): Promise<void> {
     if (trigger === "started") {
         await tellOperators({
             event: "system.updated",
-            ...inWords((t) => ({ title: t("update.installingTitle"), body: t("update.installingBody", { sha }) }))
+            ...inWords((t) => ({
+                title: t("update.installingTitle"),
+                body: t("update.installingBody", { sha })
+            }))
         });
         return;
     }
@@ -299,7 +302,10 @@ async function reportFailedInstall(sha: string): Promise<void> {
     const exitCode = outcome.exitCode;
     await tellOperators({
         event: "system.updated",
-        ...inWords((t) => ({ title: t("update.failedTitle"), body: t("update.failedBody", { sha, code: exitCode }) })),
+        ...inWords((t) => ({
+            title: t("update.failedTitle"),
+            body: t("update.failedBody", { sha, code: exitCode })
+        })),
         level: "danger",
         actionRequired: true
     });
