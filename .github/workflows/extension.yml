@@ -12,7 +12,7 @@ name: Publish extension
 # decides to cut - the store listing, the signing, the version people quote in a bug
 # report all follow from it - and building a package on every commit would publish a
 # stream of near-identical downloads nobody chose. The suites that keep the extension
-# honest already run on every push through `dashboard-ci`.
+# honest already run on every pull request through `dashboard-ci`.
 #
 # Push a tag `extension-v<version>` matching `version` in
 # `dashboard/apps/extension/package.json`. The build refuses a tag that does not
