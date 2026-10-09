@@ -1,6 +1,6 @@
 cff-version: 1.2.0
 title: Polaris
-message: "Your home lab, one control plane."
+message: "If you use this software, please cite it as below."
 type: software
 authors:
   - given-names: FJRG2007
