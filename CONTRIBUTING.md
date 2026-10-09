@@ -10,8 +10,8 @@ only clutter the discussion, and don't help resolving it. However, if you
 have ways to reproduce the issue or have additional information that may help
 resolving the issue, please leave a comment.
 
-Security problems are not filed as issues: report them privately to the
-maintainer listed in [CITATION.cff](CITATION.cff).
+Security problems are not filed as issues: report them privately, as
+[SECURITY.md](SECURITY.md) explains.
 
 ## Writing Good Bug Reports and Feature Requests
 
@@ -67,6 +67,32 @@ Contributions to Polaris are welcome. Here is how you can contribute:
    fixes and features and discuss existing proposals. Commit subjects follow
    [Conventional Commits](https://www.conventionalcommits.org) with a leading emoji,
    as in the history: `✨ feat(chat): ...`, `🐛 fix(deploy): ...`.
+
+## Working with a coding agent
+
+If you use a coding agent - Claude Code, OpenAI Codex, opencode, Kimi Code or
+another - set up [Enigma](https://github.com/FJRG2007/enigma) before you start.
+It gives the agent the engineering standards this project is written to:
+security, input validation, testing, style, debugging and git rules, loaded only
+when a task needs them. Changes made with it come out better structured, more
+efficient and closer to the rest of the codebase, and need far fewer rounds of
+review.
+
+```bash
+# macOS / Linux
+curl -fsSL https://raw.githubusercontent.com/FJRG2007/enigma/main/scripts/install.sh | sh
+
+# Windows (PowerShell)
+irm https://raw.githubusercontent.com/FJRG2007/enigma/main/scripts/install.ps1 | iex
+
+# Or one shot, with no global install
+npx enigma-cli@latest install --all --yes
+```
+
+The agent also reads [CLAUDE.md](CLAUDE.md), which holds the rules specific to
+Polaris. A pull request written by an agent is reviewed like any other: you are
+responsible for what it contains, so read it and run the checks above before
+opening it.
 
 ## License of contributions
 

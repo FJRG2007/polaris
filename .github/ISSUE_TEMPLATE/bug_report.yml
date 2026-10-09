@@ -8,7 +8,7 @@ body:
       value: |
         Thanks for taking the time to report a bug. Polaris runs on very different
         hardware, so please fill in where it runs as accurately as you can.
-        Security problems are not reported here: see CONTRIBUTING.md.
+        Security problems are not reported here: see SECURITY.md.
 
   - type: checkboxes
     id: checklist
