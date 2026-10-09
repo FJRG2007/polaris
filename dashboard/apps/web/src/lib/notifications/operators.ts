@@ -28,11 +28,13 @@ export interface OperatorAlert {
      *  the notices catalog. Each recipient reads their own; `title` and `body`
      *  are what is said if that cannot be worked out. */
     say?: (t: NamespaceTranslator<"notices">) => { title: string; body: string };
+    /** Who of them is told, when the caller has already narrowed it down. */
+    recipients?: readonly string[];
 }
 
 /** Raise one alert with every recipient, never failing its caller. */
 export async function notifyOperators(alert: OperatorAlert): Promise<void> {
-    const recipients = await usersWithPermission(alert.permission);
+    const recipients = alert.recipients ?? (await usersWithPermission(alert.permission));
     await Promise.allSettled(
         recipients.map(async (userId) => {
             const words = alert.say ? alert.say(await wordsFor(userId, "notices")) : null;

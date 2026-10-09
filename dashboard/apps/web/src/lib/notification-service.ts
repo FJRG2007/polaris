@@ -342,13 +342,22 @@ export async function markAllNotificationsRead(userId: string, shelf: string): P
  * has been installed cannot be installed again, so leaving its announcement
  * unread would hand every operator a bell to empty by hand after each release.
  * The condition being cleared belongs to the instance, so the clearing does too.
+ * `userIds` narrows it to those readers, for an alert being replaced only for
+ * some of them.
  */
-export async function markNotificationsReadByType(types: readonly string[]): Promise<void> {
+export async function markNotificationsReadByType(
+    types: readonly string[],
+    userIds?: readonly string[]
+): Promise<void> {
     await prisma.notification.updateMany({
         // Either half is worth clearing on its own: one that was read but still
         // says "Action needed" is a chore the reader cannot get rid of, and one
         // still unread is a count on the bell for something already done.
-        where: { type: { in: [...types] }, OR: [{ readAt: null }, { actionRequired: true }] },
+        where: {
+            type: { in: [...types] },
+            ...(userIds ? { userId: { in: [...userIds] } } : {}),
+            OR: [{ readAt: null }, { actionRequired: true }]
+        },
         // Read AND no longer waiting on anybody. These are answered by something
         // that happened - an update installed, a permission granted - rather than
         // by being looked at, and "Action needed" left standing after the action
