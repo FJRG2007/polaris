@@ -153,7 +153,9 @@
             "previousSlide": "Diapositiva anterior",
             "nextSlide": "Diapositiva siguiente",
             "zoomIn": "Acercar",
-            "zoomOut": "Alejar"
+            "zoomOut": "Alejar",
+            "firstSlide": "Ir a la primera diapositiva",
+            "lastSlide": "Ir a la diapositiva final"
         },
         "chat": {
             "reply": "Responder al mensaje",
@@ -191,7 +193,19 @@
                 "nudge": "Mover un poco el cuadro",
                 "nudgeFar": "Moverlo más lejos",
                 "present": "Presentar",
-                "help": "Ver atajos de teclado"
+                "help": "Ver atajos de teclado",
+                "presentFromStart": "Presentar desde el principio",
+                "newSlide": "Nueva diapositiva"
+            },
+            "slideList": {
+                "previous": "Ir a la diapositiva anterior",
+                "next": "Avanzar una diapositiva",
+                "first": "Ir a la primera diapositiva",
+                "last": "Ir a la diapositiva final",
+                "moveUp": "Subir la diapositiva",
+                "moveDown": "Bajar la diapositiva",
+                "duplicate": "Duplicar la diapositiva",
+                "delete": "Borrar diapositiva"
             }
         }
     },
@@ -220,7 +234,8 @@
         "placesClips": "Clips",
         "databasesQuery": "Consultas",
         "vaultItems": "Entradas",
-        "officeSlides": "Presentaciones"
+        "officeSlides": "Presentaciones",
+        "officeSlideList": "Diapositivas"
     },
     "apps": {
         "general": "En todas",

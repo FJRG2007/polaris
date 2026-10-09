@@ -389,6 +389,8 @@ export const SHORTCUTS: readonly ShortcutDefinition[] = [
         ["nextFile", "viewerRead", "viewer.files", ["ArrowRight"]],
         ["previousSlide", "viewerSlides", "viewer.slides", ["ArrowLeft"]],
         ["nextSlide", "viewerSlides", "viewer.slides", ["ArrowRight", "Space"]],
+        ["firstSlide", "viewerSlides", "viewer.slides", ["Home"]],
+        ["lastSlide", "viewerSlides", "viewer.slides", ["End"]],
         ["zoomIn", "viewerPictures", "viewer.picture", ["+", "="]],
         ["zoomOut", "viewerPictures", "viewer.picture", ["-"]]
     ]),
@@ -438,7 +440,18 @@ export const SHORTCUTS: readonly ShortcutDefinition[] = [
             ["Shift+ArrowUp", "Shift+ArrowDown", "Shift+ArrowLeft", "Shift+ArrowRight"]
         ],
         ["slides.present", "officeSlides", "office.slides", ["Mod+Enter"]],
-        ["slides.help", "officeSlides", "office.slides", ["?"]]
+        ["slides.presentFromStart", "officeSlides", "office.slides", ["Mod+Shift+Enter"]],
+        ["slides.newSlide", "officeSlides", "office.slides", ["Mod+m"]],
+        ["slides.help", "officeSlides", "office.slides", ["?"]],
+        // On the column of slides, with one of them focused.
+        ["slideList.previous", "officeSlideList", "office.slideList", [], ["ArrowUp", "ArrowLeft"]],
+        ["slideList.next", "officeSlideList", "office.slideList", [], ["ArrowDown", "ArrowRight"]],
+        ["slideList.first", "officeSlideList", "office.slideList", [], ["Home"]],
+        ["slideList.last", "officeSlideList", "office.slideList", [], ["End"]],
+        ["slideList.moveUp", "officeSlideList", "office.slideList", ["Mod+ArrowUp"]],
+        ["slideList.moveDown", "officeSlideList", "office.slideList", ["Mod+ArrowDown"]],
+        ["slideList.duplicate", "officeSlideList", "office.slideList", ["Mod+d"]],
+        ["slideList.delete", "officeSlideList", "office.slideList", [], ["Delete", "Backspace"]]
     ])
 ];
 
