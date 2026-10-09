@@ -1,0 +1,136 @@
+name: Dashboard cache
+
+# Keeps the caches every pull request starts from warm.
+#
+# A run can read the caches of its own branch and of main, and nothing else. Dashboard
+# CI runs for pull requests and never saves anything on main - the publish workflow
+# calls it with the app build skipped - so every pull request used to start with an
+# empty Next cache ("No build cache found") and spent about six minutes compiling what
+# had not changed. This saves, on main, the two things a pull request's run can then
+# restore: the built packages and the Next build cache.
+#
+# It gates nothing and nothing waits on it. A newer push cancels an older run: only
+# the latest copy is worth keeping.
+#
+# And it must never fail. A host that builds its own checkout asks GitHub for every
+# check on main's head and holds back an update when any of them failed
+# (checksFor in apps/web/src/lib/update-service.ts); a cold cache is no reason to.
+# So every step continues on error, and the worst a broken run leaves is the next
+# pull request building from cold, as it always did before. A cancelled run is not
+# a failure there.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "dashboard/**"
+      - ".github/workflows/dashboard-cache.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: dashboard-cache
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    working-directory: dashboard
+
+env:
+  NEXT_TELEMETRY_DISABLED: "1"
+  NPM_CONFIG_FUND: "false"
+  NPM_CONFIG_AUDIT: "false"
+  # The same two downloads Dashboard CI skips, for the same reasons.
+  PUPPETEER_SKIP_DOWNLOAD: "true"
+  ONNXRUNTIME_NODE_INSTALL: "skip"
+
+jobs:
+  warm:
+    name: warm the build caches
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      # To delete main's older Next caches once the new one is saved.
+      actions: write
+    steps:
+      - uses: actions/checkout@v7
+        continue-on-error: true
+
+      - uses: actions/setup-node@v7
+        continue-on-error: true
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: dashboard/package-lock.json
+
+      - run: npm ci --prefer-offline
+        continue-on-error: true
+      - run: npm run db:generate
+        continue-on-error: true
+
+      # The key must match Dashboard CI's character for character, or a pull
+      # request will never find this copy. Restored and saved as two steps rather
+      # than one, so a build that failed - which this job lets through - is never
+      # saved as the packages every pull request then trusts and skips building.
+      - id: packages
+        continue-on-error: true
+        uses: actions/cache/restore@v6
+        with:
+          path: dashboard/packages/*/dist
+          key: packages-v1-${{ runner.os }}-node22-${{ hashFiles('dashboard/packages/**', 'dashboard/package-lock.json', 'dashboard/patches/**', 'dashboard/tsconfig.base.json', 'dashboard/scripts/build-packages.mjs', 'dashboard/scripts/scope-editor-styles.mjs', '!dashboard/packages/*/dist/**', '!dashboard/packages/**/node_modules/**', '!dashboard/packages/db/generated/**') }}
+      - id: build-packages
+        if: steps.packages.outputs.cache-hit != 'true'
+        continue-on-error: true
+        run: npm run build:packages
+      - if: steps.build-packages.outcome == 'success'
+        continue-on-error: true
+        uses: actions/cache/save@v6
+        with:
+          path: dashboard/packages/*/dist
+          key: packages-v1-${{ runner.os }}-node22-${{ hashFiles('dashboard/packages/**', 'dashboard/package-lock.json', 'dashboard/patches/**', 'dashboard/tsconfig.base.json', 'dashboard/scripts/build-packages.mjs', 'dashboard/scripts/scope-editor-styles.mjs', '!dashboard/packages/*/dist/**', '!dashboard/packages/**/node_modules/**', '!dashboard/packages/db/generated/**') }}
+
+      - uses: actions/cache/restore@v6
+        continue-on-error: true
+        with:
+          path: dashboard/apps/web/.next/cache
+          key: next-${{ runner.os }}-${{ hashFiles('dashboard/package-lock.json') }}-${{ github.sha }}
+          restore-keys: |
+            next-${{ runner.os }}-${{ hashFiles('dashboard/package-lock.json') }}-
+            next-${{ runner.os }}-
+
+      # Built the way Dashboard CI builds it, so the cache it leaves is the one a
+      # pull request's build asks for.
+      - id: build
+        if: steps.packages.outputs.cache-hit == 'true' || steps.build-packages.outcome == 'success'
+        continue-on-error: true
+        run: npm run build -w @polaris/web
+        env:
+          NODE_OPTIONS: --max-old-space-size=8192
+          POLARIS_BUILD_SKIP_CHECKS: "1"
+
+      - id: save
+        if: steps.build.outcome == 'success'
+        continue-on-error: true
+        uses: actions/cache/save@v6
+        with:
+          path: dashboard/apps/web/.next/cache
+          key: next-${{ runner.os }}-${{ hashFiles('dashboard/package-lock.json') }}-${{ github.sha }}
+
+      # Each copy is about 350 MB and the repository holds 10 GB of caches in all;
+      # older copies on main would only push out ones still in use. Only once the
+      # new one is saved, so main is never left with none.
+      - name: Delete main's older Next caches
+        if: steps.save.outcome == 'success'
+        continue-on-error: true
+        working-directory: .
+        env:
+          GH_TOKEN: ${{ github.token }}
+          KEEP: next-${{ runner.os }}-${{ hashFiles('dashboard/package-lock.json') }}-${{ github.sha }}
+        run: |
+          gh cache list --repo "$GITHUB_REPOSITORY" --ref refs/heads/main --key "next-${RUNNER_OS}-" --limit 100 --json id,key \
+            --jq ".[] | select(.key != \"$KEEP\") | .id" |
+            while read -r id; do
+              gh cache delete "$id" --repo "$GITHUB_REPOSITORY" || echo "::warning::Could not delete cache $id."
+            done

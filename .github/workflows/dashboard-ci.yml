@@ -28,17 +28,24 @@ name: Dashboard CI
 # the publish does not watch (docs/, scripts/, ROADMAP.md): those get no run there.
 # Everything reaches main through a pull request, so that code was already checked on
 # its branch.
+#
+# On a branch it runs for the pull request only. It used to run for the push as well,
+# and since the two have different refs the concurrency group never joined them: every
+# commit on an open pull request ran the whole suite twice, six jobs each, on the
+# same code. A branch with no pull request yet can still be checked by hand
+# (workflow_dispatch).
+#
+# Caches. A branch can read its own caches and main's, never another branch's. So
+# the warm copies every branch starts from are saved on main, by dashboard-cache.yml,
+# and a closed pull request's own are deleted (cache-cleanup.yml) so they do not push
+# main's out of the repository's quota.
 
 on:
-  push:
-    branches-ignore: [main]
-    paths:
-      - "dashboard/**"
-      - ".github/workflows/dashboard-ci.yml"
   pull_request:
     paths:
       - "dashboard/**"
       - ".github/workflows/dashboard-ci.yml"
+  workflow_dispatch:
   workflow_call:
     inputs:
       skip_app:
@@ -132,7 +139,19 @@ jobs:
       - run: npm run db:generate
       # The packages only. They publish the declarations everything below reads;
       # the app's own build is another job's problem and nothing here waits on it.
-      - run: npm run build:packages
+      #
+      # Built once per set of package sources, not once per job. The key hashes
+      # everything a package build reads - its sources, the lockfile and patches,
+      # the shared tsconfig and the two build scripts - and leaves out what the
+      # build writes, so a changed package always misses and rebuilds. Most changes
+      # touch only the app, and then all six jobs skip the two minutes.
+      - id: packages
+        uses: actions/cache@v6
+        with:
+          path: dashboard/packages/*/dist
+          key: packages-v1-${{ runner.os }}-node22-${{ hashFiles('dashboard/packages/**', 'dashboard/package-lock.json', 'dashboard/patches/**', 'dashboard/tsconfig.base.json', 'dashboard/scripts/build-packages.mjs', 'dashboard/scripts/scope-editor-styles.mjs', '!dashboard/packages/*/dist/**', '!dashboard/packages/**/node_modules/**', '!dashboard/packages/db/generated/**') }}
+      - if: steps.packages.outputs.cache-hit != 'true'
+        run: npm run build:packages
       - run: npm run typecheck
       - run: npm run lint --if-present
       # Every workspace's tests but the web app's, which the shards below run.
@@ -167,7 +186,16 @@ jobs:
 
       - run: npm ci --prefer-offline
       - run: npm run db:generate
-      - run: npm run build:packages
+      # The same cache as the checks job above, and the same key, written out
+      # again because a key cannot be shared between jobs. dashboard-cache.yml
+      # carries it a fourth time; the four must stay identical.
+      - id: packages
+        uses: actions/cache@v6
+        with:
+          path: dashboard/packages/*/dist
+          key: packages-v1-${{ runner.os }}-node22-${{ hashFiles('dashboard/packages/**', 'dashboard/package-lock.json', 'dashboard/patches/**', 'dashboard/tsconfig.base.json', 'dashboard/scripts/build-packages.mjs', 'dashboard/scripts/scope-editor-styles.mjs', '!dashboard/packages/*/dist/**', '!dashboard/packages/**/node_modules/**', '!dashboard/packages/db/generated/**') }}
+      - if: steps.packages.outputs.cache-hit != 'true'
+        run: npm run build:packages
       - run: npm run test -w @polaris/web -- --shard=${{ matrix.shard }}/4
 
   # Proof that the app compiles, for branches and pull requests. The publish workflow
@@ -193,7 +221,9 @@ jobs:
 
       # Most of a Next build is recompiling what did not change. Keyed on the
       # lockfile so a dependency change starts clean, and restored across commits
-      # otherwise.
+      # otherwise. A pull request's first run restores main's copy, which
+      # dashboard-cache.yml keeps warm; before that existed every branch started
+      # cold, because nothing on main ever saved one.
       - uses: actions/cache@v6
         with:
           path: dashboard/apps/web/.next/cache
@@ -204,11 +234,24 @@ jobs:
 
       - run: npm ci --prefer-offline
       - run: npm run db:generate
-      - run: npm run build:packages
+      # The same cache as the checks job above, and the same key, written out
+      # again because a key cannot be shared between jobs. dashboard-cache.yml
+      # carries it a fourth time; the four must stay identical.
+      - id: packages
+        uses: actions/cache@v6
+        with:
+          path: dashboard/packages/*/dist
+          key: packages-v1-${{ runner.os }}-node22-${{ hashFiles('dashboard/packages/**', 'dashboard/package-lock.json', 'dashboard/patches/**', 'dashboard/tsconfig.base.json', 'dashboard/scripts/build-packages.mjs', 'dashboard/scripts/scope-editor-styles.mjs', '!dashboard/packages/*/dist/**', '!dashboard/packages/**/node_modules/**', '!dashboard/packages/db/generated/**') }}
+      - if: steps.packages.outputs.cache-hit != 'true'
+        run: npm run build:packages
       # Node's default heap tops out near 4 GB, and the app build now peaks right
       # at it: the same commit passed on one run and died with "JavaScript heap
       # out of memory" on the next. The runner has 16 GB, so the build gets room
       # instead of a coin toss.
+      #
+      # The checks job runs tsc and ESLint over the same sources in this same run,
+      # so the build skips its own copy of both (next.config.mjs).
       - run: npm run build -w @polaris/web
         env:
           NODE_OPTIONS: --max-old-space-size=8192
+          POLARIS_BUILD_SKIP_CHECKS: "1"
