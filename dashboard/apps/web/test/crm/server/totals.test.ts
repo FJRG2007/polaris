@@ -23,7 +23,15 @@ import { computeTotals } from "@polaris-app/crm/src/lib/totals";
 import { aggregatesFor } from "@polaris-app/crm/src/model/views";
 import { FIELDS, type CrmObject } from "@polaris-app/crm/src/model/objects";
 
-const NOT_TEXT = new Set(["employees", "annualRevenue", "idealCustomer", "createdAt", "updatedAt", "amount", "closeDate"]);
+const NOT_TEXT = new Set([
+    "employees",
+    "annualRevenue",
+    "idealCustomer",
+    "createdAt",
+    "updatedAt",
+    "amount",
+    "closeDate"
+]);
 
 function blankCompared(value: unknown): string[] {
     if (!value || typeof value !== "object") return [];
@@ -44,9 +52,18 @@ describe("computeTotals", () => {
             for (const aggregate of aggregatesFor(field.kind)) {
                 it(`${object}.${field.key} ${aggregate}`, async () => {
                     vi.clearAllMocks();
-                    const totals = await computeTotals(actor, object, [{ key: field.key, aggregate }], {});
+                    const totals = await computeTotals(
+                        actor,
+                        object,
+                        [{ key: field.key, aggregate }],
+                        {}
+                    );
                     expect(totals).toHaveLength(1);
-                    const calls = [...delegate.count.mock.calls, ...delegate.groupBy.mock.calls, ...delegate.aggregate.mock.calls];
+                    const calls = [
+                        ...delegate.count.mock.calls,
+                        ...delegate.groupBy.mock.calls,
+                        ...delegate.aggregate.mock.calls
+                    ];
                     expect(blankCompared(calls)).toEqual([]);
                 });
             }

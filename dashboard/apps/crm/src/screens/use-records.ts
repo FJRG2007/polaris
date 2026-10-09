@@ -33,7 +33,9 @@ export interface RecordsState {
     readonly put: (records: readonly CrmRecord[]) => void;
     /** Change some fields of records on screen, leaving their other fields as
      *  they are now - so two edits in flight on one row do not undo each other. */
-    readonly patch: (changes: readonly { id: string; values: Readonly<Record<string, FieldValue>> }[]) => void;
+    readonly patch: (
+        changes: readonly { id: string; values: Readonly<Record<string, FieldValue>> }[]
+    ) => void;
     /** A new record, at the top. */
     readonly prepend: (record: CrmRecord) => void;
     /** Take records off screen (moved to the trash). */
@@ -79,12 +81,17 @@ export function useRecords(
         // eslint-disable-next-line react-hooks/exhaustive-deps
         [object, query.search, sortsKey, t]
     );
-    const first = hostUi.liveRead.useLiveRead({ cacheKey: key, load, enabled: query.enabled ?? true });
+    const first = hostUi.liveRead.useLiveRead({
+        cacheKey: key,
+        load,
+        enabled: query.enabled ?? true
+    });
     const [listing, setListing] = useState<Listing | null>(null);
     const [loadingMore, setLoadingMore] = useState(false);
     const current = useRef<Listing | null>(null);
     // What is on screen: the listing, or the first page before it is copied in.
-    current.current = listing ?? (first.data ? { rows: first.data.records, total: first.data.total } : null);
+    current.current =
+        listing ?? (first.data ? { rows: first.data.records, total: first.data.total } : null);
     // The query on screen, so a late page for a search somebody has since
     // changed is thrown away rather than appended.
     const shown = useRef(key);
@@ -151,7 +158,10 @@ export function useRecords(
             const listed = current.current;
             if (!listed) return;
             const byId = new Map(records.map((record) => [record.id, record]));
-            commit({ rows: listed.rows.map((row) => byId.get(row.id) ?? row), total: listed.total });
+            commit({
+                rows: listed.rows.map((row) => byId.get(row.id) ?? row),
+                total: listed.total
+            });
         },
         [commit]
     );

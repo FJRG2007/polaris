@@ -14,8 +14,8 @@
 import "@/components/app-host/client";
 import { MessagesWrapper } from "../../setup/i18n";
 import { defaultConfig } from "@polaris-app/crm/src/model/views";
-import type { CrmRecord } from "@polaris-app/crm/src/model/objects";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { CrmRecord, FieldValue } from "@polaris-app/crm/src/model/objects";
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 
 const VIEW_ID = "11111111-1111-4111-8111-111111111111";
@@ -46,19 +46,26 @@ vi.mock("@polaris-app/crm/src/actions/records", () => {
     return {
         openListAction: async () => ({
             ok: true,
-            view: state.can.read ? { id: VIEW_ID, name: "", config: defaultConfig("companies") } : null,
+            view: state.can.read
+                ? { id: VIEW_ID, name: "", config: defaultConfig("companies") }
+                : null,
             can: abilities(),
             people: [],
             shelfName: null
         }),
-        listRecordsAction: async () => ({ ok: true, records: state.rows, total: state.rows.length }),
+        listRecordsAction: async () => ({
+            ok: true,
+            records: state.rows,
+            total: state.rows.length
+        }),
         totalsAction: async () => ({
             ok: true,
             totals: [{ key: "name", aggregate: "countAll", value: state.rows.length }]
         }),
-        updateRecordAction: async (input: { id: string; values: Record<string, unknown> }) => {
+        updateRecordAction: async (input: { id: string; values: Record<string, FieldValue> }) => {
             state.updates.push(input);
-            if (state.refuseUpdate) return { ok: false, error: "Your role cannot change companies here." };
+            if (state.refuseUpdate)
+                return { ok: false, error: "Your role cannot change companies here." };
             const row = state.rows.find((one) => one.id === input.id)!;
             const record = { ...row, values: { ...row.values, ...input.values } };
             state.rows = state.rows.map((one) => (one.id === input.id ? record : one));
@@ -110,7 +117,9 @@ afterEach(cleanup);
 
 const cityCell = (name: string) => {
     const row = screen.getByText(name).closest("tr")!;
-    return [...row.querySelectorAll("td")].find((cell) => cell.getAttribute("aria-label") === "City")!;
+    return [...row.querySelectorAll("td")].find(
+        (cell) => cell.getAttribute("aria-label") === "City"
+    )!;
 };
 
 describe("a CRM list", () => {
@@ -177,7 +186,9 @@ describe("a CRM list", () => {
         await act(async () => {
             fireEvent.keyDown(input, { key: "Enter" });
         });
-        await waitFor(() => expect(state.creates).toEqual([{ object: "companies", values: { name: "Initech" } }]));
+        await waitFor(() =>
+            expect(state.creates).toEqual([{ object: "companies", values: { name: "Initech" } }])
+        );
         expect(await screen.findByText("Initech")).toBeTruthy();
     });
 

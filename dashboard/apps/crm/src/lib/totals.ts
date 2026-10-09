@@ -31,12 +31,18 @@ export const UNIQUE_CAP = 10_000;
 
 /** The rows where a field holds nothing, as a `where`; null for a kind of
  *  field that is never empty. */
-function emptyWhere(object: CrmObject, key: string, spec: ColumnSpec): Record<string, unknown> | null {
+function emptyWhere(
+    object: CrmObject,
+    key: string,
+    spec: ColumnSpec
+): Record<string, unknown> | null {
     const kind = fieldOf(object, key)?.kind;
     if (kind === "dateTime" || kind === "boolean") return null;
     switch (spec.type) {
         case "scalar":
-            return NULLABLE_SCALARS.has(spec.column) ? { [spec.column]: null } : { [spec.column]: "" };
+            return NULLABLE_SCALARS.has(spec.column)
+                ? { [spec.column]: null }
+                : { [spec.column]: "" };
         case "day":
             return { [spec.column]: null };
         case "name":
@@ -140,10 +146,10 @@ async function one(
                 });
                 return { key, aggregate, value: null, money };
             }
-            const result = (await delegate.aggregate({ where, [operation]: { [column]: true } })) as Record<
-                string,
-                Record<string, unknown>
-            >;
+            const result = (await delegate.aggregate({
+                where,
+                [operation]: { [column]: true }
+            })) as Record<string, Record<string, unknown>>;
             const raw = result[operation]?.[column];
             if (aggregate === "earliest" || aggregate === "latest") {
                 const date = raw instanceof Date ? raw : null;

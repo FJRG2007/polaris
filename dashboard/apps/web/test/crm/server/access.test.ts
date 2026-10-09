@@ -41,7 +41,12 @@ describe("crmActor", () => {
         crmHost.crmShelf.mockResolvedValue({ orgId: "o1", orgName: "Acme" });
         crmHost.crmOrgPermissions.mockResolvedValue(["org.read", "crm.people.edit"]);
         const actor = await crmActor(user);
-        expect(actor.shelf).toMatchObject({ orgId: "o1", userId: null, key: "org:o1", orgName: "Acme" });
+        expect(actor.shelf).toMatchObject({
+            orgId: "o1",
+            userId: null,
+            key: "org:o1",
+            orgName: "Acme"
+        });
         expect(actor.can.companies).toEqual({ read: true, edit: false, delete: false });
         expect(actor.can.people).toEqual({ read: true, edit: true, delete: false });
     });
@@ -82,14 +87,20 @@ describe("the list query", () => {
         expect(shelfWhere(own)).toEqual({ userId: "u1", orgId: null });
         expect(shelfWhere(org)).toEqual({ orgId: "o1" });
         expect(listWhere("companies", org, {})).toEqual({ orgId: "o1", deletedAt: null });
-        expect(listWhere("companies", org, { deleted: true })).toMatchObject({ deletedAt: { not: null } });
+        expect(listWhere("companies", org, { deleted: true })).toMatchObject({
+            deletedAt: { not: null }
+        });
     });
 
     it("finds every word of a search in one of the searched columns", () => {
         const where = searchWhere("people", "  ana   garcia ") as { AND: { OR: unknown[] }[] };
         expect(where.AND).toHaveLength(2);
-        expect(where.AND[0]!.OR).toContainEqual({ firstName: { contains: "ana", mode: "insensitive" } });
-        expect(where.AND[1]!.OR).toContainEqual({ lastName: { contains: "garcia", mode: "insensitive" } });
+        expect(where.AND[0]!.OR).toContainEqual({
+            firstName: { contains: "ana", mode: "insensitive" }
+        });
+        expect(where.AND[1]!.OR).toContainEqual({
+            lastName: { contains: "garcia", mode: "insensitive" }
+        });
         expect(searchWhere("people", "   ")).toEqual({});
     });
 

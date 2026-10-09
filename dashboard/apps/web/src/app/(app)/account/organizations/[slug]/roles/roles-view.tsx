@@ -177,7 +177,9 @@ function RoleCard({ orgId, role }: { orgId: string; role: OrgRoleView }) {
                     </CardTitle>
                     <span className="text-muted-foreground text-xs">@{role.slug}</span>
                     {role.system ? <Badge>{t("roles.builtIn")}</Badge> : null}
-                    {role.restricted ? <Badge variant="neutral">{t("roles.noImplicitAccess")}</Badge> : null}
+                    {role.restricted ? (
+                        <Badge variant="neutral">{t("roles.noImplicitAccess")}</Badge>
+                    ) : null}
                     <span className="text-muted-foreground text-xs">
                         {t("roles.people", { count: role.memberCount })}
                     </span>
@@ -220,10 +222,16 @@ function RoleCard({ orgId, role }: { orgId: string; role: OrgRoleView }) {
                                 {role.restricted
                                     ? held.size === 0
                                         ? t("roles.restrictedNone")
-                                        : t("roles.restrictedSome", { held: held.size, total: GRANTABLE.length })
+                                        : t("roles.restrictedSome", {
+                                              held: held.size,
+                                              total: GRANTABLE.length
+                                          })
                                     : held.size === 0
                                       ? t("roles.plainNone")
-                                      : t("roles.plainSome", { held: held.size, total: GRANTABLE.length })}
+                                      : t("roles.plainSome", {
+                                            held: held.size,
+                                            total: GRANTABLE.length
+                                        })}
                             </p>
                             <Button
                                 size="sm"
@@ -290,9 +298,7 @@ function PermissionGrid({
                                     onChange(next);
                                 }}
                             />
-                            <span className="min-w-0">
-                                {t(PERMISSION_LABELS[permission])}
-                            </span>
+                            <span className="min-w-0">{t(PERMISSION_LABELS[permission])}</span>
                         </label>
                     ))}
                 </div>

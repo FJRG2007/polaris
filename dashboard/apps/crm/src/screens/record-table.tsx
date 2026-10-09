@@ -49,13 +49,21 @@ export interface TableProps {
     readonly selected: readonly string[];
     readonly onSelect: (ids: string[]) => void;
     /** A cell's new value: what to store, and what to show until the answer. */
-    readonly onEdit: (record: CrmRecord, field: FieldDef, stored: InputValue, shown: FieldValue) => void;
+    readonly onEdit: (
+        record: CrmRecord,
+        field: FieldDef,
+        stored: InputValue,
+        shown: FieldValue
+    ) => void;
     readonly onSort: (key: string, direction: "asc" | "desc" | null) => void;
     readonly onColumns: (columns: ViewColumn[]) => void;
     readonly onAggregate: (key: string, aggregate: Aggregate | null) => void;
     /** A new record's name, typed into the row at the top; null when there is
      *  no such row open. */
-    readonly draft: { readonly onCreate: (value: InputValue) => void; readonly onCancel: () => void } | null;
+    readonly draft: {
+        readonly onCreate: (value: InputValue) => void;
+        readonly onCancel: () => void;
+    } | null;
     readonly hasMore: boolean;
     readonly loadingMore: boolean;
     readonly onLoadMore: () => void;
@@ -78,14 +86,23 @@ export function RecordTable(props: TableProps) {
     const [editing, setEditing] = useState<Editing | null>(null);
     const scroller = useRef<HTMLDivElement>(null);
     const sentinel = useRef<HTMLTableRowElement>(null);
-    const order = useMemo(() => rows.map((row) => row.id).filter((id) => !id.startsWith("draft:")), [rows]);
+    const order = useMemo(
+        () => rows.map((row) => row.id).filter((id) => !id.startsWith("draft:")),
+        [rows]
+    );
     const selection = useRangeSelection(order, selected, onSelect);
     const fields = useMemo(
-        () => columns.map((column) => ({ column, field: fieldOf(object, column.key)! })).filter((one) => one.field),
+        () =>
+            columns
+                .map((column) => ({ column, field: fieldOf(object, column.key)! }))
+                .filter((one) => one.field),
         [columns, object]
     );
     const primary = primaryField(object);
-    const allChosen = order.length > 0 && selected.length >= order.length && order.every((id) => selected.includes(id));
+    const allChosen =
+        order.length > 0 &&
+        selected.length >= order.length &&
+        order.every((id) => selected.includes(id));
 
     // The next page is asked for when the end of the table scrolls into sight.
     const { hasMore, loadingMore, onLoadMore } = props;
@@ -115,7 +132,9 @@ export function RecordTable(props: TableProps) {
     };
 
     const change = (key: string, patch: Partial<ViewColumn>) =>
-        props.onColumns(props.columns.map((column) => (column.key === key ? { ...column, ...patch } : column)));
+        props.onColumns(
+            props.columns.map((column) => (column.key === key ? { ...column, ...patch } : column))
+        );
 
     const open = (record: CrmRecord, field: FieldDef) => {
         if (!canEdit || field.readOnly) return;
@@ -140,8 +159,11 @@ export function RecordTable(props: TableProps) {
                 aria-label={t(`fields.${object}.${field.key}` as Parameters<typeof t>[0])}
                 className={cn(
                     "relative h-9 border-b border-r border-border p-0 text-[0.8125rem]",
-                    field.primary && "sticky z-[5] bg-card font-medium group-hover/row:bg-card-hover",
-                    canEdit && !field.readOnly && "cursor-text hover:shadow-[inset_0_0_0_1px_hsl(var(--border-strong))]",
+                    field.primary &&
+                        "sticky z-[5] bg-card font-medium group-hover/row:bg-card-hover",
+                    canEdit &&
+                        !field.readOnly &&
+                        "cursor-text hover:shadow-[inset_0_0_0_1px_hsl(var(--border-strong))]",
                     active && "z-30"
                 )}
                 onClick={(event) => {
@@ -201,7 +223,10 @@ export function RecordTable(props: TableProps) {
                 if (!fromField(event)) selection.onKeyDown(event);
             }}
         >
-            <table className="table-fixed border-separate border-spacing-0" style={{ width: totalWidth }}>
+            <table
+                className="table-fixed border-separate border-spacing-0"
+                style={{ width: totalWidth }}
+            >
                 <colgroup>
                     <col style={{ width: BOX_WIDTH }} />
                     {fields.map(({ column }) => (
@@ -210,7 +235,10 @@ export function RecordTable(props: TableProps) {
                 </colgroup>
                 <thead>
                     <tr>
-                        <th scope="col" className="sticky left-0 top-0 z-20 h-9 border-b border-r border-border bg-card p-0">
+                        <th
+                            scope="col"
+                            className="sticky left-0 top-0 z-20 h-9 border-b border-r border-border bg-card p-0"
+                        >
                             <span className="flex h-9 items-center justify-center">
                                 <Checkbox
                                     checked={allChosen}
@@ -230,7 +258,9 @@ export function RecordTable(props: TableProps) {
                                 sticky={pinned(field)}
                                 onSort={(direction) => props.onSort(column.key, direction)}
                                 onHide={() => change(column.key, { hidden: true })}
-                                onResize={(width) => change(column.key, { width: Math.round(width) })}
+                                onResize={(width) =>
+                                    change(column.key, { width: Math.round(width) })
+                                }
                                 onMove={(dragged) => move(dragged, column.key)}
                             />
                         ))}
@@ -251,7 +281,10 @@ export function RecordTable(props: TableProps) {
                                     onCancel={props.draft.onCancel}
                                 />
                             </td>
-                            <td colSpan={Math.max(1, fields.length - 1)} className="border-b border-border" />
+                            <td
+                                colSpan={Math.max(1, fields.length - 1)}
+                                className="border-b border-border"
+                            />
                         </tr>
                     ) : null}
                     {rows.map((record) => {
@@ -274,7 +307,9 @@ export function RecordTable(props: TableProps) {
                                             disabled={pending}
                                             aria-label={t("selection.row")}
                                             onClick={(event) => {
-                                                selection.press(record.id, { shiftKey: event.shiftKey });
+                                                selection.press(record.id, {
+                                                    shiftKey: event.shiftKey
+                                                });
                                             }}
                                             onChange={() => undefined}
                                         />

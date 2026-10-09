@@ -24,7 +24,12 @@ import {
 } from "@polaris/ui";
 
 /** A total as one line of text, without its label. */
-export function totalText(field: FieldDef, total: Total, format: DisplayFormat, locale: string): string {
+export function totalText(
+    field: FieldDef,
+    total: Total,
+    format: DisplayFormat,
+    locale: string
+): string {
     if (total.aggregate === "earliest" || total.aggregate === "latest") {
         if (!total.date) return "";
         return field.kind === "date" ? formatDay(total.date, format) : format.dateTime(total.date);
@@ -36,7 +41,9 @@ export function totalText(field: FieldDef, total: Total, format: DisplayFormat, 
     if (total.aggregate === "percentEmpty" || total.aggregate === "percentNotEmpty") {
         return `${format.number(Math.round(total.value * 10) / 10)}%`;
     }
-    const shown = format.number(total.aggregate === "avg" ? Math.round(total.value * 100) / 100 : total.value);
+    const shown = format.number(
+        total.aggregate === "avg" ? Math.round(total.value * 100) / 100 : total.value
+    );
     return total.capped ? `${shown}+` : shown;
 }
 
@@ -68,8 +75,13 @@ export function TotalCell({
         <span className="flex h-8 w-full min-w-0 items-center justify-end gap-1.5 px-2.5 text-[0.75rem]">
             {column.aggregate ? (
                 <>
-                    <span className="shrink-0 text-muted-foreground">{t(`aggregates.short.${column.aggregate}`)}</span>
-                    <span className="truncate font-medium tabular-nums text-foreground" title={text}>
+                    <span className="shrink-0 text-muted-foreground">
+                        {t(`aggregates.short.${column.aggregate}`)}
+                    </span>
+                    <span
+                        className="truncate font-medium tabular-nums text-foreground"
+                        title={text}
+                    >
                         {text || "-"}
                     </span>
                 </>
@@ -102,15 +114,23 @@ export function TotalCell({
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end" className="w-52">
                         {aggregatesFor(field.kind).map((aggregate) => (
-                            <DropdownMenuItem key={aggregate} onSelect={() => onChange(aggregate)} className="gap-2">
+                            <DropdownMenuItem
+                                key={aggregate}
+                                onSelect={() => onChange(aggregate)}
+                                className="gap-2"
+                            >
                                 <span className="flex-1">{t(`aggregates.long.${aggregate}`)}</span>
-                                {aggregate === column.aggregate ? <Check className="size-3.5" /> : null}
+                                {aggregate === column.aggregate ? (
+                                    <Check className="size-3.5" />
+                                ) : null}
                             </DropdownMenuItem>
                         ))}
                         {column.aggregate ? (
                             <>
                                 <DropdownMenuSeparator />
-                                <DropdownMenuItem onSelect={() => onChange(null)}>{t("aggregates.none")}</DropdownMenuItem>
+                                <DropdownMenuItem onSelect={() => onChange(null)}>
+                                    {t("aggregates.none")}
+                                </DropdownMenuItem>
                             </>
                         ) : null}
                     </DropdownMenuContent>

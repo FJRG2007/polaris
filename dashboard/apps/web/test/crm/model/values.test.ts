@@ -16,8 +16,14 @@ const field = (object: CrmObject, key: string) => {
 
 describe("normalizeInput", () => {
     it("trims text and refuses an empty name", () => {
-        expect(normalizeInput(field("companies", "name"), "  Acme  ")).toEqual({ ok: true, value: "Acme" });
-        expect(normalizeInput(field("companies", "name"), "   ")).toEqual({ ok: false, reason: "required" });
+        expect(normalizeInput(field("companies", "name"), "  Acme  ")).toEqual({
+            ok: true,
+            value: "Acme"
+        });
+        expect(normalizeInput(field("companies", "name"), "   ")).toEqual({
+            ok: false,
+            reason: "required"
+        });
         expect(normalizeInput(field("companies", "city"), "")).toEqual({ ok: true, value: "" });
         expect(normalizeInput(field("companies", "city"), "x".repeat(501))).toEqual({
             ok: false,
@@ -26,7 +32,9 @@ describe("normalizeInput", () => {
     });
 
     it("capitalizes each word of a person's name and needs one of its parts", () => {
-        expect(normalizeInput(field("people", "name"), { first: " ana maría ", last: "garcía" })).toEqual({
+        expect(
+            normalizeInput(field("people", "name"), { first: " ana maría ", last: "garcía" })
+        ).toEqual({
             ok: true,
             value: { first: "Ana María", last: "García" }
         });
@@ -41,7 +49,10 @@ describe("normalizeInput", () => {
             ok: true,
             value: "ana@example.com"
         });
-        expect(normalizeInput(field("people", "email"), "ana@")).toEqual({ ok: false, reason: "email" });
+        expect(normalizeInput(field("people", "email"), "ana@")).toEqual({
+            ok: false,
+            reason: "email"
+        });
         expect(normalizeInput(field("people", "email"), "")).toEqual({ ok: true, value: "" });
     });
 
@@ -57,35 +68,54 @@ describe("normalizeInput", () => {
     });
 
     it("gives a link a scheme and refuses anything but the web", () => {
-        expect(normalizeInput(field("companies", "linkedinUrl"), "linkedin.com/company/acme")).toEqual({
+        expect(
+            normalizeInput(field("companies", "linkedinUrl"), "linkedin.com/company/acme")
+        ).toEqual({
             ok: true,
             value: "https://linkedin.com/company/acme"
         });
-        expect(normalizeInput(field("companies", "linkedinUrl"), "javascript:alert(1)")).toMatchObject({
+        expect(
+            normalizeInput(field("companies", "linkedinUrl"), "javascript:alert(1)")
+        ).toMatchObject({
             ok: false
         });
     });
 
     it("takes whole numbers of employees, and nothing for empty", () => {
-        expect(normalizeInput(field("companies", "employees"), "250")).toEqual({ ok: true, value: 250 });
-        expect(normalizeInput(field("companies", "employees"), "")).toEqual({ ok: true, value: null });
+        expect(normalizeInput(field("companies", "employees"), "250")).toEqual({
+            ok: true,
+            value: 250
+        });
+        expect(normalizeInput(field("companies", "employees"), "")).toEqual({
+            ok: true,
+            value: null
+        });
         expect(normalizeInput(field("companies", "employees"), "2.5")).toEqual({
             ok: false,
             reason: "wholeNumber"
         });
-        expect(normalizeInput(field("companies", "employees"), -1)).toEqual({ ok: false, reason: "wholeNumber" });
+        expect(normalizeInput(field("companies", "employees"), -1)).toEqual({
+            ok: false,
+            reason: "wholeNumber"
+        });
     });
 
     it("rounds an amount to cents and needs a known currency", () => {
-        expect(normalizeInput(field("opportunities", "amount"), { amount: 1200.456, currency: "EUR" })).toEqual({
+        expect(
+            normalizeInput(field("opportunities", "amount"), { amount: 1200.456, currency: "EUR" })
+        ).toEqual({
             ok: true,
             value: { amount: 1200.46, currency: "EUR" }
         });
-        expect(normalizeInput(field("opportunities", "amount"), { amount: 10, currency: "XXX" })).toEqual({
+        expect(
+            normalizeInput(field("opportunities", "amount"), { amount: 10, currency: "XXX" })
+        ).toEqual({
             ok: false,
             reason: "currency"
         });
-        expect(normalizeInput(field("opportunities", "amount"), { amount: null, currency: "EUR" })).toEqual({
+        expect(
+            normalizeInput(field("opportunities", "amount"), { amount: null, currency: "EUR" })
+        ).toEqual({
             ok: true,
             value: { amount: null, currency: "" }
         });
@@ -100,20 +130,34 @@ describe("normalizeInput", () => {
             ok: false,
             reason: "date"
         });
-        expect(normalizeInput(field("opportunities", "closeDate"), null)).toEqual({ ok: true, value: null });
+        expect(normalizeInput(field("opportunities", "closeDate"), null)).toEqual({
+            ok: true,
+            value: null
+        });
     });
 
     it("takes one of a choice's options and a reference by id", () => {
-        expect(normalizeInput(field("opportunities", "stage"), "proposal")).toEqual({ ok: true, value: "proposal" });
-        expect(normalizeInput(field("opportunities", "stage"), "won")).toEqual({ ok: false, reason: "option" });
+        expect(normalizeInput(field("opportunities", "stage"), "proposal")).toEqual({
+            ok: true,
+            value: "proposal"
+        });
+        expect(normalizeInput(field("opportunities", "stage"), "won")).toEqual({
+            ok: false,
+            reason: "option"
+        });
         const id = "6f1c2b0e-1d2a-4a8b-9c3d-2e4f5a6b7c8d";
         expect(normalizeInput(field("people", "company"), id)).toEqual({ ok: true, value: id });
-        expect(normalizeInput(field("people", "company"), "acme")).toEqual({ ok: false, reason: "option" });
+        expect(normalizeInput(field("people", "company"), "acme")).toEqual({
+            ok: false,
+            reason: "option"
+        });
         expect(normalizeInput(field("people", "company"), null)).toEqual({ ok: true, value: null });
     });
 
     it("never writes a field Polaris keeps itself", () => {
-        expect(normalizeInput(field("companies", "createdAt"), "2026-01-01T00:00:00Z")).toMatchObject({ ok: false });
+        expect(
+            normalizeInput(field("companies", "createdAt"), "2026-01-01T00:00:00Z")
+        ).toMatchObject({ ok: false });
     });
 });
 
@@ -135,10 +179,22 @@ describe("typedCount", () => {
 
     it("reads grouping and refuses a fraction instead of dropping its separator", () => {
         expect(normalizeInput(employees, typedCount("1.500"))).toEqual({ ok: true, value: 1500 });
-        expect(normalizeInput(employees, typedCount("1 500 000"))).toEqual({ ok: true, value: 1500000 });
-        expect(normalizeInput(employees, typedCount("2.5"))).toEqual({ ok: false, reason: "wholeNumber" });
-        expect(normalizeInput(employees, typedCount("1.000,5"))).toEqual({ ok: false, reason: "wholeNumber" });
-        expect(normalizeInput(employees, typedCount("12abc"))).toEqual({ ok: false, reason: "number" });
+        expect(normalizeInput(employees, typedCount("1 500 000"))).toEqual({
+            ok: true,
+            value: 1500000
+        });
+        expect(normalizeInput(employees, typedCount("2.5"))).toEqual({
+            ok: false,
+            reason: "wholeNumber"
+        });
+        expect(normalizeInput(employees, typedCount("1.000,5"))).toEqual({
+            ok: false,
+            reason: "wholeNumber"
+        });
+        expect(normalizeInput(employees, typedCount("12abc"))).toEqual({
+            ok: false,
+            reason: "number"
+        });
         expect(normalizeInput(employees, typedCount("  "))).toEqual({ ok: true, value: null });
     });
 });

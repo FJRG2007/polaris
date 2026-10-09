@@ -25,7 +25,9 @@ const sorts = z
     .max(MAX_SORTS)
     .default([]);
 /** Field values as typed: checked per field by `normalizeInput` on the way in. */
-const values = z.record(z.string().max(64), z.unknown()).refine((entry) => Object.keys(entry).length <= 64);
+const values = z
+    .record(z.string().max(64), z.unknown())
+    .refine((entry) => Object.keys(entry).length <= 64);
 
 export interface ListOpening {
     /** Null for a reader who may not see this kind of record here. */
@@ -69,7 +71,9 @@ export async function listRecordsAction(input: unknown): Promise<Outcome<records
         })
         .safeParse(input);
     if (!parsed.success) return invalid();
-    return outcome(async () => records.listRecords(await requireCrmActor(), parsed.data.object, parsed.data));
+    return outcome(async () =>
+        records.listRecords(await requireCrmActor(), parsed.data.object, parsed.data)
+    );
 }
 
 /** The totals under a list's columns. */
@@ -99,7 +103,11 @@ export async function createRecordAction(input: unknown): Promise<Outcome<{ reco
     const parsed = z.object({ object, values }).safeParse(input);
     if (!parsed.success) return invalid();
     return outcome(async () => ({
-        record: await records.createRecord(await requireCrmActor(), parsed.data.object, parsed.data.values)
+        record: await records.createRecord(
+            await requireCrmActor(),
+            parsed.data.object,
+            parsed.data.values
+        )
     }));
 }
 
@@ -119,7 +127,9 @@ export async function updateRecordAction(input: unknown): Promise<Outcome<{ reco
 const ids = z.array(id).min(1).max(records.MAX_BULK);
 
 /** The same values on several records. */
-export async function updateRecordsAction(input: unknown): Promise<Outcome<{ records: CrmRecord[] }>> {
+export async function updateRecordsAction(
+    input: unknown
+): Promise<Outcome<{ records: CrmRecord[] }>> {
     const parsed = z.object({ object, ids, values }).safeParse(input);
     if (!parsed.success) return invalid();
     return outcome(async () => ({
@@ -137,7 +147,11 @@ export async function trashRecordsAction(input: unknown): Promise<Outcome<{ coun
     const parsed = z.object({ object, ids }).safeParse(input);
     if (!parsed.success) return invalid();
     return outcome(async () => ({
-        count: await records.trashRecords(await requireCrmActor(), parsed.data.object, parsed.data.ids)
+        count: await records.trashRecords(
+            await requireCrmActor(),
+            parsed.data.object,
+            parsed.data.ids
+        )
     }));
 }
 
@@ -146,7 +160,11 @@ export async function searchRefsAction(input: unknown): Promise<Outcome<{ refs: 
     const parsed = z.object({ object, search }).safeParse(input);
     if (!parsed.success) return invalid();
     return outcome(async () => ({
-        refs: await records.searchRefs(await requireCrmActor(), parsed.data.object, parsed.data.search)
+        refs: await records.searchRefs(
+            await requireCrmActor(),
+            parsed.data.object,
+            parsed.data.search
+        )
     }));
 }
 

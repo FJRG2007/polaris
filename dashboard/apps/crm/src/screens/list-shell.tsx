@@ -21,7 +21,11 @@ function Block({ className }: { className?: string }) {
 
 export function ListShell({ words }: { words: ListShellWords }) {
     return (
-        <div className="flex h-full min-h-0 flex-col gap-3" aria-busy="true" aria-label={words.loading}>
+        <div
+            className="flex h-full min-h-0 flex-col gap-3"
+            aria-busy="true"
+            aria-label={words.loading}
+        >
             <div className="flex flex-wrap items-center gap-2">
                 <h1 className="mr-auto text-[1.0625rem] font-semibold leading-tight tracking-tight">
                     {words.title}
@@ -38,7 +42,10 @@ export function ListShell({ words }: { words: ListShellWords }) {
                     <Block className="h-3 w-28" />
                 </div>
                 {Array.from({ length: 8 }, (_, index) => (
-                    <div key={index} className="flex h-9 items-center gap-6 border-b border-border px-3">
+                    <div
+                        key={index}
+                        className="flex h-9 items-center gap-6 border-b border-border px-3"
+                    >
                         <Block className="h-3 w-40" />
                         <Block className="h-3 w-24" />
                         <Block className="h-3 w-32" />

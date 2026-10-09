@@ -45,7 +45,10 @@ function startText(field: FieldDef | undefined): string {
 }
 
 /** What the draft holds for a field, ready to store, or why it cannot be. */
-function settle(field: FieldDef, draft: Draft): { stored: InputValue; shown: FieldValue } | { error: string } {
+function settle(
+    field: FieldDef,
+    draft: Draft
+): { stored: InputValue; shown: FieldValue } | { error: string } {
     let raw: unknown = draft.text;
     if (field.kind === "currency") {
         const amount = draft.text.trim() === "" ? null : parseAmount(draft.text);
@@ -63,7 +66,11 @@ function settle(field: FieldDef, draft: Draft): { stored: InputValue; shown: Fie
     const result = normalizeInput(field, raw);
     if (!result.ok) return { error: result.reason };
     const shown: FieldValue =
-        field.kind === "relation" ? draft.ref : field.kind === "member" ? null : (result.value as FieldValue);
+        field.kind === "relation"
+            ? draft.ref
+            : field.kind === "member"
+              ? null
+              : (result.value as FieldValue);
     return { stored: result.value, shown };
 }
 
@@ -86,19 +93,32 @@ export function BulkEditDialog({
 }) {
     const t = useCrmT();
     const locale = hostUi.i18nProvider.useLocale();
-    const editable = useMemo(() => FIELDS[object].filter((field) => !field.primary && !field.readOnly), [object]);
+    const editable = useMemo(
+        () => FIELDS[object].filter((field) => !field.primary && !field.readOnly),
+        [object]
+    );
     const [key, setKey] = useState(editable[0]!.key);
     const field = editable.find((one) => one.key === key) ?? editable[0]!;
-    const [draft, setDraft] = useState<Draft>(() => ({ text: startText(editable[0]), currency: defaultCurrency, ref: null }));
+    const [draft, setDraft] = useState<Draft>(() => ({
+        text: startText(editable[0]),
+        currency: defaultCurrency,
+        ref: null
+    }));
     const [touched, setTouched] = useState(false);
     const [picking, setPicking] = useState(false);
     const result = settle(field, draft);
-    const error = "error" in result ? t(`invalid.${result.error}` as Parameters<typeof t>[0]) : null;
-    const fieldLabel = (one: FieldDef) => t(`fields.${object}.${one.key}` as Parameters<typeof t>[0]);
+    const error =
+        "error" in result ? t(`invalid.${result.error}` as Parameters<typeof t>[0]) : null;
+    const fieldLabel = (one: FieldDef) =>
+        t(`fields.${object}.${one.key}` as Parameters<typeof t>[0]);
 
     const choose = (next: string) => {
         setKey(next);
-        setDraft({ text: startText(editable.find((one) => one.key === next)), currency: defaultCurrency, ref: null });
+        setDraft({
+            text: startText(editable.find((one) => one.key === next)),
+            currency: defaultCurrency,
+            ref: null
+        });
         setTouched(false);
     };
 
@@ -138,7 +158,11 @@ export function BulkEditDialog({
                         onValueChange={(text) => setDraft({ ...draft, text })}
                         options={(field.options ?? []).map((option) => ({
                             value: option,
-                            label: t(`options.${object}.${field.key}.${option}` as Parameters<typeof t>[0])
+                            label: t(
+                                `options.${object}.${field.key}.${option}` as Parameters<
+                                    typeof t
+                                >[0]
+                            )
                         }))}
                     />
                 );
@@ -242,7 +266,10 @@ export function BulkEditDialog({
                             id="crm-bulk-field"
                             value={field.key}
                             onValueChange={choose}
-                            options={editable.map((one) => ({ value: one.key, label: fieldLabel(one) }))}
+                            options={editable.map((one) => ({
+                                value: one.key,
+                                label: fieldLabel(one)
+                            }))}
                         />
                     </div>
                     <div className="flex flex-col gap-1.5">
@@ -250,7 +277,9 @@ export function BulkEditDialog({
                             {t("bulk.value")}
                         </label>
                         {valueControl()}
-                        {touched && error ? <p className="text-[0.75rem] text-danger">{error}</p> : null}
+                        {touched && error ? (
+                            <p className="text-[0.75rem] text-danger">{error}</p>
+                        ) : null}
                     </div>
                     <DialogFooter>
                         <Button type="button" variant="ghost" onClick={onClose}>

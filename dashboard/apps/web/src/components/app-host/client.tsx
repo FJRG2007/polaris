@@ -88,11 +88,15 @@ const LogViewer = dynamic(
 /** The shared keyboard shortcuts - an app's help and the settings that move its
  *  keys. Opened from a key or a settings page, so loaded there. */
 const ShortcutsDialog = dynamic(
-    () => import("@/components/shortcuts/shortcuts-dialog").then((module) => module.ShortcutsDialog),
+    () =>
+        import("@/components/shortcuts/shortcuts-dialog").then((module) => module.ShortcutsDialog),
     { ssr: false }
 );
 const ShortcutSettings = dynamic(
-    () => import("@/components/shortcuts/shortcut-settings").then((module) => module.ShortcutSettings),
+    () =>
+        import("@/components/shortcuts/shortcut-settings").then(
+            (module) => module.ShortcutSettings
+        ),
     { ssr: false }
 );
 

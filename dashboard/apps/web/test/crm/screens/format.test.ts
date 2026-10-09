@@ -12,8 +12,16 @@ import { createDisplayFormat, DISPLAY_DEFAULTS, LOCALES } from "@polaris/core";
 
 describe("formatDay", () => {
     it("writes a stored day in the reader's order, never moved by a time zone", () => {
-        const dmy = createDisplayFormat({ ...DISPLAY_DEFAULTS, dateOrder: "dmy", timeZone: "America/Los_Angeles" });
-        const mdy = createDisplayFormat({ ...DISPLAY_DEFAULTS, dateOrder: "mdy", yearFormat: "yy" });
+        const dmy = createDisplayFormat({
+            ...DISPLAY_DEFAULTS,
+            dateOrder: "dmy",
+            timeZone: "America/Los_Angeles"
+        });
+        const mdy = createDisplayFormat({
+            ...DISPLAY_DEFAULTS,
+            dateOrder: "mdy",
+            yearFormat: "yy"
+        });
         expect(formatDay("2026-03-01", dmy)).toBe("01/03/2026");
         expect(formatDay("2026-03-01", mdy)).toBe("03/01/26");
     });
@@ -41,7 +49,8 @@ describe("the CRM's words", () => {
                 check(`empty.${object}.title`);
                 for (const field of FIELDS[object]) {
                     check(`fields.${object}.${field.key}`);
-                    for (const option of field.options ?? []) check(`options.${object}.${field.key}.${option}`);
+                    for (const option of field.options ?? [])
+                        check(`options.${object}.${field.key}.${option}`);
                 }
             }
             for (const aggregate of AGGREGATES) {

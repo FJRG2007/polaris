@@ -92,7 +92,10 @@ function sortOrder(spec: ColumnSpec, direction: "asc" | "desc"): Record<string, 
  * id - so two rows that tie on everything still come back in one order and a
  * page boundary never shows a row twice.
  */
-export function listOrder(object: CrmObject, sorts: readonly ViewSort[]): Record<string, unknown>[] {
+export function listOrder(
+    object: CrmObject,
+    sorts: readonly ViewSort[]
+): Record<string, unknown>[] {
     return [
         ...sorts.flatMap((sort) => sortOrder(columnOf(object, sort.key), sort.direction)),
         { createdAt: "desc" },

@@ -19,7 +19,10 @@ import { defaultConfig, readConfig, type ViewConfig, type ViewSummary } from "..
 
 const VIEW_SELECT = { id: true, name: true, config: true } as const;
 
-function summary(object: CrmObject, row: { id: string; name: string; config: string }): ViewSummary {
+function summary(
+    object: CrmObject,
+    row: { id: string; name: string; config: string }
+): ViewSummary {
     let stored: unknown = null;
     try {
         stored = JSON.parse(row.config);

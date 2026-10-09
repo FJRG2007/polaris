@@ -53,7 +53,10 @@ const no = (reason: InvalidReason): Normalized => ({ ok: false, reason });
 
 /** Each word's first letter upper case, the rest as typed ("mcDonald" stays). */
 export function capitalizeWords(text: string): string {
-    return text.replace(/(^|[\s'-])(\p{Ll})/gu, (_, before: string, letter: string) => before + letter.toUpperCase());
+    return text.replace(
+        /(^|[\s'-])(\p{Ll})/gu,
+        (_, before: string, letter: string) => before + letter.toUpperCase()
+    );
 }
 
 /** "https://www.Acme.com/about" -> "acme.com". Not a check: see `normalizeInput`. */

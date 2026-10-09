@@ -22,7 +22,19 @@ import type { InputValue } from "../model/values";
 import { BulkEditDialog } from "./bulk-edit-dialog";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { readConfig, type Aggregate, type ViewColumn, type ViewConfig } from "../model/views";
-import { Building2, Columns3, Pencil, Plus, Search, SearchX, ShieldOff, Target, Trash2, User, X } from "lucide-react";
+import {
+    Building2,
+    Columns3,
+    Pencil,
+    Plus,
+    Search,
+    SearchX,
+    ShieldOff,
+    Target,
+    Trash2,
+    User,
+    X
+} from "lucide-react";
 import {
     primaryField,
     type CrmObject,
@@ -64,9 +76,15 @@ function useDebounced<T>(value: T, delay: number): T {
 
 function TableSkeleton() {
     return (
-        <div className="flex min-h-0 flex-1 flex-col gap-px overflow-hidden rounded-lg border border-border bg-card" aria-hidden>
+        <div
+            className="flex min-h-0 flex-1 flex-col gap-px overflow-hidden rounded-lg border border-border bg-card"
+            aria-hidden
+        >
             {Array.from({ length: 9 }, (_, index) => (
-                <div key={index} className="flex h-9 items-center gap-6 border-b border-border px-3">
+                <div
+                    key={index}
+                    className="flex h-9 items-center gap-6 border-b border-border px-3"
+                >
                     <span className="block h-3 w-40 animate-pulse rounded bg-muted" />
                     <span className="block h-3 w-24 animate-pulse rounded bg-muted" />
                     <span className="block h-3 w-32 animate-pulse rounded bg-muted" />
@@ -89,7 +107,10 @@ export function ListScreen({ object }: { object: CrmObject }) {
         () => unwrap(() => actions.openListAction({ object }), t("errors.loadFailed")),
         [object, t]
     );
-    const opening = hostUi.liveRead.useLiveRead({ cacheKey: `crm:open:${object}`, load: loadOpening });
+    const opening = hostUi.liveRead.useLiveRead({
+        cacheKey: `crm:open:${object}`,
+        load: loadOpening
+    });
     const can = opening.data?.can[object] ?? null;
     const people = opening.data?.people ?? [];
 
@@ -121,7 +142,9 @@ export function ListScreen({ object }: { object: CrmObject }) {
                 unwrap(
                     () => actions.saveViewAction({ object, viewId: view.id, config: next }),
                     t("errors.generic")
-                ).catch((caught) => toast.show({ title: t("errors.viewNotSaved"), body: messageOf(caught) }));
+                ).catch((caught) =>
+                    toast.show({ title: t("errors.viewNotSaved"), body: messageOf(caught) })
+                );
             }, SAVE_DELAY_MS);
         },
         [object, t, toast]
@@ -150,9 +173,10 @@ export function ListScreen({ object }: { object: CrmObject }) {
     const askedKey = asked.map((one) => `${one.key}.${one.aggregate}`).join(",");
     const loadTotals = useCallback(
         () =>
-            unwrap(() => actions.totalsAction({ object, search, asked }), t("errors.loadFailed")).then(
-                (answer) => answer.totals
-            ),
+            unwrap(
+                () => actions.totalsAction({ object, search, asked }),
+                t("errors.loadFailed")
+            ).then((answer) => answer.totals),
         // `asked` is read through its key.
         // eslint-disable-next-line react-hooks/exhaustive-deps
         [object, search, askedKey, t]
@@ -169,7 +193,10 @@ export function ListScreen({ object }: { object: CrmObject }) {
     const [bulkOpen, setBulkOpen] = useState(false);
     // Chosen rows that have left the screen - trashed, or filtered away - are
     // no longer chosen.
-    const rowIds = useMemo(() => new Set((records.rows ?? []).map((row) => row.id)), [records.rows]);
+    const rowIds = useMemo(
+        () => new Set((records.rows ?? []).map((row) => row.id)),
+        [records.rows]
+    );
     useEffect(() => {
         setSelected((current) => {
             const kept = current.filter((id) => rowIds.has(id));
@@ -193,7 +220,12 @@ export function ListScreen({ object }: { object: CrmObject }) {
             const before = record.values[field.key] ?? null;
             records.patch([{ id: record.id, values: { [field.key]: shown } }]);
             unwrap(
-                () => actions.updateRecordAction({ object, id: record.id, values: { [field.key]: stored } }),
+                () =>
+                    actions.updateRecordAction({
+                        object,
+                        id: record.id,
+                        values: { [field.key]: stored }
+                    }),
                 t("errors.generic")
             )
                 .then(({ record: saved }) => {
@@ -222,9 +254,15 @@ export function ListScreen({ object }: { object: CrmObject }) {
         (field: FieldDef, stored: InputValue, shown: FieldValue) => {
             const ids = [...selected];
             const rows = (records.rows ?? []).filter((row) => ids.includes(row.id));
-            const before = rows.map((row) => ({ id: row.id, values: { [field.key]: row.values[field.key] ?? null } }));
+            const before = rows.map((row) => ({
+                id: row.id,
+                values: { [field.key]: row.values[field.key] ?? null }
+            }));
             records.patch(ids.map((id) => ({ id, values: { [field.key]: shown } })));
-            unwrap(() => actions.updateRecordsAction({ object, ids, values: { [field.key]: stored } }), t("errors.generic"))
+            unwrap(
+                () => actions.updateRecordsAction({ object, ids, values: { [field.key]: stored } }),
+                t("errors.generic")
+            )
                 .then(({ records: saved }) => {
                     records.put(saved);
                     refreshTotals();
@@ -274,7 +312,10 @@ export function ListScreen({ object }: { object: CrmObject }) {
                 values: { [primary.key]: value as FieldValue }
             };
             records.prepend(temporary);
-            unwrap(() => actions.createRecordAction({ object, values: { [primary.key]: value } }), t("errors.generic"))
+            unwrap(
+                () => actions.createRecordAction({ object, values: { [primary.key]: value } }),
+                t("errors.generic")
+            )
                 .then(({ record }) => {
                     records.drop([temporary.id]);
                     records.prepend(record);
@@ -288,30 +329,45 @@ export function ListScreen({ object }: { object: CrmObject }) {
         [object, primary.key, records, refreshTotals, failed, t]
     );
 
-    const columns = useMemo(() => (config?.columns ?? []).filter((column) => !column.hidden), [config]);
+    const columns = useMemo(
+        () => (config?.columns ?? []).filter((column) => !column.hidden),
+        [config]
+    );
     const setColumns = (next: ViewColumn[]) => {
         if (!config) return;
         // `next` is the visible columns in their new order; the hidden ones
         // keep their places after them.
         const shown = new Set(next.map((column) => column.key));
-        shape({ ...config, columns: [...next, ...config.columns.filter((column) => !shown.has(column.key))] });
+        shape({
+            ...config,
+            columns: [...next, ...config.columns.filter((column) => !shown.has(column.key))]
+        });
     };
     const toggleColumn = (key: string) => {
         if (!config) return;
         shape({
             ...config,
-            columns: config.columns.map((column) => (column.key === key ? { ...column, hidden: !column.hidden } : column))
+            columns: config.columns.map((column) =>
+                column.key === key ? { ...column, hidden: !column.hidden } : column
+            )
         });
     };
     const sortBy = (key: string, direction: "asc" | "desc" | null) => {
         if (!config) return;
-        shape({ ...config, sorts: direction ? [{ key, direction }] : config.sorts.filter((sort) => sort.key !== key) });
+        shape({
+            ...config,
+            sorts: direction
+                ? [{ key, direction }]
+                : config.sorts.filter((sort) => sort.key !== key)
+        });
     };
     const aggregate = (key: string, value: Aggregate | null) => {
         if (!config) return;
         shape({
             ...config,
-            columns: config.columns.map((column) => (column.key === key ? { ...column, aggregate: value } : column))
+            columns: config.columns.map((column) =>
+                column.key === key ? { ...column, aggregate: value } : column
+            )
         });
     };
 
@@ -319,7 +375,8 @@ export function ListScreen({ object }: { object: CrmObject }) {
     const canEdit = Boolean(can?.edit);
     const canDelete = Boolean(can?.delete);
     const rows = records.rows;
-    const failure = (!opening.data && opening.error) || (readable && !rows && records.error) || null;
+    const failure =
+        (!opening.data && opening.error) || (readable && !rows && records.error) || null;
 
     let body;
     if (failure) {
@@ -409,14 +466,22 @@ export function ListScreen({ object }: { object: CrmObject }) {
         <div data-crm-ready className="flex h-full min-h-0 flex-col gap-3">
             <div className="flex flex-wrap items-center gap-2">
                 <div className="mr-auto flex min-w-0 items-baseline gap-2">
-                    <h1 className="truncate text-[1.0625rem] font-semibold leading-tight tracking-tight" title={title}>{title}</h1>
+                    <h1
+                        className="truncate text-[1.0625rem] font-semibold leading-tight tracking-tight"
+                        title={title}
+                    >
+                        {title}
+                    </h1>
                     {rows ? (
                         <span className="shrink-0 text-[0.8125rem] tabular-nums text-muted-foreground">
                             {format.number(records.total)}
                         </span>
                     ) : null}
                     {opening.data?.shelfName ? (
-                        <span className="truncate text-[0.8125rem] text-muted-foreground" title={opening.data.shelfName}>
+                        <span
+                            className="truncate text-[0.8125rem] text-muted-foreground"
+                            title={opening.data.shelfName}
+                        >
                             {opening.data.shelfName}
                         </span>
                     ) : null}
@@ -464,17 +529,27 @@ export function ListScreen({ object }: { object: CrmObject }) {
                                         )}
                                         aria-hidden
                                     >
-                                        {column.hidden ? null : <span className="size-1.5 rounded-sm bg-current" />}
+                                        {column.hidden ? null : (
+                                            <span className="size-1.5 rounded-sm bg-current" />
+                                        )}
                                     </span>
                                     <span className="truncate">
-                                        {t(`fields.${object}.${column.key}` as Parameters<typeof t>[0])}
+                                        {t(
+                                            `fields.${object}.${column.key}` as Parameters<
+                                                typeof t
+                                            >[0]
+                                        )}
                                     </span>
                                 </DropdownMenuItem>
                             ))}
                     </DropdownMenuContent>
                 </DropdownMenu>
                 {canEdit ? (
-                    <Button size="sm" onClick={() => setDrafting(true)} disabled={!config || drafting}>
+                    <Button
+                        size="sm"
+                        onClick={() => setDrafting(true)}
+                        disabled={!config || drafting}
+                    >
                         <Plus className="size-4" />
                         {t(`objects.${object}.new`)}
                     </Button>
@@ -499,7 +574,12 @@ export function ListScreen({ object }: { object: CrmObject }) {
                         </Button>
                     ) : null}
                     {canDelete ? (
-                        <Button size="sm" variant="ghost" className="text-danger" onClick={() => void trash()}>
+                        <Button
+                            size="sm"
+                            variant="ghost"
+                            className="text-danger"
+                            onClick={() => void trash()}
+                        >
                             <Trash2 className="size-4" />
                             {t("selection.trash")}
                         </Button>

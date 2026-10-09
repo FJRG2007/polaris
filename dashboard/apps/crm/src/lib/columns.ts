@@ -55,7 +55,11 @@ export const COLUMNS: Readonly<Record<CrmObject, Readonly<Record<string, ColumnS
         domain: scalar("domain"),
         accountOwner: user("accountOwnerId", "accountOwner"),
         employees: scalar("employees"),
-        annualRevenue: { type: "money", amount: "annualRevenue", currency: "annualRevenueCurrency" },
+        annualRevenue: {
+            type: "money",
+            amount: "annualRevenue",
+            currency: "annualRevenueCurrency"
+        },
         city: scalar("city"),
         country: scalar("country"),
         address: scalar("address"),
@@ -126,7 +130,9 @@ const REF_SELECT: Readonly<Record<CrmObject | "user", Record<string, true>>> = {
 /** The name a referenced row is drawn by. */
 function refName(row: Record<string, unknown>): string {
     if ("firstName" in row) {
-        return [row.firstName, row.lastName].filter((part) => typeof part === "string" && part).join(" ");
+        return [row.firstName, row.lastName]
+            .filter((part) => typeof part === "string" && part)
+            .join(" ");
     }
     return typeof row.name === "string" ? row.name : "";
 }
@@ -136,8 +142,10 @@ export function recordSelect(object: CrmObject): Record<string, unknown> {
     const select: Record<string, unknown> = { id: true, position: true, deletedAt: true };
     for (const spec of Object.values(COLUMNS[object])) {
         if (spec.type === "scalar" || spec.type === "day") select[spec.column] = true;
-        else if (spec.type === "name") Object.assign(select, { [spec.first]: true, [spec.last]: true });
-        else if (spec.type === "money") Object.assign(select, { [spec.amount]: true, [spec.currency]: true });
+        else if (spec.type === "name")
+            Object.assign(select, { [spec.first]: true, [spec.last]: true });
+        else if (spec.type === "money")
+            Object.assign(select, { [spec.amount]: true, [spec.currency]: true });
         else select[spec.relation] = { select: REF_SELECT[spec.target] };
     }
     return select;
@@ -184,7 +192,8 @@ export function readValue(spec: ColumnSpec, row: Record<string, unknown>): Field
 /** A row read with `recordSelect`, as the screens receive it. */
 export function toRecord(object: CrmObject, row: Record<string, unknown>): CrmRecord {
     const values: Record<string, FieldValue> = {};
-    for (const field of FIELDS[object]) values[field.key] = readValue(columnOf(object, field.key), row);
+    for (const field of FIELDS[object])
+        values[field.key] = readValue(columnOf(object, field.key), row);
     return {
         id: String(row.id),
         position: Number(row.position ?? 0),
@@ -194,7 +203,11 @@ export function toRecord(object: CrmObject, row: Record<string, unknown>): CrmRe
 }
 
 /** The columns one normalized value is written to. */
-export function writeData(object: CrmObject, field: FieldDef, value: InputValue): Record<string, unknown> {
+export function writeData(
+    object: CrmObject,
+    field: FieldDef,
+    value: InputValue
+): Record<string, unknown> {
     const spec = columnOf(object, field.key);
     switch (spec.type) {
         case "scalar":
@@ -208,7 +221,8 @@ export function writeData(object: CrmObject, field: FieldDef, value: InputValue)
         case "money": {
             const money = value as Money;
             return {
-                [spec.amount]: money.amount === null ? null : new Prisma.Decimal(money.amount.toFixed(2)),
+                [spec.amount]:
+                    money.amount === null ? null : new Prisma.Decimal(money.amount.toFixed(2)),
                 [spec.currency]: money.amount === null ? "" : money.currency
             };
         }

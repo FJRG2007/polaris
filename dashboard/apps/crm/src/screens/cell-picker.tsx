@@ -92,10 +92,18 @@ function RelationOptions({
     const t = useCrmT();
     const found = useRefLookup(target, search);
     if (found === null) {
-        return <p className="px-2 py-1.5 text-[0.8125rem] text-muted-foreground">{t("list.loading")}</p>;
+        return (
+            <p className="px-2 py-1.5 text-[0.8125rem] text-muted-foreground">
+                {t("list.loading")}
+            </p>
+        );
     }
     if (found.length === 0) {
-        return <p className="px-2 py-1.5 text-[0.8125rem] text-muted-foreground">{t("picker.noMatches")}</p>;
+        return (
+            <p className="px-2 py-1.5 text-[0.8125rem] text-muted-foreground">
+                {t("picker.noMatches")}
+            </p>
+        );
     }
     return (
         <>
@@ -115,13 +123,21 @@ function RelationOptions({
 export function CellPicker({ object, field, value, people, onPick, onClose }: PickerProps) {
     const t = useCrmT();
     const [search, setSearch] = useState("");
-    const selected = typeof value === "string" ? value : value && "id" in (value as Ref) ? (value as Ref).id : null;
+    const selected =
+        typeof value === "string"
+            ? value
+            : value && "id" in (value as Ref)
+              ? (value as Ref).id
+              : null;
     const members = useMemo(
         () => people.filter((person) => menuSearchMatches(person.name, search)),
         [people, search]
     );
     const options = (field.options ?? []).filter((option) =>
-        menuSearchMatches(t(`options.${object}.${field.key}.${option}` as Parameters<typeof t>[0]), search)
+        menuSearchMatches(
+            t(`options.${object}.${field.key}.${option}` as Parameters<typeof t>[0]),
+            search
+        )
     );
     const clearable = field.kind !== "select" && selected !== null;
 
@@ -144,11 +160,19 @@ export function CellPicker({ object, field, value, people, onPick, onClose }: Pi
                     ) : null}
                     {field.kind === "select"
                         ? options.map((option) => (
-                              <Item key={option} chosen={option === selected} onSelect={() => onPick(option, option)}>
+                              <Item
+                                  key={option}
+                                  chosen={option === selected}
+                                  onSelect={() => onPick(option, option)}
+                              >
                                   <OptionChip
                                       field={field}
                                       option={option}
-                                      label={t(`options.${object}.${field.key}.${option}` as Parameters<typeof t>[0])}
+                                      label={t(
+                                          `options.${object}.${field.key}.${option}` as Parameters<
+                                              typeof t
+                                          >[0]
+                                      )}
                                   />
                               </Item>
                           ))
@@ -174,7 +198,9 @@ export function CellPicker({ object, field, value, people, onPick, onClose }: Pi
                     ) : null}
                     {(field.kind === "select" && options.length === 0) ||
                     (field.kind === "member" && members.length === 0) ? (
-                        <p className="px-2 py-1.5 text-[0.8125rem] text-muted-foreground">{t("picker.noMatches")}</p>
+                        <p className="px-2 py-1.5 text-[0.8125rem] text-muted-foreground">
+                            {t("picker.noMatches")}
+                        </p>
                     ) : null}
                 </div>
             </DropdownMenuContent>

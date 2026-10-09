@@ -17,7 +17,13 @@ import type { CrmObject, FieldDef, FieldValue, Ref } from "../model/objects";
 const { Avatar } = hostUi.avatar;
 
 /** The hues the options of a choice are told apart by, in option order. */
-const OPTION_DOTS = ["bg-sky-500", "bg-violet-500", "bg-amber-500", "bg-orange-500", "bg-emerald-500"];
+const OPTION_DOTS = [
+    "bg-sky-500",
+    "bg-violet-500",
+    "bg-amber-500",
+    "bg-orange-500",
+    "bg-emerald-500"
+];
 
 export function optionDot(field: FieldDef, option: string): string {
     const index = field.options?.indexOf(option) ?? -1;
@@ -44,11 +50,21 @@ export function RefChip({ target, value }: { target: CrmObject; value: Ref }) {
 }
 
 /** A choice, as a chip with its dot. */
-export function OptionChip({ field, option, label }: { field: FieldDef; option: string; label: string }) {
+export function OptionChip({
+    field,
+    option,
+    label
+}: {
+    field: FieldDef;
+    option: string;
+    label: string;
+}) {
     return (
         <span className="inline-flex min-w-0 max-w-full items-center gap-1.5 rounded border border-border px-1.5 py-0.5 text-[0.75rem]">
             <span className={cn("size-2 shrink-0 rounded-full", optionDot(field, option))} />
-            <span className="truncate" title={label}>{label}</span>
+            <span className="truncate" title={label}>
+                {label}
+            </span>
         </span>
     );
 }
@@ -117,7 +133,11 @@ export function CellDisplay({
             );
         case "phone":
             return (
-                <a href={`tel:${(value as string).replace(/[^\d+]/g, "")}`} onClick={keep} className="truncate">
+                <a
+                    href={`tel:${(value as string).replace(/[^\d+]/g, "")}`}
+                    onClick={keep}
+                    className="truncate"
+                >
                     {value as string}
                 </a>
             );
@@ -133,13 +153,19 @@ export function CellDisplay({
             return <ExternalLink href={href}>{shown}</ExternalLink>;
         }
         case "domain":
-            return <ExternalLink href={`https://${value as string}`}>{value as string}</ExternalLink>;
+            return (
+                <ExternalLink href={`https://${value as string}`}>{value as string}</ExternalLink>
+            );
         case "select":
             return (
                 <OptionChip
                     field={field}
                     option={value as string}
-                    label={t(`options.${object}.${field.key}.${value as string}` as Parameters<typeof t>[0])}
+                    label={t(
+                        `options.${object}.${field.key}.${value as string}` as Parameters<
+                            typeof t
+                        >[0]
+                    )}
                 />
             );
         case "member":
@@ -149,7 +175,9 @@ export function CellDisplay({
         case "number":
         case "currency":
             return (
-                <span className="ml-auto truncate tabular-nums">{plainText(field, value, format, locale)}</span>
+                <span className="ml-auto truncate tabular-nums">
+                    {plainText(field, value, format, locale)}
+                </span>
             );
         default: {
             const text = plainText(field, value, format, locale);

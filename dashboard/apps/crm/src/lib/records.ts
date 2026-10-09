@@ -61,7 +61,10 @@ export async function listRecords(
         }),
         table(object).count({ where })
     ]);
-    return { records: (rows as Record<string, unknown>[]).map((row) => toRecord(object, row)), total };
+    return {
+        records: (rows as Record<string, unknown>[]).map((row) => toRecord(object, row)),
+        total
+    };
 }
 
 /** One record on the reader's shelf, or null. */

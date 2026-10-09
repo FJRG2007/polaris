@@ -69,7 +69,9 @@ function Overlay({
             onClick={(event) => event.stopPropagation()}
         >
             {children}
-            {error ? <p className="px-1.5 pb-1 pt-0.5 text-[0.6875rem] text-danger">{error}</p> : null}
+            {error ? (
+                <p className="px-1.5 pb-1 pt-0.5 text-[0.6875rem] text-danger">{error}</p>
+            ) : null}
         </div>
     );
 }
@@ -122,7 +124,9 @@ export function TextEditor({ field, value, onCommit, onCancel }: EditorProps) {
                 autoFocus
                 className={FIELD_INPUT}
                 value={text}
-                inputMode={field.kind === "number" ? "numeric" : field.kind === "phone" ? "tel" : undefined}
+                inputMode={
+                    field.kind === "number" ? "numeric" : field.kind === "phone" ? "tel" : undefined
+                }
                 type={field.kind === "email" ? "email" : "text"}
                 placeholder={placeholder}
                 aria-invalid={Boolean(touched && result.error)}
