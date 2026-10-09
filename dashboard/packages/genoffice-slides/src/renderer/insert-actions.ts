@@ -428,13 +428,27 @@ export async function insertModel3dFile(ctx: ActionCtx): Promise<void> {
   }
 }
 
+/**
+ * Whether this browser can record the screen at all. No phone browser can
+ * (Chrome on Android and Safari on iOS have no getDisplayMedia), so the control
+ * is left out there rather than offered and failing. Read in the browser only,
+ * after mount - the server has no navigator to ask.
+ */
+export function canRecordScreen(): boolean {
+  return (
+    typeof navigator !== 'undefined' &&
+    typeof navigator.mediaDevices?.getDisplayMedia === 'function' &&
+    typeof MediaRecorder !== 'undefined'
+  )
+}
+
 /** Screen recording: getDisplayMedia + MediaRecorder; when stopped, inserted into the current page as webm video. */
 export async function toggleScreenRecord(ctx: ActionCtx): Promise<void> {
   if (ctx.recorderRef.current) {
     ctx.recorderRef.current.rec.stop()
     return
   }
-  if (!ctx.slide) return
+  if (!ctx.slide || !canRecordScreen()) return
   try {
     const stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: false })
     const mime = MediaRecorder.isTypeSupported('video/webm;codecs=vp9')

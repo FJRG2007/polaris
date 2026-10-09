@@ -38,6 +38,8 @@ import {
   IconWordArt,
   IconZoomJump,
 } from './icons'
+import { useEffect, useState } from 'react'
+import { canRecordScreen } from '../insert-actions'
 import { saveEditSelection } from '../TextEditOverlay'
 import {
   BIG,
@@ -92,6 +94,10 @@ export function RibbonInsertTab({ rb }: { rb: RibbonTabCtx }) {
     tableHover,
     tableOpen,
   } = rb
+  // Decided after mount: the server render has no navigator, and a phone
+  // browser has no screen to record.
+  const [canRecord, setCanRecord] = useState(false)
+  useEffect(() => setCanRecord(canRecordScreen()), [])
   return (
     <>
       <Group label={t('ribbonGroupSlides')}>
@@ -536,17 +542,19 @@ export function RibbonInsertTab({ rb }: { rb: RibbonTabCtx }) {
           </span>
           <span>{t('ribbonAudio')}</span>
         </button>
-        <button
-          className={`rb-big ${recording ? 'active rb-recording' : ''}`}
-          disabled={!hasDoc}
-          onClick={onToggleScreenRecord}
-          data-tip={recording ? t('ribbonStopRecTip') : t('ribbonScreenRecTip')}
-        >
-          <span className="rb-big-icon">
-            <IconScreenRec size={BIG} />
-          </span>
-          <span>{recording ? t('ribbonStopRec') : t('ribbonScreenRec')}</span>
-        </button>
+        {canRecord || recording ? (
+          <button
+            className={`rb-big ${recording ? 'active rb-recording' : ''}`}
+            disabled={!hasDoc}
+            onClick={onToggleScreenRecord}
+            data-tip={recording ? t('ribbonStopRecTip') : t('ribbonScreenRecTip')}
+          >
+            <span className="rb-big-icon">
+              <IconScreenRec size={BIG} />
+            </span>
+            <span>{recording ? t('ribbonStopRec') : t('ribbonScreenRec')}</span>
+          </button>
+        ) : null}
       </Group>
     </>
   )
