@@ -2278,7 +2278,8 @@
             "tools": "Tools",
             "tasks": "Tasks",
             "inbox": "Inbox",
-            "management": "Management"
+            "management": "Management",
+            "crm": "CRM"
         },
         "permissions": {
             "drive": {
@@ -2366,6 +2367,9 @@
             },
             "system": {
                 "manage": "Updates, backups and maintenance"
+            },
+            "crm": {
+                "use": "Keep companies, people and deals"
             }
         }
     },

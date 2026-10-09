@@ -366,6 +366,15 @@ model User {
     calendarBookingPages CalendarBookingPage[]
     calendarProposals    CalendarProposal[]
     calendarPreference   CalendarPreference?
+    crmCompanies            CrmCompany[]     @relation("CrmCompanyShelf")
+    crmAccountsOwned        CrmCompany[]     @relation("CrmCompanyAccountOwner")
+    crmCompaniesCreated     CrmCompany[]     @relation("CrmCompanyCreatedBy")
+    crmPeople               CrmPerson[]      @relation("CrmPersonShelf")
+    crmPeopleCreated        CrmPerson[]      @relation("CrmPersonCreatedBy")
+    crmOpportunities        CrmOpportunity[] @relation("CrmOpportunityShelf")
+    crmOpportunitiesOwned   CrmOpportunity[] @relation("CrmOpportunityOwner")
+    crmOpportunitiesCreated CrmOpportunity[] @relation("CrmOpportunityCreatedBy")
+    crmViews                CrmView[]        @relation("CrmViewShelf")
     clockAlarms          ClockAlarm[]
     clockTimers          ClockTimer[]
     clockStopwatch       ClockStopwatch?
@@ -5798,6 +5807,10 @@ model Organization {
     banner   OrganizationBanner?
     successor OrganizationSuccessor?
     budget   OrganizationBudget?
+    crmCompanies     CrmCompany[]
+    crmPeople        CrmPerson[]
+    crmOpportunities CrmOpportunity[]
+    crmViews         CrmView[]
     vault    VaultOrganization?
     // Its own Drive: one row, made the first time somebody opens it.
     storages  StorageConnection[]
@@ -12558,4 +12571,152 @@ model StorageFallbackFile {
 
     @@unique([localFolder, path])
     @@index([targetId])
+}
+
+// ---------------------------------------------------------------------------
+// CRM (apps/crm): companies, the people at them and the opportunities worked
+// with them.
+//
+// Every record sits on one shelf: an organization's (`orgId`) or one account's
+// own (`userId`), never both - the same split the workspace switcher draws.
+// Each is a real foreign key so that deleting the organization or the account
+// takes its CRM with it. `createdById` is only who made the record and keeps it
+// when that account goes (SetNull), because an organization's records outlive
+// the person who typed them.
+//
+// `deletedAt` is the trash: a deleted record is hidden everywhere and can be
+// restored until somebody deletes it for good. `position` orders records by
+// hand (a board column).
+// ---------------------------------------------------------------------------
+
+model CrmCompany {
+    id                    String    @id @default(uuid(7)) @db.Uuid
+    orgId                 String?   @db.Uuid
+    userId                String?   @db.Uuid
+    name                  String
+    // A bare host name, lowercased: "acme.com", never a URL.
+    domain                String    @default("")
+    employees             Int?
+    annualRevenue         Decimal?
+    // ISO 4217 code of annualRevenue.
+    annualRevenueCurrency String    @default("")
+    linkedinUrl           String    @default("")
+    xUrl                  String    @default("")
+    address               String    @default("")
+    city                  String    @default("")
+    country               String    @default("")
+    idealCustomer         Boolean   @default(false)
+    accountOwnerId        String?   @db.Uuid
+    createdById           String?   @db.Uuid
+    position              Float     @default(0)
+    deletedAt             DateTime?
+    createdAt             DateTime  @default(now())
+    updatedAt             DateTime  @updatedAt
+
+    org           Organization?    @relation(fields: [orgId], references: [id], onDelete: Cascade)
+    user          User?            @relation("CrmCompanyShelf", fields: [userId], references: [id], onDelete: Cascade)
+    accountOwner  User?            @relation("CrmCompanyAccountOwner", fields: [accountOwnerId], references: [id], onDelete: SetNull)
+    createdBy     User?            @relation("CrmCompanyCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+    people        CrmPerson[]
+    opportunities CrmOpportunity[]
+
+    @@index([orgId, deletedAt])
+    @@index([userId, deletedAt])
+    @@index([orgId, domain])
+    @@index([userId, domain])
+}
+
+model CrmPerson {
+    id          String    @id @default(uuid(7)) @db.Uuid
+    orgId       String?   @db.Uuid
+    userId      String?   @db.Uuid
+    firstName   String    @default("")
+    lastName    String    @default("")
+    // Lowercased.
+    email       String    @default("")
+    phone       String    @default("")
+    jobTitle    String    @default("")
+    city        String    @default("")
+    linkedinUrl String    @default("")
+    xUrl        String    @default("")
+    companyId   String?   @db.Uuid
+    createdById String?   @db.Uuid
+    position    Float     @default(0)
+    deletedAt   DateTime?
+    createdAt   DateTime  @default(now())
+    updatedAt   DateTime  @updatedAt
+
+    org           Organization?    @relation(fields: [orgId], references: [id], onDelete: Cascade)
+    user          User?            @relation("CrmPersonShelf", fields: [userId], references: [id], onDelete: Cascade)
+    company       CrmCompany?      @relation(fields: [companyId], references: [id], onDelete: SetNull)
+    createdBy     User?            @relation("CrmPersonCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+    opportunities CrmOpportunity[]
+
+    @@index([orgId, deletedAt])
+    @@index([userId, deletedAt])
+    @@index([companyId])
+    @@index([orgId, email])
+    @@index([userId, email])
+}
+
+model CrmOpportunity {
+    id               String    @id @default(uuid(7)) @db.Uuid
+    orgId            String?   @db.Uuid
+    userId           String?   @db.Uuid
+    name             String
+    amount           Decimal?
+    // ISO 4217 code of amount.
+    amountCurrency   String    @default("")
+    // A calendar day, stored at midnight UTC.
+    closeDate        DateTime?
+    // new | screening | meeting | proposal | customer (apps/crm model/objects).
+    stage            String    @default("new")
+    companyId        String?   @db.Uuid
+    pointOfContactId String?   @db.Uuid
+    ownerId          String?   @db.Uuid
+    createdById      String?   @db.Uuid
+    position         Float     @default(0)
+    deletedAt        DateTime?
+    createdAt        DateTime  @default(now())
+    updatedAt        DateTime  @updatedAt
+
+    org            Organization? @relation(fields: [orgId], references: [id], onDelete: Cascade)
+    user           User?         @relation("CrmOpportunityShelf", fields: [userId], references: [id], onDelete: Cascade)
+    company        CrmCompany?   @relation(fields: [companyId], references: [id], onDelete: SetNull)
+    pointOfContact CrmPerson?    @relation(fields: [pointOfContactId], references: [id], onDelete: SetNull)
+    owner          User?         @relation("CrmOpportunityOwner", fields: [ownerId], references: [id], onDelete: SetNull)
+    createdBy      User?         @relation("CrmOpportunityCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+
+    @@index([orgId, deletedAt, stage])
+    @@index([userId, deletedAt, stage])
+    @@index([companyId])
+    @@index([pointOfContactId])
+}
+
+// A saved way of looking at one kind of record: its columns, filters, sorts
+// and grouping, as JSON in `config` (apps/crm model/views). Shared by everybody
+// on the shelf, the way a team shares one list. `shelf` repeats orgId/userId as
+// one string so a view name can be unique per shelf and object; the empty name
+// is the default view every object starts with.
+model CrmView {
+    id          String   @id @default(uuid(7)) @db.Uuid
+    orgId       String?  @db.Uuid
+    userId      String?  @db.Uuid
+    // "org:<id>" or "user:<id>".
+    shelf       String
+    // companies | people | opportunities
+    object      String
+    name        String   @default("")
+    // table | kanban
+    kind        String   @default("table")
+    config      String   @default("{}")
+    position    Float    @default(0)
+    createdById String?  @db.Uuid
+    createdAt   DateTime @default(now())
+    updatedAt   DateTime @updatedAt
+
+    org  Organization? @relation(fields: [orgId], references: [id], onDelete: Cascade)
+    user User?         @relation("CrmViewShelf", fields: [userId], references: [id], onDelete: Cascade)
+
+    @@unique([shelf, object, name])
 }

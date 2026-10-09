@@ -1,0 +1,210 @@
+{
+    "objects": {
+        "companies": {
+            "plural": "Companies",
+            "new": "New company"
+        },
+        "people": {
+            "plural": "People",
+            "new": "New person"
+        },
+        "opportunities": {
+            "plural": "Opportunities",
+            "new": "New opportunity"
+        }
+    },
+    "fields": {
+        "nameOf": "Name",
+        "valueOf": "Value",
+        "amountOf": "Amount",
+        "currencyOf": "Currency",
+        "companies": {
+            "name": "Name",
+            "domain": "Website",
+            "accountOwner": "Account owner",
+            "employees": "Employees",
+            "annualRevenue": "Annual revenue",
+            "city": "City",
+            "country": "Country",
+            "address": "Address",
+            "idealCustomer": "Ideal customer",
+            "linkedinUrl": "LinkedIn",
+            "xUrl": "X",
+            "createdAt": "Created",
+            "updatedAt": "Updated",
+            "createdBy": "Created by"
+        },
+        "people": {
+            "name": "Name",
+            "email": "Email",
+            "company": "Company",
+            "jobTitle": "Job title",
+            "phone": "Phone",
+            "city": "City",
+            "linkedinUrl": "LinkedIn",
+            "xUrl": "X",
+            "createdAt": "Created",
+            "updatedAt": "Updated",
+            "createdBy": "Created by"
+        },
+        "opportunities": {
+            "name": "Name",
+            "amount": "Amount",
+            "stage": "Stage",
+            "closeDate": "Close date",
+            "company": "Company",
+            "pointOfContact": "Point of contact",
+            "owner": "Owner",
+            "createdAt": "Created",
+            "updatedAt": "Updated",
+            "createdBy": "Created by"
+        }
+    },
+    "options": {
+        "opportunities": {
+            "stage": {
+                "new": "New",
+                "screening": "Screening",
+                "meeting": "Meeting",
+                "proposal": "Proposal",
+                "customer": "Customer"
+            }
+        }
+    },
+    "values": {
+        "yes": "Yes",
+        "no": "No"
+    },
+    "placeholders": {
+        "email": "name@company.com",
+        "firstName": "First name",
+        "lastName": "Last name"
+    },
+    "invalid": {
+        "required": "A name is required.",
+        "tooLong": "That is too long.",
+        "email": "Enter an email address, like name@company.com.",
+        "phone": "Enter a phone number: digits, spaces and + ( ) - only.",
+        "url": "Enter a web address, like https://company.com.",
+        "domain": "Enter a domain, like company.com.",
+        "number": "Enter a number.",
+        "wholeNumber": "Enter a whole number, 0 or more.",
+        "currency": "Choose a currency from the list.",
+        "date": "Enter a date.",
+        "option": "Choose one of the options.",
+        "missing": "That record is gone or in the trash.",
+        "notOnShelf": "That person is not a member here."
+    },
+    "list": {
+        "loading": "Loading",
+        "loadingMore": "Loading more",
+        "search": "Search {object}"
+    },
+    "columns": {
+        "fields": "Fields",
+        "sortAscending": "Sort ascending",
+        "sortDescending": "Sort descending",
+        "clearSort": "Remove sort",
+        "notSortable": "Cannot sort by this",
+        "hide": "Hide field",
+        "width": "{field} column width"
+    },
+    "aggregates": {
+        "add": "Calculate",
+        "choose": "Total for {field}",
+        "none": "None",
+        "short": {
+            "countAll": "Count",
+            "countEmpty": "Empty",
+            "countNotEmpty": "Not empty",
+            "countUnique": "Unique",
+            "percentEmpty": "Empty",
+            "percentNotEmpty": "Not empty",
+            "sum": "Sum",
+            "avg": "Average",
+            "min": "Min",
+            "max": "Max",
+            "earliest": "Earliest",
+            "latest": "Latest"
+        },
+        "long": {
+            "countAll": "Count all",
+            "countEmpty": "Count empty",
+            "countNotEmpty": "Count not empty",
+            "countUnique": "Count unique values",
+            "percentEmpty": "Percent empty",
+            "percentNotEmpty": "Percent not empty",
+            "sum": "Sum",
+            "avg": "Average",
+            "min": "Min",
+            "max": "Max",
+            "earliest": "Earliest date",
+            "latest": "Latest date"
+        }
+    },
+    "picker": {
+        "search": "Search",
+        "none": "None",
+        "noMatches": "Nothing matches"
+    },
+    "selection": {
+        "all": "Select all loaded rows",
+        "row": "Select row",
+        "toolbar": "Selected records",
+        "count": "{count, plural, one {# selected} other {# selected}}",
+        "edit": "Edit",
+        "trash": "Delete",
+        "clear": "Clear selection"
+    },
+    "bulk": {
+        "title": "{count, plural, one {Edit # record} other {Edit # records}}",
+        "description": "Every selected record gets the same value for the field you choose.",
+        "field": "Field",
+        "value": "New value",
+        "apply": "{count, plural, one {Update # record} other {Update # records}}",
+        "done": "{count, plural, one {# record updated.} other {# records updated.}}"
+    },
+    "trash": {
+        "title": "{count, plural, one {Delete # record?} other {Delete # records?}}",
+        "description": "They are removed from every list.",
+        "confirm": "Delete",
+        "done": "{count, plural, one {# record deleted.} other {# records deleted.}}"
+    },
+    "empty": {
+        "companies": {
+            "title": "No companies yet",
+            "body": "Add the companies you sell to or work with."
+        },
+        "people": {
+            "title": "No people yet",
+            "body": "Add the people you talk to at those companies."
+        },
+        "opportunities": {
+            "title": "No opportunities yet",
+            "body": "Add a deal to follow it from first contact to customer."
+        },
+        "noMatches": "Nothing matches \"{search}\"",
+        "forbiddenTitle": "Your role cannot see this list",
+        "forbiddenBody": "An organization admin can give your role access in the organization's roles."
+    },
+    "actions": {
+        "cancel": "Cancel",
+        "clear": "Clear",
+        "clearSearch": "Clear search",
+        "retry": "Try again"
+    },
+    "errors": {
+        "generic": "Something went wrong. Try again.",
+        "checkInput": "Check the values and try again.",
+        "forbidden": "Your role cannot {verb, select, read {see} edit {change} delete {delete} other {use}} {object, select, companies {companies} people {people} opportunities {opportunities} other {records}} here.",
+        "invalidValue": "{field}: {reason}",
+        "unknownField": "That field does not exist.",
+        "notFound": "That record is gone or in the trash.",
+        "viewMissing": "That view no longer exists.",
+        "loadFailed": "Could not load this list.",
+        "notSaved": "The change was not saved",
+        "notCreated": "The record was not created",
+        "notTrashed": "Nothing was deleted",
+        "viewNotSaved": "The columns were not saved"
+    }
+}

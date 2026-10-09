@@ -111,6 +111,7 @@
         "@breezystack/lamejs": "1.2.7",
         "@mediapipe/selfie_segmentation": "0.1.1675465747",
         "@polaris-app/calendar": "0.1.0",
+        "@polaris-app/crm": "0.1.0",
         "@polaris-app/game-servers": "0.1.0",
         "@polaris-app/places": "0.1.0",
         "@testing-library/react": "16.3.2",

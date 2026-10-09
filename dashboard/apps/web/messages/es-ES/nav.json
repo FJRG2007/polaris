@@ -147,6 +147,9 @@
         },
         "account": {
             "description": "Perfil, seguridad y claves de API"
+        },
+        "crm": {
+            "description": "Empresas, personas y los tratos que llevas"
         }
     },
     "labels": {
@@ -311,7 +314,10 @@
         "Home": "Hogar",
         "Infrastructure": "Infraestructura",
         "Games": "Juegos",
-        "Keyboard shortcuts": "Atajos de teclado"
+        "Keyboard shortcuts": "Atajos de teclado",
+        "CRM": "CRM",
+        "Companies": "Empresas",
+        "Opportunities": "Oportunidades"
     },
     "errors": {
         "favoritesNotSaved": "No se han podido guardar esos favoritos.",

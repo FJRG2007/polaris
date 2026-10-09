@@ -147,6 +147,9 @@
         },
         "account": {
             "description": "Profile, security & API keys"
+        },
+        "crm": {
+            "description": "Companies, people and the deals you are working"
         }
     },
     "labels": {
@@ -311,7 +314,10 @@
         "Home": "Home",
         "Infrastructure": "Infrastructure",
         "Games": "Games",
-        "Keyboard shortcuts": "Keyboard shortcuts"
+        "Keyboard shortcuts": "Keyboard shortcuts",
+        "CRM": "CRM",
+        "Companies": "Companies",
+        "Opportunities": "Opportunities"
     },
     "errors": {
         "favoritesNotSaved": "Those favorites could not be saved.",

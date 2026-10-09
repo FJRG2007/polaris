@@ -231,7 +231,8 @@
         "areas": {
             "general": "General",
             "people": "Personas",
-            "work": "Trabajo"
+            "work": "Trabajo",
+            "crm": "CRM"
         },
         "permissions": {
             "orgRead": "Ver la organización, sus personas y sus equipos",
@@ -245,7 +246,13 @@
             "domainsManage": "Añadir y verificar los dominios de la organización",
             "vaultManage": "Gestionar las colecciones y los miembros de la bóveda compartida",
             "driveManage": "Añadir y cambiar los archivos de la organización",
-            "mailManage": "Repartir los buzones de la organización"
+            "mailManage": "Repartir los buzones de la organización",
+            "crmCompaniesEdit": "Añadir y cambiar empresas",
+            "crmCompaniesDelete": "Borrar empresas",
+            "crmPeopleEdit": "Añadir y cambiar personas",
+            "crmPeopleDelete": "Borrar personas",
+            "crmOpportunitiesEdit": "Añadir y cambiar oportunidades",
+            "crmOpportunitiesDelete": "Borrar oportunidades"
         }
     },
     "settings": {

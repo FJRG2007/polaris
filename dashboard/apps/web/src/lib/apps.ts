@@ -41,6 +41,7 @@ import {
     FolderOpen,
     Gamepad2,
     Gauge,
+    Handshake,
     GitPullRequest,
     Globe,
     HardDrive,
@@ -339,6 +340,22 @@ export const POLARIS_APPS: AppEntry[] = [
         href: "/calendar",
         permission: "calendar.use",
         requiresApp: "calendar"
+    },
+    {
+        /**
+         * Companies, people and the opportunities worked with them - for one
+         * person, or shared by an organization under its own roles.
+         *
+         * Installable: a Polaris that sells nothing carries no menu entry for it.
+         */
+        id: "crm",
+        category: "work",
+        label: "CRM", // i18n-ignore
+        description: "Companies, people and the deals you are working", // i18n-ignore
+        icon: Handshake,
+        href: "/crm",
+        permission: "crm.use",
+        requiresApp: "crm"
     },
     {
         id: "notes",
@@ -1174,6 +1191,26 @@ export const APP_SECTIONS: Record<string, AppSection[]> = {
             icon: CalendarClock,
             hidden: true,
             keywords: ["out of office", "vacation", "holiday", "auto reply", "autoresponder"]
+        }
+    ],
+    crm: [
+        {
+            label: "Companies", // i18n-ignore
+            href: "/crm/companies",
+            icon: Building2,
+            keywords: ["accounts", "organizations", "customers", "clients", "domains"]
+        },
+        {
+            label: "People", // i18n-ignore
+            href: "/crm/people",
+            icon: Contact,
+            keywords: ["contacts", "leads", "email", "phone", "job title"]
+        },
+        {
+            label: "Opportunities", // i18n-ignore
+            href: "/crm/opportunities",
+            icon: Target,
+            keywords: ["deals", "pipeline", "stages", "sales", "amount", "close date"]
         }
     ],
     notes: [

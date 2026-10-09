@@ -63,6 +63,33 @@ export function suggestSlug(name: string): string {
 // Roles
 // ---------------------------------------------------------------------------
 
+/** The CRM's record kinds, as its permissions name them. */
+export const CRM_OBJECTS = ["companies", "people", "opportunities"] as const;
+
+export type CrmObject = (typeof CRM_OBJECTS)[number];
+
+/** What a role may do with one kind of CRM record. */
+export const CRM_VERBS = ["read", "edit", "delete"] as const;
+
+export type CrmVerb = (typeof CRM_VERBS)[number];
+
+/**
+ * `crm.<object>.<verb>` for changing and deleting each kind of record, in the
+ * order the role editor draws them.
+ *
+ * Seeing them is not here, for the reason reading the Drive is not: being on
+ * the roster is what opens the organization's CRM, and a read permission no
+ * existing role holds would be an empty CRM in every organization there is.
+ */
+export const CRM_ORG_PERMISSIONS = [
+    "crm.companies.edit",
+    "crm.companies.delete",
+    "crm.people.edit",
+    "crm.people.delete",
+    "crm.opportunities.edit",
+    "crm.opportunities.delete"
+] as const satisfies readonly `crm.${CrmObject}.${CrmVerb}`[];
+
 /**
  * What somebody may do across a whole organization.
  *
@@ -98,7 +125,10 @@ export const ORG_PERMISSIONS = [
     // holds would be an empty shelf on every organization that already exists.
     "drive.manage",
     "activity.read",
-    "settings.manage"
+    "settings.manage",
+    // The organization's CRM, per kind of record: creating and changing it, and
+    // deleting, restoring and merging it.
+    ...CRM_ORG_PERMISSIONS
 ] as const;
 
 export type OrgPermission = (typeof ORG_PERMISSIONS)[number];
@@ -137,7 +167,13 @@ export const ORG_PERMISSION_META: Readonly<Record<OrgPermission, { area: string;
         "drive.manage": { area: "Work", label: "Add to and change the organization's files" },
         // Giving somebody the company address or the support mailbox, and taking
         // it back when they leave. Never reading what is in one.
-        "mail.manage": { area: "Work", label: "Hand out the organization's mailboxes" }
+        "mail.manage": { area: "Work", label: "Hand out the organization's mailboxes" },
+        "crm.companies.edit": { area: "CRM", label: "Add and change companies" },
+        "crm.companies.delete": { area: "CRM", label: "Delete companies" },
+        "crm.people.edit": { area: "CRM", label: "Add and change people" },
+        "crm.people.delete": { area: "CRM", label: "Delete people" },
+        "crm.opportunities.edit": { area: "CRM", label: "Add and change opportunities" },
+        "crm.opportunities.delete": { area: "CRM", label: "Delete opportunities" }
     };
 
 /** The areas in the order the editor draws them. Read off the meta rather than
@@ -183,7 +219,8 @@ export const ORG_SYSTEM_ROLES: Readonly<
     // a team, a project, a space - and nothing because of where they belong.
     restricted: {
         name: "Restricted",
-        description: "Reaches only what is granted to them. Does not see the roster, the files or internal work.",
+        description:
+            "Reaches only what is granted to them. Does not see the roster, the files or internal work.",
         permissions: [],
         restricted: true
     }
@@ -369,7 +406,8 @@ export const ORG_NEW_PEOPLE_LABELS: Record<OrgNewPeopleMode, string> = {
 
 export const ORG_NEW_PEOPLE_HINTS: Record<OrgNewPeopleMode, string> = {
     admins: "Administrators can invite by email from any organization. Everybody else invites people who already have an account.",
-    managers: "The invitation creates their account when they accept it, so this lets organizations bring in new people.",
+    managers:
+        "The invitation creates their account when they accept it, so this lets organizations bring in new people.",
     off: "Organizations only invite people who already have an account."
 };
 
@@ -388,12 +426,7 @@ export const organizationPolicySchema = z.object({
     maxTeams: limitField,
     newPeople: z.enum(ORG_NEW_PEOPLE_MODES).default("admins"),
     /** Per person, per organization, per hour. Zero is no limit. */
-    invitesPerHour: z.coerce
-        .number()
-        .int()
-        .min(0)
-        .max(10_000)
-        .default(ORG_INVITES_PER_HOUR_DEFAULT)
+    invitesPerHour: z.coerce.number().int().min(0).max(10_000).default(ORG_INVITES_PER_HOUR_DEFAULT)
 });
 
 export type OrganizationPolicy = z.infer<typeof organizationPolicySchema>;

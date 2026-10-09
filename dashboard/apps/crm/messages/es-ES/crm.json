@@ -1,0 +1,210 @@
+{
+    "objects": {
+        "companies": {
+            "plural": "Empresas",
+            "new": "Nueva empresa"
+        },
+        "people": {
+            "plural": "Personas",
+            "new": "Nueva persona"
+        },
+        "opportunities": {
+            "plural": "Oportunidades",
+            "new": "Nueva oportunidad"
+        }
+    },
+    "fields": {
+        "nameOf": "Nombre",
+        "valueOf": "Valor",
+        "amountOf": "Importe",
+        "currencyOf": "Moneda",
+        "companies": {
+            "name": "Nombre",
+            "domain": "Web",
+            "accountOwner": "Responsable",
+            "employees": "Empleados",
+            "annualRevenue": "Ingresos anuales",
+            "city": "Ciudad",
+            "country": "País",
+            "address": "Dirección",
+            "idealCustomer": "Cliente ideal",
+            "linkedinUrl": "LinkedIn",
+            "xUrl": "X",
+            "createdAt": "Creado",
+            "updatedAt": "Editado",
+            "createdBy": "Creado por"
+        },
+        "people": {
+            "name": "Nombre",
+            "email": "Correo",
+            "company": "Empresa",
+            "jobTitle": "Cargo",
+            "phone": "Teléfono",
+            "city": "Ciudad",
+            "linkedinUrl": "LinkedIn",
+            "xUrl": "X",
+            "createdAt": "Creado",
+            "updatedAt": "Editado",
+            "createdBy": "Creado por"
+        },
+        "opportunities": {
+            "name": "Nombre",
+            "amount": "Importe",
+            "stage": "Etapa",
+            "closeDate": "Cierre",
+            "company": "Empresa",
+            "pointOfContact": "Contacto",
+            "owner": "Dueño",
+            "createdAt": "Creado",
+            "updatedAt": "Editado",
+            "createdBy": "Creado por"
+        }
+    },
+    "options": {
+        "opportunities": {
+            "stage": {
+                "new": "Nueva",
+                "screening": "Filtrado",
+                "meeting": "Reunión",
+                "proposal": "Propuesta",
+                "customer": "Cliente"
+            }
+        }
+    },
+    "values": {
+        "yes": "Sí",
+        "no": "No"
+    },
+    "placeholders": {
+        "email": "nombre@empresa.com",
+        "firstName": "Nombre",
+        "lastName": "Apellidos"
+    },
+    "invalid": {
+        "required": "Falta el nombre.",
+        "tooLong": "Es demasiado largo.",
+        "email": "Escribe un correo, como nombre@empresa.com.",
+        "phone": "Escribe un teléfono: solo cifras, espacios y + ( ) -.",
+        "url": "Escribe una dirección web, como https://empresa.com.",
+        "domain": "Escribe un dominio, como empresa.com.",
+        "number": "Escribe un número.",
+        "wholeNumber": "Escribe un número entero, 0 o más.",
+        "currency": "Elige una moneda de la lista.",
+        "date": "Escribe una fecha.",
+        "option": "Elige una de las opciones.",
+        "missing": "Ese registro ya no existe o está en la papelera.",
+        "notOnShelf": "Esa persona no es miembro aquí."
+    },
+    "list": {
+        "loading": "Cargando",
+        "loadingMore": "Cargando más",
+        "search": "Buscar {object}"
+    },
+    "columns": {
+        "fields": "Campos",
+        "sortAscending": "Orden ascendente",
+        "sortDescending": "Orden descendente",
+        "clearSort": "Quitar orden",
+        "notSortable": "No se puede ordenar",
+        "hide": "Ocultar campo",
+        "width": "Ancho de la columna {field}"
+    },
+    "aggregates": {
+        "add": "Calcular",
+        "choose": "Total de {field}",
+        "none": "Ninguno",
+        "short": {
+            "countAll": "Total",
+            "countEmpty": "Vacíos",
+            "countNotEmpty": "Con valor",
+            "countUnique": "Únicos",
+            "percentEmpty": "Vacíos",
+            "percentNotEmpty": "Con valor",
+            "sum": "Suma",
+            "avg": "Media",
+            "min": "Mín",
+            "max": "Máx",
+            "earliest": "Primera",
+            "latest": "Última"
+        },
+        "long": {
+            "countAll": "Contar todos",
+            "countEmpty": "Contar vacíos",
+            "countNotEmpty": "Contar con valor",
+            "countUnique": "Contar valores únicos",
+            "percentEmpty": "Porcentaje vacío",
+            "percentNotEmpty": "% con valor",
+            "sum": "Suma",
+            "avg": "Media",
+            "min": "Mínimo",
+            "max": "Máximo",
+            "earliest": "Primera fecha",
+            "latest": "Última fecha"
+        }
+    },
+    "picker": {
+        "search": "Buscar",
+        "none": "Ninguno",
+        "noMatches": "Sin resultados"
+    },
+    "selection": {
+        "all": "Elegir las filas cargadas",
+        "row": "Elegir fila",
+        "toolbar": "Registros elegidos",
+        "count": "{count, plural, one {# elegido} other {# elegidos}}",
+        "edit": "Editar",
+        "trash": "Borrar",
+        "clear": "Quitar selección"
+    },
+    "bulk": {
+        "title": "{count, plural, one {Editar # registro} other {Editar # registros}}",
+        "description": "Todos los registros elegidos reciben el mismo valor en el campo que elijas.",
+        "field": "Campo",
+        "value": "Nuevo valor",
+        "apply": "{count, plural, one {Cambiar # registro} other {Cambiar # registros}}",
+        "done": "{count, plural, one {# registro cambiado.} other {# registros cambiados.}}"
+    },
+    "trash": {
+        "title": "{count, plural, one {¿Borrar # registro?} other {¿Borrar # registros?}}",
+        "description": "Desaparecen de todas las listas.",
+        "confirm": "Borrar",
+        "done": "{count, plural, one {# registro borrado.} other {# registros borrados.}}"
+    },
+    "empty": {
+        "companies": {
+            "title": "Aún no hay empresas",
+            "body": "Añade las empresas a las que vendes o con las que trabajas."
+        },
+        "people": {
+            "title": "Sin personas aún",
+            "body": "Añade las personas con las que hablas en esas empresas."
+        },
+        "opportunities": {
+            "title": "Sin oportunidades",
+            "body": "Añade un negocio para seguirlo del primer contacto a cliente."
+        },
+        "noMatches": "Nada coincide con \"{search}\"",
+        "forbiddenTitle": "Tu rol no puede ver esta lista",
+        "forbiddenBody": "Un administrador de la organización puede dar acceso a tu rol en los roles de la organización."
+    },
+    "actions": {
+        "cancel": "Cancelar",
+        "clear": "Borrar",
+        "clearSearch": "Quitar búsqueda",
+        "retry": "Reintentar"
+    },
+    "errors": {
+        "generic": "Algo ha fallado. Inténtalo de nuevo.",
+        "checkInput": "Revisa los valores e inténtalo de nuevo.",
+        "forbidden": "Tu rol no puede {verb, select, read {ver} edit {cambiar} delete {borrar} other {usar}} {object, select, companies {empresas} people {personas} opportunities {oportunidades} other {registros}} aquí.",
+        "invalidValue": "{field}: {reason}",
+        "unknownField": "Ese campo no existe.",
+        "notFound": "Ese registro ya no existe o está en la papelera.",
+        "viewMissing": "Esa vista ya no existe.",
+        "loadFailed": "No se pudo cargar la lista.",
+        "notSaved": "El cambio no se guardó",
+        "notCreated": "No se creó el registro",
+        "notTrashed": "No se borró nada",
+        "viewNotSaved": "Las columnas no se guardaron"
+    }
+}

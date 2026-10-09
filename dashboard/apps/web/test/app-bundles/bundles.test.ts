@@ -79,6 +79,7 @@ describe("app bundles", () => {
     it("are built for every app package", () => {
         expect(built.map((bundle) => bundle.manifest.id).sort()).toEqual([
             "calendar",
+            "crm",
             "game-servers",
             "home"
         ]);

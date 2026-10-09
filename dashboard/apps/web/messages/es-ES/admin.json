@@ -2278,7 +2278,8 @@
             "tools": "Útiles",
             "tasks": "Tareas",
             "inbox": "Bandeja",
-            "management": "Gestión"
+            "management": "Gestión",
+            "crm": "CRM"
         },
         "permissions": {
             "drive": {
@@ -2366,6 +2367,9 @@
             },
             "system": {
                 "manage": "Versiones, copias y mantenimiento"
+            },
+            "crm": {
+                "use": "Llevar empresas, personas y tratos"
             }
         }
     },
