@@ -14,7 +14,7 @@
  * The flag is the banner. A player touching the other team's takes it off its
  * stand and wears it on their head (marked as the kit, so it is taken back),
  * glowing and slowed a little. Brought home while their own flag stands at
- * home, it is a capture; brought low on the way, they drop it and it goes back
+ * home, it is a capture; dying on the way, they drop it and it goes back
  * on its stand. Where each flag is, is written into the run (`FlagState`), and
  * every tick puts the stands as that says, so a restart leaves them right.
  *
@@ -97,7 +97,7 @@ export const stateSchema = z.object({
     design: z.number().int().default(DESIGN),
     /** Each team's flag: home on its stand, or carried by somebody. */
     flags: z.tuple([flagSchema, flagSchema]).default([{ carrier: null }, { carrier: null }]),
-    /** Players each one brought low: what breaks a tie on captures. */
+    /** Players each one killed: what breaks a tie on captures. */
     kills: z.record(z.number().int()).default({})
 });
 export type FlagState = z.infer<typeof stateSchema>;

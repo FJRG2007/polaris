@@ -4,11 +4,11 @@
  *
  * Each tick reads what a duel's does - health, damage dealt, deaths and kills,
  * where everybody is - and what the quick look marked since (who touched a
- * flag, who stood at home), taken in one batch. In that order it then: sends
- * back whoever was brought low, crediting whoever the game says hurt them,
- * puts any flag they carried back on its stand and wipes what the quick look
- * marked on them before the move; hands a flag at home to whoever of the
- * other team, alive, touched it; and counts a capture for a carrier who
+ * flag, who stood at home), taken in one batch. In that order it then:
+ * credits whoever the game says killed anybody who died, sends them back once
+ * they are up again, puts any flag they carried back on its stand and wipes
+ * what the quick look marked on them before the move; hands a flag at home
+ * to whoever of the other team, alive, touched it; and counts a capture for a carrier who
  * reached their own base while their own flag stands there. The flags are
  * written into the run before a tick ends.
  */
@@ -22,7 +22,6 @@ import * as written from "../messages";
 import * as commands from "../commands";
 import type * as stored from "../state";
 import * as ctf from "./capture-the-flag";
-import * as hitsService from "./hits-service";
 import * as said from "./capture-the-flag-messages";
 import type { ArenaGame, KindContext } from "./arena-game";
 
@@ -40,7 +39,6 @@ interface Memory {
     dealt: hits.Tally;
     kills: hits.Tally;
     lastHit: Map<string, number>;
-    shieldedUntil: Map<string, number>;
 }
 
 const memories = new Map<string, Memory>();
@@ -53,8 +51,7 @@ function memoryOf(runId: string): Memory {
         memory = {
             dealt: hits.tally(),
             kills: hits.tally(),
-            lastHit: new Map(),
-            shieldedUntil: new Map()
+            lastHit: new Map()
         };
         memories.set(runId, memory);
     }
@@ -210,7 +207,6 @@ async function tick(ctx: KindContext, lines: string[]): Promise<string | null> {
         // they carried back on its stand.
         if (hearts > 0 && (!at || !arena.contains(box, at))) {
             lines.push(...duel.sendBack(one.name, spot), ...ctf.unmarkLines(one.name));
-            memory.shieldedUntil.set(one.name, now + duel.SHIELD_SECONDS * 1000);
             const still = carrying(one.name);
             if (still !== undefined) {
                 flagHome(still);

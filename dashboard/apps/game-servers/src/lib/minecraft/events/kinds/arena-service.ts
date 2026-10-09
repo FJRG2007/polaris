@@ -71,7 +71,6 @@ interface Memory {
     dealt: hits.Tally;
     kills: hits.Tally;
     lastHit: Map<string, number>;
-    shieldedUntil: Map<string, number>;
     tour: number;
     /** The spot the tour stands at for each plot, once found clear. */
     views: Map<number, arena.Spot | null>;
@@ -87,7 +86,6 @@ function memoryOf(runId: string): Memory {
             dealt: hits.tally(),
             kills: hits.tally(),
             lastHit: new Map(),
-            shieldedUntil: new Map(),
             tour: -1,
             views: new Map()
         };
@@ -856,7 +854,6 @@ async function duelTick(ctx: KindContext, lines: string[]): Promise<void> {
         // their side, healed and shielded for a moment.
         if (hearts > 0 && (!at || !arena.contains(box, at))) {
             lines.push(...duel.sendBack(one.name, spot));
-            memory.shieldedUntil.set(one.name, now + duel.SHIELD_SECONDS * 1000);
         }
         lines.push(
             arena.feed(one.name),

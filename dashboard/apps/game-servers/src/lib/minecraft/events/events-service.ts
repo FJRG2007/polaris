@@ -300,8 +300,8 @@ interface Loop {
     saving?: Promise<void>;
     /** The boss bar's clock, a second at a time, apart from the tick. */
     clock: ReturnType<typeof setInterval> | null;
-    /** Parkour and a team duel: the quick look, far oftener than the tick -
-     *  falls and checkpoints, or whoever was brought low. */
+    /** Parkour and an arena: the quick look, far oftener than the tick -
+     *  falls and checkpoints, or who touched a flag. */
     quick: ReturnType<typeof setInterval> | null;
     quickBusy: boolean;
     busy: boolean;
