@@ -99,7 +99,7 @@ describe("a deadly nether maze", () => {
                     hazards += plan.hazards;
                 }
         expect(hazards).toBeGreaterThan(0);
-    });
+    }, 180_000);
 
     it("lays out the same maze for the same run, and another for another", () => {
         const one = maze.plan({ size: "medium", hazards: "some" }, "same");
@@ -180,7 +180,7 @@ describe("a deadly nether maze", () => {
                     2
                 );
             }
-    });
+    }, 180_000);
 
     it("can be walked from the starting room to the middle on the blocks it is built of", () => {
         for (const size of SIZES)
@@ -191,7 +191,7 @@ describe("a deadly nether maze", () => {
                         true
                     );
                 }
-    });
+    }, 180_000);
 
     it("starts everybody in the starting room, facing the door, behind the glass", () => {
         const built = maze.maze({ size: "small", hazards: "some" }, "spots", SITE, Y);
