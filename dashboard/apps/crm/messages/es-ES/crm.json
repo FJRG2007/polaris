@@ -2,11 +2,11 @@
     "objects": {
         "companies": {
             "plural": "Empresas",
-            "new": "Nueva empresa"
+            "new": "Añadir cliente o socio"
         },
         "people": {
             "plural": "Personas",
-            "new": "Nueva persona"
+            "new": "Nuevo contacto"
         },
         "opportunities": {
             "plural": "Oportunidades",
@@ -172,16 +172,19 @@
     },
     "empty": {
         "companies": {
-            "title": "Aún no hay empresas",
-            "body": "Añade las empresas a las que vendes o con las que trabajas."
+            "title": "Sin empresas registradas",
+            "body": "Añade los clientes, proveedores y socios con los que trabajas.",
+            "bodyOrg": "Añade las empresas a las que {org} vende, compra o con las que colabora. {org} es el espacio de trabajo, no un registro."
         },
         "people": {
-            "title": "Sin personas aún",
-            "body": "Añade las personas con las que hablas en esas empresas."
+            "title": "Sin contactos aún",
+            "body": "Añade tus contactos en las empresas con las que trabajas.",
+            "bodyOrg": "Añade las personas con las que {org} habla en esas empresas. Los miembros de {org} no son registros."
         },
         "opportunities": {
             "title": "Sin oportunidades",
-            "body": "Añade un negocio para seguirlo del primer contacto a cliente."
+            "body": "Añade un negocio para seguirlo del primer contacto a cliente.",
+            "bodyOrg": "Añade un negocio de {org} para seguirlo del primer contacto a cliente."
         },
         "noMatches": "Nada coincide con \"{search}\"",
         "forbiddenTitle": "Tu rol no puede ver esta lista",

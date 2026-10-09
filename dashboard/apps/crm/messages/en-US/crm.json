@@ -2,11 +2,11 @@
     "objects": {
         "companies": {
             "plural": "Companies",
-            "new": "New company"
+            "new": "Add customer or partner"
         },
         "people": {
             "plural": "People",
-            "new": "New person"
+            "new": "New contact"
         },
         "opportunities": {
             "plural": "Opportunities",
@@ -172,16 +172,19 @@
     },
     "empty": {
         "companies": {
-            "title": "No companies yet",
-            "body": "Add the companies you sell to or work with."
+            "title": "No companies tracked yet",
+            "body": "Add the customers, suppliers and partners you work with.",
+            "bodyOrg": "Add the companies {org} sells to, buys from or partners with. {org} itself is the workspace, not a record here."
         },
         "people": {
-            "title": "No people yet",
-            "body": "Add the people you talk to at those companies."
+            "title": "No contacts yet",
+            "body": "Add your contacts at the companies you work with.",
+            "bodyOrg": "Add the people {org} talks to at those companies. {org}'s own members are not records here."
         },
         "opportunities": {
             "title": "No opportunities yet",
-            "body": "Add a deal to follow it from first contact to customer."
+            "body": "Add a deal to follow it from first contact to customer.",
+            "bodyOrg": "Add a deal {org} is working on to follow it from first contact to customer."
         },
         "noMatches": "Nothing matches \"{search}\"",
         "forbiddenTitle": "Your role cannot see this list",

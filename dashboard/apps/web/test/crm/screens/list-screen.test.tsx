@@ -42,6 +42,7 @@ const state = vi.hoisted(() => ({
     madeViews: [] as unknown[],
     /** The views the list opens with; null is only the default table. */
     views: null as ViewSummary[] | null,
+    shelfName: null as string | null,
     groups: [] as { value: string; records: CrmRecord[]; total: number }[]
 }));
 
@@ -69,7 +70,7 @@ vi.mock("@polaris-app/crm/src/actions/records", () => {
                 views,
                 can: abilities(),
                 people: [],
-                shelfName: null
+                shelfName: state.shelfName
             };
         },
         listRecordsAction: async (input: unknown) => {
@@ -146,6 +147,7 @@ beforeEach(() => {
     state.madeViews = [];
     state.views = null;
     state.groups = [];
+    state.shelfName = null;
     if (typeof localStorage !== "undefined") localStorage.clear();
     // What the tab kept from the last test would paint before the read.
     if (typeof sessionStorage !== "undefined") sessionStorage.clear();
@@ -178,7 +180,7 @@ describe("a CRM list", () => {
         expect(await screen.findByText("Acme")).toBeTruthy();
         expect(screen.getByText("Globex")).toBeTruthy();
         expect(screen.getByRole("heading", { name: "Companies" })).toBeTruthy();
-        expect(screen.getByRole("button", { name: /New company/ })).toBeTruthy();
+        expect(screen.getByRole("button", { name: /Add customer or partner/ })).toBeTruthy();
     });
 
     it("keeps an edited cell once the server agrees", async () => {
@@ -230,7 +232,7 @@ describe("a CRM list", () => {
     it("makes a record from the name typed into the top row", async () => {
         render(<ListScreen object="companies" />, { wrapper: MessagesWrapper });
         await screen.findByText("Acme");
-        fireEvent.click(screen.getByRole("button", { name: /New company/ }));
+        fireEvent.click(screen.getByRole("button", { name: /Add customer or partner/ }));
         const input = screen.getByRole("textbox", { name: "Name" });
         fireEvent.change(input, { target: { value: "Initech" } });
         await act(async () => {
@@ -246,7 +248,7 @@ describe("a CRM list", () => {
         state.can = { read: true, edit: false, delete: false };
         render(<ListScreen object="companies" />, { wrapper: MessagesWrapper });
         await screen.findByText("Acme");
-        expect(screen.queryByRole("button", { name: /New company/ })).toBeNull();
+        expect(screen.queryByRole("button", { name: /Add customer or partner/ })).toBeNull();
         fireEvent.click(cityCell("Acme"));
         expect(screen.queryByDisplayValue("Madrid")).toBeNull();
     });
@@ -327,6 +329,18 @@ describe("a CRM list", () => {
                 rules: [{ key: "name", operator: "contains", value: "Acm" }]
             }
         });
+    });
+
+    it("says an empty list holds the organization's customers and partners, not itself", async () => {
+        state.rows = [];
+        state.shelfName = "Dymo";
+        render(<ListScreen object="companies" />, { wrapper: MessagesWrapper });
+        expect(await screen.findByText("No companies tracked yet")).toBeTruthy();
+        expect(
+            screen.getByText(
+                "Add the companies Dymo sells to, buys from or partners with. Dymo itself is the workspace, not a record here."
+            )
+        ).toBeTruthy();
     });
 
     it("says so to somebody who may not see this kind of record", async () => {

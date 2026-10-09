@@ -125,7 +125,12 @@ async function refuseTaken(
         where: {
             shelf: actor.shelf.key,
             object,
-            name: { equals: name, mode: "insensitive" },
+            // SQLite has no `mode`; its comparisons of ASCII text ignore case
+            // only with LIKE, so a local install compares as typed.
+            name:
+                process.env.POLARIS_DB_PROVIDER === "sqlite"
+                    ? { equals: name }
+                    : { equals: name, mode: "insensitive" },
             ...(except ? { NOT: { id: except } } : {})
         },
         select: { id: true }

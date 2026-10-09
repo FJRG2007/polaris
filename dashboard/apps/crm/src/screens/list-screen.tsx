@@ -738,7 +738,13 @@ export function ListScreen({ object }: { object: CrmObject }) {
             <EmptyState
                 icon={<Icon />}
                 title={t(`empty.${object}.title`)}
-                description={t(`empty.${object}.body`)}
+                description={
+                    // In an organization, say whose records these are, so its
+                    // own name is not taken for one of them.
+                    opening.data?.shelfName
+                        ? t(`empty.${object}.bodyOrg`, { org: opening.data.shelfName })
+                        : t(`empty.${object}.body`)
+                }
                 action={
                     canEdit ? (
                         <Button onClick={() => setDrafting(true)}>
