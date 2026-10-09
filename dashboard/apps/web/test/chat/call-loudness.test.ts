@@ -9,6 +9,8 @@
 
 import { describe, expect, it } from "vitest";
 import {
+    BOOST_ENGAGE,
+    boostHeld,
     ENOUGH_SPEECH_MS,
     gapBelow,
     gapFor,
@@ -16,6 +18,7 @@ import {
     LIFT_FROM_DB,
     LIFT_MAX,
     liftFor,
+    liftGapFor,
     LOUDNESS_START,
     QUIET_CLEAR_DB,
     QUIET_GAP_DB,
@@ -109,5 +112,37 @@ describe("lifting a quiet voice", () => {
         expect(liftFor(gapFor(all, "quiet"))).toBe(LIFT_MAX);
         expect(liftFor(gapFor(all, "a"))).toBe(1);
         expect(liftFor(gapFor(all, "b"))).toBe(1);
+    });
+
+    it("leaves your own microphone out of the room a voice is lifted against", () => {
+        const alone = new Map([
+            [SELF, talked(-20)],
+            ["sam", talked(-40)]
+        ]);
+        expect(liftGapFor(alone, "sam")).toBeNull();
+        expect(liftFor(liftGapFor(alone, "sam"))).toBe(1);
+
+        const room = new Map([
+            [SELF, talked(-10)],
+            ["sam", talked(-30)],
+            ["ana", talked(-29)]
+        ]);
+        expect(liftGapFor(room, "sam")).toBeCloseTo(1, 1);
+        expect(liftFor(liftGapFor(room, "sam"))).toBe(1);
+    });
+});
+
+describe("moving a voice onto the boost graph", () => {
+    it("engages at once for a volume somebody picked past 1", () => {
+        expect(boostHeld(1.05, 1, false)).toBe(true);
+        expect(boostHeld(1, 1, false)).toBe(false);
+    });
+
+    it("waits for the dead band before a lift alone engages it, and holds it down to 1", () => {
+        expect(boostHeld(1, 1.05, false)).toBe(false);
+        expect(boostHeld(1, BOOST_ENGAGE + 0.01, false)).toBe(true);
+        expect(boostHeld(1, 1.05, true)).toBe(true);
+        expect(boostHeld(1, 1, true)).toBe(false);
+        expect(boostHeld(0.5, 1.5, true)).toBe(false);
     });
 });

@@ -26,6 +26,7 @@ import { LogIn, Ticket } from "lucide-react";
 import { PUBLIC_PATHS } from "@/lib/legal/service";
 import { Button, PolarisMark, cn } from "@polaris/ui";
 import { readerWords } from "@/lib/i18n/reader-words";
+import { OutsideApp } from "@/components/profile-link";
 
 export async function PublicChrome({
     children,
@@ -74,7 +75,7 @@ export async function PublicChrome({
                     className
                 )}
             >
-                {children}
+                <OutsideApp>{children}</OutsideApp>
             </main>
 
             <footer className="mx-auto flex w-full max-w-2xl flex-wrap items-center gap-x-5 gap-y-1 px-4 pb-8 text-xs text-muted-foreground sm:px-6">

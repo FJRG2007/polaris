@@ -29,7 +29,7 @@
  */
 
 import { searchItems, type SearchField } from "@polaris/core/search-text";
-import Link from "next/link";
+import { ProfileLink } from "@/components/profile-link";
 import { Avatar } from "@/components/avatar";
 import { runAction } from "@/lib/run-action";
 import { useTranslations } from "@/components/i18n/i18n-provider";
@@ -277,7 +277,7 @@ function PeopleDialog({
                         {shown.map((person) => (
                             <li key={person.id}>
                                 <PersonRow
-                                    as={Link}
+                                    as={ProfileLink}
                                     personId={person.id}
                                     href={`/u/${person.username}`}
                                     className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors hover:bg-muted"

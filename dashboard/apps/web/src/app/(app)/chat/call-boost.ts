@@ -64,8 +64,16 @@ export interface Boost {
  *
  * Answers null where Web Audio is unavailable, which leaves the element's own
  * volume in charge - the reader loses the boost and keeps the call.
+ *
+ * `onRunning` hears whether the context is actually producing sound, now and on
+ * every change. A context the browser keeps suspended plays nothing, so the
+ * element must go on playing until this says true, or the person goes silent.
  */
-export function boostStream(stream: MediaStream, volume: number): Boost | null {
+export function boostStream(
+    stream: MediaStream,
+    volume: number,
+    onRunning: (running: boolean) => void
+): Boost | null {
     const audio = context();
     if (!audio) return null;
 
@@ -95,6 +103,9 @@ export function boostStream(stream: MediaStream, volume: number): Boost | null {
     source.connect(gain);
     gain.connect(limiter);
     limiter.connect(audio.destination);
+    const report = () => onRunning(audio.state === "running");
+    audio.addEventListener("statechange", report);
+    report();
     // A context that was created outside a gesture starts suspended, and a
     // suspended context is silence.
     void audio.resume().catch(() => undefined);
@@ -111,6 +122,7 @@ export function boostStream(stream: MediaStream, volume: number): Boost | null {
             }
         },
         stop: () => {
+            audio.removeEventListener("statechange", report);
             source.disconnect();
             gain.disconnect();
             limiter.disconnect();

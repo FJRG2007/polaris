@@ -24,6 +24,7 @@ let volume = 1;
 const built: number[] = [];
 const setTo: number[] = [];
 let stopped = 0;
+let running = true;
 
 vi.mock("@/app/(app)/chat/call-volumes", () => ({
     useCallVolume: () => [volume, () => undefined]
@@ -31,8 +32,9 @@ vi.mock("@/app/(app)/chat/call-volumes", () => ({
 
 vi.mock("@/app/(app)/chat/call-boost", () => ({
     resumeBoost: () => undefined,
-    boostStream: (_stream: MediaStream, level: number) => {
+    boostStream: (_stream: MediaStream, level: number, onRunning: (running: boolean) => void) => {
         built.push(level);
+        onRunning(running);
         return {
             set: (next: number) => setTo.push(next),
             stop: () => {
@@ -86,6 +88,7 @@ beforeEach(() => {
     built.length = 0;
     setTo.length = 0;
     stopped = 0;
+    running = true;
     HTMLMediaElement.prototype.play = () => Promise.resolve();
 });
 
@@ -106,6 +109,17 @@ describe("playing somebody in a call", () => {
 
         expect(built).toEqual([2]);
         expect(played().volume).toBe(0);
+    });
+
+    it("keeps the element playing while the browser holds the graph's context suspended", () => {
+        // A suspended context plays nothing: silencing the element under it
+        // would leave the person turned up unheard altogether.
+        volume = 2;
+        running = false;
+        render(<CallAudio call={callWith(false)} />);
+
+        expect(built).toEqual([2]);
+        expect(played().volume).toBe(1);
     });
 
     it("stops the graph for a reader who has deafened themselves", () => {

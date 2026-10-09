@@ -23,6 +23,7 @@ import { useTranslations } from "@/components/i18n/i18n-provider";
 import { AtSign, CalendarDays, Settings2 } from "lucide-react";
 import { Avatar, OrgAvatar } from "@/components/avatar";
 import { ProfileBanner } from "@/components/profile-banner";
+import { ProfileLink } from "@/components/profile-link";
 import { PersonName, PersonRow } from "@/components/person-name";
 
 export function OrgProfileCard({ org }: { org: OrgProfile }) {
@@ -75,7 +76,7 @@ export function OrgProfileCard({ org }: { org: OrgProfile }) {
                             {org.people.map((person) => (
                                 <li key={person.id}>
                                     <PersonRow
-                                        as={Link}
+                                        as={ProfileLink}
                                         personId={person.id}
                                         href={`/u/${person.username}`}
                                         className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors hover:bg-muted"
