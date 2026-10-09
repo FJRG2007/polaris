@@ -85,6 +85,8 @@ export interface AddingAccount {
     back: string;
     /** The browser holds as many accounts as it may. */
     full: boolean;
+    /** How many accounts the browser may hold. */
+    max: number;
 }
 
 export function LoginForm({
@@ -291,7 +293,7 @@ export function LoginForm({
                         {chooser.length > 0 ? <AccountChooser accounts={chooser} /> : null}
                         {add?.full ? (
                             <p className="mb-3 rounded-md border border-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
-                                {t("login.addFull")}
+                                {t("login.addFull", { max: add.max })}
                             </p>
                         ) : null}
                         {notice ? (

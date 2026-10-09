@@ -140,4 +140,23 @@ describe("signing out", () => {
         // Only this store's namespace: nothing else in the tab is its to clear.
         expect(sessionStorage.getItem("something.else")).toBe("kept");
     });
+
+    it("stays put and hands the refusal back when the server keeps the session", async () => {
+        const cache = await store();
+        cache.writeSnapshot("mail.list.inbox", { rows: ["a pay slip"] });
+
+        vi.doMock("better-auth/react", () => ({
+            createAuthClient: () => ({ signIn: {}, signUp: {}, useSession: () => null })
+        }));
+        vi.doMock("@/app/device-account-actions", () => ({
+            signOutAccountAction: async () => ({ error: "Something went wrong. Try again." })
+        }));
+        const assign = vi.fn();
+        Object.defineProperty(window, "location", { value: { ...window.location, assign }, configurable: true });
+        const { signOut } = await import("@/lib/auth-client");
+
+        expect(await signOut()).toBe("Something went wrong. Try again.");
+        expect(assign).not.toHaveBeenCalled();
+        expect(cache.readSnapshot("mail.list.inbox", 60_000)).not.toBeNull();
+    });
 });

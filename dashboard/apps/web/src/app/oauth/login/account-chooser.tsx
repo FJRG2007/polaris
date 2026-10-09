@@ -25,7 +25,7 @@ export function AccountChooser({ accounts }: { accounts: DeviceAccountView[] }) 
     async function choose(account: DeviceAccountView) {
         setBusy(account.id);
         setError(null);
-        const result = await switchAccountAction(account.id).catch(() => ({ error: t("login.chooserFailed") }));
+        const result = await switchAccountAction(account.id).catch(() => ({ error: t("login.chooserError") }));
         if (result.error) {
             setError(result.error);
             setBusy(null);

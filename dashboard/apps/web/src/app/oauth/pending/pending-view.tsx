@@ -6,7 +6,7 @@
  * opinion about the session's state.
  */
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ShieldQuestion } from "lucide-react";
 import { Card, CardBody, CardHeader, CardTitle, PolarisMark } from "@polaris/ui";
@@ -20,6 +20,7 @@ const POLL_MS = 5000;
 export function PendingView({ requestedAt }: { requestedAt: string }) {
     const router = useRouter();
     const t = useTranslations("auth");
+    const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
         const timer = window.setInterval(() => router.refresh(), POLL_MS);
@@ -27,7 +28,9 @@ export function PendingView({ requestedAt }: { requestedAt: string }) {
     }, [router]);
 
     async function onCancel() {
-        await signOut();
+        setError(null);
+        const refused = await signOut();
+        if (refused) setError(refused);
     }
 
     return (
@@ -52,6 +55,7 @@ export function PendingView({ requestedAt }: { requestedAt: string }) {
                     >
                         {t("pending.cancel")}
                     </button>
+                    {error ? <p className="text-sm text-danger">{error}</p> : null}
                 </CardBody>
             </Card>
         </main>

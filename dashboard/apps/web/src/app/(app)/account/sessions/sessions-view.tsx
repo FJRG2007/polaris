@@ -218,7 +218,8 @@ export function SessionsView({
     /** Ending your own session goes through the auth client, so the cookie is
      *  dropped here too - deleting the row alone would leave a stale one. */
     async function signOutHere() {
-        await signOut();
+        const refused = await signOut();
+        if (refused) setError(refused);
     }
 
     async function revokeOthers() {

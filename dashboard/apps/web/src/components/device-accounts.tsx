@@ -73,7 +73,7 @@ function useDeviceAccounts(enabled: boolean) {
         try {
             await action();
         } catch {
-            setError(t("account.switcher.failed"));
+            setError(t("account.switcher.error"));
             setBusy(null);
         }
     }
@@ -95,7 +95,11 @@ function useDeviceAccounts(enabled: boolean) {
     function signOutOf(account: DeviceAccountView) {
         void run(account.id, async () => {
             if (account.active) {
-                await signOut();
+                const refused = await signOut();
+                if (refused) {
+                    setError(refused);
+                    setBusy(null);
+                }
                 return;
             }
             const result = await signOutAccountAction(account.id);
@@ -259,7 +263,9 @@ function DeviceAccountsBody({ state }: { state: ReturnType<typeof useDeviceAccou
                     </Button>
                 ) : null}
             </div>
-            {full ? <p className="text-xs text-muted-foreground">{t("account.switcher.full")}</p> : null}
+            {full && data ? (
+                <p className="text-xs text-muted-foreground">{t("account.switcher.full", { max: data.max })}</p>
+            ) : null}
             {state.confirmElement}
         </div>
     );

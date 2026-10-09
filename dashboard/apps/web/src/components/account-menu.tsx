@@ -62,7 +62,8 @@ import {
     DropdownMenuSubTrigger,
     DropdownMenuTrigger,
     Input,
-    Select
+    Select,
+    useToast
 } from "@polaris/ui";
 
 /**
@@ -136,6 +137,7 @@ export function AccountMenu({
     const router = useRouter();
     const t = useTranslations("nav");
     const tc = useTranslations("common");
+    const toast = useToast();
     const format = useDisplayFormat();
     const refreshPresence = usePresenceRefresh();
     const [open, setOpen] = useState(false);
@@ -367,7 +369,8 @@ export function AccountMenu({
 
     async function onSignOut() {
         // Only this account: any other signed in on this browser takes over.
-        await signOut();
+        const refused = await signOut();
+        if (refused) toast.show({ title: refused });
     }
 
     return (

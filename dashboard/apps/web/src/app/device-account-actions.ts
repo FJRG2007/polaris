@@ -25,6 +25,7 @@ import { rateLimit } from "@/lib/rate-limit-service";
 import { getTranslations } from "@/lib/i18n/request";
 import { noteSignedOut } from "@/lib/session-sign-out";
 import {
+    MAX_DEVICE_ACCOUNTS,
     deviceAccountRoom,
     enrollDeviceAccount,
     listDeviceAccounts,
@@ -51,6 +52,8 @@ export interface DeviceAccounts {
     readonly accounts: DeviceAccountView[];
     /** How many more this browser can take. */
     readonly room: number;
+    /** How many this browser can hold at once. */
+    readonly max: number;
 }
 
 const sessionIdSchema = z.string().uuid();
@@ -100,12 +103,16 @@ async function failure(): Promise<{ error: string }> {
     return { error: (await getTranslations("nav"))("account.switcher.failed") };
 }
 
+async function broken(): Promise<{ error: string }> {
+    return { error: (await getTranslations("nav"))("account.switcher.error") };
+}
+
 /** The accounts this browser is signed in to, the active one first. */
 export async function deviceAccountsAction(): Promise<DeviceAccounts> {
     const request = await requestHeaders();
     const accounts = await listDeviceAccounts(auth, request);
     await dropStale(request, accounts);
-    return { accounts: accounts.map(view), room: deviceAccountRoom(accounts.length) };
+    return { accounts: accounts.map(view), room: deviceAccountRoom(accounts.length), max: MAX_DEVICE_ACCOUNTS };
 }
 
 /** Act as another account this browser holds. */
@@ -137,7 +144,7 @@ export async function prepareAddAccountAction(): Promise<{ error?: string }> {
     const accounts = await listDeviceAccounts(auth, request);
     await dropStale(request, accounts);
     if (deviceAccountRoom(accounts.length) === 0) {
-        return { error: (await getTranslations("nav"))("account.switcher.full") };
+        return { error: (await getTranslations("nav"))("account.switcher.full", { max: MAX_DEVICE_ACCOUNTS }) };
     }
     await apply(await enrollDeviceAccount(auth, request));
     return {};
@@ -172,7 +179,7 @@ export async function signOutAccountAction(sessionId: unknown = null): Promise<{
 
     await noteSignedOut(target.userId, target.sessionId).catch(() => undefined);
     const ended = await signOutDeviceAccount(auth, request, target.sessionId);
-    if (!ended) return failure();
+    if (!ended) return broken();
     await apply(ended.cookies);
     return {};
 }

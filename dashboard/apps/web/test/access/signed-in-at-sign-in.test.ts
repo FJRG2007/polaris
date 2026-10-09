@@ -42,7 +42,8 @@ vi.mock("@/lib/two-factor-challenge", () => ({
 vi.mock("@polaris/auth", () => ({
     hasAnyUser: async () => true,
     listDeviceAccounts: async () => [],
-    deviceAccountRoom: () => 4
+    deviceAccountRoom: () => 4,
+    MAX_DEVICE_ACCOUNTS: 5
 }));
 vi.mock("@/lib/auth", () => ({ auth: {} }));
 vi.mock("next/headers", () => ({ headers: async () => new Headers() }));

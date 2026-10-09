@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { hasAnyUser } from "@polaris/auth";
 import { resolveSession } from "@/lib/session";
 import { CONNECTION_PROVIDERS } from "@polaris/core";
-import { deviceAccountRoom, listDeviceAccounts } from "@polaris/auth";
+import { MAX_DEVICE_ACCOUNTS, deviceAccountRoom, listDeviceAccounts } from "@polaris/auth";
 import { safeRedirect } from "./post-login-target";
 import { LoginForm, type SignInProvider } from "./login-form";
 import { connectionSignInOffered } from "@/lib/connections/oauth";
@@ -75,7 +75,8 @@ export default async function LoginPage({
         ? {
               name: session.name,
               back: safeRedirect(typeof params.back === "string" ? params.back : null),
-              full: deviceAccountRoom(onDevice.length) === 0
+              full: deviceAccountRoom(onDevice.length) === 0,
+              max: MAX_DEVICE_ACCOUNTS
           }
         : null;
     // The accounts still signed in here, offered when none of them is active.

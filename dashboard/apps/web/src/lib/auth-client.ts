@@ -34,12 +34,15 @@ export const { signIn, signUp, useSession } = authClient;
  * rest of the account's traces and reloads the page - here rather than at each
  * place that signs out, so a new one cannot forget, and in a `finally`, because a
  * sign-out that failed on the wire has still ended this session's claim on what
- * is in the tab.
+ * is in the tab. A sign-out the server refused has not: the session is still
+ * live, so the tab stays where it is and the refusal is handed back to be shown.
  */
-export async function signOut(): Promise<void> {
+export async function signOut(): Promise<string | null> {
+    let refused: string | undefined;
     try {
-        await signOutAccountAction();
+        refused = (await signOutAccountAction()).error;
     } finally {
-        await leaveAccount("/oauth/login");
+        if (!refused) await leaveAccount("/oauth/login");
     }
+    return refused ?? null;
 }

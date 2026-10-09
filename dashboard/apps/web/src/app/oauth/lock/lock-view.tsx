@@ -44,7 +44,9 @@ export function LockView({
     }
 
     async function onSignOut() {
-        await signOut();
+        setError(null);
+        const refused = await signOut();
+        if (refused) setError(refused);
     }
 
     return (

@@ -94,7 +94,8 @@ export function DeviceDialog({
     /** Ending the session this page is being read from means dropping the cookie
      *  too, not only the row behind it. */
     async function leaveHere() {
-        await signOut();
+        const refused = await signOut();
+        if (refused) setError(refused);
     }
 
     async function signOutSession(session: SessionView) {

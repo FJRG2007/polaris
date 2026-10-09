@@ -29,6 +29,7 @@ let notedOut: string[] = [];
 let throttled = false;
 let switchCalls: string[] = [];
 let signOutCalls: string[] = [];
+let revokeFails = false;
 
 function account(sessionId: string, name: string, active: boolean): FakeAccount {
     return {
@@ -83,6 +84,7 @@ vi.mock("@polaris/auth", async () => {
         },
         signOutDeviceAccount: async (_auth: unknown, _headers: Headers, sessionId: string) => {
             signOutCalls.push(sessionId);
+            if (revokeFails) return null;
             const found = accounts.find((entry) => entry.sessionId === sessionId);
             return found ? { account: found, cookies: issued("polaris.session_token") } : null;
         },
@@ -101,12 +103,14 @@ beforeEach(() => {
     throttled = false;
     switchCalls = [];
     signOutCalls = [];
+    revokeFails = false;
 });
 
 describe("deviceAccountsAction", () => {
     it("hands the page names and ids, never a session token", async () => {
         const result = await actions.deviceAccountsAction();
         expect(result.room).toBe(3);
+        expect(result.max).toBe(5);
         expect(result.accounts.map((entry) => [entry.id, entry.name, entry.active])).toEqual([
             [ANA, "ana", true],
             [BEN, "ben", false]
@@ -193,6 +197,12 @@ describe("signOutAccountAction", () => {
         expect(set).toEqual([
             expect.objectContaining({ name: "polaris.session_token", value: "", options: expect.objectContaining({ maxAge: 0 }) })
         ]);
+    });
+
+    it("says something went wrong, not that the account is gone, when the revoke fails", async () => {
+        revokeFails = true;
+        expect((await actions.signOutAccountAction()).error).toBe("account.switcher.error");
+        expect(set).toEqual([]);
     });
 
     it("refuses an id this browser does not hold", async () => {
