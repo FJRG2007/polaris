@@ -187,6 +187,7 @@
         "emojiFileSize": "An emoji can be up to 256 KB",
         "emojiFileType": "Use a PNG, JPG, GIF or WEBP image",
         "emojiFileDimensions": "That image is too big. Use one up to 2048 pixels a side",
+        "emojiFileFrames": "That animation is too big. Use fewer or smaller frames",
         "emojiFileUnreadable": "That image could not be read",
         "emojiNameShort": "A name needs at least 2 characters",
         "emojiNameLong": "A name can be up to 32 characters",

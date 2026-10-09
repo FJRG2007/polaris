@@ -25,6 +25,11 @@ export const CUSTOM_EMOJI_MAX_BYTES = 256 * 1024;
  *  rather than an emoji, and decoding it costs every reader for nothing. */
 export const CUSTOM_EMOJI_MAX_SIDE = 2048;
 
+/** The most pixels one may hold across every frame together, which is what
+ *  decoding it costs: a small file can pack many large frames that compress to
+ *  almost nothing. */
+export const CUSTOM_EMOJI_MAX_PIXELS = CUSTOM_EMOJI_MAX_SIDE * CUSTOM_EMOJI_MAX_SIDE * 2;
+
 export const CUSTOM_EMOJI_NAME_MIN = 2;
 export const CUSTOM_EMOJI_NAME_MAX = 32;
 

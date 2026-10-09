@@ -109,4 +109,27 @@ describe("a file that is refused", () => {
             .toBuffer();
         expect(await inspectEmojiFile(bytes(wide))).toEqual({ ok: false, problem: "dimensions" });
     });
+
+    it("packs more pixels across its frames than one is worth decoding", async () => {
+        const frame = (red: number) =>
+            sharp({ create: { width: 2048, height: 2048, channels: 3, background: { r: red, g: 0, b: 0 } } })
+                .png()
+                .toBuffer();
+        const gif = await sharp(await Promise.all([frame(0), frame(120), frame(240)]), { join: { animated: true } })
+            .gif()
+            .toBuffer();
+        expect(gif.length).toBeLessThanOrEqual(CUSTOM_EMOJI_MAX_BYTES);
+        expect(await inspectEmojiFile(bytes(gif))).toEqual({ ok: false, problem: "frames" });
+    });
+
+    it("is animated at full size within the budget", async () => {
+        const frame = (red: number) =>
+            sharp({ create: { width: 1024, height: 1024, channels: 3, background: { r: red, g: 0, b: 0 } } })
+                .png()
+                .toBuffer();
+        const gif = await sharp(await Promise.all([frame(0), frame(120)]), { join: { animated: true } })
+            .gif()
+            .toBuffer();
+        expect(await inspectEmojiFile(bytes(gif))).toMatchObject({ ok: true, animated: true, width: 1024 });
+    });
 });

@@ -99,7 +99,7 @@ function view(row: ViewRow): SpaceEmojiView {
 // ---------------------------------------------------------------------------
 
 /** Why a file is refused, as a word the screen turns into a sentence. */
-export type EmojiFileProblem = "empty" | "size" | "type" | "dimensions" | "unreadable";
+export type EmojiFileProblem = "empty" | "size" | "type" | "dimensions" | "frames" | "unreadable";
 
 /** What a file turned out to be, once its bytes were read. */
 export type InspectedEmoji =
@@ -130,11 +130,9 @@ export async function inspectEmojiFile(bytes: Uint8Array): Promise<InspectedEmoj
 
     try {
         const { default: sharp } = await import("sharp");
-        // Bounded before anything is decoded: a small file can still declare a
-        // picture of millions of pixels, and that is the decoder's memory.
-        const limitInputPixels = core.CUSTOM_EMOJI_MAX_SIDE * core.CUSTOM_EMOJI_MAX_SIDE * 64;
-        const image = sharp(bytes, { animated: true, limitInputPixels });
-        const meta = await image.metadata();
+        // Only the header is read here; the size it declares is checked before
+        // anything is decoded, and the decoder is held to the same bound.
+        const meta = await sharp(bytes, { animated: true, limitInputPixels: false }).metadata();
         if (meta.format !== SHARP_FORMAT[mime]) return { ok: false, problem: "type" };
         const width = meta.width ?? 0;
         const height = meta.pageHeight ?? meta.height ?? 0;
@@ -142,10 +140,11 @@ export async function inspectEmojiFile(bytes: Uint8Array): Promise<InspectedEmoj
         if (width > core.CUSTOM_EMOJI_MAX_SIDE || height > core.CUSTOM_EMOJI_MAX_SIDE) {
             return { ok: false, problem: "dimensions" };
         }
+        const frames = meta.pages ?? 1;
+        if (width * height * frames > core.CUSTOM_EMOJI_MAX_PIXELS) return { ok: false, problem: "frames" };
         // Every frame, so a file that is only a valid header is refused here
         // rather than drawn as a broken picture in every message that uses it.
-        await image.stats();
-        const frames = meta.pages ?? 1;
+        await sharp(bytes, { animated: true, limitInputPixels: core.CUSTOM_EMOJI_MAX_PIXELS }).stats();
         const animated = (mime === "image/gif" || mime === "image/webp") && frames > 1;
         return { ok: true, mime, animated, width, height };
     } catch {
@@ -158,6 +157,7 @@ const FILE_REFUSAL: Record<EmojiFileProblem, ChatErrorText> = {
     size: { key: "errors.emojiFileSize" },
     type: { key: "errors.emojiFileType" },
     dimensions: { key: "errors.emojiFileDimensions" },
+    frames: { key: "errors.emojiFileFrames" },
     unreadable: { key: "errors.emojiFileUnreadable" }
 };
 
