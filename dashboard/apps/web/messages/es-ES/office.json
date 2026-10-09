@@ -223,7 +223,16 @@
         "duplicateSlide": "Duplicar",
         "present": "Presentar",
         "presenting": "Presentando",
-        "stopPresenting": "Dejar de presentar"
+        "stopPresenting": "Dejar de presentar",
+        "undo": "Deshacer cambio",
+        "redo": "Rehacer cambio",
+        "duplicateBox": "Duplicar",
+        "deleteBox": "Borrar",
+        "shortcuts": "Atajos de teclado",
+        "clickToAddText": "Haz clic para escribir",
+        "canvas": "Diapositiva {number}",
+        "resize": "Cambiar tamaño",
+        "counter": "{at} de {total}"
     },
     "positioning": {
         "twoThingsToMeasure": "Dos cosas que medir",

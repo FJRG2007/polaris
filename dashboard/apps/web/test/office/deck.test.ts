@@ -117,3 +117,122 @@ describe("a new slide", () => {
         });
     });
 });
+
+describe("pulling a grip", () => {
+    const start = { x: 0.2, y: 0.2, w: 0.4, h: 0.4 };
+
+    it("keeps the opposite side where it was", () => {
+        const grown = deck.resizeFrame(start, "se", 0.1, 0.05);
+        expect(grown.x).toBeCloseTo(0.2);
+        expect(grown.y).toBeCloseTo(0.2);
+        expect(grown.w).toBeCloseTo(0.5);
+        expect(grown.h).toBeCloseTo(0.45);
+
+        const fromLeft = deck.resizeFrame(start, "w", -0.1, 0.3);
+        expect(fromLeft.x).toBeCloseTo(0.1);
+        expect(fromLeft.w).toBeCloseTo(0.5);
+        // A side grip changes one dimension, whatever the pointer did across.
+        expect(fromLeft.h).toBeCloseTo(0.4);
+        expect(fromLeft.y).toBeCloseTo(0.2);
+    });
+
+    it("stops a moving side at the edge rather than sliding the box", () => {
+        // Clamping afterwards would push the whole box left, which reads as the
+        // box running away from the pointer.
+        const pulled = deck.resizeFrame(start, "e", 5, 0);
+        expect(pulled.x).toBeCloseTo(0.2);
+        expect(pulled.w).toBeCloseTo(0.8);
+    });
+
+    it("never shrinks a box past something that can be grabbed again", () => {
+        const crushed = deck.resizeFrame(start, "nw", 2, 2);
+        expect(crushed.w).toBeCloseTo(deck.SMALLEST);
+        expect(crushed.h).toBeCloseTo(deck.SMALLEST);
+        // Its far corner stays put.
+        expect(crushed.x + crushed.w).toBeCloseTo(0.6);
+        expect(crushed.y + crushed.h).toBeCloseTo(0.6);
+    });
+
+    it("keeps the proportions with Shift, by the larger pull", () => {
+        const kept = deck.resizeFrame({ x: 0.1, y: 0.1, w: 0.2, h: 0.1 }, "se", 0.2, 0.01, {
+            keepRatio: true
+        });
+        expect(kept.w / kept.h).toBeCloseTo(2);
+        expect(kept.w).toBeCloseTo(0.4);
+    });
+
+    it("keeps the proportions within the slide, too", () => {
+        const kept = deck.resizeFrame({ x: 0.5, y: 0.5, w: 0.2, h: 0.1 }, "se", 1, 1, { keepRatio: true });
+        expect(kept.w / kept.h).toBeCloseTo(2);
+        expect(kept.x + kept.w).toBeLessThanOrEqual(1 + 1e-9);
+        expect(kept.y + kept.h).toBeLessThanOrEqual(1 + 1e-9);
+    });
+
+    it("grows both ways from the middle with Alt", () => {
+        const both = deck.resizeFrame(start, "e", 0.05, 0, { fromCenter: true });
+        expect(both.w).toBeCloseTo(0.5);
+        expect(both.x + both.w / 2).toBeCloseTo(0.4);
+    });
+});
+
+describe("nudging with the arrows", () => {
+    it("moves the same distance on screen across and down", () => {
+        const right = deck.nudgeFrame({ x: 0.5, y: 0.5, w: 0.1, h: 0.1 }, 1, 0, false);
+        const down = deck.nudgeFrame({ x: 0.5, y: 0.5, w: 0.1, h: 0.1 }, 0, 1, false);
+        // A fraction of a 16:9 slide's height is a shorter distance than the
+        // same fraction of its width.
+        expect((right.x - 0.5) * deck.SLIDE_RATIO).toBeCloseTo(down.y - 0.5);
+    });
+
+    it("goes ten times as far with Shift, and stops at the edge", () => {
+        const far = deck.nudgeFrame({ x: 0.5, y: 0.5, w: 0.1, h: 0.1 }, -1, 0, true);
+        expect(0.5 - far.x).toBeCloseTo(deck.NUDGE * 10);
+        expect(deck.nudgeFrame({ x: 0, y: 0, w: 0.1, h: 0.1 }, -1, -1, true)).toMatchObject({ x: 0, y: 0 });
+    });
+});
+
+describe("copying boxes", () => {
+    it("puts a copy visibly beside its original, as a new box", () => {
+        const original = box({ id: "a", version: 7, x: 0.2, y: 0.2, w: 0.3, h: 0.2 });
+        const copy = deck.copyOf(original, "b");
+        expect(copy.id).toBe("b");
+        expect(copy.version).toBe(1);
+        expect(copy.x).toBeGreaterThan(original.x);
+        expect(copy.y).toBeGreaterThan(original.y);
+    });
+
+    it("reads back what it wrote, with new ids", () => {
+        const original = box({ id: "a", text: "Hello", version: 4 });
+        let next = 0;
+        const pasted = deck.readClipboard(deck.writeClipboard([original]), () => `n${++next}`);
+        expect(pasted).toEqual([{ ...original, id: "n1", version: 1 }]);
+    });
+
+    it("refuses anything off the clipboard that is not exactly boxes", () => {
+        const id = () => "x";
+        expect(deck.readClipboard("not json", id)).toEqual([]);
+        expect(deck.readClipboard(JSON.stringify({ boxes: [] }), id)).toEqual([]);
+        expect(deck.readClipboard(JSON.stringify({ boxes: [{ kind: "text" }] }), id)).toEqual([]);
+        const written = JSON.parse(deck.writeClipboard([box()])) as { boxes: Record<string, unknown>[] };
+        const hostile = { boxes: [{ ...written.boxes[0], kind: "image", src: "javascript:alert(1)" }] };
+        expect(deck.readClipboard(JSON.stringify(hostile), id)).toEqual([]);
+        const offSlide = { boxes: [{ ...written.boxes[0], x: 4 }] };
+        expect(deck.readClipboard(JSON.stringify(offSlide), id)).toEqual([]);
+    });
+});
+
+describe("every slide's boxes at once", () => {
+    it("groups them by slide in the order they were added", () => {
+        const grouped = deck.groupBySlide(
+            new Map([
+                [deck.boxKey("s1", "a"), box({ id: "a" })],
+                [deck.boxKey("s2", "c"), box({ id: "c" })],
+                [deck.boxKey("s1", "b"), box({ id: "b" })],
+                ["stray", box({ id: "z" })]
+            ])
+        );
+        expect(grouped.get("s1")?.map((one) => one.id)).toEqual(["a", "b"]);
+        expect(grouped.get("s2")?.map((one) => one.id)).toEqual(["c"]);
+        expect(grouped.size).toBe(2);
+    });
+});

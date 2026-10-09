@@ -17,6 +17,8 @@
  * canvas, and so the exporters read the same model the editor writes.
  */
 
+import { z } from "zod";
+
 /** What a box on a slide is. Three, deliberately: a deck made of more kinds than
  *  this is a deck nobody finishes. */
 export const BOX_KINDS = ["text", "shape", "image"] as const;
@@ -152,4 +154,212 @@ export function deckText(slides: readonly Slide[], boxes: ReadonlyMap<string, Bo
             .filter(Boolean)
             .join("\n")
     );
+}
+
+/** The boxes of every slide at once, for a screen that draws them all - the
+ *  slide list - and would otherwise walk every box once per slide. */
+export function groupBySlide(boxes: ReadonlyMap<string, Box>): Map<string, Box[]> {
+    const out = new Map<string, Box[]>();
+    for (const [key, box] of boxes) {
+        const at = readBoxKey(key);
+        if (!at) continue;
+        const list = out.get(at.slideId);
+        if (list) list.push(box);
+        else out.set(at.slideId, [box]);
+    }
+    return out;
+}
+
+// ---------------------------------------------------------------------------
+// Moving and resizing
+// ---------------------------------------------------------------------------
+
+/** The eight grips round a chosen box: the corners and the middle of each side,
+ *  named by compass point the way every drawing tool names them. */
+export const HANDLES = ["nw", "n", "ne", "e", "se", "s", "sw", "w"] as const;
+
+export type Handle = (typeof HANDLES)[number];
+
+export interface ResizeOptions {
+    /** Shift: the box keeps its proportions. */
+    readonly keepRatio?: boolean;
+    /** Alt: the box grows from its centre, so both opposite sides move. */
+    readonly fromCenter?: boolean;
+}
+
+/**
+ * A box, after its grip `handle` was dragged by `dx`, `dy` (fractions of the
+ * slide).
+ *
+ * The side opposite the grip stays where it was, as in every drawing tool; a
+ * side grip changes one dimension, a corner both. Kept on the slide by stopping
+ * the moving sides at its edges - never by sliding the whole box, which is what
+ * clamping the result afterwards would do and which reads as the box running
+ * away from the pointer. Never smaller than `SMALLEST`, so a box shrunk to
+ * nothing can still be grabbed.
+ */
+export function resizeFrame(
+    start: BoxFrame,
+    handle: Handle,
+    dx: number,
+    dy: number,
+    options: ResizeOptions = {}
+): BoxFrame {
+    const west = handle.endsWith("w");
+    const east = handle.endsWith("e");
+    const north = handle.startsWith("n");
+    const south = handle.startsWith("s");
+    const centered = options.fromCenter === true;
+    const twice = centered ? 2 : 1;
+    // How far each dimension may grow before a moving side leaves the slide.
+    const room = (from: number, size: number, toStart: boolean, toEnd: boolean): number => {
+        if (centered || (!toStart && !toEnd))
+            return 2 * Math.min(from + size / 2, 1 - from - size / 2);
+        return toStart ? from + size : 1 - from;
+    };
+    const roomW = room(start.x, start.w, west, east);
+    const roomH = room(start.y, start.h, north, south);
+    let w = start.w + (east ? dx : west ? -dx : 0) * twice;
+    let h = start.h + (south ? dy : north ? -dy : 0) * twice;
+    if (options.keepRatio) {
+        const horizontal = east || west;
+        const vertical = north || south;
+        let scale =
+            horizontal && vertical
+                ? Math.max(w / start.w, h / start.h)
+                : horizontal
+                  ? w / start.w
+                  : h / start.h;
+        scale = Math.min(scale, roomW / start.w, roomH / start.h);
+        scale = Math.max(scale, SMALLEST / start.w, SMALLEST / start.h);
+        w = start.w * scale;
+        h = start.h * scale;
+    } else {
+        w = Math.min(roomW, Math.max(SMALLEST, w));
+        h = Math.min(roomH, Math.max(SMALLEST, h));
+    }
+    // A side grip with the proportions kept also changes the other dimension;
+    // that one grows evenly about the middle, as both do with Alt.
+    const x =
+        west && !centered
+            ? start.x + start.w - w
+            : east && !centered
+              ? start.x
+              : start.x + (start.w - w) / 2;
+    const y =
+        north && !centered
+            ? start.y + start.h - h
+            : south && !centered
+              ? start.y
+              : start.y + (start.h - h) / 2;
+    return clampFrame({ x, y, w, h });
+}
+
+/**
+ * How far an arrow key moves a box: a three-hundred-and-twentieth of the slide's
+ * width, and the same distance on screen downwards - which, on a slide wider
+ * than it is tall, is a larger fraction of its height. Ten times that with
+ * Shift, as in every editor that nudges.
+ */
+export const NUDGE = 1 / 320;
+
+export function nudgeFrame(frame: BoxFrame, right: number, down: number, large: boolean): BoxFrame {
+    const step = NUDGE * (large ? 10 : 1);
+    return clampFrame({
+        ...frame,
+        x: frame.x + right * step,
+        y: frame.y + down * step * SLIDE_RATIO
+    });
+}
+
+/** Where a copy lands: a step down and to the right of what it copies, so it is
+ *  visibly a second box rather than one hiding exactly behind the other. */
+export const COPY_OFFSET = 0.02;
+
+export function copyOf(box: Box, id: string, offset = COPY_OFFSET): Box {
+    const frame = clampFrame({
+        x: box.x + offset,
+        y: box.y + offset * SLIDE_RATIO,
+        w: box.w,
+        h: box.h
+    });
+    return { ...box, ...frame, id, version: 1 };
+}
+
+// ---------------------------------------------------------------------------
+// The clipboard
+// ---------------------------------------------------------------------------
+
+/** The clipboard type boxes travel under, between slides and between tabs. */
+export const CLIPBOARD_TYPE = "application/x-polaris-slide-boxes";
+
+const fraction = z.number().finite().min(0).max(1);
+
+/** A picture's address, as a box may hold one: inline image data, a web address
+ *  or one of Polaris' own paths. A pasted `javascript:` or `file:` address never
+ *  reaches the page. */
+const imageSource = z
+    .string()
+    .max(8_000_000)
+    .refine((value) => value === "" || /^(data:image\/|https:\/\/|\/(?!\/))/.test(value));
+
+const pastedBox = z.object({
+    kind: z.enum(BOX_KINDS),
+    x: fraction,
+    y: fraction,
+    w: fraction,
+    h: fraction,
+    text: z.string().max(20_000),
+    size: z.number().finite().min(0.005).max(1),
+    color: z.string().max(64),
+    fill: z.string().max(64),
+    align: z.enum(["left", "center", "right"]),
+    src: imageSource
+});
+
+const pastedBoxes = z.object({ boxes: z.array(pastedBox).min(1).max(500) });
+
+/** What goes on the clipboard: the boxes, without the ids and versions that
+ *  belong to the slide they were copied from. */
+export function writeClipboard(boxes: readonly Box[]): string {
+    return JSON.stringify({
+        boxes: boxes.map(({ kind, x, y, w, h, text, size, color, fill, align, src }) => ({
+            kind,
+            x,
+            y,
+            w,
+            h,
+            text,
+            size,
+            color,
+            fill,
+            align,
+            src
+        }))
+    });
+}
+
+/**
+ * Boxes off the clipboard, checked field by field, or none.
+ *
+ * The clipboard is anybody's - another tab, another site, a hand-written string
+ * - so what comes off it is untrusted, and anything that is not exactly a box
+ * is refused whole rather than half-used. Each box gets a new id from `newId`
+ * and a first version: it is a new box wherever it lands.
+ */
+export function readClipboard(raw: string, newId: () => string): Box[] {
+    let parsed: unknown;
+    try {
+        parsed = JSON.parse(raw);
+    } catch {
+        return [];
+    }
+    const read = pastedBoxes.safeParse(parsed);
+    if (!read.success) return [];
+    return read.data.boxes.map((one) => ({
+        ...one,
+        ...clampFrame(one),
+        id: newId(),
+        version: 1
+    }));
 }
