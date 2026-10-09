@@ -25,6 +25,7 @@ import { seeded } from "../trivia-bank";
 import {
     FINISH_BASE as RACE_FINISH,
     PARKOUR_SHAPES,
+    PARKOUR_SHAPES_BEFORE,
     PARKOUR_THEMES,
     type EventOptions
 } from "../catalog";
@@ -106,11 +107,12 @@ export const SHIFT_STEP = layout.SHIFT_STEP;
 /**
  * How courses are laid out now. A course placed before climbs, moving
  * platforms and looks (design 1), before the layout rules (`parkour-layout`,
- * design 2), or before shapes and the rule that nothing past the next platform
- * is in reach (design 3), is laid out the way it was then, so a race running
- * across an update keeps the course it was built as.
+ * design 2), before shapes and the rule that nothing past the next platform
+ * is in reach (design 3), or before every jump had to be one a player makes
+ * (`parkour-layout.jumpProblems`, design 4), is laid out the way it was then,
+ * so a race running across an update keeps the course it was built as.
  */
-export const DESIGN = 4;
+export const DESIGN = 5;
 
 const TRAP_BLOCKS: Readonly<Record<Trap, Box["block"]>> = {
     slime: "minecraft:slime_block",
@@ -172,7 +174,7 @@ const ROLE_BLOCKS: Readonly<Record<"checkpoint" | "finish", Box["block"]>> = {
 
 /** A run's shape: drawn from its id among those the event allows. */
 export function shapeFor(options: EventOptions<"parkour">, seed: string): layout.Shape {
-    const allowed = options.shapes ?? PARKOUR_SHAPES;
+    const allowed = options.shapes ?? PARKOUR_SHAPES_BEFORE;
     const shapes = PARKOUR_SHAPES.filter((shape) => allowed.includes(shape));
     return shuffled(
         shapes.length > 0 ? shapes : PARKOUR_SHAPES,
@@ -295,12 +297,12 @@ const walks = new Map<string, Platform[]>();
  * A design-4 layout, searched for once per run and options: the search can
  * take a while, and every tick and quick look asks for the course again.
  */
-function walkedOnce(options: EventOptions<"parkour">, seed: string): Platform[] {
+function walkedOnce(options: EventOptions<"parkour">, seed: string, makeable: boolean): Platform[] {
     const shape = shapeFor(options, seed);
-    const key = JSON.stringify([seed, shape, options.difficulty, options.jumps]);
+    const key = JSON.stringify([seed, shape, options.difficulty, options.jumps, makeable]);
     const kept = walks.get(key);
     if (kept) return kept;
-    const platforms = layout.walked(options, seed, shape);
+    const platforms = layout.walked(options, seed, shape, makeable);
     walks.set(key, platforms);
     if (walks.size > WALKS_KEPT) walks.delete(walks.keys().next().value!);
     return platforms;
@@ -320,7 +322,7 @@ export function course(
     const legacy = design < 2;
     const raw =
         design >= 4
-            ? walkedOnce(options, seed)
+            ? walkedOnce(options, seed, design >= 5)
             : design >= 3
               ? layout.laidOut(options, seed)
               : laidOutBefore(options, seed, legacy);

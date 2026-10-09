@@ -89,7 +89,10 @@ const SHAPE_LABELS: Readonly<
     Record<(typeof catalog.PARKOUR_SHAPES)[number], GameKey<"minecraft">>
 > = {
     rows: "editor.labels.parkourShape.rows",
-    tower: "editor.labels.parkourShape.tower"
+    tower: "editor.labels.parkourShape.tower",
+    line: "editor.labels.parkourShape.line",
+    snake: "editor.labels.parkourShape.snake",
+    spiral: "editor.labels.parkourShape.spiral"
 };
 
 const SPLEEF_LABELS: Readonly<

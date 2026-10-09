@@ -1968,7 +1968,13 @@ describe("a parkour course", () => {
         const widestUp = { easy: 1, medium: 2, hard: 2 };
         for (const { difficulty, jumps, seed } of shapes) {
             const course = parkour.course(
-                { place: { mode: "players" }, jumps, difficulty, height: 30 },
+                {
+                    place: { mode: "players" },
+                    jumps,
+                    difficulty,
+                    height: 30,
+                    shapes: [...catalog.PARKOUR_SHAPES]
+                },
                 seed,
                 { x: 0, z: 0 },
                 80
@@ -1993,8 +1999,8 @@ describe("a parkour course", () => {
         }
     });
 
-    it("leaves nothing in reach but the next platform, in rows and in a tower", () => {
-        for (const shape of ["rows", "tower"] as const)
+    it("leaves nothing in reach but the next platform, in every shape", () => {
+        for (const shape of catalog.PARKOUR_SHAPES)
             for (const { difficulty, jumps, seed } of shapes) {
                 const course = parkour.course(
                     { place: { mode: "players" }, jumps, difficulty, height: 30, shapes: [shape] },
@@ -2011,7 +2017,13 @@ describe("a parkour course", () => {
     it("leaves head room over every platform and keeps everything in its volume, net at the bottom", () => {
         for (const { difficulty, jumps, seed } of shapes) {
             const course = parkour.course(
-                { place: { mode: "players" }, jumps, difficulty, height: 30 },
+                {
+                    place: { mode: "players" },
+                    jumps,
+                    difficulty,
+                    height: 30,
+                    shapes: [...catalog.PARKOUR_SHAPES]
+                },
                 seed,
                 { x: 7, z: 7 },
                 100
@@ -3300,7 +3312,14 @@ describe("a parkour course's traps", () => {
 describe("a parkour course's climbs, moving platforms and looks", () => {
     const course = (difficulty: "easy" | "medium" | "hard", seed: string, theme = "random") =>
         parkour.course(
-            { place: { mode: "players" }, jumps: 40, difficulty, height: 30, theme } as never,
+            {
+                place: { mode: "players" },
+                jumps: 40,
+                difficulty,
+                height: 30,
+                theme,
+                shapes: catalog.PARKOUR_SHAPES
+            } as never,
             seed,
             { x: 0, z: 0 },
             100
@@ -3419,7 +3438,7 @@ describe("a parkour course's climbs, moving platforms and looks", () => {
         }
         expect(changed).toBeGreaterThan(0);
         expect(stage.EMPTY_STAGE.design).toBe(1);
-        expect(parkour.DESIGN).toBe(4);
+        expect(parkour.DESIGN).toBe(5);
     });
 
     it("draws one of four looks for a run, or the one chosen, keeping checkpoints lime", () => {

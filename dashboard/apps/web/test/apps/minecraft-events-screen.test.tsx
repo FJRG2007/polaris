@@ -661,10 +661,18 @@ describe("the parkour and spleef editors", () => {
         await waitFor(() =>
             expect((screen.getByText("Done") as HTMLButtonElement).disabled).toBe(false)
         );
-        // Both shapes on; the last one left cannot be switched off.
+        // Every shape on; the last one left cannot be switched off.
         const tower = screen.getByLabelText("A tower climbed round and round") as HTMLButtonElement;
         expect(tower.getAttribute("aria-checked")).toBe("true");
-        fireEvent.click(screen.getByLabelText("Rows climbing back and forth"));
+        for (const label of [
+            "Rows climbing back and forth",
+            "One long line",
+            "A snake winding on",
+            "A spiral winding out"
+        ]) {
+            expect(tower.disabled).toBe(false);
+            fireEvent.click(screen.getByLabelText(label));
+        }
         expect(tower.disabled).toBe(true);
         fireEvent.click(screen.getByText("Done"));
         const options = (saved[0] as { options: { jumps: number; shapes: string[] } }).options;

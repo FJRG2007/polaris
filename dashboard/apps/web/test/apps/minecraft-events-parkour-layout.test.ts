@@ -8,6 +8,7 @@
 import { describe, expect, it } from "vitest";
 import * as parkour from "@polaris-app/game-servers/src/lib/minecraft/events/kinds/parkour";
 import * as layout from "@polaris-app/game-servers/src/lib/minecraft/events/kinds/parkour-layout";
+import { PARKOUR_SHAPES } from "@polaris-app/game-servers/src/lib/minecraft/events/catalog";
 
 type Difficulty = "easy" | "medium" | "hard";
 
@@ -16,7 +17,7 @@ const courseOf = (
     jumps: number,
     seed: string,
     design?: number,
-    shapes: readonly ("rows" | "tower")[] = ["rows", "tower"]
+    shapes: readonly layout.Shape[] = ["rows", "tower"]
 ) =>
     parkour.course(
         { place: { mode: "players" }, jumps, difficulty, height: 30, shapes } as never,
@@ -31,11 +32,11 @@ const SHAPES = (["easy", "medium", "hard"] as const).flatMap((difficulty) =>
 );
 
 describe("a parkour course's layout", () => {
-    it("keeps every rule and leaves nothing to skip, over thousands of courses of both shapes", () => {
+    it("keeps every rule, leaves nothing to skip and every jump makeable, over thousands of courses of every shape", () => {
         let courses = 0;
         let slimes = 0;
         let specials = 0;
-        for (const shape of ["rows", "tower"] as const)
+        for (const shape of PARKOUR_SHAPES)
             for (const { difficulty, jumps } of SHAPES)
                 for (let seed = 0; seed < 100; seed += 1) {
                     const course = courseOf(difficulty, jumps, `layout-${seed}`, undefined, [
@@ -45,12 +46,13 @@ describe("a parkour course's layout", () => {
                     expect(course.platforms).toHaveLength(jumps + 1);
                     expect(layout.layoutProblems(course.platforms)).toEqual([]);
                     expect(layout.skipProblems(course.platforms)).toEqual([]);
+                    expect(layout.jumpProblems(course.platforms)).toEqual([]);
                     for (const one of course.platforms) {
                         if (one.trap === "slime") slimes += 1;
                         if (one.trap || one.climb) specials += 1;
                     }
                 }
-        expect(courses).toBe(3000);
+        expect(courses).toBe(7500);
         // Still a course worth running: traps and climbs on plenty of them.
         // Fewer slime pads than before nothing could be skipped: a pad's
         // bounce has to reach the next platform, and the jump before the pad
@@ -60,7 +62,7 @@ describe("a parkour course's layout", () => {
     });
 
     it("falls back to a course that keeps every rule, up to the longest a race can be", () => {
-        for (const shape of ["rows", "tower"] as const)
+        for (const shape of PARKOUR_SHAPES)
             for (const difficulty of ["easy", "medium", "hard"] as const)
                 for (const jumps of [10, 30, 60]) {
                     const options = {
@@ -75,17 +77,19 @@ describe("a parkour course's layout", () => {
                     expect(platforms.at(-1)!.role).toBe("finish");
                     expect(layout.layoutProblems(platforms)).toEqual([]);
                     expect(layout.skipProblems(platforms)).toEqual([]);
+                    expect(layout.jumpProblems(platforms)).toEqual([]);
                 }
     });
 
     it("lays out the longest courses by the rules too", () => {
-        for (const shape of ["rows", "tower"] as const)
+        for (const shape of PARKOUR_SHAPES)
             for (const difficulty of ["easy", "medium", "hard"] as const)
                 for (let seed = 0; seed < 10; seed += 1) {
                     const course = courseOf(difficulty, 60, `long-${seed}`, undefined, [shape]);
                     expect(course.platforms).toHaveLength(61);
                     expect(layout.layoutProblems(course.platforms)).toEqual([]);
                     expect(layout.skipProblems(course.platforms)).toEqual([]);
+                    expect(layout.jumpProblems(course.platforms)).toEqual([]);
                 }
     });
 
@@ -108,6 +112,42 @@ describe("a parkour course's layout", () => {
         expect(tower.at(-1)!.y).toBeGreaterThan(tower[0]!.y + 10);
     });
 
+    it("lays a line straight on, a snake back and forth across its way, and a spiral outward", () => {
+        for (let seed = 0; seed < 30; seed += 1) {
+            const line = courseOf("medium", 40, `line-${seed}`, undefined, ["line"]).platforms;
+            // Long rows: its first runs most of `LINE_ROW` before any turn.
+            const firstTurn = line.findIndex((one) => one.turn);
+            const straight = firstTurn < 0 ? line : line.slice(0, firstTurn);
+            expect(Math.max(...straight.map((one) => one.x))).toBeGreaterThan(layout.LINE_ROW / 2);
+            expect(line.every((one) => one.y >= line[0]!.y)).toBe(true);
+
+            const snake = courseOf("medium", 40, `snake-${seed}`, undefined, ["snake"]).platforms;
+            // Its legs across go both ways, and it ends well on from the start.
+            const across = snake.slice(1).map((one, index) => Math.sign(one.z - snake[index]!.z));
+            expect(across).toContain(1);
+            expect(across).toContain(-1);
+            const zs = snake.map((one) => one.z);
+            expect(Math.max(...zs) - Math.min(...zs)).toBeLessThanOrEqual(layout.SNAKE_WIDTH + 3);
+            expect(snake.at(-1)!.x - snake[0]!.x).toBeGreaterThan(2 * layout.SNAKE_STEP);
+
+            const spiral = courseOf("medium", 40, `spiral-${seed}`, undefined, [
+                "spiral"
+            ]).platforms;
+            // Round all four ways, each lap wider than the one inside it.
+            const turns = spiral.filter((one) => one.turn).length;
+            expect(turns).toBeGreaterThanOrEqual(5);
+            const middle = { x: -4, z: 2 };
+            const far = (one: (typeof spiral)[number]) =>
+                Math.max(Math.abs(one.x - middle.x), Math.abs(one.z - middle.z));
+            const half = Math.floor(spiral.length / 2);
+            expect(Math.max(...spiral.slice(half).map(far))).toBeGreaterThan(
+                Math.max(...spiral.slice(1, 12).map(far))
+            );
+            const xs = spiral.map((one) => one.x);
+            expect(Math.max(...xs) - Math.min(...xs)).toBeGreaterThan(2 * layout.TOWER_SIDE);
+        }
+    });
+
     it("finds what was wrong with courses laid out before the rules", () => {
         const found = new Set<string>();
         for (let seed = 0; seed < 200; seed += 1)
@@ -122,6 +162,19 @@ describe("a parkour course's layout", () => {
             "special # comes right after something else",
             "special # comes right before something else"
         ]);
+    });
+
+    it("keeps a tower built before every jump had to be makeable as it was, and makes new ones makeable", () => {
+        let broken = 0;
+        for (let seed = 0; seed < 60; seed += 1) {
+            const before = courseOf("hard", 40, `corner-${seed}`, 4, ["tower"]);
+            expect(courseOf("hard", 40, `corner-${seed}`, 4, ["tower"])).toEqual(before);
+            if (layout.jumpProblems(before.platforms).length > 0) broken += 1;
+            const now = courseOf("hard", 40, `corner-${seed}`, undefined, ["tower"]);
+            expect(layout.jumpProblems(now.platforms)).toEqual([]);
+        }
+        // A corner jump three across, two aside and a block up: what design 4 left.
+        expect(broken).toBeGreaterThan(0);
     });
 
     it("keeps a race already running on the course it was built as", () => {
@@ -179,8 +232,10 @@ describe("a slime pad's bounce", () => {
         // Further than anybody carries in the air.
         expect(layout.bounceReaches(before, pad, { ...level, x: 5 })).toBe(false);
         let checked = 0;
-        for (let seed = 0; seed < 300; seed += 1) {
-            const { platforms } = courseOf("hard", 40, `slime-${seed}`);
+        for (let seed = 0; seed < 500; seed += 1) {
+            // A tower's sides are too short for a pad and the jump it throws onto
+            // to leave its corner a jump anybody makes: the other shapes have them.
+            const { platforms } = courseOf("hard", 40, `slime-${seed}`, undefined, PARKOUR_SHAPES);
             platforms.forEach((one, index) => {
                 if (one.trap !== "slime") return;
                 checked += 1;
