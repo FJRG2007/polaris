@@ -22,7 +22,8 @@ vi.mock("@/lib/chat/custom-emoji", () => ({
 
 const { GET } = await import("@/app/api/chat/emoji/[emojiId]/route");
 
-const get = (emojiId: string) => GET(new Request("http://polaris.test"), { params: Promise.resolve({ emojiId }) });
+const get = (emojiId: string) =>
+    GET(new Request("http://polaris.test"), { params: Promise.resolve({ emojiId }) });
 
 beforeEach(() => {
     reachable = true;

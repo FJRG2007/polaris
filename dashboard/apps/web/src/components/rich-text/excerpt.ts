@@ -67,7 +67,15 @@ export function plainText(markdown: string): string {
 
 /** The block-level nodes whose children are separate lines. Everything else is
  *  inline and runs together. */
-const STACKED = new Set(["doc", "bulletList", "orderedList", "listItem", "blockquote", "taskList", "taskItem"]);
+const STACKED = new Set([
+    "doc",
+    "bulletList",
+    "orderedList",
+    "listItem",
+    "blockquote",
+    "taskList",
+    "taskItem"
+]);
 
 function blocksOf(node: JSONContent): string {
     if (node.type === "text") return spoken(node);

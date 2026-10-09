@@ -470,14 +470,20 @@ export function EmojiPicker({
                 const ref = core.parseCustomEmojiToken(char);
                 if (!ref) return [{ char, words: "" }];
                 const entry = byId.get(ref.id);
-                return entry ? [{ char: core.customEmojiToken(entry), words: entry.name, entry }] : [];
+                return entry
+                    ? [{ char: core.customEmojiToken(entry), words: entry.name, entry }]
+                    : [];
             }),
         [recent.emoji, byId]
     );
     const customGrid = useMemo(
         () =>
             (customEntries ?? []).map(
-                (entry): PickerEntry => ({ char: core.customEmojiToken(entry), words: entry.name, entry })
+                (entry): PickerEntry => ({
+                    char: core.customEmojiToken(entry),
+                    words: entry.name,
+                    entry
+                })
             ),
         [customEntries]
     );
@@ -629,7 +635,10 @@ export function EmojiPicker({
                                     {custom && (
                                         <section className="mb-2">
                                             <h3 className="flex items-center gap-1 px-1 pb-1 text-[0.625rem] font-medium uppercase tracking-[0.04em] text-foreground-subtle">
-                                                <span className="min-w-0 flex-1 truncate" title={custom.spaceName}>
+                                                <span
+                                                    className="min-w-0 flex-1 truncate"
+                                                    title={custom.spaceName}
+                                                >
                                                     {custom.spaceName}
                                                 </span>
                                                 {custom.manageHref && (
@@ -664,7 +673,11 @@ export function EmojiPicker({
                                         <section key={group.name} className="mb-2">
                                             <h3 className="px-1 pb-1 text-[0.625rem] font-medium uppercase tracking-[0.04em] text-foreground-subtle">
                                                 {group.name in GROUP_KEYS
-                                                    ? t(GROUP_KEYS[group.name as keyof typeof GROUP_KEYS])
+                                                    ? t(
+                                                          GROUP_KEYS[
+                                                              group.name as keyof typeof GROUP_KEYS
+                                                          ]
+                                                      )
                                                     : group.name}
                                             </h3>
                                             <Grid entries={group.emoji} onPick={pick} />
@@ -908,7 +921,11 @@ function Tile({
             <button
                 type="button"
                 aria-pressed={kept}
-                aria-label={kept ? t("emojiPicker.stopKeepingThisPicture") : t("emojiPicker.keepThisPicture")}
+                aria-label={
+                    kept
+                        ? t("emojiPicker.stopKeepingThisPicture")
+                        : t("emojiPicker.keepThisPicture")
+                }
                 title={kept ? t("emojiPicker.keptItIsInYour") : t("emojiPicker.keepThis")}
                 onClick={(event) => {
                     // The tile under it sends. Keeping is not the first half of
@@ -963,7 +980,11 @@ const Grid = memo(function Grid({
                             onClick={() => onPick(item.char)}
                             className="flex size-8 items-center justify-center rounded text-lg transition-colors hover:bg-muted"
                         >
-                            {item.entry ? <EmojiPicture entry={item.entry} className="size-6" /> : item.char}
+                            {item.entry ? (
+                                <EmojiPicture entry={item.entry} className="size-6" />
+                            ) : (
+                                item.char
+                            )}
                         </button>
                     </li>
                 );

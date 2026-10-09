@@ -31,7 +31,11 @@ import type { SpaceEmojiView as SpaceEmoji } from "@/lib/chat/custom-emoji";
 import { emojiSrc, patchSpaceEmoji, useSpaceEmoji } from "@/app/(app)/chat/space-emoji";
 import { ArrowLeft, Loader2, RotateCcw, Smile, Trash2, Upload, X } from "lucide-react";
 import { Button, cn, ConfirmDeleteDialog, EmptyState, Input, Skeleton } from "@polaris/ui";
-import { deleteSpaceEmojiAction, renameSpaceEmojiAction, uploadSpaceEmojiAction } from "@/app/(app)/chat/emoji-actions";
+import {
+    deleteSpaceEmojiAction,
+    renameSpaceEmojiAction,
+    uploadSpaceEmojiAction
+} from "@/app/(app)/chat/emoji-actions";
 
 /** One file chosen for upload and not in the list yet. */
 interface Staged {
@@ -50,7 +54,9 @@ const KINDS = new Set<string>(core.CUSTOM_EMOJI_TYPES);
 function nameProblem(name: string): core.CustomEmojiNameProblem | null {
     const parsed = core.customEmojiNameSchema.safeParse(name);
     if (parsed.success) return null;
-    return (parsed.error.issues[0]?.message as core.CustomEmojiNameProblem | undefined) ?? "characters";
+    return (
+        (parsed.error.issues[0]?.message as core.CustomEmojiNameProblem | undefined) ?? "characters"
+    );
 }
 
 export function SpaceEmojiView({ spaceId }: { spaceId: string }) {
@@ -96,7 +102,8 @@ export function SpaceEmojiView({ spaceId }: { spaceId: string }) {
                 (emoji ?? []).some((one) => one.id !== except && one.name.toLowerCase() === key) ||
                 staged.some(
                     (one) =>
-                        one.key !== except && core.customEmojiNameKey(core.normalizeEmojiName(one.name)) === key
+                        one.key !== except &&
+                        core.customEmojiNameKey(core.normalizeEmojiName(one.name)) === key
                 )
             );
         },
@@ -124,7 +131,9 @@ export function SpaceEmojiView({ spaceId }: { spaceId: string }) {
     );
 
     const update = (key: string, change: Partial<Staged>) =>
-        setStaged((current) => current.map((one) => (one.key === key ? { ...one, ...change } : one)));
+        setStaged((current) =>
+            current.map((one) => (one.key === key ? { ...one, ...change } : one))
+        );
 
     const dismiss = (key: string) =>
         setStaged((current) => {
@@ -147,11 +156,17 @@ export function SpaceEmojiView({ spaceId }: { spaceId: string }) {
             const result = await uploadSpaceEmojiAction(form);
             if (result.emoji) {
                 const added = result.emoji;
-                patchSpaceEmoji(spaceId, (current) => [...current.filter((one) => one.id !== added.id), added]);
+                patchSpaceEmoji(spaceId, (current) => [
+                    ...current.filter((one) => one.id !== added.id),
+                    added
+                ]);
                 dismiss(item.key);
                 return;
             }
-            update(item.key, { sending: false, error: result.error ?? t("spaceEmoji.uploadFailed") });
+            update(item.key, {
+                sending: false,
+                error: result.error ?? t("spaceEmoji.uploadFailed")
+            });
         } catch {
             update(item.key, { sending: false, error: t("spaceEmoji.uploadFailed") });
         }
@@ -173,7 +188,11 @@ export function SpaceEmojiView({ spaceId }: { spaceId: string }) {
             const problem = nameProblem(name);
             const error =
                 fileRefusal(file) ??
-                (problem ? refusalFor(problem) : names.has(key) ? t("errors.emojiNameTaken") : null);
+                (problem
+                    ? refusalFor(problem)
+                    : names.has(key)
+                      ? t("errors.emojiNameTaken")
+                      : null);
             names.add(key);
             return { key: crypto.randomUUID(), file, preview, name, error, sending: false };
         });
@@ -246,7 +265,10 @@ export function SpaceEmojiView({ spaceId }: { spaceId: string }) {
                 <Smile className="size-4 shrink-0 text-primary" />
                 <span className="shrink-0 text-sm font-semibold">{t("spaceEmoji.title")}</span>
                 {spaceName && (
-                    <span className="min-w-0 truncate text-sm text-muted-foreground" title={spaceName}>
+                    <span
+                        className="min-w-0 truncate text-sm text-muted-foreground"
+                        title={spaceName}
+                    >
                         {spaceName}
                     </span>
                 )}
@@ -256,7 +278,9 @@ export function SpaceEmojiView({ spaceId }: { spaceId: string }) {
                 <div className="mx-auto flex w-full max-w-3xl flex-col gap-6 p-4">
                     <section className="flex flex-col gap-3">
                         <p className="text-sm text-muted-foreground">
-                            {spaceName ? t("spaceEmoji.intro", { space: spaceName }) : t("spaceEmoji.introNoName")}
+                            {spaceName
+                                ? t("spaceEmoji.intro", { space: spaceName })
+                                : t("spaceEmoji.introNoName")}
                         </p>
                         {list === null && failed === null ? (
                             <Skeleton className="h-24 w-full" />
@@ -274,15 +298,23 @@ export function SpaceEmojiView({ spaceId }: { spaceId: string }) {
                                 }}
                                 className={cn(
                                     "flex flex-col gap-3 rounded-lg border border-dashed p-4 transition-colors sm:flex-row sm:items-center",
-                                    dragging ? "border-primary bg-primary/5" : "border-border bg-card"
+                                    dragging
+                                        ? "border-primary bg-primary/5"
+                                        : "border-border bg-card"
                                 )}
                             >
                                 <div className="min-w-0 flex-1 text-xs text-muted-foreground">
-                                    <p className="font-medium text-foreground">{t("spaceEmoji.rulesTitle")}</p>
+                                    <p className="font-medium text-foreground">
+                                        {t("spaceEmoji.rulesTitle")}
+                                    </p>
                                     <ul className="mt-1 list-disc pl-4">
                                         <li>{t("spaceEmoji.ruleFiles")}</li>
                                         <li>{t("spaceEmoji.ruleNames")}</li>
-                                        <li>{t("spaceEmoji.ruleSlots", { total: core.CUSTOM_EMOJI_SLOTS })}</li>
+                                        <li>
+                                            {t("spaceEmoji.ruleSlots", {
+                                                total: core.CUSTOM_EMOJI_SLOTS
+                                            })}
+                                        </li>
                                     </ul>
                                 </div>
                                 <div className="flex shrink-0 flex-col items-start gap-1 sm:items-end">
@@ -295,7 +327,11 @@ export function SpaceEmojiView({ spaceId }: { spaceId: string }) {
                                         <Upload className="size-3.5" />
                                         {t("spaceEmoji.upload")}
                                     </Button>
-                                    {full && <p className="text-xs text-muted-foreground">{t("spaceEmoji.full")}</p>}
+                                    {full && (
+                                        <p className="text-xs text-muted-foreground">
+                                            {t("spaceEmoji.full")}
+                                        </p>
+                                    )}
                                     <input
                                         ref={chooser}
                                         type="file"
@@ -334,7 +370,10 @@ export function SpaceEmojiView({ spaceId }: { spaceId: string }) {
                                                 className="size-8 shrink-0 rounded object-contain"
                                             />
                                             <div className="flex min-w-0 flex-1 flex-col gap-1">
-                                                <p className="truncate text-xs text-muted-foreground" title={item.file.name}>
+                                                <p
+                                                    className="truncate text-xs text-muted-foreground"
+                                                    title={item.file.name}
+                                                >
                                                     {item.file.name}
                                                 </p>
                                                 <Input
@@ -344,15 +383,22 @@ export function SpaceEmojiView({ spaceId }: { spaceId: string }) {
                                                     aria-invalid={live !== null}
                                                     maxLength={core.CUSTOM_EMOJI_NAME_MAX + 2}
                                                     onChange={(event) =>
-                                                        update(item.key, { name: event.target.value, error: null })
+                                                        update(item.key, {
+                                                            name: event.target.value,
+                                                            error: null
+                                                        })
                                                     }
                                                     className="h-8"
                                                 />
-                                                {(fileError ?? live ?? nameError) && !item.sending && (
-                                                    <p className="text-xs text-danger" role="alert">
-                                                        {fileError ?? live ?? nameError}
-                                                    </p>
-                                                )}
+                                                {(fileError ?? live ?? nameError) &&
+                                                    !item.sending && (
+                                                        <p
+                                                            className="text-xs text-danger"
+                                                            role="alert"
+                                                        >
+                                                            {fileError ?? live ?? nameError}
+                                                        </p>
+                                                    )}
                                             </div>
                                             <div className="flex shrink-0 items-center gap-1 pt-5">
                                                 {item.sending ? (
@@ -367,7 +413,9 @@ export function SpaceEmojiView({ spaceId }: { spaceId: string }) {
                                                                 type="button"
                                                                 disabled={live !== null}
                                                                 onClick={() => void send(item)}
-                                                                aria-label={t("spaceEmoji.tryAgain")}
+                                                                aria-label={t(
+                                                                    "spaceEmoji.tryAgain"
+                                                                )}
                                                                 title={t("spaceEmoji.tryAgain")}
                                                                 className="rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50"
                                                             >
@@ -478,10 +526,15 @@ function EmojiSection({
     return (
         <section className="flex flex-col gap-2">
             <div className="flex items-baseline justify-between gap-2">
-                <h2 className="min-w-0 truncate text-sm font-semibold" title={title}>{title}</h2>
+                <h2 className="min-w-0 truncate text-sm font-semibold" title={title}>
+                    {title}
+                </h2>
                 {items !== null && (
                     <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
-                        {t("spaceEmoji.slots", { count: items.length, total: core.CUSTOM_EMOJI_SLOTS })}
+                        {t("spaceEmoji.slots", {
+                            count: items.length,
+                            total: core.CUSTOM_EMOJI_SLOTS
+                        })}
                     </span>
                 )}
             </div>
@@ -582,7 +635,10 @@ function EmojiRow({
                         className="h-8"
                     />
                 ) : (
-                    <p className="truncate text-sm font-medium" title={core.customEmojiFallback(item)}>
+                    <p
+                        className="truncate text-sm font-medium"
+                        title={core.customEmojiFallback(item)}
+                    >
                         {core.customEmojiFallback(item)}
                     </p>
                 )}

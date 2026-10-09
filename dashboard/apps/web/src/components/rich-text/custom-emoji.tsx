@@ -51,7 +51,9 @@ export function EmojiRun({
                 if (part.emoji === undefined) return part.text;
                 const entry = set?.entries.get(part.emoji.id);
                 if (!entry) return core.customEmojiFallback(part.emoji);
-                return <CustomEmojiGlyph key={index} entry={entry} from={set!.from} jumbo={jumbo} />;
+                return (
+                    <CustomEmojiGlyph key={index} entry={entry} from={set!.from} jumbo={jumbo} />
+                );
             })}
         </>
     );
@@ -79,7 +81,13 @@ export function EmojiFace({
 }
 
 /** The picture alone, at whatever size the caller gives it. */
-export function EmojiPicture({ entry, className }: { entry: CustomEmojiEntry; className?: string }) {
+export function EmojiPicture({
+    entry,
+    className
+}: {
+    entry: CustomEmojiEntry;
+    className?: string;
+}) {
     const label = core.customEmojiFallback(entry);
     return (
         <img

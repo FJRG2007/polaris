@@ -20,7 +20,9 @@ const GONE = "0193b0f0-0000-7000-8000-0000000000e4";
 
 const HOME: CustomEmojiSet = {
     from: "Home",
-    entries: new Map([[WAVE, { id: WAVE, name: "wave", animated: false, src: `/api/chat/emoji/${WAVE}` }]])
+    entries: new Map([
+        [WAVE, { id: WAVE, name: "wave", animated: false, src: `/api/chat/emoji/${WAVE}` }]
+    ])
 };
 const OTHER: CustomEmojiSet = { from: "Other", entries: new Map() };
 
@@ -65,7 +67,9 @@ describe("a space's emoji outside a message", () => {
     it("is a picture on a reaction chip in its space and the name elsewhere", () => {
         const token = `<:wave:${WAVE}>`;
         expect(renderToStaticMarkup(<EmojiFace value={token} set={HOME} />)).toContain("<img");
-        expect(renderToStaticMarkup(<EmojiFace value={token} set={null} />)).toBe("<span>:wave:</span>");
+        expect(renderToStaticMarkup(<EmojiFace value={token} set={null} />)).toBe(
+            "<span>:wave:</span>"
+        );
         expect(renderToStaticMarkup(<EmojiFace value="👍" set={HOME} />)).toBe("<span>👍</span>");
     });
 });

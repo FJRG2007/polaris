@@ -28,18 +28,30 @@ const { inspectEmojiFile } = await import("@/lib/chat/custom-emoji");
 
 function square(red: number, side = 8): Promise<Buffer> {
     return sharp({
-        create: { width: side, height: side, channels: 4, background: { r: red, g: 0, b: 0, alpha: 1 } }
+        create: {
+            width: side,
+            height: side,
+            channels: 4,
+            background: { r: red, g: 0, b: 0, alpha: 1 }
+        }
     })
         .png()
         .toBuffer();
 }
 
-const bytes = (value: Buffer | string) => new Uint8Array(typeof value === "string" ? Buffer.from(value) : value);
+const bytes = (value: Buffer | string) =>
+    new Uint8Array(typeof value === "string" ? Buffer.from(value) : value);
 
 describe("an uploaded emoji", () => {
     it("is a still PNG, with its real size", async () => {
         const result = await inspectEmojiFile(bytes(await square(255, 64)));
-        expect(result).toEqual({ ok: true, mime: "image/png", animated: false, width: 64, height: 64 });
+        expect(result).toEqual({
+            ok: true,
+            mime: "image/png",
+            animated: false,
+            width: 64,
+            height: 64
+        });
     });
 
     it("is animated when a GIF has more than one frame, measured per frame", async () => {
@@ -47,18 +59,30 @@ describe("an uploaded emoji", () => {
             .gif()
             .toBuffer();
         const result = await inspectEmojiFile(bytes(gif));
-        expect(result).toEqual({ ok: true, mime: "image/gif", animated: true, width: 8, height: 8 });
+        expect(result).toEqual({
+            ok: true,
+            mime: "image/gif",
+            animated: true,
+            width: 8,
+            height: 8
+        });
     });
 
     it("is still when a GIF has one frame", async () => {
-        const gif = await sharp(await square(10)).gif().toBuffer();
+        const gif = await sharp(await square(10))
+            .gif()
+            .toBuffer();
         const result = await inspectEmojiFile(bytes(gif));
         expect(result).toMatchObject({ ok: true, mime: "image/gif", animated: false });
     });
 
     it("takes JPEG and WEBP too", async () => {
-        const jpeg = await sharp(await square(20)).jpeg().toBuffer();
-        const webp = await sharp(await square(30)).webp().toBuffer();
+        const jpeg = await sharp(await square(20))
+            .jpeg()
+            .toBuffer();
+        const webp = await sharp(await square(30))
+            .webp()
+            .toBuffer();
         expect(await inspectEmojiFile(bytes(jpeg))).toMatchObject({ ok: true, mime: "image/jpeg" });
         expect(await inspectEmojiFile(bytes(webp))).toMatchObject({ ok: true, mime: "image/webp" });
     });
@@ -81,7 +105,9 @@ describe("a file that is refused", () => {
             ok: false,
             problem: "type"
         });
-        const tiff = await sharp(await square(40)).toFormat("tiff").toBuffer();
+        const tiff = await sharp(await square(40))
+            .toFormat("tiff")
+            .toBuffer();
         expect(await inspectEmojiFile(bytes(tiff))).toEqual({ ok: false, problem: "type" });
     });
 
@@ -112,10 +138,19 @@ describe("a file that is refused", () => {
 
     it("packs more pixels across its frames than one is worth decoding", async () => {
         const frame = (red: number) =>
-            sharp({ create: { width: 2048, height: 2048, channels: 3, background: { r: red, g: 0, b: 0 } } })
+            sharp({
+                create: {
+                    width: 2048,
+                    height: 2048,
+                    channels: 3,
+                    background: { r: red, g: 0, b: 0 }
+                }
+            })
                 .png()
                 .toBuffer();
-        const gif = await sharp(await Promise.all([frame(0), frame(120), frame(240)]), { join: { animated: true } })
+        const gif = await sharp(await Promise.all([frame(0), frame(120), frame(240)]), {
+            join: { animated: true }
+        })
             .gif()
             .toBuffer();
         expect(gif.length).toBeLessThanOrEqual(CUSTOM_EMOJI_MAX_BYTES);
@@ -124,12 +159,25 @@ describe("a file that is refused", () => {
 
     it("is animated at full size within the budget", async () => {
         const frame = (red: number) =>
-            sharp({ create: { width: 1024, height: 1024, channels: 3, background: { r: red, g: 0, b: 0 } } })
+            sharp({
+                create: {
+                    width: 1024,
+                    height: 1024,
+                    channels: 3,
+                    background: { r: red, g: 0, b: 0 }
+                }
+            })
                 .png()
                 .toBuffer();
-        const gif = await sharp(await Promise.all([frame(0), frame(120)]), { join: { animated: true } })
+        const gif = await sharp(await Promise.all([frame(0), frame(120)]), {
+            join: { animated: true }
+        })
             .gif()
             .toBuffer();
-        expect(await inspectEmojiFile(bytes(gif))).toMatchObject({ ok: true, animated: true, width: 1024 });
+        expect(await inspectEmojiFile(bytes(gif))).toMatchObject({
+            ok: true,
+            animated: true,
+            width: 1024
+        });
     });
 });

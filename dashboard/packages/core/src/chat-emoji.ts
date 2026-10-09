@@ -39,7 +39,8 @@ export const CUSTOM_EMOJI_TYPES = ["image/png", "image/jpeg", "image/gif", "imag
 export type CustomEmojiType = (typeof CUSTOM_EMOJI_TYPES)[number];
 
 /** What a file picker is told to offer. A hint, never the check. */
-export const CUSTOM_EMOJI_ACCEPT = ".png,.jpg,.jpeg,.gif,.webp,image/png,image/jpeg,image/gif,image/webp";
+export const CUSTOM_EMOJI_ACCEPT =
+    ".png,.jpg,.jpeg,.gif,.webp,image/png,image/jpeg,image/gif,image/webp";
 
 /** Why a name is refused, as a word a screen turns into a sentence. */
 export type CustomEmojiNameProblem = "short" | "long" | "characters" | "edges";
@@ -52,7 +53,10 @@ export type CustomEmojiNameProblem = "short" | "long" | "characters" | "edges";
  * uniqueness is decided on the lowercased form instead (`customEmojiNameKey`).
  */
 export function normalizeEmojiName(raw: string): string {
-    return raw.trim().replace(/^:+|:+$/g, "").trim();
+    return raw
+        .trim()
+        .replace(/^:+|:+$/g, "")
+        .trim();
 }
 
 /** The form two names are compared in, so `Wave` and `wave` cannot both exist. */
@@ -235,6 +239,7 @@ export function emojiOnlyCount(text: string): number {
 /** How many characters a reader would count, a family emoji being one. */
 function graphemes(text: string): number {
     const Segmenter = (Intl as { Segmenter?: typeof Intl.Segmenter }).Segmenter;
-    if (Segmenter) return [...new Segmenter(undefined, { granularity: "grapheme" }).segment(text)].length;
+    if (Segmenter)
+        return [...new Segmenter(undefined, { granularity: "grapheme" }).segment(text)].length;
     return (text.match(/\p{Extended_Pictographic}|\p{Regional_Indicator}{2}/gu) ?? []).length;
 }

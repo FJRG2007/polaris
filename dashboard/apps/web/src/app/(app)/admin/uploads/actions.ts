@@ -154,7 +154,10 @@ export async function tidyChatStorageAction(): Promise<{
         // The space emoji's root as well: a space removed with its owner's
         // account leaves that folder behind the same way.
         const [files, emoji] = await Promise.all([tidyChatStorage(), tidyEmojiStorage()]);
-        const result = { removed: files.removed + emoji.removed, failed: files.failed + emoji.failed };
+        const result = {
+            removed: files.removed + emoji.removed,
+            failed: files.failed + emoji.failed
+        };
         await recordAudit({
             actorId: admin.id,
             action: "settings.chat.uploads.tidy",

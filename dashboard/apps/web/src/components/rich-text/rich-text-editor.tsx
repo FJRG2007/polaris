@@ -310,7 +310,10 @@ export function RichTextEditor({
     const withEmoji = useCallback(
         (doc: JSONContent): JSONContent =>
             writesEmoji
-                ? withCustomEmojiNodes(doc, new Map(customEmoji.current.map((entry) => [entry.id, entry])))
+                ? withCustomEmojiNodes(
+                      doc,
+                      new Map(customEmoji.current.map((entry) => [entry.id, entry]))
+                  )
                 : doc,
         [writesEmoji]
     );

@@ -30,7 +30,10 @@ export async function GET(
 
     const picture = await readSpaceEmoji({ id: user.id }, emojiId.toLowerCase());
     if (!picture) {
-        return new Response("Not found", { status: 404, headers: { "Cache-Control": "private, no-store" } });
+        return new Response("Not found", {
+            status: 404,
+            headers: { "Cache-Control": "private, no-store" }
+        });
     }
 
     return new Response(picture.bytes as BodyInit, {

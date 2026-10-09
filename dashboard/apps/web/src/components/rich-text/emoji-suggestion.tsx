@@ -33,7 +33,13 @@ import { CUSTOM_EMOJI_NODE, customEmojiNode } from "./custom-emoji-doc";
 import { Extension, InputRule, mergeAttributes, Node } from "@tiptap/core";
 import { forwardRef, useEffect, useImperativeHandle, useState } from "react";
 import type { SuggestionOptions, SuggestionProps } from "@tiptap/suggestion";
-import { EMOJI_MENU_KEY, POPUP_CLASS, POPUP_ITEM_CLASS, POPUP_LAYER_CLASS, type SuggestionHandle } from "./suggestion";
+import {
+    EMOJI_MENU_KEY,
+    POPUP_CLASS,
+    POPUP_ITEM_CLASS,
+    POPUP_LAYER_CLASS,
+    type SuggestionHandle
+} from "./suggestion";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -124,9 +130,14 @@ export function emojiSuggestions(
     if (needle.length < 2 || !/^[a-z0-9_+-]+$/.test(needle)) return [];
     const starts = custom.filter((entry) => entry.name.toLowerCase().startsWith(needle));
     const contains = custom.filter(
-        (entry) => !entry.name.toLowerCase().startsWith(needle) && entry.name.toLowerCase().includes(needle)
+        (entry) =>
+            !entry.name.toLowerCase().startsWith(needle) &&
+            entry.name.toLowerCase().includes(needle)
     );
-    const own: EmojiSuggestionItem[] = [...starts, ...contains].map((entry) => ({ kind: "custom", entry }));
+    const own: EmojiSuggestionItem[] = [...starts, ...contains].map((entry) => ({
+        kind: "custom",
+        entry
+    }));
     const ordinary: EmojiSuggestionItem[] = searchEmoji(needle.replace(/_/g, " ")).map((emoji) => ({
         kind: "unicode",
         char: emoji.char,

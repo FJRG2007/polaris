@@ -1798,7 +1798,10 @@ export async function decorateMessages(
         });
         onMessageFiles.set(file.messageId, bucket);
     }
-    const onMessage = new Map<string, Map<string, { emoji: string; count: number; mine: boolean }>>();
+    const onMessage = new Map<
+        string,
+        Map<string, { emoji: string; count: number; mine: boolean }>
+    >();
     for (const reaction of reactions) {
         const bucket = onMessage.get(reaction.messageId) ?? new Map();
         // A space's emoji is counted by its id, so two presses either side of a

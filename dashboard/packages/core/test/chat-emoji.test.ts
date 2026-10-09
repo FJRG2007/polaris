@@ -43,7 +43,9 @@ describe("an emoji's name", () => {
     });
 
     it("is compared ignoring case", () => {
-        expect(emoji.customEmojiNameKey("PartyParrot")).toBe(emoji.customEmojiNameKey("partyparrot"));
+        expect(emoji.customEmojiNameKey("PartyParrot")).toBe(
+            emoji.customEmojiNameKey("partyparrot")
+        );
     });
 
     it("is offered from the file's name", () => {
@@ -55,12 +57,20 @@ describe("an emoji's name", () => {
 
 describe("the stored token", () => {
     it("is Discord's shape, with an a for an animated one", () => {
-        expect(emoji.customEmojiToken({ id: ID, name: "wave", animated: false })).toBe(`<:wave:${ID}>`);
-        expect(emoji.customEmojiToken({ id: ID, name: "wave", animated: true })).toBe(`<a:wave:${ID}>`);
+        expect(emoji.customEmojiToken({ id: ID, name: "wave", animated: false })).toBe(
+            `<:wave:${ID}>`
+        );
+        expect(emoji.customEmojiToken({ id: ID, name: "wave", animated: true })).toBe(
+            `<a:wave:${ID}>`
+        );
     });
 
     it("reads back what it wrote, and nothing else", () => {
-        expect(emoji.parseCustomEmojiToken(`<a:wave:${ID}>`)).toEqual({ id: ID, name: "wave", animated: true });
+        expect(emoji.parseCustomEmojiToken(`<a:wave:${ID}>`)).toEqual({
+            id: ID,
+            name: "wave",
+            animated: true
+        });
         expect(emoji.parseCustomEmojiToken(`<:wave:${ID.toUpperCase()}>`)?.id).toBe(ID);
         expect(emoji.parseCustomEmojiToken("<:wave:not-an-id>")).toBeNull();
         expect(emoji.parseCustomEmojiToken(`<:w:${ID}>`)).toBeNull();
@@ -71,7 +81,13 @@ describe("the stored token", () => {
         const text = `hi <:wave:${ID}> and <a:dance:${OTHER}>!`;
         expect(emoji.customEmojiRefs(text).map((ref) => ref.name)).toEqual(["wave", "dance"]);
         const parts = emoji.splitCustomEmoji(text);
-        expect(parts.map((part) => part.emoji?.name ?? part.text)).toEqual(["hi ", "wave", " and ", "dance", "!"]);
+        expect(parts.map((part) => part.emoji?.name ?? part.text)).toEqual([
+            "hi ",
+            "wave",
+            " and ",
+            "dance",
+            "!"
+        ]);
     });
 
     it("reads as its name where it cannot be drawn", () => {

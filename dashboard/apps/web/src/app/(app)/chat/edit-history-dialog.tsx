@@ -106,7 +106,9 @@ export function EditHistoryDialog({
                                     title={format.dateTime(version.replacedAt)}
                                 >
                                     {t.rich("editHistory.until", {
-                                        time: () => <RelativeTime key="time" iso={version.replacedAt} />
+                                        time: () => (
+                                            <RelativeTime key="time" iso={version.replacedAt} />
+                                        )
                                     })}
                                 </p>
                                 <div className="text-sm text-muted-foreground">

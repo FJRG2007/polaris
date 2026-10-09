@@ -120,8 +120,11 @@ vi.mock("@polaris/db", () => {
         chatReaction: {
             findFirst: async ({ where }: { where: { emoji: { endsWith: string } } }) =>
                 reactions.find((one) => one.emoji.endsWith(where.emoji.endsWith)) ?? null,
-            findUnique: async ({ where }: { where: { messageId_userId_emoji: { emoji: string } } }) =>
-                reactions.find((one) => one.emoji === where.messageId_userId_emoji.emoji) ?? null,
+            findUnique: async ({
+                where
+            }: {
+                where: { messageId_userId_emoji: { emoji: string } };
+            }) => reactions.find((one) => one.emoji === where.messageId_userId_emoji.emoji) ?? null,
             create: async ({ data }: { data: { emoji: string } }) => {
                 reactions.push({ id: crypto.randomUUID(), emoji: data.emoji });
                 return {};
@@ -179,7 +182,10 @@ describe("sending a space's emoji", () => {
     });
 
     it("is held to the same rule on an edit", async () => {
-        await edit(ada, { messageId: "message-1", body: `edited <:theirs:${FOREIGN}> <:wave:${WAVE}>` });
+        await edit(ada, {
+            messageId: "message-1",
+            body: `edited <:theirs:${FOREIGN}> <:wave:${WAVE}>`
+        });
         expect(edited).toEqual([`edited :theirs: <:wave:${WAVE}>`]);
     });
 });

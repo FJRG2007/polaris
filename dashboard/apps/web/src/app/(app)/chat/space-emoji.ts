@@ -63,7 +63,10 @@ function keep(spaceId: string, list: SpaceEmojiList): void {
     const before = held.get(spaceId);
     held.set(spaceId, { list, at: Date.now() });
     try {
-        sessionStorage.setItem(`${STORE_PREFIX}${spaceId}`, JSON.stringify({ list, at: Date.now() }));
+        sessionStorage.setItem(
+            `${STORE_PREFIX}${spaceId}`,
+            JSON.stringify({ list, at: Date.now() })
+        );
     } catch {
         // A private window or a full storage: the tab still has it in memory.
     }
@@ -186,7 +189,10 @@ export function useSpaceEmojiScope(
             spaceId,
             spaceName,
             entries,
-            set: { entries: new Map((entries ?? []).map((entry) => [entry.id, entry])), from: spaceName },
+            set: {
+                entries: new Map((entries ?? []).map((entry) => [entry.id, entry])),
+                from: spaceName
+            },
             manages: list?.manages ?? false
         };
     }, [spaceId, spaceName, list]);

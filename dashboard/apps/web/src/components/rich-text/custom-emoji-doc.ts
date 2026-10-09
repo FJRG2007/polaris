@@ -18,7 +18,10 @@ export const CUSTOM_EMOJI_NODE = "customEmoji";
 
 /** The editor node for one emoji. */
 export function customEmojiNode(ref: core.CustomEmojiRef): JSONContent {
-    return { type: CUSTOM_EMOJI_NODE, attrs: { id: ref.id, name: ref.name, animated: ref.animated } };
+    return {
+        type: CUSTOM_EMOJI_NODE,
+        attrs: { id: ref.id, name: ref.name, animated: ref.animated }
+    };
 }
 
 /** The token one node writes, or null for a node that is not one. */
@@ -53,7 +56,11 @@ export function withCustomEmojiNodes(
             }
             for (const part of core.splitCustomEmoji(child.text ?? "")) {
                 const found = part.emoji ? known.get(part.emoji.id) : undefined;
-                if (found) content.push({ ...customEmojiNode(found), ...(child.marks ? { marks: child.marks } : {}) });
+                if (found)
+                    content.push({
+                        ...customEmojiNode(found),
+                        ...(child.marks ? { marks: child.marks } : {})
+                    });
                 else {
                     const text = part.emoji ? core.customEmojiToken(part.emoji) : part.text;
                     if (text) content.push({ ...child, text });

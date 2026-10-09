@@ -110,16 +110,25 @@ vi.mock("@polaris/db", () => {
             return used;
         },
         create: async ({ data }: { data: Omit<Row, "id" | "createdAt"> }) => {
-            if (rows.some((row) => row.spaceId === data.spaceId && row.nameKey === data.nameKey)) throw unique();
+            if (rows.some((row) => row.spaceId === data.spaceId && row.nameKey === data.nameKey))
+                throw unique();
             const row = { ...data, id: crypto.randomUUID(), createdAt: new Date() };
             rows.push(row);
             return viewOf(row);
         },
-        findUnique: async ({ where }: { where: { id: string } }) => rows.find((row) => row.id === where.id) ?? null,
+        findUnique: async ({ where }: { where: { id: string } }) =>
+            rows.find((row) => row.id === where.id) ?? null,
         findMany: async () => rows.map(viewOf),
-        update: async ({ where, data }: { where: { id: string }; data: { name: string; nameKey: string } }) => {
+        update: async ({
+            where,
+            data
+        }: {
+            where: { id: string };
+            data: { name: string; nameKey: string };
+        }) => {
             const row = rows.find((one) => one.id === where.id)!;
-            if (rows.some((one) => one.id !== row.id && one.nameKey === data.nameKey)) throw unique();
+            if (rows.some((one) => one.id !== row.id && one.nameKey === data.nameKey))
+                throw unique();
             Object.assign(row, data);
             return viewOf(row);
         },
@@ -171,7 +180,14 @@ beforeEach(async () => {
     announced = 0;
     lock = Promise.resolve();
     const frame = (red: number) =>
-        sharp({ create: { width: 8, height: 8, channels: 4, background: { r: red, g: 0, b: 0, alpha: 1 } } })
+        sharp({
+            create: {
+                width: 8,
+                height: 8,
+                channels: 4,
+                background: { r: red, g: 0, b: 0, alpha: 1 }
+            }
+        })
             .png()
             .toBuffer();
     still ??= new Uint8Array(await frame(200));
@@ -182,11 +198,15 @@ beforeEach(async () => {
     );
 });
 
-const upload = (name: string, bytes = still) => service.uploadSpaceEmoji(ada, SPACE, { name, bytes });
+const upload = (name: string, bytes = still) =>
+    service.uploadSpaceEmoji(ada, SPACE, { name, bytes });
 
 describe("who may change a space's emoji", () => {
     it("is its owner and its administrators", async () => {
-        await expect(upload("owner_one")).resolves.toMatchObject({ name: "owner_one", uploaderId: "ada" });
+        await expect(upload("owner_one")).resolves.toMatchObject({
+            name: "owner_one",
+            uploaderId: "ada"
+        });
         role = "admin";
         await expect(upload("admin_one")).resolves.toMatchObject({ name: "admin_one" });
         expect(announced).toBe(2);
@@ -214,7 +234,9 @@ describe("who may change a space's emoji", () => {
         await expect(
             service.renameSpaceEmoji(ada, { emojiId: rows[0]!.id, name: "renamed" })
         ).rejects.toBeInstanceOf(ChatAccessError);
-        await expect(service.deleteSpaceEmoji(ada, rows[0]!.id)).rejects.toBeInstanceOf(ChatAccessError);
+        await expect(service.deleteSpaceEmoji(ada, rows[0]!.id)).rejects.toBeInstanceOf(
+            ChatAccessError
+        );
         expect(rows).toHaveLength(1);
     });
 });
@@ -238,12 +260,12 @@ describe("a name", () => {
     it("can be changed, and not to one already taken", async () => {
         const first = await upload("first");
         await upload("second");
-        await expect(service.renameSpaceEmoji(ada, { emojiId: first.id, name: "Second" })).rejects.toThrow(
-            /already has an emoji with that name/
-        );
-        await expect(service.renameSpaceEmoji(ada, { emojiId: first.id, name: "renamed" })).resolves.toMatchObject(
-            { name: "renamed" }
-        );
+        await expect(
+            service.renameSpaceEmoji(ada, { emojiId: first.id, name: "Second" })
+        ).rejects.toThrow(/already has an emoji with that name/);
+        await expect(
+            service.renameSpaceEmoji(ada, { emojiId: first.id, name: "renamed" })
+        ).resolves.toMatchObject({ name: "renamed" });
     });
 });
 
@@ -279,7 +301,11 @@ describe("the fifty slots", () => {
 
     it("hold when several uploads race for the last one", async () => {
         seed(CUSTOM_EMOJI_SLOTS - 1, false);
-        const results = await Promise.allSettled([upload("race_a"), upload("race_b"), upload("race_c")]);
+        const results = await Promise.allSettled([
+            upload("race_a"),
+            upload("race_b"),
+            upload("race_c")
+        ]);
         expect(results.filter((result) => result.status === "fulfilled")).toHaveLength(1);
         expect(results.filter((result) => result.status === "rejected")).toHaveLength(2);
         expect(rows.filter((row) => !row.animated)).toHaveLength(CUSTOM_EMOJI_SLOTS);
@@ -292,7 +318,9 @@ describe("reading one's picture", () => {
     it("is for somebody in its space, and nobody else", async () => {
         const made = await upload("seen");
         role = "member";
-        await expect(service.readSpaceEmoji(ada, made.id)).resolves.toMatchObject({ mime: "image/png" });
+        await expect(service.readSpaceEmoji(ada, made.id)).resolves.toMatchObject({
+            mime: "image/png"
+        });
         role = null;
         await expect(service.readSpaceEmoji(ada, made.id)).resolves.toBeNull();
     });

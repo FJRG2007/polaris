@@ -84,7 +84,9 @@ export function RichText({
     jumboEmoji?: boolean;
 }) {
     if (!value.trim()) return null;
-    const doc = references ? resolve(markdownToDoc(value, origin), references) : markdownToDoc(value, origin);
+    const doc = references
+        ? resolve(markdownToDoc(value, origin), references)
+        : markdownToDoc(value, origin);
     // Everything it said was an address that is drawn underneath instead. The
     // blank line that would otherwise sit above the card is not worth a div.
     if ((doc.content ?? []).length === 0) return null;
@@ -144,7 +146,10 @@ function WithEmoji({ text, scope }: { text: string; scope: EmojiScope }) {
  * stays a pure function of the node it is given and nothing has to be threaded
  * through five levels of recursion to reach it.
  */
-function resolve(doc: JSONContent, references: ReadonlyMap<string, ResolvedReference>): JSONContent {
+function resolve(
+    doc: JSONContent,
+    references: ReadonlyMap<string, ResolvedReference>
+): JSONContent {
     /** A node the resolution removed, rather than one it rewrote. */
     const GONE = null;
 
@@ -176,7 +181,10 @@ function resolve(doc: JSONContent, references: ReadonlyMap<string, ResolvedRefer
     return walk(doc) ?? { type: "doc", content: [] };
 }
 
-function blocks(nodes: readonly JSONContent[] | undefined, scope: EmojiScope = NO_EMOJI): React.ReactNode {
+function blocks(
+    nodes: readonly JSONContent[] | undefined,
+    scope: EmojiScope = NO_EMOJI
+): React.ReactNode {
     return (nodes ?? []).map((node, index) => <Block key={index} node={node} scope={scope} />);
 }
 
@@ -194,7 +202,11 @@ function Block({ node, scope }: { node: JSONContent; scope: EmojiScope }) {
         case "bulletList":
             return <ul>{listItems(node.content, scope)}</ul>;
         case "orderedList":
-            return <ol start={Number(node.attrs?.start ?? 1) || 1}>{listItems(node.content, scope)}</ol>;
+            return (
+                <ol start={Number(node.attrs?.start ?? 1) || 1}>
+                    {listItems(node.content, scope)}
+                </ol>
+            );
         case "taskList":
             // The same attribute the editor's own list carries, so one rule in
             // the shared type styles reaches both.
@@ -203,9 +215,7 @@ function Block({ node, scope }: { node: JSONContent; scope: EmojiScope }) {
             return (
                 <CodeBlock
                     code={text(node)}
-                    language={
-                        typeof node.attrs?.language === "string" ? node.attrs.language : null
-                    }
+                    language={typeof node.attrs?.language === "string" ? node.attrs.language : null}
                 />
             );
         case MARKDOWN_BLOCK:
@@ -236,13 +246,17 @@ function taskItems(nodes: readonly JSONContent[] | undefined, scope: EmojiScope)
     return (nodes ?? []).map((item, index) => (
         <li key={index} className="flex items-start gap-2">
             <TaskBox checked={item.attrs?.checked === true} />
-            <span className={cn("min-w-0", item.attrs?.checked === true && "text-muted-foreground line-through")}>
+            <span
+                className={cn(
+                    "min-w-0",
+                    item.attrs?.checked === true && "text-muted-foreground line-through"
+                )}
+            >
                 {blocks(item.content, scope)}
             </span>
         </li>
     ));
 }
-
 
 function Media({ node }: { node: JSONContent }) {
     const src = typeof node.attrs?.src === "string" ? node.attrs.src.trim() : "";
@@ -329,7 +343,8 @@ function Inline({ node, scope }: { node: JSONContent; scope: EmojiScope }) {
         else if (mark.type === "italic") content = <em>{content}</em>;
         else if (mark.type === "strike") content = <s>{content}</s>;
         else if (mark.type === "code") content = <code>{content}</code>;
-        else if (mark.type === "link") content = <Anchor href={String(mark.attrs?.href ?? "")}>{content}</Anchor>;
+        else if (mark.type === "link")
+            content = <Anchor href={String(mark.attrs?.href ?? "")}>{content}</Anchor>;
     }
     return <>{content}</>;
 }
@@ -372,7 +387,11 @@ export function isSafeHref(href: string): boolean {
         // above; anything that parses relative here has no scheme of its own and
         // is not something to link to from rendered text.
         const parsed = new URL(trimmed, "https://polaris.invalid");
-        if (trimmed.startsWith("http://") || trimmed.startsWith("https://") || trimmed.startsWith("mailto:")) {
+        if (
+            trimmed.startsWith("http://") ||
+            trimmed.startsWith("https://") ||
+            trimmed.startsWith("mailto:")
+        ) {
             return SAFE_SCHEMES.has(parsed.protocol);
         }
         return false;
@@ -380,4 +399,3 @@ export function isSafeHref(href: string): boolean {
         return false;
     }
 }
-

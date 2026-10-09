@@ -141,10 +141,14 @@ export async function inspectEmojiFile(bytes: Uint8Array): Promise<InspectedEmoj
             return { ok: false, problem: "dimensions" };
         }
         const frames = meta.pages ?? 1;
-        if (width * height * frames > core.CUSTOM_EMOJI_MAX_PIXELS) return { ok: false, problem: "frames" };
+        if (width * height * frames > core.CUSTOM_EMOJI_MAX_PIXELS)
+            return { ok: false, problem: "frames" };
         // Every frame, so a file that is only a valid header is refused here
         // rather than drawn as a broken picture in every message that uses it.
-        await sharp(bytes, { animated: true, limitInputPixels: core.CUSTOM_EMOJI_MAX_PIXELS }).stats();
+        await sharp(bytes, {
+            animated: true,
+            limitInputPixels: core.CUSTOM_EMOJI_MAX_PIXELS
+        }).stats();
         const animated = (mime === "image/gif" || mime === "image/webp") && frames > 1;
         return { ok: true, mime, animated, width, height };
     } catch {
@@ -255,7 +259,9 @@ export async function uploadSpaceEmoji(
             });
             if (used >= core.CUSTOM_EMOJI_SLOTS) {
                 throw new ChatRuleError({
-                    key: inspected.animated ? "errors.emojiSlotsAnimated" : "errors.emojiSlotsStatic"
+                    key: inspected.animated
+                        ? "errors.emojiSlotsAnimated"
+                        : "errors.emojiSlotsStatic"
                 });
             }
             return tx.chatSpaceEmoji.create({
@@ -333,7 +339,10 @@ export async function deleteSpaceEmoji(actor: ChatActor, emojiId: string): Promi
  * that drew it the first time.
  */
 async function announce(actor: ChatActor, spaceId: string): Promise<void> {
-    const channels = await prisma.chatChannel.findMany({ where: { spaceId }, select: { id: true } });
+    const channels = await prisma.chatChannel.findMany({
+        where: { spaceId },
+        select: { id: true }
+    });
     publishChatChange({
         kind: "emoji",
         spaceId,
@@ -367,7 +376,10 @@ export async function discardSpaceEmoji(spaceId: string): Promise<void> {
  */
 export async function tidyEmojiStorage(): Promise<{ removed: number; failed: number }> {
     const [stored, spaces, current] = await Promise.all([
-        prisma.chatSpaceEmoji.findMany({ select: { connectionId: true }, distinct: ["connectionId"] }),
+        prisma.chatSpaceEmoji.findMany({
+            select: { connectionId: true },
+            distinct: ["connectionId"]
+        }),
         prisma.chatSpace.findMany({ select: { id: true } }),
         chatTarget()
     ]);
@@ -491,4 +503,3 @@ export async function reactionEmoji(
     if (removing) return { stored: core.customEmojiToken(ref), customId: ref.id };
     throw new ChatRuleError({ key: "errors.emojiNotHere" });
 }
-

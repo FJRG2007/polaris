@@ -10,21 +10,29 @@
 import { describe, expect, it } from "vitest";
 import { emojiSuggestions } from "@/components/rich-text/emoji-suggestion";
 import { docToMarkdown, markdownToDoc } from "@/components/rich-text/markdown";
-import { CUSTOM_EMOJI_NODE, customEmojiNode, withCustomEmojiNodes } from "@/components/rich-text/custom-emoji-doc";
+import {
+    CUSTOM_EMOJI_NODE,
+    customEmojiNode,
+    withCustomEmojiNodes
+} from "@/components/rich-text/custom-emoji-doc";
 
 const WAVE = "0193b0f0-0000-7000-8000-0000000000e1";
 const FOREIGN = "0193b0f0-0000-7000-8000-0000000000e3";
 
-const entry = (id: string, name: string) => ({ id, name, animated: false, src: `/api/chat/emoji/${id}` });
+const entry = (id: string, name: string) => ({
+    id,
+    name,
+    animated: false,
+    src: `/api/chat/emoji/${id}`
+});
 const CUSTOM = [entry(WAVE, "wave"), entry("0193b0f0-0000-7000-8000-0000000000e2", "big_wave")];
 
 describe("what `:` offers", () => {
     it("is the space's own first, names starting with it before names containing it", () => {
         const offered = emojiSuggestions("wa", CUSTOM);
-        expect(offered.slice(0, 2).map((item) => (item.kind === "custom" ? item.entry.name : ""))).toEqual([
-            "wave",
-            "big_wave"
-        ]);
+        expect(
+            offered.slice(0, 2).map((item) => (item.kind === "custom" ? item.entry.name : ""))
+        ).toEqual(["wave", "big_wave"]);
         expect(offered.some((item) => item.kind === "unicode")).toBe(true);
         expect(offered.length).toBeLessThanOrEqual(10);
     });
