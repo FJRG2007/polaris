@@ -12,9 +12,13 @@
   <span>&nbsp;&nbsp;•&nbsp;&nbsp;</span>
   <a href="#whats-in-it">What's in it</a>
   <span>&nbsp;&nbsp;•&nbsp;&nbsp;</span>
+  <a href="#everything-connects">Integrations</a>
+  <span>&nbsp;&nbsp;•&nbsp;&nbsp;</span>
   <a href="#usage">Usage</a>
   <span>&nbsp;&nbsp;•&nbsp;&nbsp;</span>
   <a href="docs/developers/README.md">Developers</a>
+  <span>&nbsp;&nbsp;•&nbsp;&nbsp;</span>
+  <a href="README.es.md">Español</a>
   <hr />
 </div>
 
@@ -105,8 +109,8 @@ with one thing does not get the rest.
 - **Drive** - a private drive for every account from the moment they open it, plus
   a shelf for every organization, reached by everybody on its roster; browsing,
   uploading, downloading and sharing across every NAS you own: local disks,
-  SFTP, WebDAV, S3-compatible, SMB/NFS, and vendor APIs (Synology, QNAP,
-  TrueNAS, UniFi UNAS). Streaming transfers, so multi-gigabyte files never
+  SFTP, S3-compatible, SMB/NFS, UniFi UNAS, Google Drive, OneDrive and Dropbox
+  (WebDAV, Synology, QNAP and TrueNAS are coming). Streaming transfers, so multi-gigabyte files never
   buffer. Send a file or folder to a person or an organization, a copy by
   default or the file itself on a move, kept with the sender until accepted;
   share a file or folder with a person or group, with a role, a note and
@@ -194,6 +198,156 @@ each one may touch - see
 
 What is built versus in progress is tracked in
 [`dashboard/ROADMAP.md`](dashboard/ROADMAP.md).
+
+## Where it runs
+
+The interface is in English and Spanish ([en español](README.es.md)), and each account picks its own.
+
+| Client                                                                        | Status                                                                           |
+| ----------------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
+| Web app, installable from the browser                                         | Available                                                                        |
+| Browser extension for Chrome and Firefox: fills sign-in forms from your vault | Available ([releases](https://github.com/FJRG2007/polaris/releases?q=extension)) |
+| MCP server for Claude, ChatGPT, Cursor, VS Code and other AI clients          | Available ([setup](docs/connecting-ai-assistants.md))                            |
+| Developer CLI (`plr`): deploy, logs, restarts                                 | Coming: in the repo, not released yet                                            |
+| Desktop app for Windows, macOS and Linux                                      | Coming: in the repo, not released yet                                            |
+| iOS and Android apps                                                          | Coming                                                                           |
+
+## Everything connects
+
+The services Polaris already talks to. Each one is switched on from the interface.
+
+|                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |                                                                                                                                                          |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| <img src="docs/assets/logos/google.svg" width="28" height="28" alt="Google" title="Google">                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           | **Google**: sign in, two-way Calendar and Tasks sync, Gmail as a mailbox, Google Drive as storage, Docs and Sheets imported into Office                  |
+| <img src="docs/assets/logos/microsoft.svg" width="28" height="28" alt="Microsoft" title="Microsoft">                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  | **Microsoft 365**: Outlook calendar sync, Outlook mail, OneDrive as storage                                                                              |
+| <img src="docs/assets/logos/github.svg" width="28" height="28" alt="GitHub" title="GitHub"> <img src="docs/assets/logos/github-copilot.svg" width="28" height="28" alt="GitHub Copilot" title="GitHub Copilot">                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       | **GitHub**: sign in, deploy repositories, run Actions on your own runners, read pull requests and issues                                                 |
+| <img src="docs/assets/logos/linear.svg" width="28" height="28" alt="Linear" title="Linear"> <img src="docs/assets/logos/jira.svg" width="28" height="28" alt="Jira" title="Jira">                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     | **Linear and Jira**: issues mirrored into Tasks, status pushed back                                                                                      |
+| <img src="docs/assets/logos/icloud.svg" width="28" height="28" alt="iCloud" title="iCloud"> <img src="docs/assets/logos/nextcloud.svg" width="28" height="28" alt="Nextcloud" title="Nextcloud">                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      | **CalDAV**: iCloud, Nextcloud, Fastmail, Yahoo or any CalDAV server, plus ICS feeds                                                                      |
+| <img src="docs/assets/logos/telegram.svg" width="28" height="28" alt="Telegram" title="Telegram"> <img src="docs/assets/logos/whatsapp.svg" width="28" height="28" alt="WhatsApp" title="WhatsApp"> <img src="docs/assets/logos/discord.svg" width="28" height="28" alt="Discord" title="Discord"> <img src="docs/assets/logos/slack.svg" width="28" height="28" alt="Slack" title="Slack">                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           | **Inbox**: conversations from Telegram, WhatsApp, Discord and Slack in one place                                                                         |
+| <img src="docs/assets/logos/dropbox.svg" width="28" height="28" alt="Dropbox" title="Dropbox"> <img src="docs/assets/logos/ubiquiti.svg" width="28" height="28" alt="Ubiquiti UniFi" title="Ubiquiti UniFi"> <img src="docs/assets/logos/docker.svg" width="28" height="28" alt="Docker" title="Docker">                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              | **Storage and hosts**: Dropbox, UniFi UNAS, S3, SFTP, SMB and NFS in Drive; the Docker engine of every server you enrol                                  |
+| <img src="docs/assets/logos/vercel.svg" width="28" height="28" alt="Vercel" title="Vercel"> <img src="docs/assets/logos/railway.svg" width="28" height="28" alt="Railway" title="Railway"> <img src="docs/assets/logos/aws.svg" width="28" height="28" alt="AWS" title="AWS">                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         | **Deploy elsewhere**: Vercel, Railway and AWS (ECS, Amplify) projects next to your own                                                                   |
+| <img src="docs/assets/logos/cloudflare.svg" width="28" height="28" alt="Cloudflare" title="Cloudflare"> <img src="docs/assets/logos/ngrok.svg" width="28" height="28" alt="ngrok" title="ngrok"> <img src="docs/assets/logos/duckdns.svg" width="28" height="28" alt="DuckDNS" title="DuckDNS">                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       | **Networking**: DNS records and tunnels with Cloudflare, ngrok tunnels, DuckDNS names                                                                    |
+| <img src="docs/assets/logos/anthropic.svg" width="28" height="28" alt="Anthropic" title="Anthropic"> <img src="docs/assets/logos/openai.svg" width="28" height="28" alt="OpenAI" title="OpenAI"> <img src="docs/assets/logos/gemini.svg" width="28" height="28" alt="Google Gemini" title="Google Gemini"> <img src="docs/assets/logos/xai.svg" width="28" height="28" alt="xAI" title="xAI"> <img src="docs/assets/logos/deepseek.svg" width="28" height="28" alt="DeepSeek" title="DeepSeek"> <img src="docs/assets/logos/moonshot.svg" width="28" height="28" alt="Moonshot AI" title="Moonshot AI"> <img src="docs/assets/logos/groq.svg" width="28" height="28" alt="Groq" title="Groq"> <img src="docs/assets/logos/cerebras.svg" width="28" height="28" alt="Cerebras" title="Cerebras"> <img src="docs/assets/logos/openrouter.svg" width="28" height="28" alt="OpenRouter" title="OpenRouter">                                                                               | **Models**: your own keys for these and over 50 more providers                                                                                           |
+| <img src="docs/assets/logos/claude.svg" width="28" height="28" alt="Claude" title="Claude"> <img src="docs/assets/logos/cursor.svg" width="28" height="28" alt="Cursor" title="Cursor"> <img src="docs/assets/logos/opencode.svg" width="28" height="28" alt="OpenCode" title="OpenCode"> <img src="docs/assets/logos/vscode.svg" width="28" height="28" alt="Visual Studio Code" title="Visual Studio Code">                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         | **Coding agents**: Claude Code, Codex, Gemini CLI, Copilot CLI, Cursor CLI, OpenCode and 9 more in live sessions; MCP clients connect as you             |
+| <img src="docs/assets/logos/tuya.svg" width="28" height="28" alt="Tuya" title="Tuya"> <img src="docs/assets/logos/tp-link.svg" width="28" height="28" alt="TP-Link" title="TP-Link"> <img src="docs/assets/logos/shelly.svg" width="28" height="28" alt="Shelly" title="Shelly"> <img src="docs/assets/logos/philips-hue.svg" width="28" height="28" alt="Philips Hue" title="Philips Hue"> <img src="docs/assets/logos/ikea.svg" width="28" height="28" alt="IKEA" title="IKEA"> <img src="docs/assets/logos/gree.svg" width="28" height="28" alt="Gree" title="Gree"> <img src="docs/assets/logos/philips.svg" width="28" height="28" alt="Philips" title="Philips"> <img src="docs/assets/logos/home-assistant.svg" width="28" height="28" alt="Home Assistant" title="Home Assistant"> <img src="docs/assets/logos/switchbot.svg" width="28" height="28" alt="SwitchBot" title="SwitchBot"> <img src="docs/assets/logos/nuki.svg" width="28" height="28" alt="Nuki" title="Nuki"> | **Places**: plugs, lights, locks and climate from these brands; cameras from Tapo, VIGI, Reolink, Hikvision, Dahua, Amcrest, or any ONVIF or RTSP camera |
+| <img src="docs/assets/logos/steam.svg" width="28" height="28" alt="Steam" title="Steam"> <img src="docs/assets/logos/epic-games.svg" width="28" height="28" alt="Epic Games" title="Epic Games"> <img src="docs/assets/logos/minecraft.svg" width="28" height="28" alt="Minecraft" title="Minecraft"> <img src="docs/assets/logos/discord.svg" width="28" height="28" alt="Discord" title="Discord">                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  | **Game servers**: players link their game accounts so servers recognise them                                                                             |
+| <img src="docs/assets/logos/spotify.svg" width="28" height="28" alt="Spotify" title="Spotify"> <img src="docs/assets/logos/tenor.svg" width="28" height="28" alt="Tenor" title="Tenor"> <img src="docs/assets/logos/giphy.svg" width="28" height="28" alt="GIPHY" title="GIPHY">                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      | **Chat**: listen along on Spotify, GIFs from Tenor and GIPHY, Krisp noise filtering in calls                                                             |
+| <img src="docs/assets/logos/virustotal.svg" width="28" height="28" alt="VirusTotal" title="VirusTotal"> <img src="docs/assets/logos/criminal-ip.svg" width="28" height="28" alt="Criminal IP" title="Criminal IP">                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    | **Security**: uploads scanned by VirusTotal, known-bad addresses blocked with Criminal IP or Dymo                                                        |
+| <img src="docs/assets/logos/bitwarden.svg" width="28" height="28" alt="Bitwarden" title="Bitwarden"> <img src="docs/assets/logos/keepassxc.svg" width="28" height="28" alt="KeePassXC" title="KeePassXC">                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             | **Vault**: Bitwarden apps and extensions point at it; imports from Bitwarden, KeePass or any CSV                                                         |
+| <img src="docs/assets/logos/obsidian.svg" width="28" height="28" alt="Obsidian" title="Obsidian">                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     | **Notes**: an Obsidian vault, or any folder of Markdown, imported with its links                                                                         |
+| <img src="docs/assets/logos/postgresql.svg" width="28" height="28" alt="PostgreSQL" title="PostgreSQL"> <img src="docs/assets/logos/mysql.svg" width="28" height="28" alt="MySQL" title="MySQL"> <img src="docs/assets/logos/mariadb.svg" width="28" height="28" alt="MariaDB" title="MariaDB"> <img src="docs/assets/logos/mongodb.svg" width="28" height="28" alt="MongoDB" title="MongoDB"> <img src="docs/assets/logos/redis.svg" width="28" height="28" alt="Redis" title="Redis">                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               | **Databases**: deployed or external, browsed, queried and backed up                                                                                      |
+
+Mail also takes any IMAP account and imports `.mbox` and `.eml` archives.
+
+## The apps link to each other
+
+Something made in one app is reachable from the others without copying it.
+
+- **Mention it.** Type `#` in a chat message, an email, a task or a note to link a task, a doc or a note. A pasted link to a task, event, channel or message becomes a card that shows its current state.
+- **Attach from Drive.** Chat, Mail, Tasks and Office take a file straight from Drive, with no download and re-upload.
+- **Plan it in Calendar.** Create a task due at a slot, or give an event a Polaris meeting link.
+- **Hand it to an agent.** A task goes to a coding agent from its panel; the agent reads it and moves it through Polaris's MCP server.
+- **Hear about it in Chat.** Camera and device alerts from Places arrive as messages.
+
+```mermaid
+flowchart LR
+    Drive -- attach --> Chat
+    Drive -- attach --> Mail
+    Drive -- attach --> Tasks
+    Drive -- open as a document --> Office
+    Chat -- "mention with #" --> Tasks
+    Mail -- "mention with #" --> Tasks
+    Notes -- "mention with #" --> Tasks
+    Calendar -- new task due here --> Tasks
+    Calendar -- meeting link --> Chat
+    Tasks -- hand to agent --> Agents
+```
+
+## Built in for every app you deploy
+
+These work for any service Polaris deploys, with no SDK, agent or change to the app's code: they run at the edge or on the host.
+
+|                                                                                                                                                                                                                                                    | Instead of                               | Polaris                                                                                                                               |
+| -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| <img src="docs/assets/logos/google-analytics.svg" width="28" height="28" alt="Google Analytics" title="Google Analytics"> <img src="docs/assets/logos/plausible.svg" width="28" height="28" alt="Plausible Analytics" title="Plausible Analytics"> | Google Analytics, Plausible              | **Analytics** read from the edge's access log, with no script tag                                                                     |
+| <img src="docs/assets/logos/cloudflare.svg" width="28" height="28" alt="Cloudflare" title="Cloudflare">                                                                                                                                            | Cloudflare WAF and Access                | **Firewall** in front of every route: country and network rules, bot defences, injection scanning, bans, and an optional sign-in wall |
+| <img src="docs/assets/logos/beekeeper-studio.svg" width="28" height="28" alt="Beekeeper Studio" title="Beekeeper Studio">                                                                                                                          | Beekeeper Studio and other database GUIs | **Databases**: browse and query Postgres, MySQL, MariaDB, MongoDB and Redis                                                           |
+| <img src="docs/assets/logos/uptime-kuma.svg" width="28" height="28" alt="Uptime Kuma" title="Uptime Kuma">                                                                                                                                         | Uptime Kuma and other uptime checkers    | **Watch**: every domain probed, a sustained outage alerted                                                                            |
+| <img src="docs/assets/logos/datadog.svg" width="28" height="28" alt="Datadog" title="Datadog">                                                                                                                                                     | Datadog and other metrics agents         | **Metrics** for every container and server, read over SSH and Docker                                                                  |
+| <img src="docs/assets/logos/lets-encrypt.svg" width="28" height="28" alt="Let's Encrypt" title="Let's Encrypt">                                                                                                                                    | Certbot                                  | **HTTPS**: Let's Encrypt certificates issued and renewed for each public domain                                                       |
+
+<img src="docs/assets/logos/sentry.svg" width="20" height="20" alt="Sentry" title="Sentry"> Error tracking is the exception: **Telemetry** takes events from the Sentry SDK your app already uses, so the one change is the DSN.
+
+## How it works
+
+### Updating
+
+The Update button in Settings is how an installed Polaris is updated. The limited edition has no host daemon, so there the button reports that updates are unavailable.
+
+```mermaid
+flowchart LR
+    A[Update button] --> B[dashboard]
+    B -- full edition: POST /v1/update --> C[polaris-hostd]
+    B -- limited edition: no hostd --> Y[updates unavailable]
+    C -- update command set --> D[polaris-updater]
+    D --> E[scripts/update.sh]
+    E --> F[pull the release]
+    F --> G[add new settings to .env]
+    G --> H[start the new dashboard, retire the old one]
+    C -- no update command --> X[501: not available]
+```
+
+### A request through the edge
+
+Every router has an explicit priority, highest first. Routes with firewall rules pass through the guard before reaching the app.
+
+```mermaid
+flowchart LR
+    R[request] --> T[Traefik]
+    T -- "110: call path, guarded" --> L[LiveKit]
+    T -- "100: /livekit, /api/deploy/ws" --> P[LiveKit, terminal]
+    T -- "50: dashboard hostnames" --> D[dashboard]
+    T -- "40: deployed app hostnames" --> G{firewall guard}
+    G -- allowed --> S[app container]
+    G -- denied --> B[block page]
+    T -- "10: catch-all" --> D
+    T -- "1: unrouted name" --> V[vacant page]
+```
+
+### Deploying an app
+
+```mermaid
+flowchart LR
+    A[Git repository] --> B[build on the server or a chosen build machine]
+    U[upload] --> B
+    I[image] --> C
+    B --> C
+    C[container on the Polaris host or an enrolled server] --> E[that server's Traefik: route and firewall]
+    E --> F[your domain, a Cloudflare or ngrok tunnel, or DuckDNS]
+```
+
+### Repository layout
+
+```mermaid
+flowchart TB
+    subgraph dashboard
+        web[apps/web: Next.js dashboard]
+        apps[apps/calendar, places, game-servers, crm]
+        ext[apps/extension: browser extension]
+        pkgs[packages: core, db, ui, storage, deploy, ...]
+        svc[services: edge-guard, messaging-bridge, camera-relay, vision, face, hytale]
+        cli[packages/cli: developer CLI]
+    end
+    hostd[crates/polaris-hostd: Rust host daemon]
+    desk[desktop: Electron app]
+    plug[plugins/unifi-unas]
+    web --> pkgs
+    apps --> pkgs
+    cli --> web
+    desk --> web
+    ext --> web
+    web -- unix socket --> hostd
+```
 
 ## Usage
 
