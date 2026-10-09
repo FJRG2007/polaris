@@ -153,7 +153,9 @@
             "previousSlide": "Go to the previous slide",
             "nextSlide": "Go to the next slide",
             "zoomIn": "Zoom in",
-            "zoomOut": "Zoom out"
+            "zoomOut": "Zoom out",
+            "firstSlide": "Go to the first slide",
+            "lastSlide": "Go to the last slide"
         },
         "chat": {
             "reply": "Reply to the message",
@@ -191,7 +193,19 @@
                 "nudge": "Nudge the chosen box",
                 "nudgeFar": "Nudge it further",
                 "present": "Present",
-                "help": "Show keyboard shortcuts"
+                "help": "Show keyboard shortcuts",
+                "presentFromStart": "Present from the beginning",
+                "newSlide": "Add a new slide"
+            },
+            "slideList": {
+                "previous": "Go to the previous slide",
+                "next": "Go to the next slide",
+                "first": "Go to the first slide",
+                "last": "Go to the last slide",
+                "moveUp": "Move the slide up",
+                "moveDown": "Move the slide down",
+                "duplicate": "Duplicate the slide",
+                "delete": "Delete the slide"
             }
         }
     },
@@ -220,7 +234,8 @@
         "placesClips": "Clips",
         "databasesQuery": "Queries",
         "vaultItems": "Entries",
-        "officeSlides": "Presentations"
+        "officeSlides": "Presentations",
+        "officeSlideList": "Slide list"
     },
     "apps": {
         "general": "Everywhere",

@@ -57,6 +57,37 @@ export function duplicateSlide(doc: Y.Doc, slideId: string, index: number): stri
     return id;
 }
 
+/** A slide and everything on it, gone - one step, so one undo brings both back. */
+export function removeSlide(doc: Y.Doc, slideId: string): void {
+    const slides = slidesOf(doc);
+    const index = slides.toArray().findIndex((one) => one.id === slideId);
+    if (index < 0) return;
+    change(doc, () => {
+        slides.delete(index, 1);
+        const boxes = boxesOf(doc);
+        for (const key of [...boxes.keys()]) {
+            if (deck.readBoxKey(key)?.slideId === slideId) boxes.delete(key);
+        }
+    });
+}
+
+/**
+ * A slide moved to sit at `to` in the deck as it will be afterwards.
+ *
+ * A Yjs array has no move, so it is taken out and put back in one transaction;
+ * the slide keeps its id, and its boxes - keyed by that id - never notice.
+ */
+export function moveSlide(doc: Y.Doc, from: number, to: number): void {
+    const slides = slidesOf(doc);
+    const target = Math.max(0, Math.min(slides.length - 1, to));
+    if (from === target || from < 0 || from >= slides.length) return;
+    const slide = slides.get(from);
+    change(doc, () => {
+        slides.delete(from, 1);
+        slides.insert(target, [slide]);
+    });
+}
+
 /** A new box on a slide; its id, so the screen can choose it. */
 export function addBox(doc: Y.Doc, slideId: string, kind: deck.BoxKind): string {
     const id = crypto.randomUUID();

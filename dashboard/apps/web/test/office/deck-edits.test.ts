@@ -69,3 +69,49 @@ describe("undo in the slides editor", () => {
         expect(history.undoStack.length).toBe(1);
     });
 });
+
+describe("the slide list", () => {
+    function deckOf(count: number): { doc: Y.Doc; ids: string[] } {
+        const doc = new Y.Doc();
+        const ids = Array.from({ length: count }, (_, at) => edits.addSlide(doc, at));
+        return { doc, ids };
+    }
+    const order = (doc: Y.Doc) =>
+        edits
+            .slidesOf(doc)
+            .toArray()
+            .map((one) => one.id);
+
+    it("moves a slide to where it is dropped, keeping its boxes", () => {
+        const { doc, ids } = deckOf(4);
+        edits.moveSlide(doc, 0, 2);
+        expect(order(doc)).toEqual([ids[1], ids[2], ids[0], ids[3]]);
+        edits.moveSlide(doc, 3, 0);
+        expect(order(doc)).toEqual([ids[3], ids[1], ids[2], ids[0]]);
+        expect(edits.boxesOf(doc).get(deck.boxKey(ids[0] ?? "", "title"))).toBeDefined();
+    });
+
+    it("does nothing for a move that goes nowhere or off the end", () => {
+        const { doc, ids } = deckOf(2);
+        let updates = 0;
+        doc.on("update", () => (updates += 1));
+        edits.moveSlide(doc, 1, 1);
+        edits.moveSlide(doc, 5, 0);
+        expect(updates).toBe(0);
+        edits.moveSlide(doc, 0, 9);
+        expect(order(doc)).toEqual([ids[1], ids[0]]);
+    });
+
+    it("removes a slide with its boxes, and one undo brings both back", () => {
+        const { doc, ids } = deckOf(2);
+        const history = edits.deckUndoManager(doc);
+        const gone = ids[0] ?? "";
+        edits.removeSlide(doc, gone);
+        expect(order(doc)).toEqual([ids[1]]);
+        expect(edits.boxesOf(doc).get(deck.boxKey(gone, "title"))).toBeUndefined();
+        expect(edits.boxesOf(doc).get(deck.boxKey(ids[1] ?? "", "title"))).toBeDefined();
+        history.undo();
+        expect(order(doc)).toEqual(ids);
+        expect(edits.boxesOf(doc).get(deck.boxKey(gone, "title"))).toBeDefined();
+    });
+});

@@ -20,24 +20,34 @@
 
 import * as deck from "@/lib/office/deck";
 import * as edits from "./deck-edits";
+import { Present } from "./present";
+import { SlideList } from "./slide-list";
 import { SlideDrawing, SlideStage } from "./slide-canvas";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useOfficeDocument } from "@/app/(app)/office/use-office-document";
 import { ShortcutsDialog } from "@/components/shortcuts/shortcuts-dialog";
-import { Button, cn, matchShortcut, shortcutPressed } from "@polaris/ui";
+import {
+    Button,
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+    matchShortcut,
+    ShortcutHint
+} from "@polaris/ui";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
-    Copy,
+    ChevronDown,
     CopyPlus,
     Keyboard,
     Play,
     Plus,
     Redo2,
+    SkipBack,
     Square,
     Trash2,
     Type,
-    Undo2,
-    X
+    Undo2
 } from "lucide-react";
 
 /** Every key the editor answers to, in the order a press is tried. */
@@ -51,6 +61,8 @@ const KEYS = [
     "office.slides.nudge",
     "office.slides.nudgeFar",
     "office.slides.present",
+    "office.slides.presentFromStart",
+    "office.slides.newSlide",
     "office.slides.help"
 ] as const;
 
@@ -99,7 +111,8 @@ export function SlidesEditor({
     const [atIndex, setAtIndex] = useState(0);
     const [chosen, setChosen] = useState("");
     const [editing, setEditing] = useState("");
-    const [presenting, setPresenting] = useState(false);
+    /** The slide the show started from, while it runs. */
+    const [presenting, setPresenting] = useState<number | null>(null);
     const [helpOpen, setHelpOpen] = useState(false);
     const root = useRef<HTMLDivElement | null>(null);
 
@@ -120,6 +133,34 @@ export function SlidesEditor({
         edits.addSlide(doc, at + 1);
         goTo(at + 1);
     }, [at, doc, goTo]);
+
+    const listActions = {
+        onGo: goTo,
+        onAdd: (after: number) => {
+            edits.addSlide(doc, after + 1);
+            goTo(after + 1);
+        },
+        onDuplicate: (index: number) => {
+            const one = deckSlides[index];
+            if (!one) return;
+            edits.duplicateSlide(doc, one.id, index);
+            goTo(index + 1);
+        },
+        onDelete: (index: number) => {
+            const one = deckSlides[index];
+            if (!one) return;
+            edits.removeSlide(doc, one.id);
+            // The next slide takes its place; the last one's place is taken by
+            // the one before it.
+            goTo(Math.max(0, Math.min(index, deckSlides.length - 2)));
+        },
+        onMove: (from: number, to: number) => {
+            edits.moveSlide(doc, from, to);
+            if (from === at) setAtIndex(to);
+            else if (from < at && to >= at) setAtIndex(at - 1);
+            else if (from > at && to <= at) setAtIndex(at + 1);
+        }
+    };
 
     const addBox = (kind: deck.BoxKind): void => {
         if (!slide) return;
@@ -150,7 +191,10 @@ export function SlidesEditor({
         const handled = ((): boolean => {
             switch (action) {
                 case "office.slides.present":
-                    setPresenting(true);
+                    setPresenting(at);
+                    return true;
+                case "office.slides.presentFromStart":
+                    setPresenting(0);
                     return true;
                 case "office.slides.help":
                     setHelpOpen(true);
@@ -162,6 +206,9 @@ export function SlidesEditor({
             }
             if (!editable || !slide) return false;
             switch (action) {
+                case "office.slides.newSlide":
+                    addSlide();
+                    return true;
                 case "office.slides.undo":
                     history.undo();
                     return true;
@@ -294,41 +341,16 @@ export function SlidesEditor({
 
     return (
         <>
-            <div ref={root} className="flex min-h-0 flex-1">
-                {/* The slides. A column of them rather than a strip: a deck is read
-                top to bottom in every tool that makes one. */}
-                <aside className="hidden w-44 shrink-0 flex-col gap-2 overflow-y-auto overscroll-contain border-r border-border p-2 sm:flex">
-                    {deckSlides.map((one, index) => (
-                        <button
-                            key={one.id}
-                            type="button"
-                            onClick={() => goTo(index)}
-                            aria-current={index === at ? "true" : undefined}
-                            className={cn(
-                                "relative aspect-video w-full shrink-0 overflow-hidden rounded-md border bg-background text-left transition-colors",
-                                index === at
-                                    ? "border-primary ring-1 ring-primary"
-                                    : "border-border hover:border-border-strong"
-                            )}
-                        >
-                            <SlideDrawing boxes={bySlide.get(one.id) ?? []} />
-                            <span className="absolute bottom-1 left-1 rounded bg-background/80 px-1 text-[10px] text-muted-foreground">
-                                {index + 1}
-                            </span>
-                        </button>
-                    ))}
-                    {editable ? (
-                        <Button
-                            variant="secondary"
-                            size="sm"
-                            className="shrink-0"
-                            onClick={addSlide}
-                        >
-                            <Plus className="size-4 shrink-0" aria-hidden />
-                            {t("slides.slide")}
-                        </Button>
-                    ) : null}
-                </aside>
+            <div ref={root} className="flex min-h-0 flex-1 max-sm:flex-col">
+                {/* The slides. A column of them rather than a strip: a deck is
+                    read top to bottom in every tool that makes one. */}
+                <SlideList
+                    slides={deckSlides}
+                    bySlide={bySlide}
+                    at={at}
+                    editable={editable}
+                    actions={listActions}
+                />
 
                 <div className="flex min-h-0 min-w-0 flex-1 flex-col">
                     <div className="flex shrink-0 flex-wrap items-center gap-1 border-b border-border px-3 py-1.5">
@@ -372,19 +394,6 @@ export function SlidesEditor({
                                 >
                                     <Trash2 className="size-4 shrink-0" aria-hidden />
                                 </ToolButton>
-                                <span className="mx-1 h-5 w-px bg-border" aria-hidden />
-                                <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() => {
-                                        if (!slide) return;
-                                        edits.duplicateSlide(doc, slide.id, at);
-                                        goTo(at + 1);
-                                    }}
-                                >
-                                    <Copy className="size-4 shrink-0" aria-hidden />
-                                    {t("slides.duplicateSlide")}
-                                </Button>
                             </>
                         ) : null}
                         <div className="ml-auto flex items-center gap-1">
@@ -394,14 +403,42 @@ export function SlidesEditor({
                             >
                                 <Keyboard className="size-4 shrink-0" aria-hidden />
                             </ToolButton>
-                            <Button
-                                variant="secondary"
-                                size="sm"
-                                onClick={() => setPresenting(true)}
-                            >
-                                <Play className="size-4 shrink-0" aria-hidden />
-                                {t("slides.present")}
-                            </Button>
+                            <div className="flex items-center">
+                                <Button
+                                    variant="secondary"
+                                    size="sm"
+                                    className="rounded-r-none"
+                                    onClick={() => setPresenting(at)}
+                                >
+                                    <Play className="size-4 shrink-0" aria-hidden />
+                                    {t("slides.present")}
+                                </Button>
+                                <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                        <Button
+                                            variant="secondary"
+                                            size="sm"
+                                            className="rounded-l-none border-l border-border px-1.5"
+                                            aria-label={t("slides.presentOptions")}
+                                            title={t("slides.presentOptions")}
+                                        >
+                                            <ChevronDown className="size-4 shrink-0" aria-hidden />
+                                        </Button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent align="end">
+                                        <DropdownMenuItem onSelect={() => setPresenting(at)}>
+                                            <Play aria-hidden />
+                                            {t("slides.fromHere")}
+                                            <ShortcutHint id="office.slides.present" />
+                                        </DropdownMenuItem>
+                                        <DropdownMenuItem onSelect={() => setPresenting(0)}>
+                                            <SkipBack aria-hidden />
+                                            {t("slides.fromStart")}
+                                            <ShortcutHint id="office.slides.presentFromStart" />
+                                        </DropdownMenuItem>
+                                    </DropdownMenuContent>
+                                </DropdownMenu>
+                            </div>
                         </div>
                     </div>
 
@@ -440,12 +477,12 @@ export function SlidesEditor({
                     </div>
                 </div>
             </div>
-            {presenting ? (
+            {presenting !== null ? (
                 <Present
                     slides={deckSlides}
                     bySlide={bySlide}
-                    from={at}
-                    onClose={() => setPresenting(false)}
+                    from={presenting}
+                    onClose={() => setPresenting(null)}
                 />
             ) : null}
             <ShortcutsDialog app="office" open={helpOpen} onOpenChange={setHelpOpen} />
@@ -477,59 +514,5 @@ function ToolButton({
         >
             {children}
         </Button>
-    );
-}
-
-/** The deck, full screen. Arrow keys and Escape, which is the whole interface
- *  anybody uses while presenting. */
-function Present({
-    slides,
-    bySlide,
-    from,
-    onClose
-}: {
-    slides: readonly deck.Slide[];
-    bySlide: ReadonlyMap<string, readonly deck.Box[]>;
-    from: number;
-    onClose: () => void;
-}) {
-    const t = useTranslations("office");
-    const [at, setAt] = useState(from);
-    const slide = slides[at];
-    return (
-        <div
-            role="dialog"
-            aria-label={t("slides.presenting")}
-            tabIndex={-1}
-            autoFocus
-            onKeyDown={(event) => {
-                // Its own keys, never the editor's underneath.
-                event.stopPropagation();
-                if (event.key === "Escape") onClose();
-                if (shortcutPressed(event, "viewer.nextSlide")) {
-                    setAt((one) => Math.min(slides.length - 1, one + 1));
-                }
-                if (shortcutPressed(event, "viewer.previousSlide"))
-                    setAt((one) => Math.max(0, one - 1));
-            }}
-            className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-black outline-none"
-        >
-            <Button
-                variant="ghost"
-                size="icon"
-                aria-label={t("slides.stopPresenting")}
-                title={t("slides.stopPresenting")}
-                className="absolute right-3 top-3 text-white"
-                onClick={onClose}
-            >
-                <X className="size-5 shrink-0" aria-hidden />
-            </Button>
-            <div className="relative aspect-video w-full max-w-[95vw] bg-background sm:max-h-[90vh]">
-                {slide ? <SlideDrawing boxes={bySlide.get(slide.id) ?? []} /> : null}
-            </div>
-            <p className="mt-3 text-[12px] text-white/60">
-                {t("slides.counter", { at: at + 1, total: slides.length })}
-            </p>
-        </div>
     );
 }
