@@ -333,6 +333,13 @@
         "always": "siempre"
     },
     "callRoom": {
+        "yourScreen": "Tu pantalla",
+        "theirScreen": "{name} - pantalla",
+        "backToTheGrid": "Volver al mosaico",
+        "backToThePeople": "Volver a las personas",
+        "you": "Tú",
+        "guest": "invitado",
+        "somebody": "Alguien",
         "theCallHasEnded": "La llamada ha terminado.",
         "close": "Cerrar",
         "shrinkTheCall": "Reducir la llamada",
@@ -1416,7 +1423,18 @@
     "members": {
         "owner": "Dueño",
         "membersListWidth": "Ancho de miembros",
-        "hideTheMembers": "Ocultar miembros"
+        "hideTheMembers": "Ocultar miembros",
+        "heading": "Miembros",
+        "headingCount": "Miembros - {count}",
+        "you": "(tú)"
+    },
+    "typing": {
+        "typingOne": "{name} está escribiendo",
+        "typingTwo": "{first} y {second} están escribiendo",
+        "typingMany": "Varias personas escriben",
+        "recordingOne": "{name} está grabando un audio",
+        "recordingTwo": "{first} y {second} están grabando un audio",
+        "recordingMany": "Varias personas graban un audio"
     },
     "thread": {
         "threadWidth": "Ancho del hilo",

@@ -245,7 +245,7 @@ export function CallBar({ onScreen }: { onScreen: string | null }) {
         id,
         name:
             (call.meeting?.participants ?? []).find((person) => person.id === id)?.name ??
-            "Somebody",
+            t("callRoom.somebody"),
         own: id === call.participantId
     }));
     const waiting = handsQueueSummary(hands);

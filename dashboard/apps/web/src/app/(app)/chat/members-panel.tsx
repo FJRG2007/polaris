@@ -342,7 +342,7 @@ function MemberRow({
                                         className={plate ? "opacity-80" : "text-muted-foreground"}
                                     >
                                         {" "}
-                                        (you)
+                                        {t("members.you")}
                                     </span>
                                 )}
                             </PersonName>
@@ -394,7 +394,9 @@ export function ChannelMembers({
     const { viewerId, refresh } = useChat();
     const wide = useWideScreen();
     const { members, loading } = useRoster(channel.id, channel.ownerId, open);
-    const heading = `Members${loading ? "" : ` - ${members.length}`}`;
+    const heading = loading
+        ? t("members.heading")
+        : t("members.headingCount", { count: members.length });
     // Above the two early returns below, and deliberately: a hook that only runs
     // on some renders is a crash the first time this panel is closed or drawn on
     // a narrow window.

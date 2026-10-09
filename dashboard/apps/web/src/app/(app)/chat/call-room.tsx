@@ -223,9 +223,14 @@ export function CallRoom({
     // This browser's own seat, which is where its own face comes from: a guest
     // has no account to draw one from, and the signed-in id is not on the seat.
     const mine = admitted?.find((person) => person.id === call.participantId);
+    // Your own tile says "You", and its face is drawn from your name - initials
+    // taken from the word on the plate were "YO" for everybody.
+    const you = t("callRoom.you");
+    const ownName = mine?.name ?? you;
     const waiting = call.meeting?.participants.filter((person) => person.admission === "waiting");
     const recordedBy =
-        call.meeting?.participants.find((person) => person.id === recording[0])?.name ?? "Somebody";
+        call.meeting?.participants.find((person) => person.id === recording[0])?.name ??
+        t("callRoom.somebody");
 
     /**
      * What somebody else's tile says and offers about sharing a room with them.
@@ -310,7 +315,11 @@ export function CallRoom({
         localScreen: call.localScreen,
         participantId: call.participantId,
         screens: call.screens,
-        nameOf: (personId) => nameOf(admitted, personId)
+        nameOf: (personId) => nameOf(admitted, personId, t("callRoom.somebody")),
+        words: {
+            yourScreen: t("callRoom.yourScreen"),
+            theirScreen: (name) => t("callRoom.theirScreen", { name })
+        }
     });
 
     /**
@@ -408,7 +417,8 @@ export function CallRoom({
     const faces = () => (
         <>
             <Face
-                name="You"
+                name={ownName}
+                label={you}
                 personId={mine?.userId ?? viewerId ?? null}
                 speaking={
                     call.participantId !== null &&
@@ -929,7 +939,7 @@ export function CallRoom({
                                     ? () => setAway((was) => [...was, stage.key])
                                     : () => focus(stage.key)
                             }
-                            backLabel={letGo ? "Back to the people" : undefined}
+                            backLabel={letGo ? t("callRoom.backToThePeople") : undefined}
                             {...column}
                             // A shared screen is usually text, and the reason
                             // anybody stares at one is to read a line of it.
@@ -948,7 +958,8 @@ export function CallRoom({
                     {live === `camera:${call.participantId}` ? (
                         <Tile
                             stream={call.localStream}
-                            name="You"
+                            name={ownName}
+                            label={you}
                             personId={mine?.userId ?? viewerId ?? null}
                             own
                             mirrored={call.mirrored}
@@ -972,7 +983,7 @@ export function CallRoom({
                             return (
                                 <Tile
                                     stream={call.remote.get(personId) ?? null}
-                                    name={person?.name ?? "Somebody"}
+                                    name={person?.name ?? t("callRoom.somebody")}
                                     personId={person?.userId ?? null}
                                     guest={person?.guest}
                                     focused
@@ -1045,7 +1056,8 @@ export function CallRoom({
                     {offersInline && putAway.map((stage) => offer(stage, "size-full min-h-24"))}
                     <Tile
                         stream={call.localStream}
-                        name="You"
+                        name={ownName}
+                        label={you}
                         personId={mine?.userId ?? viewerId ?? null}
                         own
                         mirrored={call.mirrored}
@@ -1902,6 +1914,7 @@ function StreamCard({
  */
 function Face({
     name,
+    label,
     personId,
     guest = false,
     speaking = false,
@@ -1920,6 +1933,8 @@ function Face({
     volumeKey
 }: {
     name: string;
+    /** What the plate says, when it is not the name - your own face says "You". */
+    label?: string;
     personId: string | null;
     guest?: boolean;
     speaking?: boolean;
@@ -1990,7 +2005,7 @@ function Face({
                 )}
             </span>
             <span className="flex max-w-full items-center gap-1 text-xs">
-                <span className="truncate">{name}</span>
+                <span className="truncate">{label ?? name}</span>
                 {sharing && <LiveBadge />}
                 {/* Muted and deafened are on the face itself, the way a voice
                     channel shows them - see `callBadge`. */}
@@ -2011,7 +2026,11 @@ function Face({
                     />
                 )}
             </span>
-            {guest && <span className="text-[0.6875rem] text-muted-foreground">guest</span>}
+            {guest && (
+                <span className="text-[0.6875rem] text-muted-foreground">
+                    {t("callRoom.guest")}
+                </span>
+            )}
         </li>
     );
 
@@ -2035,6 +2054,7 @@ function Face({
 function Tile({
     stream,
     name,
+    label,
     personId,
     own = false,
     mirrored = false,
@@ -2052,7 +2072,7 @@ function Tile({
     reactions = [],
     focused = false,
     onFocus,
-    backLabel = "Back to the grid",
+    backLabel,
     grown = false,
     onGrow,
     onCombine,
@@ -2065,6 +2085,8 @@ function Tile({
 }: {
     stream: MediaStream | null;
     name: string;
+    /** What the plate says, when it is not the name - your own tile says "You". */
+    label?: string;
     /** Whose picture to draw while there is no video. Their account where they
      *  have one; a guest falls back to initials, which is all there is of
      *  somebody who arrived on a link. */
@@ -2381,8 +2403,8 @@ function Tile({
                 </span>
             )}
             <span className="absolute bottom-1 left-1 flex items-center gap-1 rounded bg-background/80 px-1.5 py-0.5 text-[0.6875rem]">
-                {name}
-                {guest && <span className="text-muted-foreground">guest</span>}
+                {label ?? name}
+                {guest && <span className="text-muted-foreground">{t("callRoom.guest")}</span>}
                 {sharing && <LiveBadge />}
                 {/* Drawn because this person cannot be heard, yours included -
                     and only while the picture is a video: with the camera off
@@ -2435,8 +2457,16 @@ function Tile({
                         <button
                             type="button"
                             onClick={onFocus}
-                            aria-label={focused ? backLabel : t("callRoom.makeThisBigger")}
-                            title={focused ? backLabel : t("callRoom.makeThisBigger")}
+                            aria-label={
+                                focused
+                                    ? (backLabel ?? t("callRoom.backToTheGrid"))
+                                    : t("callRoom.makeThisBigger")
+                            }
+                            title={
+                                focused
+                                    ? (backLabel ?? t("callRoom.backToTheGrid"))
+                                    : t("callRoom.makeThisBigger")
+                            }
                             className="rounded bg-background/80 p-1 text-muted-foreground transition-colors hover:text-foreground"
                         >
                             {focused ? (
@@ -2707,9 +2737,10 @@ function InviteToCallDialog({
  *  is named as somebody rather than as nothing. */
 function nameOf(
     people: readonly { id: string; name: string }[] | undefined,
-    personId: string
+    personId: string,
+    somebody: string
 ): string {
-    return people?.find((person) => person.id === personId)?.name ?? "Somebody";
+    return people?.find((person) => person.id === personId)?.name ?? somebody;
 }
 
 /** Enough columns to keep the tiles roughly square at every size a call can

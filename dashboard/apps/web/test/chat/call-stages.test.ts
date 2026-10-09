@@ -22,6 +22,9 @@ const stream = (label: string) => ({ label }) as unknown as MediaStream;
 
 const named = (personId: string) => (personId === "p2" ? "Ada" : "Somebody");
 
+/** The English the room passes in. */
+const WORDS = { yourScreen: "Your screen", theirScreen: (name: string) => `${name} - screen` };
+
 describe("the screens on show", () => {
     it("is empty when nobody is sharing", () => {
         expect(
@@ -29,7 +32,8 @@ describe("the screens on show", () => {
                 localScreen: null,
                 participantId: "p1",
                 screens: new Map(),
-                nameOf: named
+                nameOf: named,
+                words: WORDS
             })
         ).toEqual([]);
     });
@@ -40,7 +44,8 @@ describe("the screens on show", () => {
             localScreen: mine,
             participantId: "p1",
             screens: new Map(),
-            nameOf: named
+            nameOf: named,
+            words: WORDS
         });
         expect(stages).toHaveLength(1);
         expect(stages[0]?.stream).toBe(mine);
@@ -52,7 +57,8 @@ describe("the screens on show", () => {
             localScreen: stream("mine"),
             participantId: "p1",
             screens: new Map([["p2", stream("theirs")]]),
-            nameOf: named
+            nameOf: named,
+            words: WORDS
         });
         expect(stages.map((stage) => stage.key)).toEqual([LOCAL_SCREEN_KEY, "screen:p2"]);
     });
@@ -62,7 +68,8 @@ describe("the screens on show", () => {
             localScreen: null,
             participantId: "p1",
             screens: new Map([["p2", stream("theirs")]]),
-            nameOf: named
+            nameOf: named,
+            words: WORDS
         });
         expect(stages[0]?.name).toBe("Ada - screen");
     });
@@ -76,7 +83,8 @@ describe("the screens on show", () => {
                 ["p3", stream("three")],
                 ["p4", stream("four")]
             ]),
-            nameOf: named
+            nameOf: named,
+            words: WORDS
         });
         expect(stages).toHaveLength(4);
     });
@@ -88,7 +96,8 @@ describe("the screens on show", () => {
             localScreen: stream("mine"),
             participantId: "p1",
             screens: new Map([["p1", stream("mine, returned")]]),
-            nameOf: named
+            nameOf: named,
+            words: WORDS
         });
         expect(stages).toHaveLength(1);
         expect(stages[0]?.name).toBe("Your screen");
@@ -105,13 +114,15 @@ describe("the screens on show", () => {
             localScreen: mine,
             participantId: null,
             screens: new Map(),
-            nameOf: named
+            nameOf: named,
+            words: WORDS
         });
         const after = stagesOf({
             localScreen: mine,
             participantId: "p1",
             screens: new Map(),
-            nameOf: named
+            nameOf: named,
+            words: WORDS
         });
         expect(before[0]?.key).toBe(LOCAL_SCREEN_KEY);
         expect(after[0]?.key).toBe(LOCAL_SCREEN_KEY);
@@ -124,7 +135,8 @@ describe("the screens on show", () => {
             localScreen: stream("mine"),
             participantId: null,
             screens: new Map([["p2", stream("theirs")]]),
-            nameOf: named
+            nameOf: named,
+            words: WORDS
         });
         expect(stages.map((stage) => stage.key)).toEqual([LOCAL_SCREEN_KEY, "screen:p2"]);
     });
@@ -136,7 +148,8 @@ describe("the screens on show", () => {
             localScreen: null,
             participantId: "p2",
             screens: new Map([["p2", stream("theirs")]]),
-            nameOf: named
+            nameOf: named,
+            words: WORDS
         });
         expect(stages.map((stage) => stage.key)).toEqual(["screen:p2"]);
     });
