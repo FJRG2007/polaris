@@ -42,8 +42,14 @@ name: Dashboard CI
 
 on:
   pull_request:
+    # Prose about the dashboard is not the dashboard: a change that only touches its
+    # docs/ or the Markdown at its root runs nothing. Markdown elsewhere still
+    # counts - a package's README can be part of what it ships, and a test reads one
+    # (editor-fonts-staged.test.ts).
     paths:
       - "dashboard/**"
+      - "!dashboard/docs/**"
+      - "!dashboard/*.md"
       - ".github/workflows/dashboard-ci.yml"
   workflow_dispatch:
   workflow_call:

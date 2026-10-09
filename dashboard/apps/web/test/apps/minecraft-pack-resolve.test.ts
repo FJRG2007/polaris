@@ -353,7 +353,9 @@ describe("the link the players are given", () => {
         const token = packToken("server-1");
         expect(packTokenMatches("server-1", token)).toBe(true);
         expect(packTokenMatches("server-2", token)).toBe(false);
-        expect(packTokenMatches("server-1", `${token.slice(0, -1)}x`)).toBe(false);
+        // One character off - never the one it already ends in.
+        const last = token.at(-1) === "x" ? "y" : "x";
+        expect(packTokenMatches("server-1", `${token.slice(0, -1)}${last}`)).toBe(false);
         expect(packTokenMatches("server-1", "")).toBe(false);
     });
 
