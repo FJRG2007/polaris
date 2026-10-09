@@ -81,7 +81,10 @@ function serve() {
             res.writeHead(404).end();
             return;
         }
-        const candidates = [join(site, path === "/" ? "index.html" : path), join(site, "public", path)];
+        const candidates = [
+            join(site, path === "/" ? "index.html" : path),
+            join(site, "public", path)
+        ];
         const file = candidates.find((candidate) => {
             const inside = normalize(candidate).startsWith(site + sep);
             return inside && existsSync(candidate) && statSync(candidate).isFile();
@@ -102,7 +105,9 @@ async function scenes(page, base) {
     page.on("console", (message) => message.type() === "error" && thrown.push(message.text()));
     await page.goto(`${base}/index.html?scene=__list__`);
     try {
-        await page.waitForFunction(() => Array.isArray(window.__SCENE_LIST__), null, { timeout: 30000 });
+        await page.waitForFunction(() => Array.isArray(window.__SCENE_LIST__), null, {
+            timeout: 30000
+        });
     } catch {
         throw new Error(`the scene page did not load: ${thrown.join(" | ")}`);
     }
@@ -118,7 +123,10 @@ async function settle(page) {
 }
 
 async function picture(page, scene, viewport) {
-    const shot = await page.screenshot({ type: "png", clip: { x: 0, y: 0, ...VIEWPORTS[viewport] } });
+    const shot = await page.screenshot({
+        type: "png",
+        clip: { x: 0, y: 0, ...VIEWPORTS[viewport] }
+    });
     return sharp(shot);
 }
 
@@ -162,17 +170,25 @@ async function run() {
                         );
                         const page = await context.newPage();
                         page.on("console", (message) => {
-                            if (message.type() === "error" && !message.text().startsWith("Failed to load resource")) {
+                            if (
+                                message.type() === "error" &&
+                                !message.text().startsWith("Failed to load resource")
+                            ) {
                                 problems.push(`console: ${message.text()}`);
                             }
                         });
                         page.on("pageerror", (error) => problems.push(`thrown: ${error.message}`));
                         page.on("response", (response) => {
-                            if (response.status() >= 400 && !new URL(response.url()).pathname.startsWith(FACELESS))
+                            if (
+                                response.status() >= 400 &&
+                                !new URL(response.url()).pathname.startsWith(FACELESS)
+                            )
                                 problems.push(`${response.status()}: ${response.url()}`);
                         });
                         await page.clock.install({ time: MOMENT });
-                        await page.goto(`${base}/index.html?scene=${scene.id}&theme=${theme}&locale=${locale}`);
+                        await page.goto(
+                            `${base}/index.html?scene=${scene.id}&theme=${theme}&locale=${locale}`
+                        );
                         try {
                             await settle(page);
                             await page.evaluate(() => window.__scene.prepare());
@@ -192,18 +208,34 @@ async function run() {
                             const frames = await page.evaluate(() => window.__scene.frames);
                             if (frames <= 1 || viewport === "mobile") {
                                 const image = await picture(page, scene, viewport);
-                                writeFileSync(join(output, file), await image.webp({ quality: 82 }).toBuffer());
+                                writeFileSync(
+                                    join(output, file),
+                                    await image.webp({ quality: 82 }).toBuffer()
+                                );
                             } else {
                                 const shots = [];
                                 const delays = [];
                                 for (let index = 0; index < frames; index++) {
                                     await page.evaluate((i) => window.__scene.step(i), index);
-                                    await page.clock.runFor(await page.evaluate((i) => window.__scene.advance(i), index));
+                                    await page.clock.runFor(
+                                        await page.evaluate((i) => window.__scene.advance(i), index)
+                                    );
                                     await page.waitForTimeout(120);
-                                    shots.push(await (await picture(page, scene, viewport)).resize(VIEWPORTS[viewport].width).png().toBuffer());
-                                    delays.push(await page.evaluate((i) => window.__scene.hold(i), index));
+                                    shots.push(
+                                        await (await picture(page, scene, viewport))
+                                            .resize(VIEWPORTS[viewport].width)
+                                            .png()
+                                            .toBuffer()
+                                    );
+                                    delays.push(
+                                        await page.evaluate((i) => window.__scene.hold(i), index)
+                                    );
                                 }
-                                const animated = sharp(shots, { join: { animated: true } }).webp({ quality: 75, delay: delays, loop: 0 });
+                                const animated = sharp(shots, { join: { animated: true } }).webp({
+                                    quality: 75,
+                                    delay: delays,
+                                    loop: 0
+                                });
                                 writeFileSync(join(output, file), await animated.toBuffer());
                             }
                             saved++;
@@ -218,10 +250,14 @@ async function run() {
         server.close();
     }
     for (const failure of failures) {
-        process.stderr.write(`[readme-media] ${failure.name}\n${failure.problems.map((line) => `    ${line}`).join("\n")}\n`);
+        process.stderr.write(
+            `[readme-media] ${failure.name}\n${failure.problems.map((line) => `    ${line}`).join("\n")}\n`
+        );
     }
     if (failures.length > 0) process.exit(1);
-    process.stdout.write(`[readme-media] ${check ? "checked" : `saved ${saved} pictures to ${output}`}\n`);
+    process.stdout.write(
+        `[readme-media] ${check ? "checked" : `saved ${saved} pictures to ${output}`}\n`
+    );
 }
 
 await run();

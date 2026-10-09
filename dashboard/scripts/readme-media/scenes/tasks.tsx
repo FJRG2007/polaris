@@ -5,7 +5,15 @@ import { defineScene } from "../runtime/scene";
 import { PlainNames } from "@/components/person-name";
 import { SpaceTree } from "@/app/(app)/tasks/space-tree";
 import { ListScreen } from "@/app/(app)/tasks/list-view";
-import { TASK_LIST_ID, taskDetail, listName, spaceName, spaceTree, taskContext, taskRows } from "../fixtures/tasks";
+import {
+    TASK_LIST_ID,
+    taskDetail,
+    listName,
+    spaceName,
+    spaceTree,
+    taskContext,
+    taskRows
+} from "../fixtures/tasks";
 import type { SceneContext } from "../runtime/scene";
 
 /** The page `/tasks/l/[listId]` draws, with what it would have read. */
@@ -32,7 +40,13 @@ export function TaskBoard({
                         tasks={taskRows(ctx)}
                         savedViews={[]}
                         context={taskContext(ctx)}
-                        lists={[{ id: TASK_LIST_ID, name: listName(ctx), spaceId: taskContext(ctx).spaceId }]}
+                        lists={[
+                            {
+                                id: TASK_LIST_ID,
+                                name: listName(ctx),
+                                spaceId: taskContext(ctx).spaceId
+                            }
+                        ]}
                         initialTaskId={openTask}
                     />
                 </div>

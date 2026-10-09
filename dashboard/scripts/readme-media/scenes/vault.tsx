@@ -5,7 +5,13 @@ import { VIEWER } from "../fixtures/people";
 import { defineScene } from "../runtime/scene";
 import { VaultApp } from "@/app/(app)/vault/vault-app";
 import { VaultGate, VaultSessionProvider } from "@/app/(app)/vault/vault-session";
-import { OPEN_ITEM_NAME, holdVaultKey, vaultContents, vaultList, vaultState } from "../fixtures/vault";
+import {
+    OPEN_ITEM_NAME,
+    holdVaultKey,
+    vaultContents,
+    vaultList,
+    vaultState
+} from "../fixtures/vault";
 
 export const vault = defineScene({
     id: "vault",

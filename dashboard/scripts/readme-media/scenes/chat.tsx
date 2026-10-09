@@ -6,7 +6,14 @@ import { Chrome } from "../runtime/chrome";
 import { defineScene } from "../runtime/scene";
 import { sendFrame } from "../runtime/stream";
 import { TEAM, VIEWER } from "../fixtures/people";
-import { CHANNEL_ID, arriving, chatCategories, chatChannels, chatSpaces, launchConversation } from "../fixtures/chat";
+import {
+    CHANNEL_ID,
+    arriving,
+    chatCategories,
+    chatChannels,
+    chatSpaces,
+    launchConversation
+} from "../fixtures/chat";
 
 const STREAM = "/api/chat/stream";
 /** Past the four seconds a typing line stays up (`TYPING_TTL_MS`). */
@@ -56,7 +63,9 @@ export const chat = defineScene({
             page: { messages: launchConversation(ctx), olderThan: null },
             channel: chatChannels(ctx)[0]
         }),
-        readSinceAction: () => ({ page: { messages: arriving(ctx).slice(0, delivered), newerThan: null } }),
+        readSinceAction: () => ({
+            page: { messages: arriving(ctx).slice(0, delivered), newerThan: null }
+        }),
         markReadAction: () => ({}),
         receiptsAction: () => ({ receipts: {} }),
         listScheduledAction: () => ({ scheduled: [] }),

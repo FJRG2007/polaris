@@ -30,7 +30,8 @@ export function variants() {
     const all = [];
     for (const [language, locale] of Object.entries(LOCALES)) {
         for (const theme of THEMES) {
-            for (const viewport of Object.keys(VIEWPORTS)) all.push({ language, locale, theme, viewport });
+            for (const viewport of Object.keys(VIEWPORTS))
+                all.push({ language, locale, theme, viewport });
         }
     }
     return all;

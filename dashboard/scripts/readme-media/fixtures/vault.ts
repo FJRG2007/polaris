@@ -14,7 +14,9 @@ import type { VaultState } from "@/app/(app)/vault/vault-actions";
 import { emptyItem, encryptItem, type VaultItem } from "@/app/(app)/vault/vault-model";
 
 /** The vault key of the capture: 64 fixed bytes, a fixture and nothing else. */
-export const VAULT_KEY = vaultCrypto.symmetricKeyFromBytes(Uint8Array.from({ length: 64 }, (_, index) => index + 1));
+export const VAULT_KEY = vaultCrypto.symmetricKeyFromBytes(
+    Uint8Array.from({ length: 64 }, (_, index) => index + 1)
+);
 
 /** Where the vault session keeps a held key in this tab (`vault-session.tsx`). */
 const SESSION_KEY = "polaris.vault.session";
@@ -23,7 +25,10 @@ const SESSION_KEY = "polaris.vault.session";
 export function holdVaultKey(): void {
     window.sessionStorage.setItem(
         SESSION_KEY,
-        JSON.stringify({ key: vaultCrypto.toBase64(vaultCrypto.symmetricKeyBytes(VAULT_KEY)), until: null })
+        JSON.stringify({
+            key: vaultCrypto.toBase64(vaultCrypto.symmetricKeyBytes(VAULT_KEY)),
+            until: null
+        })
     );
 }
 
@@ -60,7 +65,8 @@ export const WORK_FOLDER = id("vault-folder", 1);
 const HOME_FOLDER = id("vault-folder", 2);
 
 /** The item the scene opens, by the name the list shows. */
-export const OPEN_ITEM_NAME = (ctx: SceneContext): string => ctx.say("Shop admin", "Admin de la tienda");
+export const OPEN_ITEM_NAME = (ctx: SceneContext): string =>
+    ctx.say("Shop admin", "Admin de la tienda");
 
 function login(
     n: number,
@@ -90,7 +96,14 @@ function items(ctx: SceneContext): VaultItem[] {
     card.name = ctx.say("Company card", "Tarjeta de empresa");
     card.folderId = WORK_FOLDER;
     // The network's published test number, not a card.
-    card.card = { cardholderName: VIEWER.name, brand: "Visa", number: "4242424242424242", expMonth: "08", expYear: "2029", code: "123" };
+    card.card = {
+        cardholderName: VIEWER.name,
+        brand: "Visa",
+        number: "4242424242424242",
+        expMonth: "08",
+        expYear: "2029",
+        code: "123"
+    };
 
     const note = emptyItem(core.CIPHER_SECURE_NOTE);
     note.id = id("vault-item", 21);
@@ -101,7 +114,11 @@ function items(ctx: SceneContext): VaultItem[] {
     const ssh = emptyItem(core.CIPHER_SSH_KEY);
     ssh.id = id("vault-item", 22);
     ssh.name = ctx.say("Deploy key", "Clave de despliegue");
-    ssh.sshKey = { privateKey: "", publicKey: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFixtureFixtureFixture deploy@example.com", keyFingerprint: "SHA256:fixture" };
+    ssh.sshKey = {
+        privateKey: "",
+        publicKey: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFixtureFixtureFixture deploy@example.com",
+        keyFingerprint: "SHA256:fixture"
+    };
     ssh.folderId = WORK_FOLDER;
 
     return [
@@ -111,11 +128,30 @@ function items(ctx: SceneContext): VaultItem[] {
             favorite: true
         }),
         login(2, "Postgres (production)", "storefront", "postgres://db.shop.example.com:5432"),
-        login(3, ctx.say("Payments dashboard", "Panel de pagos"), "finance@example.com", "https://payments.example.com", { favorite: true }),
-        login(4, ctx.say("Domain registrar", "Registrador de dominios"), VIEWER.email, "https://registrar.example.com"),
+        login(
+            3,
+            ctx.say("Payments dashboard", "Panel de pagos"),
+            "finance@example.com",
+            "https://payments.example.com",
+            { favorite: true }
+        ),
+        login(
+            4,
+            ctx.say("Domain registrar", "Registrador de dominios"),
+            VIEWER.email,
+            "https://registrar.example.com"
+        ),
         login(5, ctx.say("Analytics", "Analítica"), VIEWER.email, "https://analytics.example.com"),
-        login(6, ctx.say("Router", "Router"), "admin", "http://192.168.1.1", { folderId: HOME_FOLDER }),
-        login(7, ctx.say("Streaming", "Streaming"), "alex.rivera@example.com", "https://tv.example.com", { folderId: HOME_FOLDER }),
+        login(6, ctx.say("Router", "Router"), "admin", "http://192.168.1.1", {
+            folderId: HOME_FOLDER
+        }),
+        login(
+            7,
+            ctx.say("Streaming", "Streaming"),
+            "alex.rivera@example.com",
+            "https://tv.example.com",
+            { folderId: HOME_FOLDER }
+        ),
         card,
         note,
         ssh

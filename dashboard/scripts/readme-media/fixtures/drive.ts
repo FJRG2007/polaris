@@ -49,7 +49,11 @@ const MB = 1024 * 1024;
 /** The root of their drive: a few folders, and the files a week of work leaves. */
 export function rootEntries(ctx: SceneContext): DriveEntry[] {
     const say = ctx.say;
-    const folder = (name: string, minutes: number, extra: Partial<DriveEntry> = {}): DriveEntry => ({
+    const folder = (
+        name: string,
+        minutes: number,
+        extra: Partial<DriveEntry> = {}
+    ): DriveEntry => ({
         name,
         path: name,
         kind: "dir",
@@ -59,7 +63,12 @@ export function rootEntries(ctx: SceneContext): DriveEntry[] {
         owner: VIEWER.name,
         ...extra
     });
-    const file = (name: string, bytes: number, minutes: number, owner: string = VIEWER.name): DriveEntry => ({
+    const file = (
+        name: string,
+        bytes: number,
+        minutes: number,
+        owner: string = VIEWER.name
+    ): DriveEntry => ({
         name,
         path: name,
         kind: "file",
@@ -73,7 +82,12 @@ export function rootEntries(ctx: SceneContext): DriveEntry[] {
         folder(say("Contracts", "Contratos"), 60 * 26, { locked: true }),
         folder(say("Photos", "Fotos"), 60 * 50),
         folder(say("Invoices", "Facturas"), 60 * 72),
-        file(say("Onboarding screens.fig", "Pantallas de bienvenida.fig"), 18.4 * MB, 22, TEAM.lena.name),
+        file(
+            say("Onboarding screens.fig", "Pantallas de bienvenida.fig"),
+            18.4 * MB,
+            22,
+            TEAM.lena.name
+        ),
         file(say("Q1 report.pdf", "Informe T1.pdf"), 2.1 * MB, 95, TEAM.ana.name),
         file(say("Launch plan.docx", "Plan de lanzamiento.docx"), 0.3 * MB, 60 * 5),
         file(say("Budget 2026.xlsx", "Presupuesto 2026.xlsx"), 0.09 * MB, 60 * 20, TEAM.sam.name),

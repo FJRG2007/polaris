@@ -336,9 +336,7 @@ export function useCallRecorder(call: CallState): CallRecording {
             setRunning(false);
             latest.current.setRecording(false);
             if (blob.size === 0) return;
-            setFile(
-                new File([blob], `call-recording.${recordingExtension(type)}`, { type })
-            );
+            setFile(new File([blob], `call-recording.${recordingExtension(type)}`, { type }));
         };
 
         // A slice a second, so the size is known while it grows rather than only

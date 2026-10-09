@@ -15,4 +15,23 @@ import { taskPanel, tasks } from "./tasks";
 import type { SceneDefinition } from "../runtime/scene";
 
 /** Every scene the README shows, in the order the capture takes them. */
-export const SCENES: readonly SceneDefinition[] = [chat, tasks, taskPanel, deploy, deployProject, deployLogs, drive, mail, mailThread, calendar, games, office, vault, marketplace, launcher, settings, call, inCall];
+export const SCENES: readonly SceneDefinition[] = [
+    chat,
+    tasks,
+    taskPanel,
+    deploy,
+    deployProject,
+    deployLogs,
+    drive,
+    mail,
+    mailThread,
+    calendar,
+    games,
+    office,
+    vault,
+    marketplace,
+    launcher,
+    settings,
+    call,
+    inCall
+];

@@ -318,7 +318,9 @@ function MemberRow({
                     }
                     className={cn(
                         "flex w-full items-center gap-2 rounded-md px-2 py-1 text-left transition-colors",
-                        you && !press ? "cursor-default" : "hover:bg-card-hover disabled:opacity-70",
+                        you && !press
+                            ? "cursor-default"
+                            : "hover:bg-card-hover disabled:opacity-70",
                         // A plate replaces the row's own hover tint
                         // rather than being tinted by it.
                         plate && platedRow(plate, "hover:bg-transparent")

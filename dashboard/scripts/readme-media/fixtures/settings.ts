@@ -36,7 +36,12 @@ export function settingsOverview(ctx: SceneContext): SettingsOverview {
     return {
         status: updateStatus(ctx),
         addresses: [
-            { url: "https://polaris.example.com", host: "polaris.example.com", kind: "domain", health: up },
+            {
+                url: "https://polaris.example.com",
+                host: "polaris.example.com",
+                kind: "domain",
+                health: up
+            },
             { url: "http://polaris.local", host: "polaris.local", kind: "local", health: up }
         ],
         // Documentation ranges (RFC 5737), which route nowhere.

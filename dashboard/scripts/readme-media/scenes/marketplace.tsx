@@ -12,9 +12,24 @@ export const marketplace = defineScene({
         <Chrome>
             <MarketplaceView
                 installed={[
-                    { id: id("app-install", 1), catalogId: "calendar", name: ctx.say("Calendar", "Calendario"), status: "running" },
-                    { id: id("app-install", 2), catalogId: "game-servers", name: ctx.say("Game servers", "Servidores de juegos"), status: "running" },
-                    { id: id("app-install", 3), catalogId: "crm", name: "CRM", status: "installing" }
+                    {
+                        id: id("app-install", 1),
+                        catalogId: "calendar",
+                        name: ctx.say("Calendar", "Calendario"),
+                        status: "running"
+                    },
+                    {
+                        id: id("app-install", 2),
+                        catalogId: "game-servers",
+                        name: ctx.say("Game servers", "Servidores de juegos"),
+                        status: "running"
+                    },
+                    {
+                        id: id("app-install", 3),
+                        catalogId: "crm",
+                        name: "CRM",
+                        status: "installing"
+                    }
                 ].map((row, index) => ({
                     ...row,
                     applicationId: null,

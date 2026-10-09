@@ -9,16 +9,20 @@ import { ProjectShell } from "@/app/(app)/apps/deploy/project-shell";
 import { ProjectDetail } from "@/app/(app)/apps/deploy/project-detail";
 import { PROJECT_CAPABILITIES } from "@polaris/core";
 import type { ReactNode } from "react";
-import { PROJECT_ID, WEB_ID, deployments, webLog, projectCards, projectSummary, shellProject } from "../fixtures/deploy";
+import {
+    PROJECT_ID,
+    WEB_ID,
+    deployments,
+    webLog,
+    projectCards,
+    projectSummary,
+    shellProject
+} from "../fixtures/deploy";
 
 /** The deploy layout only narrows the catalogs a page is sent; this page has
  *  every catalog already, so the frame is the chrome alone. */
 function DeployFrame({ children }: { children: ReactNode }) {
-    return (
-        <Chrome>
-            {children}
-        </Chrome>
-    );
+    return <Chrome>{children}</Chrome>;
 }
 
 export const deploy = defineScene({

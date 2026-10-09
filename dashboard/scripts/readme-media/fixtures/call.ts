@@ -25,7 +25,15 @@ const PEOPLE = [VIEWER, TEAM.ana, TEAM.priya, TEAM.kenji, TEAM.sam];
 const nothing = (): void => undefined;
 
 function peer(mic: PeerState["mic"]): PeerState {
-    return { mic, muted: mic === "muted", deafened: false, recording: false, hand: false, handAt: 0, group: null };
+    return {
+        mic,
+        muted: mic === "muted",
+        deafened: false,
+        recording: false,
+        hand: false,
+        handAt: 0,
+        group: null
+    };
 }
 
 export function callState(ctx: SceneContext): CallState {
@@ -40,7 +48,9 @@ export function callState(ctx: SceneContext): CallState {
         serverDeafened: false
     }));
     const states = new Map<string, PeerState>(
-        participants.slice(1).map((person) => [person.id, peer(person.userId === TEAM.sam.id ? "muted" : "on")])
+        participants
+            .slice(1)
+            .map((person) => [person.id, peer(person.userId === TEAM.sam.id ? "muted" : "on")])
     );
     return {
         meeting: {
@@ -75,7 +85,9 @@ export function callState(ctx: SceneContext): CallState {
         ended: false,
         saidAt: 0,
         error: "",
-        microphones: [{ id: "default", label: ctx.say("Built-in microphone", "Micrófono integrado") }],
+        microphones: [
+            { id: "default", label: ctx.say("Built-in microphone", "Micrófono integrado") }
+        ],
         cameras: [{ id: "default", label: ctx.say("Built-in camera", "Cámara integrada") }],
         microphoneId: "default",
         cameraId: "default",
@@ -147,7 +159,11 @@ export function callHold(ctx: SceneContext): CallHold {
             stop: nothing,
             discard: nothing
         } satisfies CallRecording,
-        session: { meetingId: MEETING_ID, channelId: VOICE_CHANNEL_ID, title: ctx.say("standup", "daily") },
+        session: {
+            meetingId: MEETING_ID,
+            channelId: VOICE_CHANNEL_ID,
+            title: ctx.say("standup", "daily")
+        },
         viewerId: VIEWER.id,
         enter: nothing,
         leave: nothing,

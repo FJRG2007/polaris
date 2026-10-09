@@ -81,7 +81,13 @@ const CAPABILITIES = {
     autoUpdate: true
 } as const;
 
-export function Chrome({ children, unread }: { children: ReactNode; unread?: { chat?: number; mail?: number } }) {
+export function Chrome({
+    children,
+    unread
+}: {
+    children: ReactNode;
+    unread?: { chat?: number; mail?: number };
+}) {
     return (
         <CapabilityProvider capabilities={CAPABILITIES as never}>
             <AppUrlProvider baseUrl="https://polaris.example.com">
@@ -89,21 +95,36 @@ export function Chrome({ children, unread }: { children: ReactNode; unread?: { c
                     <DisplayFormatProvider preferences={DISPLAY_DEFAULTS}>
                         <SessionScopeProvider userId={VIEWER.id}>
                             <ChatUnreadProvider
-                                initial={{ messages: unread?.chat ?? 0, conversations: unread?.chat ? 2 : 0 }}
+                                initial={{
+                                    messages: unread?.chat ?? 0,
+                                    conversations: unread?.chat ? 2 : 0
+                                }}
                                 enabled
                             >
-                                <MailUnreadProvider initial={{ messages: unread?.mail ?? 0, mailboxes: 1 }} enabled>
+                                <MailUnreadProvider
+                                    initial={{ messages: unread?.mail ?? 0, mailboxes: 1 }}
+                                    enabled
+                                >
                                     <AdminWaitingProvider initial={NO_ADMIN_WAITING} enabled>
                                         <AppUnreadDriftProvider>
                                             <NotificationsProvider initial={[]}>
                                                 <ToastProvider>
-                                                    <FavoriteAppsProvider initial={["chat", "tasks", "drive"]}>
-                                                        <ShortcutsProvider overrides={NO_SHORTCUT_OVERRIDES}>
+                                                    <FavoriteAppsProvider
+                                                        initial={["chat", "tasks", "drive"]}
+                                                    >
+                                                        <ShortcutsProvider
+                                                            overrides={NO_SHORTCUT_OVERRIDES}
+                                                        >
                                                             <KeyNamesProvider names={{}}>
                                                                 <PresenceProvider>
                                                                     <ProfileStyleProvider>
-                                                                        <CallHolder viewerId={VIEWER.id} hasChat>
-                                                                            <Frame>{children}</Frame>
+                                                                        <CallHolder
+                                                                            viewerId={VIEWER.id}
+                                                                            hasChat
+                                                                        >
+                                                                            <Frame>
+                                                                                {children}
+                                                                            </Frame>
                                                                         </CallHolder>
                                                                     </ProfileStyleProvider>
                                                                 </PresenceProvider>
@@ -142,7 +163,11 @@ function Frame({ children }: { children: ReactNode }) {
                 switcher={
                     <>
                         <AppNav appIds={APP_IDS} marketplace />
-                        <ScopeSwitcher personalName={VIEWER.name} organizations={[]} current={null} />
+                        <ScopeSwitcher
+                            personalName={VIEWER.name}
+                            organizations={[]}
+                            current={null}
+                        />
                     </>
                 }
                 navButton={<AppNavDrawer appIds={APP_IDS} isAdmin />}

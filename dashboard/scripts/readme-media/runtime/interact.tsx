@@ -11,7 +11,12 @@ import type { SceneLocale } from "./scene";
 /** The text `namespace.key` reads as in `locale`. */
 export function label(locale: SceneLocale, path: string): string {
     const catalog = (locale === "es-ES" ? esES : enUS) as unknown as Record<string, unknown>;
-    const found = path.split(".").reduce<unknown>((node, part) => (node as Record<string, unknown> | undefined)?.[part], catalog);
+    const found = path
+        .split(".")
+        .reduce<unknown>(
+            (node, part) => (node as Record<string, unknown> | undefined)?.[part],
+            catalog
+        );
     if (typeof found !== "string") throw new Error(`no text at ${path}`);
     return found;
 }
@@ -19,9 +24,12 @@ export function label(locale: SceneLocale, path: string): string {
 /** Click the first visible button whose text, or accessible name, is `text`. */
 export function press(text: string): void {
     const wanted = text.trim();
-    const found = [...document.querySelectorAll<HTMLElement>("button, [role=button], [role=tab], a")].find(
+    const found = [
+        ...document.querySelectorAll<HTMLElement>("button, [role=button], [role=tab], a")
+    ].find(
         (element) =>
-            (element.textContent?.trim() === wanted || element.getAttribute("aria-label") === wanted) &&
+            (element.textContent?.trim() === wanted ||
+                element.getAttribute("aria-label") === wanted) &&
             element.offsetParent !== null
     );
     if (!found) throw new Error(`no button reads "${wanted}"`);
@@ -38,5 +46,7 @@ export function openMenu(text: string): void {
         (element) => element.textContent?.trim() === text.trim() && element.offsetParent !== null
     );
     if (!found) throw new Error(`no menu opens from "${text}"`);
-    found.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, button: 0, pointerType: "mouse" }));
+    found.dispatchEvent(
+        new PointerEvent("pointerdown", { bubbles: true, button: 0, pointerType: "mouse" })
+    );
 }

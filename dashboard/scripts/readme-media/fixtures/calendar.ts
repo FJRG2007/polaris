@@ -2,8 +2,16 @@
 
 import { id } from "./people";
 import type { SceneContext } from "../runtime/scene";
-import { DEFAULT_PREFERENCES, type CalendarPreferences } from "../../../apps/calendar/src/lib/preferences";
-import type { CalendarSummary, OccurrenceView, RangeView, TaskItemView } from "../../../apps/calendar/src/lib/wire";
+import {
+    DEFAULT_PREFERENCES,
+    type CalendarPreferences
+} from "../../../apps/calendar/src/lib/preferences";
+import type {
+    CalendarSummary,
+    OccurrenceView,
+    RangeView,
+    TaskItemView
+} from "../../../apps/calendar/src/lib/wire";
 
 const WORK = id("calendar", 1);
 const HOME = id("calendar", 2);
@@ -21,7 +29,12 @@ export function calendarPreferences(): CalendarPreferences {
     };
 }
 
-function calendar(n: number, name: string, color: string, extra: Partial<CalendarSummary> = {}): CalendarSummary {
+function calendar(
+    n: number,
+    name: string,
+    color: string,
+    extra: Partial<CalendarSummary> = {}
+): CalendarSummary {
     return {
         id: [WORK, HOME, HOLIDAYS][n - 1]!,
         name,
@@ -54,7 +67,13 @@ export function calendars(ctx: SceneContext): CalendarSummary[] {
         calendar(2, ctx.say("Personal", "Personal"), "#f59e0b"),
         calendar(3, ctx.say("Team holidays", "Vacaciones del equipo"), "#10b981", {
             kind: "remote",
-            source: { id: id("calendar-source", 1), kind: "google", label: "Google", status: "ok", lastSyncAt: null },
+            source: {
+                id: id("calendar-source", 1),
+                kind: "google",
+                label: "Google",
+                status: "ok",
+                lastSyncAt: null
+            },
             writable: false,
             reach: "read"
         })
@@ -94,15 +113,74 @@ const DRAFTS: readonly Draft[] = [
             conference: true
         })
     ),
-    { title: ["Sprint planning", "Planificación del sprint"], day: 16, from: "10:30", to: "12:00", calendar: WORK, people: 6, conference: true },
-    { title: ["Design review", "Revisión de diseño"], day: 17, from: "15:00", to: "16:00", calendar: WORK, people: 3, location: "Room 2" },
-    { title: ["Lunch with Priya", "Comida con Priya"], day: 17, from: "13:30", to: "14:30", calendar: HOME, location: "Mercado" },
-    { title: ["Customer call: Acme", "Llamada con cliente: Acme"], day: 18, from: "12:00", to: "12:45", calendar: WORK, people: 4, conference: true },
-    { title: ["Focus: release notes", "Concentración: notas"], day: 18, from: "15:30", to: "17:30", calendar: WORK },
-    { title: ["Launch", "Lanzamiento"], day: 19, from: "10:00", to: "11:00", calendar: WORK, people: 6, conference: true },
+    {
+        title: ["Sprint planning", "Planificación del sprint"],
+        day: 16,
+        from: "10:30",
+        to: "12:00",
+        calendar: WORK,
+        people: 6,
+        conference: true
+    },
+    {
+        title: ["Design review", "Revisión de diseño"],
+        day: 17,
+        from: "15:00",
+        to: "16:00",
+        calendar: WORK,
+        people: 3,
+        location: "Room 2"
+    },
+    {
+        title: ["Lunch with Priya", "Comida con Priya"],
+        day: 17,
+        from: "13:30",
+        to: "14:30",
+        calendar: HOME,
+        location: "Mercado"
+    },
+    {
+        title: ["Customer call: Acme", "Llamada con cliente: Acme"],
+        day: 18,
+        from: "12:00",
+        to: "12:45",
+        calendar: WORK,
+        people: 4,
+        conference: true
+    },
+    {
+        title: ["Focus: release notes", "Concentración: notas"],
+        day: 18,
+        from: "15:30",
+        to: "17:30",
+        calendar: WORK
+    },
+    {
+        title: ["Launch", "Lanzamiento"],
+        day: 19,
+        from: "10:00",
+        to: "11:00",
+        calendar: WORK,
+        people: 6,
+        conference: true
+    },
     { title: ["Dentist", "Dentista"], day: 19, from: "17:30", to: "18:15", calendar: HOME },
-    { title: ["Retro", "Retrospectiva"], day: 20, from: "11:00", to: "12:00", calendar: WORK, people: 6 },
-    { title: ["Team drinks", "Algo con el equipo"], day: 20, from: "18:30", to: "20:00", calendar: WORK, location: "Terraza" },
+    {
+        title: ["Retro", "Retrospectiva"],
+        day: 20,
+        from: "11:00",
+        to: "12:00",
+        calendar: WORK,
+        people: 6
+    },
+    {
+        title: ["Team drinks", "Algo con el equipo"],
+        day: 20,
+        from: "18:30",
+        to: "20:00",
+        calendar: WORK,
+        location: "Terraza"
+    },
     { title: ["Climbing", "Escalada"], day: 21, from: "10:00", to: "12:00", calendar: HOME }
 ];
 

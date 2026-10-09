@@ -3,10 +3,21 @@
 import { id } from "./people";
 import type { SceneContext } from "../runtime/scene";
 import type { GameServerSeed } from "../../../apps/game-servers/src/screens/list";
-import type { GameServerFacts, GameServerLive } from "../../../apps/game-servers/src/lib/games-service";
+import type {
+    GameServerFacts,
+    GameServerLive
+} from "../../../apps/game-servers/src/lib/games-service";
 
 export function gameServers(ctx: SceneContext): GameServerSeed[] {
-    const server = (n: number, name: string, catalogId: string, catalogName: string, game: GameServerSeed["game"], status: string, favorite = false): GameServerSeed => ({
+    const server = (
+        n: number,
+        name: string,
+        catalogId: string,
+        catalogName: string,
+        game: GameServerSeed["game"],
+        status: string,
+        favorite = false
+    ): GameServerSeed => ({
         id: id("game-server", n),
         name,
         catalogId,
@@ -20,8 +31,23 @@ export function gameServers(ctx: SceneContext): GameServerSeed[] {
         archived: false
     });
     return [
-        server(1, ctx.say("Survival", "Supervivencia"), "minecraft", "Minecraft (Java)", "minecraft", "running", true),
-        server(2, ctx.say("Creative builds", "Construcciones"), "minecraft", "Minecraft (Java)", "minecraft", "running"),
+        server(
+            1,
+            ctx.say("Survival", "Supervivencia"),
+            "minecraft",
+            "Minecraft (Java)",
+            "minecraft",
+            "running",
+            true
+        ),
+        server(
+            2,
+            ctx.say("Creative builds", "Construcciones"),
+            "minecraft",
+            "Minecraft (Java)",
+            "minecraft",
+            "running"
+        ),
         server(3, "The Island", "ark", "ARK: Survival Evolved", "ark", "running"),
         server(4, "Roleplay City", "fivem", "FiveM", "fivem", "stopped")
     ];
@@ -46,7 +72,15 @@ const EXTRA: readonly Extra[] = [
         software: "Paper",
         edition: "java",
         online: 7,
-        players: ["Alex", "nightowl", "Builder_Ana", "kenjimori", "RedstoneRiv", "lena_f", "PixelPriya"],
+        players: [
+            "Alex",
+            "nightowl",
+            "Builder_Ana",
+            "kenjimori",
+            "RedstoneRiv",
+            "lena_f",
+            "PixelPriya"
+        ],
         upMinutes: 60 * 31
     },
     {
@@ -59,7 +93,13 @@ const EXTRA: readonly Extra[] = [
         players: ["Builder_Ana", "lena_f"],
         upMinutes: 60 * 6
     },
-    { address: "ark.example.com:7777", slots: 30, online: 4, players: ["Rex Tamer", "Doedicurus", "Kenji", "Sam"], upMinutes: 60 * 50 },
+    {
+        address: "ark.example.com:7777",
+        slots: 30,
+        online: 4,
+        players: ["Rex Tamer", "Doedicurus", "Kenji", "Sam"],
+        upMinutes: 60 * 50
+    },
     { address: "fivem.example.com:30120", slots: 48, online: 0, players: [], upMinutes: null }
 ];
 
@@ -82,8 +122,13 @@ export function gameFacts(ctx: SceneContext): GameServerFacts[] {
             software: extra.software ?? null,
             edition: extra.edition ?? null,
             crossplay: false,
-            lastOnlineAt: running ? new Date(ctx.now).toISOString() : new Date(ctx.now - 3 * 86_400_000).toISOString(),
-            onlineSince: extra.upMinutes === null ? null : new Date(ctx.now - extra.upMinutes * 60_000).toISOString(),
+            lastOnlineAt: running
+                ? new Date(ctx.now).toISOString()
+                : new Date(ctx.now - 3 * 86_400_000).toISOString(),
+            onlineSince:
+                extra.upMinutes === null
+                    ? null
+                    : new Date(ctx.now - extra.upMinutes * 60_000).toISOString(),
             message: null
         };
     });

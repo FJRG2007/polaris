@@ -62,9 +62,18 @@ function isServerPackage(path) {
 
 /** The file an `@/` or relative import names, or null when it is not ours. */
 function sourceFile(path, importer) {
-    const base = path.startsWith("@/") ? join(web, "src", path.slice(2)) : resolve(dirname(importer), path);
-    for (const candidate of [base, `${base}.ts`, `${base}.tsx`, join(base, "index.ts"), join(base, "index.tsx")]) {
-        if (existsSync(candidate) && !candidate.endsWith("/") && /\.(ts|tsx)$/.test(candidate)) return candidate;
+    const base = path.startsWith("@/")
+        ? join(web, "src", path.slice(2))
+        : resolve(dirname(importer), path);
+    for (const candidate of [
+        base,
+        `${base}.ts`,
+        `${base}.tsx`,
+        join(base, "index.ts"),
+        join(base, "index.tsx")
+    ]) {
+        if (existsSync(candidate) && !candidate.endsWith("/") && /\.(ts|tsx)$/.test(candidate))
+            return candidate;
     }
     return null;
 }
@@ -77,7 +86,8 @@ function actionStub(file) {
     const names = new Set();
     for (const match of readFileSync(file, "utf8").matchAll(EXPORTED)) names.add(match[1]);
     const lines = ['import { dispatch } from "@readme-media/actions";'];
-    for (const name of names) lines.push(`export const ${name} = dispatch(${JSON.stringify(name)});`);
+    for (const name of names)
+        lines.push(`export const ${name} = dispatch(${JSON.stringify(name)});`);
     return lines.join("\n");
 }
 
@@ -92,13 +102,19 @@ const stubs = {
         }));
         // A stylesheet's url("/x") points at the app's public folder, which the
         // page serves as it is.
-        build.onResolve({ filter: /^\// }, (args) => (args.kind === "url-token" ? { path: args.path, external: true } : undefined));
+        build.onResolve({ filter: /^\// }, (args) =>
+            args.kind === "url-token" ? { path: args.path, external: true } : undefined
+        );
         build.onResolve({ filter: /.*/ }, (args) => {
             if (args.importer.includes("node_modules")) {
                 if (builtins.has(args.path)) return { path: args.path, namespace: "empty" };
                 return undefined;
             }
-            if (builtins.has(args.path) || isServerPackage(args.path) || SERVER_LIB.test(args.path)) {
+            if (
+                builtins.has(args.path) ||
+                isServerPackage(args.path) ||
+                SERVER_LIB.test(args.path)
+            ) {
                 return { path: args.path, namespace: "empty" };
             }
             if (args.path.startsWith("@/") || args.path.startsWith(".")) {
@@ -147,7 +163,24 @@ export function bundle(entry, outfile) {
             "process.env": "__READMEMEDIA_ENV__",
             "process.platform": '"browser"'
         },
-        loader: { ".svg": "dataurl", ".png": "dataurl", ".gif": "dataurl", ".jpg": "dataurl", ".webp": "dataurl", ".woff2": "file", ".woff": "file", ".ttf": "file", ".eot": "file", ".otf": "file", ".wasm": "file", ".mp3": "file", ".ogg": "file", ".wav": "file", ".mp4": "file", ".webm": "file" },
+        loader: {
+            ".svg": "dataurl",
+            ".png": "dataurl",
+            ".gif": "dataurl",
+            ".jpg": "dataurl",
+            ".webp": "dataurl",
+            ".woff2": "file",
+            ".woff": "file",
+            ".ttf": "file",
+            ".eot": "file",
+            ".otf": "file",
+            ".wasm": "file",
+            ".mp3": "file",
+            ".ogg": "file",
+            ".wav": "file",
+            ".mp4": "file",
+            ".webm": "file"
+        },
         plugins: [stubs],
         metafile: true
     });

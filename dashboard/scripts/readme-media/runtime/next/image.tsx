@@ -15,5 +15,12 @@ export default function Image({ src, fill, priority, unoptimized, alt, ...rest }
     const style = fill
         ? { position: "absolute" as const, inset: 0, width: "100%", height: "100%", ...rest.style }
         : rest.style;
-    return <img alt={alt ?? ""} src={typeof src === "string" ? src : src.src} {...rest} style={style} />;
+    return (
+        <img
+            alt={alt ?? ""}
+            src={typeof src === "string" ? src : src.src}
+            {...rest}
+            style={style}
+        />
+    );
 }

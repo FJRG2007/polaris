@@ -56,15 +56,22 @@ function missing(what: string) {
 
 /** The dashboard's own API, answered from the scene. A path is matched with its
  *  `:param` segments, so `GET /api/chat/channels/:id/messages` covers them all. */
-function patchFetch(routes: Record<string, (request: { url: URL; method: string; body: unknown }) => unknown>) {
+function patchFetch(
+    routes: Record<string, (request: { url: URL; method: string; body: unknown }) => unknown>
+) {
     const table = Object.entries(routes).map(([key, answer]) => {
         const [method, pattern] = key.split(" ") as [string, string];
-        const source = pattern.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/:[a-zA-Z]+/g, "[^/]+");
+        const source = pattern
+            .replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+            .replace(/:[a-zA-Z]+/g, "[^/]+");
         return { method, match: new RegExp(`^${source}$`), answer };
     });
     const original = window.fetch.bind(window);
     window.fetch = async (input, init) => {
-        const url = new URL(typeof input === "string" ? input : input instanceof URL ? input.href : input.url, location.href);
+        const url = new URL(
+            typeof input === "string" ? input : input instanceof URL ? input.href : input.url,
+            location.href
+        );
         // Another site is answered from the scene too, by its full address: a
         // picture never waits on, or tells anything to, the network.
         const local = url.origin === location.origin;
@@ -98,7 +105,8 @@ function start() {
     scenePath.set(scene.path, scene.params ?? {});
     globalThis.__ACTIONS__ = { ...chromeActions(), ...scene.actions?.(ctx) } as never;
     patchFetch({ ...chromeApi(ctx), ...scene.api?.(ctx) } as never);
-    for (const [path, events] of Object.entries(scene.streams?.(ctx) ?? {})) scriptStream(path, events);
+    for (const [path, events] of Object.entries(scene.streams?.(ctx) ?? {}))
+        scriptStream(path, events);
     const messages = (locale === "es-ES" ? esES : enUS) as unknown as Namespaces;
     root.render(
         <I18nProvider locale={locale} messages={messages}>

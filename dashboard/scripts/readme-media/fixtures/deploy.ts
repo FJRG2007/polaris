@@ -129,7 +129,12 @@ export function projectSummary(): ProjectSummary {
                     volumes: []
                 })),
                 databases: [
-                    { id: id("database", 1), name: "postgres", engine: "postgres", status: "running" },
+                    {
+                        id: id("database", 1),
+                        name: "postgres",
+                        engine: "postgres",
+                        status: "running"
+                    },
                     { id: id("database", 2), name: "redis", engine: "redis", status: "running" }
                 ]
             }
@@ -201,13 +206,47 @@ export function deployments(ctx: SceneContext): DeploymentSummary[] {
         ...extra
     });
     return [
-        release(1, 12, say("Checkout: remember the shipping address", "Pago: recordar la dirección de envío"), "8f3c2a1d9e", "Ana Torres"),
-        release(4, 190, say("Product page loads images lazily", "La página de producto carga las imágenes al vuelo"), "c41b7e09aa", "Kenji Mori", "removed"),
-        release(5, 230, say("Bump the payment SDK", "Actualizar el SDK de pagos"), "1e9d44f0b2", "Sam Okafor", "failed", {
-            imageKept: false,
-            error: say("Build failed: type error in checkout/summary.tsx", "La compilación falló: error de tipos en checkout/summary.tsx")
-        }),
-        release(6, 60 * 26, say("Sale banner on the home page", "Banner de rebajas en la portada"), "7a20c3d5e1", "Lena Fischer", "removed")
+        release(
+            1,
+            12,
+            say("Checkout: remember the shipping address", "Pago: recordar la dirección de envío"),
+            "8f3c2a1d9e",
+            "Ana Torres"
+        ),
+        release(
+            4,
+            190,
+            say(
+                "Product page loads images lazily",
+                "La página de producto carga las imágenes al vuelo"
+            ),
+            "c41b7e09aa",
+            "Kenji Mori",
+            "removed"
+        ),
+        release(
+            5,
+            230,
+            say("Bump the payment SDK", "Actualizar el SDK de pagos"),
+            "1e9d44f0b2",
+            "Sam Okafor",
+            "failed",
+            {
+                imageKept: false,
+                error: say(
+                    "Build failed: type error in checkout/summary.tsx",
+                    "La compilación falló: error de tipos en checkout/summary.tsx"
+                )
+            }
+        ),
+        release(
+            6,
+            60 * 26,
+            say("Sale banner on the home page", "Banner de rebajas en la portada"),
+            "7a20c3d5e1",
+            "Lena Fischer",
+            "removed"
+        )
     ];
 }
 

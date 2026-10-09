@@ -61,7 +61,14 @@ function account(
 export function mailAccounts(ctx: SceneContext): MailAccountView[] {
     return [
         account(1, VIEWER.email, ctx.say("Work", "Trabajo"), "#6366f1", "custom", ""),
-        account(2, "alex.rivera@example.net", ctx.say("Personal", "Personal"), "#f59e0b", "fastmail", "Fastmail")
+        account(
+            2,
+            "alex.rivera@example.net",
+            ctx.say("Personal", "Personal"),
+            "#f59e0b",
+            "fastmail",
+            "Fastmail"
+        )
     ];
 }
 
@@ -72,7 +79,14 @@ export function mailUnread(read: boolean) {
 }
 
 export function mailFolders(read = false): MailFolderView[] {
-    const folder = (n: number, accountId: string, name: string, role: string, unread: number, total: number) =>
+    const folder = (
+        n: number,
+        accountId: string,
+        name: string,
+        role: string,
+        unread: number,
+        total: number
+    ) =>
         ({
             id: id("mail-folder", n),
             accountId,
@@ -98,8 +112,20 @@ export function mailFolders(read = false): MailFolderView[] {
 
 export function mailLabels(ctx: SceneContext): MailLabelView[] {
     return [
-        { id: id("mail-label", 1), name: ctx.say("Clients", "Clientes"), color: "#22c55e", position: 0, count: 14 },
-        { id: id("mail-label", 2), name: ctx.say("Receipts", "Recibos"), color: "#0ea5e9", position: 1, count: 37 }
+        {
+            id: id("mail-label", 1),
+            name: ctx.say("Clients", "Clientes"),
+            color: "#22c55e",
+            position: 0,
+            count: 14
+        },
+        {
+            id: id("mail-label", 2),
+            name: ctx.say("Receipts", "Recibos"),
+            color: "#0ea5e9",
+            position: 1,
+            count: 37
+        }
     ];
 }
 
@@ -136,7 +162,10 @@ const THREADS: readonly ThreadDraft[] = [
     {
         from: ["Kenji Mori", "kenji@example.com"],
         subject: ["Invoice 2026-031 from Northwind Studio", "Factura 2026-031 de Northwind Studio"],
-        snippet: ["Attached is the invoice for March. Payment terms as usual.", "Adjunto la factura de marzo. Condiciones de pago como siempre."],
+        snippet: [
+            "Attached is the invoice for March. Payment terms as usual.",
+            "Adjunto la factura de marzo. Condiciones de pago como siempre."
+        ],
         minutes: 41,
         unread: 1,
         attachments: true,
@@ -145,7 +174,10 @@ const THREADS: readonly ThreadDraft[] = [
     {
         from: ["Priya Nair", "priya@example.org"],
         subject: ["Dinner on Saturday?", "¿Cena el sábado?"],
-        snippet: ["We found a place near the river. Eight o'clock works for everyone so far.", "Hemos encontrado un sitio junto al río. A las ocho le va bien a todos por ahora."],
+        snippet: [
+            "We found a place near the river. Eight o'clock works for everyone so far.",
+            "Hemos encontrado un sitio junto al río. A las ocho le va bien a todos por ahora."
+        ],
         minutes: 75,
         home: true,
         unread: 1
@@ -153,7 +185,10 @@ const THREADS: readonly ThreadDraft[] = [
     {
         from: ["Lena Fischer", "lena@example.com"],
         subject: ["Re: Onboarding illustrations", "Re: Ilustraciones de bienvenida"],
-        snippet: ["Exported the dark versions too, they are in the design folder in Drive.", "También he exportado las versiones oscuras, están en la carpeta de diseño de Drive."],
+        snippet: [
+            "Exported the dark versions too, they are in the design folder in Drive.",
+            "También he exportado las versiones oscuras, están en la carpeta de diseño de Drive."
+        ],
         minutes: 130,
         count: 5,
         attachments: true
@@ -161,14 +196,20 @@ const THREADS: readonly ThreadDraft[] = [
     {
         from: ["Sam Okafor", "sam@example.com"],
         subject: ["Staging is green", "Staging en verde"],
-        snippet: ["All smoke tests passed twice. Ready when you are.", "Todas las pruebas de humo han pasado dos veces. Listo cuando quieras."],
+        snippet: [
+            "All smoke tests passed twice. Ready when you are.",
+            "Todas las pruebas de humo han pasado dos veces. Listo cuando quieras."
+        ],
         minutes: 190,
         unread: 1
     },
     {
         from: ["Example Bank", "statements@bank.example"],
         subject: ["Your March statement is ready", "Tu extracto de marzo está disponible"],
-        snippet: ["Your statement for the period ending 15 March can now be viewed online.", "Ya puedes consultar el extracto del periodo que termina el 15 de marzo."],
+        snippet: [
+            "Your statement for the period ending 15 March can now be viewed online.",
+            "Ya puedes consultar el extracto del periodo que termina el 15 de marzo."
+        ],
         minutes: 60 * 9,
         home: true,
         unread: 1,
@@ -177,7 +218,10 @@ const THREADS: readonly ThreadDraft[] = [
     {
         from: ["Ana Torres", "ana@example.com"],
         subject: ["Customer interviews: notes", "Entrevistas con clientes: notas"],
-        snippet: ["Five calls this week. The pattern is clear: people want the export earlier.", "Cinco llamadas esta semana. El patrón es claro: quieren la exportación antes."],
+        snippet: [
+            "Five calls this week. The pattern is clear: people want the export earlier.",
+            "Cinco llamadas esta semana. El patrón es claro: quieren la exportación antes."
+        ],
         minutes: 60 * 22,
         count: 2,
         starred: true
@@ -185,14 +229,20 @@ const THREADS: readonly ThreadDraft[] = [
     {
         from: ["Kenji Mori", "kenji@example.com"],
         subject: ["Changelog draft", "Borrador del changelog"],
-        snippet: ["Draft attached. Shout if I missed anything from the last two weeks.", "Borrador adjunto. Avisad si me he dejado algo de las dos últimas semanas."],
+        snippet: [
+            "Draft attached. Shout if I missed anything from the last two weeks.",
+            "Borrador adjunto. Avisad si me he dejado algo de las dos últimas semanas."
+        ],
         minutes: 60 * 27,
         attachments: true
     },
     {
         from: ["Travel Desk", "trips@travel.example"],
         subject: ["Your booking is confirmed", "Tu reserva está confirmada"],
-        snippet: ["Lisbon, 24-26 April. Your boarding passes will arrive 24 hours before departure.", "Lisboa, 24-26 de abril. Las tarjetas de embarque llegarán 24 horas antes de salir."],
+        snippet: [
+            "Lisbon, 24-26 April. Your boarding passes will arrive 24 hours before departure.",
+            "Lisboa, 24-26 de abril. Las tarjetas de embarque llegarán 24 horas antes de salir."
+        ],
         minutes: 60 * 30,
         home: true,
         label: 2
@@ -225,12 +275,22 @@ export function mailThreads(ctx: SceneContext): MailThreadView[] {
 }
 
 /** The open conversation: three messages about the launch, the newest unread. */
-export function openThread(ctx: SceneContext): { thread: MailThreadView; messages: MailMessageView[] } {
+export function openThread(ctx: SceneContext): {
+    thread: MailThreadView;
+    messages: MailMessageView[];
+} {
     const say = ctx.say;
     const thread = mailThreads(ctx)[0]!;
     const ana = { name: "Ana Torres", address: "ana@example.com" };
     const me = { name: VIEWER.name, address: VIEWER.email };
-    const message = (n: number, from: typeof ana, to: typeof ana, minutes: number, snippet: string, seen: boolean): MailMessageView => ({
+    const message = (
+        n: number,
+        from: typeof ana,
+        to: typeof ana,
+        minutes: number,
+        snippet: string,
+        seen: boolean
+    ): MailMessageView => ({
         id: n === 3 ? thread.leadMessageId : id("mail-message", 100 + n),
         accountId: WORK_ID,
         folderId: id("mail-folder", 1),
@@ -257,8 +317,28 @@ export function openThread(ctx: SceneContext): { thread: MailThreadView; message
     return {
         thread,
         messages: [
-            message(1, ana, me, 60 * 3, say("Draft of what is left before Thursday.", "Borrador de lo que falta antes del jueves."), true),
-            message(2, me, ana, 60 * 2, say("Looks complete. I'll take the status page.", "Lo veo completo. Me quedo con la página de estado."), true),
+            message(
+                1,
+                ana,
+                me,
+                60 * 3,
+                say(
+                    "Draft of what is left before Thursday.",
+                    "Borrador de lo que falta antes del jueves."
+                ),
+                true
+            ),
+            message(
+                2,
+                me,
+                ana,
+                60 * 2,
+                say(
+                    "Looks complete. I'll take the status page.",
+                    "Lo veo completo. Me quedo con la página de estado."
+                ),
+                true
+            ),
             message(3, ana, me, 8, thread.snippet, false)
         ]
     };

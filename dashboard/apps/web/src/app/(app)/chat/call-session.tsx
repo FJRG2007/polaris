@@ -351,7 +351,12 @@ export function CallBar({ onScreen }: { onScreen: string | null }) {
                         <Headphones className="size-4" />
                     )}
                 </button>
-                <Button size="icon" variant="danger" aria-label={t("callSession.leaveTheCall")} onClick={leave}>
+                <Button
+                    size="icon"
+                    variant="danger"
+                    aria-label={t("callSession.leaveTheCall")}
+                    onClick={leave}
+                >
                     <PhoneOff className="size-4" />
                 </Button>
             </div>

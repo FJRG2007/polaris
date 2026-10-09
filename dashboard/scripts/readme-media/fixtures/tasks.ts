@@ -20,9 +20,27 @@ const STATUS = {
 function statuses(ctx: SceneContext): StatusView[] {
     const say = ctx.say;
     return [
-        { id: STATUS.todo, name: say("To do", "Por hacer"), type: "open", color: "#94a3b8", order: 0 },
-        { id: STATUS.doing, name: say("In progress", "En curso"), type: "active", color: "#3b82f6", order: 1 },
-        { id: STATUS.review, name: say("In review", "En revisión"), type: "active", color: "#a855f7", order: 2 },
+        {
+            id: STATUS.todo,
+            name: say("To do", "Por hacer"),
+            type: "open",
+            color: "#94a3b8",
+            order: 0
+        },
+        {
+            id: STATUS.doing,
+            name: say("In progress", "En curso"),
+            type: "active",
+            color: "#3b82f6",
+            order: 1
+        },
+        {
+            id: STATUS.review,
+            name: say("In review", "En revisión"),
+            type: "active",
+            color: "#a855f7",
+            order: 2
+        },
         { id: STATUS.done, name: say("Done", "Hecho"), type: "done", color: "#22c55e", order: 3 }
     ];
 }
@@ -227,7 +245,13 @@ export function taskContext(ctx: SceneContext): SpaceContext {
 
 export function spaceTree(ctx: SceneContext): SpaceTreeView[] {
     const say = ctx.say;
-    const list = (n: number, name: string, open: number, total: number, folderId: string | null = null) => ({
+    const list = (
+        n: number,
+        name: string,
+        open: number,
+        total: number,
+        folderId: string | null = null
+    ) => ({
         id: n === 1 ? TASK_LIST_ID : id("task-list", n),
         name,
         folderId,
@@ -289,7 +313,12 @@ export function taskDetail(ctx: SceneContext): TaskDetail {
     const rows = taskRows(ctx);
     const task = rows[0]!;
     const statusOf = (n: number) => rows.find((row) => row.statusId === Object.values(STATUS)[n])!;
-    const sub = (n: number, name: string, done: boolean, who: { id: string; name: string }): TaskRow => {
+    const sub = (
+        n: number,
+        name: string,
+        done: boolean,
+        who: { id: string; name: string }
+    ): TaskRow => {
         const like = statusOf(done ? 3 : n === 1 ? 1 : 0);
         return {
             ...task,
@@ -313,9 +342,30 @@ export function taskDetail(ctx: SceneContext): TaskDetail {
     return {
         task,
         subtasks: [
-            sub(1, say("Final copy in the three screens", "Texto final en las tres pantallas"), true, TEAM.ana),
-            sub(2, say("Illustrations exported for dark mode", "Ilustraciones exportadas para modo oscuro"), true, TEAM.lena),
-            sub(3, say("First project created from the last screen", "Primer proyecto desde la última pantalla"), false, VIEWER),
+            sub(
+                1,
+                say("Final copy in the three screens", "Texto final en las tres pantallas"),
+                true,
+                TEAM.ana
+            ),
+            sub(
+                2,
+                say(
+                    "Illustrations exported for dark mode",
+                    "Ilustraciones exportadas para modo oscuro"
+                ),
+                true,
+                TEAM.lena
+            ),
+            sub(
+                3,
+                say(
+                    "First project created from the last screen",
+                    "Primer proyecto desde la última pantalla"
+                ),
+                false,
+                VIEWER
+            ),
             sub(4, say("Track where people drop off", "Medir dónde se abandona"), false, TEAM.sam)
         ],
         watchers: [TEAM.ana, TEAM.kenji].map((one) => ({ id: one.id, name: one.name })),
@@ -324,16 +374,34 @@ export function taskDetail(ctx: SceneContext): TaskDetail {
                 id: id("checklist", 1),
                 name: say("Before release", "Antes de publicar"),
                 items: [
-                    { id: id("check", 1), name: say("Reviewed on a phone", "Revisado en un móvil"), done: true, assigneeId: null },
-                    { id: id("check", 2), name: say("Spanish copy checked", "Texto en español revisado"), done: true, assigneeId: null },
-                    { id: id("check", 3), name: say("Screen reader pass", "Prueba con lector de pantalla"), done: false, assigneeId: TEAM.lena.id }
+                    {
+                        id: id("check", 1),
+                        name: say("Reviewed on a phone", "Revisado en un móvil"),
+                        done: true,
+                        assigneeId: null
+                    },
+                    {
+                        id: id("check", 2),
+                        name: say("Spanish copy checked", "Texto en español revisado"),
+                        done: true,
+                        assigneeId: null
+                    },
+                    {
+                        id: id("check", 3),
+                        name: say("Screen reader pass", "Prueba con lector de pantalla"),
+                        done: false,
+                        assigneeId: TEAM.lena.id
+                    }
                 ]
             }
         ],
         comments: [
             {
                 id: id("comment", 1),
-                body: say("Pushed the second screen, the progress dots now match the design.", "Subida la segunda pantalla, los puntos de progreso ya coinciden con el diseño."),
+                body: say(
+                    "Pushed the second screen, the progress dots now match the design.",
+                    "Subida la segunda pantalla, los puntos de progreso ya coinciden con el diseño."
+                ),
                 parentId: null,
                 assignedToId: null,
                 resolvedAt: null,
@@ -343,7 +411,10 @@ export function taskDetail(ctx: SceneContext): TaskDetail {
             },
             {
                 id: id("comment", 2),
-                body: say("Looks right on my phone. Can we skip the third screen for invited accounts?", "En mi móvil se ve bien. ¿Saltamos la tercera pantalla para cuentas invitadas?"),
+                body: say(
+                    "Looks right on my phone. Can we skip the third screen for invited accounts?",
+                    "En mi móvil se ve bien. ¿Saltamos la tercera pantalla para cuentas invitadas?"
+                ),
                 parentId: null,
                 assignedToId: null,
                 resolvedAt: null,

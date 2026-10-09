@@ -55,7 +55,12 @@ function channel(
 export function chatChannels(ctx: SceneContext): ChatChannelView[] {
     const say = ctx.say;
     return [
-        channel(ctx, 1, say("launch", "lanzamiento"), say("Everything for the March release", "Todo para la versión de marzo")),
+        channel(
+            ctx,
+            1,
+            say("launch", "lanzamiento"),
+            say("Everything for the March release", "Todo para la versión de marzo")
+        ),
         channel(ctx, 2, say("general", "general"), "", { unread: 3 }),
         channel(ctx, 3, say("design", "diseño"), ""),
         channel(ctx, 4, say("ops", "operaciones"), "", { unread: 1 }),
@@ -139,15 +144,62 @@ export function message(
 export function launchConversation(ctx: SceneContext): ChatMessageView[] {
     const say = ctx.say;
     return [
-        message(ctx, 1, TEAM.ana, 52, say("Morning! Release candidate is building now.", "¡Buenos días! La versión candidata ya se está compilando.")),
-        message(ctx, 2, TEAM.sam, 47, say("Staging is green. I ran the smoke tests twice.", "Staging en verde. He pasado las pruebas de humo dos veces."), {
-            reactions: [{ emoji: "\u{1F44D}", count: 3, mine: true }]
-        }),
-        message(ctx, 3, TEAM.lena, 31, say("The new onboarding screens are in the design doc, feedback welcome.", "Las nuevas pantallas de bienvenida están en el documento de diseño, se aceptan comentarios.")),
-        message(ctx, 4, VIEWER, 22, say("Looks great. Let's ship it on Thursday after the standup.", "Queda genial. Lo publicamos el jueves después de la daily.")),
-        message(ctx, 5, TEAM.kenji, 9, say("I'll update the changelog and tag the release.", "Actualizo el changelog y etiqueto la versión."), {
-            reactions: [{ emoji: "\u{1F680}", count: 2, mine: false }]
-        })
+        message(
+            ctx,
+            1,
+            TEAM.ana,
+            52,
+            say(
+                "Morning! Release candidate is building now.",
+                "¡Buenos días! La versión candidata ya se está compilando."
+            )
+        ),
+        message(
+            ctx,
+            2,
+            TEAM.sam,
+            47,
+            say(
+                "Staging is green. I ran the smoke tests twice.",
+                "Staging en verde. He pasado las pruebas de humo dos veces."
+            ),
+            {
+                reactions: [{ emoji: "\u{1F44D}", count: 3, mine: true }]
+            }
+        ),
+        message(
+            ctx,
+            3,
+            TEAM.lena,
+            31,
+            say(
+                "The new onboarding screens are in the design doc, feedback welcome.",
+                "Las nuevas pantallas de bienvenida están en el documento de diseño, se aceptan comentarios."
+            )
+        ),
+        message(
+            ctx,
+            4,
+            VIEWER,
+            22,
+            say(
+                "Looks great. Let's ship it on Thursday after the standup.",
+                "Queda genial. Lo publicamos el jueves después de la daily."
+            )
+        ),
+        message(
+            ctx,
+            5,
+            TEAM.kenji,
+            9,
+            say(
+                "I'll update the changelog and tag the release.",
+                "Actualizo el changelog y etiqueto la versión."
+            ),
+            {
+                reactions: [{ emoji: "\u{1F680}", count: 2, mine: false }]
+            }
+        )
     ];
 }
 
@@ -155,7 +207,16 @@ export function launchConversation(ctx: SceneContext): ChatMessageView[] {
 export function arriving(ctx: SceneContext): ChatMessageView[] {
     const say = ctx.say;
     return [
-        message(ctx, 6, TEAM.ana, 1, say("Deploy finished, it's live on production", "Despliegue terminado, ya está en producción")),
+        message(
+            ctx,
+            6,
+            TEAM.ana,
+            1,
+            say(
+                "Deploy finished, it's live on production",
+                "Despliegue terminado, ya está en producción"
+            )
+        ),
         message(ctx, 7, TEAM.priya, 0, say("Nice work, everyone!", "¡Buen trabajo, equipo!"))
     ];
 }

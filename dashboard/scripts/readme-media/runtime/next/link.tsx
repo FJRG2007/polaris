@@ -11,12 +11,18 @@ type Props = Omit<AnchorHTMLAttributes<HTMLAnchorElement>, "href"> & {
     children?: ReactNode;
 };
 
-const Link = forwardRef<HTMLAnchorElement, Props>(function Link({ href, prefetch, replace, scroll, shallow, onClick, ...rest }, ref) {
+const Link = forwardRef<HTMLAnchorElement, Props>(function Link(
+    { href, prefetch, replace, scroll, shallow, onClick, ...rest },
+    ref
+) {
     void prefetch;
     void replace;
     void scroll;
     void shallow;
-    const target = typeof href === "string" ? href : `${href.pathname ?? ""}${href.query ? `?${new URLSearchParams(href.query)}` : ""}`;
+    const target =
+        typeof href === "string"
+            ? href
+            : `${href.pathname ?? ""}${href.query ? `?${new URLSearchParams(href.query)}` : ""}`;
     return (
         <a
             ref={ref}

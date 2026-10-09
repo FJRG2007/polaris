@@ -28,10 +28,15 @@ export function chromeActions(): Record<string, ActionFixture> {
 export function chromeApi(ctx: SceneContext): Record<string, ApiFixture> {
     return {
         "POST /api/presence": ({ body }) => {
-            const ids = ((body as { ids?: string[] } | null)?.ids ?? []).filter((one) => one in PRESENCE);
+            const ids = ((body as { ids?: string[] } | null)?.ids ?? []).filter(
+                (one) => one in PRESENCE
+            );
             return {
                 people: Object.fromEntries(
-                    ids.map((one) => [one, { status: PRESENCE[one], note: "", inCall: null, activity: [] }])
+                    ids.map((one) => [
+                        one,
+                        { status: PRESENCE[one], note: "", inCall: null, activity: [] }
+                    ])
                 )
             };
         },
@@ -42,6 +47,10 @@ export function chromeApi(ctx: SceneContext): Record<string, ApiFixture> {
             cleared: [],
             at: new Date(ctx.now).toISOString()
         }),
-        "GET /api/mail/arrivals": () => ({ cursor: new Date(ctx.now).toISOString(), named: [], more: 0 })
+        "GET /api/mail/arrivals": () => ({
+            cursor: new Date(ctx.now).toISOString(),
+            named: [],
+            more: 0
+        })
     };
 }
