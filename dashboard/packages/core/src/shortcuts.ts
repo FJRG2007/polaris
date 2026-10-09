@@ -199,7 +199,10 @@ export function bindingOfEvent(event: {
     if (event.ctrlKey || event.metaKey) parts.push("Mod");
     if (event.altKey) parts.push("Alt");
     // Shift is part of a letter, a named key or a digit; a symbol was typed with it.
-    if (event.shiftKey && ([...canonical].length > 1 || isLetter(canonical) || /^[0-9]$/.test(canonical)))
+    if (
+        event.shiftKey &&
+        ([...canonical].length > 1 || isLetter(canonical) || /^[0-9]$/.test(canonical))
+    )
         parts.push("Shift");
     return [...parts, canonical].join("+");
 }
@@ -589,7 +592,9 @@ export function cleanShortcutOverrides(
         if (sameBindings(bindings, definition.defaults)) continue;
         kept[id] = bindings;
     }
-    return shortcutConflicts(resolveShortcuts(under, kept)).length > 0 ? NO_SHORTCUT_OVERRIDES : kept;
+    return shortcutConflicts(resolveShortcuts(under, kept)).length > 0
+        ? NO_SHORTCUT_OVERRIDES
+        : kept;
 }
 
 /** Whether two lists of bindings are the same keys in the same order. */

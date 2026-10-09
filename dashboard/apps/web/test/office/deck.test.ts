@@ -91,10 +91,15 @@ describe("what a deck says", () => {
             [deck.boxKey("s1", "b"), box({ id: "b", text: "Three parts" })],
             [deck.boxKey("s2", "c"), box({ id: "c", text: "The first" })]
         ]);
-        expect(deck.deckText([{ id: "s1", notes: "" }, { id: "s2", notes: "" }], boxes)).toEqual([
-            "The plan\nThree parts",
-            "The first"
-        ]);
+        expect(
+            deck.deckText(
+                [
+                    { id: "s1", notes: "" },
+                    { id: "s2", notes: "" }
+                ],
+                boxes
+            )
+        ).toEqual(["The plan\nThree parts", "The first"]);
     });
 
     it("says nothing for a slide nobody has written on", () => {
@@ -162,7 +167,9 @@ describe("pulling a grip", () => {
     });
 
     it("keeps the proportions within the slide, too", () => {
-        const kept = deck.resizeFrame({ x: 0.5, y: 0.5, w: 0.2, h: 0.1 }, "se", 1, 1, { keepRatio: true });
+        const kept = deck.resizeFrame({ x: 0.5, y: 0.5, w: 0.2, h: 0.1 }, "se", 1, 1, {
+            keepRatio: true
+        });
         expect(kept.w / kept.h).toBeCloseTo(2);
         expect(kept.x + kept.w).toBeLessThanOrEqual(1 + 1e-9);
         expect(kept.y + kept.h).toBeLessThanOrEqual(1 + 1e-9);
@@ -187,7 +194,10 @@ describe("nudging with the arrows", () => {
     it("goes ten times as far with Shift, and stops at the edge", () => {
         const far = deck.nudgeFrame({ x: 0.5, y: 0.5, w: 0.1, h: 0.1 }, -1, 0, true);
         expect(0.5 - far.x).toBeCloseTo(deck.NUDGE * 10);
-        expect(deck.nudgeFrame({ x: 0, y: 0, w: 0.1, h: 0.1 }, -1, -1, true)).toMatchObject({ x: 0, y: 0 });
+        expect(deck.nudgeFrame({ x: 0, y: 0, w: 0.1, h: 0.1 }, -1, -1, true)).toMatchObject({
+            x: 0,
+            y: 0
+        });
     });
 });
 
@@ -213,8 +223,12 @@ describe("copying boxes", () => {
         expect(deck.readClipboard("not json", id)).toEqual([]);
         expect(deck.readClipboard(JSON.stringify({ boxes: [] }), id)).toEqual([]);
         expect(deck.readClipboard(JSON.stringify({ boxes: [{ kind: "text" }] }), id)).toEqual([]);
-        const written = JSON.parse(deck.writeClipboard([box()])) as { boxes: Record<string, unknown>[] };
-        const hostile = { boxes: [{ ...written.boxes[0], kind: "image", src: "javascript:alert(1)" }] };
+        const written = JSON.parse(deck.writeClipboard([box()])) as {
+            boxes: Record<string, unknown>[];
+        };
+        const hostile = {
+            boxes: [{ ...written.boxes[0], kind: "image", src: "javascript:alert(1)" }]
+        };
         expect(deck.readClipboard(JSON.stringify(hostile), id)).toEqual([]);
         const offSlide = { boxes: [{ ...written.boxes[0], x: 4 }] };
         expect(deck.readClipboard(JSON.stringify(offSlide), id)).toEqual([]);
