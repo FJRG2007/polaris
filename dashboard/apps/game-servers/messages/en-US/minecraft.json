@@ -1879,7 +1879,8 @@
             "netherMaze": "A {size} maze about {height} blocks up, with {hazards} of its rooms on fire, on magma or behind a lava pit. Walls two blocks thick and a solid roof: it cannot be climbed or seen over, and every room can be reached without touching a hazard.",
             "netherMazeSafe": "Nobody's items are touched, and nobody takes damage. Minimap cave view and radar are switched off for the racers. The hazards are watched by a small data pack Polaris adds to the world.",
             "acidRain": "A {size} arena about {height} blocks up, with {acidity} rain. The world's own weather is never changed: the rain falls only over the arena.",
-            "acidRainSafe": "Nobody's items are touched, and nobody takes damage. Players get marked cobblestone that only goes on the arena, taken back when they leave. The rain is worked out by a small data pack Polaris adds to the world. Needs Minecraft 1.17 or later."
+            "acidRainSafe": "Nobody's items are touched, and nobody takes damage. Players get marked cobblestone that only goes on the arena, taken back when they leave. The rain is worked out by a small data pack Polaris adds to the world. Needs Minecraft 1.17 or later.",
+            "meteorInfection": "Each crater's ground grows sculk that creeps slowly outwards, a few blocks at most; standing in it poisons and slows you, and breaking it cleanses the ground. It never grows on anything players built, and whatever is left goes at the end. From Minecraft 1.19; older servers get plain craters."
         },
         "errors": {
             "read": "The events could not be read",
@@ -2405,7 +2406,9 @@
         "mazeHazardsHint": "How many rooms have fire, magma or a lava pit.",
         "acidSize": "Size of the arena",
         "acidity": "Acidity",
-        "acidityHint": "How fast the rain fills a bar and eats a shelter."
+        "acidityHint": "How fast the rain fills a bar and eats a shelter.",
+        "meteorInfection": "Infected craters",
+        "meteorInfectionHint": "Sculk creeps out of each crater; it poisons and slows, and can be broken to cleanse it."
     },
     "moderation": {
         "announcements": {

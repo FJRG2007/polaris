@@ -46,6 +46,7 @@ import * as gather from "./kinds/gathering";
 import * as hunt from "./kinds/treasure-hunt";
 import * as rareCatch from "./kinds/rare-catch";
 import * as meteors from "./kinds/meteor-shower";
+import * as infection from "./kinds/meteor-infection";
 import * as speechService from "../speech-service";
 import * as bossService from "./kinds/boss-service";
 import type { NameSpelling } from "./kinds/boss";
@@ -341,6 +342,10 @@ interface Loop {
     placeFloor: number;
     /** The server's AFK minutes, as last read (`loopAfkMinutes`). */
     afkMinutes: { at: number; minutes: number } | null;
+    /** Whether this server grows a meteor's infection (sculk veins, 1.19 on),
+     *  once asked; and which meteor's turn it is to creep first. */
+    infects?: boolean;
+    infectTurn?: number;
 }
 
 const loops = new Map<string, Loop>();
@@ -3821,6 +3826,10 @@ async function meteorShower(
 ): Promise<string | null> {
     const options = loop.run.preset.options as catalog.EventOptions<"meteor-shower">;
     const language = loop.language;
+    // Whether its craters can be infected here: asked once, before the first
+    // lands, so the landing says so only where it will happen.
+    if (options.infection)
+        loop.infects ??= await serverAtLeast(server, infection.SINCE).catch(() => false);
     const due = meteors.dueMeteors(
         now - loop.run.startsAt,
         loop.run.endsAt - loop.run.startsAt,
@@ -3896,6 +3905,8 @@ async function meteorShower(
     if (emptied > 0)
         lines.push(commands.say(messages.tag(language) + messages.meteorMinedOut(language)));
 
+    if (options.infection) await infect(installedAppId, loop, server, lines);
+
     const live = loop.run.meteors.filter((meteor) => meteor.blocks.length > 0);
     lines.push(...meteors.meteorTick(loop.run.meteors, options.ores), ...live.map(commands.beam));
     // Each player pointed at the nearest meteor still to mine.
@@ -3925,6 +3936,59 @@ async function meteorShower(
     // Every one down and mined out - unless none could come down at all.
     if (loop.run.meteors.length === 0) throw new PlaceNotFound();
     return "Every meteor was mined out";
+}
+
+/**
+ * Every meteor's infection a little further on (`meteor-infection.ts`): the
+ * crater's ring seeded the first time it is looked at, then a few cells a tick
+ * creeping out from a vein still there - each written down before it is
+ * placed, kept only once the game answers it changed. And whoever stands in it
+ * poisoned and slowed. Only from 1.19, where sculk veins are the game's.
+ */
+async function infect(
+    installedAppId: string,
+    loop: Loop,
+    server: ServerContainer,
+    lines: string[]
+): Promise<void> {
+    if (!loop.infects || loop.run.meteors.length === 0) return;
+    loop.infectTurn = (loop.infectTurn ?? 0) + 1;
+    const tries = infection.plan(loop.run.meteors, loop.infectTurn, Math.random);
+    if (tries.length > 0) {
+        const tried = (meteor: number) =>
+            tries.filter((one) => one.meteor === meteor).map((one) => one.to);
+        // Written down first: an end at any moment after takes away whatever
+        // of them took, and nothing else - it only clears a cell still a vein.
+        const before = loop.run.meteors;
+        loop.run = {
+            ...loop.run,
+            meteors: before.map((meteor, at) => ({
+                ...meteor,
+                infected: [...meteor.infected, ...tried(at)]
+            }))
+        };
+        await persist(installedAppId, loop);
+        const took = new Set<(typeof tries)[number]>();
+        for (const one of tries)
+            if (infection.grew(await server.say([infection.growLine(one.to, one.from)])))
+                took.add(one);
+        loop.run = {
+            ...loop.run,
+            meteors: before.map((meteor, at) => ({
+                ...meteor,
+                infected: [
+                    ...meteor.infected,
+                    ...tries
+                        .filter((one) => one.meteor === at && took.has(one))
+                        .map((one) => one.to)
+                ]
+            }))
+        };
+        await persist(installedAppId, loop);
+    }
+    for (const meteor of loop.run.meteors)
+        if (meteor.infected.length > 0)
+            lines.push(...infection.hurtLines(meteor), infection.sporeLine(meteor));
 }
 
 /**
@@ -3964,7 +4028,10 @@ async function landMeteor(
     const index = loop.run.meteors.length;
     loop.run = {
         ...loop.run,
-        meteors: [...loop.run.meteors, { x: found.x, y: found.y, z: found.z, blocks: free }],
+        meteors: [
+            ...loop.run.meteors,
+            { x: found.x, y: found.y, z: found.z, blocks: free, infected: [] }
+        ],
         chunks: [...loop.run.chunks, ...added],
         // The place and the column tried are the meteor's now, let go with
         // its chunks; the next one is looked for afresh.
@@ -4008,7 +4075,10 @@ async function landMeteor(
         commands.say(
             messages.tag(language) +
                 messages.meteorAt(found.x, found.y, found.z, ours.length, language)
-        )
+        ),
+        ...(options.infection && loop.infects
+            ? [commands.say(messages.tag(language) + messages.meteorInfected(language))]
+            : [])
     ]);
 }
 
@@ -4588,7 +4658,10 @@ export function cleanupOf(run: stored.EventRun): string[] {
             break;
         case "meteor-shower": {
             const ores = (run.preset.options as catalog.EventOptions<"meteor-shower">).ores;
-            before.push(...meteors.meteorCleanup(run.meteors, ores));
+            before.push(
+                ...meteors.meteorCleanup(run.meteors, ores),
+                ...run.meteors.flatMap((meteor) => meteor.infected.map(infection.removeIfVein))
+            );
             break;
         }
         case "xp-boost":

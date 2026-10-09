@@ -222,12 +222,16 @@ export const runSchema = z.object({
      *  coordinates, only ones nobody held before it - let go at the end. */
     chunks: z.array(z.object({ x: z.number().int(), z: z.number().int() })).default([]),
     /** Meteor shower: every meteor that landed, with each ore block of it the
-     *  event placed into air and that is still there as far as it knows - the
-     *  only blocks the end may take away. */
+     *  event placed into air and that is still there as far as it knows, and
+     *  its infection - the only blocks the end may take away. */
     meteors: z
         .array(
             pointSchema.extend({
-                blocks: z.array(pointSchema.extend({ block: z.string() })).default([])
+                blocks: z.array(pointSchema.extend({ block: z.string() })).default([]),
+                /** Every cell its infection was put into air at, or is about to
+                 *  be (`meteor-infection.ts`) - cleared at the end only while
+                 *  still a vein. */
+                infected: z.array(pointSchema).default([])
             })
         )
         .default([]),

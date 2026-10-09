@@ -471,7 +471,9 @@ export const optionsSchemas = {
             .min(3, problem("atLeast", { count: 3 }))
             .max(12, problem("atMost", { count: 12 }))
             .default(4),
-        ores: z.enum(METEOR_ORES).default("precious")
+        ores: z.enum(METEOR_ORES).default("precious"),
+        /** Whether each crater's ground grows a creeping infection (1.19 on). */
+        infection: z.boolean().default(true)
     }),
     parkour: z.preprocess(
         legacyParkour,
