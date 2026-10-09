@@ -40,6 +40,9 @@ const preset: Omit<Config, "content"> = {
                 elevated: withAlpha("elevated"),
                 // The highlighted item of a list opened over the page.
                 option: { hover: withAlpha("option-hover") },
+                // A page being written on, its edge, and the desk around it.
+                paper: { DEFAULT: withAlpha("paper"), edge: withAlpha("paper-edge") },
+                canvas: withAlpha("canvas"),
                 // Text, brightest to faintest. `muted.foreground` is the second
                 // step and `foreground.subtle` the third.
                 foreground: {

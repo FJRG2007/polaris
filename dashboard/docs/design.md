@@ -29,6 +29,13 @@ middle of the screen. It is the only tier that carries a shadow
 (`shadow-popover`, or `shadow-modal` for a dialog), which is what makes a shadow
 mean something when one appears.
 
+A page somebody writes on is not one of the four. A document is a sheet of a
+fixed width, and drawn in `card` on `background` its edge disappears in the
+light theme, where both are white or nearly. It sits on `canvas`, a desk a step
+below the ground in every theme, and is drawn in `paper` with a `paper-edge`
+hairline, so where the page ends is never a question. Use the three together
+and only for that.
+
 ### Text
 
 Three steps, and they are not interchangeable:

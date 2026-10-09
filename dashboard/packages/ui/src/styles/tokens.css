@@ -38,6 +38,15 @@
        here, and a highlight one step off it could not be seen. */
     --option-hover: 225 12% 21%;
 
+    /* A page somebody writes on, and the desk around it. A document is a sheet
+       of a fixed width, and on any of the four depth tiers its edge is lost the
+       moment the text gets long: the sheet is a step clear of everything else
+       in every theme and the desk a step below the ground, so where the page
+       ends is never a question. */
+    --canvas: 225 12% 3%;
+    --paper: 225 11% 12%;
+    --paper-edge: 225 10% 23%;
+
     /* Text, brightest to faintest. */
     --foreground: 220 14% 96%;
     --muted-foreground: 222 10% 66%;
@@ -131,6 +140,9 @@
     --card-hover: 225 20% 96%;
     --elevated: 0 0% 100%;
     --option-hover: 225 30% 91%;
+    --canvas: 225 18% 91%;
+    --paper: 0 0% 100%;
+    --paper-edge: 225 14% 81%;
 
     --foreground: 225 22% 12%;
     --muted-foreground: 225 10% 40%;
@@ -190,6 +202,9 @@
         --card-hover: 225 20% 96%;
         --elevated: 0 0% 100%;
         --option-hover: 225 30% 91%;
+        --canvas: 225 18% 91%;
+        --paper: 0 0% 100%;
+        --paper-edge: 225 14% 81%;
 
         --foreground: 225 22% 12%;
         --muted-foreground: 225 10% 40%;
@@ -247,6 +262,9 @@
     --card-hover: 225 13% 10%;
     --elevated: 225 13% 11%;
     --option-hover: 225 13% 19%;
+    --canvas: 225 16% 1.5%;
+    --paper: 225 13% 10%;
+    --paper-edge: 225 12% 20%;
 
     --foreground: 220 16% 97%;
     --muted-foreground: 222 10% 62%;
@@ -275,6 +293,9 @@
     --card-hover: 220 4% 14%;
     --elevated: 220 4% 15%;
     --option-hover: 220 4% 23%;
+    --canvas: 220 5% 4%;
+    --paper: 220 4% 13%;
+    --paper-edge: 220 4% 24%;
 
     --foreground: 220 8% 96%;
     --muted-foreground: 220 5% 68%;

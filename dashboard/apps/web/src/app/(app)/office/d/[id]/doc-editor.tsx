@@ -30,7 +30,7 @@ import { Loader2 } from "lucide-react";
 import { Extension } from "@tiptap/core";
 import { OFFICE_FIELD } from "@/lib/office/content";
 import { useOfficeDocument, type OfficeSaving } from "@/app/(app)/office/use-office-document";
-import { EditorContent, useEditor } from "@tiptap/react";
+import { EditorContent, useEditor, type Editor } from "@tiptap/react";
 import { useMemo } from "react";
 import { documentExtensions } from "@/components/rich-text/document-schema";
 import { FormattingToolbar } from "@/components/rich-text/formatting-toolbar";
@@ -131,12 +131,29 @@ export function DocEditor({
                     }}
                 />
             ) : null}
-            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
-                {/* The page. A measure rather than the full width of the window:
-                    a line of eighty characters is what anybody can read, and a
-                    document set edge to edge on a wide screen is one nobody
-                    finishes. */}
-                <div className="mx-auto w-full max-w-3xl px-4 py-10 sm:px-8">
+            {/* The desk, and the sheet on it. The sheet is a page of a fixed
+                width - a measure of about eighty characters, which is what
+                anybody can read - with a margin of its own and at least one
+                page of height, so where the page ends is never a question,
+                however short the document is. On a phone it takes the width
+                and keeps a narrow strip of desk either side. */}
+            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain bg-canvas px-2 py-3 sm:px-6 sm:py-8">
+                <div
+                    data-office-page
+                    // The margins and the space under the last line are still
+                    // the page: pressing there writes on the nearest line, as on
+                    // paper, rather than doing nothing.
+                    onMouseDown={(event) => {
+                        if (!editor || !editable || event.target !== event.currentTarget) return;
+                        event.preventDefault();
+                        placeCaretNear(editor, event.clientX, event.clientY);
+                    }}
+                    className={cn(
+                        "mx-auto flex w-full max-w-[816px] flex-col rounded-sm border border-paper-edge bg-paper text-foreground",
+                        "min-h-[calc(100%-0.5rem)] px-5 py-8 sm:min-h-[1056px] sm:px-[72px] sm:py-16",
+                        editable && editor && "cursor-text"
+                    )}
+                >
                     {editor ? (
                         <EditorContent editor={editor} />
                     ) : (
@@ -150,6 +167,19 @@ export function DocEditor({
             {editable ? <SavingNote state={saving} /> : null}
         </div>
     );
+}
+
+/** Put the caret on the line nearest a point outside the text, pulled into
+ *  the text's own box so a press in the margin lands on its line and one below
+ *  the end lands on the last line. */
+function placeCaretNear(editor: Editor, x: number, y: number): void {
+    const box = editor.view.dom.getBoundingClientRect();
+    const hit = editor.view.posAtCoords({
+        left: Math.min(Math.max(x, box.left + 1), box.right - 1),
+        top: Math.min(Math.max(y, box.top + 1), box.bottom - 1)
+    });
+    if (hit) editor.chain().focus().setTextSelection(hit.pos).run();
+    else editor.commands.focus("end");
 }
 
 /** What the corner says about whether the work is safe. Quiet when it is: a
