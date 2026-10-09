@@ -2080,6 +2080,7 @@
             "medium": "medium",
             "large": "large"
         },
+        "acidDry": "{dry}% dry",
         "acidities": {
             "mild": "mild",
             "harsh": "harsh"

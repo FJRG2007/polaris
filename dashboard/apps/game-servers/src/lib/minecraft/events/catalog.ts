@@ -1966,6 +1966,15 @@ export function finishedIn(kind: EventKind, score: number): number | null {
     return FINISH_BASE - score;
 }
 
+/** An acid rain's place is scored in steps of this, its dryness under it
+ *  (`kinds/acid-rain` `scoreOf`). */
+export const ACID_PLACE = 1000;
+
+/** An acid rain's score taken apart: its place, and how dry it ended. */
+export function acidParts(score: number): { place: number; dry: number } {
+    return { place: Math.floor(score / ACID_PLACE), dry: score % ACID_PLACE };
+}
+
 export function stashesFirst(preset: EventPreset): boolean {
     return preset.kind === "sky-wars";
 }

@@ -167,8 +167,10 @@ describe("an acid rain's arena", () => {
 
     it("is taken for an acid arena by its roof, and nothing else is", () => {
         const built = acid.arena({ size: "small", acidity: "mild" }, "r", SITE, Y);
-        expect(acid.isAcid(built.boxes)).toBe(true);
-        expect(acid.isAcid([{ block: "minecraft:snow_block" }])).toBe(false);
+        expect(acid.stopLines(built.boxes)).not.toEqual([]);
+        expect(
+            acid.stopLines([{ x1: 0, z1: 0, x2: 4, z2: 4, block: "minecraft:snow_block" }])
+        ).toEqual([]);
     });
 });
 

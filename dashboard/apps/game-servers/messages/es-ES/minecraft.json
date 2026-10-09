@@ -2080,6 +2080,7 @@
             "medium": "mediana",
             "large": "grande"
         },
+        "acidDry": "{dry}% seco",
         "acidities": {
             "mild": "suave",
             "harsh": "fuerte"

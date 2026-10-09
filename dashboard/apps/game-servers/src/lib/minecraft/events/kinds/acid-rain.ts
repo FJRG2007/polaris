@@ -32,6 +32,7 @@
  */
 
 import { seeded } from "../trivia-bank";
+import * as catalog from "../catalog";
 import type { EventOptions } from "../catalog";
 import type { Box, Flavour, Spot, Volume } from "./stage";
 
@@ -241,11 +242,6 @@ export function inside(acid: Acid, at: { x: number; y: number; z: number }): boo
     );
 }
 
-/** Whether boxes are an acid arena's: it alone has an invisible roof. */
-export function isAcid(boxes: readonly Pick<Box, "block">[]): boolean {
-    return boxes.some((one) => one.block === ROOF_BLOCK);
-}
-
 // ------------------------------------------------------------------ items
 
 /** The blocks a handed-out cobblestone can be placed on: the floor, and any
@@ -400,13 +396,11 @@ export function dryOf(acid: number): number {
  *  them (`place`, a spleef's points); among those still in at the end, the
  *  driest first. */
 export function scoreOf(place: number, dry: number | null): number {
-    return place * 1000 + Math.max(0, Math.min(ACID_MAX, dry ?? 0));
+    return place * catalog.ACID_PLACE + Math.max(0, Math.min(ACID_MAX, dry ?? 0));
 }
 
 /** A score taken apart again, for the podium's words. */
-export function scoreParts(score: number): { place: number; dry: number } {
-    return { place: Math.floor(score / 1000), dry: score % 1000 };
-}
+export const scoreParts = catalog.acidParts;
 
 /** A player out of the rain: no acid kept against them, no hearts left green. */
 export function racerOutLines(name: string): string[] {

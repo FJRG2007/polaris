@@ -197,6 +197,7 @@ function scoreFigure(kind: catalog.EventKind, score: number, locale: string): st
     // first): shown as the time it took, never as that number.
     const took = catalog.finishedIn(kind, score);
     if (took !== null) return formatDuration(took * 1000, language);
+    if (kind === "acid-rain") return formatCount(catalog.acidParts(score).place, language);
     return catalog.KIND_INFO[kind].unit === "seconds"
         ? formatDuration(score * 1000, language)
         : formatCount(score, language);
@@ -214,7 +215,9 @@ function scoreText(
         catalog.KIND_INFO[kind].unit === "seconds" || catalog.finishedIn(kind, score) !== null
             ? ""
             : kindUnit(t, kind);
-    return unit ? `${figure} ${unit}` : figure;
+    const text = unit ? `${figure} ${unit}` : figure;
+    const dry = kind === "acid-rain" ? catalog.acidParts(score).dry : 0;
+    return dry > 0 ? `${text}, ${t("events.acidDry", { dry })}` : text;
 }
 
 /** m:ss, or h:mm:ss past an hour. */
