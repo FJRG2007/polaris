@@ -1191,6 +1191,36 @@ export async function revokePlayerAccessAction(
     }
 }
 
+/** What dismissing refusals takes: the ones on the screen, each by who and when. */
+const dismissRefusalSchema = z
+    .array(
+        z.object({ player: z.string().trim().min(1).max(64), at: z.string().datetime() }).strict()
+    )
+    .min(1)
+    .max(50);
+
+/** The owner done with refusals on the players screen - one, or every one they see. */
+export async function dismissRefusalAction(
+    installedAppId: string,
+    which: unknown
+): Promise<{ error?: string }> {
+    try {
+        const parsed = dismissRefusalSchema.safeParse(which);
+        if (!parsed.success)
+            return { error: (await gameWords("minecraft"))("errors.couldNotDismissThat") };
+        const { access } = await requireGameServer("games.manage", installedAppId);
+        await playerAccess.dismissRefusals(access.ownerId, installedAppId, parsed.data);
+        return {};
+    } catch (caught) {
+        return {
+            error:
+                caught instanceof Error
+                    ? await messageText(caught.message)
+                    : (await gameWords("minecraft"))("errors.couldNotDismissThat")
+        };
+    }
+}
+
 /** Take one address off a player, leaving whatever else they have. Removing the
  *  last one removes them, which the service decides so the two screens that call
  *  this cannot disagree about it. */

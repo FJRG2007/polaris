@@ -21,7 +21,8 @@ import * as actions from "@polaris-app/game-servers/src/screens/installed/minecr
 import "@/components/app-host/client";
 
 vi.mock("@polaris-app/game-servers/src/screens/installed/minecraft-actions", () => ({
-    grantPlayerAccessAction: vi.fn(async () => ({}))
+    grantPlayerAccessAction: vi.fn(async () => ({})),
+    dismissRefusalAction: vi.fn(async () => ({}))
 }));
 vi.mock("@polaris-app/game-servers/src/screens/installed/minecraft-login-actions", () => ({
     loginStateAction: vi.fn(),
@@ -53,9 +54,19 @@ const REFUSAL: PlayerRefusal = {
 function screenWith(
     refusals: PlayerRefusal[],
     changed = vi.fn(),
-    links: { username: string; userId: string; name: string; followSignIns: boolean }[] = []
-): void {
-    render(
+    links: { username: string; userId: string; name: string; followSignIns: boolean }[] = [],
+    canManage = true
+) {
+    return render(players(refusals, changed, links, canManage));
+}
+
+function players(
+    refusals: PlayerRefusal[],
+    changed = vi.fn(),
+    links: { username: string; userId: string; name: string; followSignIns: boolean }[] = [],
+    canManage = true
+) {
+    return (
         <MinecraftPlayers
             installedAppId="server-1"
             status={STATUS}
@@ -77,6 +88,7 @@ function screenWith(
             lastLevels={{}}
             passwords={null}
             pending={[]}
+            canManage={canManage}
             onChanged={changed}
         />
     );
@@ -97,7 +109,7 @@ describe("turned away recently", () => {
         screenWith([REFUSAL]);
         // Scoped to the card: the same name is also down in the players table,
         // which is the row this card exists to explain.
-        const card = screen.getByText("Turned away recently").closest("div");
+        const card = screen.getByText("Turned away recently").closest("div")?.parentElement;
         if (!card) throw new Error("no card");
         expect(within(card).getByText("Grumm")).toBeTruthy();
         expect(within(card).getByText(/arrived from 198\.51\.100\.219/)).toBeTruthy();
@@ -116,6 +128,68 @@ describe("turned away recently", () => {
             })
         );
         await waitFor(() => expect(changed).toHaveBeenCalled());
+    });
+
+    it("clears one when the owner is done with it", async () => {
+        const changed = vi.fn();
+        screenWith(
+            [REFUSAL, { ...REFUSAL, player: "Dinnerbone", at: "2026-09-21T21:00:00.000Z" }],
+            changed
+        );
+        const [first] = screen.getAllByRole("button", { name: "Clear" });
+        await userEvent.click(first!);
+        expect(screen.queryByText("Grumm", { selector: "span" })).toBeNull();
+        await waitFor(() =>
+            expect(actions.dismissRefusalAction).toHaveBeenCalledWith("server-1", [
+                { player: "Grumm", at: REFUSAL.at }
+            ])
+        );
+        await waitFor(() => expect(changed).toHaveBeenCalled());
+        expect(screen.getByText("Turned away recently")).toBeTruthy();
+    });
+
+    it("clears them all at once, and puts them back if that could not be saved", async () => {
+        vi.mocked(actions.dismissRefusalAction).mockResolvedValueOnce({
+            error: "Could not clear that"
+        });
+        screenWith([REFUSAL, { ...REFUSAL, player: "Dinnerbone", at: "2026-09-21T21:00:00.000Z" }]);
+        await userEvent.click(screen.getByRole("button", { name: "Clear all" }));
+        await waitFor(() =>
+            expect(actions.dismissRefusalAction).toHaveBeenCalledWith("server-1", [
+                { player: "Grumm", at: REFUSAL.at },
+                { player: "Dinnerbone", at: "2026-09-21T21:00:00.000Z" }
+            ])
+        );
+        await waitFor(() => expect(screen.getByText("Turned away recently")).toBeTruthy());
+        expect(screen.getByText("Could not clear that")).toBeTruthy();
+    });
+
+    it("still shows somebody turned away after the owner cleared them all", async () => {
+        const changed = vi.fn();
+        const shown = [
+            REFUSAL,
+            { ...REFUSAL, player: "Dinnerbone", at: "2026-09-21T21:00:00.000Z" }
+        ];
+        const { rerender } = screenWith(shown, changed);
+        await userEvent.click(screen.getByRole("button", { name: "Clear all" }));
+        await waitFor(() => expect(changed).toHaveBeenCalled());
+        expect(screen.queryByText("Turned away recently")).toBeNull();
+        const later = { ...REFUSAL, player: "Jeb", at: "2026-09-21T22:00:00.000Z" };
+        rerender(players([later], changed));
+        expect(screen.getByText("Jeb", { selector: "span" })).toBeTruthy();
+    });
+
+    it("offers a reader without the manage grant nothing to press", () => {
+        screenWith(
+            [REFUSAL, { ...REFUSAL, player: "Dinnerbone", at: "2026-09-21T21:00:00.000Z" }],
+            vi.fn(),
+            [],
+            false
+        );
+        expect(screen.getByText("Turned away recently")).toBeTruthy();
+        expect(screen.queryByRole("button", { name: "Allow this address too" })).toBeNull();
+        expect(screen.queryByRole("button", { name: "Clear" })).toBeNull();
+        expect(screen.queryByRole("button", { name: "Clear all" })).toBeNull();
     });
 
     it("offers no button when the log never carried an address", () => {

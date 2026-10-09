@@ -648,6 +648,7 @@ export function MinecraftPanel({
                         pending={reading.pending}
                         passwords={loginOn ? (login.state?.players ?? []) : null}
                         canResetPasswords={canManage}
+                        canManage={canManage}
                         onPasswordsChanged={() => void login.reload()}
                         onChanged={() => void load()}
                     />

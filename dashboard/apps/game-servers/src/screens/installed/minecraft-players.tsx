@@ -109,6 +109,7 @@ export function MinecraftPlayers({
     pending: waiting,
     passwords,
     canResetPasswords,
+    canManage = false,
     onPasswordsChanged,
     onChanged
 }: {
@@ -150,6 +151,9 @@ export function MinecraftPlayers({
     passwords?: readonly { readonly name: string; readonly lastLoginAt: string | null }[] | null;
     /** Resetting one takes the manage grant; this screen only takes read. */
     canResetPasswords?: boolean;
+    /** Answering a refusal - allowing its address, or clearing it - takes the
+     *  manage grant too. */
+    canManage?: boolean;
     onPasswordsChanged?: () => void;
     onChanged: () => void;
 }) {
@@ -166,6 +170,28 @@ export function MinecraftPlayers({
     const [note, setNote] = useState<string | null>(null);
     const [query, setQuery] = useState("");
     const [filter, setFilter] = useState<Filter>("all");
+    // Refusals cleared here, hidden at once and put back if the save fails.
+    const [cleared, setCleared] = useState<ReadonlySet<string>>(new Set());
+    const refusalKey = (refusal: { player: string; at: string }) =>
+        `${refusal.player}-${refusal.at}`;
+    const refusals = (access?.refusals ?? []).filter(
+        (refusal) => !cleared.has(refusalKey(refusal))
+    );
+
+    function clearRefusals(which: readonly { player: string; at: string }[]) {
+        const keys = which.map(refusalKey);
+        const picked = which.map(({ player, at }) => ({ player, at }));
+        setCleared((was) => new Set([...was, ...keys]));
+        run(
+            () => actions.dismissRefusalAction(installedAppId, picked),
+            () =>
+                setCleared((was) => {
+                    const next = new Set(was);
+                    for (const key of keys) next.delete(key);
+                    return next;
+                })
+        );
+    }
     const [confirm, confirmElement] = useConfirm();
     // How this reader has asked for times to be written. Held here as well as in
     // the row below, because the toolbar now says when a remembered roster was
@@ -449,14 +475,26 @@ export function MinecraftPlayers({
                 home connection that changed address on its own overnight, which is
                 why the answer offered is the address they actually arrived from
                 rather than a form to fill in. */}
-            {(access?.refusals?.length ?? 0) > 0 && (
+            {refusals.length > 0 && (
                 <Card className="border-warning-edge bg-warning-soft">
                     <CardBody className="flex flex-col gap-2">
-                        <p className="flex items-center gap-2 text-sm font-medium">
-                            <Users className="size-4 text-warning" />
-                            {t("playersTab.turnedAwayRecently")}
-                        </p>
-                        {(access?.refusals ?? []).map((refusal) => {
+                        <div className="flex items-center justify-between gap-2">
+                            <p className="flex min-w-0 items-center gap-2 text-sm font-medium">
+                                <Users className="size-4 shrink-0 text-warning" />
+                                {t("playersTab.turnedAwayRecently")}
+                            </p>
+                            {canManage && refusals.length > 1 && (
+                                <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    disabled={pending}
+                                    onClick={() => clearRefusals(refusals)}
+                                >
+                                    {t("playersTab.dismissAllRefusals")}
+                                </Button>
+                            )}
+                        </div>
+                        {refusals.map((refusal) => {
                             const from = refusal.address;
                             const linked = followsSignIns(refusal.player);
                             return (
@@ -472,7 +510,7 @@ export function MinecraftPlayers({
                                         {" - "}
                                         {format.dateTime(refusal.at)}
                                     </span>
-                                    {from && (
+                                    {canManage && from && (
                                         <Button
                                             size="sm"
                                             variant="secondary"
@@ -491,6 +529,19 @@ export function MinecraftPlayers({
                                             {t("playersTab.allowThisAddressToo")}
                                         </Button>
                                     )}
+                                    {canManage && (
+                                        <Button
+                                            size="sm"
+                                            variant="ghost"
+                                            className="ml-auto"
+                                            disabled={pending}
+                                            aria-label={t("playersTab.dismissRefusal")}
+                                            title={t("playersTab.dismissRefusal")}
+                                            onClick={() => clearRefusals([refusal])}
+                                        >
+                                            <X aria-hidden="true" className="size-3.5" />
+                                        </Button>
+                                    )}
                                     {/* Where they may connect from follows their
                                         Polaris sign-ins, so the reason is a
                                         sign-in missing from that connection, not
@@ -505,9 +556,7 @@ export function MinecraftPlayers({
                                 </div>
                             );
                         })}
-                        {(access?.refusals ?? []).some(
-                            (refusal) => !followsSignIns(refusal.player)
-                        ) && (
+                        {refusals.some((refusal) => !followsSignIns(refusal.player)) && (
                             <p className="text-xs text-muted-foreground">
                                 {t("playersTab.aHomeConnectionIsGiven")}
                             </p>

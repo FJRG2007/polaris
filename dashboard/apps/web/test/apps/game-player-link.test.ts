@@ -53,6 +53,7 @@ function matches(row: Access, where: Record<string, unknown>): boolean {
 vi.mock("@polaris/db", () => ({
     prisma: {
         installedApp: {
+            findUnique: async () => ({ config: JSON.stringify(config) }),
             findFirst: async () => ({
                 id: SERVER,
                 applicationId: "app-1",
@@ -377,5 +378,44 @@ describe("an account tied to a player only as who they are", () => {
             userId: ADA
         });
         expect(access.map((row) => [row.address, row.source])).toEqual([["1.1.1.1", "session"]]);
+    });
+});
+
+describe("refusals the owner is done with", () => {
+    const at = (minute: number) => `2026-10-09T10:${String(minute).padStart(2, "0")}:00.000Z`;
+    const refusal = (player: string, address: string, minute: number) => ({
+        player,
+        address,
+        why: "Your account is registered to a different network.",
+        at: at(minute)
+    });
+
+    it("go when the address they came from is allowed", async () => {
+        config = {
+            playerRefusals: [refusal("AdaMC", "5.5.5.5", 1), refusal("AdaMC", "6.6.6.6", 2)]
+        };
+        await service.grantPlayerAccess(OWNER, SERVER, OWNER, {
+            username: "AdaMC",
+            address: "5.5.5.5"
+        });
+        expect(service.readRefusals(config).map((one) => one.address)).toEqual(["6.6.6.6"]);
+    });
+
+    it("can be cleared one at a time, by who and when, or several at once", async () => {
+        config = {
+            playerRefusals: [
+                refusal("AdaMC", "5.5.5.5", 1),
+                refusal("BeaMC", "6.6.6.6", 2),
+                refusal("CyMC", "7.7.7.7", 3)
+            ]
+        };
+        await service.dismissRefusals(OWNER, SERVER, [{ player: "adamc", at: at(1) }]);
+        expect(service.readRefusals(config).map((one) => one.player)).toEqual(["BeaMC", "CyMC"]);
+        // Another arrival of the same player is its own refusal and stays.
+        await service.dismissRefusals(OWNER, SERVER, [{ player: "BeaMC", at: at(9) }]);
+        expect(service.readRefusals(config)).toHaveLength(2);
+        // Clearing what the screen showed leaves one that arrived after it.
+        await service.dismissRefusals(OWNER, SERVER, [{ player: "BeaMC", at: at(2) }]);
+        expect(service.readRefusals(config).map((one) => one.player)).toEqual(["CyMC"]);
     });
 });
