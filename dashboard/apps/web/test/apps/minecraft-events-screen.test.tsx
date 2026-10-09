@@ -852,19 +852,14 @@ describe("the editor of an event players join", () => {
         ]);
     });
 
-    it("holds a duel's hearts between one and six", async () => {
+    it("asks nothing about hearts for a duel: a player is out by dying", async () => {
         const saved: catalog.EventPreset[] = [];
         await edit(catalog.newPreset("team-duel", "duel"), saved);
-        expect(screen.getByText(/sent back to their side, healed/)).toBeTruthy();
-        const hearts = screen
-            .getAllByDisplayValue("3")
-            .find((input) => input.getAttribute("max") === "6")!;
-        fireEvent.change(hearts, { target: { value: "9" } });
-        await waitFor(() => expect(done().disabled).toBe(true));
-        fireEvent.change(hearts, { target: { value: "2" } });
-        await waitFor(() => expect(done().disabled).toBe(false));
-        fireEvent.click(done());
-        expect((saved[0]?.options as catalog.EventOptions<"team-duel">).downHearts).toBe(2);
+        expect(screen.queryByText(/sent back to their side/)).toBeNull();
+        expect(
+            screen.queryAllByRole("spinbutton").some((input) => input.getAttribute("max") === "6")
+        ).toBe(false);
+        expect(catalog.newPreset("team-duel", "duel").options).not.toHaveProperty("downHearts");
     });
 });
 
@@ -879,7 +874,7 @@ describe("the editor in Spanish", () => {
                 onSave={() => undefined}
             />
         );
-        expect(screen.getByText("Fuera a (corazones)")).toBeTruthy();
+        expect(screen.getByText("El mismo para todos, y se retira al final.")).toBeTruthy();
         expect(
             screen.getByText("Se cancela si se apuntan menos durante la cuenta atrás.")
         ).toBeTruthy();

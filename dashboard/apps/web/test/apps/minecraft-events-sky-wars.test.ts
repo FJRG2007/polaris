@@ -292,14 +292,13 @@ describe("SkyWars' rules", () => {
     const box = sw.arenaBox(layout, at);
     const play = sw.playArea(layout, at);
 
-    it("shields whoever is low, takes up at once whoever crosses the play area's edge, and lets no stuck arrow be picked up", () => {
+    it("takes up at once whoever crosses the play area's edge, and lets no stuck arrow be picked up", () => {
         const lines = sw.quickLines(layout, at, box);
-        expect(lines[0]).toBe(
-            "effect give @a[tag=pe_arena,tag=!pe_sw_out,scores={pe_hp=..4}] minecraft:resistance 2 4 true"
-        );
+        // Nobody is shielded at a few hearts: a player is out by dying.
+        expect(lines.some((line) => line.includes("pe_hp"))).toBe(false);
         expect(lines.filter((line) => line.endsWith(" add pe_sw_gone"))).toHaveLength(6);
         // Under the islands: everything below the play area's floor.
-        expect(lines[1]).toContain(`dy=${play.y1 - 1 - (box.y1 - 128)}`);
+        expect(lines[0]).toContain(`dy=${play.y1 - 1 - (box.y1 - 128)}`);
         expect(
             lines.some((line) =>
                 line.includes("run tp @a[tag=pe_arena,tag=!pe_sw_out,tag=pe_sw_gone]")

@@ -1,6 +1,6 @@
 /**
  * Capture the flag's arena and commands: two teams set up as a duel's
- * (`team-duel.ts`, its kit, its `downHearts` send-back and shield, its kill
+ * (`team-duel.ts`, its kit, its death and send-back and shield, its kill
  * credit), a long closed arena in the air with a base at each end - its floor
  * in the team's color, a banner standing on a light at its back - and cover
  * between them drawn from the run's id.

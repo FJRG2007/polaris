@@ -1709,7 +1709,7 @@
             },
             "team-duel": {
                 "label": "Team duel",
-                "summary": "Players who type join are split into two teams in an arena built in the sky, each given the same sword and shield. The team with more eliminations wins; the podium goes by each player's own. Nobody loses anything: a player low on health is sent back to their side, and inventories are kept whatever happens.",
+                "summary": "Players who type join are split into two teams in an arena built in the sky, each given the same sword and shield. The team with more eliminations wins; the podium goes by each player's own. Nobody loses anything: a player who dies comes back on their side with everything they had, levels included.",
                 "unit": "eliminations"
             },
             "build-battle": {
@@ -1734,7 +1734,7 @@
             },
             "capture-the-flag": {
                 "label": "Capture the flag",
-                "summary": "Players who type join are split into two teams in an arena built in the sky, with a base and a banner at each end and cover in between. Carry the other team's banner home while yours is there to capture it; the carrier glows, and drops it when brought low. The captures set win it early, or the most when time is up. Nothing of anybody's is lost.",
+                "summary": "Players who type join are split into two teams in an arena built in the sky, with a base and a banner at each end and cover in between. Carry the other team's banner home while yours is there to capture it; the carrier glows, and drops it on dying. The captures set win it early, or the most when time is up. Nothing of anybody's is lost.",
                 "unit": "captures"
             },
             "hide-and-seek": {
@@ -1849,7 +1849,7 @@
             "dropper": "A shaft of {levels} floors, {difficulty}, each with one hole that never lines up with the one above it, and a pool at the bottom. A new shaft every time, and every hole reachable from the one above while falling.",
             "dropperSafe": "Played under Slow Falling, so there is time to steer and no fall hurts. Landing on a floor is caught the moment it happens by a small data pack Polaris adds to the world.",
             "duelJoin": "Only players who type join (or unirse) in the chat during the countdown take part. They are split into two teams and taken to an arena built 30 blocks up, over open ground away from anybody's bed.",
-            "duelKit": "Everybody gets the same {kit} sword and a shield. A player down to {hearts} {hearts, plural, one {heart} other {hearts}} is out: the other team scores, the rival who brought them down gets the elimination, and they are sent back to their side, healed. The team with more wins; the podium goes by eliminations.",
+            "duelKit": "Everybody gets the same {kit} sword and a shield. A player who dies is out: the other team scores, the rival who killed them gets the elimination, and they come back on their side, healed. The team with more wins; the podium goes by eliminations.",
             "duelKeepInventory": "Keep inventory is on while it lasts and put back after, so even a death in the arena keeps everything.",
             "duelNeeds": "Needs Player versus player allowed in Settings. Up to 16 players.",
             "buildJoin": "Only players who type join (or unirse) in the chat during the countdown take part. Each gets a plot on a platform built 30 blocks up, over open ground away from anybody's bed.",
@@ -2376,8 +2376,6 @@
         "leastRanked": "Least to be ranked ({unit})",
         "kit": "Kit",
         "kitHint": "The same for everybody, and taken back at the end.",
-        "outAtHearts": "Out at (hearts)",
-        "outAtHint": "1 to 6. A player this low is sent back to their side, healed, and the other team scores.",
         "plotSize": "Plot size (blocks)",
         "plotSizeHint": "7 to 15 a side, as tall as it is wide",
         "secondsToVote": "Seconds to vote",

@@ -302,12 +302,6 @@ describe("where an event looked for its place", () => {
 });
 
 describe("a team duel between two looks", () => {
-    it("shields at once whoever is already down to their last hearts", () => {
-        expect(duel.shieldLow(3)).toBe(
-            "effect give @a[tag=pe_arena,scores={pe_hp=..6}] minecraft:resistance 2 4 true"
-        );
-    });
-
     it("sends whoever is brought low back healed whole at once, with nothing healing them over time", () => {
         const lines = duel.sendBack("Ben", { x: 1, y: 2, z: 3, yaw: 180 });
         expect(lines).toContain("effect give Ben minecraft:instant_health 1 3 true");

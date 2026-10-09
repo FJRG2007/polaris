@@ -7601,10 +7601,11 @@ describe("players' own things through an arena", () => {
         world.at = { Ana: [300, 102, -8], Ben: [300, 102, 8] };
         await play(6_100);
         world.dealt = { Ana: 60 };
-        world.hp = { Ben: 4 };
-        world.attackers = { Ben: "Ana" };
+        // Ben dies, and comes back at home.
+        world.died = { Ben: 1 };
+        world.at = { ...world.at, Ben: [0, 64, 0] };
         await play(2_100);
-        world.hp = {};
+        world.died = {};
         const from = world.sent.length;
         await play(3 * 60_000);
         expect(state().run).toBeNull();
@@ -7753,10 +7754,11 @@ describe("players' own things through an arena", () => {
         world.at = { Ana: [300, 102, -8], Ben: [300, 102, 8] };
         await play(6_100);
         world.dealt = { Ana: 60 };
-        world.hp = { Ben: 4 };
-        world.attackers = { Ben: "Ana" };
+        // Ben dies, and comes back at home.
+        world.died = { Ben: 1 };
+        world.at = { ...world.at, Ben: [0, 64, 0] };
         await play(2_100);
-        world.hp = {};
+        world.died = {};
         // Ben logs off before the end.
         world.online = ["Ana"];
         await play(3 * 60_000);
@@ -8003,10 +8005,11 @@ describe("players' own things through an arena", () => {
         world.at = { Ana: [300, 102, -8], Ben: [300, 102, 8] };
         await play(6_100);
         world.dealt = { Ana: 60 };
-        world.hp = { Ben: 4 };
-        world.attackers = { Ben: "Ana" };
+        // Ben dies, and comes back at home.
+        world.died = { Ben: 1 };
+        world.at = { ...world.at, Ben: [0, 64, 0] };
         await play(2_100);
-        world.hp = {};
+        world.died = {};
         // Still falling when the end is handed out: nothing of hers is back.
         world.aloft = ["Ana"];
         await play(3 * 60_000 + 30_000);
@@ -8784,10 +8787,11 @@ describe("a team duel", () => {
         world.at = { Ana: [300, 102, -8], Ben: [300, 102, 8] };
         await play(6_100);
         world.dealt = { Ana: 60 };
-        world.hp = { Ben: 4 };
-        world.attackers = { Ben: "Ana" };
+        // Ben dies, and comes back at home.
+        world.died = { Ben: 1 };
+        world.at = { ...world.at, Ben: [0, 64, 0] };
         await play(2_100);
-        world.hp = {};
+        world.died = {};
         expect(state().run?.points).toEqual({ Ana: 1 });
         expect(state().run?.tally).toEqual({ 0: 1 });
         expect(world.sent).toContain("scoreboard players set Ana pe_score 1");
@@ -10699,7 +10703,7 @@ describe("capture the flag", () => {
         onlyOurBlocks();
     });
 
-    it("drops the flag when its carrier is brought low, back on its stand, the elimination credited", async () => {
+    it("drops the flag when its carrier dies, back on its stand, the elimination credited", async () => {
         const flag = await ctf();
         setUp([ctfOf(3)]);
         await joinAndStart("ctf");
@@ -10713,10 +10717,11 @@ describe("capture the flag", () => {
         await play(2_100);
         expect(flag.stateOf(state().run!.game).flags[1].carrier).toBe("Ana");
         world.dealt = { Ben: 40 };
-        world.hp = { Ana: 4 };
-        world.attackers = { Ana: "Ben" };
+        // Ana dies, and comes back at home.
+        world.died = { Ana: 1 };
+        world.at = { ...world.at, Ana: [0, 64, 0] };
         await play(2_100);
-        world.hp = {};
+        world.died = {};
         const game = flag.stateOf(state().run!.game);
         expect(game.flags[1].carrier).toBeNull();
         expect(game.kills).toEqual({ Ben: 1 });
@@ -10736,14 +10741,16 @@ describe("capture the flag", () => {
         await joinAndStart("ctf");
         const box = state().run!.arena!.box;
         const blue = flag.standAt(box, 1);
-        // Ana fights by the blue flag and is brought low there; the quick look
-        // marks her at it after the tick took the marks, before it moves her.
+        // Ana fights by the blue flag and dies there; the quick look marks her
+        // at it after the tick took the marks, before it moves her back.
         world.at = {
             Ana: [blue.x + 2.5, blue.y, blue.z - 2.5],
             Ben: [blue.x + 3.5, blue.y, blue.z - 2.5]
         };
-        world.hp = { Ana: 4 };
-        world.attackers = { Ana: "Ben" };
+        await play(2_100);
+        world.dealt = { Ben: 40 };
+        world.died = { Ana: 1 };
+        world.at = { ...world.at, Ana: [0, 64, 0] };
         world.onLine = (line) => {
             if (!line.startsWith("execute in minecraft:overworld run tp Ana ")) return;
             (world.tags.pe_ctf_t1 ??= new Set()).add("Ana");
@@ -10752,7 +10759,7 @@ describe("capture the flag", () => {
         };
         await play(2_100);
         world.onLine = null;
-        world.hp = {};
+        world.died = {};
         expect(flag.stateOf(state().run!.game).kills).toEqual({ Ben: 1 });
         // Back home, two blocks from her own flag: no flag taken, none captured.
         await play(2_100);
@@ -10822,7 +10829,7 @@ describe("capture the flag", () => {
         expect(flag.stateOf(state().run!.game).kills).toEqual({});
     });
 
-    it("credits a player brought low to the rival the game says hurt them, not whoever struck last", async () => {
+    it("credits a death to the rival the game counts the kill for, not whoever struck last", async () => {
         const flag = await ctf();
         const four = ["Ana", "Ben", "Cy", "Dee"];
         world.online = [...four];
@@ -10835,14 +10842,15 @@ describe("capture the flag", () => {
             ["Dee", 1]
         ]);
         await play(2_100);
-        // Dee wears Ana down; on the next look Ben strikes Cy, and Ana is low.
+        // Dee wears Ana down; on the next look Ben strikes Cy, and Dee kills Ana.
         world.dealt = { Dee: 30 };
         await play(2_100);
         world.dealt = { Dee: 30, Ben: 10 };
-        world.hp = { Ana: 4 };
-        world.attackers = { Ana: "Dee" };
+        world.died = { Ana: 1 };
+        world.pk = { Dee: 1 };
+        world.at = { ...world.at, Ana: [0, 64, 0] };
         await play(2_100);
-        world.hp = {};
+        world.died = {};
         expect(flag.stateOf(state().run!.game).kills).toEqual({ Dee: 1 });
         expect(saidToAll("Ana is out - Dee")).toBe(true);
     });
@@ -11708,13 +11716,13 @@ describe("SkyWars", () => {
         );
         expect(saidToAll("Cy fell into the void")).toBe(true);
 
-        // Ana strikes Ben beside her, and Ben is brought low: Ana's elimination.
+        // Ana strikes Ben beside her, and Ben dies: Ana's elimination.
         const ana = world.at.Ana!;
         world.at.Ben = [ana[0] + 1.5, ana[1], ana[2]];
         world.dealt.Ana = 30;
         world.board.pe_swt!.Ben = 30;
         world.attackers.Ben = "Ana";
-        world.hp = { Ben: 3 };
+        world.died = { Ben: 1 };
         await play(2_100);
         const done = state();
         expect(done.run).toBeNull();
@@ -11766,14 +11774,15 @@ describe("SkyWars", () => {
         world.board.pe_swt!.Ben = 30;
         world.board.pe_swt!.Cy = 20;
         world.attackers.Ben = "Ana";
-        world.hp = { Cy: 3 };
+        world.died = { Cy: 1 };
         await play(2_100);
+        world.died = {};
         expect(sw.stateOf(state().run!.game).out.map((one) => one.name)).toEqual(["Cy"]);
         expect(sw.stateOf(state().run!.game).kills).toEqual({});
         expect(saidToAll("Cy is out (Ana).")).toBe(false);
-        // Ben, struck by Ana on the first hit of the game, brought low now:
-        // Ana's, and the last one left.
-        world.hp = { Ben: 3 };
+        // Ben, struck by Ana on the first hit of the game, dead now: Ana's,
+        // and the last one left.
+        world.died = { Ben: 1 };
         await play(2_100);
         expect(saidToAll("Ben is out (Ana).")).toBe(true);
         expect(state().history[0]).toMatchObject({ note: "Only one player was left" });

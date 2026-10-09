@@ -1709,7 +1709,7 @@
             },
             "team-duel": {
                 "label": "Duelo",
-                "summary": "Quienes escriben join se reparten en dos equipos en una arena construida en el cielo, con la misma espada y escudo. Gana el equipo con más eliminaciones; el podio va por las de cada jugador. Nadie pierde nada: a quien le queda poca vida se le devuelve a su lado, y los inventarios se conservan pase lo que pase.",
+                "summary": "Quienes escriben join se reparten en dos equipos en una arena construida en el cielo, con la misma espada y escudo. Gana el equipo con más eliminaciones; el podio va por las de cada jugador. Nadie pierde nada: quien muere vuelve a su lado con todo lo que tenía, niveles incluidos.",
                 "unit": "eliminaciones"
             },
             "build-battle": {
@@ -1734,7 +1734,7 @@
             },
             "capture-the-flag": {
                 "label": "Captura la bandera",
-                "summary": "Quienes escriben join se reparten en dos equipos en una arena en el cielo, con una base y una bandera en cada extremo y cobertura en medio. Lleva la bandera rival a tu base mientras la tuya esté en casa para capturarla; quien la lleva brilla y la suelta si le dejan sin vida. Gana quien llegue a las capturas fijadas, o quien tenga más al acabar el tiempo. Nadie pierde nada.",
+                "summary": "Quienes escriben join se reparten en dos equipos en una arena en el cielo, con una base y una bandera en cada extremo y cobertura en medio. Lleva la bandera rival a tu base mientras la tuya esté en casa para capturarla; quien la lleva brilla y la suelta al morir. Gana quien llegue a las capturas fijadas, o quien tenga más al acabar el tiempo. Nadie pierde nada.",
                 "unit": "capturas"
             },
             "hide-and-seek": {
@@ -1849,7 +1849,7 @@
             "dropper": "Un pozo de {levels} pisos, {difficulty}, cada uno con un hueco que nunca coincide con el de arriba, y una piscina al fondo. Un pozo nuevo cada vez, y cada hueco alcanzable desde el anterior mientras caes.",
             "dropperSafe": "Se juega con Caída lenta, así que da tiempo a guiarse y ninguna caída hace daño. Tocar un piso se detecta en el momento con un pequeño paquete de datos que Polaris añade al mundo.",
             "duelJoin": "Solo participan los jugadores que escriben join (o unirse) en el chat durante la cuenta atrás. Se reparten en dos equipos y se les lleva a una arena construida a 30 bloques de altura, sobre terreno abierto lejos de la cama de nadie.",
-            "duelKit": "Todos reciben la misma espada de {kit} y un escudo. Un jugador que baja a {hearts} {hearts, plural, one {corazón} other {corazones}} queda fuera: el otro equipo puntúa, el rival que lo derribó se lleva la eliminación, y se le devuelve a su lado, curado. Gana el equipo con más; el podio va por eliminaciones.",
+            "duelKit": "Todos reciben la misma espada de {kit} y un escudo. Un jugador que muere queda fuera: el otro equipo puntúa, el rival que lo mató se lleva la eliminación, y reaparece en su lado, curado. Gana el equipo con más; el podio va por eliminaciones.",
             "duelKeepInventory": "Conservar inventario está activo mientras dura y se restaura después, así que incluso una muerte en la arena lo conserva todo.",
             "duelNeeds": "Necesita permitir Jugador contra jugador en Ajustes. Hasta 16 jugadores.",
             "buildJoin": "Solo participan los jugadores que escriben join (o unirse) en el chat durante la cuenta atrás. Cada uno recibe una parcela en una plataforma construida a 30 bloques de altura, sobre terreno abierto lejos de la cama de nadie.",
@@ -2376,8 +2376,6 @@
         "leastRanked": "Mínimo para clasificar ({unit})",
         "kit": "Kit",
         "kitHint": "El mismo para todos, y se retira al final.",
-        "outAtHearts": "Fuera a (corazones)",
-        "outAtHint": "De 1 a 6. Quien baja a esto vuelve a su lado curado, y el otro equipo puntúa.",
         "plotSize": "Parcela (bloques)",
         "plotSizeHint": "De 7 a 15 por lado, tan alta como ancha",
         "secondsToVote": "Segundos para votar",

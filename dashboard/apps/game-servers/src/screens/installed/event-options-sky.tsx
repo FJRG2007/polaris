@@ -505,16 +505,6 @@ export function CaptureTheFlagFields({
                     issues={issues}
                     field="captures"
                 />
-                <NumberField
-                    label={t("editor.outAtHearts")}
-                    hint={t("editor.outAtHint")}
-                    min={1}
-                    max={6}
-                    value={value.downHearts}
-                    onChange={(downHearts) => onChange({ ...value, downHearts })}
-                    issues={issues}
-                    field="downHearts"
-                />
             </div>
             <PlaceField
                 value={value.place}

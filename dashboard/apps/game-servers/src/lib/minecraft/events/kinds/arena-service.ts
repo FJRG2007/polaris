@@ -645,7 +645,7 @@ function goLines(run: stored.EventRun, language: speech.Speech, offhand: boolean
                 ...arena.titleTo(
                     one.name,
                     messages.duelEnterTitle(one.side, language),
-                    messages.duelEnterSubtitle(options.downHearts, language)
+                    messages.duelEnterSubtitle(language)
                 )
             );
         return out;
@@ -817,21 +817,6 @@ async function duelTick(ctx: KindContext, lines: string[]): Promise<void> {
     const on = new Set(here.keys());
     const killsSince = hits.rose(memory.kills, kills, on);
     for (const name of hits.rose(memory.dealt, dealt, on).keys()) memory.lastHit.set(name, now);
-    // Whom the game says last hurt whoever is brought low (from 1.19.4).
-    const attackers = await hitsService.attackers(
-        ctx,
-        run.entrants
-            .filter((one) => {
-                const hearts = health.get(one.name);
-                return (
-                    hearts !== undefined &&
-                    hearts > 0 &&
-                    hearts <= options.downHearts * 2 &&
-                    (memory.shieldedUntil.get(one.name) ?? 0) <= now
-                );
-            })
-            .map((one) => one.name)
-    );
 
     const points = { ...run.points };
     const tally = { ...run.tally };
@@ -847,21 +832,13 @@ async function duelTick(ctx: KindContext, lines: string[]): Promise<void> {
         const rivals = run.entrants
             .filter((other) => other.side !== one.side)
             .map((other) => other.name);
+        // Out by dying, as anywhere else in the game: what they carry is kept
+        // through it (`keepInventory`, on for as long as the event lasts), and
+        // a death is credited by the game's kill count - whoever comes back
+        // from one is a new player, and the game forgets who hurt them.
         const dead = (died.get(one.name) ?? 0) > 0;
-        const low =
-            hearts > 0 &&
-            hearts <= options.downHearts * 2 &&
-            (memory.shieldedUntil.get(one.name) ?? 0) <= now;
-        if (dead || low) {
-            // A death is credited by the game's kill count: whoever comes back
-            // from one is a new player, and the game forgets who hurt them.
-            const by = duel.creditFor(
-                rivals,
-                killsSince,
-                memory.lastHit,
-                now,
-                dead ? undefined : attackers.get(lower(one.name))
-            );
+        if (dead) {
+            const by = duel.creditFor(rivals, killsSince, memory.lastHit, now);
             const other = String(1 - one.side);
             tally[other] = (tally[other] ?? 0) + 1;
             if (by) {
@@ -871,13 +848,13 @@ async function duelTick(ctx: KindContext, lines: string[]): Promise<void> {
             lines.push(
                 commands.say(messages.tag(language) + messages.duelDown(one.name, by, language))
             );
-            if (dead) lines.push(`scoreboard players set ${one.name} ${duel.DIED} 0`);
+            lines.push(`scoreboard players set ${one.name} ${duel.DIED} 0`);
             scored = true;
         }
         const at = here.get(lower(one.name));
-        // Brought low, or back from a death at home, or out of it any other
-        // way: back to their side, healed and shielded for a moment.
-        if (hearts > 0 && (low || !at || !arena.contains(box, at))) {
+        // Back from a death at home, or out of it any other way: back to
+        // their side, healed and shielded for a moment.
+        if (hearts > 0 && (!at || !arena.contains(box, at))) {
             lines.push(...duel.sendBack(one.name, spot));
             memory.shieldedUntil.set(one.name, now + duel.SHIELD_SECONDS * 1000);
         }

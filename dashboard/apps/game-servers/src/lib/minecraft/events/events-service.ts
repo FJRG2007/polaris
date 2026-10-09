@@ -1034,7 +1034,6 @@ function startLoop(
         run.preset.kind === "downhill-race" ||
         run.preset.kind === "nether-maze" ||
         run.preset.kind === "elytra-race" ||
-        run.preset.kind === "team-duel" ||
         arenaService.quickens(run.preset)
     ) {
         loop.quick = setInterval(() => void quickLook(loop), QUICK_MS);
@@ -1286,24 +1285,15 @@ async function countdown(
  */
 /**
  * The quick look - parkour's falls and checkpoints (`stageService.quickLines`),
- * a duel's low players shielded (`duel.shieldLow`): one batch, nothing read,
- * never two at once, and nothing while the tick has no connection open.
+ * an arena's own (`arenaService.quickLines`): one batch, nothing read, never
+ * two at once, and nothing while the tick has no connection open.
  */
 async function quickLook(loop: Loop): Promise<void> {
     const server = loop.link?.server;
     if (!server || loop.finishing || loop.quickBusy || loop.run.phase !== "running") return;
-    const lines =
-        loop.run.preset.kind === "team-duel"
-            ? loop.run.readyAt === null
-                ? []
-                : [
-                      duel.shieldLow(
-                          (loop.run.preset.options as catalog.EventOptions<"team-duel">).downHearts
-                      )
-                  ]
-            : catalog.playsInArena(loop.run.preset)
-              ? arenaService.quickLines(loop.run)
-              : stageService.quickLines(loop);
+    const lines = catalog.playsInArena(loop.run.preset)
+        ? arenaService.quickLines(loop.run)
+        : stageService.quickLines(loop);
     if (lines.length === 0) return;
     loop.quickBusy = true;
     try {

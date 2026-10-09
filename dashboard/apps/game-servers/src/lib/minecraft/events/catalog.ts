@@ -551,10 +551,10 @@ export const optionsSchemas = {
     "team-duel": z.object({
         /** The arena is built in the air above ground found here. */
         place: placeSchema.default({ mode: "players" }),
-        kit: z.enum(DUEL_KITS).default("stone"),
-        /** Hearts left at which a player is out of the fight and sent back to
-         *  their side, before the next blow can kill them. */
-        downHearts: z.number().int().min(1).max(6).default(3)
+        // A player is out by dying, kept whole by `keepInventory`: the hearts
+        // a player was once sent back at (`downHearts`) are no longer read,
+        // and an old save's are dropped as it is read.
+        kit: z.enum(DUEL_KITS).default("stone")
     }),
     "build-battle": z
         .object({
@@ -640,9 +640,7 @@ export const optionsSchemas = {
             .int()
             .min(1, problem("atLeast", { count: 1 }))
             .max(10, problem("atMost", { count: 10 }))
-            .default(3),
-        /** As in a duel: hearts left at which a player is sent back to their base. */
-        downHearts: z.number().int().min(1).max(6).default(3)
+            .default(3)
     }),
     "hide-and-seek": z.object({
         place: placeSchema.default({ mode: "players" }),
