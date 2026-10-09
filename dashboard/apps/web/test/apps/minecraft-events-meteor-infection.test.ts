@@ -84,8 +84,10 @@ describe("a meteor's infection", () => {
             for (const [index, meteor] of meteors.entries()) {
                 const { get } = worlds[index]!;
                 const seen = new Set<string>();
-                if (meteor.infected.length + meteor.missed.length > infection.MAX_CELLS)
+                if (meteor.infected.length > infection.MAX_CELLS)
                     problems.push(`${seed}: too many`);
+                if (meteor.missed.length > infection.MAX_MISSES)
+                    problems.push(`${seed}: too many misses`);
                 for (const cell of meteor.infected) {
                     if (seen.has(key(cell))) problems.push(`${seed}: infected twice`);
                     seen.add(key(cell));
@@ -155,7 +157,7 @@ describe("a meteor's infection", () => {
                     asked += 1;
                     meteor.missed.push(one.to);
                 }
-            expect(asked, name).toBeLessThanOrEqual(infection.MAX_CELLS);
+            expect(asked, name).toBeLessThanOrEqual(infection.MAX_MISSES);
             expect(infection.plan([meteor], 500, random), name).toEqual([]);
             expect(new Set(meteor.missed.map(key)).size, name).toBe(meteor.missed.length);
         }

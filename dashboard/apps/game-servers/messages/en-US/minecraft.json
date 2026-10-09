@@ -1824,7 +1824,7 @@
             "wavesPoint": "The point is on open, flat ground the world made, at least 96 blocks from any online player's bed. Only monsters that cannot break blocks come - no creepers, endermen or ravagers - and every one of them is removed when it ends.",
             "keepInventory": "Keep inventory is on while it runs, so dying costs nothing; the server's own setting comes back afterward.",
             "meteors": "{meteors} meteors of {size} ore blocks each, one every {seconds} seconds from the start. Each block mined near a meteor scores 1; ore placed near one is taken off.",
-            "meteorsLand": "Meteors land on open, flat ground the world made, away from every online player's bed - on an island, on the island itself - and ore is only ever put where there was air. What nobody mined is taken away at the end - only blocks still exactly the meteor's ore - and nothing else is touched.",
+            "meteorsLand": "Meteors land on open, flat ground the world made, away from every online player's bed - on an island, on the island itself - and ore is only ever put where there was air. What nobody mined is taken away at the end - only blocks still exactly the meteor's ore - and nothing else is touched, but for an infected crater's sculk, also taken away at the end.",
             "pickaxes": "Diamond and emerald ore need an iron pickaxe, ancient debris a diamond one.",
             "parkour": "{jumps} jumps, {difficulty}, built about {height} blocks up. A fall lands on a net and goes back to the last checkpoint.",
             "spleef": "A {size} by {size} snow floor about {height} blocks up. Falling through it is being out; the last one on it wins.",
@@ -1883,7 +1883,7 @@
             "netherMazeSafe": "Nobody's items are touched, and nobody takes damage. Minimap cave view and radar are switched off for the racers. The hazards are watched by a small data pack Polaris adds to the world.",
             "acidRain": "A {size} arena about {height} blocks up, with {acidity} rain. The world's own weather is never changed: the rain falls only over the arena.",
             "acidRainSafe": "Nobody's items are touched, and nobody takes damage. Players get marked cobblestone that only goes on the arena, taken back when they leave. The rain is worked out by a small data pack Polaris adds to the world. Needs Minecraft 1.17 or later.",
-            "meteorInfection": "Each crater's ground grows sculk that creeps slowly outwards, a few blocks at most; standing in it poisons and slows you, and breaking it cleanses the ground. It never grows on anything players built, and whatever is left goes at the end. From Minecraft 1.19; older servers get plain craters."
+            "meteorInfection": "Each crater's ground grows sculk that creeps slowly outwards, a few blocks at most; standing in it poisons and slows you, and breaking it cleanses the ground. It only grows over stone, dirt, sand and the like - never over planks, glass or other building blocks - and whatever is left goes at the end. From Minecraft 1.19; older servers get plain craters."
         },
         "errors": {
             "read": "The events could not be read",

@@ -27,8 +27,12 @@ type Point = { readonly x: number; readonly y: number; readonly z: number };
 export const SINCE = [1, 19] as const;
 /** How far from the meteor the infection may creep. */
 export const RADIUS = 7;
-/** The most cells one meteor ever tries, cleansed and missed ones included. */
+/** The most cells one meteor ever infects, cleansed ones included. */
 export const MAX_CELLS = 40;
+/** The most cells one meteor tries and misses - air over air, inside the
+ *  ground, a flower in the way - before it stops trying: kept apart from
+ *  `MAX_CELLS`, so misses never shrink a crater that can grow. */
+export const MAX_MISSES = 60;
 /** Cells round the crater infected as the meteor lands. */
 export const SEEDS = 6;
 /** Cells tried, each tick, to creep onto, for each meteor. */
@@ -78,7 +82,11 @@ export function creepCells(
     random: () => number,
     missed: readonly Point[] = []
 ): { from: Point; to: Point }[] {
-    const left = Math.min(TRIES_PER_TICK, MAX_CELLS - infected.length - missed.length);
+    const left = Math.min(
+        TRIES_PER_TICK,
+        MAX_CELLS - infected.length,
+        MAX_MISSES - missed.length
+    );
     if (left <= 0 || infected.length === 0) return [];
     const taken = new Set([...infected, ...missed].map(at));
     const picked: { from: Point; to: Point }[] = [];
@@ -110,7 +118,7 @@ export interface Try {
 /**
  * This tick's tries over every meteor, within `BUDGET`: a meteor with nothing
  * infected yet is seeded round its crater, the rest creep. A cell tried and
- * `missed` is never tried again and counts towards `MAX_CELLS`, so a crater
+ * `missed` is never tried again and counts towards `MAX_MISSES`, so a crater
  * that cannot grow stops costing anything. The meteors taken in turn from
  * `turn`, so each gets its go however many there are.
  */
@@ -130,7 +138,7 @@ export function plan(
         const cells =
             meteor.infected.length === 0
                 ? seedCells(meteor, random, missed)
-                      .slice(0, Math.max(0, MAX_CELLS - missed.length))
+                      .slice(0, Math.max(0, MAX_MISSES - missed.length))
                       .map((to) => ({ to }))
                 : creepCells(meteor, meteor.infected, random, missed);
         for (const cell of cells.slice(0, BUDGET - tries.length))
