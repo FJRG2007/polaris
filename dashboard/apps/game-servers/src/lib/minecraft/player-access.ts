@@ -225,21 +225,20 @@ async function dropRefusals(
 }
 
 /**
- * The owner done with a refusal - one, by who and when, or every one. Read, or
- * dealt with somewhere else, a refusal left on the screen is a warning about
- * nothing.
+ * The owner done with refusals, each named by who and when. Read, or dealt with
+ * somewhere else, a refusal left on the screen is a warning about nothing; one
+ * that arrived after the screen was drawn has not been read, so it stays.
  */
 export async function dismissRefusals(
     ownerId: string,
     installedAppId: string,
-    which: { player: string; at: string } | "all"
+    which: readonly { player: string; at: string }[]
 ): Promise<void> {
     await resolve(ownerId, installedAppId);
-    await dropRefusals(
-        installedAppId,
-        (one) =>
-            which === "all" ||
-            (one.player.toLowerCase() === which.player.toLowerCase() && one.at === which.at)
+    await dropRefusals(installedAppId, (one) =>
+        which.some(
+            (seen) => one.player.toLowerCase() === seen.player.toLowerCase() && one.at === seen.at
+        )
     );
 }
 

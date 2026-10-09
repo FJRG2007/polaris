@@ -109,6 +109,7 @@ export function MinecraftPlayers({
     pending: waiting,
     passwords,
     canResetPasswords,
+    canManage = false,
     onPasswordsChanged,
     onChanged
 }: {
@@ -150,6 +151,9 @@ export function MinecraftPlayers({
     passwords?: readonly { readonly name: string; readonly lastLoginAt: string | null }[] | null;
     /** Resetting one takes the manage grant; this screen only takes read. */
     canResetPasswords?: boolean;
+    /** Answering a refusal - allowing its address, or clearing it - takes the
+     *  manage grant too. */
+    canManage?: boolean;
     onPasswordsChanged?: () => void;
     onChanged: () => void;
 }) {
@@ -168,19 +172,22 @@ export function MinecraftPlayers({
     const [filter, setFilter] = useState<Filter>("all");
     // Refusals cleared here, hidden at once and put back if the save fails.
     const [cleared, setCleared] = useState<ReadonlySet<string>>(new Set());
+    const refusalKey = (refusal: { player: string; at: string }) =>
+        `${refusal.player}-${refusal.at}`;
     const refusals = (access?.refusals ?? []).filter(
-        (refusal) => !cleared.has("all") && !cleared.has(`${refusal.player}-${refusal.at}`)
+        (refusal) => !cleared.has(refusalKey(refusal))
     );
 
-    function clearRefusal(which: { player: string; at: string } | "all") {
-        const key = which === "all" ? "all" : `${which.player}-${which.at}`;
-        setCleared((was) => new Set(was).add(key));
+    function clearRefusals(which: readonly { player: string; at: string }[]) {
+        const keys = which.map(refusalKey);
+        const picked = which.map(({ player, at }) => ({ player, at }));
+        setCleared((was) => new Set([...was, ...keys]));
         run(
-            () => actions.dismissRefusalAction(installedAppId, which),
+            () => actions.dismissRefusalAction(installedAppId, picked),
             () =>
                 setCleared((was) => {
                     const next = new Set(was);
-                    next.delete(key);
+                    for (const key of keys) next.delete(key);
                     return next;
                 })
         );
@@ -476,12 +483,12 @@ export function MinecraftPlayers({
                                 <Users className="size-4 shrink-0 text-warning" />
                                 {t("playersTab.turnedAwayRecently")}
                             </p>
-                            {refusals.length > 1 && (
+                            {canManage && refusals.length > 1 && (
                                 <Button
                                     size="sm"
                                     variant="ghost"
                                     disabled={pending}
-                                    onClick={() => clearRefusal("all")}
+                                    onClick={() => clearRefusals(refusals)}
                                 >
                                     {t("playersTab.dismissAllRefusals")}
                                 </Button>
@@ -503,7 +510,7 @@ export function MinecraftPlayers({
                                         {" - "}
                                         {format.dateTime(refusal.at)}
                                     </span>
-                                    {from && (
+                                    {canManage && from && (
                                         <Button
                                             size="sm"
                                             variant="secondary"
@@ -522,19 +529,19 @@ export function MinecraftPlayers({
                                             {t("playersTab.allowThisAddressToo")}
                                         </Button>
                                     )}
-                                    <Button
-                                        size="sm"
-                                        variant="ghost"
-                                        className="ml-auto"
-                                        disabled={pending}
-                                        aria-label={t("playersTab.dismissRefusal")}
-                                        title={t("playersTab.dismissRefusal")}
-                                        onClick={() =>
-                                            clearRefusal({ player: refusal.player, at: refusal.at })
-                                        }
-                                    >
-                                        <X aria-hidden="true" className="size-3.5" />
-                                    </Button>
+                                    {canManage && (
+                                        <Button
+                                            size="sm"
+                                            variant="ghost"
+                                            className="ml-auto"
+                                            disabled={pending}
+                                            aria-label={t("playersTab.dismissRefusal")}
+                                            title={t("playersTab.dismissRefusal")}
+                                            onClick={() => clearRefusals([refusal])}
+                                        >
+                                            <X aria-hidden="true" className="size-3.5" />
+                                        </Button>
+                                    )}
                                     {/* Where they may connect from follows their
                                         Polaris sign-ins, so the reason is a
                                         sign-in missing from that connection, not

@@ -1191,13 +1191,15 @@ export async function revokePlayerAccessAction(
     }
 }
 
-/** What dismissing refusals takes: one, by who and when, or all of them. */
-const dismissRefusalSchema = z.union([
-    z.literal("all"),
-    z.object({ player: z.string().trim().min(1).max(64), at: z.string().datetime() }).strict()
-]);
+/** What dismissing refusals takes: the ones on the screen, each by who and when. */
+const dismissRefusalSchema = z
+    .array(
+        z.object({ player: z.string().trim().min(1).max(64), at: z.string().datetime() }).strict()
+    )
+    .min(1)
+    .max(50);
 
-/** The owner done with one refusal on the players screen, or with every one. */
+/** The owner done with refusals on the players screen - one, or every one they see. */
 export async function dismissRefusalAction(
     installedAppId: string,
     which: unknown

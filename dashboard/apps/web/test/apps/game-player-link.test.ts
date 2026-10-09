@@ -401,16 +401,21 @@ describe("refusals the owner is done with", () => {
         expect(service.readRefusals(config).map((one) => one.address)).toEqual(["6.6.6.6"]);
     });
 
-    it("can be cleared one at a time, by who and when, or all at once", async () => {
+    it("can be cleared one at a time, by who and when, or several at once", async () => {
         config = {
-            playerRefusals: [refusal("AdaMC", "5.5.5.5", 1), refusal("BeaMC", "6.6.6.6", 2)]
+            playerRefusals: [
+                refusal("AdaMC", "5.5.5.5", 1),
+                refusal("BeaMC", "6.6.6.6", 2),
+                refusal("CyMC", "7.7.7.7", 3)
+            ]
         };
-        await service.dismissRefusals(OWNER, SERVER, { player: "adamc", at: at(1) });
-        expect(service.readRefusals(config).map((one) => one.player)).toEqual(["BeaMC"]);
+        await service.dismissRefusals(OWNER, SERVER, [{ player: "adamc", at: at(1) }]);
+        expect(service.readRefusals(config).map((one) => one.player)).toEqual(["BeaMC", "CyMC"]);
         // Another arrival of the same player is its own refusal and stays.
-        await service.dismissRefusals(OWNER, SERVER, { player: "BeaMC", at: at(9) });
-        expect(service.readRefusals(config)).toHaveLength(1);
-        await service.dismissRefusals(OWNER, SERVER, "all");
-        expect(service.readRefusals(config)).toEqual([]);
+        await service.dismissRefusals(OWNER, SERVER, [{ player: "BeaMC", at: at(9) }]);
+        expect(service.readRefusals(config)).toHaveLength(2);
+        // Clearing what the screen showed leaves one that arrived after it.
+        await service.dismissRefusals(OWNER, SERVER, [{ player: "BeaMC", at: at(2) }]);
+        expect(service.readRefusals(config).map((one) => one.player)).toEqual(["CyMC"]);
     });
 });

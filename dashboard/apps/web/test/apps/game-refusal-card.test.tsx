@@ -54,9 +54,19 @@ const REFUSAL: PlayerRefusal = {
 function screenWith(
     refusals: PlayerRefusal[],
     changed = vi.fn(),
-    links: { username: string; userId: string; name: string; followSignIns: boolean }[] = []
-): void {
-    render(
+    links: { username: string; userId: string; name: string; followSignIns: boolean }[] = [],
+    canManage = true
+) {
+    return render(players(refusals, changed, links, canManage));
+}
+
+function players(
+    refusals: PlayerRefusal[],
+    changed = vi.fn(),
+    links: { username: string; userId: string; name: string; followSignIns: boolean }[] = [],
+    canManage = true
+) {
+    return (
         <MinecraftPlayers
             installedAppId="server-1"
             status={STATUS}
@@ -78,6 +88,7 @@ function screenWith(
             lastLevels={{}}
             passwords={null}
             pending={[]}
+            canManage={canManage}
             onChanged={changed}
         />
     );
@@ -129,10 +140,9 @@ describe("turned away recently", () => {
         await userEvent.click(first!);
         expect(screen.queryByText("Grumm", { selector: "span" })).toBeNull();
         await waitFor(() =>
-            expect(actions.dismissRefusalAction).toHaveBeenCalledWith("server-1", {
-                player: "Grumm",
-                at: REFUSAL.at
-            })
+            expect(actions.dismissRefusalAction).toHaveBeenCalledWith("server-1", [
+                { player: "Grumm", at: REFUSAL.at }
+            ])
         );
         await waitFor(() => expect(changed).toHaveBeenCalled());
         expect(screen.getByText("Turned away recently")).toBeTruthy();
@@ -145,10 +155,41 @@ describe("turned away recently", () => {
         screenWith([REFUSAL, { ...REFUSAL, player: "Dinnerbone", at: "2026-09-21T21:00:00.000Z" }]);
         await userEvent.click(screen.getByRole("button", { name: "Clear all" }));
         await waitFor(() =>
-            expect(actions.dismissRefusalAction).toHaveBeenCalledWith("server-1", "all")
+            expect(actions.dismissRefusalAction).toHaveBeenCalledWith("server-1", [
+                { player: "Grumm", at: REFUSAL.at },
+                { player: "Dinnerbone", at: "2026-09-21T21:00:00.000Z" }
+            ])
         );
         await waitFor(() => expect(screen.getByText("Turned away recently")).toBeTruthy());
         expect(screen.getByText("Could not clear that")).toBeTruthy();
+    });
+
+    it("still shows somebody turned away after the owner cleared them all", async () => {
+        const changed = vi.fn();
+        const shown = [
+            REFUSAL,
+            { ...REFUSAL, player: "Dinnerbone", at: "2026-09-21T21:00:00.000Z" }
+        ];
+        const { rerender } = screenWith(shown, changed);
+        await userEvent.click(screen.getByRole("button", { name: "Clear all" }));
+        await waitFor(() => expect(changed).toHaveBeenCalled());
+        expect(screen.queryByText("Turned away recently")).toBeNull();
+        const later = { ...REFUSAL, player: "Jeb", at: "2026-09-21T22:00:00.000Z" };
+        rerender(players([later], changed));
+        expect(screen.getByText("Jeb", { selector: "span" })).toBeTruthy();
+    });
+
+    it("offers a reader without the manage grant nothing to press", () => {
+        screenWith(
+            [REFUSAL, { ...REFUSAL, player: "Dinnerbone", at: "2026-09-21T21:00:00.000Z" }],
+            vi.fn(),
+            [],
+            false
+        );
+        expect(screen.getByText("Turned away recently")).toBeTruthy();
+        expect(screen.queryByRole("button", { name: "Allow this address too" })).toBeNull();
+        expect(screen.queryByRole("button", { name: "Clear" })).toBeNull();
+        expect(screen.queryByRole("button", { name: "Clear all" })).toBeNull();
     });
 
     it("offers no button when the log never carried an address", () => {
