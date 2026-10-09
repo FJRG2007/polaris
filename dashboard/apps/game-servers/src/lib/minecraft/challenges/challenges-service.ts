@@ -1880,7 +1880,12 @@ async function carry(
                 commands.tell(
                     name,
                     eventMessages.tag(language) +
-                        eventMessages.mendedWith(mended.count, mended.points, mended.rest > 0, language)
+                        eventMessages.mendedWith(
+                            mended.count,
+                            mended.points,
+                            mended.rest > 0,
+                            language
+                        )
                 )
             );
     }
