@@ -15,8 +15,8 @@ run-name: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run && form
 # pulls, and the update card offers whatever commit that tag was built from - so
 # publishing from a commit whose tests failed is how a broken build reaches every
 # box that presses Update. The suites are called here rather than watched for:
-# they run standalone on every push to a branch or a pull request (that is the
-# signal there), and on main this call is the only run of them.
+# they run standalone on every pull request (that is the signal there), and on
+# main this call is the only run of them.
 #
 # The gate is on the TAG, not on the build. An image whose sources changed starts
 # building the moment the push lands, beside the suites rather than behind them,

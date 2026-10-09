@@ -108,7 +108,7 @@ jobs:
         run: npm run build -w @polaris/web
         env:
           NODE_OPTIONS: --max-old-space-size=8192
-          POLARIS_BUILD_SKIP_CHECKS: "1"
+          POLARIS_BUILD_SKIP_LINT: "1"
 
       - id: save
         if: steps.build.outcome == 'success'

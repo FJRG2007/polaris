@@ -49,8 +49,8 @@ test("pull requests restore the Next cache under the prefix main saves it with",
     assert.equal(used, saved[0]);
 });
 
-test("the CI build and the warming build skip the same checks", () => {
-    const flag = /POLARIS_BUILD_SKIP_CHECKS:\s*"1"/;
+test("the CI build and the warming build skip the same lint", () => {
+    const flag = /POLARIS_BUILD_SKIP_LINT:\s*"1"/;
     assert.match(ci, flag);
     assert.match(warm, flag);
 });

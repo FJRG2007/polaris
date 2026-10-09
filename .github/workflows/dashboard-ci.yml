@@ -203,9 +203,9 @@ jobs:
   # skipped rather than paying for a second Next build of the same commit.
   #
   # The condition is a negation of an input that defaults to false on purpose. An
-  # `inputs.build_app != false` reads as the obvious form and is wrong: on a push
-  # there is no input, and GitHub casts both null and false to 0, so the job would
-  # be skipped exactly where it is the only gate there is.
+  # `inputs.build_app != false` reads as the obvious form and is wrong: on a pull
+  # request there is no input, and GitHub casts both null and false to 0, so the
+  # job would be skipped exactly where it is the only gate there is.
   app:
     name: build
     if: ${{ !inputs.skip_app }}
@@ -249,9 +249,10 @@ jobs:
       # out of memory" on the next. The runner has 16 GB, so the build gets room
       # instead of a coin toss.
       #
-      # The checks job runs tsc and ESLint over the same sources in this same run,
-      # so the build skips its own copy of both (next.config.mjs).
+      # The checks job runs ESLint over the same sources in this same run, so the
+      # build skips its own copy (next.config.mjs). It keeps its type check, which
+      # alone sees the route types Next generates during the build.
       - run: npm run build -w @polaris/web
         env:
           NODE_OPTIONS: --max-old-space-size=8192
-          POLARIS_BUILD_SKIP_CHECKS: "1"
+          POLARIS_BUILD_SKIP_LINT: "1"

@@ -50,13 +50,13 @@ const nextConfig = {
     output: "standalone",
     reactStrictMode: true,
     experimental: { serverActions: { bodySizeLimit: "32mb" } },
-    // CI's checks job runs `tsc` and ESLint over these same sources beside the app
-    // build, so running both again inside `next build` cost the slowest job about
-    // two minutes and proved nothing new. Skipped only where that job is known to
-    // run: dashboard-ci.yml sets the flag on its build, and nothing else does - the
-    // image and every local build still check.
-    typescript: { ignoreBuildErrors: process.env.POLARIS_BUILD_SKIP_CHECKS === "1" },
-    eslint: { ignoreDuringBuilds: process.env.POLARIS_BUILD_SKIP_CHECKS === "1" },
+    // CI's checks job runs ESLint over these same sources beside the app build, so
+    // linting again inside `next build` proved nothing new. Skipped only where that
+    // job is known to run: dashboard-ci.yml sets the flag on its build, and nothing
+    // else does - the image and every local build still lint. The type check stays:
+    // it also covers the route types Next generates under .next/types, which exist
+    // only after a build, so the checks job's `tsc` never sees them.
+    eslint: { ignoreDuringBuilds: process.env.POLARIS_BUILD_SKIP_LINT === "1" },
     transpilePackages: ["@polaris/ui", "@polaris/file-parse", "@polaris/app-host"],
     serverExternalPackages: [
         "@prisma/client",
