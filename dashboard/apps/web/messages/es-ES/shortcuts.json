@@ -179,6 +179,20 @@
             "copyUsername": "Copiar el usuario",
             "edit": "Editar la entrada",
             "delete": "Borrar la entrada"
+        },
+        "office": {
+            "slides": {
+                "undo": "Deshacer cambio",
+                "redo": "Rehacer cambio",
+                "duplicate": "Duplicar el cuadro elegido",
+                "delete": "Borrar el cuadro elegido",
+                "edit": "Editar el texto del cuadro",
+                "deselect": "Dejar de editar y soltar el cuadro",
+                "nudge": "Mover un poco el cuadro",
+                "nudgeFar": "Moverlo más lejos",
+                "present": "Presentar",
+                "help": "Ver atajos de teclado"
+            }
         }
     },
     "groups": {
@@ -205,7 +219,8 @@
         "chatCalls": "Llamadas",
         "placesClips": "Clips",
         "databasesQuery": "Consultas",
-        "vaultItems": "Entradas"
+        "vaultItems": "Entradas",
+        "officeSlides": "Presentaciones"
     },
     "apps": {
         "general": "En todas",
@@ -217,6 +232,7 @@
         "chat": "Chat",
         "places": "Lugares",
         "databases": "Bases",
-        "vault": "Vault"
+        "vault": "Vault",
+        "office": "Office"
     }
 }

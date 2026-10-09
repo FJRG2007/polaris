@@ -223,7 +223,16 @@
         "duplicateSlide": "Duplicate slide",
         "present": "Present",
         "presenting": "Presenting",
-        "stopPresenting": "Stop presenting"
+        "stopPresenting": "Stop presenting",
+        "undo": "Undo last change",
+        "redo": "Redo last change",
+        "duplicateBox": "Duplicate",
+        "deleteBox": "Delete",
+        "shortcuts": "Keyboard shortcuts",
+        "clickToAddText": "Click to add text",
+        "canvas": "Slide {number}",
+        "resize": "Resize the box",
+        "counter": "{at} of {total}"
     },
     "positioning": {
         "twoThingsToMeasure": "Two things to measure",

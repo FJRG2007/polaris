@@ -179,6 +179,20 @@
             "copyUsername": "Copy the username",
             "edit": "Edit the entry",
             "delete": "Delete the entry"
+        },
+        "office": {
+            "slides": {
+                "undo": "Undo last change",
+                "redo": "Redo last change",
+                "duplicate": "Duplicate the chosen box",
+                "delete": "Delete the chosen box",
+                "edit": "Edit the chosen box's text",
+                "deselect": "Stop editing, then clear the choice",
+                "nudge": "Nudge the chosen box",
+                "nudgeFar": "Nudge it further",
+                "present": "Present",
+                "help": "Show keyboard shortcuts"
+            }
         }
     },
     "groups": {
@@ -205,7 +219,8 @@
         "chatCalls": "Calls",
         "placesClips": "Clips",
         "databasesQuery": "Queries",
-        "vaultItems": "Entries"
+        "vaultItems": "Entries",
+        "officeSlides": "Presentations"
     },
     "apps": {
         "general": "Everywhere",
@@ -217,6 +232,7 @@
         "chat": "Chat",
         "places": "Places",
         "databases": "Databases",
-        "vault": "Vault"
+        "vault": "Vault",
+        "office": "Office"
     }
 }
