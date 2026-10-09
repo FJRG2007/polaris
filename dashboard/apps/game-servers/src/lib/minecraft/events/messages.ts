@@ -411,6 +411,17 @@ export function droppedAtFeet(count: number, item: string, language: Language): 
         : `${WARN}Inventory full: ${mark(`${count} ${item}`, WARN)} fell at your feet. Pick them up before they despawn.`;
 }
 
+export function mendedWith(
+    count: number,
+    points: number,
+    rest: boolean,
+    language: Language
+): string {
+    return language === "es"
+        ? `${GOOD}Tu equipo con Reparación se ha reparado: ${mark(count, GOOD)} objeto(s) con ${mark(points, GOOD)} de experiencia.${rest ? " El resto va a tu barra." : ""}`
+        : `${GOOD}Your Mending gear was repaired: ${mark(count, GOOD)} item(s) with ${mark(points, GOOD)} experience.${rest ? " The rest goes on your bar." : ""}`;
+}
+
 export function rewardWaiting(language: Language): string {
     return language === "es"
         ? `${INFO}Quien no esté conectado recibirá su premio al volver.`

@@ -1874,6 +1874,20 @@ async function carry(
                         eventMessages.droppedAtFeet(one.dropped, one.label ?? one.id, language)
                 )
             );
+        const mended = delivery.mendedOf(handed.delivery);
+        if (mended)
+            said.push(
+                commands.tell(
+                    name,
+                    eventMessages.tag(language) +
+                        eventMessages.mendedWith(
+                            mended.count,
+                            mended.points,
+                            mended.rest > 0,
+                            language
+                        )
+                )
+            );
     }
     if (said.length > 0) await sweep.server.sayAll(said);
     if (owed.items.length === 0 && owed.levels === 0) return;
