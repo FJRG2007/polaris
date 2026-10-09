@@ -46,12 +46,17 @@ function account(sessionId: string, name: string, active: boolean): FakeAccount 
 vi.mock("next/headers", () => ({
     headers: async () => new Headers({ cookie: cookieHeader }),
     cookies: async () => ({
-        set: (name: string, value: string, options: Record<string, unknown>) => set.push({ name, value, options })
+        set: (name: string, value: string, options: Record<string, unknown>) =>
+            set.push({ name, value, options })
     })
 }));
 
 vi.mock("@/lib/auth", () => ({
-    auth: { $context: Promise.resolve({ authCookies: { sessionToken: { name: "polaris.session_token" } } }) }
+    auth: {
+        $context: Promise.resolve({
+            authCookies: { sessionToken: { name: "polaris.session_token" } }
+        })
+    }
 }));
 
 vi.mock("@/lib/request-context", () => ({ clientIp: async () => "203.0.113.9" }));
@@ -88,7 +93,10 @@ vi.mock("@polaris/auth", async () => {
             const found = accounts.find((entry) => entry.sessionId === sessionId);
             return found ? { account: found, cookies: issued("polaris.session_token") } : null;
         },
-        signOutAllDeviceAccounts: async () => ({ accounts, cookies: issued("polaris.session_token") })
+        signOutAllDeviceAccounts: async () => ({
+            accounts,
+            cookies: issued("polaris.session_token")
+        })
     };
 });
 
@@ -119,10 +127,15 @@ describe("deviceAccountsAction", () => {
     });
 
     it("clears the cookies of sessions that no longer exist", async () => {
-        cookieHeader = "polaris.session_token_multi-token-ana=x; polaris.session_token_multi-gone=y";
+        cookieHeader =
+            "polaris.session_token_multi-token-ana=x; polaris.session_token_multi-gone=y";
         await actions.deviceAccountsAction();
         expect(set).toEqual([
-            expect.objectContaining({ name: "polaris.session_token_multi-gone", value: "", options: expect.objectContaining({ maxAge: 0 }) })
+            expect.objectContaining({
+                name: "polaris.session_token_multi-gone",
+                value: "",
+                options: expect.objectContaining({ maxAge: 0 })
+            })
         ]);
     });
 });
@@ -139,7 +152,11 @@ describe("switchAccountAction", () => {
         expect(await actions.switchAccountAction(BEN)).toEqual({});
         expect(set.map((cookie) => cookie.name)).toEqual(["polaris.session_token"]);
         expect(audits).toEqual([
-            expect.objectContaining({ actorId: "user-ben", action: "account.session.switched-to", targetId: BEN })
+            expect.objectContaining({
+                actorId: "user-ben",
+                action: "account.session.switched-to",
+                targetId: BEN
+            })
         ]);
     });
 
@@ -195,7 +212,11 @@ describe("signOutAccountAction", () => {
         accounts = [];
         expect(await actions.signOutAccountAction()).toEqual({});
         expect(set).toEqual([
-            expect.objectContaining({ name: "polaris.session_token", value: "", options: expect.objectContaining({ maxAge: 0 }) })
+            expect.objectContaining({
+                name: "polaris.session_token",
+                value: "",
+                options: expect.objectContaining({ maxAge: 0 })
+            })
         ]);
     });
 

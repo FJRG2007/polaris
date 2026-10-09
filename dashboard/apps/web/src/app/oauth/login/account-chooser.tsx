@@ -25,7 +25,9 @@ export function AccountChooser({ accounts }: { accounts: DeviceAccountView[] }) 
     async function choose(account: DeviceAccountView) {
         setBusy(account.id);
         setError(null);
-        const result = await switchAccountAction(account.id).catch(() => ({ error: t("login.chooserError") }));
+        const result = await switchAccountAction(account.id).catch(() => ({
+            error: t("login.chooserError")
+        }));
         if (result.error) {
             setError(result.error);
             setBusy(null);
@@ -57,10 +59,16 @@ export function AccountChooser({ accounts }: { accounts: DeviceAccountView[] }) 
                                     {initials(account.name)}
                                 </span>
                                 <span className="flex min-w-0 flex-1 flex-col">
-                                    <span className="truncate text-sm font-medium" title={account.name}>
+                                    <span
+                                        className="truncate text-sm font-medium"
+                                        title={account.name}
+                                    >
                                         {account.name}
                                     </span>
-                                    <span className="truncate text-xs text-muted-foreground" title={account.email}>
+                                    <span
+                                        className="truncate text-xs text-muted-foreground"
+                                        title={account.email}
+                                    >
                                         {account.email}
                                     </span>
                                 </span>

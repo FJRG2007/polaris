@@ -27,7 +27,10 @@ vi.mock("next/navigation", () => ({
     useRouter: () => ({ push: () => undefined, refresh: () => undefined })
 }));
 vi.mock("@/lib/auth-client", () => ({ signOut: async () => undefined }));
-vi.mock("@/components/presence-store", () => ({ usePresenceRefresh: () => () => undefined, usePresence: () => null }));
+vi.mock("@/components/presence-store", () => ({
+    usePresenceRefresh: () => () => undefined,
+    usePresence: () => null
+}));
 vi.mock("@/components/device-accounts", () => ({ AccountSwitcherDialog: () => null }));
 vi.mock("@/app/(app)/account/preferences/actions", () => ({
     presenceNowAction: async () => ({}),
@@ -51,7 +54,12 @@ vi.mock("@polaris/ui", async (original) => ({
         disabled?: boolean;
         "aria-label"?: string;
     }) => (
-        <select aria-label={label} value={value} disabled={disabled} onChange={(event) => onValueChange(event.target.value)}>
+        <select
+            aria-label={label}
+            value={value}
+            disabled={disabled}
+            onChange={(event) => onValueChange(event.target.value)}
+        >
             {options.map((option) => (
                 <option key={option.value} value={option.value}>
                     {option.label}
@@ -161,7 +169,9 @@ describe("the language card", () => {
     it("sends nothing when the language picked is the one in use", () => {
         const save = vi.fn(async () => ({}));
         render(withMessages(<LanguageCard current="es-ES" save={save} />, "es-ES"));
-        fireEvent.change(screen.getByRole("combobox", { name: "Idioma" }), { target: { value: "es-ES" } });
+        fireEvent.change(screen.getByRole("combobox", { name: "Idioma" }), {
+            target: { value: "es-ES" }
+        });
         expect(save).not.toHaveBeenCalled();
     });
 
