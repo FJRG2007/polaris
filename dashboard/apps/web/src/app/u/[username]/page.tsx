@@ -16,11 +16,9 @@
 
 import type { Metadata } from "next";
 import { guardedUser } from "@/lib/session";
-import { Messages } from "@/components/i18n/messages";
 import { getTranslations } from "@/lib/i18n/request";
-import { ProfileCard } from "./profile-card";
-import { publicProfile, profilesArePublic } from "@/lib/profile-service";
-import { NothingToShow, ProfileFrame } from "@/components/profile-frame";
+import { ProfileFrame } from "@/components/profile-frame";
+import { ProfileBody } from "./profile-body";
 
 export const dynamic = "force-dynamic";
 
@@ -38,25 +36,9 @@ export default async function ProfilePage({ params }: { params: Promise<{ userna
     // the same reason it is not shown it anywhere else, and reads this page as
     // anybody without an account would.
     const viewer = await guardedUser().catch(() => null);
-    const profile = await publicProfile(
-        decodeURIComponent(username),
-        viewer ? { id: viewer.id, isAdmin: viewer.isAdmin } : null
-    );
-
-    if (!profile) {
-        const closed = !viewer && !(await profilesArePublic());
-        return (
-            <ProfileFrame viewer={viewer}>
-                <NothingToShow closed={closed} subject="profile" />
-            </ProfileFrame>
-        );
-    }
-
     return (
         <ProfileFrame viewer={viewer}>
-            <Messages namespaces={["publicPages"]}>
-                <ProfileCard profile={profile} own={viewer?.id === profile.id} signedIn={viewer !== null} />
-            </Messages>
+            <ProfileBody username={username} viewer={viewer} />
         </ProfileFrame>
     );
 }

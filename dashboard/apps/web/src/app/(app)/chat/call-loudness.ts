@@ -104,6 +104,33 @@ export function quietVerdict(gap: number | null, wasQuiet: boolean): boolean {
     return wasQuiet ? gap >= QUIET_CLEAR_DB : gap >= QUIET_GAP_DB;
 }
 
+/** Where lifting a quiet voice starts, in dB below the room: under this two
+ *  voices are as alike as two good microphones, and nobody is touched. */
+export const LIFT_FROM_DB = 3;
+
+/** The most a voice is lifted on its own, as a multiple of how it arrives: six
+ *  decibels. Enough to bring a laptop microphone across a room back into the
+ *  conversation; past it the noise around the voice comes up with it, and the
+ *  rest is the person's own microphone volume to fix - which they are told. */
+export const LIFT_MAX = 2;
+
+/**
+ * How much louder to play somebody who arrives below everybody else, as a
+ * multiple: 1 for anybody at or above the room's level, rising with the gap past
+ * `LIFT_FROM_DB` and stopping at `LIFT_MAX`.
+ *
+ * Only ever up. A loud voice is somebody's choice of microphone to turn down on
+ * their own speakers; a quiet one is everybody's problem, and lifting it here
+ * spares each listener reaching for the slider. Continuous in the gap, and the
+ * gap itself moves over seconds, so nobody is heard stepping up and down. The
+ * gap is measured on the voice as it arrives, before any volume is applied, so
+ * the lift never feeds back into what it is computed from.
+ */
+export function liftFor(gap: number | null): number {
+    if (gap === null || gap <= LIFT_FROM_DB) return 1;
+    return Math.min(LIFT_MAX, 10 ** ((gap - LIFT_FROM_DB) / 20));
+}
+
 /** How a gap reads in the person menu. */
 export function gapWords(gap: number | null): "unknown" | "quieter" | "louder" | "same" {
     if (gap === null) return "unknown";

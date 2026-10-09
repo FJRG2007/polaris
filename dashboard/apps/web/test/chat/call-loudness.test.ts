@@ -13,6 +13,9 @@ import {
     gapBelow,
     gapFor,
     gapWords,
+    LIFT_FROM_DB,
+    LIFT_MAX,
+    liftFor,
     LOUDNESS_START,
     QUIET_CLEAR_DB,
     QUIET_GAP_DB,
@@ -79,5 +82,32 @@ describe("the hint", () => {
     it("keeps what it said while there is nothing new to go on", () => {
         expect(quietVerdict(null, true)).toBe(true);
         expect(quietVerdict(null, false)).toBe(false);
+    });
+});
+
+describe("lifting a quiet voice", () => {
+    it("leaves anybody at or above the room alone", () => {
+        expect(liftFor(null)).toBe(1);
+        expect(liftFor(-12)).toBe(1);
+        expect(liftFor(0)).toBe(1);
+        expect(liftFor(LIFT_FROM_DB)).toBe(1);
+    });
+
+    it("rises with the gap, without a step, and stops at the ceiling", () => {
+        expect(liftFor(LIFT_FROM_DB + 0.01)).toBeCloseTo(1, 2);
+        expect(liftFor(LIFT_FROM_DB + 6)).toBeCloseTo(10 ** (6 / 20), 5);
+        expect(liftFor(LIFT_FROM_DB + 5)).toBeGreaterThan(liftFor(LIFT_FROM_DB + 2));
+        expect(liftFor(40)).toBe(LIFT_MAX);
+    });
+
+    it("lifts the voice that arrives below everybody else, and only that one", () => {
+        const all = new Map([
+            ["quiet", talked(-40)],
+            ["a", talked(-25)],
+            ["b", talked(-26)]
+        ]);
+        expect(liftFor(gapFor(all, "quiet"))).toBe(LIFT_MAX);
+        expect(liftFor(gapFor(all, "a"))).toBe(1);
+        expect(liftFor(gapFor(all, "b"))).toBe(1);
     });
 });

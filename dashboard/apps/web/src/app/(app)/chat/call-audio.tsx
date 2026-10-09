@@ -35,6 +35,7 @@ import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { CallState } from "./use-call";
 import { useCallVolume } from "./call-volumes";
 import { CallLoudnessProbe } from "./call-loudness-probe";
+import { gapFor, liftFor, useLoudness } from "./call-loudness";
 import { useVoiceSettings } from "./voice-settings";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { boostStream, resumeBoost, type Boost } from "./call-boost";
@@ -321,7 +322,10 @@ function RemoteAudio({
 }) {
     const element = useRef<HTMLAudioElement>(null);
     const [chosen] = useCallVolume(volumeKey);
-    const volume = chosen * scale;
+    // A voice that arrives well below the rest of the room is lifted on its
+    // own, on top of whatever this reader set - see `liftFor`.
+    const lift = liftFor(gapFor(useLoudness(), volumeKey));
+    const volume = chosen * scale * lift;
     // Nothing is attached, and so nothing plays, until what this browser
     // remembers about this sound has been read - see `useSettled`.
     const ready = useSettled();

@@ -14,11 +14,9 @@
 
 import type { Metadata } from "next";
 import { guardedUser } from "@/lib/session";
-import { Messages } from "@/components/i18n/messages";
 import { getTranslations } from "@/lib/i18n/request";
-import { OrgProfileCard } from "./org-profile-card";
-import { orgProfile, profilesArePublic } from "@/lib/profile-service";
-import { NothingToShow, ProfileFrame } from "@/components/profile-frame";
+import { ProfileFrame } from "@/components/profile-frame";
+import { OrgBody } from "./org-body";
 
 export const dynamic = "force-dynamic";
 
@@ -32,25 +30,9 @@ export async function generateMetadata(): Promise<Metadata> {
 export default async function OrganizationPage({ params }: { params: Promise<{ slug: string }> }) {
     const { slug } = await params;
     const viewer = await guardedUser().catch(() => null);
-    const org = await orgProfile(
-        decodeURIComponent(slug),
-        viewer ? { id: viewer.id, isAdmin: viewer.isAdmin } : null
-    );
-
-    if (!org) {
-        const closed = !viewer && !(await profilesArePublic());
-        return (
-            <ProfileFrame viewer={viewer}>
-                <NothingToShow closed={closed} subject="organization" />
-            </ProfileFrame>
-        );
-    }
-
     return (
         <ProfileFrame viewer={viewer}>
-            <Messages namespaces={["publicPages"]}>
-                <OrgProfileCard org={org} />
-            </Messages>
+            <OrgBody slug={slug} viewer={viewer} />
         </ProfileFrame>
     );
 }
