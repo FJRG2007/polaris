@@ -55,6 +55,20 @@ export type ContainerFileRead =
  */
 export const RUN_OUTPUT_MAX = 16 * 1024;
 
+/**
+ * The longest single argument a `run` may carry. The host daemon refuses any
+ * argv element past this (`deploy_exec_run` in polaris-hostd) with "argv
+ * element too long or contains a NUL", and a write carries the whole file in
+ * its command - so the events data pack, once it outgrew it, could not be put
+ * on any server and every event that needs it was cancelled.
+ */
+export const RUN_ARG_MAX = 16 * 1024;
+
+/** How much of a file goes into one write command, in bytes: a multiple of
+ *  three, so each piece is whole base64 on its own, and with room under
+ *  `RUN_ARG_MAX` for the path and the shell around it. */
+export const WRITE_PIECE = 9 * 1024;
+
 /** Whether a `run` said everything, or may have been cut at `RUN_OUTPUT_MAX`. A
  *  few bytes short counts as cut: the daemon steps back to a character boundary. */
 export function mayBeCut(output: string): boolean {
@@ -340,7 +354,7 @@ export async function writeContainerFile(
     content: string
 ): Promise<void> {
     assertSafePath(path);
-    const encoded = Buffer.from(content, "utf8").toString("base64");
+    const bytes = Buffer.from(content, "utf8");
     const temporary = `${path}.polaris-new`;
     // Ownership is copied rather than asked for with --reference, which busybox
     // does not carry. Never fatal: a file written but left owned by the wrong
@@ -348,19 +362,30 @@ export async function writeContainerFile(
     // one it certainly will not.
     const takeOwner = `chown "$(stat -c %u:%g ${path})" ${temporary} || true; chmod "$(stat -c %a ${path})" ${temporary} || true`;
     const inheritOwner = `chown "$(stat -c %u:%g "$(dirname ${path})")" ${temporary} || true`;
-    const script = [
-        `mkdir -p "$(dirname ${path})"`,
-        `printf %s ${encoded} | base64 -d > ${temporary}`,
-        `if [ -f ${path} ]; then ${takeOwner}; else ${inheritOwner}; fi`,
-        `mv -f ${temporary} ${path}`
-    ].join(" && ");
-    const result = await server.run(["sh", "-c", script]);
-    if (result.code !== 0) {
-        const said = result.output.trim().slice(0, 200);
-        throw new Error(
-            said.length > 0
-                ? gameMessage("games", "lib.writeRefused", { said })
-                : gameMessage("games", "lib.writeFailed")
-        );
+    const pieces: string[] = [];
+    for (let at = 0; at < bytes.length || pieces.length === 0; at += WRITE_PIECE) {
+        pieces.push(bytes.subarray(at, at + WRITE_PIECE).toString("base64"));
+    }
+    const steps = pieces.map((piece, index) =>
+        index === 0
+            ? `mkdir -p "$(dirname ${path})" && printf %s ${piece} | base64 -d > ${temporary}`
+            : `printf %s ${piece} | base64 -d >> ${temporary}`
+    );
+    const finish = `if [ -f ${path} ]; then ${takeOwner}; else ${inheritOwner}; fi && mv -f ${temporary} ${path}`;
+    // A file that fits in one command is written in one; a longer one is built
+    // up in the temporary file a piece per command, and only moved onto the real
+    // one once every piece is in.
+    if (steps.length === 1) steps[0] = `${steps[0]} && ${finish}`;
+    else steps.push(finish);
+    for (const step of steps) {
+        const result = await server.run(["sh", "-c", step]);
+        if (result.code !== 0) {
+            const said = result.output.trim().slice(0, 200);
+            throw new Error(
+                said.length > 0
+                    ? gameMessage("games", "lib.writeRefused", { said })
+                    : gameMessage("games", "lib.writeFailed")
+            );
+        }
     }
 }

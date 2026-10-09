@@ -190,7 +190,9 @@ async function writeIntoContainer(
     path: string,
     bytes: Buffer
 ): Promise<void> {
-    const CHUNK = 32 * 1024;
+    // Under the daemon's limit on one argument (`RUN_ARG_MAX`), with room for
+    // the command around it: past it every piece is refused.
+    const CHUNK = 12 * 1024;
     const encoded = bytes.toString("base64");
     await server.runOk(["sh", "-c", `: > ${shellQuote(path)}.b64`], gameMessage("games", "lib.run.stageArchive"));
     for (let at = 0; at < encoded.length; at += CHUNK) {
