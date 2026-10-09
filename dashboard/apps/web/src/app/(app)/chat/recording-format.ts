@@ -15,11 +15,18 @@
  *
  * WebM is what is left for a browser that will not record MP4, and it is played
  * back perfectly well by the browser that made it.
+ *
+ * H.264 with Opus comes before H.264 with AAC, and not for the size. Chrome on
+ * Windows answers yes to AAC in `isTypeSupported` and then has no encoder for
+ * it: the recorder starts, fails a moment later with an `EncodingError`, and has
+ * written nothing - which on screen was a record button that did nothing at
+ * all. Opus in MP4 is what Chrome actually encodes everywhere, and a browser
+ * that will not record it (Safari) still falls through to AAC, which it does.
  */
 
 const TYPES = [
-    "video/mp4;codecs=avc1.42E01E,mp4a.40.2",
     "video/mp4;codecs=avc1,opus",
+    "video/mp4;codecs=avc1.42E01E,mp4a.40.2",
     "video/mp4",
     "video/webm;codecs=vp9,opus",
     "video/webm;codecs=vp8,opus",

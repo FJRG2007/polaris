@@ -52,6 +52,24 @@ export function RecordingPanel({
     const [error, setError] = useState("");
 
     const file = recording.file;
+    // A recording that failed before it wrote anything. Said here, where the
+    // finished one would have been offered, because otherwise the record button
+    // simply goes back to how it was and nobody knows why there is no file.
+    if (!file && recording.error && !recording.running) {
+        return (
+            <Dialog open onOpenChange={(open) => !open && recording.discard()}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>{t("recording.notRecorded")}</DialogTitle>
+                        <DialogDescription>{t("recording.notRecordedWhy")}</DialogDescription>
+                    </DialogHeader>
+                    <DialogFooter>
+                        <Button onClick={recording.discard}>{t("recording.close")}</Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+        );
+    }
     if (!file) return null;
 
     const send = async () => {

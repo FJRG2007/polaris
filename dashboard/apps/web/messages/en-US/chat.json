@@ -1213,7 +1213,10 @@
         "discard": "Discard",
         "download": "Download",
         "sending": "Sending",
-        "sendToTheConversation": "Send to the conversation"
+        "sendToTheConversation": "Send to the conversation",
+        "notRecorded": "The call was not recorded",
+        "notRecordedWhy": "This browser could not encode the call, so nothing was saved.",
+        "close": "Close"
     },
     "pollCard": {
         "pollClosed": "Poll closed",

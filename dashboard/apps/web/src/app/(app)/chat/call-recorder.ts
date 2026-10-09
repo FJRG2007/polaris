@@ -313,8 +313,21 @@ export function useCallRecorder(call: CallState): CallRecording {
         const recorded = new MediaStream(canvas.captureStream(FPS).getVideoTracks());
         for (const track of mixed.stream.getAudioTracks()) recorded.addTrack(track);
 
-        const recorder = new MediaRecorder(recorded, { mimeType: type });
+        let recorder: MediaRecorder;
+        try {
+            recorder = new MediaRecorder(recorded, { mimeType: type });
+            recorder.start(1000);
+        } catch {
+            teardown();
+            setError("This browser could not start recording the call.");
+            return;
+        }
         parts.recorder = recorder;
+        // An encoder the browser said it had and then did not. The recorder
+        // stops itself after this, and `onstop` below lets go of everything.
+        recorder.onerror = () => {
+            setError("This browser could not encode the call, so it was not recorded.");
+        };
         recorder.ondataavailable = (event) => {
             if (event.data.size === 0) return;
             parts.chunks.push(event.data);
@@ -339,9 +352,8 @@ export function useCallRecorder(call: CallState): CallRecording {
             setFile(new File([blob], `call-recording.${recordingExtension(type)}`, { type }));
         };
 
-        // A slice a second, so the size is known while it grows rather than only
-        // at the end.
-        recorder.start(1000);
+        // Started above, a slice a second, so the size is known while it grows
+        // rather than only at the end.
         setRunning(true);
         // Said out loud before anything else: from this moment the room is being
         // written down, and everybody in it is entitled to see that on screen.

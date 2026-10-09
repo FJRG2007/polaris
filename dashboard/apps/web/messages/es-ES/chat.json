@@ -1213,7 +1213,10 @@
         "discard": "Descartar",
         "download": "Descargar",
         "sending": "Enviando",
-        "sendToTheConversation": "Enviar a la conversación"
+        "sendToTheConversation": "Enviar a la conversación",
+        "notRecorded": "No se grabó la llamada",
+        "notRecordedWhy": "Este navegador no pudo codificar la llamada y no se guardó nada.",
+        "close": "Cerrar"
     },
     "pollCard": {
         "pollClosed": "Cerrada",

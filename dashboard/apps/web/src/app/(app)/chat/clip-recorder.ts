@@ -313,8 +313,21 @@ export function useClipRecorder(options: { maxBytes: number }): ClipRecording {
             for (const track of audio.tracks) recorded.addTrack(track);
             parts.recorded = recorded;
 
-            const recorder = new MediaRecorder(recorded, { mimeType: type });
+            let recorder: MediaRecorder;
+            try {
+                recorder = new MediaRecorder(recorded, { mimeType: type });
+            } catch {
+                teardown();
+                setStage("idle");
+                setError("This browser could not start recording the screen");
+                return;
+            }
             parts.recorder = recorder;
+            // An encoder the browser said it had and then did not. The recorder
+            // stops itself after this, and `onstop` below lets go of everything.
+            recorder.onerror = () => {
+                setError("This browser could not encode the screen, so nothing was recorded");
+            };
             recorder.ondataavailable = (event) => {
                 if (event.data.size === 0) return;
                 parts.chunks.push(event.data);
@@ -352,7 +365,14 @@ export function useClipRecorder(options: { maxBytes: number }): ClipRecording {
 
             // A slice per second, so the size is known as it grows rather than
             // only at the end.
-            recorder.start(1000);
+            try {
+                recorder.start(1000);
+            } catch {
+                teardown();
+                setStage("idle");
+                setError("This browser could not start recording the screen");
+                return;
+            }
             setSeconds(0);
             setStage("recording");
         },
