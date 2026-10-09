@@ -54,7 +54,9 @@ function summary(object: CrmObject, row: ViewRow): ViewSummary {
     };
 }
 
-async function refuse(key: "viewMissing" | "viewNameTaken" | "viewName" | "viewDefault" | "viewLimit"): Promise<never> {
+async function refuse(
+    key: "viewMissing" | "viewNameTaken" | "viewName" | "viewDefault" | "viewLimit"
+): Promise<never> {
     const t = await crmT();
     throw new CrmRefusal(t(`errors.${key}`, { max: MAX_VIEWS, length: VIEW_NAME_MAX }));
 }
@@ -142,7 +144,11 @@ export async function createView(
     const where = { shelf: actor.shelf.key, object, NOT: { name: "" } };
     const [count, last] = await Promise.all([
         prisma.crmView.count({ where }),
-        prisma.crmView.findFirst({ where, orderBy: { position: "desc" }, select: { position: true } })
+        prisma.crmView.findFirst({
+            where,
+            orderBy: { position: "desc" },
+            select: { position: true }
+        })
     ]);
     if (count >= MAX_VIEWS) await refuse("viewLimit");
     await refuseTaken(actor, object, name);
@@ -196,7 +202,11 @@ export async function renameView(
 }
 
 /** Remove a named view. The default view cannot be removed. */
-export async function deleteView(actor: CrmActor, object: CrmObject, viewId: string): Promise<void> {
+export async function deleteView(
+    actor: CrmActor,
+    object: CrmObject,
+    viewId: string
+): Promise<void> {
     await requireCan(actor, object, "edit");
     const where = { id: viewId, shelf: actor.shelf.key, object };
     const found = await prisma.crmView.findFirst({ where, select: { name: true } });
@@ -221,7 +231,8 @@ export async function saveViewConfig(
         where,
         data: { config: JSON.stringify(clean), ...(kind ? { kind: kindFor(object, kind) } : {}) }
     });
-    const row = result.count > 0 ? await prisma.crmView.findFirst({ where, select: VIEW_SELECT }) : null;
+    const row =
+        result.count > 0 ? await prisma.crmView.findFirst({ where, select: VIEW_SELECT }) : null;
     if (!row) await refuse("viewMissing");
     return summary(object, row!);
 }

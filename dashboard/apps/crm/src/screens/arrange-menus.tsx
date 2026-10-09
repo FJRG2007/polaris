@@ -89,19 +89,27 @@ export function SortMenu({
                                     </DropdownMenuSubTrigger>
                                     <DropdownMenuSubContent className="w-48">
                                         <DropdownMenuItem
-                                            onSelect={() => set(index, { ...sort, direction: "asc" })}
+                                            onSelect={() =>
+                                                set(index, { ...sort, direction: "asc" })
+                                            }
                                         >
                                             <ArrowUp className="size-3.5" />
-                                            <span className="flex-1">{t("columns.sortAscending")}</span>
+                                            <span className="flex-1">
+                                                {t("columns.sortAscending")}
+                                            </span>
                                             {sort.direction === "asc" ? (
                                                 <Check className="size-3.5" />
                                             ) : null}
                                         </DropdownMenuItem>
                                         <DropdownMenuItem
-                                            onSelect={() => set(index, { ...sort, direction: "desc" })}
+                                            onSelect={() =>
+                                                set(index, { ...sort, direction: "desc" })
+                                            }
                                         >
                                             <ArrowDown className="size-3.5" />
-                                            <span className="flex-1">{t("columns.sortDescending")}</span>
+                                            <span className="flex-1">
+                                                {t("columns.sortDescending")}
+                                            </span>
                                             {sort.direction === "desc" ? (
                                                 <Check className="size-3.5" />
                                             ) : null}

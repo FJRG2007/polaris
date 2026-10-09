@@ -193,7 +193,9 @@ export function Board(props: BoardProps) {
     return (
         <div
             className="flex min-h-0 flex-1 gap-3 overflow-x-auto overscroll-x-contain pb-1"
-            aria-label={t("board.label", { field: t(`fields.${object}.${field.key}` as Parameters<typeof t>[0]) })}
+            aria-label={t("board.label", {
+                field: t(`fields.${object}.${field.key}` as Parameters<typeof t>[0])
+            })}
             role="region"
         >
             {groups.map((group) => {
@@ -279,7 +281,9 @@ export function Board(props: BoardProps) {
                                     <article
                                         key={record.id}
                                         data-card={record.id}
-                                        draggable={props.canEdit && !pending && editing?.id !== record.id}
+                                        draggable={
+                                            props.canEdit && !pending && editing?.id !== record.id
+                                        }
                                         aria-label={name}
                                         onDragStart={(event) => {
                                             event.dataTransfer.setData(CARD_DRAG, record.id);
@@ -292,7 +296,9 @@ export function Board(props: BoardProps) {
                                         }}
                                         className={cn(
                                             "group/card relative flex shrink-0 flex-col gap-1.5 rounded-md border border-border bg-card p-2.5 shadow-sm",
-                                            props.canEdit && !pending && "cursor-grab active:cursor-grabbing",
+                                            props.canEdit &&
+                                                !pending &&
+                                                "cursor-grab active:cursor-grabbing",
                                             dragging === record.id && "opacity-50",
                                             pending && "pointer-events-none opacity-60",
                                             over &&
@@ -322,8 +328,9 @@ export function Board(props: BoardProps) {
                                                             record,
                                                             value,
                                                             // The top of the column it goes to.
-                                                            groups.find((one) => one.value === value)
-                                                                ?.rows[0]?.id ?? null
+                                                            groups.find(
+                                                                (one) => one.value === value
+                                                            )?.rows[0]?.id ?? null
                                                         )
                                                     }
                                                 />
@@ -332,7 +339,9 @@ export function Board(props: BoardProps) {
                                         {shown
                                             .filter((one) => {
                                                 const value = record.values[one.key];
-                                                return one.kind === "boolean" ? value === true : !isEmptyValue(value);
+                                                return one.kind === "boolean"
+                                                    ? value === true
+                                                    : !isEmptyValue(value);
                                             })
                                             .map((one) => (
                                                 <div
@@ -340,7 +349,11 @@ export function Board(props: BoardProps) {
                                                     className="flex min-w-0 items-center gap-2 text-[0.75rem]"
                                                 >
                                                     <span className="w-24 shrink-0 truncate text-muted-foreground">
-                                                        {t(`fields.${object}.${one.key}` as Parameters<typeof t>[0])}
+                                                        {t(
+                                                            `fields.${object}.${one.key}` as Parameters<
+                                                                typeof t
+                                                            >[0]
+                                                        )}
                                                     </span>
                                                     {editable(
                                                         record,
@@ -369,7 +382,9 @@ export function Board(props: BoardProps) {
                                 >
                                     {props.loadingGroup === group.value
                                         ? t("list.loadingMore")
-                                        : t("board.more", { count: group.total - group.rows.length })}
+                                        : t("board.more", {
+                                              count: group.total - group.rows.length
+                                          })}
                                 </Button>
                             ) : null}
                         </div>
@@ -416,7 +431,9 @@ function MoveMenu({
                         onSelect={() => onMove(option)}
                         className="gap-2"
                     >
-                        <span className={cn("size-2 shrink-0 rounded-full", optionDot(field, option))} />
+                        <span
+                            className={cn("size-2 shrink-0 rounded-full", optionDot(field, option))}
+                        />
                         <span className="min-w-0 flex-1 truncate">{label(option)}</span>
                         {option === current ? <Check className="size-3.5 shrink-0" /> : null}
                     </DropdownMenuItem>

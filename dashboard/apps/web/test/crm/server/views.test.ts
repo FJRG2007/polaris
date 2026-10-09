@@ -36,7 +36,11 @@ vi.mock("@polaris/db", () => ({
     Prisma: { Decimal: class {} },
     prisma: {
         crmView: {
-            findUnique: async ({ where }: { where: { shelf_object_name: Record<string, unknown> } }) => {
+            findUnique: async ({
+                where
+            }: {
+                where: { shelf_object_name: Record<string, unknown> };
+            }) => {
                 const row = db.rows.find((one) => matches(one, where.shelf_object_name));
                 return row ? pick(row) : null;
             },
@@ -90,7 +94,13 @@ vi.mock("@polaris/db", () => ({
                 Object.assign(row, data);
                 return pick(row);
             },
-            updateMany: async ({ where, data }: { where: Record<string, unknown>; data: Partial<Row> }) => {
+            updateMany: async ({
+                where,
+                data
+            }: {
+                where: Record<string, unknown>;
+                data: Partial<Row>;
+            }) => {
                 const rows = db.rows.filter((one) => matches(one, where));
                 for (const row of rows) Object.assign(row, data);
                 return { count: rows.length };
@@ -186,9 +196,9 @@ describe("saved views", () => {
 
     it("keeps the default view's name and place", async () => {
         const [first] = await views.listViews(actor(), "people");
-        await expect(views.renameView(actor(), "people", first!.id, "Renamed")).rejects.toBeInstanceOf(
-            CrmRefusal
-        );
+        await expect(
+            views.renameView(actor(), "people", first!.id, "Renamed")
+        ).rejects.toBeInstanceOf(CrmRefusal);
         await expect(views.deleteView(actor(), "people", first!.id)).rejects.toBeInstanceOf(
             CrmRefusal
         );

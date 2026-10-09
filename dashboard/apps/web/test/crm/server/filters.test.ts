@@ -11,7 +11,8 @@ import { filterWhere } from "@polaris-app/crm/src/lib/filters";
 import { listOrder, listWhere } from "@polaris-app/crm/src/lib/query";
 
 const shelf = { orgId: "o1", userId: null, key: "org:o1", orgName: "Acme" };
-const rule = (key: string, operator: string, value: unknown) => ({ id: key, key, operator, value }) as never;
+const rule = (key: string, operator: string, value: unknown) =>
+    ({ id: key, key, operator, value }) as never;
 const insensitive = (text: string) => ({ contains: text, mode: "insensitive" });
 
 describe("filterWhere", () => {
@@ -44,7 +45,10 @@ describe("filterWhere", () => {
 
     it("reads a person's name in both its parts, every word somewhere", () => {
         expect(
-            filterWhere("people", { conjunction: "and", rules: [rule("name", "contains", "ana gar")] })
+            filterWhere("people", {
+                conjunction: "and",
+                rules: [rule("name", "contains", "ana gar")]
+            })
         ).toEqual({
             AND: [
                 { OR: [{ firstName: insensitive("ana") }, { lastName: insensitive("ana") }] },
@@ -64,7 +68,10 @@ describe("filterWhere", () => {
 
     it("compares a count with whole numbers only", () => {
         const where = (operator: string, value: number) =>
-            filterWhere("companies", { conjunction: "and", rules: [rule("employees", operator, value)] });
+            filterWhere("companies", {
+                conjunction: "and",
+                rules: [rule("employees", operator, value)]
+            });
         expect(where("greaterThan", 2.5)).toEqual({ employees: { gt: 2 } });
         expect(where("lessThan", 2.5)).toEqual({ employees: { lt: 3 } });
         expect(where("is", 2.5)).toEqual({ id: { in: [] } });

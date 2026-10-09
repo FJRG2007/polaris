@@ -68,9 +68,9 @@ export function ViewPicker({
 }) {
     const t = useCrmT();
     const viewName = useViewName();
-    const [naming, setNaming] = useState<{ mode: "create" } | { mode: "rename"; view: ViewSummary } | null>(
-        null
-    );
+    const [naming, setNaming] = useState<
+        { mode: "create" } | { mode: "rename"; view: ViewSummary } | null
+    >(null);
     const CurrentIcon = KIND_ICON[current?.kind ?? "table"];
     const taken = (name: string, except?: string) =>
         views.some(
@@ -127,7 +127,9 @@ export function ViewPicker({
                             {current && current.name ? (
                                 <>
                                     <DropdownMenuItem
-                                        onSelect={() => setNaming({ mode: "rename", view: current })}
+                                        onSelect={() =>
+                                            setNaming({ mode: "rename", view: current })
+                                        }
                                     >
                                         <Pencil className="size-3.5" />
                                         {t("views.rename")}
@@ -233,7 +235,9 @@ function ViewNameDialog({
                             onChange={(event) => setName(event.target.value)}
                         />
                         {duplicate ? (
-                            <span className="text-[0.75rem] text-danger">{t("views.nameTaken")}</span>
+                            <span className="text-[0.75rem] text-danger">
+                                {t("views.nameTaken")}
+                            </span>
                         ) : null}
                     </label>
                     {kind !== null ? (
@@ -260,7 +264,11 @@ function ViewNameDialog({
                         <Button type="button" variant="ghost" onClick={onClose}>
                             {t("actions.cancel")}
                         </Button>
-                        <Button type="submit" aria-disabled={blocked} className={blocked ? "opacity-60" : undefined}>
+                        <Button
+                            type="submit"
+                            aria-disabled={blocked}
+                            className={blocked ? "opacity-60" : undefined}
+                        >
                             {initialKind === null ? t("views.save") : t("views.createButton")}
                         </Button>
                     </DialogFooter>

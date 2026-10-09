@@ -388,13 +388,16 @@ export function RecordTable(props: TableProps) {
                                                   <button
                                                       type="button"
                                                       disabled={grouping.loadingGroup !== null}
-                                                      onClick={() => grouping.onLoadMore(group.value)}
+                                                      onClick={() =>
+                                                          grouping.onLoadMore(group.value)
+                                                      }
                                                       className="sticky left-0 flex h-9 items-center px-3 text-[0.8125rem] text-muted-foreground hover:text-foreground disabled:opacity-60"
                                                   >
                                                       {grouping.loadingGroup === group.value
                                                           ? t("list.loadingMore")
                                                           : t("board.more", {
-                                                                count: group.total - group.rows.length
+                                                                count:
+                                                                    group.total - group.rows.length
                                                             })}
                                                   </button>
                                               </td>

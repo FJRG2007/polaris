@@ -31,13 +31,7 @@ import {
     menuSearchMatches,
     Select
 } from "@polaris/ui";
-import {
-    FIELDS,
-    fieldOf,
-    type CrmObject,
-    type FieldDef,
-    type Ref
-} from "../model/objects";
+import { FIELDS, fieldOf, type CrmObject, type FieldDef, type Ref } from "../model/objects";
 import * as filters from "../model/filters";
 
 let made = 0;
@@ -50,11 +44,19 @@ function localId(): string {
 
 function newRule(object: CrmObject): filters.FilterRule {
     const field = FIELDS[object][0]!;
-    return { id: localId(), key: field.key, operator: filters.operatorsFor(field.kind)[0]!, value: null };
+    return {
+        id: localId(),
+        key: field.key,
+        operator: filters.operatorsFor(field.kind)[0]!,
+        value: null
+    };
 }
 
 function countRules(filter: filters.ViewFilter): number {
-    return filter.rules.reduce((sum, item) => sum + (filters.isGroup(item) ? item.rules.length : 1), 0);
+    return filter.rules.reduce(
+        (sum, item) => sum + (filters.isGroup(item) ? item.rules.length : 1),
+        0
+    );
 }
 
 export function FilterButton({
@@ -136,7 +138,10 @@ function ConjunctionPicker({
             onValueChange={(next) => onChange(next as filters.Conjunction)}
             aria-label={label}
             className="h-8 w-auto min-w-0"
-            options={filters.CONJUNCTIONS.map((one) => ({ value: one, label: t(`filters.match.${one}`) }))}
+            options={filters.CONJUNCTIONS.map((one) => ({
+                value: one,
+                label: t(`filters.match.${one}`)
+            }))}
         />
     );
 }
@@ -156,9 +161,7 @@ function FilterEditor({
     const full = countRules(filter) >= filters.MAX_RULES;
     const setItems = (rules: filters.FilterItem[]) => onChange({ ...filter, rules });
     const replace = (id: string, next: filters.FilterItem | null) =>
-        setItems(
-            filter.rules.flatMap((item) => (item.id === id ? (next ? [next] : []) : [item]))
-        );
+        setItems(filter.rules.flatMap((item) => (item.id === id ? (next ? [next] : []) : [item])));
 
     return (
         <div className="flex flex-col gap-3">
@@ -321,7 +324,12 @@ function RuleEditor({
                 onValueChange={(key) => {
                     const next = fieldOf(object, key);
                     if (!next || key === rule.key) return;
-                    onChange({ ...rule, key, operator: filters.operatorsFor(next.kind)[0]!, value: null });
+                    onChange({
+                        ...rule,
+                        key,
+                        operator: filters.operatorsFor(next.kind)[0]!,
+                        value: null
+                    });
                 }}
             />
             <Select
@@ -426,7 +434,14 @@ function ValueEditor({
                 />
             );
         case "number":
-            return <NumberInput key={rule.operator} value={rule.value} onChange={onChange} label={label} />;
+            return (
+                <NumberInput
+                    key={rule.operator}
+                    value={rule.value}
+                    onChange={onChange}
+                    label={label}
+                />
+            );
         case "day":
             return (
                 <Input
@@ -483,7 +498,8 @@ function useChoices(
                 name: optionLabel(option)
             }));
         }
-        if (field.kind === "member") return people.filter((one) => menuSearchMatches(one.name, search));
+        if (field.kind === "member")
+            return people.filter((one) => menuSearchMatches(one.name, search));
         return found;
     }, [field, people, search, found, optionLabel]);
 }
@@ -505,7 +521,8 @@ function ChoicePicker({
     const [open, setOpen] = useState(false);
     const [search, setSearch] = useState("");
     const optionLabel = useCallback(
-        (option: string) => t(`options.${object}.${field.key}.${option}` as Parameters<typeof t>[0]),
+        (option: string) =>
+            t(`options.${object}.${field.key}.${option}` as Parameters<typeof t>[0]),
         [t, object, field.key]
     );
     const choices = useChoices(field, people, search, open, optionLabel);
@@ -515,10 +532,10 @@ function ChoicePicker({
         onChange(
             isChosen(choice.id)
                 ? chosen.filter((one) => one.id !== choice.id)
-                : [...chosen, { id: choice.id, name: field.kind === "select" ? "" : choice.name }].slice(
-                      0,
-                      filters.MAX_CHOICES
-                  )
+                : [
+                      ...chosen,
+                      { id: choice.id, name: field.kind === "select" ? "" : choice.name }
+                  ].slice(0, filters.MAX_CHOICES)
         );
     const summary = chosen.map(named).join(", ");
     const searchable = field.kind !== "select";

@@ -123,7 +123,9 @@ export async function moveRecord(
         data: { ...data, position: move.position }
     });
     const row =
-        result.count > 0 ? await table(object).findFirst({ where, select: recordSelect(object) }) : null;
+        result.count > 0
+            ? await table(object).findFirst({ where, select: recordSelect(object) })
+            : null;
     if (!row) {
         const t = await crmT();
         throw new CrmRefusal(t("errors.notFound"));

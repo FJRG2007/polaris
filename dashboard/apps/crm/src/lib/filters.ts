@@ -69,7 +69,9 @@ function compareRule(column: string, field: FieldDef, rule: FilterRule): Where {
             return { [column]: { not: null } };
         case "is":
             if (field.kind === "dateTime") {
-                return { [column]: { gte: dayDate(value as string), lt: nextDay(value as string) } };
+                return {
+                    [column]: { gte: dayDate(value as string), lt: nextDay(value as string) }
+                };
             }
             return { [column]: day ? dayDate(value as string) : value };
         case "greaterThan":
@@ -81,7 +83,10 @@ function compareRule(column: string, field: FieldDef, rule: FilterRule): Where {
         default:
             // "after" a day: from the start of the next one.
             return {
-                [column]: field.kind === "dateTime" ? { gte: nextDay(value as string) } : { gt: dayDate(value as string) }
+                [column]:
+                    field.kind === "dateTime"
+                        ? { gte: nextDay(value as string) }
+                        : { gt: dayDate(value as string) }
             };
     }
 }
@@ -125,7 +130,8 @@ export function ruleWhere(object: CrmObject, rule: FilterRule): Where | null {
                     const value = rule.value as number;
                     if (Number.isInteger(value)) return compareRule(spec.column, field, rule);
                     if (rule.operator === "is") return { id: { in: [] } };
-                    const whole = rule.operator === "greaterThan" ? Math.floor(value) : Math.ceil(value);
+                    const whole =
+                        rule.operator === "greaterThan" ? Math.floor(value) : Math.ceil(value);
                     return compareRule(spec.column, field, { ...rule, value: whole });
                 }
                 case "dateTime":

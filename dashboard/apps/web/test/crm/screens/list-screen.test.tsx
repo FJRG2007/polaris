@@ -79,10 +79,16 @@ vi.mock("@polaris-app/crm/src/actions/records", () => {
         listGroupsAction: async () => ({ ok: true, groups: state.groups }),
         moveRecordAction: async (input: { id: string; value: string }) => {
             state.moves.push(input);
-            const row = state.groups.flatMap((group) => group.records).find((one) => one.id === input.id)!;
+            const row = state.groups
+                .flatMap((group) => group.records)
+                .find((one) => one.id === input.id)!;
             return { ok: true, record: { ...row, values: { ...row.values, stage: input.value } } };
         },
-        createViewAction: async (input: { name: string; kind: "table" | "kanban"; config: never }) => {
+        createViewAction: async (input: {
+            name: string;
+            kind: "table" | "kanban";
+            config: never;
+        }) => {
             state.madeViews.push(input);
             return {
                 ok: true,
@@ -316,7 +322,10 @@ describe("a CRM list", () => {
         fireEvent.change(value, { target: { value: "Acm" } });
         await waitFor(() => expect(state.lists.length).toBeGreaterThan(before), { timeout: 2000 });
         expect(state.lists.at(-1)).toMatchObject({
-            filter: { conjunction: "and", rules: [{ key: "name", operator: "contains", value: "Acm" }] }
+            filter: {
+                conjunction: "and",
+                rules: [{ key: "name", operator: "contains", value: "Acm" }]
+            }
         });
     });
 

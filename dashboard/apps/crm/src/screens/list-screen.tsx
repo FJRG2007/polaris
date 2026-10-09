@@ -473,7 +473,8 @@ export function ListScreen({ object }: { object: CrmObject }) {
             // Until the answer, a new row in a grouped list sits in the group a
             // record starts in: the field's first choice.
             const shownIn =
-                choice ?? (groupField ? { key: groupField.key, value: groupField.options![0]! } : null);
+                choice ??
+                (groupField ? { key: groupField.key, value: groupField.options![0]! } : null);
             const temporary: CrmRecord = {
                 id: `draft:${drafts.current}`,
                 position: Number.NEGATIVE_INFINITY,
@@ -665,8 +666,7 @@ export function ListScreen({ object }: { object: CrmObject }) {
     const rows = store.rows;
     const boardable = views.groupFields(object).length > 0;
     const narrowed = Boolean(search) || activeFilters > 0;
-    const failure =
-        (!opening.data && opening.error) || (readable && !rows && store.error) || null;
+    const failure = (!opening.data && opening.error) || (readable && !rows && store.error) || null;
 
     const clearNarrowing = () => {
         setTyped("");

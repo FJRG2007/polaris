@@ -39,7 +39,10 @@ describe("readFilter", () => {
     it("keeps a rule still being written, emptying a value its operator cannot use", () => {
         const filter = readFilter("opportunities", {
             conjunction: "and",
-            rules: [rule("amount", "greaterThan", "a lot"), rule("closeDate", "before", "2026-13-40")]
+            rules: [
+                rule("amount", "greaterThan", "a lot"),
+                rule("closeDate", "before", "2026-13-40")
+            ]
         });
         expect(filter.rules).toEqual([
             rule("amount", "greaterThan", null),
@@ -64,7 +67,12 @@ describe("readFilter", () => {
         const id = "22222222-2222-4222-8222-222222222222";
         const filter = readFilter("people", {
             conjunction: "and",
-            rules: [rule("company", "isAnyOf", [{ id, name: "Acme" }, { id: "1 OR 1=1", name: "x" }])]
+            rules: [
+                rule("company", "isAnyOf", [
+                    { id, name: "Acme" },
+                    { id: "1 OR 1=1", name: "x" }
+                ])
+            ]
         });
         expect(filter.rules[0]).toMatchObject({ value: [{ id, name: "Acme" }] });
     });

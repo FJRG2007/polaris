@@ -183,7 +183,17 @@ export function useGroups(
                 .catch(() => undefined)
                 .finally(() => setLoadingGroup(null));
         },
-        [loadingGroup, groupKey, key, object, query.search, query.sorts, query.filter, query.byPosition, t]
+        [
+            loadingGroup,
+            groupKey,
+            key,
+            object,
+            query.search,
+            query.sorts,
+            query.filter,
+            query.byPosition,
+            t
+        ]
     );
 
     /** The groups with each row run through `change`; a row whose grouping
@@ -198,7 +208,10 @@ export function useGroups(
                 let left = 0;
                 for (const row of group.rows) {
                     const next = change(row);
-                    if (next.values[groupKey] !== undefined && next.values[groupKey] !== group.value) {
+                    if (
+                        next.values[groupKey] !== undefined &&
+                        next.values[groupKey] !== group.value
+                    ) {
                         moving.push(next);
                         left += 1;
                     } else {
@@ -286,7 +299,8 @@ export function useGroups(
             if (!listed || !groupKey) return record.position;
             const target = listed.find((group) => group.value === value);
             const others = (target?.rows ?? []).filter((row) => row.id !== record.id);
-            const at = beforeId === null ? others.length : others.findIndex((row) => row.id === beforeId);
+            const at =
+                beforeId === null ? others.length : others.findIndex((row) => row.id === beforeId);
             const index = at < 0 ? others.length : at;
             const position = placeBetween(others[index - 1]?.position, others[index]?.position);
             const moved: CrmRecord = {
