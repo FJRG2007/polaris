@@ -61,7 +61,11 @@ export interface SheetMenuEngine {
     activeCell: () => { row: number; column: number } | null;
     /** Draw a label component of the engine's own that this menu does not
      *  draw itself - an item a plugin added. */
-    foreignLabel: (label: menu.LabelComponent, value: unknown, onChange: (value: unknown) => void) => ReactNode;
+    foreignLabel: (
+        label: menu.LabelComponent,
+        value: unknown,
+        onChange: (value: unknown) => void
+    ) => ReactNode;
 }
 
 /** How the engine opens and closes this menu. */
@@ -168,7 +172,10 @@ export function SheetContextMenu({ engine }: { engine: SheetMenuEngine }) {
                 // left edge, so the whole width of the screen is the menu's.
                 clientX: session.narrow
                     ? SCREEN_GUTTER
-                    : Math.max(SCREEN_GUTTER, Math.min(session.x, window.innerWidth - MENU_WIDTH - SCREEN_GUTTER)),
+                    : Math.max(
+                          SCREEN_GUTTER,
+                          Math.min(session.x, window.innerWidth - MENU_WIDTH - SCREEN_GUTTER)
+                      ),
                 clientY: session.y,
                 button: 2
             })
@@ -192,7 +199,11 @@ export function SheetContextMenu({ engine }: { engine: SheetMenuEngine }) {
     return (
         <ContextMenu key={session.id} modal={false} onOpenChange={setOpen}>
             <ContextMenuTrigger asChild>
-                <span ref={trigger} aria-hidden className="pointer-events-none fixed left-0 top-0 size-0" />
+                <span
+                    ref={trigger}
+                    aria-hidden
+                    className="pointer-events-none fixed left-0 top-0 size-0"
+                />
             </ContextMenuTrigger>
             <MenuContext.Provider value={{ engine, session, choose }}>
                 <ContextMenuContent
@@ -219,13 +230,15 @@ export function SheetContextMenu({ engine }: { engine: SheetMenuEngine }) {
 function Groups({ nodes }: { nodes: readonly menu.MenuNode[] }) {
     return (
         <>
-            {nodes.filter(menu.renderable).map((node) =>
-                node.item ? (
-                    <Item key={node.key} node={node} />
-                ) : (
-                    <Group key={node.key} node={node} />
-                )
-            )}
+            {nodes
+                .filter(menu.renderable)
+                .map((node) =>
+                    node.item ? (
+                        <Item key={node.key} node={node} />
+                    ) : (
+                        <Group key={node.key} node={node} />
+                    )
+                )}
         </>
     );
 }
@@ -243,7 +256,9 @@ function Group({ node }: { node: menu.MenuNode }) {
             <div data-group-rule>
                 <ContextMenuSeparator />
             </div>
-            {node.title ? <ContextMenuLabel>{words(t, engine, node.title)}</ContextMenuLabel> : null}
+            {node.title ? (
+                <ContextMenuLabel>{words(t, engine, node.title)}</ContextMenuLabel>
+            ) : null}
             {children.map((child) => (
                 <Item key={child.key} node={child} />
             ))}
@@ -265,12 +280,15 @@ function Item({ node }: { node: menu.MenuNode }) {
     if (hidden) return null;
 
     const options = menu.staticSelections(item) ?? watched ?? [];
-    const children = item.type === menu.MENU_ITEM.subitems ? engine.menu(item.id).filter(menu.renderable) : [];
+    const children =
+        item.type === menu.MENU_ITEM.subitems ? engine.menu(item.id).filter(menu.renderable) : [];
 
     if (children.length > 0 && session.narrow) {
         return (
             <ContextMenuGroup>
-                <ContextMenuLabel className={cn("flex items-center gap-2", disabled && "opacity-50")}>
+                <ContextMenuLabel
+                    className={cn("flex items-center gap-2", disabled && "opacity-50")}
+                >
                     <ItemFace item={item} value={value} />
                 </ContextMenuLabel>
                 <div className="pl-3">
@@ -293,7 +311,8 @@ function Item({ node }: { node: menu.MenuNode }) {
             </ContextMenuSub>
         );
     }
-    if (options.length > 0) return <Choices item={item} options={options} value={value} disabled={disabled} />;
+    if (options.length > 0)
+        return <Choices item={item} options={options} value={value} disabled={disabled} />;
     if (item.type === menu.MENU_ITEM.subitems) return null;
     if (typeof item.label === "object" && menu.INPUT_LABEL.test(item.label.name)) {
         return <CountItem item={item} value={value} disabled={disabled} />;
@@ -302,7 +321,15 @@ function Item({ node }: { node: menu.MenuNode }) {
 }
 
 /** An item that does one thing. */
-function Action({ item, value, disabled }: { item: menu.MenuItem; value: unknown; disabled: boolean }) {
+function Action({
+    item,
+    value,
+    disabled
+}: {
+    item: menu.MenuItem;
+    value: unknown;
+    disabled: boolean;
+}) {
     const { choose } = useMenu();
     const shortcut = item.title ? menu.MENU_SHORTCUTS[item.title] : undefined;
     return (
@@ -332,65 +359,82 @@ function Choices({
 }) {
     const t = useTranslations("office");
     const { engine, session, choose } = useMenu();
-    const colour = options.some((option) => typeof option.label === "object" && menu.COLOR_LABEL.test(option.label.name));
+    const colour = options.some(
+        (option) => typeof option.label === "object" && menu.COLOR_LABEL.test(option.label.name)
+    );
     const body = colour ? (
-                    <>
-                        <div className="grid grid-cols-5 gap-1 p-1">
-                            {menu.TAB_COLORS.map((swatch) => (
-                                <ContextMenuItem
-                                    key={swatch.hex}
-                                    aria-label={t(`sheetMenu.colors.${swatch.word}`)}
-                                    title={t(`sheetMenu.colors.${swatch.word}`)}
-                                    className="size-7 justify-center p-0"
-                                    disabled={disabled}
-                                    onSelect={() => choose(item.selectionsCommandId ?? item.id, undefined, swatch.hex)}
-                                >
-                                    <span
-                                        aria-hidden
-                                        className="size-5 rounded border border-border-strong"
-                                        style={{ background: swatch.hex }}
-                                    />
-                                </ContextMenuItem>
-                            ))}
-                        </div>
-                        <ContextMenuSeparator />
-                        <ContextMenuItem
-                            disabled={disabled}
-                            onSelect={() => choose(item.selectionsCommandId ?? item.id, undefined, "")}
-                        >
-                            <span aria-hidden className="size-4 rounded border border-dashed border-border-strong" />
-                            {t("sheetMenu.noColor")}
-                        </ContextMenuItem>
-                    </>
-                ) : (
-                    options.map((option, index) => {
-                        const label =
-                            typeof option.label === "string"
-                                ? words(t, engine, option.label)
-                                : option.label
-                                  ? engine.foreignLabel(option.label, option.value, (next) =>
-                                        choose(menu.optionCommand(item, option), undefined, next)
-                                    )
-                                  : String(option.value ?? "");
-                        const chosen = value !== undefined && String(value) === String(option.value);
-                        return (
-                            <ContextMenuItem
-                                key={`${String(option.value)}-${index}`}
-                                disabled={disabled || option.disabled}
-                                onSelect={() => choose(menu.optionCommand(item, option), undefined, option.value)}
-                            >
-                                <Check className={cn("size-4", chosen ? "opacity-100" : "opacity-0")} aria-hidden />
-                                <span className="min-w-0 truncate" title={typeof label === "string" ? label : undefined}>
-                                    {label}
-                                </span>
-                            </ContextMenuItem>
-                        );
-                    })
-                );
+        <>
+            <div className="grid grid-cols-5 gap-1 p-1">
+                {menu.TAB_COLORS.map((swatch) => (
+                    <ContextMenuItem
+                        key={swatch.hex}
+                        aria-label={t(`sheetMenu.colors.${swatch.word}`)}
+                        title={t(`sheetMenu.colors.${swatch.word}`)}
+                        className="size-7 justify-center p-0"
+                        disabled={disabled}
+                        onSelect={() =>
+                            choose(item.selectionsCommandId ?? item.id, undefined, swatch.hex)
+                        }
+                    >
+                        <span
+                            aria-hidden
+                            className="size-5 rounded border border-border-strong"
+                            style={{ background: swatch.hex }}
+                        />
+                    </ContextMenuItem>
+                ))}
+            </div>
+            <ContextMenuSeparator />
+            <ContextMenuItem
+                disabled={disabled}
+                onSelect={() => choose(item.selectionsCommandId ?? item.id, undefined, "")}
+            >
+                <span
+                    aria-hidden
+                    className="size-4 rounded border border-dashed border-border-strong"
+                />
+                {t("sheetMenu.noColor")}
+            </ContextMenuItem>
+        </>
+    ) : (
+        options.map((option, index) => {
+            const label =
+                typeof option.label === "string"
+                    ? words(t, engine, option.label)
+                    : option.label
+                      ? engine.foreignLabel(option.label, option.value, (next) =>
+                            choose(menu.optionCommand(item, option), undefined, next)
+                        )
+                      : String(option.value ?? "");
+            const chosen = value !== undefined && String(value) === String(option.value);
+            return (
+                <ContextMenuItem
+                    key={`${String(option.value)}-${index}`}
+                    disabled={disabled || option.disabled}
+                    onSelect={() =>
+                        choose(menu.optionCommand(item, option), undefined, option.value)
+                    }
+                >
+                    <Check
+                        className={cn("size-4", chosen ? "opacity-100" : "opacity-0")}
+                        aria-hidden
+                    />
+                    <span
+                        className="min-w-0 truncate"
+                        title={typeof label === "string" ? label : undefined}
+                    >
+                        {label}
+                    </span>
+                </ContextMenuItem>
+            );
+        })
+    );
     if (session.narrow) {
         return (
             <ContextMenuGroup>
-                <ContextMenuLabel className={cn("flex items-center gap-2", disabled && "opacity-50")}>
+                <ContextMenuLabel
+                    className={cn("flex items-center gap-2", disabled && "opacity-50")}
+                >
                     <ItemFace item={item} value={value} />
                 </ContextMenuLabel>
                 <div className="pl-3">{body}</div>
@@ -402,7 +446,9 @@ function Choices({
             <ContextMenuSubTrigger disabled={disabled}>
                 <ItemFace item={item} value={value} />
             </ContextMenuSubTrigger>
-            <ContextMenuSubContent className={colour ? "min-w-0" : "min-w-44"}>{body}</ContextMenuSubContent>
+            <ContextMenuSubContent className={colour ? "min-w-0" : "min-w-44"}>
+                {body}
+            </ContextMenuSubContent>
         </ContextMenuSub>
     );
 }
@@ -416,7 +462,15 @@ function Choices({
  * row does not take the caret out of it. Enter in the field, or choosing the
  * words beside it, runs the command with the number in the field.
  */
-function CountItem({ item, value, disabled }: { item: menu.MenuItem; value: unknown; disabled: boolean }) {
+function CountItem({
+    item,
+    value,
+    disabled
+}: {
+    item: menu.MenuItem;
+    value: unknown;
+    disabled: boolean;
+}) {
     const t = useTranslations("office");
     const { engine, choose } = useMenu();
     const props = (typeof item.label === "object" ? item.label.props : undefined) ?? {};
@@ -426,14 +480,19 @@ function CountItem({ item, value, disabled }: { item: menu.MenuItem; value: unkn
     const suffixKey = typeof props.suffix === "string" ? props.suffix : "";
     const words$ = menu.COUNT_WORDS[prefixKey];
     const prefix = words$ ? t(`sheetMenu.count.${words$}.before`) : engine.engineWords(prefixKey);
-    const suffix = words$ ? t(`sheetMenu.count.${words$}.after`) : suffixKey ? engine.engineWords(suffixKey) : "";
+    const suffix = words$
+        ? t(`sheetMenu.count.${words$}.after`)
+        : suffixKey
+          ? engine.engineWords(suffixKey)
+          : "";
 
     const initial = clamp(Number(value ?? min), min, max);
     const [count, setCount] = useState(String(initial));
     const field = useRef<HTMLInputElement | null>(null);
     useEffect(() => setCount(String(clamp(Number(value ?? min), min, max))), [value, min, max]);
 
-    const run = (): void => choose(item.commandId ?? item.id, item.params, clamp(Number(count), min, max));
+    const run = (): void =>
+        choose(item.commandId ?? item.id, item.params, clamp(Number(count), min, max));
     const Icon = menu.menuIcon(item);
     const stop = (event: { stopPropagation: () => void }): void => event.stopPropagation();
 
@@ -446,7 +505,11 @@ function CountItem({ item, value, disabled }: { item: menu.MenuItem; value: unkn
                 if (document.activeElement === field.current) event.preventDefault();
             }}
         >
-            {Icon ? <Icon className="size-4" aria-hidden /> : <span aria-hidden className="size-4" />}
+            {Icon ? (
+                <Icon className="size-4" aria-hidden />
+            ) : (
+                <span aria-hidden className="size-4" />
+            )}
             <span className="whitespace-nowrap">{prefix}</span>
             <input
                 ref={field}
@@ -493,16 +556,29 @@ function ItemFace({ item, value }: { item: menu.MenuItem; value: unknown }) {
                   ? t("sheetMenu.freezeToColumn", { column: at.column })
                   : t("sheetMenu.freezeToCell", { cell: `${at.column}${at.row}` });
     } else if (typeof item.label === "object") {
-        label = engine.foreignLabel(item.label, value, (next) => choose(item.commandId ?? item.id, item.params, next));
+        label = engine.foreignLabel(item.label, value, (next) =>
+            choose(item.commandId ?? item.id, item.params, next)
+        );
     } else {
-        label = words(t, engine, item.title ?? (typeof item.label === "string" ? item.label : item.id));
+        label = words(
+            t,
+            engine,
+            item.title ?? (typeof item.label === "string" ? item.label : item.id)
+        );
     }
     return (
         <>
             {/* Every row keeps the icon's column, so the words line up whether
                 or not a row has one. */}
-            {Icon ? <Icon className="size-4" aria-hidden /> : <span aria-hidden className="size-4 shrink-0" />}
-            <span className="min-w-0 truncate" title={typeof label === "string" ? label : undefined}>
+            {Icon ? (
+                <Icon className="size-4" aria-hidden />
+            ) : (
+                <span aria-hidden className="size-4 shrink-0" />
+            )}
+            <span
+                className="min-w-0 truncate"
+                title={typeof label === "string" ? label : undefined}
+            >
                 {label}
             </span>
         </>
@@ -544,7 +620,9 @@ function useWatch<T>(source: menu.Watchable<T> | undefined, fallback: T): T {
 
 /** Whether every one of several boolean streams is true right now. */
 function useAll(sources: readonly (menu.Watchable<boolean> | undefined)[]): boolean {
-    const [values, setValues] = useState<boolean[]>(() => sources.map((one) => readNow(one, false)));
+    const [values, setValues] = useState<boolean[]>(() =>
+        sources.map((one) => readNow(one, false))
+    );
     // The group's items do not change while one menu is open, so the streams
     // are subscribed once per count of them rather than once per render.
     const current = useRef(sources);

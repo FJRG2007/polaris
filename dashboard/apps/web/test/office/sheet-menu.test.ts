@@ -30,7 +30,10 @@ describe("sheet menu words", () => {
             for (const word of new Set(Object.values(MENU_WORDS))) {
                 expect(items[word], word).toBeTruthy();
             }
-            const counts = catalog.sheetMenu.count as Record<string, { before: string; after: string }>;
+            const counts = catalog.sheetMenu.count as Record<
+                string,
+                { before: string; after: string }
+            >;
             for (const word of Object.values(COUNT_WORDS)) {
                 expect(counts[word]?.before, word).toBeTruthy();
             }

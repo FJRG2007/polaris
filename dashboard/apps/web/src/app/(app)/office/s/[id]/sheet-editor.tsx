@@ -32,11 +32,23 @@ import { useTranslations } from "@/components/i18n/i18n-provider";
 import * as Y from "yjs";
 import { Loader2 } from "lucide-react";
 import { SheetTools } from "./sheet-tools";
-import { SheetContextMenu, type SheetMenuEngine, type SheetMenuHandler } from "./sheet-context-menu";
+import {
+    SheetContextMenu,
+    type SheetMenuEngine,
+    type SheetMenuHandler
+} from "./sheet-context-menu";
 import { setNumberFormatter } from "@polaris/core/sheets";
 import { polarisUniverTheme } from "@/lib/office/editor-theme";
 import { pageIsDark, watchPageTheme } from "@/lib/page-theme";
-import { useEffect, useMemo, useRef, useState, type ComponentType, type Context, type ReactNode } from "react";
+import {
+    useEffect,
+    useMemo,
+    useRef,
+    useState,
+    type ComponentType,
+    type Context,
+    type ReactNode
+} from "react";
 import type { MenuNode } from "@/lib/office/sheet-menu";
 import { useOfficeDocument, REMOTE } from "@/app/(app)/office/use-office-document";
 import {
@@ -98,15 +110,21 @@ export function SheetEditor({
         void (async () => {
             try {
                 const [
-                    { createUniver, LocaleType, merge, defaultTheme, ICommandService, LocaleService },
+                    {
+                        createUniver,
+                        LocaleType,
+                        merge,
+                        defaultTheme,
+                        ICommandService,
+                        LocaleService
+                    },
                     sheetsCore,
                     locale
-                ] =
-                    await Promise.all([
-                        import("@univerjs/presets"),
-                        import("@univerjs/preset-sheets-core"),
-                        import("@univerjs/preset-sheets-core/locales/en-US")
-                    ]);
+                ] = await Promise.all([
+                    import("@univerjs/presets"),
+                    import("@univerjs/preset-sheets-core"),
+                    import("@univerjs/preset-sheets-core/locales/en-US")
+                ]);
                 if (disposed || !host.current) return;
 
                 // The engine's own number formatter, handed to the ported chart
@@ -115,8 +133,11 @@ export function SheetEditor({
                 // `setNumberFormatter`.
                 setNumberFormatter((format, value) =>
                     String(
-                        (sheetsCore as { numfmt?: { format: (f: string, v: number, o: object) => string } })
-                            .numfmt?.format(format, value, { throws: false }) ?? value
+                        (
+                            sheetsCore as {
+                                numfmt?: { format: (f: string, v: number, o: object) => string };
+                            }
+                        ).numfmt?.format(format, value, { throws: false }) ?? value
                     )
                 );
 
@@ -157,14 +178,26 @@ export function SheetEditor({
                 const unwireMenu: (() => void)[] = [];
                 try {
                     const ui = sheetsCore as unknown as UniverMenuModule;
-                    const injector = (univer as unknown as { __getInjector: () => Injector }).__getInjector();
+                    const injector = (
+                        univer as unknown as { __getInjector: () => Injector }
+                    ).__getInjector();
                     const routed = routeContextMenu(injector, ui);
                     unwireMenu.push(routed.restore);
-                    unwireMenu.push(takeRightClicks(host.current, injector, ui, ICommandService, routed));
-                    setMenuEngine(menuEngineOf(injector, ui, ICommandService, LocaleService, routed));
+                    unwireMenu.push(
+                        takeRightClicks(host.current, injector, ui, ICommandService, routed)
+                    );
+                    setMenuEngine(
+                        menuEngineOf(injector, ui, ICommandService, LocaleService, routed)
+                    );
                 } catch (caught) {
-                    console.error("[office] the spreadsheet keeps the engine's own right-click menu", caught);
-                    unwireMenu.splice(0).reverse().forEach((undo) => undo());
+                    console.error(
+                        "[office] the spreadsheet keeps the engine's own right-click menu",
+                        caught
+                    );
+                    unwireMenu
+                        .splice(0)
+                        .reverse()
+                        .forEach((undo) => undo());
                 }
                 setReady(true);
 
@@ -219,7 +252,10 @@ export function SheetEditor({
                 cells.observe(observe);
 
                 stop = () => {
-                    unwireMenu.splice(0).reverse().forEach((undo) => undo());
+                    unwireMenu
+                        .splice(0)
+                        .reverse()
+                        .forEach((undo) => undo());
                     listener.dispose();
                     cells.unobserve(observe);
                 };
@@ -264,7 +300,10 @@ export function SheetEditor({
                 </p>
             ) : null}
             {failed ? (
-                <p role="alert" className="absolute inset-0 flex items-center justify-center px-6 text-center text-[13px] text-danger">
+                <p
+                    role="alert"
+                    className="absolute inset-0 flex items-center justify-center px-6 text-center text-[13px] text-danger"
+                >
                     {failed}
                 </p>
             ) : null}
@@ -286,7 +325,9 @@ interface UniverWorkbook {
     getSnapshot: () => object;
     setEditable: (value: boolean) => unknown;
     onCommandExecuted: (callback: () => void) => { dispose: () => void };
-    getSheetBySheetId: (id: string) => { getRange: (row: number, column: number) => { setValue: (value: unknown) => unknown } } | null;
+    getSheetBySheetId: (id: string) => {
+        getRange: (row: number, column: number) => { setValue: (value: unknown) => unknown };
+    } | null;
 }
 
 /** The stored shape with the stored cells put back into it, which is what the
@@ -328,7 +369,11 @@ interface UniverMenuModule {
     SheetsSelectionsService: unknown;
     SetWorksheetActiveOperation: { id: string };
     RediContext: Context<{ injector: Injector }>;
-    CustomLabel: ComponentType<{ label: unknown; value?: unknown; onChange?: (value: unknown) => void }>;
+    CustomLabel: ComponentType<{
+        label: unknown;
+        value?: unknown;
+        onChange?: (value: unknown) => void;
+    }>;
 }
 
 /** The engine's context-menu service: what opens a menu, and whether one is open. */
@@ -461,8 +506,10 @@ function takeRightClicks(
         void commands
             .executeCommand(ui.SetWorksheetActiveOperation.id, { subUnitId: sheetId })
             .then(
-                () => routed.slot.handler?.open(at, "contextMenu.footerTabs", { subUnitId: sheetId }),
-                (caught: unknown) => console.error("[office] the sheet tab could not be made active", caught)
+                () =>
+                    routed.slot.handler?.open(at, "contextMenu.footerTabs", { subUnitId: sheetId }),
+                (caught: unknown) =>
+                    console.error("[office] the sheet tab could not be made active", caught)
             );
     };
     window.addEventListener("contextmenu", onContextMenu, true);
@@ -480,7 +527,9 @@ function menuEngineOf(
     const menus = injector.get(ui.IMenuManagerService) as {
         getMenuByPositionKey: (key: string) => MenuNode[];
     };
-    const commands = injector.get(commandService) as { executeCommand: (id: string, params?: unknown) => unknown };
+    const commands = injector.get(commandService) as {
+        executeCommand: (id: string, params?: unknown) => unknown;
+    };
     const locale = injector.get(localeService) as { t: (key: string, ...args: string[]) => string };
     const layout = injector.get(ui.ILayoutService) as { focus: () => void };
     const selections = injector.get(ui.SheetsSelectionsService) as {

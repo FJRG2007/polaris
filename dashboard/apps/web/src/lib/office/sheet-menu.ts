@@ -117,15 +117,60 @@ export interface MenuNode {
 
 /** The catalog keys under `office.sheetMenu.items` and `.count`. */
 export type MenuWord =
-    | "copy" | "cut" | "paste" | "copySpecial" | "pasteSpecial" | "pasteValue" | "pasteFormat"
-    | "pasteColWidth" | "pasteBesidesBorder" | "copyFormula" | "pasteFormula" | "clear" | "clearContent" | "clearFormat" | "clearAll"
-    | "textToNumber" | "insert" | "delete" | "shiftLeft" | "shiftUp" | "shiftRight" | "shiftDown"
-    | "deleteRows" | "deleteColumns" | "hideRows" | "hideColumns" | "showRows" | "showColumns"
-    | "fitContent" | "freeze" | "freezeFirstRow" | "freezeFirstColumn" | "unfreeze" | "protectRange"
-    | "addProtection" | "editProtection" | "removeProtection" | "protectedRanges" | "deleteSheet"
-    | "duplicateSheet" | "renameSheet" | "tabColor" | "hideSheet" | "unhideSheet" | "protectSheet"
-    | "unprotectSheet" | "sheetPermissions";
-export type CountWord = "rowsAbove" | "rowsBelow" | "columnsLeft" | "columnsRight" | "columnWidth" | "rowHeight";
+    | "copy"
+    | "cut"
+    | "paste"
+    | "copySpecial"
+    | "pasteSpecial"
+    | "pasteValue"
+    | "pasteFormat"
+    | "pasteColWidth"
+    | "pasteBesidesBorder"
+    | "copyFormula"
+    | "pasteFormula"
+    | "clear"
+    | "clearContent"
+    | "clearFormat"
+    | "clearAll"
+    | "textToNumber"
+    | "insert"
+    | "delete"
+    | "shiftLeft"
+    | "shiftUp"
+    | "shiftRight"
+    | "shiftDown"
+    | "deleteRows"
+    | "deleteColumns"
+    | "hideRows"
+    | "hideColumns"
+    | "showRows"
+    | "showColumns"
+    | "fitContent"
+    | "freeze"
+    | "freezeFirstRow"
+    | "freezeFirstColumn"
+    | "unfreeze"
+    | "protectRange"
+    | "addProtection"
+    | "editProtection"
+    | "removeProtection"
+    | "protectedRanges"
+    | "deleteSheet"
+    | "duplicateSheet"
+    | "renameSheet"
+    | "tabColor"
+    | "hideSheet"
+    | "unhideSheet"
+    | "protectSheet"
+    | "unprotectSheet"
+    | "sheetPermissions";
+export type CountWord =
+    | "rowsAbove"
+    | "rowsBelow"
+    | "columnsLeft"
+    | "columnsRight"
+    | "columnWidth"
+    | "rowHeight";
 
 /** The engine's two label components this menu draws itself. */
 export const INPUT_LABEL = /_MENU_ITEM_INPUT_COMPONENT$/;
@@ -323,7 +368,17 @@ export function freezePoint(cell: { row: number; column: number } | null): {
 /** A tab colour: the swatch drawn and its name in the catalog. */
 export interface TabColor {
     readonly hex: string;
-    readonly word: "blue" | "teal" | "green" | "yellow" | "orange" | "red" | "pink" | "violet" | "slate" | "black";
+    readonly word:
+        | "blue"
+        | "teal"
+        | "green"
+        | "yellow"
+        | "orange"
+        | "red"
+        | "pink"
+        | "violet"
+        | "slate"
+        | "black";
 }
 
 /** The catalog name of each of the colour picker's suggestions, in its order. */

@@ -42,19 +42,45 @@ const MENUS: Record<string, MenuNode[]> = {
         {
             key: "contextMenu.quick",
             children: [
-                { key: "copy", item: { id: "copy", commandId: "sheet.copy", type: 0, title: "sheets-ui.rightClick.copy", icon: "CopyDoubleIcon" } }
+                {
+                    key: "copy",
+                    item: {
+                        id: "copy",
+                        commandId: "sheet.copy",
+                        type: 0,
+                        title: "sheets-ui.rightClick.copy",
+                        icon: "CopyDoubleIcon"
+                    }
+                }
             ]
         },
         {
             key: "contextMenu.layout",
             children: [
-                { key: "insert", item: { id: "sheet.menu.cell-insert", type: 3, title: "sheets-ui.rightClick.insert", icon: "InsertDoubleIcon", disabled$: insertDisabled } }
+                {
+                    key: "insert",
+                    item: {
+                        id: "sheet.menu.cell-insert",
+                        type: 3,
+                        title: "sheets-ui.rightClick.insert",
+                        icon: "InsertDoubleIcon",
+                        disabled$: insertDisabled
+                    }
+                }
             ]
         },
         {
             key: "contextMenu.others",
             children: [
-                { key: "protect", item: { id: "protect", type: 0, title: "sheets-ui.rightClick.protectRange", hidden$: hiddenProtect } }
+                {
+                    key: "protect",
+                    item: {
+                        id: "protect",
+                        type: 0,
+                        title: "sheets-ui.rightClick.protectRange",
+                        hidden$: hiddenProtect
+                    }
+                }
             ]
         }
     ],
@@ -67,7 +93,12 @@ const MENUS: Record<string, MenuNode[]> = {
                 icon: "InsertRowAboveDoubleIcon",
                 label: {
                     name: "SHEET_UI_MENU_ITEM_INPUT_COMPONENT",
-                    props: { prefix: "sheets-ui.rightClick.insertRowsAbove", suffix: "sheets-ui.rightClick.insertRowsAboveSuffix", min: 1, max: 1000 }
+                    props: {
+                        prefix: "sheets-ui.rightClick.insertRowsAbove",
+                        suffix: "sheets-ui.rightClick.insertRowsAboveSuffix",
+                        min: 1,
+                        max: 1000
+                    }
                 },
                 value$: stream(2)
             }
@@ -77,7 +108,14 @@ const MENUS: Record<string, MenuNode[]> = {
         {
             key: "contextMenu.others",
             children: [
-                { key: "delete", item: { id: "sheet.command.remove-sheet-confirm", type: 0, title: "sheets-ui.sheetConfig.delete" } },
+                {
+                    key: "delete",
+                    item: {
+                        id: "sheet.command.remove-sheet-confirm",
+                        type: 0,
+                        title: "sheets-ui.sheetConfig.delete"
+                    }
+                },
                 {
                     key: "color",
                     item: {
@@ -85,7 +123,15 @@ const MENUS: Record<string, MenuNode[]> = {
                         type: 1,
                         title: "sheets-ui.sheetConfig.changeColor",
                         disabled$: colorDisabled,
-                        selections: [{ label: { name: "UI_COLOR_PICKER_COMPONENT", selectable: false, hoverable: false } }]
+                        selections: [
+                            {
+                                label: {
+                                    name: "UI_COLOR_PICKER_COMPONENT",
+                                    selectable: false,
+                                    hoverable: false
+                                }
+                            }
+                        ]
                     }
                 }
             ]
@@ -111,7 +157,8 @@ function engine() {
     return {
         fake,
         run,
-        open: (position: string, extra?: Record<string, unknown>) => act(() => handler!.open({ x: 120, y: 80 }, position, extra)),
+        open: (position: string, extra?: Record<string, unknown>) =>
+            act(() => handler!.open({ x: 120, y: 80 }, position, extra)),
         close: () => act(() => handler!.close())
     };
 }
@@ -177,7 +224,10 @@ describe("the spreadsheet's right-click menu", () => {
         open("contextMenu.footerTabs", { subUnitId: "sheet-2" });
         const remove = await screen.findByRole("menuitem", { name: /Delete/ });
         fireEvent.click(remove);
-        expect(run).toHaveBeenCalledWith("sheet.command.remove-sheet-confirm", { value: undefined, subUnitId: "sheet-2" });
+        expect(run).toHaveBeenCalledWith("sheet.command.remove-sheet-confirm", {
+            value: undefined,
+            subUnitId: "sheet-2"
+        });
     });
 
     it("lists a submenu's options under its name on a phone, where no submenu fits", async () => {
@@ -189,7 +239,10 @@ describe("the spreadsheet's right-click menu", () => {
             open("contextMenu.footerTabs", { subUnitId: "sheet-2" });
             expect(await screen.findByText("Change color")).toBeTruthy();
             fireEvent.click(screen.getByRole("menuitem", { name: "Blue" }));
-            expect(run).toHaveBeenCalledWith("sheet.command.set-tab-color", { value: "#5b8def", subUnitId: "sheet-2" });
+            expect(run).toHaveBeenCalledWith("sheet.command.set-tab-color", {
+                value: "#5b8def",
+                subUnitId: "sheet-2"
+            });
         } finally {
             vi.unstubAllGlobals();
         }
@@ -227,8 +280,13 @@ describe("the spreadsheet's right-click menu", () => {
         const { fake, run, open } = engine();
         render(<SheetContextMenu engine={fake} />, { wrapper: MessagesWrapper });
         open("contextMenu.footerTabs", { subUnitId: "sheet-2" });
-        fireEvent.keyDown(await screen.findByRole("menuitem", { name: /Change color/ }), { key: "ArrowRight" });
+        fireEvent.keyDown(await screen.findByRole("menuitem", { name: /Change color/ }), {
+            key: "ArrowRight"
+        });
         fireEvent.click(await screen.findByRole("menuitem", { name: "Blue" }));
-        expect(run).toHaveBeenCalledWith("sheet.command.set-tab-color", { value: "#5b8def", subUnitId: "sheet-2" });
+        expect(run).toHaveBeenCalledWith("sheet.command.set-tab-color", {
+            value: "#5b8def",
+            subUnitId: "sheet-2"
+        });
     });
 });
