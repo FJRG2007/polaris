@@ -12354,3 +12354,134 @@ describe("an elytra race", () => {
         );
     });
 });
+
+const downhillKind = await import(
+    "@polaris-app/game-servers/src/lib/minecraft/events/kinds/downhill-race"
+);
+
+describe("a downhill boat race", () => {
+    const race = () => ({
+        ...newPreset("downhill-race", "down"),
+        minutes: 5,
+        options: { place: { mode: "players" as const }, steepness: "steep" as const, height: 30 }
+    });
+    const trackNow = () => {
+        const current = state().run!;
+        const origin = current.stage!.origin!;
+        return downhillKind.course(race().options, current.id, origin, origin.y);
+    };
+    const scores = (objective: string) => (world.stageScores[objective] ??= {});
+
+    it("starts everybody at the top in a boat, counts each gate once on the way down, and ranks the finish", async () => {
+        setUp([race()]);
+        await startArena("down");
+        await play(2_100);
+        chat(["Ana", "join"], ["Ben", "join"]);
+        await play(44_000);
+        const track = trackNow();
+        expect(track.floor).toBeGreaterThan(track.downhill!.bottom);
+        // The pack on before the road is built: blue ice lines over packed ice.
+        const enabled = world.sent.indexOf(`datapack enable "${snowballPack.PACK_ID}"`);
+        const built = world.sent.findIndex(
+            (line) => line.endsWith(" minecraft:packed_ice keep") && line.includes(" fill ")
+        );
+        expect(enabled).toBeGreaterThan(-1);
+        expect(built).toBeGreaterThan(enabled);
+        // Waiting on the grid at the top, told it is one way down.
+        const grid = boatKind.grid(track, 2);
+        expect(grid.every((spot) => spot.y === track.floor + 1)).toBe(true);
+        expect(world.sent).toContain(
+            `execute in minecraft:overworld run tp Ana ${grid[0]!.x.toFixed(3)} ${grid[0]!.y.toFixed(3)} ${grid[0]!.z.toFixed(3)} ${grid[0]!.yaw.toFixed(1)} 0.0`
+        );
+        expect(
+            world.sent.some(
+                (line) =>
+                    line.startsWith("title Ana subtitle") &&
+                    visible(line).includes("Down through every gate in order")
+            )
+        ).toBe(true);
+        await play(8_000);
+        const one = world.sent.findIndex(
+            (line) => line.includes(" title ") && visible(line).endsWith(" title 1")
+        );
+        const armed = world.sent.indexOf("scoreboard players set #on polaris_boat 1");
+        expect(one).toBeGreaterThan(-1);
+        expect(armed).toBeGreaterThan(one);
+        // Every line passed once makes the finish, each gate box at its own height.
+        for (const line of boatKind.armLines(track)) expect(world.sent).toContain(line);
+        expect(world.sent).toContain(
+            `scoreboard players set #total polaris_boat ${track.gates.length}`
+        );
+        for (const line of boatKind.boatLines("Ana", "oak_boat", grid[0]!.yaw))
+            expect(world.sent).toContain(line);
+
+        // A fall is counted from under the bottom of the road, not under the top.
+        world.sent = [];
+        await play(500);
+        const fell = world.sent.find(
+            (line) => line.includes(" run tag @a[tag=pe_in,") && line.includes("dy=")
+        )!;
+        expect(fell).toBeDefined();
+        const y = Number(/,y=(-?\d+),/.exec(fell)![1]);
+        const dy = Number(/dy=(\d+)/.exec(fell)![1]);
+        expect(y + dy).toBe(track.downhill!.bottom - 1);
+
+        // Ben is two gates down; Ana crosses the finish.
+        scores("pe_gate").Ben = 2;
+        scores("pe_gate").Ana = track.gates.length;
+        scores("pe_fin").Ana = Math.floor(Date.now() / 50) % 2147483647;
+        await play(2_100);
+        expect(
+            world.sent.some(
+                (line) =>
+                    line.startsWith("tellraw @a") &&
+                    visible(line).includes("Ana reached the finish")
+            )
+        ).toBe(true);
+        expect(state().run!.stage!.racers.find((one) => one.name === "Ben")!.best).toBe(2);
+        expect(
+            world.sent.some(
+                (line) =>
+                    line.includes("title Ben actionbar") &&
+                    visible(line).includes(`Gate 2/${track.gates.length}`)
+            )
+        ).toBe(true);
+        expect(world.sent.some((line) => visible(line).includes("Lap "))).toBe(false);
+        chat(["Ben", "leave"]);
+        await play(4_100);
+
+        const after = state();
+        expect(after.run).toBeNull();
+        expect(after.history[0]?.podium?.[0]).toMatchObject({ place: 1, name: "Ana" });
+        expect(after.history[0]?.podium?.[1]).toEqual({ place: 2, name: "Ben", score: 2 });
+        for (const line of boatKind.stopLines(track.boxes)) expect(world.sent).toContain(line);
+        for (const line of boatKind.SCORES_REMOVED) expect(world.sent).toContain(line);
+        expect(world.inside.size).toBe(0);
+        keptTheRules();
+        expect(after.stageLeftovers).toEqual([]);
+    });
+
+    it("takes a racer who left back in at the last gate they passed, at its height", async () => {
+        setUp([race()]);
+        await startArena("down");
+        await play(2_100);
+        chat(["Ana", "join"], ["Ben", "join"]);
+        await play(52_000);
+        const track = trackNow();
+        scores("pe_gate").Ben = 2;
+        await play(2_100);
+        expect(state().run!.stage!.racers.find((one) => one.name === "Ben")!.best).toBe(2);
+        chat(["Ben", "leave"]);
+        await play(2_100);
+        world.sent = [];
+        chat(["Ben", "join"]);
+        await play(2_100);
+        expect(world.sent).toContain("scoreboard players set Ben pe_gate 2");
+        const spot = boatKind.resumeSpot(track, 2);
+        expect(spot).toBe(track.respawns[1]);
+        expect(spot.y).toBe(track.downhill!.gateFloors[1]! + 1);
+        expect(world.sent).toContain(
+            `execute in minecraft:overworld run tp Ben ${spot.x.toFixed(3)} ${spot.y.toFixed(3)} ${spot.z.toFixed(3)} ${spot.yaw.toFixed(1)} 0.0`
+        );
+    });
+});

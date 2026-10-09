@@ -60,7 +60,8 @@ export const EVENT_KINDS = [
     "boss-fishing",
     "nether-maze",
     "acid-rain",
-    "elytra-race"
+    "elytra-race",
+    "downhill-race"
 ] as const;
 
 export type EventKind = (typeof EVENT_KINDS)[number];
@@ -239,6 +240,8 @@ export const ACID_SIZES = ["small", "medium", "large"] as const;
 export const ACIDITIES = ["mild", "harsh"] as const;
 /** How many pillars stand beside the line between each two rings of an elytra race. */
 export const ELYTRA_OBSTACLES = ["none", "few", "many"] as const;
+/** How often a downhill boat race's ice drops a block: every 14 blocks, or every 9. */
+export const DOWNHILL_STEEPNESS = ["gentle", "steep"] as const;
 
 /** How big hide and seek's house is: by how many play, or three, four or five
  *  rooms along a side. */
@@ -754,6 +757,17 @@ export const optionsSchemas = {
             .min(40, problem("atLeast", { count: 40 }))
             .max(80, problem("atMost", { count: 80 }))
             .default(50)
+    }),
+    "downhill-race": z.object({
+        place: placeSchema.default({ mode: "players" }),
+        steepness: z.enum(DOWNHILL_STEEPNESS).default("gentle"),
+        /** How high the finish, at the bottom, is over the ground. */
+        height: z
+            .number()
+            .int()
+            .min(25, problem("atLeast", { count: 25 }))
+            .max(40, problem("atMost", { count: 40 }))
+            .default(30)
     })
 } as const satisfies Record<EventKind, z.ZodTypeAny>;
 
@@ -895,6 +909,10 @@ export const presetSchema = z
         presetBase.extend({
             kind: z.literal("elytra-race"),
             options: optionsSchemas["elytra-race"]
+        }),
+        presetBase.extend({
+            kind: z.literal("downhill-race"),
+            options: optionsSchemas["downhill-race"]
         })
     ])
     .transform((value) => value as EventPreset);
@@ -965,7 +983,7 @@ export type RandomEvents = z.infer<typeof randomSchema>;
  * value an operator chooses later, even one that happens to be an old default,
  * is theirs.
  */
-export const DEFAULTS_VERSION = 6;
+export const DEFAULTS_VERSION = 7;
 
 /** Events saved before this were brought up to their kind's defaults once
  *  (`toKindDefaults`). */
@@ -992,7 +1010,8 @@ const KIND_SINCE: Partial<Readonly<Record<EventKind, number>>> = {
     "boss-fishing": 3,
     "nether-maze": 4,
     "acid-rain": 5,
-    "elytra-race": 6
+    "elytra-race": 6,
+    "downhill-race": 7
 };
 
 export const settingsSchema = z.object({
@@ -1082,7 +1101,8 @@ export const KIND_NAMES: Readonly<Record<EventKind, Readonly<Record<Language, st
     "boss-fishing": { en: "Boss fishing", es: "Pesca del jefe" },
     "nether-maze": { en: "Deadly nether maze", es: "Laberintos mortales" },
     "acid-rain": { en: "Acid rain", es: "Lluvia ácida" },
-    "elytra-race": { en: "Elytra race", es: "Carrera aérea" }
+    "elytra-race": { en: "Elytra race", es: "Carrera aérea" },
+    "downhill-race": { en: "Downhill boat race", es: "Descenso en barca" }
 };
 
 /** What an event of each kind is. Its name and summary on a screen are the
@@ -1226,6 +1246,10 @@ export const KIND_INFO: Readonly<Record<EventKind, KindInfo>> = {
     "elytra-race": {
         unit: "rings",
         competitive: true
+    },
+    "downhill-race": {
+        unit: "gates",
+        competitive: true
     }
 };
 
@@ -1345,7 +1369,8 @@ export const DEFAULT_PRIZES: Readonly<Record<EventKind, Rewards>> = {
     "boss-fishing": STANDARD,
     "nether-maze": STANDARD,
     "acid-rain": STANDARD,
-    "elytra-race": STANDARD
+    "elytra-race": STANDARD,
+    "downhill-race": QUICK
 };
 
 /** The names a king of the ring was given by default while it was a hill, and
@@ -1396,7 +1421,8 @@ export const DEFAULT_MINUTES: Readonly<Record<EventKind, number>> = {
     "boss-fishing": 10,
     "nether-maze": 6,
     "acid-rain": 6,
-    "elytra-race": 8
+    "elytra-race": 8,
+    "downhill-race": 5
 };
 
 /** What every kind ran for before `DEFAULT_MINUTES`: an event still on exactly
@@ -1755,7 +1781,8 @@ export const DEFAULT_MIN_SCORE: Readonly<Record<EventKind, number>> = {
     "boss-fishing": 2,
     "nether-maze": 1,
     "acid-rain": 1,
-    "elytra-race": 1
+    "elytra-race": 1,
+    "downhill-race": 1
 };
 
 /** Whether the minimum is something an operator can set for this event. A
@@ -1798,6 +1825,7 @@ export function needsOverworld(preset: EventPreset): boolean {
         case "nether-maze":
         case "acid-rain":
         case "elytra-race":
+        case "downhill-race":
         case "village-defense":
             return true;
         case "explorer":
@@ -1889,6 +1917,7 @@ export function readyToPlay(run: {
         case "nether-maze":
         case "acid-rain":
         case "elytra-race":
+        case "downhill-race":
             // Once everybody brought in is there and the start given (`arrival`).
             return (run.stage?.racers.length ?? 0) > 0 && (run.stage?.goAt ?? null) !== null;
         case "team-duel":
@@ -1977,7 +2006,8 @@ export function playsOnStage(preset: EventPreset): boolean {
         preset.kind === "dropper" ||
         preset.kind === "nether-maze" ||
         preset.kind === "acid-rain" ||
-        preset.kind === "elytra-race"
+        preset.kind === "elytra-race" ||
+        preset.kind === "downhill-race"
     );
 }
 
@@ -2007,7 +2037,8 @@ const RACES: readonly EventKind[] = [
     "boat-race",
     "dropper",
     "nether-maze",
-    "elytra-race"
+    "elytra-race",
+    "downhill-race"
 ];
 
 /** How long a race took, in seconds, when the score is a finish; null for a
@@ -2225,7 +2256,8 @@ export const WORLD_NEEDS: Readonly<Record<EventKind, WorldNeeds>> = {
     // is every player's, and is left as it is. Held in the day like every
     // stage, so the arena can be seen.
     "acid-rain": { time: "day", weather: null },
-    "elytra-race": { time: "day", weather: "clear" }
+    "elytra-race": { time: "day", weather: "clear" },
+    "downhill-race": { time: "day", weather: "clear" }
 };
 
 export function worldNeeds(preset: Pick<EventPreset, "kind">): WorldNeeds {

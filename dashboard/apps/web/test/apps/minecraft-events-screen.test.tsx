@@ -755,6 +755,21 @@ describe("the TNT run, ice boat race and dropper editors", () => {
         expect(saved.at(-1)!.options).toMatchObject({ laps: 3, height: 30 });
     });
 
+    it("saves a downhill boat race's finish height, gentle by default, between 25 and 40", async () => {
+        const saved: Preset[] = [];
+        edit(catalog.newPreset("downhill-race", "down"), saved);
+        expect(screen.getByLabelText("Slope").textContent).toContain("Gentle");
+        expect(field(/^Height \(blocks\)/).value).toBe("30");
+        fireEvent.change(field(/^Height \(blocks\)/), { target: { value: "41" } });
+        await waitFor(() => expect(screen.getAllByText("At most 40").length).toBeGreaterThan(0));
+        fireEvent.change(field(/^Height \(blocks\)/), { target: { value: "35" } });
+        await waitFor(() =>
+            expect((screen.getByText("Done") as HTMLButtonElement).disabled).toBe(false)
+        );
+        fireEvent.click(screen.getByText("Done"));
+        expect(saved.at(-1)!.options).toMatchObject({ steepness: "gentle", height: 35 });
+    });
+
     it("saves a dropper's floors, and holds them between five and twenty", async () => {
         const saved: Preset[] = [];
         edit(catalog.newPreset("dropper", "drop"), saved);
@@ -777,7 +792,8 @@ describe("the TNT run, ice boat race and dropper editors", () => {
                 presets: [
                     catalog.newPreset("tnt-run", "tnt"),
                     catalog.newPreset("boat-race", "boats"),
-                    catalog.newPreset("dropper", "drop")
+                    catalog.newPreset("dropper", "drop"),
+                    catalog.newPreset("downhill-race", "down")
                 ]
             }
         };
@@ -793,6 +809,9 @@ describe("the TNT run, ice boat race and dropper editors", () => {
         fireEvent.click(screen.getByLabelText("What Dropper is"));
         expect(screen.getByText(/A shaft of 10 floors, medium/)).toBeTruthy();
         expect(screen.getByText(/Played under Slow Falling/)).toBeTruthy();
+        fireEvent.click(screen.getByLabelText("What Downhill boat race is"));
+        expect(screen.getByText(/drops a block every 14 blocks/)).toBeTruthy();
+        expect(screen.getByText(/Every racer starts with a boat at the top/)).toBeTruthy();
     });
 });
 

@@ -182,6 +182,10 @@ const RULES: Readonly<Record<EventKind, Text>> = {
     "elytra-race": {
         en: "Fly through every ring in order, lap after lap. Rings and boosters give rockets; falling, landing or missing a ring sends you back to your last one.",
         es: "Cruza cada aro en orden, vuelta tras vuelta. Los aros y los propulsores dan cohetes; caer, aterrizar o saltarte un aro te devuelve al último."
+    },
+    "downhill-race": {
+        en: "Ride your boat down the ice from the start at the top through every gate. The first over the finish at the bottom wins.",
+        es: "Baja en barca por el hielo desde la salida en lo alto pasando por cada puerta. Gana el primero en cruzar la meta de abajo."
     }
 };
 

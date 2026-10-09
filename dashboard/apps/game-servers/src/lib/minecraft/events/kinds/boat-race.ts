@@ -584,6 +584,21 @@ export interface Track {
     readonly origin: { readonly x: number; readonly z: number };
     /** A lap, in blocks along the middle of the track. */
     readonly lap: number;
+    /** A downhill race's (`downhill-race`): one way from the start line at the
+     *  top (`floor`) to the finish, its last gate, at `bottom`, each gate at its
+     *  own height. Raced once, never round. */
+    readonly downhill?: {
+        readonly bottom: number;
+        readonly gateFloors: readonly number[];
+        /** Blocks of level road behind the start line: all the grid there is. */
+        readonly grid: number;
+    };
+}
+
+/** How many gates make the race: the start line, then every gate of every lap -
+ *  or, downhill, every line once, the finish last. */
+export function passesOf(track: Track): number {
+    return track.downhill ? track.gates.length : track.laps * track.gates.length + 1;
 }
 
 /**
@@ -777,8 +792,14 @@ function roundGrid(track: Track, count: number): Spot[] {
     const samples = centerline(points, design);
     const start = sampleAt(points, track.layout.gates[0]!.at, design);
     const spots: Spot[] = [];
+    // A downhill road ends behind its grid, with open air past it: once its
+    // rows are full the next racers are put on them again, from the front,
+    // rather than off the end of the road. A loop has the whole track behind.
+    const rows = track.downhill
+        ? Math.max(1, Math.floor((track.downhill.grid - GATE_DEPTH - 4) / 3) + 1)
+        : Infinity;
     for (let index = 0; index < count; index += 1) {
-        const row = Math.floor(index / 3);
+        const row = Math.floor(index / 3) % rows;
         const back = GATE_DEPTH + 2 + row * 3;
         const one = samples[(((start - back) % samples.length) + samples.length) % samples.length]!;
         const side = ((index % 3) - 1) * 3;
@@ -1216,17 +1237,22 @@ export function armLines(track: Track): string[] {
         set("tx", cornerOf(track.boxes)!.x),
         set("tz", cornerOf(track.boxes)!.z),
         set("gates", track.gates.length),
-        set("total", track.laps * track.gates.length + 1),
+        set("total", passesOf(track)),
         ...track.gates.flatMap((gate, index) => [
             set(`g${index}x1`, from(gate.x1)),
             set(`g${index}x2`, to(gate.x2)),
-            set(`g${index}y1`, from(track.floor - 1)),
-            set(`g${index}y2`, to(track.floor + 3)),
+            set(`g${index}y1`, from(floorOf(track, index) - 1)),
+            set(`g${index}y2`, to(floorOf(track, index) + 3)),
             set(`g${index}z1`, from(gate.z1)),
             set(`g${index}z2`, to(gate.z2))
         ]),
         set("on", 1)
     ];
+}
+
+/** The ice's height at a gate. */
+function floorOf(track: Track, gate: number): number {
+    return track.downhill?.gateFloors[gate] ?? track.floor;
 }
 
 /** The corner of a track's gate lines: what names the track the pack is armed for. */
@@ -1293,7 +1319,8 @@ export function quickLines(
     const x = Math.min(volume.x1, volume.x2) - 4;
     const z = Math.min(volume.z1, volume.z2) - 4;
     const y = Math.min(volume.y1, volume.y2) - 64;
-    const under = `x=${x},y=${y},z=${z},dx=${Math.abs(volume.x2 - volume.x1) + 8},dy=${track.floor - 1 - y},dz=${Math.abs(volume.z2 - volume.z1) + 8}`;
+    const lowest = track.downhill?.bottom ?? track.floor;
+    const under = `x=${x},y=${y},z=${z},dx=${Math.abs(volume.x2 - volume.x1) + 8},dy=${lowest - 1 - y},dz=${Math.abs(volume.z2 - volume.z1) + 8}`;
     const racing = `tag=pe_in,scores={${FINISH_SCORE}=0}`;
     const world = "execute in minecraft:overworld";
     const lines: string[] = [];

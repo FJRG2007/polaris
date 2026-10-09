@@ -1031,6 +1031,7 @@ function startLoop(
         run.preset.kind === "parkour" ||
         run.preset.kind === "dropper" ||
         run.preset.kind === "boat-race" ||
+        run.preset.kind === "downhill-race" ||
         run.preset.kind === "nether-maze" ||
         run.preset.kind === "elytra-race" ||
         run.preset.kind === "team-duel" ||
@@ -1792,6 +1793,7 @@ async function play(
         case "tnt-run":
         case "dropper":
         case "boat-race":
+        case "downhill-race":
         case "nether-maze":
         case "acid-rain":
         case "elytra-race":
@@ -4701,6 +4703,7 @@ export function cleanupOf(run: stored.EventRun): string[] {
             after.push(...dropper.SCORES_REMOVED);
             break;
         case "boat-race":
+        case "downhill-race":
             after.push(...boatRace.SCORES_REMOVED);
             break;
         case "nether-maze":
