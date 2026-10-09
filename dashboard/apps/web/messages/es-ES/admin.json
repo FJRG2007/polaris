@@ -3072,10 +3072,10 @@
         },
         "seasonal": {
             "title": "Temas de temporada",
-            "body": "Decoración y sonidos opcionales en Halloween, las fiestas de invierno, Año Nuevo y el Año Nuevo Lunar. Cada persona puede desactivarlos para sí misma.",
+            "body": "Decoración y un pack de sonidos en Halloween, las fiestas de invierno, Año Nuevo y el Año Nuevo Lunar, en las mismas fechas que Discord. Cada persona puede apagar el pack en curso.",
             "label": "Temas de temporada para todos",
-            "on": "Activados. Cada persona elige en sus Preferencias.",
-            "off": "Desactivados para todos, elijan lo que elijan.",
+            "on": "Activados. Cada persona puede apagar el pack en sus Preferencias.",
+            "off": "Desactivados para todos.",
             "notSaved": "No se pudo guardar el cambio. Inténtalo de nuevo en un momento."
         }
     }

@@ -15,12 +15,13 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { SOUNDS, type CallSound } from "@/lib/call-sounds";
+import { SEASONS, type Season } from "@polaris/core";
+import { notesFor, type CallSound } from "@/lib/call-sounds";
 
 /** What a sound is, at the resolution an ear has: how many notes, whether it
  *  goes up or down, and what it is made of. */
-function shape(name: CallSound) {
-    const notes = SOUNDS[name];
+function shape(name: CallSound, season: Season | null = null) {
+    const notes = notesFor(name, season);
     const first = notes[0]!;
     const last = notes[notes.length - 1]!;
     return {
@@ -32,7 +33,17 @@ function shape(name: CallSound) {
 
 /** The events of a call that are announced by a sound, and nothing else: a ring
  *  is not one of these and neither is a message in another conversation. */
-const EVENTS: readonly CallSound[] = ["join", "leave", "shareOn", "shareOff", "hangUp"];
+const EVENTS: readonly CallSound[] = [
+    "join",
+    "leave",
+    "shareOn",
+    "shareOff",
+    "hangUp",
+    "mute",
+    "unmute",
+    "deafen",
+    "undeafen"
+];
 
 describe("a screen going up or coming down", () => {
     it("is made of a different wave from every other thing that happens", () => {
@@ -69,7 +80,17 @@ describe("every pair of announced events", () => {
     });
 
     it("never plays a single note, which is a beep with no direction in it", () => {
-        for (const name of EVENTS) expect(SOUNDS[name].length).toBeGreaterThan(1);
+        for (const name of EVENTS) expect(notesFor(name, null).length).toBeGreaterThan(1);
+    });
+
+    it.each(SEASONS)("still differs in something other than pitch in the %s pack", (season) => {
+        for (const [index, one] of EVENTS.entries())
+            for (const other of EVENTS.slice(index + 1)) {
+                const a = shape(one, season);
+                const b = shape(other, season);
+                const told = a.way !== b.way || a.notes !== b.notes || a.wave !== b.wave;
+                expect(told, `${one} and ${other} sound alike in ${season}`).toBe(true);
+            }
     });
 
     it("keeps the call ending apart from somebody stepping out of it", () => {

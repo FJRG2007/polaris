@@ -1,8 +1,8 @@
 "use server";
 
 /**
- * The account's seasonal switches: the decoration, and the alternate sounds.
- * Saved on the account, so they hold on every device it signs in on.
+ * The season's sound pack, turned off or back on for this account. Saved on the
+ * account, so it holds on every device it signs in on.
  */
 
 import * as core from "@polaris/core";
@@ -20,7 +20,7 @@ export async function saveSeasonalAction(
     if (!parsed.success) return { error: t("seasonal.notSaved") };
     try {
         const choice = await saveSeasonalChoice(user.id, parsed.data);
-        // The decoration is drawn by the frame, which the layout renders.
+        // The sounds are set by the frame, which the layout renders.
         revalidatePath("/", "layout");
         return { choice };
     } catch (caught) {

@@ -95,6 +95,10 @@ export type CallSound =
     | "shareOff"
     | "hangUp"
     | "handUp"
+    | "mute"
+    | "unmute"
+    | "deafen"
+    | "undeafen"
     | "ring"
     | "ringBack";
 
@@ -186,6 +190,37 @@ export const SOUNDS: Record<CallSound, readonly Note[]> = {
         { from: 880.0, at: 0.055, seconds: 0.11, gain: 0.06 }
     ],
     /**
+     * You turned your microphone off, or back on.
+     *
+     * Played only to the person who pressed it, as every client does, so a
+     * press made by a shortcut with the window behind something else is still
+     * heard to have landed. A quick pair of clicks on a triangle wave: two
+     * notes like arriving and leaving, but audibly another instrument, and
+     * quieter, because it answers a press rather than announcing anything.
+     */
+    mute: [
+        { from: 698.46, at: 0, seconds: 0.05, gain: 0.07, wave: "triangle" },
+        { from: 466.16, at: 0.05, seconds: 0.08, gain: 0.07, wave: "triangle" }
+    ],
+    unmute: [
+        { from: 466.16, at: 0, seconds: 0.05, gain: 0.07, wave: "triangle" },
+        { from: 698.46, at: 0.05, seconds: 0.08, gain: 0.07, wave: "triangle" }
+    ],
+    /**
+     * You stopped hearing the call, or started again. Lower and a little longer
+     * than the microphone's pair, on a square wave kept well down: the press
+     * that takes the whole room away should not be mistaken for the one that
+     * only takes your voice out of it.
+     */
+    deafen: [
+        { from: 392.0, at: 0, seconds: 0.07, gain: 0.04, wave: "square" },
+        { from: 261.63, at: 0.07, seconds: 0.12, gain: 0.04, wave: "square" }
+    ],
+    undeafen: [
+        { from: 261.63, at: 0, seconds: 0.07, gain: 0.04, wave: "square" },
+        { from: 392.0, at: 0.07, seconds: 0.12, gain: 0.04, wave: "square" }
+    ],
+    /**
      * You hung up, or the call ended under you.
      *
      * Three notes falling away rather than two, and the last one held: the same
@@ -227,14 +262,15 @@ export const SOUNDS: Record<CallSound, readonly Note[]> = {
 };
 
 /**
- * The seasonal sound packs: the ring and the message blip, recast for each time
- * of year, played only to an account that asked for them (see `seasons` in
- * @polaris/core - Discord's own packs went opt-in after it turned them on for
- * everybody).
+ * The seasonal sound packs, played while a season is on unless the account
+ * turned its pack off (see `seasons` in @polaris/core). Like Discord's, a pack
+ * recasts every sound: the ring, the message blip, and what a call is followed
+ * by - arriving, leaving, a screen, a hand, the microphone and the headphones.
  *
- * Only the two sounds that carry the season. Join, leave, share and hang-up are
- * signals somebody tells apart by their shape, and a season that reshaped them
- * would make a call harder to follow for a fortnight.
+ * The ring and the message are written for each season. The rest are the
+ * ordinary sounds with the season's colour on them (`recast`): the same notes
+ * in the same number, order, timing and wave - which is what tells them apart,
+ * see `call-sound-shapes` - moved into the season's key and given its touch.
  *
  * Each ring keeps the default's skeleton - three overlapping bells, a breath,
  * the same three again, at the same gain and on the same timings - so what
@@ -242,7 +278,10 @@ export const SOUNDS: Record<CallSound, readonly Note[]> = {
  * `seasonal-sounds` checks that it does. What changes is the notes and the
  * wave: that is what makes a season recognisable in the first half-second.
  */
-function ringOf(notes: readonly [number, number, number], extra: Partial<Note> = {}): readonly Note[] {
+function ringOf(
+    notes: readonly [number, number, number],
+    extra: Partial<Note> = {}
+): readonly Note[] {
     const [a, b, c] = notes;
     return [
         { from: a, at: 0, seconds: 1, gain: RING_GAIN, bell: true, ...extra },
@@ -254,9 +293,53 @@ function ringOf(notes: readonly [number, number, number], extra: Partial<Note> =
     ];
 }
 
+/** The sounds a call is followed by, which every pack recasts rather than
+ *  rewrites. The ring and the message are not among them. */
+export const RECAST: readonly CallSound[] = [
+    "join",
+    "leave",
+    "shareOn",
+    "shareOff",
+    "hangUp",
+    "handUp",
+    "mute",
+    "unmute",
+    "deafen",
+    "undeafen"
+];
+
+/** What a season does to an ordinary sound: a pitch it moves to, and a touch. */
+const SEASON_COLOUR: Record<Season, { ratio: number; touch: (note: Note) => Partial<Note> }> = {
+    // Down a minor third, each note sagging a semitone as it sounds.
+    halloween: { ratio: 0.8409, touch: (note) => ({ to: (note.to ?? note.from) * 0.944 }) },
+    // Up a fourth and struck like a bell: sleigh bells, not a whistle.
+    winter: { ratio: 1.3348, touch: () => ({ bell: true }) },
+    newYear: { ratio: 1.5, touch: () => ({ bell: true }) },
+    lunarNewYear: { ratio: 1.122, touch: () => ({ bell: true }) }
+};
+
+/** An ordinary sound in a season's colour. Count, order, timing, loudness and
+ *  wave are kept; only the pitch and the touch change. */
+export function recast(notes: readonly Note[], season: Season): readonly Note[] {
+    const { ratio, touch } = SEASON_COLOUR[season];
+    return notes.map((note) => {
+        const moved = {
+            ...note,
+            from: note.from * ratio,
+            ...(note.to ? { to: note.to * ratio } : {})
+        };
+        return { ...moved, ...touch(moved) };
+    });
+}
+
+function recastAll(season: Season): Partial<Record<CallSound, readonly Note[]>> {
+    return Object.fromEntries(RECAST.map((name) => [name, recast(SOUNDS[name], season)]));
+}
+
 export const SEASONAL_SOUNDS: Record<Season, Partial<Record<CallSound, readonly Note[]>>> = {
     /** A minor triad sliding down a semitone on a triangle: a theremin, roughly. */
     halloween: {
+        ...recastAll("halloween"),
         ring: ringOf([440, 523.25, 659.25], { wave: "triangle" }).map((note) => ({
             ...note,
             to: note.from * 0.944
@@ -268,6 +351,7 @@ export const SEASONAL_SOUNDS: Record<Season, Partial<Record<CallSound, readonly 
     },
     /** Sleigh bells: a major arpeggio high up, struck quickly. */
     winter: {
+        ...recastAll("winter"),
         ring: ringOf([783.99, 987.77, 1174.66]),
         message: [
             { from: 1318.51, at: 0, seconds: 0.06, gain: 0.05, bell: true },
@@ -276,6 +360,7 @@ export const SEASONAL_SOUNDS: Record<Season, Partial<Record<CallSound, readonly 
     },
     /** A fanfare climbing to the octave, and a three-note sparkle. */
     newYear: {
+        ...recastAll("newYear"),
         ring: ringOf([523.25, 659.25, 1046.5]),
         message: [
             { from: 1046.5, at: 0, seconds: 0.04, gain: 0.05 },
@@ -285,6 +370,7 @@ export const SEASONAL_SOUNDS: Record<Season, Partial<Record<CallSound, readonly 
     },
     /** Pentatonic, the way a festival tune is: D, E and A. */
     lunarNewYear: {
+        ...recastAll("lunarNewYear"),
         ring: ringOf([587.33, 659.25, 880]),
         message: [
             { from: 587.33, at: 0, seconds: 0.06, gain: 0.05, bell: true },

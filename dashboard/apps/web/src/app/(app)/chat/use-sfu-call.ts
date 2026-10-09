@@ -480,13 +480,13 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
      */
     const hosting = Boolean(
         participantId &&
-            meeting &&
-            meeting.participants.some(
-                (person) =>
-                    person.id === participantId &&
-                    person.userId !== null &&
-                    person.userId === meeting.hostId
-            )
+        meeting &&
+        meeting.participants.some(
+            (person) =>
+                person.id === participantId &&
+                person.userId !== null &&
+                person.userId === meeting.hostId
+        )
     );
     /**
      * Whether this browser is holding a room nobody else is in.
@@ -2393,7 +2393,8 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
             },
             roleRef.current === "companion"
         );
-        if (deafenedRef.current && !next.deafened) {
+        const undeafened = deafenedRef.current && !next.deafened;
+        if (undeafened) {
             deafenedRef.current = false;
             setDeafened(false);
             say({ [DEAFENED]: "" });
@@ -2407,6 +2408,10 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
             leaveCombine();
             return;
         }
+        // Heard by the one who pressed it, so a shortcut pressed with the call
+        // behind another window is known to have landed.
+        if (undeafened) sound("undeafen");
+        else if (next.micOn !== micOnRef.current) sound(next.micOn ? "unmute" : "mute");
         micOnRef.current = next.micOn;
         setVoiceEnabled(next.micOn);
         setMicOn(next.micOn);
@@ -2415,7 +2420,7 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
         // muted because you once put your headphones down is not what anybody
         // meant by it.
         setCallMuted(!next.micOn);
-    }, [leaveCombine, say, setVoiceEnabled]);
+    }, [leaveCombine, say, setVoiceEnabled, sound]);
 
     /**
      * Turn the camera on or off.
@@ -2608,6 +2613,7 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
             },
             roleRef.current === "companion"
         );
+        if (next.deafened !== deafenedRef.current) sound(next.deafened ? "deafen" : "undeafen");
         deafenedRef.current = next.deafened;
         micBeforeDeafen.current = next.micBeforeDeafen;
         setDeafened(next.deafened);
@@ -2621,7 +2627,7 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
             setMicOn(micOnNow);
         }
         say({ [DEAFENED]: next.deafened ? "1" : "" });
-    }, [say, setVoiceEnabled]);
+    }, [say, setVoiceEnabled, sound]);
 
     /** Swap one input for another, mid-call. */
     const chooseDevice = useCallback(
