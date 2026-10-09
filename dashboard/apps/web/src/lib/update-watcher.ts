@@ -76,6 +76,21 @@ const UPDATE_EVENTS = ["system.update", "system.updated"] as const;
  */
 const READY_EVENT = "system.update";
 
+/**
+ * How long an unread "update ready" alert goes on speaking for the builds after
+ * it.
+ *
+ * On a project that merges often a build is published every hour or so, and
+ * each one used to raise a fresh alert - a chime, a phone buzzing - for news the
+ * reader had been told an hour earlier and had not even opened yet. Heard from an
+ * idle tab, that is a sound with no cause anybody can see. While the last one is
+ * still unread and this recent, it already says the true thing - an update is
+ * waiting, and installing takes the newest build - so the next build is noted
+ * without a word. Once it is read, or a day has passed, the next build is
+ * announced as before.
+ */
+const STANDING_ALERT_MS = 24 * 60 * 60_000;
+
 const POLICY_KEY = "updates.auto";
 const ANNOUNCED_KEY = "updates.announced";
 const INSTALLED_KEY = "updates.installed";
@@ -131,6 +146,19 @@ async function tellOperators(input: {
     await notifyOperators({ ...input, permission: UPDATE_PERMISSION, href: "/admin/settings" });
 }
 
+/** Whether an "update ready" alert raised within `STANDING_ALERT_MS` is still
+ *  unread by anybody - see there. */
+async function alertStillStanding(now: Date): Promise<boolean> {
+    const standing = await prisma.notification.count({
+        where: {
+            type: READY_EVENT,
+            readAt: null,
+            createdAt: { gt: new Date(now.getTime() - STANDING_ALERT_MS) }
+        }
+    });
+    return standing > 0;
+}
+
 /**
  * When this deployment first saw the published build, which is what a daily
  * schedule counts from. Announces it on the way, if this container is the one
@@ -139,6 +167,7 @@ async function tellOperators(input: {
 async function firstSeen(sha: string, policy: AutoUpdatePolicy): Promise<Date> {
     const now = new Date();
     if (await claim(ANNOUNCED_KEY, sha, `${sha} ${now.toISOString()}`)) {
+        if (await alertStillStanding(now)) return now;
         // Before raising this one, put down the ones it replaces - they name
         // builds this announcement supersedes. Done here rather than in the
         // reader so what reaches a phone or a chat webhook is superseded too,

@@ -69,6 +69,8 @@ const setting = {
 
 /** Marking a whole event read, which is how the watcher puts its own alerts down. */
 const notificationUpdateMany = vi.fn(async () => ({ count: 0 }));
+/** Unread "update ready" alerts recent enough to speak for the next build. */
+const notificationCount = vi.fn(async () => 0);
 
 const notify = vi.fn(async () => {});
 const startHostUpdate = vi.fn(async () => "started" as const);
@@ -80,7 +82,7 @@ const lastUpdateOutcome = vi.fn(
 let status: UpdateStatus;
 
 vi.mock("@polaris/db", () => ({
-    prisma: { setting, notification: { updateMany: notificationUpdateMany } }
+    prisma: { setting, notification: { updateMany: notificationUpdateMany, count: notificationCount } }
 }));
 vi.mock("@polaris/auth", () => ({ usersWithPermission: async () => ["user-1", "user-2"] }));
 vi.mock("@/lib/notifications/dispatch", () => ({
@@ -140,6 +142,8 @@ beforeEach(() => {
     startHostUpdate.mockResolvedValue("started");
     lastUpdateOutcome.mockResolvedValue(null);
     notificationUpdateMany.mockClear();
+    notificationCount.mockReset();
+    notificationCount.mockResolvedValue(0);
     status = available();
 });
 
@@ -162,6 +166,29 @@ describe("announcing a build", () => {
         status = available("def5678");
         await checkForUpdate();
         expect(raised("system.update")).toHaveLength(4);
+    });
+
+    it("stays quiet about the next build while the last alert is unread and recent", async () => {
+        await saveAutoUpdatePolicy({ mode: "off", at: "05:00" });
+        await checkForUpdate();
+        // Nobody has opened it yet: a second chime an hour later is a sound with
+        // no cause anybody can see.
+        notificationCount.mockResolvedValue(1);
+        status = available("def5678");
+        await checkForUpdate();
+        await checkForUpdate();
+
+        expect(raised("system.update")).toHaveLength(2);
+        // And the standing alert is left standing: it still says the true thing.
+        expect(cleared("system.update")).toHaveLength(0);
+        const asked = notificationCount.mock.calls.at(-1) as unknown as [
+            { where: { type: string; readAt: null; createdAt: { gt: Date } } }
+        ];
+        expect(asked[0].where.type).toBe("system.update");
+        expect(asked[0].where.readAt).toBeNull();
+        expect(Date.now() - asked[0].where.createdAt.gt.getTime()).toBeGreaterThanOrEqual(
+            24 * 60 * 60_000 - 1000
+        );
     });
 
     it("puts down the alert it supersedes, so the bell holds the latest and not the pile", async () => {
