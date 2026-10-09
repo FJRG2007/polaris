@@ -2686,19 +2686,20 @@ function SlowmodeLine({ seconds, lastSentAt }: { seconds: number; lastSentAt: st
  * reason to be waited for.
  */
 function TypingLine({ typists, viewerId }: { typists: readonly Typist[]; viewerId: string }) {
+    const t = useTranslations("chat");
     const others = typists.filter((entry) => entry.userId !== viewerId);
     if (others.length === 0) return <div className="h-4" aria-hidden="true" />;
 
     const recording = others.filter((entry) => entry.activity === "recording");
     const shown = recording.length > 0 ? recording : others;
-    const doing = recording.length > 0 ? "recording a voice message" : "typing";
+    const doing = recording.length > 0 ? "recording" : "typing";
 
     const names =
         shown.length === 1
-            ? `${shown[0]!.name} is ${doing}`
+            ? t(`typing.${doing}One`, { name: shown[0]!.name })
             : shown.length === 2
-              ? `${shown[0]!.name} and ${shown[1]!.name} are ${doing}`
-              : `Several people are ${doing}`;
+              ? t(`typing.${doing}Two`, { first: shown[0]!.name, second: shown[1]!.name })
+              : t(`typing.${doing}Many`);
 
     return (
         <p aria-live="polite" className="h-4 px-4 text-[0.6875rem] text-muted-foreground">

@@ -22,6 +22,159 @@ nuevas y las reparaciones se hacen desde la interfaz.
 La guía completa (qué incluye cada app, requisitos, uso y desarrollo) está en el
 [README en inglés](README.md).
 
+## Un vistazo
+
+Cada imagen es la interfaz real, dibujada con sus propios componentes y datos de
+ejemplo, y sigue tu modo claro u oscuro. Las versiones para móvil están junto a
+ellas en [docs/assets/media](docs/assets/media).
+
+<table>
+  <tr>
+    <td width="50%" valign="top">
+      <picture>
+        <source media="(prefers-color-scheme: light)" srcset="docs/assets/media/chat-light-es-desktop.webp">
+        <img src="docs/assets/media/chat-dark-es-desktop.webp" alt="Chat, con el equipo escribiendo y respondiendo">
+      </picture>
+      <br><sub>Chat, con el equipo escribiendo y respondiendo</sub>
+    </td>
+    <td width="50%" valign="top">
+      <picture>
+        <source media="(prefers-color-scheme: light)" srcset="docs/assets/media/call-light-es-desktop.webp">
+        <img src="docs/assets/media/call-dark-es-desktop.webp" alt="Una llamada que suena sobre lo que estés haciendo">
+      </picture>
+      <br><sub>Una llamada que suena sobre lo que estés haciendo</sub>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <picture>
+        <source media="(prefers-color-scheme: light)" srcset="docs/assets/media/in-call-light-es-desktop.webp">
+        <img src="docs/assets/media/in-call-dark-es-desktop.webp" alt="La daily en una sala de voz">
+      </picture>
+      <br><sub>La daily en una sala de voz</sub>
+    </td>
+    <td width="50%" valign="top">
+      <picture>
+        <source media="(prefers-color-scheme: light)" srcset="docs/assets/media/tasks-light-es-desktop.webp">
+        <img src="docs/assets/media/tasks-dark-es-desktop.webp" alt="Tareas: el tablero de una lista a mitad de sprint">
+      </picture>
+      <br><sub>Tareas: el tablero de una lista a mitad de sprint</sub>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <picture>
+        <source media="(prefers-color-scheme: light)" srcset="docs/assets/media/task-panel-light-es-desktop.webp">
+        <img src="docs/assets/media/task-panel-dark-es-desktop.webp" alt="Una tarea abierta junto al tablero">
+      </picture>
+      <br><sub>Una tarea abierta junto al tablero</sub>
+    </td>
+    <td width="50%" valign="top">
+      <picture>
+        <source media="(prefers-color-scheme: light)" srcset="docs/assets/media/deploy-light-es-desktop.webp">
+        <img src="docs/assets/media/deploy-dark-es-desktop.webp" alt="Deploy: tus proyectos">
+      </picture>
+      <br><sub>Deploy: tus proyectos</sub>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <picture>
+        <source media="(prefers-color-scheme: light)" srcset="docs/assets/media/deploy-project-light-es-desktop.webp">
+        <img src="docs/assets/media/deploy-project-dark-es-desktop.webp" alt="Los servicios de un proyecto y cómo se conectan">
+      </picture>
+      <br><sub>Los servicios de un proyecto y cómo se conectan</sub>
+    </td>
+    <td width="50%" valign="top">
+      <picture>
+        <source media="(prefers-color-scheme: light)" srcset="docs/assets/media/deploy-logs-light-es-desktop.webp">
+        <img src="docs/assets/media/deploy-logs-dark-es-desktop.webp" alt="Una versión y sus logs en directo">
+      </picture>
+      <br><sub>Una versión y sus logs en directo</sub>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <picture>
+        <source media="(prefers-color-scheme: light)" srcset="docs/assets/media/drive-light-es-desktop.webp">
+        <img src="docs/assets/media/drive-dark-es-desktop.webp" alt="Drive en todo tu almacenamiento">
+      </picture>
+      <br><sub>Drive en todo tu almacenamiento</sub>
+    </td>
+    <td width="50%" valign="top">
+      <picture>
+        <source media="(prefers-color-scheme: light)" srcset="docs/assets/media/mail-light-es-desktop.webp">
+        <img src="docs/assets/media/mail-dark-es-desktop.webp" alt="Correo: todas las cuentas en una bandeja">
+      </picture>
+      <br><sub>Correo: todas las cuentas en una bandeja</sub>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <picture>
+        <source media="(prefers-color-scheme: light)" srcset="docs/assets/media/mail-thread-light-es-desktop.webp">
+        <img src="docs/assets/media/mail-thread-dark-es-desktop.webp" alt="Una conversación, leída">
+      </picture>
+      <br><sub>Una conversación, leída</sub>
+    </td>
+    <td width="50%" valign="top">
+      <picture>
+        <source media="(prefers-color-scheme: light)" srcset="docs/assets/media/calendar-light-es-desktop.webp">
+        <img src="docs/assets/media/calendar-dark-es-desktop.webp" alt="Calendario: la semana de trabajo">
+      </picture>
+      <br><sub>Calendario: la semana de trabajo</sub>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <picture>
+        <source media="(prefers-color-scheme: light)" srcset="docs/assets/media/office-light-es-desktop.webp">
+        <img src="docs/assets/media/office-dark-es-desktop.webp" alt="Office: documentos, hojas, presentaciones y diagramas">
+      </picture>
+      <br><sub>Office: documentos, hojas, presentaciones y diagramas</sub>
+    </td>
+    <td width="50%" valign="top">
+      <picture>
+        <source media="(prefers-color-scheme: light)" srcset="docs/assets/media/vault-light-es-desktop.webp">
+        <img src="docs/assets/media/vault-dark-es-desktop.webp" alt="Bóveda: contraseñas y códigos de un solo uso">
+      </picture>
+      <br><sub>Bóveda: contraseñas y códigos de un solo uso</sub>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <picture>
+        <source media="(prefers-color-scheme: light)" srcset="docs/assets/media/games-light-es-desktop.webp">
+        <img src="docs/assets/media/games-dark-es-desktop.webp" alt="Servidores de juegos">
+      </picture>
+      <br><sub>Servidores de juegos</sub>
+    </td>
+    <td width="50%" valign="top">
+      <picture>
+        <source media="(prefers-color-scheme: light)" srcset="docs/assets/media/marketplace-light-es-desktop.webp">
+        <img src="docs/assets/media/marketplace-dark-es-desktop.webp" alt="El marketplace de apps para instalar">
+      </picture>
+      <br><sub>El marketplace de apps para instalar</sub>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <picture>
+        <source media="(prefers-color-scheme: light)" srcset="docs/assets/media/launcher-light-es-desktop.webp">
+        <img src="docs/assets/media/launcher-dark-es-desktop.webp" alt="El lanzador de apps, con lo pendiente">
+      </picture>
+      <br><sub>El lanzador de apps, con lo pendiente</sub>
+    </td>
+    <td width="50%" valign="top">
+      <picture>
+        <source media="(prefers-color-scheme: light)" srcset="docs/assets/media/settings-light-es-desktop.webp">
+        <img src="docs/assets/media/settings-dark-es-desktop.webp" alt="Ajustes: una actualización lista para instalar">
+      </picture>
+      <br><sub>Ajustes: una actualización lista para instalar</sub>
+    </td>
+  </tr>
+</table>
+
 ## Instalar
 
 Un comando. Levanta todo: dashboard, base de datos, proxy inverso y el daemon de
@@ -66,7 +219,7 @@ Los servicios con los que Polaris ya habla. Cada uno se activa desde la interfaz
 | <img src="docs/assets/logos/dropbox.svg" width="28" height="28" alt="Dropbox" title="Dropbox"> <img src="docs/assets/logos/ubiquiti.svg" width="28" height="28" alt="Ubiquiti UniFi" title="Ubiquiti UniFi"> <img src="docs/assets/logos/docker.svg" width="28" height="28" alt="Docker" title="Docker">                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              | **Almacenamiento y hosts**: Dropbox, UniFi UNAS, S3, SFTP, SMB y NFS en Drive; el motor Docker de cada servidor que añades                                              |
 | <img src="docs/assets/logos/vercel.svg" width="28" height="28" alt="Vercel" title="Vercel"> <img src="docs/assets/logos/railway.svg" width="28" height="28" alt="Railway" title="Railway"> <img src="docs/assets/logos/aws.svg" width="28" height="28" alt="AWS" title="AWS">                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         | **Desplegar fuera**: proyectos de Vercel, Railway y AWS (ECS, Amplify) junto a los tuyos                                                                                |
 | <img src="docs/assets/logos/cloudflare.svg" width="28" height="28" alt="Cloudflare" title="Cloudflare"> <img src="docs/assets/logos/ngrok.svg" width="28" height="28" alt="ngrok" title="ngrok"> <img src="docs/assets/logos/duckdns.svg" width="28" height="28" alt="DuckDNS" title="DuckDNS">                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       | **Red**: registros DNS y túneles con Cloudflare, túneles de ngrok, nombres de DuckDNS                                                                                   |
-| <img src="docs/assets/logos/anthropic.svg" width="28" height="28" alt="Anthropic" title="Anthropic"> <img src="docs/assets/logos/openai.svg" width="28" height="28" alt="OpenAI" title="OpenAI"> <img src="docs/assets/logos/gemini.svg" width="28" height="28" alt="Google Gemini" title="Google Gemini"> <img src="docs/assets/logos/xai.svg" width="28" height="28" alt="xAI" title="xAI"> <img src="docs/assets/logos/deepseek.svg" width="28" height="28" alt="DeepSeek" title="DeepSeek"> <img src="docs/assets/logos/moonshot.svg" width="28" height="28" alt="Moonshot AI" title="Moonshot AI"> <img src="docs/assets/logos/groq.svg" width="28" height="28" alt="Groq" title="Groq"> <img src="docs/assets/logos/cerebras.svg" width="28" height="28" alt="Cerebras" title="Cerebras"> <img src="docs/assets/logos/openrouter.svg" width="28" height="28" alt="OpenRouter" title="OpenRouter">                                                                               | **Modelos**: tus propias claves para estos y más de 50 proveedores más                                                                                                  |
+| <img src="docs/assets/logos/anthropic.svg" width="28" height="28" alt="Anthropic" title="Anthropic"> <img src="docs/assets/logos/openai.svg" width="28" height="28" alt="OpenAI" title="OpenAI"> <img src="docs/assets/logos/gemini.svg" width="28" height="28" alt="Google Gemini" title="Google Gemini"> <img src="docs/assets/logos/xai.svg" width="28" height="28" alt="xAI" title="xAI"> <img src="docs/assets/logos/deepseek.svg" width="28" height="28" alt="DeepSeek" title="DeepSeek"> <img src="docs/assets/logos/moonshot.svg" width="28" height="28" alt="Moonshot AI" title="Moonshot AI"> <img src="docs/assets/logos/groq.svg" width="28" height="28" alt="Groq" title="Groq"> <img src="docs/assets/logos/cerebras.svg" width="28" height="28" alt="Cerebras" title="Cerebras"> <img src="docs/assets/logos/openrouter.svg" width="28" height="28" alt="OpenRouter" title="OpenRouter">                                                                               | **Modelos**: tus propias claves para estos y más de 50 proveedores                                                                                                      |
 | <img src="docs/assets/logos/claude.svg" width="28" height="28" alt="Claude" title="Claude"> <img src="docs/assets/logos/cursor.svg" width="28" height="28" alt="Cursor" title="Cursor"> <img src="docs/assets/logos/opencode.svg" width="28" height="28" alt="OpenCode" title="OpenCode"> <img src="docs/assets/logos/vscode.svg" width="28" height="28" alt="Visual Studio Code" title="Visual Studio Code">                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         | **Agentes de código**: Claude Code, Codex, Gemini CLI, Copilot CLI, Cursor CLI, OpenCode y 9 más en sesiones en vivo; los clientes MCP se conectan como tú              |
 | <img src="docs/assets/logos/tuya.svg" width="28" height="28" alt="Tuya" title="Tuya"> <img src="docs/assets/logos/tp-link.svg" width="28" height="28" alt="TP-Link" title="TP-Link"> <img src="docs/assets/logos/shelly.svg" width="28" height="28" alt="Shelly" title="Shelly"> <img src="docs/assets/logos/philips-hue.svg" width="28" height="28" alt="Philips Hue" title="Philips Hue"> <img src="docs/assets/logos/ikea.svg" width="28" height="28" alt="IKEA" title="IKEA"> <img src="docs/assets/logos/gree.svg" width="28" height="28" alt="Gree" title="Gree"> <img src="docs/assets/logos/philips.svg" width="28" height="28" alt="Philips" title="Philips"> <img src="docs/assets/logos/home-assistant.svg" width="28" height="28" alt="Home Assistant" title="Home Assistant"> <img src="docs/assets/logos/switchbot.svg" width="28" height="28" alt="SwitchBot" title="SwitchBot"> <img src="docs/assets/logos/nuki.svg" width="28" height="28" alt="Nuki" title="Nuki"> | **Places**: enchufes, luces, cerraduras y climatización de estas marcas; cámaras Tapo, VIGI, Reolink, Hikvision, Dahua, Amcrest o cualquier cámara ONVIF o RTSP         |
 | <img src="docs/assets/logos/steam.svg" width="28" height="28" alt="Steam" title="Steam"> <img src="docs/assets/logos/epic-games.svg" width="28" height="28" alt="Epic Games" title="Epic Games"> <img src="docs/assets/logos/minecraft.svg" width="28" height="28" alt="Minecraft" title="Minecraft"> <img src="docs/assets/logos/discord.svg" width="28" height="28" alt="Discord" title="Discord">                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  | **Servidores de juegos**: los jugadores vinculan sus cuentas para que el servidor los reconozca                                                                         |

@@ -318,7 +318,9 @@ function MemberRow({
                     }
                     className={cn(
                         "flex w-full items-center gap-2 rounded-md px-2 py-1 text-left transition-colors",
-                        you && !press ? "cursor-default" : "hover:bg-card-hover disabled:opacity-70",
+                        you && !press
+                            ? "cursor-default"
+                            : "hover:bg-card-hover disabled:opacity-70",
                         // A plate replaces the row's own hover tint
                         // rather than being tinted by it.
                         plate && platedRow(plate, "hover:bg-transparent")
@@ -342,7 +344,7 @@ function MemberRow({
                                         className={plate ? "opacity-80" : "text-muted-foreground"}
                                     >
                                         {" "}
-                                        (you)
+                                        {t("members.you")}
                                     </span>
                                 )}
                             </PersonName>
@@ -394,7 +396,9 @@ export function ChannelMembers({
     const { viewerId, refresh } = useChat();
     const wide = useWideScreen();
     const { members, loading } = useRoster(channel.id, channel.ownerId, open);
-    const heading = `Members${loading ? "" : ` - ${members.length}`}`;
+    const heading = loading
+        ? t("members.heading")
+        : t("members.headingCount", { count: members.length });
     // Above the two early returns below, and deliberately: a hook that only runs
     // on some renders is a crash the first time this panel is closed or drawn on
     // a narrow window.

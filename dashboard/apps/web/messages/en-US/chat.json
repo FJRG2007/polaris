@@ -333,6 +333,13 @@
         "always": "always"
     },
     "callRoom": {
+        "yourScreen": "Your screen",
+        "theirScreen": "{name} - screen",
+        "backToTheGrid": "Back to the grid",
+        "backToThePeople": "Back to the people",
+        "you": "You",
+        "guest": "guest",
+        "somebody": "Somebody",
         "theCallHasEnded": "The call has ended.",
         "close": "Close",
         "shrinkTheCall": "Shrink the call",
@@ -1416,7 +1423,18 @@
     "members": {
         "owner": "Owner",
         "membersListWidth": "Members list width",
-        "hideTheMembers": "Hide the members"
+        "hideTheMembers": "Hide the members",
+        "heading": "Members",
+        "headingCount": "Members - {count}",
+        "you": "(you)"
+    },
+    "typing": {
+        "typingOne": "{name} is typing",
+        "typingTwo": "{first} and {second} are typing",
+        "typingMany": "Several people are typing",
+        "recordingOne": "{name} is recording a voice message",
+        "recordingTwo": "{first} and {second} are recording a voice message",
+        "recordingMany": "Several people are recording a voice message"
     },
     "thread": {
         "threadWidth": "Thread width",

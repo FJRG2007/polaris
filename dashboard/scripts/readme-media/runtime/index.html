@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title>Polaris</title>
+        <style>
+            @font-face { font-family: "IBM Plex Sans"; src: url("fonts/IBMPlexSans-Regular.woff2") format("woff2"); font-weight: 400; }
+            @font-face { font-family: "IBM Plex Sans"; src: url("fonts/IBMPlexSans-Medium.woff2") format("woff2"); font-weight: 500; }
+            @font-face { font-family: "IBM Plex Sans"; src: url("fonts/IBMPlexSans-SemiBold.woff2") format("woff2"); font-weight: 600; }
+            @font-face { font-family: "IBM Plex Sans"; src: url("fonts/IBMPlexSans-Bold.woff2") format("woff2"); font-weight: 700; }
+            @font-face { font-family: "IBM Plex Mono"; src: url("fonts/IBMPlexMono-Regular.woff2") format("woff2"); font-weight: 400; }
+            @font-face { font-family: "IBM Plex Mono"; src: url("fonts/IBMPlexMono-Medium.woff2") format("woff2"); font-weight: 500; }
+            @font-face { font-family: "IBM Plex Mono"; src: url("fonts/IBMPlexMono-SemiBold.woff2") format("woff2"); font-weight: 600; }
+            :root { --font-plex-sans: "IBM Plex Sans"; --font-plex-mono: "IBM Plex Mono"; --app-text-size: 16px; }
+            html, body, #root { height: 100%; }
+        </style>
+        <link rel="stylesheet" href="styles.css" />
+        <link rel="stylesheet" href="harness.css" />
+        <script>
+            window.__READMEMEDIA_ENV__ = { NODE_ENV: "production" };
+            window.process = { env: window.__READMEMEDIA_ENV__, platform: "browser" };
+        </script>
+    </head>
+    <body>
+        <div id="root"></div>
+        <script type="module" src="harness.js"></script>
+    </body>
+</html>

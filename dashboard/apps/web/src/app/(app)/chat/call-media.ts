@@ -285,10 +285,16 @@ export function stagesOf(room: {
     participantId: string | null;
     screens: ReadonlyMap<string, MediaStream>;
     nameOf: (personId: string) => string;
+    /** What a screen is called on the stage, in the reader's language. */
+    words: { yourScreen: string; theirScreen: (name: string) => string };
 }): CallStage[] {
     const stages: CallStage[] = [];
     if (room.localScreen) {
-        stages.push({ key: LOCAL_SCREEN_KEY, stream: room.localScreen, name: "Your screen" });
+        stages.push({
+            key: LOCAL_SCREEN_KEY,
+            stream: room.localScreen,
+            name: room.words.yourScreen
+        });
     }
     for (const [personId, stream] of room.screens) {
         // This browser's own screen coming back from the server, which happens
@@ -298,7 +304,7 @@ export function stagesOf(room: {
         stages.push({
             key: `screen:${personId}`,
             stream,
-            name: `${room.nameOf(personId)} - screen`
+            name: room.words.theirScreen(room.nameOf(personId))
         });
     }
     return stages;

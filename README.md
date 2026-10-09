@@ -38,6 +38,159 @@ Docker engine, and the machines you enrol over SSH are all managed from the one
 container. After the install, nothing needs a terminal - updates, new features
 and repairs all happen from the interface.
 
+## A look inside
+
+Every picture below is the real interface, drawn from its own components with
+made-up data, and follows your light or dark setting. Phone-sized versions sit
+beside them in [docs/assets/media](docs/assets/media).
+
+<table>
+  <tr>
+    <td width="50%" valign="top">
+      <picture>
+        <source media="(prefers-color-scheme: light)" srcset="docs/assets/media/chat-light-en-desktop.webp">
+        <img src="docs/assets/media/chat-dark-en-desktop.webp" alt="Chat, with the team typing and replying">
+      </picture>
+      <br><sub>Chat, with the team typing and replying</sub>
+    </td>
+    <td width="50%" valign="top">
+      <picture>
+        <source media="(prefers-color-scheme: light)" srcset="docs/assets/media/call-light-en-desktop.webp">
+        <img src="docs/assets/media/call-dark-en-desktop.webp" alt="A call ringing over whatever you are doing">
+      </picture>
+      <br><sub>A call ringing over whatever you are doing</sub>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <picture>
+        <source media="(prefers-color-scheme: light)" srcset="docs/assets/media/in-call-light-en-desktop.webp">
+        <img src="docs/assets/media/in-call-dark-en-desktop.webp" alt="The stand-up in a voice room">
+      </picture>
+      <br><sub>The stand-up in a voice room</sub>
+    </td>
+    <td width="50%" valign="top">
+      <picture>
+        <source media="(prefers-color-scheme: light)" srcset="docs/assets/media/tasks-light-en-desktop.webp">
+        <img src="docs/assets/media/tasks-dark-en-desktop.webp" alt="Tasks: a list's board mid-sprint">
+      </picture>
+      <br><sub>Tasks: a list's board mid-sprint</sub>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <picture>
+        <source media="(prefers-color-scheme: light)" srcset="docs/assets/media/task-panel-light-en-desktop.webp">
+        <img src="docs/assets/media/task-panel-dark-en-desktop.webp" alt="A task opened beside the board">
+      </picture>
+      <br><sub>A task opened beside the board</sub>
+    </td>
+    <td width="50%" valign="top">
+      <picture>
+        <source media="(prefers-color-scheme: light)" srcset="docs/assets/media/deploy-light-en-desktop.webp">
+        <img src="docs/assets/media/deploy-dark-en-desktop.webp" alt="Deploy: your projects">
+      </picture>
+      <br><sub>Deploy: your projects</sub>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <picture>
+        <source media="(prefers-color-scheme: light)" srcset="docs/assets/media/deploy-project-light-en-desktop.webp">
+        <img src="docs/assets/media/deploy-project-dark-en-desktop.webp" alt="A project's services and how they connect">
+      </picture>
+      <br><sub>A project's services and how they connect</sub>
+    </td>
+    <td width="50%" valign="top">
+      <picture>
+        <source media="(prefers-color-scheme: light)" srcset="docs/assets/media/deploy-logs-light-en-desktop.webp">
+        <img src="docs/assets/media/deploy-logs-dark-en-desktop.webp" alt="A release and its live logs">
+      </picture>
+      <br><sub>A release and its live logs</sub>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <picture>
+        <source media="(prefers-color-scheme: light)" srcset="docs/assets/media/drive-light-en-desktop.webp">
+        <img src="docs/assets/media/drive-dark-en-desktop.webp" alt="Drive across every storage you own">
+      </picture>
+      <br><sub>Drive across every storage you own</sub>
+    </td>
+    <td width="50%" valign="top">
+      <picture>
+        <source media="(prefers-color-scheme: light)" srcset="docs/assets/media/mail-light-en-desktop.webp">
+        <img src="docs/assets/media/mail-dark-en-desktop.webp" alt="Mail: every account in one inbox">
+      </picture>
+      <br><sub>Mail: every account in one inbox</sub>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <picture>
+        <source media="(prefers-color-scheme: light)" srcset="docs/assets/media/mail-thread-light-en-desktop.webp">
+        <img src="docs/assets/media/mail-thread-dark-en-desktop.webp" alt="A conversation, read">
+      </picture>
+      <br><sub>A conversation, read</sub>
+    </td>
+    <td width="50%" valign="top">
+      <picture>
+        <source media="(prefers-color-scheme: light)" srcset="docs/assets/media/calendar-light-en-desktop.webp">
+        <img src="docs/assets/media/calendar-dark-en-desktop.webp" alt="Calendar: the working week">
+      </picture>
+      <br><sub>Calendar: the working week</sub>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <picture>
+        <source media="(prefers-color-scheme: light)" srcset="docs/assets/media/office-light-en-desktop.webp">
+        <img src="docs/assets/media/office-dark-en-desktop.webp" alt="Office: documents, sheets, slides and diagrams">
+      </picture>
+      <br><sub>Office: documents, sheets, slides and diagrams</sub>
+    </td>
+    <td width="50%" valign="top">
+      <picture>
+        <source media="(prefers-color-scheme: light)" srcset="docs/assets/media/vault-light-en-desktop.webp">
+        <img src="docs/assets/media/vault-dark-en-desktop.webp" alt="Vault: passwords and one-time codes">
+      </picture>
+      <br><sub>Vault: passwords and one-time codes</sub>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <picture>
+        <source media="(prefers-color-scheme: light)" srcset="docs/assets/media/games-light-en-desktop.webp">
+        <img src="docs/assets/media/games-dark-en-desktop.webp" alt="Game servers">
+      </picture>
+      <br><sub>Game servers</sub>
+    </td>
+    <td width="50%" valign="top">
+      <picture>
+        <source media="(prefers-color-scheme: light)" srcset="docs/assets/media/marketplace-light-en-desktop.webp">
+        <img src="docs/assets/media/marketplace-dark-en-desktop.webp" alt="The marketplace of apps to install">
+      </picture>
+      <br><sub>The marketplace of apps to install</sub>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <picture>
+        <source media="(prefers-color-scheme: light)" srcset="docs/assets/media/launcher-light-en-desktop.webp">
+        <img src="docs/assets/media/launcher-dark-en-desktop.webp" alt="The app launcher, with what is waiting">
+      </picture>
+      <br><sub>The app launcher, with what is waiting</sub>
+    </td>
+    <td width="50%" valign="top">
+      <picture>
+        <source media="(prefers-color-scheme: light)" srcset="docs/assets/media/settings-light-en-desktop.webp">
+        <img src="docs/assets/media/settings-dark-en-desktop.webp" alt="Settings: an update ready to install">
+      </picture>
+      <br><sub>Settings: an update ready to install</sub>
+    </td>
+  </tr>
+</table>
+
 ## If you already pay for these
 
 The fastest way to say what Polaris is: it is the tools you are already using,

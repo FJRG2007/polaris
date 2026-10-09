@@ -42,10 +42,12 @@ export function HandStrip({ call }: { call: CallState }) {
                 id,
                 // A seat with nobody behind it is somebody who has just left,
                 // which reads better than an identifier nobody chose.
-                name: participants?.find((person) => person.id === id)?.name ?? "Somebody",
+                name:
+                    participants?.find((person) => person.id === id)?.name ??
+                    t("callRoom.somebody"),
                 own: id === seat
             })),
-        [call.hands, participants, seat]
+        [call.hands, participants, seat, t]
     );
 
     /**

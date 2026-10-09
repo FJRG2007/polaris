@@ -38,6 +38,7 @@
  */
 
 import * as core from "@polaris/core";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import type { CallState } from "./call-state";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { recordingExtension, recordingType } from "./recording-format";
@@ -208,12 +209,20 @@ export function useCallRecorder(call: CallState): CallRecording {
     const [bytes, setBytes] = useState(0);
     const [file, setFile] = useState<File | null>(null);
     const [error, setError] = useState("");
+    const t = useTranslations("chat");
 
     /** The call as it is right now, for the timers to read. They are started
      *  once and would otherwise be composing the room as it was when record was
      *  pressed - the people in it, their cameras and their screens all change. */
     const latest = useRef(call);
     latest.current = call;
+    /** What the picture calls people and screens, in the reader's language. */
+    const words = useRef<PieceWords>({ somebody: "", yourScreen: "", theirScreen: () => "" });
+    words.current = {
+        somebody: t("callRoom.somebody"),
+        yourScreen: t("callRoom.yourScreen"),
+        theirScreen: (name) => t("callRoom.theirScreen", { name })
+    };
 
     const kit = useRef<Machinery>({
         recorder: null,
@@ -293,10 +302,13 @@ export function useCallRecorder(call: CallState): CallRecording {
         // which is an hour of silence over a perfectly good picture.
         void audio.resume().catch(() => undefined);
 
-        const settle = () => settleSources(parts, latest.current);
+        const settle = () => settleSources(parts, latest.current, words.current);
         settle();
         parts.settling = setInterval(settle, SETTLE_MS);
-        parts.painting = setInterval(() => paint(brush, parts, latest.current), 1000 / FPS);
+        parts.painting = setInterval(
+            () => paint(brush, parts, latest.current, words.current),
+            1000 / FPS
+        );
 
         const recorded = new MediaStream(canvas.captureStream(FPS).getVideoTracks());
         for (const track of mixed.stream.getAudioTracks()) recorded.addTrack(track);
@@ -324,9 +336,7 @@ export function useCallRecorder(call: CallState): CallRecording {
             setRunning(false);
             latest.current.setRecording(false);
             if (blob.size === 0) return;
-            setFile(
-                new File([blob], `call-recording.${recordingExtension(type)}`, { type })
-            );
+            setFile(new File([blob], `call-recording.${recordingExtension(type)}`, { type }));
         };
 
         // A slice a second, so the size is known while it grows rather than only
@@ -388,22 +398,32 @@ export function useCallRecorder(call: CallState): CallRecording {
 }
 
 /** Everything the recording is being made of, in the order it is drawn. */
-function piecesOf(call: CallState): {
+/** The words drawn into the recording over its pictures. */
+interface PieceWords {
+    readonly somebody: string;
+    readonly yourScreen: string;
+    readonly theirScreen: (name: string) => string;
+}
+
+function piecesOf(
+    call: CallState,
+    words: PieceWords
+): {
     stage: { key: string; stream: MediaStream; name: string }[];
     faces: { key: string; stream: MediaStream | null; name: string }[];
 } {
     const named = (personId: string): string => {
         const person = call.meeting?.participants.find((entry) => entry.id === personId);
-        return person?.name ?? "Somebody";
+        return person?.name ?? words.somebody;
     };
 
     const stage: { key: string; stream: MediaStream; name: string }[] = [];
     if (call.localScreen) {
-        stage.push({ key: "screen:self", stream: call.localScreen, name: "Your screen" });
+        stage.push({ key: "screen:self", stream: call.localScreen, name: words.yourScreen });
     }
     for (const [personId, stream] of call.screens) {
         if (call.localScreen && personId === call.participantId) continue;
-        stage.push({ key: `screen:${personId}`, stream, name: `${named(personId)} - screen` });
+        stage.push({ key: `screen:${personId}`, stream, name: words.theirScreen(named(personId)) });
     }
 
     const faces: { key: string; stream: MediaStream | null; name: string }[] = [];
@@ -429,12 +449,12 @@ function piecesOf(call: CallState): {
  * node rebuilt for a stream that had not changed would be an audible break in
  * the recording.
  */
-function settleSources(parts: Machinery, call: CallState): void {
+function settleSources(parts: Machinery, call: CallState, words: PieceWords): void {
     const audio = parts.audio;
     const mixed = parts.mixed;
     if (!audio || !mixed) return;
 
-    const { stage, faces } = piecesOf(call);
+    const { stage, faces } = piecesOf(call, words);
     const streams = new Map<string, MediaStream>();
     for (const piece of [...stage, ...faces]) {
         if (piece.stream) streams.set(piece.key, piece.stream);
@@ -491,8 +511,13 @@ function settleSources(parts: Machinery, call: CallState): void {
 }
 
 /** One frame of the recording. */
-function paint(brush: CanvasRenderingContext2D, parts: Machinery, call: CallState): void {
-    const { stage, faces } = piecesOf(call);
+function paint(
+    brush: CanvasRenderingContext2D,
+    parts: Machinery,
+    call: CallState,
+    words: PieceWords
+): void {
+    const { stage, faces } = piecesOf(call, words);
     const places = recordingLayout(stage.length, faces.length);
 
     brush.fillStyle = "#0b0b0f";
