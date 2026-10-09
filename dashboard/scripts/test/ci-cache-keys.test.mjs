@@ -12,7 +12,14 @@ import { dirname, join } from "node:path";
  * back to building everything. These fail first.
  */
 
-const workflows = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "..", ".github", "workflows");
+const workflows = join(
+    dirname(fileURLToPath(import.meta.url)),
+    "..",
+    "..",
+    "..",
+    ".github",
+    "workflows"
+);
 const read = (name) => readFileSync(join(workflows, name), "utf8");
 
 /** Every `key:` line of a workflow whose value starts with `prefix`. */
