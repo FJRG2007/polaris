@@ -21,6 +21,7 @@
  */
 
 import { prisma } from "@polaris/db";
+import { usersWithPermission } from "@polaris/auth";
 import { getUpdateSource } from "@/lib/update-source";
 import { getUpdateStatus, type UpdateStatus } from "@/lib/update-service";
 import { getSetting, setSetting } from "@/lib/setting-store";
@@ -88,6 +89,11 @@ const READY_EVENT = "system.update";
  * waiting, and installing takes the newest build - so the next build is noted
  * without a word. Once it is read, or a day has passed, the next build is
  * announced as before.
+ *
+ * Decided for each reader on their own: one operator who never signs in must
+ * not hold the news back from the others. Mail, a text or a webhook carries no
+ * "read", so for somebody told only that way an alert delivered this recently
+ * is the one still standing.
  */
 const STANDING_ALERT_MS = 24 * 60 * 60_000;
 
@@ -142,21 +148,43 @@ async function tellOperators(input: {
     level?: NotificationLevel;
     actionRequired?: boolean;
     say?: OperatorAlert["say"];
+    recipients?: OperatorAlert["recipients"];
 }): Promise<void> {
     await notifyOperators({ ...input, permission: UPDATE_PERMISSION, href: "/admin/settings" });
 }
 
-/** Whether an "update ready" alert raised within `STANDING_ALERT_MS` is still
- *  unread by anybody - see there. */
-async function alertStillStanding(now: Date): Promise<boolean> {
-    const standing = await prisma.notification.count({
-        where: {
-            type: READY_EVENT,
-            readAt: null,
-            createdAt: { gt: new Date(now.getTime() - STANDING_ALERT_MS) }
-        }
-    });
-    return standing > 0;
+/**
+ * Who a newly published build is announced to: everyone allowed to install it,
+ * less those an earlier "update ready" alert is still standing for - see
+ * `STANDING_ALERT_MS`. Nothing stands once the build it named has landed, which
+ * is when there is no earlier announcement left to speak for the next one.
+ */
+async function recipientsFor(now: Date, earlier: string | null): Promise<string[]> {
+    const operators = await usersWithPermission(UPDATE_PERMISSION);
+    if (!earlier || operators.length === 0) return operators;
+    const since = new Date(now.getTime() - STANDING_ALERT_MS);
+    const [onBell, offBell] = await Promise.all([
+        prisma.notification.findMany({
+            where: { userId: { in: operators }, type: READY_EVENT, createdAt: { gt: since } },
+            select: { userId: true, readAt: true }
+        }),
+        prisma.notificationDelivery.findMany({
+            where: {
+                userId: { in: operators },
+                event: READY_EVENT,
+                kind: { not: "inapp" },
+                status: "sent",
+                createdAt: { gt: since }
+            },
+            select: { userId: true }
+        })
+    ]);
+    const bell = new Set(onBell.map((row) => row.userId));
+    const unread = new Set(onBell.filter((row) => row.readAt === null).map((row) => row.userId));
+    const reached = new Set(offBell.map((row) => row.userId));
+    return operators.filter((userId) =>
+        bell.has(userId) ? !unread.has(userId) : !reached.has(userId)
+    );
 }
 
 /**
@@ -166,15 +194,18 @@ async function alertStillStanding(now: Date): Promise<boolean> {
  */
 async function firstSeen(sha: string, policy: AutoUpdatePolicy): Promise<Date> {
     const now = new Date();
+    const earlier = await getSetting(ANNOUNCED_KEY);
     if (await claim(ANNOUNCED_KEY, sha, `${sha} ${now.toISOString()}`)) {
-        if (await alertStillStanding(now)) return now;
+        const recipients = await recipientsFor(now, earlier);
+        if (recipients.length === 0) return now;
         // Before raising this one, put down the ones it replaces - they name
         // builds this announcement supersedes. Done here rather than in the
         // reader so what reaches a phone or a chat webhook is superseded too,
         // and so the bell holds the latest rather than the pile.
-        await markNotificationsReadByType([READY_EVENT]);
+        await markNotificationsReadByType([READY_EVENT], recipients);
         await tellOperators({
             event: "system.update",
+            recipients,
             ...inWords((t) => ({
                 title: t("update.readyTitle"),
                 body: t("update.readyBody", {

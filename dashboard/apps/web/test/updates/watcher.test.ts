@@ -69,8 +69,57 @@ const setting = {
 
 /** Marking a whole event read, which is how the watcher puts its own alerts down. */
 const notificationUpdateMany = vi.fn(async () => ({ count: 0 }));
-/** Unread "update ready" alerts recent enough to speak for the next build. */
-const notificationCount = vi.fn(async () => 0);
+/** Bell rows and off-bell deliveries already out there, which is what decides
+ *  whether an earlier alert is still standing for somebody. */
+interface BellRow {
+    userId: string;
+    type: string;
+    readAt: Date | null;
+    createdAt: Date;
+}
+interface DeliveryRow {
+    userId: string;
+    event: string;
+    kind: string;
+    status: string;
+    createdAt: Date;
+}
+const bellRows: BellRow[] = [];
+const deliveryRows: DeliveryRow[] = [];
+const notificationFindMany = vi.fn(
+    async ({
+        where
+    }: {
+        where: { userId: { in: string[] }; type: string; createdAt: { gt: Date } };
+    }) =>
+        bellRows.filter(
+            (row) =>
+                where.userId.in.includes(row.userId) &&
+                row.type === where.type &&
+                row.createdAt > where.createdAt.gt
+        )
+);
+const deliveryFindMany = vi.fn(
+    async ({
+        where
+    }: {
+        where: {
+            userId: { in: string[] };
+            event: string;
+            kind: { not: string };
+            status: string;
+            createdAt: { gt: Date };
+        };
+    }) =>
+        deliveryRows.filter(
+            (row) =>
+                where.userId.in.includes(row.userId) &&
+                row.event === where.event &&
+                row.kind !== where.kind.not &&
+                row.status === where.status &&
+                row.createdAt > where.createdAt.gt
+        )
+);
 
 const notify = vi.fn(async () => {});
 const startHostUpdate = vi.fn(async () => "started" as const);
@@ -82,7 +131,11 @@ const lastUpdateOutcome = vi.fn(
 let status: UpdateStatus;
 
 vi.mock("@polaris/db", () => ({
-    prisma: { setting, notification: { updateMany: notificationUpdateMany, count: notificationCount } }
+    prisma: {
+        setting,
+        notification: { updateMany: notificationUpdateMany, findMany: notificationFindMany },
+        notificationDelivery: { findMany: deliveryFindMany }
+    }
 }));
 vi.mock("@polaris/auth", () => ({ usersWithPermission: async () => ["user-1", "user-2"] }));
 vi.mock("@/lib/notifications/dispatch", () => ({
@@ -116,7 +169,7 @@ function available(latest: string | null = SHA): UpdateStatus {
 /** The one write the watcher makes against notifications: answering its own
  *  alerts, by type, for everybody at once. */
 interface MarkRead {
-    where: { type: { in: string[] } };
+    where: { type: { in: string[] }; userId?: { in: string[] } };
 }
 
 /** Every clearing write that named this event. `system.update` alone is the
@@ -128,9 +181,12 @@ function cleared(event: string): MarkRead[] {
 }
 
 /** Every alert raised so far, by event id. */
-function raised(event: string): { title: string; body: string }[] {
+function raised(event: string): { userId: string; title: string; body: string }[] {
     return notify.mock.calls
-        .map(([input]) => input as unknown as { event: string; title: string; body: string })
+        .map(
+            ([input]) =>
+                input as unknown as { userId: string; event: string; title: string; body: string }
+        )
         .filter((input) => input.event === event);
 }
 
@@ -142,8 +198,8 @@ beforeEach(() => {
     startHostUpdate.mockResolvedValue("started");
     lastUpdateOutcome.mockResolvedValue(null);
     notificationUpdateMany.mockClear();
-    notificationCount.mockReset();
-    notificationCount.mockResolvedValue(0);
+    bellRows.length = 0;
+    deliveryRows.length = 0;
     status = available();
 });
 
@@ -168,27 +224,117 @@ describe("announcing a build", () => {
         expect(raised("system.update")).toHaveLength(4);
     });
 
-    it("stays quiet about the next build while the last alert is unread and recent", async () => {
+    it("stays quiet about the next build for whoever has not read the last alert", async () => {
         await saveAutoUpdatePolicy({ mode: "off", at: "05:00" });
         await checkForUpdate();
-        // Nobody has opened it yet: a second chime an hour later is a sound with
-        // no cause anybody can see.
-        notificationCount.mockResolvedValue(1);
+        // user-1 has not opened it yet: a second chime an hour later is a sound
+        // with no cause anybody can see. user-2 read theirs and wants the next.
+        const anHourAgo = new Date(Date.now() - 60 * 60_000);
+        bellRows.push(
+            { userId: "user-1", type: "system.update", readAt: null, createdAt: anHourAgo },
+            { userId: "user-2", type: "system.update", readAt: new Date(), createdAt: anHourAgo }
+        );
+        notify.mockClear();
+        notificationUpdateMany.mockClear();
         status = available("def5678");
         await checkForUpdate();
         await checkForUpdate();
 
-        expect(raised("system.update")).toHaveLength(2);
-        // And the standing alert is left standing: it still says the true thing.
+        expect(raised("system.update").map((alert) => alert.userId)).toEqual(["user-2"]);
+        // And user-1's standing alert is left standing: it still says the true thing.
+        expect(cleared("system.update").map((call) => call.where.userId?.in)).toEqual([["user-2"]]);
+    });
+
+    it("says nothing at all while everybody's last alert is unread", async () => {
+        await saveAutoUpdatePolicy({ mode: "off", at: "05:00" });
+        await checkForUpdate();
+        for (const userId of ["user-1", "user-2"]) {
+            bellRows.push({ userId, type: "system.update", readAt: null, createdAt: new Date() });
+        }
+        notify.mockClear();
+        notificationUpdateMany.mockClear();
+        status = available("def5678");
+        await checkForUpdate();
+
+        expect(raised("system.update")).toHaveLength(0);
         expect(cleared("system.update")).toHaveLength(0);
-        const asked = notificationCount.mock.calls.at(-1) as unknown as [
-            { where: { type: string; readAt: null; createdAt: { gt: Date } } }
-        ];
-        expect(asked[0].where.type).toBe("system.update");
-        expect(asked[0].where.readAt).toBeNull();
-        expect(Date.now() - asked[0].where.createdAt.gt.getTime()).toBeGreaterThanOrEqual(
-            24 * 60 * 60_000 - 1000
+    });
+
+    it("counts a text or webhook sent recently as standing for someone with the bell off", async () => {
+        await saveAutoUpdatePolicy({ mode: "off", at: "05:00" });
+        await checkForUpdate();
+        deliveryRows.push(
+            {
+                userId: "user-1",
+                event: "system.update",
+                kind: "inapp",
+                status: "skipped",
+                createdAt: new Date()
+            },
+            {
+                userId: "user-1",
+                event: "system.update",
+                kind: "webhook",
+                status: "sent",
+                createdAt: new Date()
+            },
+            {
+                userId: "user-2",
+                event: "system.update",
+                kind: "sms",
+                status: "failed",
+                createdAt: new Date()
+            }
         );
+        notify.mockClear();
+        status = available("def5678");
+        await checkForUpdate();
+
+        expect(raised("system.update").map((alert) => alert.userId)).toEqual(["user-2"]);
+    });
+
+    it("lets an alert stand for a day, no longer", async () => {
+        await saveAutoUpdatePolicy({ mode: "off", at: "05:00" });
+        await checkForUpdate();
+        const yesterday = new Date(Date.now() - 25 * 60 * 60_000);
+        bellRows.push({
+            userId: "user-1",
+            type: "system.update",
+            readAt: null,
+            createdAt: yesterday
+        });
+        deliveryRows.push({
+            userId: "user-2",
+            event: "system.update",
+            kind: "webhook",
+            status: "sent",
+            createdAt: yesterday
+        });
+        notify.mockClear();
+        status = available("def5678");
+        await checkForUpdate();
+
+        expect(raised("system.update")).toHaveLength(2);
+    });
+
+    it("announces the build after an install to everyone, whatever was sent before it", async () => {
+        await saveAutoUpdatePolicy({ mode: "off", at: "05:00" });
+        await checkForUpdate();
+        deliveryRows.push({
+            userId: "user-1",
+            event: "system.update",
+            kind: "webhook",
+            status: "sent",
+            createdAt: new Date()
+        });
+        // The announced build lands, which answers what was said about it.
+        status = { ...available(), current: SHA, upToDate: true, phase: "up-to-date" };
+        await checkForUpdate();
+        notify.mockClear();
+        status = { ...available("def5678"), current: SHA };
+        await checkForUpdate();
+
+        expect(raised("system.update")).toHaveLength(2);
     });
 
     it("puts down the alert it supersedes, so the bell holds the latest and not the pile", async () => {
