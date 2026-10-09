@@ -69,10 +69,16 @@ export type EventKind = (typeof EVENT_KINDS)[number];
 /**
  * Kinds no new event can be: the ice boat race, replaced by the downhill one
  * (which still builds its track with the same code). Still read, so a run of
- * one that is under way finishes; left out of the screen, of a server's
- * defaults, and of what a saved config keeps.
+ * one that is under way finishes; left out of the screen and of a server's
+ * defaults, and a saved one is read as the kind that replaced it
+ * (`replaceRetired`).
  */
 export const RETIRED_KINDS: readonly EventKind[] = ["boat-race"];
+
+/** The kind each retired one is read as. */
+const REPLACED_BY = { "boat-race": "downhill-race" } as const satisfies Partial<
+    Record<EventKind, EventKind>
+>;
 
 /** The kinds a new event can be. */
 export const OFFERED_KINDS: readonly EventKind[] = EVENT_KINDS.filter(
@@ -1637,6 +1643,32 @@ export function toKindDefaults(preset: EventPreset): EventPreset {
     return next;
 }
 
+/**
+ * A saved event of a retired kind as the kind that replaced it, so its
+ * schedules and its place in the draw stay: the same id, a name somebody chose,
+ * whether it is on, its length, players and prizes, where it is held and how
+ * high. What only the old kind had - its laps, a least score counted in them -
+ * is the new kind's default. Any other event as it is.
+ */
+function replaceRetired(preset: EventPreset): EventPreset {
+    if (!(preset.kind in REPLACED_BY)) return preset;
+    const kind = REPLACED_BY[preset.kind as keyof typeof REPLACED_BY];
+    const old = preset.options as EventOptions<"boat-race">;
+    const fresh = newPreset(kind, preset.id);
+    const language = LANGUAGES.find((one) => KIND_NAMES[preset.kind][one] === preset.name);
+    const candidate = {
+        ...fresh,
+        name: language ? KIND_NAMES[kind][language] : preset.name,
+        enabled: preset.enabled,
+        minutes: preset.minutes,
+        minPlayers: preset.minPlayers,
+        rewards: preset.rewards,
+        options: { ...fresh.options, place: old.place, height: old.height }
+    };
+    const read = presetSchema.safeParse(candidate);
+    return read.success ? read.data : { ...fresh, name: candidate.name };
+}
+
 /** The value that comes up most often, the first of a tie; null for none. */
 function mostCommon(values: readonly number[]): number | null {
     const counts = new Map<number, number>();
@@ -1702,8 +1734,7 @@ export function readEventsConfig(
     // back to its kind's defaults (`repairPreset`), rather than vanishing
     // from the list and the draw with nothing to say so.
     const kept = readPresets(value.presets)
-        .filter(({ preset }) => !RETIRED_KINDS.includes(preset.kind))
-        .map(({ preset }) => (saved < KIND_DEFAULTS_SINCE ? toKindDefaults(preset) : preset))
+        .map(({ preset }) => replaceRetired(saved < KIND_DEFAULTS_SINCE ? toKindDefaults(preset) : preset))
         .map((preset) => (saved < HIDE_SECONDS_SINCE ? toHideSeconds(preset) : preset));
     // Every kind this server's events were saved before, once, named in the
     // language its players read.

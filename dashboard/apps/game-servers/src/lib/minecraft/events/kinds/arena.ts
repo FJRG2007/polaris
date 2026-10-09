@@ -163,6 +163,7 @@ export function notLoaded(output: string): boolean {
 
 const ITEM_ID = /^[a-z0-9_.-]+:[a-z0-9_./-]+$/;
 const MARK = "polaris_event:1b";
+const SILK_TOUCH = "minecraft:silk_touch";
 
 export interface KitExtras {
     /** Blocks it can be placed on in adventure mode. */
@@ -176,6 +177,11 @@ export interface KitExtras {
      *  would. From 1.20.5, which has the tool component; ignored before. What it
      *  may break is still only `breaks`. */
     readonly miningSpeed?: number;
+    /** Breaks blocks whole, as silk touch does: glass, which drops nothing by
+     *  hand, and a sea lantern, which drops crystals, drop themselves. How the
+     *  component is spelled from 1.20.5: with `levels`, or as a plain map from
+     *  1.21.5. A tag before 1.20.5 whichever is given. */
+    readonly silkTouch?: "levels" | "map";
 }
 
 /** What every piece of kit that can wear out is given: it lasts the event. */
@@ -189,6 +195,9 @@ export function marked(id: string, marker: Marker, extras: KitExtras = {}): stri
         if (extras.placeOn) parts.push(`minecraft:can_place_on={blocks:${list(extras.placeOn)}}`);
         if (extras.breaks) parts.push(`minecraft:can_break={blocks:${list(extras.breaks)}}`);
         if (extras.unbreakable) parts.push("minecraft:unbreakable={}");
+        if (extras.silkTouch === "levels")
+            parts.push(`minecraft:enchantments={levels:{"${SILK_TOUCH}":1}}`);
+        if (extras.silkTouch === "map") parts.push(`minecraft:enchantments={"${SILK_TOUCH}":1}`);
         // A tag rather than the blocks again: the list twice outgrew one command.
         if (extras.miningSpeed)
             parts.push(
@@ -200,6 +209,7 @@ export function marked(id: string, marker: Marker, extras: KitExtras = {}): stri
     if (extras.placeOn) parts.push(`CanPlaceOn:${list(extras.placeOn)}`);
     if (extras.breaks) parts.push(`CanDestroy:${list(extras.breaks)}`);
     if (extras.unbreakable) parts.push("Unbreakable:1b");
+    if (extras.silkTouch) parts.push(`Enchantments:[{id:"${SILK_TOUCH}",lvl:1s}]`);
     return `${id}{${parts.join(",")}}`;
 }
 
@@ -211,6 +221,18 @@ export function giveMarked(
     extras: KitExtras = {}
 ): string {
     return `give ${name} ${marked(id, marker, extras)} ${count}`;
+}
+
+/** One marked item, only to `name` while they carry none of it marked: what
+ *  follows a spelling their version may have refused. */
+export function giveMarkedUnlessHeld(
+    name: string,
+    id: string,
+    marker: Marker,
+    extras: KitExtras = {}
+): string {
+    const held = `{id:"${id}",${markedItem(marker).slice(1)}`;
+    return `give @a[name=${name},nbt=!{Inventory:[${held}]}] ${marked(id, marker, extras)} 1`;
 }
 
 /** A marked item put straight into one slot (`weapon.offhand`), from 1.17. Only

@@ -136,7 +136,7 @@ Rare catch, Bingo rush, Boss fishing) leave the world alone.
 | Hot potato                                                     | day   | clear   |
 | Hide and seek                                                  | day   | clear   |
 | SkyWars                                                        | day   | clear   |
-| TNT run, Dropper, Ice boat race, Nether maze                   | day   | clear   |
+| TNT run, Dropper, Nether maze                                  | day   | clear   |
 | Elytra race, Downhill boat race                                | day   | clear   |
 | Acid rain                                                      | day   | -       |
 | Treasure hunt, Supply drop, Explorer, Gathering                | day   | clear   |
@@ -173,6 +173,12 @@ left out.
   other build. Each round is built in one material drawn for it
   (`build-battle.PALETTES`: glass, wool, concrete, terracotta and quartz),
   said in the theme title and the chat; the brush breaks only that material.
+  It breaks it whole, with silk touch (glass by hand drops nothing, a sea
+  lantern crystals), and from 1.20.5 at once and as the right tool would; what
+  drops is marked as kit again on the quick look (`build-battle.reclaimLines`),
+  so it is used again and taken back. Silk touch is spelled with `levels` up
+  to 1.21.4 and as a plain map from 1.21.5: the brush is given in the first
+  spelling, then in the second and plain only to whoever still has none.
 - **Meteor shower** craters are infected by default (`infection`): sculk veins
   grow round each one and creep outwards (`meteor-infection.ts`). A vein goes
   only into air over the game's own ground (`#minecraft:sculk_replaceable`)
@@ -232,7 +238,13 @@ left out.
   (twenty floors would need over five hundred blocks). Its water is built last
   and taken out first, and nothing built before a box that would not come out
   is taken out after it, so the walls never go from round the water.
-- **Ice boat race** (`boat-race`) is one closed loop of packed ice, `WIDTH`
+- **Ice boat race** (`boat-race`) is retired: the downhill race replaced it,
+  and no new event can be one (`catalog.RETIRED_KINDS`). A saved one is read
+  as a downhill race with the same id, name, length, prizes, place and height
+  (`catalog.replaceRetired`), so its schedules and its place in the draw stay;
+  a run already under way when it was retired still finishes or is called off
+  as below. Its track code is what the downhill and elytra races build with.
+  It was one closed loop of packed ice, `WIDTH`
   (5) across, walled two blocks high on both sides, laid out from the run's id
   (`boat-race.track`), with gates (blue ice lines under an arch, the start
   chequered) to pass in order, `laps` times. At "Go!" every racer is put on

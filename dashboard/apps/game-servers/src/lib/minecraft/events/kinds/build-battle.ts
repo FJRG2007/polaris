@@ -12,9 +12,12 @@
  * the plot's floor and on the kit's own glass; the kit's brush may break only
  * the kit's glass. A player's own blocks say nothing of the kind, so they cannot
  * be put down at all - there is nothing of theirs on a plot to lose when it is
- * taken down. A block the brush breaks drops as it would for the right tool
- * (concrete broken by hand drops nothing), and what drops is made kit again on
- * the quick look (`reclaimLines`): marked, so it is used again and taken back.
+ * taken down. A block the brush breaks drops itself, whole (silk touch: glass
+ * by hand drops nothing, a sea lantern crystals) and, from 1.20.5, as it would
+ * for the right tool (concrete by hand drops nothing); what drops is made kit
+ * again on the quick look (`reclaimLines`): marked, so it is used again and
+ * taken back. Silk touch is spelled the two ways 1.20.5 and 1.21.5 read it, the
+ * second and a plain brush only to whoever the first gave none.
  * From 1.20.5 the brush also mines the material at once, where by hand
  * concrete or planks took seconds a block.
  *
@@ -24,7 +27,7 @@
 import * as speech from "../../speech";
 import type { Box } from "../state";
 import type { Marker } from "../state";
-import { giveMarked, reclaimBrokenDrops, type Spot } from "./arena";
+import { giveMarked, giveMarkedUnlessHeld, reclaimBrokenDrops, type Spot } from "./arena";
 import { seeded, shuffled } from "../trivia-bank";
 import type { EventOptions, Language } from "../catalog";
 
@@ -278,12 +281,15 @@ export function airAt(spot: { x: number; y: number; z: number }, above = 0): str
 export function kitCommands(name: string, marker: Marker, palette: Palette = "glass"): string[] {
     const blocks = PALETTES[palette].blocks;
     const placeOn = placeOnFor(palette);
+    const brush = { breaks: blocks, unbreakable: true, miningSpeed: BRUSH_SPEED };
     return [
-        giveMarked(name, TOOL, 1, marker, {
-            breaks: blocks,
-            unbreakable: true,
-            miningSpeed: BRUSH_SPEED
-        }),
+        giveMarked(name, TOOL, 1, marker, { ...brush, silkTouch: "levels" }),
+        ...(marker === "components"
+            ? [
+                  giveMarkedUnlessHeld(name, TOOL, marker, { ...brush, silkTouch: "map" }),
+                  giveMarkedUnlessHeld(name, TOOL, marker, brush)
+              ]
+            : []),
         ...blocks.map((id) => giveMarked(name, id, STACK, marker, { placeOn }))
     ];
 }

@@ -2791,10 +2791,11 @@ describe("the kit is marked, and only it is taken back", () => {
     it("lets the kit's glass go only on the plot and on itself, and its brush break only the glass", () => {
         for (const marker of ["components", "tag"] as const) {
             const lines = build.kitCommands("Ana", marker);
-            expect(lines).toHaveLength(build.KIT_BLOCKS.length + 1);
+            const brushes = marker === "components" ? 3 : 1;
+            expect(lines).toHaveLength(build.KIT_BLOCKS.length + brushes);
             expect(lines.every((line) => commandBytes(line) <= COMMAND_BYTES_MAX)).toBe(true);
             // The brush first, so it lands in the hotbar; the glass after it.
-            const glass = lines[1]!;
+            const glass = lines[brushes]!;
             expect(glass).toContain(
                 marker === "components" ? "minecraft:can_place_on={blocks:[" : "CanPlaceOn:["
             );
@@ -2817,7 +2818,7 @@ describe("the kit is marked, and only it is taken back", () => {
         for (const palette of Object.keys(build.PALETTES) as build.Palette[]) {
             const blocks = build.PALETTES[palette].blocks;
             const lines = build.kitCommands("Ana", "components", palette);
-            expect(lines).toHaveLength(blocks.length + 1);
+            expect(lines).toHaveLength(blocks.length + 3);
             expect(lines.length).toBeLessThanOrEqual(36);
             expect(lines.every((line) => commandBytes(line) <= COMMAND_BYTES_MAX)).toBe(true);
             // The brush breaks this set and nothing else; all of it is taken back and cleared.
@@ -2829,6 +2830,7 @@ describe("the kit is marked, and only it is taken back", () => {
             expect(blocks).not.toContain(build.FLOOR);
         }
         expect(build.kitCommands("Ana", "tag", "wool")[1]).toContain("minecraft:white_wool");
+        expect(build.kitCommands("Ana", "components", "wool")[3]).toContain("minecraft:white_wool");
     });
 
     it("keeps what a player drops theirs, and sends it after them", () => {
@@ -3461,10 +3463,26 @@ describe("a build battle's brush and what it breaks", () => {
         expect(brush).toContain("correct_for_drops:true");
         for (const palette of Object.keys(build.PALETTES) as build.Palette[])
             for (const marker of ["components", "tag"] as const)
-                expect(
-                    commandBytes(build.kitCommands("Abcdefghijklmnop", marker, palette)[0]!)
-                ).toBeLessThanOrEqual(COMMAND_BYTES_MAX);
+                for (const line of build.kitCommands("Abcdefghijklmnop", marker, palette))
+                    expect(commandBytes(line)).toBeLessThanOrEqual(COMMAND_BYTES_MAX);
         expect(build.kitCommands("Ana", "tag")[0]).not.toContain("tool");
+    });
+
+    it("breaks glass and sea lanterns whole, however the version spells silk touch, and hands one brush", () => {
+        const [levels, map, plain] = build.kitCommands("Ana", "components", "quartz");
+        expect(levels).toMatch(/^give Ana minecraft:stick\[/);
+        expect(levels).toContain('minecraft:enchantments={levels:{"minecraft:silk_touch":1}}');
+        // The spellings after the first go only to whoever the first gave nothing.
+        const unlessHeld =
+            'give @a[name=Ana,nbt=!{Inventory:[{id:"minecraft:stick",components:{"minecraft:custom_data":{polaris_event:1b}}}]}] minecraft:stick[';
+        expect(map!.startsWith(unlessHeld)).toBe(true);
+        expect(map).toContain('minecraft:enchantments={"minecraft:silk_touch":1}');
+        expect(plain!.startsWith(unlessHeld)).toBe(true);
+        expect(plain).not.toContain("enchantments");
+        expect(plain).toContain("minecraft:can_break={blocks:[");
+        const old = build.kitCommands("Ana", "tag", "glass")[0]!;
+        expect(old).toContain('Enchantments:[{id:"minecraft:silk_touch",lvl:1s}]');
+        expect(old).toContain("CanDestroy:[");
     });
 
     it("turns what it broke back into kit, never what somebody threw", () => {
@@ -3480,23 +3498,57 @@ describe("a build battle's brush and what it breaks", () => {
 });
 
 describe("the ice boat race, retired", () => {
-    it("is never offered, nor kept from a saved config, nor saved", () => {
+    it("is never offered nor saved, and a saved one is read as a downhill race", () => {
         expect(catalog.OFFERED_KINDS).not.toContain("boat-race");
         expect(catalog.OFFERED_KINDS).toContain("downhill-race");
+        const base = catalog.newPreset("boat-race", "ice", "Friday boats");
+        const rewards = {
+            ...base.rewards,
+            first: { items: [{ id: "minecraft:emerald", count: 9 }], levels: 3 }
+        };
+        const ice = {
+            ...base,
+            enabled: false,
+            minutes: 7,
+            minPlayers: 3,
+            options: { place: { mode: "fixed" as const, x: 10, z: -4 }, laps: 4, height: 35 },
+            rewards
+        };
         const read = catalog.readEventsConfig({
             [catalog.EVENTS_KEY]: {
                 presets: [
-                    catalog.newPreset("boat-race", "ice"),
+                    ice,
+                    catalog.newPreset("boat-race", "plain", "Carrera de barcos"),
                     catalog.newPreset("trivia", "quiz")
                 ],
-                settings: { random: { enabled: true, pool: [{ presetId: "ice", weight: 1 }] } }
+                schedules: [{ id: "fri", presetId: "ice", days: [5], at: "20:00" }],
+                settings: { random: { enabled: true, pool: [{ presetId: "ice", weight: 2 }] } }
             }
         });
         expect(read.presets.map((one) => one.kind)).not.toContain("boat-race");
-        expect(read.settings.random.pool).toEqual([]);
+        const carried = read.presets.find((one) => one.id === "ice")!;
+        expect(carried).toMatchObject({
+            kind: "downhill-race",
+            name: "Friday boats",
+            enabled: false,
+            minutes: 7,
+            minPlayers: 3,
+            rewards
+        });
+        expect(carried.options).toEqual({
+            ...catalog.newPreset("downhill-race", "x").options,
+            place: { mode: "fixed", x: 10, z: -4 },
+            height: 35
+        });
+        expect(read.presets.find((one) => one.id === "plain")!.name).toBe(
+            catalog.KIND_NAMES["downhill-race"].es
+        );
+        expect(read.schedules.map((one) => one.presetId)).toEqual(["ice"]);
+        expect(read.settings.random.pool).toEqual([{ presetId: "ice", weight: 2 }]);
+        expect(catalog.eventsConfigSchema.safeParse(read).success).toBe(true);
         const saved = catalog.eventsConfigSchema.safeParse({
             ...read,
-            presets: [...read.presets, catalog.newPreset("boat-race", "ice")]
+            presets: [...read.presets, catalog.newPreset("boat-race", "again")]
         });
         expect(saved.success).toBe(false);
     });

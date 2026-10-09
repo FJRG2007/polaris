@@ -7199,6 +7199,110 @@ describe("a dropper", () => {
 
 const boatKind = await import("@polaris-app/game-servers/src/lib/minecraft/events/kinds/boat-race");
 
+describe("an ice boat race under way when it was retired", () => {
+    const race = () => ({
+        ...newPreset("boat-race", "boats"),
+        minutes: 5,
+        options: { place: { mode: "players" as const }, laps: 2, height: 30 }
+    });
+    const scores = (objective: string) => (world.stageScores[objective] ??= {});
+
+    /** A race already on, as a restart finds it: built, Ana two passes on. */
+    function underWay() {
+        const preset = race();
+        setUp([]);
+        const now = Date.now();
+        const site = { x: 300, y: 100, z: 0 };
+        const track = boatKind.track(preset.options, "resumed-boats", site, site.y);
+        const spot = track.respawns[1]!;
+        world.inside = new Set(["Ana"]);
+        world.at = { Ana: [spot.x, spot.y, spot.z] };
+        scores("pe_gate").Ana = 2;
+        scores("pe_fin").Ana = 0;
+        config[catalog.EVENT_STATE_KEY] = {
+            run: {
+                id: "resumed-boats",
+                trigger: "manual",
+                startedBy: null,
+                preset,
+                phase: "running",
+                createdAt: now - 60_000,
+                startsAt: now - 30_000,
+                endsAt: now + 120_000,
+                readyAt: now - 20_000,
+                participants: ["Ana"],
+                place: { x: 300, y: 70, z: 0 },
+                stage: {
+                    origin: site,
+                    area: stageKit.areaOf(track.volume),
+                    boxes: track.boxes,
+                    built: true,
+                    design: boatKind.DESIGN,
+                    goAt: now - 20_000,
+                    saved: [
+                        {
+                            name: "Ana",
+                            dimension: "minecraft:overworld",
+                            x: 1,
+                            y: 64,
+                            z: 2,
+                            yaw: 0,
+                            pitch: 0,
+                            mode: "survival"
+                        }
+                    ],
+                    racers: [{ name: "Ana", since: now - 20_000, best: 2 }]
+                }
+            }
+        };
+        return track;
+    }
+
+    it("picked up after a restart mid-race, still counts a finish and ends", async () => {
+        const track = underWay();
+        await events.sweepEvents();
+        expect(events.runningEvents()).toContain(SERVER);
+        await play(2_100);
+        expect(state().run?.phase).toBe("running");
+        // Nothing built again, nobody put on the grid again.
+        expect(world.sent.some((line) => line.endsWith(" keep"))).toBe(false);
+        expect(world.sent).not.toContain("scoreboard players set #on polaris_boat 1");
+        scores("pe_gate").Ana = 2 * track.gates.length + 1;
+        scores("pe_fin").Ana = Math.floor(Date.now() / 50) % 2147483647;
+        await play(4_100);
+        const after = state();
+        expect(after.run).toBeNull();
+        expect(after.history[0]?.podium?.[0]).toMatchObject({ place: 1, name: "Ana" });
+        expect(world.sent).toContain(
+            "execute in minecraft:overworld run tp Ana 1.000 64.000 2.000 0.0 0.0"
+        );
+        expect(after.stageLeftovers).toEqual([]);
+    });
+
+    it("called off mid-race, takes its boats and its track away and switches its pack off", async () => {
+        const track = underWay();
+        await events.sweepEvents();
+        expect(events.runningEvents()).toContain(SERVER);
+        await play(2_100);
+        expect(state().run?.phase).toBe("running");
+        await events.cancelEvent("owner", SERVER);
+        await play(4_200);
+        for (const line of boatKind.stopLines(track.boxes)) expect(world.sent).toContain(line);
+        for (const line of boatKind.SCORES_REMOVED) expect(world.sent).toContain(line);
+        expect(
+            world.sent.some((line) => /run kill @e\[type=minecraft:(oak_)?boat,x=/.test(line))
+        ).toBe(true);
+        for (const box of track.boxes)
+            expect(world.sent).toContain(
+                `execute in minecraft:overworld run fill ${box.x1} ${box.y1} ${box.z1} ${box.x2} ${box.y2} ${box.z2} minecraft:air replace ${box.block}`
+            );
+        expect(world.inside.size).toBe(0);
+        expect(state().run).toBeNull();
+        expect(state().history[0]).toMatchObject({ outcome: "cancelled" });
+        expect(state().stageLeftovers).toEqual([]);
+    });
+});
+
 // ------------------------------------------------------------------ events players join
 
 /** Every block an event put in or took out, and how. */
