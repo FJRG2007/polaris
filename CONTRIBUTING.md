@@ -70,9 +70,13 @@ Contributions to Polaris are welcome. Here is how you can contribute:
 
 ## Working with a coding agent
 
-If you use a coding agent - Claude Code, OpenAI Codex, opencode, Kimi Code or
-another - set up [Enigma](https://github.com/FJRG2007/enigma) before you start.
-It gives the agent the engineering standards this project is written to:
+Contributions made with an AI coding agent - Claude Code, OpenAI Codex, opencode,
+Kimi Code or any other - **must** be made with
+[Enigma](https://github.com/FJRG2007/enigma) installed and active. This is a
+requirement, not a suggestion: a pull request written by an agent without it may
+be closed without review.
+
+Enigma gives the agent the engineering standards this project is written to:
 security, input validation, testing, style, debugging and git rules, loaded only
 when a task needs them. Changes made with it come out better structured, more
 efficient and closer to the rest of the codebase, and need far fewer rounds of
