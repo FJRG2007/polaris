@@ -110,7 +110,9 @@ describe("the preferences card", () => {
         const pack = screen.getByRole("switch", { name: "Halloween sound pack" });
         act(() => fireEvent.click(pack));
         expect(save).toHaveBeenCalledWith({ mutedPack: "halloween-2026" });
-        await waitFor(() => expect(screen.getByRole("alert").textContent).toContain("could not be saved"));
+        await waitFor(() =>
+            expect(screen.getByRole("alert").textContent).toContain("could not be saved")
+        );
         expect(pack.getAttribute("aria-checked")).toBe("true");
     });
 
@@ -124,7 +126,9 @@ describe("the preferences card", () => {
     });
 
     it("is not there while the operator has seasons off", () => {
-        const view = render(withMessages(<SeasonalCard allowed={false} initial={SEASONAL_DEFAULTS} />));
+        const view = render(
+            withMessages(<SeasonalCard allowed={false} initial={SEASONAL_DEFAULTS} />)
+        );
         expect(view.container.textContent).toBe("");
     });
 });

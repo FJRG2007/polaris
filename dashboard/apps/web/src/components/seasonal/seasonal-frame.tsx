@@ -45,7 +45,9 @@ export function useSeasonToday(): { season: Season | null; pack: string | null }
             const now = new Date();
             const season = seasonOn(now);
             const pack = packOn(now);
-            setToday((was) => (was.season === season && was.pack === pack ? was : { season, pack }));
+            setToday((was) =>
+                was.season === season && was.pack === pack ? was : { season, pack }
+            );
         };
         look();
         const timer = window.setInterval(look, RECHECK_MS);
@@ -155,7 +157,11 @@ export function SeasonalBadge() {
     const Icon = SEASON_ICONS[season];
     return (
         <span title={t(`season.${season}`)} className="flex shrink-0 items-center">
-            <Icon aria-hidden="true" className="size-3.5 text-[hsl(var(--season-a))]" strokeWidth={2} />
+            <Icon
+                aria-hidden="true"
+                className="size-3.5 text-[hsl(var(--season-a))]"
+                strokeWidth={2}
+            />
         </span>
     );
 }

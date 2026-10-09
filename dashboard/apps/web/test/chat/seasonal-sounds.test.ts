@@ -14,7 +14,14 @@ import { SEASONS } from "@polaris/core";
 import { peakLevel, passLength } from "./sound-peak";
 import { setSoundSeason } from "@/lib/sound-season";
 import { CHIME, chimeFor, SEASONAL_CHIMES } from "@/lib/notification-sound";
-import { DEFAULT_GAIN, notesFor, RECAST, RING_EVERY_MS, SEASONAL_SOUNDS, SOUNDS } from "@/lib/call-sounds";
+import {
+    DEFAULT_GAIN,
+    notesFor,
+    RECAST,
+    RING_EVERY_MS,
+    SEASONAL_SOUNDS,
+    SOUNDS
+} from "@/lib/call-sounds";
 
 afterEach(() => setSoundSeason(null));
 
@@ -35,7 +42,8 @@ describe.each(SEASONS)("the %s pack", (season) => {
     it("keeps its message blip as quiet as the ordinary one", () => {
         const message = SEASONAL_SOUNDS[season].message ?? [];
         expect(message.length).toBeGreaterThan(1);
-        for (const note of message) expect(note.gain ?? DEFAULT_GAIN).toBeLessThanOrEqual(DEFAULT_GAIN);
+        for (const note of message)
+            expect(note.gain ?? DEFAULT_GAIN).toBeLessThanOrEqual(DEFAULT_GAIN);
     });
 
     it("recasts every sound, and only in pitch and touch", () => {
@@ -47,9 +55,9 @@ describe.each(SEASONS)("the %s pack", (season) => {
         for (const name of RECAST) {
             const plain = SOUNDS[name];
             const recast = SEASONAL_SOUNDS[season][name] ?? [];
-            expect(recast.map(({ at, seconds, gain, wave }) => ({ at, seconds, gain, wave }))).toEqual(
-                plain.map(({ at, seconds, gain, wave }) => ({ at, seconds, gain, wave }))
-            );
+            expect(
+                recast.map(({ at, seconds, gain, wave }) => ({ at, seconds, gain, wave }))
+            ).toEqual(plain.map(({ at, seconds, gain, wave }) => ({ at, seconds, gain, wave })));
             expect(peakLevel(recast)).toBeLessThan(0.5);
         }
     });

@@ -107,7 +107,9 @@ describe("parseSeasonalPrefs", () => {
     });
 
     it("reads the pack turned off, and nothing from the switches kept before", () => {
-        expect(parseSeasonalPrefs('{"mutedPack":"winter-2026"}')).toEqual({ mutedPack: "winter-2026" });
+        expect(parseSeasonalPrefs('{"mutedPack":"winter-2026"}')).toEqual({
+            mutedPack: "winter-2026"
+        });
         expect(parseSeasonalPrefs('{"theme":false,"sounds":false}')).toEqual(SEASONAL_DEFAULTS);
         expect(parseSeasonalPrefs("not json")).toEqual(SEASONAL_DEFAULTS);
         expect(parseSeasonalPrefs('{"mutedPack":7}')).toEqual(SEASONAL_DEFAULTS);

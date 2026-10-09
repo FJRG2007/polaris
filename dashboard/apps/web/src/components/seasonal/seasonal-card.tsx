@@ -22,7 +22,13 @@ import { useTranslations } from "@/components/i18n/i18n-provider";
 import { Button, Card, CardBody, CardHeader, CardTitle, Switch } from "@polaris/ui";
 import { saveSeasonalAction } from "@/app/(app)/account/preferences/seasonal-actions";
 
-export function SeasonalCard({ allowed, initial }: { allowed: boolean; initial: core.SeasonalChoice }) {
+export function SeasonalCard({
+    allowed,
+    initial
+}: {
+    allowed: boolean;
+    initial: core.SeasonalChoice;
+}) {
     const t = useTranslations("account");
     const format = useDisplayFormat();
     const [choice, setChoice] = useState(initial);
@@ -74,9 +80,14 @@ export function SeasonalCard({ allowed, initial }: { allowed: boolean; initial: 
             <CardBody className="flex flex-col gap-4">
                 <div className="flex items-center justify-between gap-3">
                     <div className="flex min-w-0 items-start gap-2">
-                        <Icon aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+                        <Icon
+                            aria-hidden="true"
+                            className="mt-0.5 size-4 shrink-0 text-muted-foreground"
+                        />
                         <div className="min-w-0">
-                            <p className="text-sm font-medium">{t("seasonal.pack", { season: name })}</p>
+                            <p className="text-sm font-medium">
+                                {t("seasonal.pack", { season: name })}
+                            </p>
                             <p className="text-xs text-muted-foreground">
                                 {t("seasonal.packHint", { date: format.date(lastDay) })}
                             </p>
