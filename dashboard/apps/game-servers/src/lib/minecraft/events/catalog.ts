@@ -923,6 +923,17 @@ export const presetSchema = z
             options: optionsSchemas["downhill-race"]
         })
     ])
+    .superRefine((value, context) => {
+        if (value.kind !== "hide-and-seek") return;
+        const most = Math.floor((value.minutes * 60) / 2);
+        if (value.options.hideSeconds > most) {
+            context.addIssue({
+                code: z.ZodIssueCode.custom,
+                path: ["options", "hideSeconds"],
+                message: problem("hideHalfEvent", { count: most })
+            });
+        }
+    })
     .transform((value) => value as EventPreset);
 
 const TIME = /^([01]\d|2[0-3]):([0-5]\d)$/;
@@ -991,11 +1002,15 @@ export type RandomEvents = z.infer<typeof randomSchema>;
  * value an operator chooses later, even one that happens to be an old default,
  * is theirs.
  */
-export const DEFAULTS_VERSION = 7;
+export const DEFAULTS_VERSION = 8;
 
 /** Events saved before this were brought up to their kind's defaults once
  *  (`toKindDefaults`). */
 const KIND_DEFAULTS_SINCE = 2;
+
+/** Hide and seek saved before this was given `OLD_HIDE_SECONDS` to hide, and is
+ *  brought up to `HIDE_SECONDS` once (`toHideSeconds`). */
+const HIDE_SECONDS_SINCE = 8;
 
 /**
  * The defaults version each kind joined the catalog at. A server whose events
@@ -1449,13 +1464,6 @@ export function oldDefaultMinutes(kind: EventKind): number {
 export function migratePreset(entry: unknown): unknown {
     if (typeof entry !== "object" || entry === null) return entry;
     const named = entry as { kind?: unknown; name?: unknown };
-    if (named.kind === "hide-and-seek") {
-        const raw = entry as { options?: unknown };
-        const options = raw.options as { hideSeconds?: unknown } | undefined;
-        if (typeof options === "object" && options !== null && options.hideSeconds === OLD_HIDE_SECONDS)
-            return { ...raw, options: { ...options, hideSeconds: HIDE_SECONDS } };
-        return entry;
-    }
     if (named.kind !== "king-of-the-hill") return entry;
     // Named "King of the hill" when it was added, before it became a ring
     // floating in the air: the name it was given, not one anybody chose.
@@ -1562,6 +1570,15 @@ function readPresets(list: unknown): { preset: EventPreset; reset: string[] }[] 
     });
 }
 
+/** A hide and seek still on the time to hide every one was given before
+ *  `HIDE_SECONDS`, given that instead. */
+function toHideSeconds(preset: EventPreset): EventPreset {
+    if (preset.kind !== "hide-and-seek") return preset;
+    const options = preset.options as EventOptions<"hide-and-seek">;
+    if (options.hideSeconds !== OLD_HIDE_SECONDS) return preset;
+    return { ...preset, options: { ...options, hideSeconds: HIDE_SECONDS } } as EventPreset;
+}
+
 /** The name the first events gave a horde defense. */
 const BRITISH_HORDE_NAME = "Horde defence";
 
@@ -1663,9 +1680,9 @@ export function readEventsConfig(
     // One that no longer reads whole keeps every part that does, the rest
     // back to its kind's defaults (`repairPreset`), rather than vanishing
     // from the list and the draw with nothing to say so.
-    const kept = readPresets(value.presets).map(({ preset }) =>
-        saved < KIND_DEFAULTS_SINCE ? toKindDefaults(preset) : preset
-    );
+    const kept = readPresets(value.presets)
+        .map(({ preset }) => (saved < KIND_DEFAULTS_SINCE ? toKindDefaults(preset) : preset))
+        .map((preset) => (saved < HIDE_SECONDS_SINCE ? toHideSeconds(preset) : preset));
     // Every kind this server's events were saved before, once, named in the
     // language its players read.
     const had = new Set(kept.map((preset) => preset.kind));

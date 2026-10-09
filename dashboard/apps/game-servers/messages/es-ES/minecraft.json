@@ -2018,6 +2018,7 @@
             "writeTheme": "Escribe al menos un tema",
             "giveName": "Ponle un nombre",
             "timeFormat": "Escribe la hora como HH:MM",
+            "hideHalfEvent": "Como mucho {count} segundos, la mitad del evento",
             "gapOrder": "La espera más larga no puede ser menor que la más corta",
             "eventsAtMost": "Como máximo {count} eventos",
             "schedulesAtMost": "Como máximo {count} eventos programados",

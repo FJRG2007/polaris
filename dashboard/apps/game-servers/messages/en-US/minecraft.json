@@ -2018,6 +2018,7 @@
             "writeTheme": "Write at least one theme",
             "giveName": "Give it a name",
             "timeFormat": "Write the time as HH:MM",
+            "hideHalfEvent": "At most {count} seconds, half the event",
             "gapOrder": "The longest wait cannot be shorter than the shortest",
             "eventsAtMost": "At most {count} events",
             "schedulesAtMost": "At most {count} scheduled events",
