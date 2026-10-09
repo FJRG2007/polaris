@@ -67,7 +67,9 @@ export function MutualPanel({ friends, spaces, compact = false }: MutualPanelPro
                         <p className="min-w-0 flex-1 truncate text-sm">
                             {friends.people.map((person, index) => (
                                 <span key={person.id}>
-                                    {index > 0 ? <span className="text-muted-foreground">, </span> : null}
+                                    {index > 0 ? (
+                                        <span className="text-muted-foreground">, </span>
+                                    ) : null}
                                     <ProfileLink
                                         href={`/u/${person.username}`}
                                         className="transition-colors hover:text-foreground"

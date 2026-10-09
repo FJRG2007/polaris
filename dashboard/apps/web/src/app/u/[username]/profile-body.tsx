@@ -13,7 +13,13 @@ import { Messages } from "@/components/i18n/messages";
 import { NothingToShow } from "@/components/nothing-to-show";
 import { publicProfile, profilesArePublic } from "@/lib/profile-service";
 
-export async function ProfileBody({ username, viewer }: { username: string; viewer: SessionUser | null }) {
+export async function ProfileBody({
+    username,
+    viewer
+}: {
+    username: string;
+    viewer: SessionUser | null;
+}) {
     const profile = await publicProfile(
         decodeURIComponent(username),
         viewer ? { id: viewer.id, isAdmin: viewer.isAdmin } : null
@@ -26,7 +32,11 @@ export async function ProfileBody({ username, viewer }: { username: string; view
 
     return (
         <Messages namespaces={["publicPages"]}>
-            <ProfileCard profile={profile} own={viewer?.id === profile.id} signedIn={viewer !== null} />
+            <ProfileCard
+                profile={profile}
+                own={viewer?.id === profile.id}
+                signedIn={viewer !== null}
+            />
         </Messages>
     );
 }
