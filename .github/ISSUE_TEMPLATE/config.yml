@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Discord community
+    url: https://tpe.li/dsc
+    about: Ask questions or get help from the community before filing an issue.

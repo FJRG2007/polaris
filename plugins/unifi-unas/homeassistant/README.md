@@ -1,6 +1,6 @@
 # UniFi UNAS for Home Assistant (Polaris)
 
-[![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
+[![License](https://img.shields.io/badge/license-AGPL--3.0-blue.svg)](LICENSE)
 
 Monitoring and fan control for UniFi UNAS with native Home Assistant integration.
 
@@ -167,4 +167,4 @@ systemctl status polaris-unas-agent
 
 ## License
 
-Apache-2.0 - see [LICENSE](LICENSE).
+AGPL-3.0, with the additional terms in Polaris's [NOTICE](https://github.com/FJRG2007/polaris/blob/main/NOTICE.md) - see [LICENSE](LICENSE).

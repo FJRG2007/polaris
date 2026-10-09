@@ -1,0 +1,74 @@
+name: Feature request
+description: Suggest an improvement or a new capability for Polaris.
+title: "[feat]: "
+labels: ["enhancement"]
+body:
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Pre-submission checklist
+      options:
+        - label: >-
+            I have searched the existing issues (open and closed) and confirmed this
+            is not a duplicate. I understand that knowingly filing duplicates may
+            result in a sanction or limits on participating in this repository.
+          required: true
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      description: Which part of Polaris is this about?
+      multiple: true
+      options:
+        - Install or Update
+        - Account, sign-in and security
+        - Admin and settings
+        - Drive
+        - Vault
+        - Deploy
+        - Servers, Containers and Backups
+        - Marketplace and installed apps
+        - Runners
+        - Agents and Code
+        - Databases
+        - Tasks
+        - Calendar
+        - Chat, calls and meetings
+        - Mail and Inbox
+        - Notes and Office
+        - Organizations
+        - Watch, Analytics and Firewall
+        - Domains and Domain security
+        - Places
+        - Game servers
+        - Browser extension
+        - Desktop app
+        - MCP server or CLI
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What problem or friction does this solve? What do you do today instead?
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed solution
+      description: What you would like Polaris to do.
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Other tools that do this, or other ways it could work.
+    validations:
+      required: false

@@ -54,7 +54,7 @@ Decisions:
 - **ical.js 2.2.1 (MPL-2.0)** parses and serializes iCalendar and iterates
   recurrence rules. It is what Nextcloud Calendar and Thunderbird use; an own
   RRULE engine would be the riskiest code in the app. MPL-2.0 is file-level and
-  compatible with Polaris's Apache-2.0 when used unmodified as a dependency.
+  compatible with Polaris's AGPL-3.0 when used unmodified as a dependency.
 - **No tz database dependency.** Expansion runs in the event's local wall time
   (RFC 5545 requires it) and each wall time is turned into an instant with `Intl`
   for its TZID. A VTIMEZONE block in a file is kept verbatim for round trips; a

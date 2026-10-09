@@ -17,7 +17,7 @@
         },
         "software": {
             "title": "The software",
-            "body": "Polaris is open source, published under the Apache 2.0 license. The people who write it operate no service and never see this deployment: it runs entirely on its operator's own machine."
+            "body": "Polaris is free software, published under the GNU AGPL-3.0 license. The people who write it operate no service and never see this deployment: it runs entirely on its operator's own machine."
         }
     },
     "legal": {
