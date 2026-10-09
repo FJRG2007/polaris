@@ -61,7 +61,9 @@ export function RecordingPanel({
                 <DialogContent>
                     <DialogHeader>
                         <DialogTitle>{t("recording.notRecorded")}</DialogTitle>
-                        <DialogDescription>{t("recording.notRecordedWhy")}</DialogDescription>
+                        <DialogDescription>
+                            {t(`recording.errors.${recording.error}`)} {t("recording.notRecordedWhy")}
+                        </DialogDescription>
                     </DialogHeader>
                     <DialogFooter>
                         <Button onClick={recording.discard}>{t("recording.close")}</Button>
@@ -123,7 +125,7 @@ export function RecordingPanel({
 
                 {(error || recording.error) && (
                     <p role="alert" className="text-xs text-danger">
-                        {error || recording.error}
+                        {error || (recording.error && t(`recording.errors.${recording.error}`))}
                     </p>
                 )}
 

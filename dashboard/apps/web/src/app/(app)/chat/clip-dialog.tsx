@@ -332,7 +332,7 @@ export function ClipDialog({
 
                     {clip.error && (
                         <p role="alert" className="text-xs text-danger">
-                            {clip.error}
+                            {t(`clip.errors.${clip.error}`)}
                         </p>
                     )}
                 </div>

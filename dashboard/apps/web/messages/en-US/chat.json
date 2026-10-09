@@ -845,7 +845,16 @@
         "stopAndClose": "Stop and close",
         "close": "Close",
         "description": "Polaris records the screen or window you pick and puts the video in your message. Up to {time} and {size} MB.",
-        "recorded": "{time}, {size} MB"
+        "recorded": "{time}, {size} MB",
+        "errors": {
+            "unsupported": "This browser cannot record video. Try another browser.",
+            "withoutCamera": "Recording without the camera: it could not be opened.",
+            "withoutMicrophone": "Recording without the microphone: it could not be opened.",
+            "noPicture": "This browser could not put the picture together. Try again, or use another browser.",
+            "notStarted": "This browser could not start recording the screen. Try again, or use another browser.",
+            "notEncoded": "This browser could not record the screen, so nothing was saved. Try again, or use another browser.",
+            "tooLarge": "Stopped: the recording reached the size a message can carry."
+        }
     },
     "channelSettings": {
         "channelSettings": "Channel settings",
@@ -1215,8 +1224,15 @@
         "sending": "Sending",
         "sendToTheConversation": "Send to the conversation",
         "notRecorded": "The call was not recorded",
-        "notRecordedWhy": "This browser could not encode the call, so nothing was saved.",
-        "close": "Close"
+        "notRecordedWhy": "Try again, or record from another browser.",
+        "close": "Close",
+        "errors": {
+            "unsupported": "This browser cannot record video.",
+            "noPicture": "This browser could not put the picture together.",
+            "notStarted": "This browser could not start recording the call.",
+            "notEncoded": "This browser could not record the call.",
+            "tooLarge": "Stopped: the recording reached the size a message can carry."
+        }
     },
     "pollCard": {
         "pollClosed": "Poll closed",

@@ -845,7 +845,16 @@
         "stopAndClose": "Parar y cerrar",
         "close": "Cerrar",
         "description": "Polaris graba la pantalla o ventana que elijas y pone el vídeo en tu mensaje. Hasta {time} y {size} MB.",
-        "recorded": "{time}, {size} MB"
+        "recorded": "{time}, {size} MB",
+        "errors": {
+            "unsupported": "Este navegador no puede grabar vídeo. Prueba con otro navegador.",
+            "withoutCamera": "Grabando sin la cámara: no se pudo abrir.",
+            "withoutMicrophone": "Grabando sin el micrófono: no se pudo abrir.",
+            "noPicture": "Este navegador no pudo componer la imagen. Vuelve a intentarlo o usa otro navegador.",
+            "notStarted": "Este navegador no pudo empezar a grabar la pantalla. Vuelve a intentarlo o usa otro navegador.",
+            "notEncoded": "Este navegador no pudo grabar la pantalla y no se guardó nada. Vuelve a intentarlo o usa otro navegador.",
+            "tooLarge": "Detenida: la grabación llegó al tamaño máximo de un mensaje."
+        }
     },
     "channelSettings": {
         "channelSettings": "Ajustes del canal",
@@ -1215,8 +1224,15 @@
         "sending": "Enviando",
         "sendToTheConversation": "Enviar a la conversación",
         "notRecorded": "No se grabó la llamada",
-        "notRecordedWhy": "Este navegador no pudo codificar la llamada y no se guardó nada.",
-        "close": "Cerrar"
+        "notRecordedWhy": "Vuelve a intentarlo o graba desde otro navegador.",
+        "close": "Cerrar",
+        "errors": {
+            "unsupported": "Este navegador no puede grabar vídeo.",
+            "noPicture": "Este navegador no pudo componer la imagen.",
+            "notStarted": "Este navegador no pudo empezar a grabar la llamada.",
+            "notEncoded": "Este navegador no pudo grabar la llamada.",
+            "tooLarge": "Detenida: la grabación llegó al tamaño máximo de un mensaje."
+        }
     },
     "pollCard": {
         "pollClosed": "Cerrada",

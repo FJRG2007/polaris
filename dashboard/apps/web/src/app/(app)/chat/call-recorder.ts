@@ -155,6 +155,15 @@ export function recordingLayout(
     };
 }
 
+/** Why a call was not recorded as asked, as a key of `chat.recording.errors`. */
+export type CallRecordingError =
+    | ""
+    | "unsupported"
+    | "noPicture"
+    | "notStarted"
+    | "notEncoded"
+    | "tooLarge";
+
 export interface CallRecording {
     /** Whether this browser is recording right now. */
     readonly running: boolean;
@@ -165,7 +174,7 @@ export interface CallRecording {
     readonly bytes: number;
     /** The finished recording, waiting to be sent or saved. */
     readonly file: File | null;
-    readonly error: string;
+    readonly error: CallRecordingError;
     /** Whether this browser can record video at all. */
     readonly supported: boolean;
     start: () => void;
@@ -208,7 +217,7 @@ export function useCallRecorder(call: CallState): CallRecording {
     const [seconds, setSeconds] = useState(0);
     const [bytes, setBytes] = useState(0);
     const [file, setFile] = useState<File | null>(null);
-    const [error, setError] = useState("");
+    const [error, setError] = useState<CallRecordingError>("");
     const t = useTranslations("chat");
 
     /** The call as it is right now, for the timers to read. They are started
@@ -269,7 +278,7 @@ export function useCallRecorder(call: CallState): CallRecording {
     const start = useCallback(() => {
         const type = recordingType();
         if (!type) {
-            setError("This browser cannot record video.");
+            setError("unsupported");
             return;
         }
         const parts = kit.current;
@@ -288,7 +297,7 @@ export function useCallRecorder(call: CallState): CallRecording {
         canvas.height = HEIGHT;
         const brush = canvas.getContext("2d");
         if (!brush) {
-            setError("This browser cannot compose the picture.");
+            setError("noPicture");
             return;
         }
         parts.canvas = canvas;
@@ -319,14 +328,14 @@ export function useCallRecorder(call: CallState): CallRecording {
             recorder.start(1000);
         } catch {
             teardown();
-            setError("This browser could not start recording the call.");
+            setError("notStarted");
             return;
         }
         parts.recorder = recorder;
         // An encoder the browser said it had and then did not. The recorder
         // stops itself after this, and `onstop` below lets go of everything.
         recorder.onerror = () => {
-            setError("This browser could not encode the call, so it was not recorded.");
+            setError("notEncoded");
         };
         recorder.ondataavailable = (event) => {
             if (event.data.size === 0) return;
@@ -338,7 +347,7 @@ export function useCallRecorder(call: CallState): CallRecording {
             // send, which they find out about at the end.
             if (parts.bytes > MAX_RECORDING_BYTES && recorder.state !== "inactive") {
                 parts.stopping = true;
-                setError("Stopped: the recording reached the size a message can carry.");
+                setError("tooLarge");
                 recorder.stop();
             }
         };

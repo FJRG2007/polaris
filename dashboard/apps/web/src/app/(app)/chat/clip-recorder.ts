@@ -94,6 +94,17 @@ export interface ClipSources {
 
 export type ClipStage = "idle" | "starting" | "recording" | "paused" | "ready";
 
+/** Why a clip could not be made as asked, as a key of `chat.clip.errors`. */
+export type ClipError =
+    | ""
+    | "unsupported"
+    | "withoutCamera"
+    | "withoutMicrophone"
+    | "noPicture"
+    | "notStarted"
+    | "notEncoded"
+    | "tooLarge";
+
 export interface ClipRecording {
     readonly stage: ClipStage;
     /** How long it has run for, in seconds, not counting time paused. */
@@ -102,7 +113,7 @@ export interface ClipRecording {
     readonly file: File | null;
     /** A URL for playing it back, revoked when it is thrown away. */
     readonly preview: string | null;
-    readonly error: string;
+    readonly error: ClipError;
     /** The composed picture, for the preview shown while it records. Null until
      *  a recording is running. */
     readonly canvas: HTMLCanvasElement | null;
@@ -147,7 +158,7 @@ export function useClipRecorder(options: { maxBytes: number }): ClipRecording {
     const [seconds, setSeconds] = useState(0);
     const [file, setFile] = useState<File | null>(null);
     const [preview, setPreview] = useState<string | null>(null);
-    const [error, setError] = useState("");
+    const [error, setError] = useState<ClipError>("");
     const [canvas, setCanvas] = useState<HTMLCanvasElement | null>(null);
 
     const kit = useRef<Machinery>({
@@ -216,7 +227,7 @@ export function useClipRecorder(options: { maxBytes: number }): ClipRecording {
         async (sources: ClipSources) => {
             const type = clipRecordingType();
             if (!type) {
-                setError("This browser cannot record video");
+                setError("unsupported");
                 return;
             }
             setError("");
@@ -270,11 +281,7 @@ export function useClipRecorder(options: { maxBytes: number }): ClipRecording {
                     // The screen is already being shared and is the point of the
                     // recording; losing the face is worth saying and not worth
                     // abandoning it for.
-                    setError(
-                        sources.camera
-                            ? "Recording without the camera - it could not be opened"
-                            : "Recording without the microphone - it could not be opened"
-                    );
+                    setError(sources.camera ? "withoutCamera" : "withoutMicrophone");
                 }
             }
 
@@ -300,7 +307,7 @@ export function useClipRecorder(options: { maxBytes: number }): ClipRecording {
                 if (!composed) {
                     teardown();
                     setStage("idle");
-                    setError("This browser cannot compose the picture");
+                    setError("noPicture");
                     return;
                 }
                 parts.canvas = composed.canvas;
@@ -313,20 +320,23 @@ export function useClipRecorder(options: { maxBytes: number }): ClipRecording {
             for (const track of audio.tracks) recorded.addTrack(track);
             parts.recorded = recorded;
 
+            // A slice per second, so the size is known as it grows rather than
+            // only at the end.
             let recorder: MediaRecorder;
             try {
                 recorder = new MediaRecorder(recorded, { mimeType: type });
+                recorder.start(1000);
             } catch {
                 teardown();
                 setStage("idle");
-                setError("This browser could not start recording the screen");
+                setError("notStarted");
                 return;
             }
             parts.recorder = recorder;
             // An encoder the browser said it had and then did not. The recorder
             // stops itself after this, and `onstop` below lets go of everything.
             recorder.onerror = () => {
-                setError("This browser could not encode the screen, so nothing was recorded");
+                setError("notEncoded");
             };
             recorder.ondataavailable = (event) => {
                 if (event.data.size === 0) return;
@@ -336,7 +346,7 @@ export function useClipRecorder(options: { maxBytes: number }): ClipRecording {
                 // full of movement makes bytes far faster than a still one.
                 if (parts.bytes > ceiling.current && recorder.state !== "inactive") {
                     parts.stopping = true;
-                    setError("Stopped: the recording reached the size a message can carry");
+                    setError("tooLarge");
                     recorder.stop();
                 }
             };
@@ -363,16 +373,6 @@ export function useClipRecorder(options: { maxBytes: number }): ClipRecording {
                 }
             });
 
-            // A slice per second, so the size is known as it grows rather than
-            // only at the end.
-            try {
-                recorder.start(1000);
-            } catch {
-                teardown();
-                setStage("idle");
-                setError("This browser could not start recording the screen");
-                return;
-            }
             setSeconds(0);
             setStage("recording");
         },
