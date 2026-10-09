@@ -106,6 +106,18 @@ function rememberNoScreenSound(): void {
 }
 
 /**
+ * Whether this browser can share a screen at all.
+ *
+ * No phone browser can: neither Chrome on Android nor Safari on iOS has
+ * `getDisplayMedia`, so a Share button there could only ever fail with "could
+ * not reach your screen". Asked of the browser rather than guessed from its
+ * name, so a phone that gains it gets the button the day it does.
+ */
+export function canShareScreen(): boolean {
+    return typeof navigator?.mediaDevices?.getDisplayMedia === "function";
+}
+
+/**
  * Open a screen, with its sound where this browser has any to offer.
  *
  * Asked in two goes rather than one, for the reason `openMedia` is asked in

@@ -26,6 +26,7 @@
  */
 
 import { micGain } from "./mic-gain";
+import { canShareScreen } from "./call-media";
 import { filterMic, type FilteredMic } from "./mic-filter";
 import { micCleanup, micConstraints } from "./mic-cleanup";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -66,10 +67,7 @@ export function clipRecordingType(): string | null {
  * not offering one.
  */
 export function canRecordClip(): boolean {
-    return (
-        clipRecordingType() !== null &&
-        typeof navigator?.mediaDevices?.getDisplayMedia === "function"
-    );
+    return clipRecordingType() !== null && canShareScreen();
 }
 
 /** The name a clip is sent under. Plain, like a voice message: the message says
