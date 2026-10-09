@@ -95,12 +95,7 @@ async function dropStale(request: Headers, accounts: readonly DeviceAccount[]): 
 async function expire(names: readonly string[]): Promise<void> {
     const store = await cookies();
     for (const name of names) {
-        store.set(name, "", {
-            path: "/",
-            maxAge: 0,
-            secure: name.startsWith("__Secure-"),
-            httpOnly: true
-        });
+        store.set(name, "", { path: "/", maxAge: 0, secure: name.startsWith("__Secure-"), httpOnly: true });
     }
 }
 
@@ -117,22 +112,14 @@ export async function deviceAccountsAction(): Promise<DeviceAccounts> {
     const request = await requestHeaders();
     const accounts = await listDeviceAccounts(auth, request);
     await dropStale(request, accounts);
-    return {
-        accounts: accounts.map(view),
-        room: deviceAccountRoom(accounts.length),
-        max: MAX_DEVICE_ACCOUNTS
-    };
+    return { accounts: accounts.map(view), room: deviceAccountRoom(accounts.length), max: MAX_DEVICE_ACCOUNTS };
 }
 
 /** Act as another account this browser holds. */
 export async function switchAccountAction(sessionId: unknown): Promise<{ error?: string }> {
     const parsed = sessionIdSchema.safeParse(sessionId);
     if (!parsed.success) return failure();
-    const throttle = await rateLimit(
-        `account-switch:${(await clientIp()) ?? "unknown"}`,
-        SWITCH_LIMIT,
-        SWITCH_WINDOW_MS
-    );
+    const throttle = await rateLimit(`account-switch:${(await clientIp()) ?? "unknown"}`, SWITCH_LIMIT, SWITCH_WINDOW_MS);
     if (!throttle.ok) return { error: (await getTranslations("nav"))("account.switcher.tooFast") };
     const switched = await switchDeviceAccount(auth, await requestHeaders(), parsed.data);
     if (!switched) return failure();
@@ -157,11 +144,7 @@ export async function prepareAddAccountAction(): Promise<{ error?: string }> {
     const accounts = await listDeviceAccounts(auth, request);
     await dropStale(request, accounts);
     if (deviceAccountRoom(accounts.length) === 0) {
-        return {
-            error: (await getTranslations("nav"))("account.switcher.full", {
-                max: MAX_DEVICE_ACCOUNTS
-            })
-        };
+        return { error: (await getTranslations("nav"))("account.switcher.full", { max: MAX_DEVICE_ACCOUNTS }) };
     }
     await apply(await enrollDeviceAccount(auth, request));
     return {};

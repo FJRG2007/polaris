@@ -84,15 +84,11 @@ type Translate = NamespaceTranslator<"nav">;
  * core without one.
  */
 function presenceForKey(minutes: number | null): NamespaceKey<"nav"> {
-    return (
-        minutes === null ? "account.presenceFor.untilChanged" : `account.presenceFor.m${minutes}`
-    ) as NamespaceKey<"nav">;
+    return (minutes === null ? "account.presenceFor.untilChanged" : `account.presenceFor.m${minutes}`) as NamespaceKey<"nav">;
 }
 
 function clearsInKey(minutes: number | null): NamespaceKey<"nav"> {
-    return (
-        minutes === null ? "account.status.clearsIn.never" : `account.status.clearsIn.m${minutes}`
-    ) as NamespaceKey<"nav">;
+    return (minutes === null ? "account.status.clearsIn.never" : `account.status.clearsIn.m${minutes}`) as NamespaceKey<"nav">;
 }
 
 /** What a chosen state is called, in the reader's language. */
@@ -565,9 +561,7 @@ export function AccountMenu({
                         }}
                     >
                         <MessageSquareText className="size-4" />
-                        <span className="min-w-0 truncate">
-                            {shownStatus || t("account.setStatus")}
-                        </span>
+                        <span className="min-w-0 truncate">{shownStatus || t("account.setStatus")}</span>
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem asChild>
@@ -621,9 +615,7 @@ export function AccountMenu({
                 <DialogContent className="max-w-sm">
                     <DialogHeader>
                         <DialogTitle>
-                            {t("account.timing.title", {
-                                state: timing ? presenceLabel(timing, t) : ""
-                            })}
+                            {t("account.timing.title", { state: timing ? presenceLabel(timing, t) : "" })}
                         </DialogTitle>
                         <DialogDescription>{t("account.timing.description")}</DialogDescription>
                     </DialogHeader>
@@ -675,9 +667,7 @@ export function AccountMenu({
                             }}
                         />
                         <label className="flex flex-col gap-1">
-                            <span className="text-xs text-muted-foreground">
-                                {t("account.status.clear")}
-                            </span>
+                            <span className="text-xs text-muted-foreground">{t("account.status.clear")}</span>
                             <Select
                                 value={clearsAt === null ? String(clears) : AT_A_TIME}
                                 aria-label={t("account.status.clearsWhen")}

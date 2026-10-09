@@ -86,13 +86,9 @@ class Browser {
 
 async function signUp(name: string): Promise<string> {
     const email = `${name}@fixture.test`;
-    const result = await (
-        auth.api as unknown as {
-            signUpEmail(input: {
-                body: { email: string; password: string; name: string };
-            }): Promise<{ user: { id: string } }>;
-        }
-    ).signUpEmail({ body: { email, password: PASSWORD, name } });
+    const result = await (auth.api as unknown as {
+        signUpEmail(input: { body: { email: string; password: string; name: string } }): Promise<{ user: { id: string } }>;
+    }).signUpEmail({ body: { email, password: PASSWORD, name } });
     return result.user.id;
 }
 
@@ -114,10 +110,7 @@ async function signIn(browser: Browser, name: string): Promise<Response> {
 }
 
 async function activeUserId(browser: Browser): Promise<string | null> {
-    const session = await auth.api.getSession({
-        headers: browser.headers(),
-        query: { disableRefresh: true }
-    });
+    const session = await auth.api.getSession({ headers: browser.headers(), query: { disableRefresh: true } });
     return session?.user.id ?? null;
 }
 
@@ -173,9 +166,7 @@ describe("switching", () => {
         const browser = new Browser();
         await signIn(browser, "ana");
         await signIn(browser, "ben");
-        const ana = (await listDeviceAccounts(auth, browser.headers())).find(
-            (account) => account.name === "ana"
-        );
+        const ana = (await listDeviceAccounts(auth, browser.headers())).find((account) => account.name === "ana");
 
         const switched = await switchDeviceAccount(auth, browser.headers(), ana!.sessionId);
         expect(switched?.account.userId).toBe(ids.ana);
@@ -212,27 +203,19 @@ describe("signing out", () => {
 
         expect(await activeUserId(browser)).toBe(ids.ana);
         expect(db.session.some((row) => row.id === ben!.sessionId)).toBe(false);
-        expect(
-            (await listDeviceAccounts(auth, browser.headers())).map((account) => account.name)
-        ).toEqual(["ana"]);
+        expect((await listDeviceAccounts(auth, browser.headers())).map((account) => account.name)).toEqual(["ana"]);
     });
 
     it("ends an account in the background without touching the active one", async () => {
         const browser = new Browser();
         await signIn(browser, "ana");
         await signIn(browser, "ben");
-        const ana = (await listDeviceAccounts(auth, browser.headers())).find(
-            (account) => account.name === "ana"
-        );
+        const ana = (await listDeviceAccounts(auth, browser.headers())).find((account) => account.name === "ana");
 
-        browser.take(
-            (await signOutDeviceAccount(auth, browser.headers(), ana!.sessionId))!.cookies
-        );
+        browser.take((await signOutDeviceAccount(auth, browser.headers(), ana!.sessionId))!.cookies);
 
         expect(await activeUserId(browser)).toBe(ids.ben);
-        expect(
-            (await listDeviceAccounts(auth, browser.headers())).map((account) => account.name)
-        ).toEqual(["ben"]);
+        expect((await listDeviceAccounts(auth, browser.headers())).map((account) => account.name)).toEqual(["ben"]);
     });
 
     it("signs the last account out completely, even one that predates enrolment", async () => {
@@ -241,9 +224,7 @@ describe("signing out", () => {
         for (const name of browser.multiCookies()) browser.jar.delete(name);
         const [ana] = await listDeviceAccounts(auth, browser.headers());
 
-        browser.take(
-            (await signOutDeviceAccount(auth, browser.headers(), ana!.sessionId))!.cookies
-        );
+        browser.take((await signOutDeviceAccount(auth, browser.headers(), ana!.sessionId))!.cookies);
 
         expect(await activeUserId(browser)).toBeNull();
         expect(db.session.some((row) => row.id === ana!.sessionId)).toBe(false);
@@ -261,8 +242,7 @@ describe("signing out", () => {
         expect(ended.accounts).toHaveLength(2);
         expect(await activeUserId(browser)).toBeNull();
         expect(await listDeviceAccounts(auth, browser.headers())).toEqual([]);
-        for (const account of before)
-            expect(db.session.some((row) => row.id === account.sessionId)).toBe(false);
+        for (const account of before) expect(db.session.some((row) => row.id === account.sessionId)).toBe(false);
     });
 });
 
@@ -293,18 +273,14 @@ describe("isolation between browsers", () => {
         const second = new Browser();
         await signIn(second, "cai");
 
-        expect(
-            (await listDeviceAccounts(auth, second.headers())).map((account) => account.name)
-        ).toEqual(["cai"]);
+        expect((await listDeviceAccounts(auth, second.headers())).map((account) => account.name)).toEqual(["cai"]);
     });
 
     it("cannot switch to or sign out another browser's account", async () => {
         const first = new Browser();
         await signIn(first, "ana");
         await signIn(first, "ben");
-        const ana = (await listDeviceAccounts(auth, first.headers())).find(
-            (account) => account.name === "ana"
-        );
+        const ana = (await listDeviceAccounts(auth, first.headers())).find((account) => account.name === "ana");
         const second = new Browser();
         await signIn(second, "cai");
 
@@ -320,18 +296,13 @@ describe("isolation between browsers", () => {
         const victim = db.session.find((row) => row.userId === ids.ana) as { token: string };
         browser.jar.set(`${SESSION_COOKIE}_multi-${victim.token.toLowerCase()}`, victim.token);
 
-        expect(
-            (await listDeviceAccounts(auth, browser.headers())).map((account) => account.name)
-        ).toEqual(["cai"]);
+        expect((await listDeviceAccounts(auth, browser.headers())).map((account) => account.name)).toEqual(["cai"]);
     });
 
     it("answers nothing when the endpoints are called over HTTP", async () => {
         const browser = new Browser();
         await signIn(browser, "ana");
-        for (const path of [
-            "/multi-session/list-device-sessions",
-            "/polaris/device-accounts/enroll"
-        ]) {
+        for (const path of ["/multi-session/list-device-sessions", "/polaris/device-accounts/enroll"]) {
             const response = await auth.handler(
                 new Request(`${BASE}/api/auth${path}`, {
                     method: path.endsWith("enroll") ? "POST" : "GET",
@@ -351,9 +322,7 @@ describe("staleDeviceCookies", () => {
             `__Secure-${SESSION_COOKIE}_multi-gone=gone.sig`,
             "other=1"
         ].join("; ");
-        expect(staleDeviceCookies(header, ["ABC"])).toEqual([
-            `__Secure-${SESSION_COOKIE}_multi-gone`
-        ]);
+        expect(staleDeviceCookies(header, ["ABC"])).toEqual([`__Secure-${SESSION_COOKIE}_multi-gone`]);
         expect(staleDeviceCookies(null, [])).toEqual([]);
     });
 });

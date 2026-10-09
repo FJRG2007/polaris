@@ -128,14 +128,9 @@ describe("signing out", () => {
             })
         }));
         // Signing out is a server action now, and leaves on a full load.
-        vi.doMock("@/app/device-account-actions", () => ({
-            signOutAccountAction: async () => ({})
-        }));
+        vi.doMock("@/app/device-account-actions", () => ({ signOutAccountAction: async () => ({}) }));
         const assign = vi.fn();
-        Object.defineProperty(window, "location", {
-            value: { ...window.location, assign },
-            configurable: true
-        });
+        Object.defineProperty(window, "location", { value: { ...window.location, assign }, configurable: true });
         const { signOut } = await import("@/lib/auth-client");
         await signOut();
         expect(assign).toHaveBeenCalledWith("/oauth/login");
@@ -157,10 +152,7 @@ describe("signing out", () => {
             signOutAccountAction: async () => ({ error: "Something went wrong. Try again." })
         }));
         const assign = vi.fn();
-        Object.defineProperty(window, "location", {
-            value: { ...window.location, assign },
-            configurable: true
-        });
+        Object.defineProperty(window, "location", { value: { ...window.location, assign }, configurable: true });
         const { signOut } = await import("@/lib/auth-client");
 
         expect(await signOut()).toBe("Something went wrong. Try again.");

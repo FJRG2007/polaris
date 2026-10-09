@@ -25,11 +25,8 @@ export const dynamic = "force-dynamic";
  */
 async function signInProviders(): Promise<SignInProvider[]> {
     const offered = await Promise.all(
-        CONNECTION_PROVIDERS.map(
-            async (provider): Promise<SignInProvider | null> =>
-                (await connectionSignInOffered(provider.slug))
-                    ? { slug: provider.slug, name: provider.name }
-                    : null
+        CONNECTION_PROVIDERS.map(async (provider): Promise<SignInProvider | null> =>
+            (await connectionSignInOffered(provider.slug)) ? { slug: provider.slug, name: provider.name } : null
         )
     );
     return offered.filter((provider): provider is SignInProvider => provider !== null);
@@ -94,11 +91,6 @@ export default async function LoginPage({
               active: false
           }));
     return (
-        <LoginForm
-            awaitingSetup={awaitingSetup}
-            providers={providers}
-            add={add}
-            chooser={chooser}
-        />
+        <LoginForm awaitingSetup={awaitingSetup} providers={providers} add={add} chooser={chooser} />
     );
 }

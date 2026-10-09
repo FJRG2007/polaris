@@ -136,18 +136,7 @@ function useDeviceAccounts(enabled: boolean) {
         });
     }
 
-    return {
-        data,
-        failed,
-        error,
-        busy,
-        load,
-        switchTo,
-        signOutOf,
-        signOutAll,
-        add,
-        confirmElement
-    };
+    return { data, failed, error, busy, load, switchTo, signOutOf, signOutAll, add, confirmElement };
 }
 
 function AccountRow({
@@ -171,22 +160,14 @@ function AccountRow({
                 onClick={onSwitch}
                 disabled={disabled || account.active}
                 aria-current={account.active ? "true" : undefined}
-                aria-label={
-                    account.active
-                        ? undefined
-                        : t("account.switcher.switchTo", { name: account.name })
-                }
+                aria-label={account.active ? undefined : t("account.switcher.switchTo", { name: account.name })}
                 className={cn(
                     "flex min-w-0 flex-1 items-center gap-3 rounded-md px-2 py-2 text-left transition-colors",
                     account.active ? "cursor-default" : "hover:bg-muted/60 disabled:opacity-60",
                     busy && "animate-pulse"
                 )}
             >
-                <Avatar
-                    person={{ id: account.userId, name: account.name }}
-                    size={36}
-                    status={false}
-                />
+                <Avatar person={{ id: account.userId, name: account.name }} size={36} status={false} />
                 <span className="flex min-w-0 flex-1 flex-col">
                     <span className="truncate text-sm font-medium" title={account.name}>
                         {account.name}
@@ -229,12 +210,7 @@ function DeviceAccountsBody({ state }: { state: ReturnType<typeof useDeviceAccou
             {failed ? (
                 <div className="flex items-center justify-between gap-2 text-sm text-danger">
                     <span className="min-w-0">{t("account.switcher.loadFailed")}</span>
-                    <Button
-                        type="button"
-                        variant="secondary"
-                        size="sm"
-                        onClick={() => void state.load()}
-                    >
+                    <Button type="button" variant="secondary" size="sm" onClick={() => void state.load()}>
                         {t("account.switcher.retry")}
                     </Button>
                 </div>
@@ -288,9 +264,7 @@ function DeviceAccountsBody({ state }: { state: ReturnType<typeof useDeviceAccou
                 ) : null}
             </div>
             {full && data ? (
-                <p className="text-xs text-muted-foreground">
-                    {t("account.switcher.full", { max: data.max })}
-                </p>
+                <p className="text-xs text-muted-foreground">{t("account.switcher.full", { max: data.max })}</p>
             ) : null}
             {state.confirmElement}
         </div>
@@ -329,9 +303,7 @@ export function DeviceAccountsCard() {
             <CardBody className="flex flex-col gap-3">
                 <div className="min-w-0">
                     <h2 className="text-sm font-medium">{t("account.switcher.sectionTitle")}</h2>
-                    <p className="text-xs text-muted-foreground">
-                        {t("account.switcher.description")}
-                    </p>
+                    <p className="text-xs text-muted-foreground">{t("account.switcher.description")}</p>
                 </div>
                 <DeviceAccountsBody state={state} />
             </CardBody>
