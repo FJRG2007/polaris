@@ -298,7 +298,10 @@ export function ThreadView({
         // as that line, thousands of pixels, with the Reply buttons and the
         // pane's scrollbar pushed off the right-hand edge of the screen.
         <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-            <header className="flex shrink-0 items-start gap-2 border-b border-border px-4 py-3">
+            {/* Wrapping, so a narrow pane puts the actions on a line of their
+                own: kept beside the subject on a phone, nine buttons left it no
+                room at all, and it was printed one letter to a line. */}
+            <header className="flex shrink-0 flex-wrap items-start gap-2 border-b border-border px-4 py-3">
                 {onBack ? (
                     <Button
                         variant="ghost"
@@ -310,7 +313,7 @@ export function ThreadView({
                         <ArrowLeft className="size-4 shrink-0" aria-hidden />
                     </Button>
                 ) : null}
-                <div className="min-w-0 flex-1">
+                <div className="min-w-0 flex-1 basis-48">
                     {/* The whole subject, wrapped, as every mail client shows the
                         one being read: the list is where it is cut short, and the
                         reading pane is where somebody goes to see the rest. */}
@@ -330,7 +333,7 @@ export function ThreadView({
                         </p>
                     ) : null}
                 </div>
-                <div className="flex shrink-0 items-center gap-1">
+                <div className="flex max-w-full shrink-0 flex-wrap items-center gap-1">
                     {/* Answering is offered at the top as well as the bottom.
                         A company's newsletter is a screen and a half of HTML
                         with a footer under it, and having to scroll all of it
