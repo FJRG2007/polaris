@@ -32,10 +32,12 @@ import { useTranslations } from "@/components/i18n/i18n-provider";
 import * as Y from "yjs";
 import { Loader2 } from "lucide-react";
 import { SheetTools } from "./sheet-tools";
+import { SheetContextMenu, type SheetMenuEngine, type SheetMenuHandler } from "./sheet-context-menu";
 import { setNumberFormatter } from "@polaris/core/sheets";
 import { polarisUniverTheme } from "@/lib/office/editor-theme";
 import { pageIsDark, watchPageTheme } from "@/lib/page-theme";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ComponentType, type Context, type ReactNode } from "react";
+import type { MenuNode } from "@/lib/office/sheet-menu";
 import { useOfficeDocument, REMOTE } from "@/app/(app)/office/use-office-document";
 import {
     cellsOf,
@@ -79,6 +81,7 @@ export function SheetEditor({
     const host = useRef<HTMLDivElement | null>(null);
     const [failed, setFailed] = useState("");
     const [ready, setReady] = useState(false);
+    const [menuEngine, setMenuEngine] = useState<SheetMenuEngine | null>(null);
 
     /** The engine's facade, once it is up. */
     const api = useRef<UniverFacade | null>(null);
@@ -94,7 +97,11 @@ export function SheetEditor({
 
         void (async () => {
             try {
-                const [{ createUniver, LocaleType, merge, defaultTheme }, sheetsCore, locale] =
+                const [
+                    { createUniver, LocaleType, merge, defaultTheme, ICommandService, LocaleService },
+                    sheetsCore,
+                    locale
+                ] =
                     await Promise.all([
                         import("@univerjs/presets"),
                         import("@univerjs/preset-sheets-core"),
@@ -113,7 +120,7 @@ export function SheetEditor({
                     )
                 );
 
-                const { univerAPI } = createUniver({
+                const { univer, univerAPI } = createUniver({
                     locale: LocaleType.EN_US,
                     locales: { [LocaleType.EN_US]: merge({}, locale.default ?? locale) },
                     // Polaris' own violet and Polaris' own neutrals, and the
@@ -141,6 +148,15 @@ export function SheetEditor({
                 const held = (shape.get("workbook") as object | undefined) ?? {};
                 const workbook = univerAPI.createWorkbook(withCells(held, cells));
                 if (!editable) workbook.setEditable(false);
+
+                // The right-click menu is Polaris' own (`sheet-context-menu`).
+                // Wired once the workbook exists, because that is when the
+                // engine's interface services do.
+                const ui = sheetsCore as unknown as UniverMenuModule;
+                const injector = (univer as unknown as { __getInjector: () => Injector }).__getInjector();
+                const routed = routeContextMenu(injector, ui);
+                const stopRightClicks = takeRightClicks(host.current, injector, ui, ICommandService, routed);
+                setMenuEngine(menuEngineOf(injector, ui, ICommandService, LocaleService, routed));
                 setReady(true);
 
                 /** The workbook as it is now, compared with what is shared, and
@@ -194,6 +210,8 @@ export function SheetEditor({
                 cells.observe(observe);
 
                 stop = () => {
+                    stopRightClicks();
+                    routed.restore();
                     listener.dispose();
                     cells.unobserve(observe);
                 };
@@ -209,6 +227,7 @@ export function SheetEditor({
             stop?.();
             unwatchTheme?.();
             api.current = null;
+            setMenuEngine(null);
         };
     }, [cells, doc, editable, shape]);
 
@@ -229,6 +248,7 @@ export function SheetEditor({
                 a height of its own rather than one that grows to fit what it
                 draws. */}
             <div ref={host} className="min-h-0 w-full flex-1" />
+            {menuEngine ? <SheetContextMenu engine={menuEngine} /> : null}
             {!ready && !failed ? (
                 <p className="absolute inset-0 flex items-center justify-center gap-2 text-[13px] text-muted-foreground">
                     <Loader2 className="size-4 shrink-0 animate-spin" aria-hidden />
@@ -291,4 +311,197 @@ function withoutCells(snapshot: object): object {
         if (sheet) sheet.cellData = {};
     }
     return workbook;
+}
+/** As much of the engine's interface module as the right-click menu uses. */
+interface UniverMenuModule {
+    IContextMenuService: unknown;
+    IMenuManagerService: unknown;
+    ILayoutService: unknown;
+    SheetsSelectionsService: unknown;
+    SetWorksheetActiveOperation: { id: string };
+    RediContext: Context<{ injector: Injector }>;
+    CustomLabel: ComponentType<{ label: unknown; value?: unknown; onChange?: (value: unknown) => void }>;
+}
+
+/** The engine's context-menu service: what opens a menu, and whether one is open. */
+interface EngineContextMenuService {
+    triggerContextMenu: (event: PointerEvent | MouseEvent, menuType: string) => void;
+    hideContextMenu: () => void;
+    readonly visible: boolean;
+    disabled: boolean;
+}
+
+interface Injector {
+    get: (identifier: unknown) => unknown;
+}
+
+/** How long a press waits for the browser's right-click event before opening the menu anyway. */
+const PRESS_SETTLE_MS = 400;
+
+/** The slot a Polaris menu sits in, shared by the routed service and the menu. */
+interface RoutedMenu {
+    slot: { handler: SheetMenuHandler | null };
+    /** Open the menu a press asked for, now that the gesture is over. */
+    flush: () => void;
+    /** Put the engine's service back as it was. */
+    restore: () => void;
+}
+
+/**
+ * The engine's context-menu service, with every right-click handed to Polaris.
+ *
+ * The grid, the row and column headers and every plugin ask this one service to
+ * open a menu, so routing it routes all of them at once. Its three entry points
+ * are redirected on the live instance - the engine offers no way to replace the
+ * service from outside, because the preset does not pass its interface plugin a
+ * dependency override - and the engine's own menu, still registered behind it,
+ * answers only while no Polaris menu is attached, so a right-click is never lost.
+ */
+function routeContextMenu(injector: Injector, ui: UniverMenuModule): RoutedMenu {
+    const slot: RoutedMenu["slot"] = { handler: null };
+    const service = injector.get(ui.IContextMenuService) as EngineContextMenuService;
+    const trigger = service.triggerContextMenu.bind(service);
+    const hide = service.hideContextMenu.bind(service);
+    const visible = Object.getOwnPropertyDescriptor(Object.getPrototypeOf(service), "visible");
+    // The grid asks on the press, while the button is still down. The engine
+    // moves focus to its own input on that same press and again on release,
+    // and a menu that loses focus closes, so the menu waits for the browser's
+    // right-click event, which ends the gesture - or, where none follows, for a
+    // moment after the press.
+    let pending: { open: () => void; timer: number } | null = null;
+    const flush = (): void => {
+        if (!pending) return;
+        window.clearTimeout(pending.timer);
+        const { open } = pending;
+        pending = null;
+        open();
+    };
+    service.triggerContextMenu = (event, menuType) => {
+        if (!slot.handler) return trigger(event, menuType);
+        event.stopPropagation();
+        if (service.disabled) return;
+        const at = { x: event.clientX, y: event.clientY };
+        const open = (): void => slot.handler?.open(at, menuType);
+        if (event.type !== "pointerdown" && event.type !== "mousedown") return open();
+        if (pending) window.clearTimeout(pending.timer);
+        pending = { open, timer: window.setTimeout(flush, PRESS_SETTLE_MS) };
+    };
+    service.hideContextMenu = () => {
+        slot.handler?.close();
+        hide();
+    };
+    Object.defineProperty(service, "visible", {
+        configurable: true,
+        get: () => Boolean(slot.handler?.isOpen()) || Boolean(visible?.get?.call(service))
+    });
+    return {
+        slot,
+        flush,
+        restore: () => {
+            if (pending) window.clearTimeout(pending.timer);
+            pending = null;
+            service.triggerContextMenu = trigger;
+            service.hideContextMenu = hide;
+            delete (service as { visible?: boolean }).visible;
+        }
+    };
+}
+
+/**
+ * The browser's own right-click event inside the sheet, taken before anything
+ * else on the page sees it.
+ *
+ * On the grid and its headers the engine opens its menu on the press, so by the
+ * time the browser's event arrives Polaris' menu is already open - and a menu
+ * treats a right-click outside itself as a request to open again where it
+ * landed, which closed the menu it had just opened. That event has nothing left
+ * to do there, so it is swallowed.
+ *
+ * The sheet tabs' menu is opened by the engine's own tab bar rather than through
+ * the context-menu service, so on a tab this same event is the gesture itself:
+ * the tab is made active as the engine would have made it, and Polaris' menu
+ * opens for it instead.
+ *
+ * Listened for on the window, in the capture phase, because the menu's own
+ * listener sits on the document and would otherwise see it first.
+ */
+function takeRightClicks(
+    host: HTMLElement,
+    injector: Injector,
+    ui: UniverMenuModule,
+    commandService: unknown,
+    routed: RoutedMenu
+): () => void {
+    const commands = injector.get(commandService) as {
+        executeCommand: (id: string, params?: object) => Promise<unknown>;
+    };
+    const onContextMenu = (event: MouseEvent): void => {
+        const target = event.target;
+        if (!routed.slot.handler || !(target instanceof Element) || !host.contains(target)) return;
+        if (target instanceof HTMLCanvasElement) {
+            event.preventDefault();
+            event.stopPropagation();
+            routed.flush();
+            return;
+        }
+        const tab = target.closest("[data-u-comp=slide-tab-item]");
+        const sheetId = (tab as HTMLElement | null)?.dataset.id;
+        if (!tab || !sheetId) return;
+        event.preventDefault();
+        event.stopPropagation();
+        const at = { x: event.clientX, y: event.clientY };
+        void commands
+            .executeCommand(ui.SetWorksheetActiveOperation.id, { subUnitId: sheetId })
+            .finally(() => routed.slot.handler?.open(at, "contextMenu.footerTabs", { subUnitId: sheetId }));
+    };
+    window.addEventListener("contextmenu", onContextMenu, true);
+    return () => window.removeEventListener("contextmenu", onContextMenu, true);
+}
+
+/** Everything Polaris' menu needs from the engine, behind one small interface. */
+function menuEngineOf(
+    injector: Injector,
+    ui: UniverMenuModule,
+    commandService: unknown,
+    localeService: unknown,
+    routed: RoutedMenu
+): SheetMenuEngine {
+    const menus = injector.get(ui.IMenuManagerService) as {
+        getMenuByPositionKey: (key: string) => MenuNode[];
+    };
+    const commands = injector.get(commandService) as { executeCommand: (id: string, params?: unknown) => unknown };
+    const locale = injector.get(localeService) as { t: (key: string, ...args: string[]) => string };
+    const layout = injector.get(ui.ILayoutService) as { focus: () => void };
+    const selections = injector.get(ui.SheetsSelectionsService) as {
+        getCurrentLastSelection: () => {
+            primary?: { startRow?: number; startColumn?: number } | null;
+            range: { startRow: number; startColumn: number };
+        } | null;
+    };
+    const { RediContext, CustomLabel } = ui;
+    return {
+        attach: (handler) => {
+            routed.slot.handler = handler;
+            return () => {
+                if (routed.slot.handler === handler) routed.slot.handler = null;
+            };
+        },
+        menu: (position) => menus.getMenuByPositionKey(position),
+        run: (commandId, params) => void commands.executeCommand(commandId, params),
+        focusGrid: () => layout.focus(),
+        engineWords: (key, ...args) => locale.t(key, ...args),
+        activeCell: () => {
+            const last = selections.getCurrentLastSelection();
+            if (!last) return null;
+            return {
+                row: last.primary?.startRow ?? last.range.startRow,
+                column: last.primary?.startColumn ?? last.range.startColumn
+            };
+        },
+        foreignLabel: (label, value, onChange): ReactNode => (
+            <RediContext.Provider value={{ injector }}>
+                <CustomLabel label={label} value={value} onChange={onChange} />
+            </RediContext.Provider>
+        )
+    };
 }

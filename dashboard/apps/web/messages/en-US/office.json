@@ -292,5 +292,98 @@
             "api-off": "The Google Drive API is off in this Polaris's Google project. An administrator can switch it on under Integrations.",
             "busy": "Google is busy right now. Try again in a minute."
         }
+    },
+    "sheetMenu": {
+        "items": {
+            "copy": "Copy",
+            "cut": "Cut",
+            "paste": "Paste",
+            "copySpecial": "Copy special",
+            "pasteSpecial": "Paste special",
+            "pasteValue": "Values only",
+            "pasteFormat": "Formatting only",
+            "pasteColWidth": "Column widths only",
+            "pasteBesidesBorder": "All except borders",
+            "copyFormula": "Formulas only",
+            "pasteFormula": "Formulas only",
+            "clear": "Clear",
+            "clearContent": "Clear contents",
+            "clearFormat": "Clear formatting",
+            "clearAll": "Clear all",
+            "textToNumber": "Convert to number",
+            "insert": "Insert",
+            "delete": "Delete",
+            "shiftLeft": "Shift cells to the left",
+            "shiftUp": "Shift cells upwards",
+            "shiftRight": "Shift cells to the right",
+            "shiftDown": "Shift cells downwards",
+            "deleteRows": "Delete selected rows",
+            "deleteColumns": "Delete selected columns",
+            "hideRows": "Hide selected rows",
+            "hideColumns": "Hide selected columns",
+            "showRows": "Show hidden rows",
+            "showColumns": "Show hidden columns",
+            "fitContent": "Fit to contents",
+            "freeze": "Freeze",
+            "freezeFirstRow": "Freeze first row",
+            "freezeFirstColumn": "Freeze first column",
+            "unfreeze": "Unfreeze panes",
+            "protectRange": "Protect range",
+            "addProtection": "Add protection",
+            "editProtection": "Edit protection",
+            "removeProtection": "Remove protection",
+            "protectedRanges": "All protected ranges",
+            "deleteSheet": "Delete",
+            "duplicateSheet": "Duplicate",
+            "renameSheet": "Rename",
+            "tabColor": "Change color",
+            "hideSheet": "Hide",
+            "unhideSheet": "Unhide",
+            "protectSheet": "Protect sheet",
+            "unprotectSheet": "Unprotect sheet",
+            "sheetPermissions": "Sheet permissions"
+        },
+        "count": {
+            "rowsAbove": {
+                "before": "Insert",
+                "after": "rows above"
+            },
+            "rowsBelow": {
+                "before": "Insert",
+                "after": "rows below"
+            },
+            "columnsLeft": {
+                "before": "Insert",
+                "after": "columns to the left"
+            },
+            "columnsRight": {
+                "before": "Insert",
+                "after": "columns to the right"
+            },
+            "columnWidth": {
+                "before": "Set column width",
+                "after": "px"
+            },
+            "rowHeight": {
+                "before": "Set row height",
+                "after": "px"
+            }
+        },
+        "freezeToRow": "Freeze up to row {row}",
+        "freezeToColumn": "Freeze up to column {column}",
+        "freezeToCell": "Freeze up to {cell}",
+        "noColor": "No color",
+        "colors": {
+            "blue": "Blue",
+            "teal": "Teal",
+            "green": "Green",
+            "yellow": "Yellow",
+            "orange": "Orange",
+            "red": "Red",
+            "pink": "Pink",
+            "violet": "Violet",
+            "slate": "Slate",
+            "black": "Black"
+        }
     }
 }

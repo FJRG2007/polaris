@@ -292,5 +292,98 @@
             "api-off": "La API de Google Drive está apagada en el proyecto de Google de Polaris. Un admin puede activarla en Integraciones.",
             "busy": "Google está ocupado ahora. Reintenta en un minuto."
         }
+    },
+    "sheetMenu": {
+        "items": {
+            "copy": "Copiar",
+            "cut": "Cortar",
+            "paste": "Pegar",
+            "copySpecial": "Copia especial",
+            "pasteSpecial": "Pegado especial",
+            "pasteValue": "Solo valores",
+            "pasteFormat": "Solo formato",
+            "pasteColWidth": "Solo anchos de columna",
+            "pasteBesidesBorder": "Todo menos bordes",
+            "copyFormula": "Solo fórmulas",
+            "pasteFormula": "Solo fórmulas",
+            "clear": "Borrar",
+            "clearContent": "Borrar contenido",
+            "clearFormat": "Borrar formato",
+            "clearAll": "Borrar todo",
+            "textToNumber": "Convertir a número",
+            "insert": "Insertar",
+            "delete": "Eliminar",
+            "shiftLeft": "Celdas a la izquierda",
+            "shiftUp": "Celdas hacia arriba",
+            "shiftRight": "Celdas a la derecha",
+            "shiftDown": "Celdas hacia abajo",
+            "deleteRows": "Eliminar filas",
+            "deleteColumns": "Eliminar columnas",
+            "hideRows": "Ocultar filas",
+            "hideColumns": "Ocultar columnas",
+            "showRows": "Ver filas ocultas",
+            "showColumns": "Ver columnas ocultas",
+            "fitContent": "Ajustar al texto",
+            "freeze": "Fijar",
+            "freezeFirstRow": "Fijar primera fila",
+            "freezeFirstColumn": "Fijar primera columna",
+            "unfreeze": "Quitar fijación",
+            "protectRange": "Proteger rango",
+            "addProtection": "Añadir protección",
+            "editProtection": "Editar protección",
+            "removeProtection": "Quitar protección",
+            "protectedRanges": "Rangos protegidos",
+            "deleteSheet": "Eliminar",
+            "duplicateSheet": "Duplicar",
+            "renameSheet": "Renombrar",
+            "tabColor": "Cambiar color",
+            "hideSheet": "Ocultar",
+            "unhideSheet": "Mostrar",
+            "protectSheet": "Proteger hoja",
+            "unprotectSheet": "Desproteger hoja",
+            "sheetPermissions": "Permisos de hoja"
+        },
+        "count": {
+            "rowsAbove": {
+                "before": "Insertar",
+                "after": "filas arriba"
+            },
+            "rowsBelow": {
+                "before": "Insertar",
+                "after": "filas abajo"
+            },
+            "columnsLeft": {
+                "before": "Insertar",
+                "after": "columnas a la izquierda"
+            },
+            "columnsRight": {
+                "before": "Insertar",
+                "after": "columnas a la derecha"
+            },
+            "columnWidth": {
+                "before": "Ancho de columna",
+                "after": "px"
+            },
+            "rowHeight": {
+                "before": "Alto de fila",
+                "after": "px"
+            }
+        },
+        "freezeToRow": "Fijar hasta la fila {row}",
+        "freezeToColumn": "Fijar hasta la columna {column}",
+        "freezeToCell": "Fijar hasta {cell}",
+        "noColor": "Sin color",
+        "colors": {
+            "blue": "Azul",
+            "teal": "Cian",
+            "green": "Verde",
+            "yellow": "Amarillo",
+            "orange": "Naranja",
+            "red": "Rojo",
+            "pink": "Rosa",
+            "violet": "Violeta",
+            "slate": "Pizarra",
+            "black": "Negro"
+        }
     }
 }
