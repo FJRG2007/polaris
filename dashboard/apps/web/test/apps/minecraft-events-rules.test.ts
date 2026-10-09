@@ -123,6 +123,40 @@ describe("a kind added in an update", () => {
     });
 });
 
+describe("hide and seek's time to hide", () => {
+    const seek = (hideSeconds: number, minutes = 7) => {
+        const preset = catalog.newPreset("hide-and-seek", "seek") as catalog.EventPreset & {
+            options: catalog.EventOptions<"hide-and-seek">;
+        };
+        return { ...preset, minutes, options: { ...preset.options, hideSeconds } };
+    };
+    const read = (defaults: number, hideSeconds: number) => {
+        const preset = catalog
+            .readEventsConfig({
+                [catalog.EVENTS_KEY]: { presets: [seek(hideSeconds)], settings: { defaults } }
+            })
+            .presets.find((one) => one.id === "seek")!;
+        return (preset.options as catalog.EventOptions<"hide-and-seek">).hideSeconds;
+    };
+
+    it("brings the old default up once, and keeps one chosen since", () => {
+        expect(read(7, 45)).toBe(catalog.HIDE_SECONDS);
+        expect(read(7, 60)).toBe(60);
+        expect(read(catalog.DEFAULTS_VERSION, 45)).toBe(45);
+    });
+
+    it("leaves the seekers at least half the event", () => {
+        expect(catalog.presetSchema.safeParse(seek(90, 3)).success).toBe(true);
+        const long = catalog.presetSchema.safeParse(seek(91, 3));
+        expect(long.success).toBe(false);
+        expect(long.error?.issues[0]?.path).toEqual(["options", "hideSeconds"]);
+        expect(english(long.error?.issues[0]?.message)).toBe("At most 90 seconds, half the event");
+        expect(catalog.presetSchema.safeParse(seek(catalog.MOST_HIDE_SECONDS, 6)).success).toBe(
+            true
+        );
+    });
+});
+
 describe("an event a server cannot play", () => {
     const of = (kind: catalog.EventKind) => catalog.newPreset(kind, "k");
 

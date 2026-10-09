@@ -1049,6 +1049,18 @@ export function manorProblems(manor: Manor): string[] {
         problems.push(
             `${dark.length} places to stand are dark enough for monsters, first ${dark[0]}`
         );
+    // In and never out again: a drop with no ladder back up, powder snow over a
+    // hollow whose panel was never built. Whoever falls in is stuck there for
+    // the rest of the game, seeker or hider.
+    for (const walker of ["hider", "seeker"] as const) {
+        const stuck = model.stranded(grid, { x: start.x, feet: 1, z: start.z }, walker);
+        if (stuck.length > 0) {
+            const at = grid.place(stuck[0]!);
+            problems.push(
+                `${stuck.length} places a ${walker} gets into and not out of, first ${at.x},${at.feet},${at.z}`
+            );
+        }
+    }
     for (const spot of manor.spots)
         if (seeker[grid.index(spot.x, spot.feet, spot.z)]! < 0)
             problems.push(`the hiding place at ${spot.x},${spot.feet},${spot.z} cannot be reached`);
@@ -1131,6 +1143,13 @@ export function manorBlocks(manor: Manor): string[] {
  * holds it, which is how a server keeps it, the floor after the rest, the
  * water and lava after the stone round them so nothing runs - and last a
  * block of floor already there, the probe that proves the blocks stayed.
+ *
+ * Scaffolding is the exception to "what hangs before what holds": it checks
+ * its own support a tick after it is placed, not when something next to it
+ * changes, and scaffolding with nothing under it breaks and drops itself as an
+ * item. Put down before the floor, every tower came apart into scaffolding in
+ * the hiders' hands - which they cannot place - and left no way up. So it comes
+ * after the solid blocks, standing on a floor that is already there.
  */
 export function manorFills(box: Box, manor: Manor): Fill[] {
     const fills: Fill[] = [
@@ -1140,7 +1159,8 @@ export function manorFills(box: Box, manor: Manor): Fill[] {
     const order = (block: string) => {
         const id = model.bare(block);
         if (/lava|water/.test(id)) return 3;
-        if (/(_button|ladder|_banner|_door|_trapdoor|scaffolding)$/.test(id)) return 0;
+        if (/scaffolding$/.test(id)) return 2;
+        if (/(_button|ladder|_banner|_door|_trapdoor)$/.test(id)) return 0;
         return 1;
     };
     const parts = manor.grid.boxes().sort((a, b) => order(a.block) - order(b.block));

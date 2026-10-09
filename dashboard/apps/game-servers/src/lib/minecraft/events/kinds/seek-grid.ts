@@ -107,6 +107,9 @@ export interface Merged {
     readonly z2: number;
 }
 
+/** A ladder, in any facing. */
+const LADDER = /^minecraft:ladder(\[|$)/;
+
 /** The inside of a house `size` across, outer walls included. */
 export class Grid {
     readonly size: number;
@@ -123,6 +126,14 @@ export class Grid {
         return ((level - DEEP) * this.size + x) * this.size + z;
     }
 
+    /** Where an index from `index` is: the other way round. */
+    place(index: number): { x: number; feet: number; z: number } {
+        const z = index % this.size;
+        const x = Math.floor(index / this.size) % this.size;
+        const feet = Math.floor(index / (this.size * this.size)) + DEEP;
+        return { x, feet, z };
+    }
+
     inside(x: number, level: number, z: number): boolean {
         return x >= 0 && z >= 0 && x < this.size && z < this.size && level >= DEEP && level < ROOF;
     }
@@ -136,12 +147,26 @@ export class Grid {
         return this.inside(x, level, z) && this.cells[this.index(x, level, z)] === null;
     }
 
-    /** Sets a box, never over a block already set: what is set first wins. */
+    /**
+     * Sets a box, never over a block already set: what is set first wins.
+     *
+     * Except a ladder, which also goes into reserved air. A hollow is cleared
+     * first and its ladder set after it, and with "first wins" the ladder only
+     * ever landed in the floor's own block: a pit three deep with its rung out
+     * of reach at the top, which a hider dropped into and never left. A ladder
+     * takes no room from anybody, so putting it in reserved air keeps what the
+     * air was reserved for.
+     */
     set(block: string, x1: number, l1: number, z1: number, x2 = x1, l2 = l1, z2 = z1): void {
+        const rung = LADDER.test(block);
         for (let x = Math.min(x1, x2); x <= Math.max(x1, x2); x += 1)
             for (let level = Math.min(l1, l2); level <= Math.max(l1, l2); level += 1)
-                for (let z = Math.min(z1, z2); z <= Math.max(z1, z2); z += 1)
-                    if (this.free(x, level, z)) this.cells[this.index(x, level, z)] = block;
+                for (let z = Math.min(z1, z2); z <= Math.max(z1, z2); z += 1) {
+                    if (!this.inside(x, level, z)) continue;
+                    const index = this.index(x, level, z);
+                    const now = this.cells[index];
+                    if (now === null || (rung && now === "")) this.cells[index] = block;
+                }
     }
 
     /** Reserves a box as air: nothing set later fills it. */
@@ -289,12 +314,64 @@ export function walk(
     start: { x: number; feet: number; z: number },
     walker: Walker
 ): Int32Array {
+    return explore(grid, start, walker).steps;
+}
+
+/**
+ * Every place a walker reaches from `start` and cannot walk back to it from:
+ * a drop with no way up, a drift of powder snow over a hollow whose panel was
+ * never built. A hider who goes in there is stuck for the rest of the game, so
+ * a house with one is drawn again. Answers the places, in the grid's indices.
+ *
+ * Measured over the same moves as `walk`, backwards: every move made from a
+ * reached place is kept, and the places that can get back to `start` are the
+ * ones reached from it along those moves reversed.
+ */
+export function stranded(
+    grid: Grid,
+    start: { x: number; feet: number; z: number },
+    walker: Walker
+): number[] {
+    const { steps, moves } = explore(grid, start, walker);
+    const back = new Map<number, number[]>();
+    for (let index = 0; index < moves.length; index += 2) {
+        const from = moves[index]!;
+        const to = moves[index + 1]!;
+        const list = back.get(to);
+        if (list) list.push(from);
+        else back.set(to, [from]);
+    }
+    const home = grid.index(start.x, start.feet, start.z);
+    const returns = new Uint8Array(steps.length);
+    returns[home] = 1;
+    const queue = [home];
+    for (let head = 0; head < queue.length; head += 1)
+        for (const from of back.get(queue[head]!) ?? [])
+            if (!returns[from]) {
+                returns[from] = 1;
+                queue.push(from);
+            }
+    const out: number[] = [];
+    for (let index = 0; index < steps.length; index += 1)
+        if (steps[index]! >= 0 && !returns[index]) out.push(index);
+    return out;
+}
+
+/** The walk itself, with every move it made: pairs of grid indices, from and to. */
+function explore(
+    grid: Grid,
+    start: { x: number; feet: number; z: number },
+    walker: Walker
+): { steps: Int32Array; moves: number[] } {
     const m = moves(grid, walker);
     const steps = new Int32Array(grid.size * grid.size * Grid.LEVELS).fill(-1);
+    const made: number[] = [];
     const queue: number[] = [];
+    let current = -1;
     const visit = (x: number, feet: number, z: number, from: number) => {
         if (!grid.inside(x, feet, z)) return;
         const index = grid.index(x, feet, z);
+        if (current >= 0) made.push(current, index);
         if (steps[index]! >= 0) return;
         steps[index] = from + 1;
         queue.push(x, feet, z);
@@ -304,7 +381,8 @@ export function walk(
         const x = queue[head]!;
         const feet = queue[head + 1]!;
         const z = queue[head + 2]!;
-        const here = steps[grid.index(x, feet, z)]!;
+        current = grid.index(x, feet, z);
+        const here = steps[current]!;
         const swims = m.fluid(x, feet, z);
         const climbs = m.climb(x, feet, z);
         for (const [dx, dz] of [
@@ -343,7 +421,7 @@ export function walk(
             if (rest !== null) visit(x, rest, z, here);
         }
     }
-    return steps;
+    return { steps, moves: made };
 }
 
 /** The block light each place gets, as the game spreads it: a level less a

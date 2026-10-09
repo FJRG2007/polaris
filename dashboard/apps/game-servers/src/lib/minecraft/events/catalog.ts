@@ -289,6 +289,12 @@ function legacySpleef(value: unknown): unknown {
     return { ...rest, variants: one ? [one] : [...SPLEEF_VARIANTS] };
 }
 
+/** Hide and seek's time to hide, and the most it may be. */
+export const HIDE_SECONDS = 75;
+export const MOST_HIDE_SECONDS = 180;
+/** What every hide and seek was given before `HIDE_SECONDS`: nobody's choice. */
+const OLD_HIDE_SECONDS = 45;
+
 /** What each kind can be set to. Every field has a default, so an event made on
  *  an older version of this screen reads as a whole one. */
 export const optionsSchemas = {
@@ -641,13 +647,15 @@ export const optionsSchemas = {
     "hide-and-seek": z.object({
         place: placeSchema.default({ mode: "players" }),
         /** How long the hiders have before the seekers can move: the house has
-         *  nine rooms to run through, so longer than a hall would need. */
+         *  nine rooms to run through, secret rooms to open and climbs to make,
+         *  so longer than a hall would need. Forty-five was too short to reach
+         *  the far rooms and settle (`OLD_HIDE_SECONDS`). */
         hideSeconds: z
             .number()
             .int()
             .min(15, problem("atLeast", { count: 15 }))
-            .max(90, problem("atMost", { count: 90 }))
-            .default(45),
+            .max(MOST_HIDE_SECONDS, problem("atMost", { count: MOST_HIDE_SECONDS }))
+            .default(HIDE_SECONDS),
         /** Seekers at the start; everybody found becomes one. */
         seekers: z
             .number()
@@ -915,6 +923,17 @@ export const presetSchema = z
             options: optionsSchemas["downhill-race"]
         })
     ])
+    .superRefine((value, context) => {
+        if (value.kind !== "hide-and-seek") return;
+        const most = Math.floor((value.minutes * 60) / 2);
+        if (value.options.hideSeconds > most) {
+            context.addIssue({
+                code: z.ZodIssueCode.custom,
+                path: ["options", "hideSeconds"],
+                message: problem("hideHalfEvent", { count: most })
+            });
+        }
+    })
     .transform((value) => value as EventPreset);
 
 const TIME = /^([01]\d|2[0-3]):([0-5]\d)$/;
@@ -983,11 +1002,15 @@ export type RandomEvents = z.infer<typeof randomSchema>;
  * value an operator chooses later, even one that happens to be an old default,
  * is theirs.
  */
-export const DEFAULTS_VERSION = 7;
+export const DEFAULTS_VERSION = 8;
 
 /** Events saved before this were brought up to their kind's defaults once
  *  (`toKindDefaults`). */
 const KIND_DEFAULTS_SINCE = 2;
+
+/** Hide and seek saved before this was given `OLD_HIDE_SECONDS` to hide, and is
+ *  brought up to `HIDE_SECONDS` once (`toHideSeconds`). */
+const HIDE_SECONDS_SINCE = 8;
 
 /**
  * The defaults version each kind joined the catalog at. A server whose events
@@ -1547,6 +1570,15 @@ function readPresets(list: unknown): { preset: EventPreset; reset: string[] }[] 
     });
 }
 
+/** A hide and seek still on the time to hide every one was given before
+ *  `HIDE_SECONDS`, given that instead. */
+function toHideSeconds(preset: EventPreset): EventPreset {
+    if (preset.kind !== "hide-and-seek") return preset;
+    const options = preset.options as EventOptions<"hide-and-seek">;
+    if (options.hideSeconds !== OLD_HIDE_SECONDS) return preset;
+    return { ...preset, options: { ...options, hideSeconds: HIDE_SECONDS } } as EventPreset;
+}
+
 /** The name the first events gave a horde defense. */
 const BRITISH_HORDE_NAME = "Horde defence";
 
@@ -1648,9 +1680,9 @@ export function readEventsConfig(
     // One that no longer reads whole keeps every part that does, the rest
     // back to its kind's defaults (`repairPreset`), rather than vanishing
     // from the list and the draw with nothing to say so.
-    const kept = readPresets(value.presets).map(({ preset }) =>
-        saved < KIND_DEFAULTS_SINCE ? toKindDefaults(preset) : preset
-    );
+    const kept = readPresets(value.presets)
+        .map(({ preset }) => (saved < KIND_DEFAULTS_SINCE ? toKindDefaults(preset) : preset))
+        .map((preset) => (saved < HIDE_SECONDS_SINCE ? toHideSeconds(preset) : preset));
     // Every kind this server's events were saved before, once, named in the
     // language its players read.
     const had = new Set(kept.map((preset) => preset.kind));
