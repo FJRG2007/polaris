@@ -3072,10 +3072,10 @@
         },
         "seasonal": {
             "title": "Seasonal themes",
-            "body": "Decorations and optional sounds around Halloween, the winter holidays, New Year and the Lunar New Year. Each person can still turn them off for themselves.",
+            "body": "Decorations and a sound pack around Halloween, the winter holidays, New Year and the Lunar New Year, on the same dates as Discord. Each person can turn off the sound pack in force.",
             "label": "Seasonal themes for everyone",
-            "on": "On. Each person chooses in their Preferences.",
-            "off": "Off for everyone, whatever they chose.",
+            "on": "On. The sound pack can be turned off in each person's Preferences.",
+            "off": "Off for everyone.",
             "notSaved": "The change could not be saved. Try again in a moment."
         }
     }

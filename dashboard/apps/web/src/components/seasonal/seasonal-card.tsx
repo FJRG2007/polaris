@@ -1,19 +1,20 @@
 "use client";
 
 /**
- * The account's seasonal switches, on Preferences: the decoration and the
- * season's sounds, each saved the moment it moves and put back if the save is
- * refused. Says which season is on, or which comes next and when, so a switch
- * flipped in June is not a switch that seems to do nothing.
+ * The season's sound pack, on Preferences: one switch, named after the pack in
+ * force, that turns it off for this account until the season ends - the way
+ * Discord offers its Halloween sound pack. Saved the moment it moves and put
+ * back if the save is refused.
  *
- * With the deployment's switch off, both are shown off and cannot be moved, and
- * the card says who turned them off.
+ * There is nothing else to choose: Polaris runs the packs on their dates, and
+ * the decoration follows the operator's switch alone. Outside a season, or with
+ * that switch off, there is no pack to turn off and the card is not drawn.
  */
 
 import { Play } from "lucide-react";
 import * as core from "@polaris/core";
 import { playCallSound } from "@/lib/call-sounds";
-import { useEffect, useId, useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { playChimeOf } from "@/lib/notification-sound";
 import { useDisplayFormat } from "@/components/display-format";
 import { SEASON_ICONS } from "./seasonal-frame";
@@ -24,7 +25,6 @@ import { saveSeasonalAction } from "@/app/(app)/account/preferences/seasonal-act
 export function SeasonalCard({ allowed, initial }: { allowed: boolean; initial: core.SeasonalChoice }) {
     const t = useTranslations("account");
     const format = useDisplayFormat();
-    const offId = useId();
     const [choice, setChoice] = useState(initial);
     const [error, setError] = useState("");
     const [, startSaving] = useTransition();
@@ -32,14 +32,23 @@ export function SeasonalCard({ allowed, initial }: { allowed: boolean; initial: 
     // no idea what day it is where they are, and a guess would be redrawn.
     const [now, setNow] = useState<Date | null>(null);
     useEffect(() => setNow(new Date()), []);
-    const today = now ? core.seasonOn(now) : null;
 
-    function change(field: keyof core.SeasonalChoice, next: boolean) {
+    const season = now ? core.seasonOn(now) : null;
+    const pack = now ? core.packOn(now) : null;
+    const lastDay = now ? core.packLastDay(now) : null;
+    if (!allowed || !season || !pack || !lastDay) return null;
+
+    const name = t(`seasonal.names.${core.packOf(season)}`);
+    const Icon = SEASON_ICONS[season];
+    const on = choice.mutedPack !== pack;
+
+    function change(next: boolean) {
         const before = choice;
-        setChoice({ ...choice, [field]: next });
+        const mutedPack = next ? null : pack;
+        setChoice({ mutedPack });
         setError("");
         startSaving(async () => {
-            const result = await saveSeasonalAction({ [field]: next }).catch(() => ({
+            const result = await saveSeasonalAction({ mutedPack }).catch(() => ({
                 error: t("seasonal.notSaved"),
                 choice: undefined
             }));
@@ -50,18 +59,11 @@ export function SeasonalCard({ allowed, initial }: { allowed: boolean; initial: 
         });
     }
 
-    const lastDay = now && today ? core.seasonLastDay(now) : null;
-    const next = now && !today ? core.nextSeason(now) : null;
-    // Nothing to announce on a deployment that has seasons off: the card says
-    // that instead.
-    const shown = allowed ? (today ?? next?.season ?? null) : null;
-    const Icon = shown ? SEASON_ICONS[shown] : null;
-
     function preview() {
-        if (!shown) return;
-        playChimeOf(shown);
+        if (!season) return;
+        playChimeOf(season);
         // The ring after the chime has finished, as it would arrive.
-        window.setTimeout(() => playCallSound("ring", shown), 600);
+        window.setTimeout(() => playCallSound("ring", season), 600);
     }
 
     return (
@@ -70,70 +72,30 @@ export function SeasonalCard({ allowed, initial }: { allowed: boolean; initial: 
                 <CardTitle>{t("seasonal.title")}</CardTitle>
             </CardHeader>
             <CardBody className="flex flex-col gap-4">
-                <p className="text-sm text-muted-foreground">{t("seasonal.intro")}</p>
-                {/* The line is held open before the date is known, so nothing below
-                    it moves when it fills in. */}
-                <p className="flex min-h-5 min-w-0 items-center gap-2 text-sm">
-                    {Icon && shown ? (
-                        <>
-                            <Icon aria-hidden="true" className="size-4 shrink-0 text-muted-foreground" />
-                            <span className="min-w-0">
-                                {today && lastDay
-                                    ? t("seasonal.onUntil", {
-                                          season: t(`seasonal.names.${today}`),
-                                          date: format.date(lastDay)
-                                      })
-                                    : next
-                                      ? t("seasonal.nextFrom", {
-                                            season: t(`seasonal.names.${next.season}`),
-                                            date: format.date(next.from)
-                                        })
-                                      : null}
-                            </span>
-                        </>
-                    ) : null}
-                </p>
-                {allowed ? null : (
-                    <p id={offId} className="text-sm text-muted-foreground">
-                        {t("seasonal.offForAll")}
-                    </p>
-                )}
                 <div className="flex items-center justify-between gap-3">
-                    <div className="min-w-0">
-                        <p className="text-sm font-medium">{t("seasonal.theme")}</p>
-                        <p className="text-xs text-muted-foreground">{t("seasonal.themeHint")}</p>
-                    </div>
-                    <Switch
-                        checked={allowed && choice.theme}
-                        disabled={!allowed}
-                        onChange={(next) => change("theme", next)}
-                        aria-label={t("seasonal.theme")}
-                        aria-describedby={allowed ? undefined : offId}
-                    />
-                </div>
-                <div className="flex items-center justify-between gap-3">
-                    <div className="min-w-0">
-                        <p className="text-sm font-medium">{t("seasonal.sounds")}</p>
-                        <p className="text-xs text-muted-foreground">{t("seasonal.soundsHint")}</p>
+                    <div className="flex min-w-0 items-start gap-2">
+                        <Icon aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+                        <div className="min-w-0">
+                            <p className="text-sm font-medium">{t("seasonal.pack", { season: name })}</p>
+                            <p className="text-xs text-muted-foreground">
+                                {t("seasonal.packHint", { date: format.date(lastDay) })}
+                            </p>
+                        </div>
                     </div>
                     <div className="flex shrink-0 items-center gap-2">
-                        {shown && allowed ? (
-                            <Button
-                                size="sm"
-                                variant="ghost"
-                                onClick={preview}
-                                aria-label={t("seasonal.preview", { season: t(`seasonal.names.${shown}`) })}
-                                title={t("seasonal.preview", { season: t(`seasonal.names.${shown}`) })}
-                            >
-                                <Play aria-hidden="true" className="size-3.5" />
-                            </Button>
-                        ) : null}
+                        <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={preview}
+                            aria-label={t("seasonal.preview", { season: name })}
+                            title={t("seasonal.preview", { season: name })}
+                        >
+                            <Play aria-hidden="true" className="size-3.5" />
+                        </Button>
                         <Switch
-                            checked={allowed && choice.sounds}
-                            disabled={!allowed}
-                            onChange={(next) => change("sounds", next)}
-                            aria-label={t("seasonal.sounds")}
-                            aria-describedby={allowed ? undefined : offId}
+                            checked={on}
+                            onChange={change}
+                            aria-label={t("seasonal.pack", { season: name })}
                         />
                     </div>
                 </div>

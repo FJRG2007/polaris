@@ -1,19 +1,20 @@
 /**
- * The times of year Polaris dresses up for, and what an account chose about it.
+ * The times of year Polaris dresses up for, and the one thing an account can say
+ * about it.
  *
- * Modelled on Discord's seasonal events: a light decoration for a couple of weeks
- * around a holiday, and an alternate set of sounds somebody has to ask for. The
- * windows are Discord's own where it published one - Halloween from 20 October
- * to 3 November, the winter pack from 19 December to 3 January - with New Year's
+ * Modelled on Discord's seasonal events: Polaris carries the packs and runs each
+ * one on its dates - a light decoration and a set of sounds - with nothing to
+ * set up. The windows are Discord's: Halloween from 7 October to 2 November (its
+ * 2026 event), the winter pack from 19 December to 5 January, with New Year's
  * Eve and Day carved out of winter for confetti, and the Lunar New Year (the
  * first fifteen days of the first lunar month, up to the Lantern Festival).
  *
  * Decided in the reader's own calendar, on their device: a holiday is a date on
  * the wall where somebody is sitting, not one on the server's clock.
  *
- * Sounds are off unless chosen. Discord turned every sound festive for everybody
- * in 2021 and made them opt-in after the complaints; the decoration stayed on by
- * default with a switch beside it, and so does this.
+ * Like Discord, the sounds come on with the season and an account can turn off
+ * the pack in force - only that one: the next season's comes on again when it
+ * starts. The decoration is not a choice; the operator's switch is the only one.
  */
 
 import { z } from "zod";
@@ -22,35 +23,63 @@ export const SEASONS = ["halloween", "winter", "newYear", "lunarNewYear"] as con
 
 export type Season = (typeof SEASONS)[number];
 
-/** What an account chose. Absent fields follow `SEASONAL_DEFAULTS`. */
+/** The sound pack a season plays. New Year's Eve and Day sit inside the winter
+ *  event, so they belong to its pack: one switch turns the whole stretch off. */
+export function packOf(season: Season): Season {
+    return season === "newYear" ? "winter" : season;
+}
+
+/**
+ * Which pack is playing on a date, as a key that names that one run of it -
+ * `halloween-2026`, `winter-2026` (through to 5 January 2027) - or null when
+ * none is. A pack turned off is stored by this key, so turning one off says
+ * nothing about the next.
+ */
+export function packOn(date: Date): string | null {
+    const season = seasonOn(date);
+    if (!season) return null;
+    const pack = packOf(season);
+    // Winter runs over New Year: its January days belong to December's run.
+    const year = pack === "winter" && date.getMonth() === 0 ? date.getFullYear() - 1 : date.getFullYear();
+    return `${pack}-${year}`;
+}
+
+/** What an account sends: the pack it turned off, or null to turn it back on. */
 export const seasonalPrefsSchema = z
-    .object({
-        /** The decoration: the mark beside the logo and what drifts over the page. */
-        theme: z.boolean(),
-        /** The alternate ring, message and alert sounds. */
-        sounds: z.boolean()
-    })
-    .partial()
+    .object({ mutedPack: z.string().regex(/^(halloween|winter|lunarNewYear)-\d{4}$/).nullable() })
     .strict();
 
 export type SeasonalPrefs = z.infer<typeof seasonalPrefsSchema>;
 
 export interface SeasonalChoice {
-    readonly theme: boolean;
-    readonly sounds: boolean;
+    /** The run of a pack this account turned off, by `packOn`'s key. */
+    readonly mutedPack: string | null;
 }
 
-export const SEASONAL_DEFAULTS: SeasonalChoice = { theme: true, sounds: false };
+export const SEASONAL_DEFAULTS: SeasonalChoice = { mutedPack: null };
 
-/** A stored choice read back. Anything that does not parse is the defaults. */
+/**
+ * A stored choice read back. Anything that does not parse is the defaults.
+ *
+ * Rows saved before the packs ran by date hold `theme` and `sounds` switches;
+ * those were choices about a feature that no longer asks, and read as nothing.
+ */
 export function parseSeasonalPrefs(raw: string | null | undefined): SeasonalChoice {
     if (!raw) return SEASONAL_DEFAULTS;
     try {
-        const parsed = seasonalPrefsSchema.safeParse(JSON.parse(raw));
-        return parsed.success ? { ...SEASONAL_DEFAULTS, ...parsed.data } : SEASONAL_DEFAULTS;
+        const parsed = z
+            .object({ mutedPack: seasonalPrefsSchema.shape.mutedPack.optional() })
+            .safeParse(JSON.parse(raw));
+        return parsed.success ? { mutedPack: parsed.data.mutedPack ?? null } : SEASONAL_DEFAULTS;
     } catch {
         return SEASONAL_DEFAULTS;
     }
+}
+
+/** Whether a pack's sounds play on a date for an account with this choice. */
+export function packPlays(date: Date, choice: SeasonalChoice): boolean {
+    const pack = packOn(date);
+    return pack !== null && pack !== choice.mutedPack;
 }
 
 let lunar: Intl.DateTimeFormat | null | undefined;
@@ -88,8 +117,8 @@ export function seasonOn(date: Date): Season | null {
     const month = date.getMonth() + 1;
     const day = date.getDate();
     if ((month === 12 && day === 31) || (month === 1 && day === 1)) return "newYear";
-    if (within(month, day, [12, 19], [12, 31]) || within(month, day, [1, 1], [1, 3])) return "winter";
-    if (within(month, day, [10, 20], [11, 3])) return "halloween";
+    if (within(month, day, [12, 19], [12, 31]) || within(month, day, [1, 1], [1, 5])) return "winter";
+    if (within(month, day, [10, 7], [11, 2])) return "halloween";
     // The lunar new year never falls before 21 January or after 20 February, so
     // the calendar is only asked about those weeks and the rest of the year
     // costs nothing.
@@ -120,6 +149,20 @@ export function seasonLastDay(date: Date): Date | null {
     for (let step = 0; step < 40; step += 1) {
         const next = new Date(day.getFullYear(), day.getMonth(), day.getDate() + 1);
         if (seasonOn(next) !== current) return day;
+        day.setDate(day.getDate() + 1);
+    }
+    return day;
+}
+
+/** The last day of the sound pack playing on `date` - winter's runs through New
+ *  Year - or null when none is. */
+export function packLastDay(date: Date): Date | null {
+    const pack = packOn(date);
+    if (!pack) return null;
+    const day = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+    for (let step = 0; step < 40; step += 1) {
+        const next = new Date(day.getFullYear(), day.getMonth(), day.getDate() + 1);
+        if (packOn(next) !== pack) return day;
         day.setDate(day.getDate() + 1);
     }
     return day;

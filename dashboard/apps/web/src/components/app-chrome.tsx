@@ -328,7 +328,7 @@ export async function AppChrome({ user, children }: { user: SessionUser; childre
                                     sends a recording and then goes to read their
                                     mail has not cancelled anything. */}
                                                                 <TransfersView />
-                                                                <SeasonalFrame allowed={seasonsOn} theme={seasonal.theme} sounds={seasonal.sounds}>
+                                                                <SeasonalFrame allowed={seasonsOn} mutedPack={seasonal.mutedPack}>
                                                                 <AppShell
                                                                     mark={
                                                                         <Link

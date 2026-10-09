@@ -1054,21 +1054,15 @@
         "signedInAs": "Signed in as {name}"
     },
     "seasonal": {
-        "title": "Seasonal themes",
-        "intro": "Polaris dresses up for Halloween, the winter holidays, New Year and the Lunar New Year.",
+        "title": "Seasonal sounds",
         "names": {
             "halloween": "Halloween",
             "winter": "Winter holidays",
             "newYear": "New Year",
             "lunarNewYear": "Lunar New Year"
         },
-        "onUntil": "On now: {season}, until {date}.",
-        "nextFrom": "Next: {season}, from {date}.",
-        "offForAll": "An administrator turned seasonal themes off for everyone on this Polaris.",
-        "theme": "Decorations",
-        "themeHint": "A mark beside the logo and a few things drifting across the top. The drifting ones are hidden when your system asks for less motion.",
-        "sounds": "Seasonal sounds",
-        "soundsHint": "The season's ring, message and alert sounds instead of the usual ones.",
+        "pack": "{season} sound pack",
+        "packHint": "Plays instead of the usual sounds until {date}. Turned off, it stays off until then.",
         "preview": "Play the {season} sounds",
         "notSaved": "Your choice could not be saved. Try again in a moment."
     }

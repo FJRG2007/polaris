@@ -1,6 +1,6 @@
 /**
  * Where the seasonal choices are kept: the operator's switch for the whole
- * deployment, and each account's own pair of switches.
+ * deployment, and the pack each account turned off.
  *
  * The deployment's is a setting that is only ever written to say no - absent is
  * on - so an install that predates it decorates like every other, and turning it
@@ -28,13 +28,13 @@ export const getSeasonalChoice = cache(async (userId: string): Promise<core.Seas
     return core.parseSeasonalPrefs(row?.seasonal);
 });
 
-/** Store a choice the caller has already validated. Merged over what is kept,
- *  so one switch saved never resets the other. */
+/** Store a choice the caller has already validated. It replaces what was kept:
+ *  an account only ever has one pack turned off, the one in force. */
 export async function saveSeasonalChoice(
     userId: string,
-    patch: core.SeasonalPrefs
+    choice: core.SeasonalPrefs
 ): Promise<core.SeasonalChoice> {
-    const next = { ...(await getSeasonalChoice(userId)), ...patch };
+    const next: core.SeasonalChoice = { mutedPack: choice.mutedPack };
     await prisma.user.update({ where: { id: userId }, data: { seasonal: JSON.stringify(next) } });
     return next;
 }

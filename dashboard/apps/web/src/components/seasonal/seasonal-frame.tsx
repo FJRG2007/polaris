@@ -2,8 +2,8 @@
 
 /**
  * The time of year, on the frame: a mark beside the logo, a few things drifting
- * down across the top of the page, and - for an account that asked - the
- * season's ring and chimes.
+ * down across the top of the page, and the season's sound pack - unless this
+ * account turned the pack in force off.
  *
  * The season is worked out here, on the reader's device, after the first paint:
  * a holiday is a date where somebody is sitting, and the server's clock does not
@@ -18,7 +18,7 @@
 import type { ReactNode } from "react";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { setSoundSeason } from "@/lib/sound-season";
-import { seasonOn, type Season } from "@polaris/core";
+import { packOn, seasonOn, type Season } from "@polaris/core";
 import { createContext, useContext, useEffect, useState } from "react";
 import { Ghost, Leaf, PartyPopper, Snowflake, Sparkles, type LucideIcon } from "lucide-react";
 
@@ -32,12 +32,21 @@ export function useDecorationSeason(): Season | null {
     return useContext(SeasonContext);
 }
 
-/** The season on the reader's calendar today, followed across midnight. Null
- *  until the page is in the browser. */
-export function useSeasonToday(): Season | null {
-    const [season, setSeason] = useState<Season | null>(null);
+/** The season on the reader's calendar today, and the run of the sound pack it
+ *  plays (see `packOn`), followed across midnight. Both null until the page is
+ *  in the browser. */
+export function useSeasonToday(): { season: Season | null; pack: string | null } {
+    const [today, setToday] = useState<{ season: Season | null; pack: string | null }>({
+        season: null,
+        pack: null
+    });
     useEffect(() => {
-        const look = () => setSeason(seasonOn(new Date()));
+        const look = () => {
+            const now = new Date();
+            const season = seasonOn(now);
+            const pack = packOn(now);
+            setToday((was) => (was.season === season && was.pack === pack ? was : { season, pack }));
+        };
         look();
         const timer = window.setInterval(look, RECHECK_MS);
         document.addEventListener("visibilitychange", look);
@@ -46,25 +55,23 @@ export function useSeasonToday(): Season | null {
             document.removeEventListener("visibilitychange", look);
         };
     }, []);
-    return season;
+    return today;
 }
 
 export function SeasonalFrame({
     allowed,
-    theme,
-    sounds,
+    mutedPack,
     children
 }: {
     /** The deployment's switch. Off is off for everybody. */
     allowed: boolean;
-    /** The account's switches. */
-    theme: boolean;
-    sounds: boolean;
+    /** The run of a sound pack this account turned off. */
+    mutedPack: string | null;
     children: ReactNode;
 }) {
-    const today = useSeasonToday();
-    const decoration = allowed && theme ? today : null;
-    const soundsOf = allowed && sounds ? today : null;
+    const { season: today, pack } = useSeasonToday();
+    const decoration = allowed ? today : null;
+    const soundsOf = allowed && pack !== mutedPack ? today : null;
 
     useEffect(() => {
         setSoundSeason(soundsOf);
