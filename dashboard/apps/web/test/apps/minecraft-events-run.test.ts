@@ -6230,15 +6230,51 @@ describe("spleef", () => {
         // No tool at all: the floor goes by itself.
         expect(world.sent.some((line) => line.includes("iron_shovel"))).toBe(false);
         expect(run.stage?.boxes.some((box) => box.block === spleef.WARN)).toBe(true);
+        // Taken in the game every tick by the pack, not on the slow look.
+        const arenaAt = spleef.arena(floor().options, run.stage!.origin!, run.stage!.origin!.y);
+        expect(world.packsOn.has(snowballPack.PACK_ID)).toBe(true);
+        for (const line of snowballPack.armLines(arenaAt, true)) expect(world.sent).toContain(line);
         expect(
-            world.sent.some(
-                (line) =>
-                    line.includes(`if block ~ ~-1 ~ ${spleef.FLOOR}`) &&
-                    line.endsWith(`run setblock ~ ~-1 ~ ${spleef.WARN}`)
-            )
-        ).toBe(true);
+            world.sent.some((line) => line.endsWith(`run setblock ~ ~-1 ~ ${spleef.WARN}`))
+        ).toBe(false);
         await events.cancelEvent("owner", SERVER);
         await play(4_200);
+        expect(
+            world.sent.some((line) => line.endsWith(`minecraft:air replace ${spleef.WARN}`))
+        ).toBe(true);
+        expect(state().stageLeftovers).toEqual([]);
+    });
+
+    it("lets nobody wait the others out: everybody glows, and the floors close in after a minute", async () => {
+        world.online = ["Ana", "Ben"];
+        setUp([floor()]);
+        await startArena("floor");
+        await play(2_100);
+        chat(["Ana", "join"], ["Ben", "join"]);
+        await play(44_000);
+        await play(8_000);
+        const run = state().run!;
+        const arenaAt = spleef.arena(floor().options, run.stage!.origin!, run.stage!.origin!.y);
+        expect(world.sent).toContain(spleef.GLOW);
+        const closing = () =>
+            world.sent.filter((line) => visible(line).includes("The floors are closing in"));
+        expect(closing()).toHaveLength(0);
+        // Ben drops a floor and waits there: a minute on, the floors close in.
+        world.at.Ben = [arenaAt.center.x, arenaAt.floors[1]! + 1, arenaAt.center.z];
+        await play(spleef.SHRINK_AFTER_MS + 4_000);
+        expect(world.inside.has("Ben")).toBe(true);
+        expect(closing()).toHaveLength(1);
+        for (const line of spleef.shrinkLines(arenaAt, 1)) expect(world.sent).toContain(line);
+        await play(10 * spleef.SHRINK_EVERY_MS);
+        // Told once, however many rings go.
+        expect(closing()).toHaveLength(1);
+        // Out: no longer glowing.
+        world.at.Ben = [arenaAt.center.x, arenaAt.floors.at(-1)! - 3, arenaAt.center.z];
+        await play(4_100);
+        expect(world.sent).toContain("effect clear Ben minecraft:glowing");
+        expect(state().run).toBeNull();
+        expect(world.sent).toContain("effect clear @a[tag=pe_in] minecraft:glowing");
+        // The red edge is the arena's: taken out with the rest.
         expect(
             world.sent.some((line) => line.endsWith(`minecraft:air replace ${spleef.WARN}`))
         ).toBe(true);

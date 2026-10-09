@@ -13,6 +13,13 @@
  *   next look, so standing still is falling;
  * - snowballs: a snowball breaks the snow it hits (`snowball-pack.ts`).
  *
+ * Nobody can wait the others out. Whoever dropped to a lower floor and
+ * crouched there, or kept to an untouched corner, used to make the rest dig
+ * the whole floor blind. So every player inside glows - seen through the snow
+ * - and from `SHRINK_AFTER_MS` after the start the floors close in from the
+ * walls, a ring every `SHRINK_EVERY_MS`, the next ring turning red first,
+ * until there is no floor left (`shrinkLines`).
+ *
  * Built only into air, taken out only where its own blocks still are.
  */
 
@@ -41,6 +48,14 @@ const NET_DROP = 4;
 const WALL_HEIGHT = 3;
 /** Room above the top floor for jumping about. */
 const HEADROOM = 5;
+
+/** When the floors start closing in, after the start. */
+export const SHRINK_AFTER_MS = 60_000;
+/** How often the next ring of every floor goes once they do. */
+export const SHRINK_EVERY_MS = 3_000;
+/** Glowing for whoever is inside, given again on every look and gone a moment
+ *  after the last, so nobody keeps it once they are out - online or not. */
+export const GLOW = "effect give @a[tag=pe_in] minecraft:glowing 4 0 true";
 
 export const VARIANTS = SPLEEF_VARIANTS;
 export type Variant = (typeof VARIANTS)[number];
@@ -182,15 +197,17 @@ export function warnBoxes(arena: Arena): Box[] {
 /**
  * One look of the decay game: the red snow of the last look gone, and the snow
  * under each player still in it turned red - only inside the arena's own
- * floors, only where it is still the arena's snow.
+ * floors, only where it is still the arena's snow. With `rings` closed in, the
+ * red ring the floors close in to next is left for `shrinkLines` to take.
  */
-export function decayLines(arena: Arena, inArena: string): string[] {
+export function decayLines(arena: Arena, inArena: string, rings = 0): string[] {
     const r = arena.size;
     const { x, z } = arena.center;
+    const s = rings > 0 ? r - rings - 1 : r;
     return [
-        ...(arena.floors ?? [arena.floor]).map(
+        ...(s < 0 ? [] : (arena.floors ?? [arena.floor])).map(
             (at) =>
-                `execute in minecraft:overworld run fill ${x - r} ${at} ${z - r} ${x + r} ${at} ${z + r} minecraft:air replace ${WARN}`
+                `execute in minecraft:overworld run fill ${x - s} ${at} ${z - s} ${x + s} ${at} ${z + s} minecraft:air replace ${WARN}`
         ),
         `execute in minecraft:overworld as @a[tag=${inArena}] at @s if block ~ ~-1 ~ ${FLOOR} if entity @s[x=${x - r},dx=${2 * r},z=${z - r},dz=${2 * r},y=${arena.floors?.at(-1) ?? arena.floor},dy=${arena.floor - (arena.floors?.at(-1) ?? arena.floor) + 2}] run setblock ~ ~-1 ~ ${WARN}`
     ];
@@ -198,3 +215,66 @@ export function decayLines(arena: Arena, inArena: string): string[] {
 
 /** How many snowballs a player is topped up to in the snowball game. */
 export const SNOWBALLS = 16;
+
+/** How many rings of every floor have gone `elapsed` after the start, from the
+ *  wall in: none before `SHRINK_AFTER_MS`, then one more each `SHRINK_EVERY_MS`. */
+export function shrunk(elapsed: number): number {
+    if (elapsed < SHRINK_AFTER_MS) return 0;
+    return Math.floor((elapsed - SHRINK_AFTER_MS) / SHRINK_EVERY_MS) + 1;
+}
+
+/**
+ * Every floor with its outer `rings` gone and the ring inside them turned red,
+ * as a warning - only the arena's own snow, white or red, is ever touched, so
+ * the walls and a floor already dug stay as they are. Everything gone up to
+ * here goes again on every look, so a missed look is caught up on the next.
+ * With every ring gone, so is the middle.
+ */
+export function shrinkLines(arena: Arena, rings: number): string[] {
+    if (rings <= 0) return [];
+    const r = arena.size;
+    const { x, z } = arena.center;
+    const lines: string[] = [];
+    const fill = (
+        x1: number,
+        z1: number,
+        x2: number,
+        z2: number,
+        at: number,
+        to: string,
+        from: string
+    ) =>
+        `execute in minecraft:overworld run fill ${x1} ${at} ${z1} ${x2} ${at} ${z2} ${to} replace ${from}`;
+    for (const at of arena.floors ?? [arena.floor]) {
+        if (rings > r) {
+            for (const block of [FLOOR, WARN])
+                lines.push(fill(x - r, z - r, x + r, z + r, at, "minecraft:air", block));
+            continue;
+        }
+        const t = rings;
+        // The band `t` wide inside the walls: west and east whole, north and
+        // south between them.
+        const band: [number, number, number, number][] = [
+            [x - r, z - r, x - r + t - 1, z + r],
+            [x + r - t + 1, z - r, x + r, z + r],
+            [x - r + t, z - r, x + r - t, z - r + t - 1],
+            [x - r + t, z + r - t + 1, x + r - t, z + r]
+        ];
+        for (const [x1, z1, x2, z2] of band)
+            for (const block of [FLOOR, WARN])
+                lines.push(fill(x1, z1, x2, z2, at, "minecraft:air", block));
+        // The next ring, red.
+        const n = r - t;
+        const ring: [number, number, number, number][] =
+            n === 0
+                ? [[x, z, x, z]]
+                : [
+                      [x - n, z - n, x - n, z + n],
+                      [x + n, z - n, x + n, z + n],
+                      [x - n + 1, z - n, x + n - 1, z - n],
+                      [x - n + 1, z + n, x + n - 1, z + n]
+                  ];
+        for (const [x1, z1, x2, z2] of ring) lines.push(fill(x1, z1, x2, z2, at, WARN, FLOOR));
+    }
+    return lines;
+}

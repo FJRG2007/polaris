@@ -49,6 +49,8 @@ export interface StageLoop {
     readonly language: speech.Speech;
     /** Whether the snowball pack is on, once it has been looked at this run. */
     snowballPack?: boolean;
+    /** Whether a spleef's players were told its floors are closing in. */
+    shrinkTold?: boolean;
     /** How a boat race hands out boats on this server, once looked at. */
     boatWay?: boatRace.BoatWay;
 }
@@ -1610,9 +1612,11 @@ async function spleefTick(
               loop.run.id,
               (loop.run.preset.options as catalog.EventOptions<"spleef">).variants
           );
-    // Snowballs break the floor through a data pack, put on while everybody is
-    // still getting ready: taking it in pauses the game for a moment.
-    if (!current.armed && variant === "snowballs" && loop.snowballPack === undefined) {
+    // Snowballs break the floor, and the decay game takes it, through a data
+    // pack put on while everybody is still getting ready: taking it in pauses
+    // the game for a moment.
+    const packed = variant === "snowballs" || variant === "decay";
+    if (!current.armed && packed && loop.snowballPack === undefined) {
         loop.snowballPack = await snowballPackService.ensurePack(server).catch((error) => {
             console.warn("polaris: the snowball pack could not be put on", String(error));
             return false;
@@ -1622,10 +1626,10 @@ async function spleefTick(
     }
     if (!current.armed && current.goAt !== null && now >= current.goAt) {
         const { items } = await tools.flavour();
-        // The decay game's red snow is the arena's too: written down before any
-        // is made, so whatever ends it takes it out with the rest.
-        if (variant === "decay")
-            change(loop, { boxes: [...current.boxes, ...spleef.warnBoxes(floor)] });
+        // Red snow - the decay game's, and the edge about to go when the floors
+        // close in - is the arena's too: written down before any is made, so
+        // whatever ends it takes it out with the rest.
+        if (variant) change(loop, { boxes: [...current.boxes, ...spleef.warnBoxes(floor)] });
         for (const racer of current.racers) {
             if (racer.outAt !== null) continue;
             if (variant === "shovel") await handShovel(server, tools, racer.name, items);
@@ -1638,20 +1642,42 @@ async function spleefTick(
             );
         }
         if (variant === "snowballs") lines.push(...snowballPack.armLines(floor));
+        if (variant === "decay" && loop.snowballPack)
+            lines.push(...snowballPack.armLines(floor, true));
         if (tnt) lines.push(...tntRun.armLines(floor));
         change(loop, { armed: true });
         dirty = true;
     } else if (current.armed && tnt) {
         // A primed block taken out over RCON too, should the pack miss one.
         lines.push(tntRun.primedOut(volume));
-    } else if (current.armed && variant === "decay") {
-        lines.push(...spleef.decayLines(floor, stage.IN_ARENA));
+    } else if (current.armed && variant === "decay" && loop.snowballPack !== true) {
+        // No pack: the snow is taken on each look instead, slower.
+        const rings = current.goAt === null ? 0 : spleef.shrunk(now - current.goAt);
+        lines.push(...spleef.decayLines(floor, stage.IN_ARENA, rings));
     } else if (current.armed && variant === "snowballs" && Math.floor(now / 1000) % 10 < 2) {
         // Topped up every ten seconds or so: nobody runs out for long.
         const { items } = await tools.flavour();
         for (const racer of current.racers)
             if (racer.outAt === null)
                 lines.push(...stage.markedSnowballs(racer.name, items, spleef.SNOWBALLS));
+    }
+
+    // Nobody waits the others out: everybody glows, and after a while the
+    // floors close in.
+    if (variant && state(loop).armed && current.goAt !== null) {
+        lines.push(spleef.GLOW);
+        const rings = spleef.shrunk(now - current.goAt);
+        if (rings > 0 && !loop.shrinkTold) {
+            loop.shrinkTold = true;
+            lines.push(commands.say(messages.tag(language) + messages.spleefShrinking(language)));
+            for (const racer of state(loop).racers)
+                if (racer.outAt === null)
+                    lines.push(
+                        `title ${racer.name} subtitle ${commands.text(" ")}`,
+                        `title ${racer.name} title ${commands.text(messages.spleefShrinkingTitle(language))}`
+                    );
+        }
+        lines.push(...spleef.shrinkLines(floor, rings));
     }
 
     const out: string[] = [];
@@ -1694,7 +1720,8 @@ async function spleefTick(
             lines.push(
                 commands.say(messages.tag(language) + messages.spleefOut(name, left, language)),
                 `title ${name} subtitle ${commands.text(" ")}`,
-                `title ${name} title ${commands.text(messages.spleefOutTitle(language))}`
+                `title ${name} title ${commands.text(messages.spleefOutTitle(language))}`,
+                ...(variant ? [`effect clear ${name} minecraft:glowing`] : [])
             );
         }
         dirty = true;
@@ -1722,7 +1749,8 @@ async function spleefTick(
     if (dirty) await tools.persist();
     if (!state(loop).armed || standing.length > 1) return null;
     const winner = standing[0];
-    if (variant === "snowballs") lines.push(...snowballPack.stopLines(floor.boxes));
+    if (packed) lines.push(...snowballPack.stopLines(floor.boxes));
+    if (variant) lines.push("effect clear @a[tag=pe_in] minecraft:glowing");
     if (tnt) lines.push(...tntRun.stopLines(floor.boxes));
     if (!winner) {
         lines.push(commands.say(messages.tag(language) + messages.nobodyStanding(language)));

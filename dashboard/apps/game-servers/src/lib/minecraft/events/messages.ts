@@ -1207,6 +1207,16 @@ export function spleefOut(name: string, left: number, language: Language): strin
         : `${BAD}${mark(name, BAD)} is out. ${INFO}${mark(left, INFO)} left.`;
 }
 
+export function spleefShrinking(language: Language): string {
+    return language === "es"
+        ? `${WARN}La pista se cierra: el borde rojo cae el siguiente.`
+        : `${WARN}The floors are closing in: the red edge goes next.`;
+}
+
+export function spleefShrinkingTitle(language: Language): string {
+    return language === "es" ? "&c&l¡Se cierra!" : "&c&lClosing in!";
+}
+
 export function spleefOutTitle(language: Language): string {
     return language === "es" ? "&cHas caído" : "&cYou are out";
 }

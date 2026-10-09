@@ -2208,10 +2208,13 @@ describe("a spleef floor", () => {
                 );
         }
         const fn = (name: string) => files.get(`data/polaris/function/spleef/${name}.mcfunction`)!;
-        // Off unless switched on, and only snowballs in the overworld.
-        expect(fn("tick")).toBe(
-            "execute if score #on polaris_spleef matches 1 in minecraft:overworld as @e[type=minecraft:snowball,distance=0..] run function polaris:spleef/ball\n"
-        );
+        // Off unless switched on, and only snowballs in the overworld - the
+        // decay game only behind its own switch.
+        expect(fn("tick").split("\n")).toEqual([
+            "execute if score #on polaris_spleef matches 1 in minecraft:overworld as @e[type=minecraft:snowball,distance=0..] run function polaris:spleef/ball",
+            "execute if score #on polaris_spleef matches 1 if score #decay polaris_spleef matches 1 run function polaris:spleef/decay",
+            ""
+        ]);
         // Followed only close round the box; gravity is taken off before it is
         // followed, and a tick's flight is tried a quarter further than it goes.
         expect(fn("ball")).toContain(
@@ -2276,6 +2279,8 @@ describe("a spleef floor", () => {
         const ours = `if score #x1 polaris_spleef matches ${-8 * 64} if score #y1 polaris_spleef matches ${bottom * 64} if score #z1 polaris_spleef matches ${35 * 64}`;
         expect(snowballPack.stopLines(floor.boxes)).toEqual([
             `execute ${ours} run kill @e[type=minecraft:armor_stand,tag=polaris_spleef_probe]`,
+            `execute ${ours} run kill @e[type=minecraft:armor_stand,tag=polaris_spleef_fuse]`,
+            `execute ${ours} run scoreboard players set #decay polaris_spleef 0`,
             `execute ${ours} run scoreboard players set #on polaris_spleef 0`
         ]);
         // Nothing for an arena with no snow.
@@ -2291,6 +2296,131 @@ describe("a spleef floor", () => {
             snowballPack.packEnabled("There are 1 data pack(s) enabled: [vanilla (built-in)]")
         ).toBe(false);
     });
+    it("plays the decay game in the pack only when armed for it, taking only red snow after its fuse", () => {
+        const floor = spleef.arena(
+            { place: { mode: "players" }, size: 5, height: 30 },
+            { x: -3, z: 40 },
+            100
+        );
+        const bottom = floor.floors.at(-1)!;
+        // A snowball game never decays; a decay game is switched to it.
+        expect(snowballPack.armLines(floor)).toContain(
+            "scoreboard players set #decay polaris_spleef 0"
+        );
+        const lines = snowballPack.armLines(floor, true);
+        expect(lines).toContain("scoreboard players set #decay polaris_spleef 1");
+        expect(lines.at(-1)).toBe("scoreboard players set #on polaris_spleef 1");
+        // A player's feet count from the lowest floor to a jump over the top one.
+        expect(lines).toContain(`scoreboard players set #fy1 polaris_spleef ${bottom * 64}`);
+        expect(lines).toContain(
+            `scoreboard players set #fy2 polaris_spleef ${(100 + 3 + 1) * 64 - 1}`
+        );
+        // Fuses of an earlier game never take this one's snow.
+        expect(lines).toContain("kill @e[type=minecraft:armor_stand,tag=polaris_spleef_fuse]");
+
+        const files = snowballPack.packFiles();
+        const fn = (name: string) =>
+            files.get(`data/polaris/function/spleef/${name}.mcfunction`)!.trim().split("\n");
+        expect(fn("tick")[1]).toBe(
+            "execute if score #on polaris_spleef matches 1 if score #decay polaris_spleef matches 1 run function polaris:spleef/decay"
+        );
+        // Each corner of the feet: a fuse, then red - only on white snow, so a
+        // block two corners share gets one fuse.
+        const under = fn("under");
+        expect(under).toHaveLength(4 * 2 + 2);
+        for (let corner = 0; corner < 4; corner += 1) {
+            expect(under[corner * 2]).toContain(`if block ~ ~ ~ ${spleef.FLOOR} run summon`);
+            expect(under[corner * 2 + 1]).toContain(
+                `if block ~ ~ ~ ${spleef.FLOOR} run setblock ~ ~ ~ ${spleef.WARN}`
+            );
+        }
+        expect(under.at(-2)).toBe(
+            `scoreboard players set @e[type=minecraft:armor_stand,tag=polaris_spleef_new] polaris_spleef ${snowballPack.DECAY_TICKS}`
+        );
+        // Gone only where it is still red.
+        expect(fn("gone")[0]).toBe(`fill ~ ~ ~ ~ ~ ~ minecraft:air replace ${spleef.WARN}`);
+        expect(fn("decay")[0]).toBe(
+            "scoreboard players remove @e[type=minecraft:armor_stand,tag=polaris_spleef_fuse] polaris_spleef 1"
+        );
+    });
+
+    it("closes the floors in from the walls, a red ring ahead, until nothing is left", () => {
+        const size = 4;
+        const floor = spleef.arena(
+            { place: { mode: "players" }, size, height: 30 },
+            { x: 10, z: -20 },
+            80
+        );
+        expect(spleef.shrunk(spleef.SHRINK_AFTER_MS - 1)).toBe(0);
+        expect(spleef.shrinkLines(floor, 0)).toEqual([]);
+        expect(spleef.shrunk(spleef.SHRINK_AFTER_MS)).toBe(1);
+        expect(spleef.shrunk(spleef.SHRINK_AFTER_MS + 2 * spleef.SHRINK_EVERY_MS)).toBe(3);
+
+        // Played out on a grid of one floor: white snow everywhere to start.
+        type Cell = "snow" | "red" | "air";
+        const at = floor.floors[0]!;
+        const apply = (grid: Map<string, Cell>, lines: string[]) => {
+            for (const line of lines) {
+                const m =
+                    /fill (-?\d+) (-?\d+) (-?\d+) (-?\d+) (-?\d+) (-?\d+) (\S+) replace (\S+)$/.exec(
+                        line
+                    );
+                expect(m).not.toBeNull();
+                const [x1, y1, z1, x2, y2, z2] = m!.slice(1, 7).map(Number) as number[];
+                expect(y1).toBe(y2);
+                if (y1 !== at) continue;
+                const to: Cell = m![7] === spleef.WARN ? "red" : "air";
+                const from: Cell = m![8] === spleef.WARN ? "red" : "snow";
+                for (let x = Math.min(x1!, x2!); x <= Math.max(x1!, x2!); x += 1)
+                    for (let z = Math.min(z1!, z2!); z <= Math.max(z1!, z2!); z += 1) {
+                        const key = `${x},${z}`;
+                        if (grid.get(key) === from) grid.set(key, to);
+                    }
+            }
+        };
+        const fresh = () => {
+            const grid = new Map<string, Cell>();
+            for (let x = 10 - size; x <= 10 + size; x += 1)
+                for (let z = -20 - size; z <= -20 + size; z += 1) grid.set(`${x},${z}`, "snow");
+            return grid;
+        };
+        for (let rings = 1; rings <= size + 1; rings += 1) {
+            const grid = fresh();
+            apply(grid, spleef.shrinkLines(floor, rings));
+            for (const [key, cell] of grid) {
+                const [x, z] = key.split(",").map(Number) as [number, number];
+                const ring = size - Math.max(Math.abs(x - 10), Math.abs(z + 20));
+                // Ring 0 is against the wall.
+                const want: Cell =
+                    rings > size || ring < rings ? "air" : ring === rings ? "red" : "snow";
+                expect(cell, `${rings} rings at ${key}`).toBe(want);
+            }
+        }
+        // A look missed is caught up: two looks' rings at once leave what two looks would.
+        const late = fresh();
+        apply(late, spleef.shrinkLines(floor, 3));
+        const step = fresh();
+        for (const rings of [1, 2, 3]) apply(step, spleef.shrinkLines(floor, rings));
+        expect([...late]).toEqual([...step]);
+        // A decay look over RCON never takes the red ring ahead of its time.
+        const sweeps = (rings: number) =>
+            spleef.decayLines(floor, "in", rings).filter((line) => line.includes(" run fill "));
+        for (let rings = 1; rings <= size + 1; rings += 1) {
+            const shrunk = fresh();
+            apply(shrunk, spleef.shrinkLines(floor, rings));
+            const decayed = fresh();
+            apply(decayed, spleef.shrinkLines(floor, rings));
+            apply(decayed, sweeps(rings));
+            expect([...decayed], `${rings} rings`).toEqual([...shrunk]);
+        }
+        expect(sweeps(0)).toHaveLength(floor.floors.length);
+        // Every floor closes in.
+        for (const each of floor.floors)
+            expect(spleef.shrinkLines(floor, 1).some((line) => line.includes(` ${each} `))).toBe(
+                true
+            );
+    });
+
     it("spreads players over the snow, never onto a wall", () => {
         const floor = spleef.arena(
             { place: { mode: "players" }, size: 5, height: 30 },
