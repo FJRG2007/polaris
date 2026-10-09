@@ -41,6 +41,7 @@ import * as dropper from "./kinds/dropper";
 import * as boatRace from "./kinds/boat-race";
 import * as netherMaze from "./kinds/nether-maze";
 import * as acidRain from "./kinds/acid-rain";
+import * as elytraRace from "./kinds/elytra-race";
 import { withTimeout } from "@polaris/core";
 import * as gather from "./kinds/gathering";
 import * as hunt from "./kinds/treasure-hunt";
@@ -1031,6 +1032,7 @@ function startLoop(
         run.preset.kind === "dropper" ||
         run.preset.kind === "boat-race" ||
         run.preset.kind === "nether-maze" ||
+        run.preset.kind === "elytra-race" ||
         run.preset.kind === "team-duel" ||
         arenaService.quickens(run.preset)
     ) {
@@ -1792,6 +1794,7 @@ async function play(
         case "boat-race":
         case "nether-maze":
         case "acid-rain":
+        case "elytra-race":
             decided = await stageService.stageTick(
                 loop,
                 server,
@@ -4705,6 +4708,9 @@ export function cleanupOf(run: stored.EventRun): string[] {
             break;
         case "acid-rain":
             after.push(...acidRain.SCORES_REMOVED);
+            break;
+        case "elytra-race":
+            after.push(...elytraRace.SCORES_REMOVED);
             break;
         case "rare-catch":
             after.push(...rareCatch.catchCleanup());

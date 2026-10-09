@@ -51,11 +51,13 @@ describe("a kind added in an update", () => {
             "bingo",
             "boss-fishing",
             "nether-maze",
-            "acid-rain"
+            "acid-rain",
+            "elytra-race"
         ]);
         expect(added.find((one) => one.kind === "hot-potato")?.name).toBe("Patata bomba");
         expect(added.find((one) => one.kind === "nether-maze")?.name).toBe("Laberintos mortales");
         expect(added.find((one) => one.kind === "acid-rain")?.name).toBe("Lluvia ácida");
+        expect(added.find((one) => one.kind === "elytra-race")?.name).toBe("Carrera aérea");
         expect(read.settings.defaults).toBe(catalog.DEFAULTS_VERSION);
         // Saved since: one deleted after that stays deleted.
         expect(
@@ -71,8 +73,9 @@ describe("a kind added in an update", () => {
                 .readEventsConfig(saved(version, []))
                 .presets.filter((one) => one.id.startsWith("default-"))
                 .map((one) => one.kind);
-        expect(added(3)).toEqual(["nether-maze", "acid-rain"]);
-        expect(added(4)).toEqual(["acid-rain"]);
+        expect(added(3)).toEqual(["nether-maze", "acid-rain", "elytra-race"]);
+        expect(added(4)).toEqual(["acid-rain", "elytra-race"]);
+        expect(added(5)).toEqual(["elytra-race"]);
     });
 
     it("joins the draw only where the draw took every event the server had", () => {
@@ -82,7 +85,7 @@ describe("a kind added in an update", () => {
                 { presetId: "quiz", weight: 2 }
             ])
         );
-        expect(all.settings.random.pool).toHaveLength(14);
+        expect(all.settings.random.pool).toHaveLength(15);
         expect(all.settings.random.pool.every((entry) => entry.weight === 2)).toBe(true);
         const some = catalog.readEventsConfig(saved(2, [{ presetId: "fish", weight: 1 }]));
         expect(some.settings.random.pool).toEqual([{ presetId: "fish", weight: 1 }]);

@@ -137,6 +137,8 @@ Rare catch, Bingo rush, Boss fishing) leave the world alone.
 | Hide and seek                                                  | day   | clear   |
 | SkyWars                                                        | day   | clear   |
 | TNT run, Dropper, Ice boat race, Nether maze                   | day   | clear   |
+| Elytra race                                                    | day   | clear   |
+| Acid rain                                                      | day   | -       |
 | Treasure hunt, Supply drop, Explorer, Gathering                | day   | clear   |
 | Horde defense, Villager defense, Mob hunt, Meteor shower       | night | clear   |
 | Blood moon                                                     | night | rain    |
@@ -280,6 +282,20 @@ left out.
   wins; at the end of the time, the driest. What players placed and what the
   rain left is taken out by sweep boxes over the inside, written down at "Go!".
   Needs 1.17, for `spreadplayers ... under`.
+- **Elytra race** (`elytra-race`) is a loop of rings in the sky, 40 to 80
+  blocks over the ground, taken from an ice boat race's track
+  (`boat-race.laidOut`): rings over its points, each facing one of the four ways,
+  chosen so that the straight line from every ring to the next crosses both
+  squarely (`elytra-race.SQUARE`, at most 60 degrees off), climbs at most a
+  quarter of its length, and passes no other frame or pillar. A track no rings
+  fit is drawn again, then the plain one. Racers wait on a glass pad behind the
+  start ring; at "Go!" its floor goes, and each wears a marked, unbreakable
+  elytra and holds three marked rockets. A ring passed gives one more rocket, a
+  yellow glass booster on each leg two; the quick look hands them out one at a
+  time and puts back behind their last ring whoever fell under the course,
+  landed, or flew a ring out of turn. Laps and checkpoints are counted by the
+  events data pack, as in the boat race. The wings and rockets are taken back
+  at the end, on leaving and on coming back. Needs 1.17, to put the elytra on.
 - **King of the ring** (`king-of-the-hill` in code and saved settings; it was
   called King of the hill before it moved into the air) with fists only is a
   platform floating `hill.LIFT` over whatever is under it. Off the ring Poison
@@ -786,6 +802,7 @@ Everything below is part of the arena's own boxes: built into air with
 | Ice boat race    | packed ice, white walls with a glass rail and lights, an arch over each gate                                                                                                                                                    |
 | Nether maze      | netherrack walls and roof, glowstone over every other room, a nether-brick starting room and a quartz floor at the goal                                                                                                         |
 | Acid rain        | mossy stone floor with a sea lantern in each corner, glass walls, an invisible roof, cobblestone huts                                                                                                                           |
+| Elytra race      | orange concrete rings, a white start ring lit at its corners, yellow glass boosters, magenta pillars                                                                                                                            |
 | Parkour          | the course's theme, a light under every checkpoint                                                                                                                                                                              |
 | King of the ring | polished stone edge, sea lanterns at the corners, the circle drawn in yellow                                                                                                                                                    |
 | Build battle     | a stone curb between plots and glowstone where the lines meet, at floor level                                                                                                                                                   |

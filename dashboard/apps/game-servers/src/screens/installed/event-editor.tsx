@@ -39,6 +39,7 @@ import {
     BoatRaceFields,
     CaptureTheFlagFields,
     DropperFields,
+    ElytraRaceFields,
     HideAndSeekFields,
     HotPotatoFields,
     NetherMazeFields,
@@ -1130,6 +1131,14 @@ function OptionsFields({
             return (
                 <NetherMazeFields
                     value={preset.options as catalog.EventOptions<"nether-maze">}
+                    onChange={onChange}
+                    issues={issues}
+                />
+            );
+        case "elytra-race":
+            return (
+                <ElytraRaceFields
+                    value={preset.options as catalog.EventOptions<"elytra-race">}
                     onChange={onChange}
                     issues={issues}
                 />

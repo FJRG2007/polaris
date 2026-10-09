@@ -42,6 +42,7 @@ import * as secretPanels from "./secret-panels";
 import * as boatRace from "./boat-race";
 import * as netherMaze from "./nether-maze";
 import * as acidRain from "./acid-rain";
+import * as elytraRace from "./elytra-race";
 import { FLOOR, WARN, type Arena } from "./spleef";
 
 /** The pack's folder under the world's `datapacks`, and its id in `/datapack`. */
@@ -207,6 +208,7 @@ const GAMES: readonly (readonly [string, Readonly<Record<string, readonly string
     ["boat", boatRace.FUNCTIONS],
     ["maze", netherMaze.FUNCTIONS],
     ["acid", acidRain.FUNCTIONS],
+    ["elytra", elytraRace.FUNCTIONS],
     ["hit", hits.FUNCTIONS],
     ["door", doors.FUNCTIONS],
     ["panel", secretPanels.FUNCTIONS]

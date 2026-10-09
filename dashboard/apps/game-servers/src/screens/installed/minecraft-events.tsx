@@ -430,6 +430,18 @@ function stageFacts(t: GameText<"minecraft">, preset: catalog.EventPreset): stri
                 })
             ];
         }
+        case "elytra-race": {
+            const options = preset.options as catalog.EventOptions<"elytra-race">;
+            return [
+                t("events.facts.elytraRace", {
+                    laps: options.laps,
+                    obstacles: t(
+                        `events.elytraObstacles.${options.obstacles}` as GameKey<"minecraft">
+                    ),
+                    height: options.height
+                })
+            ];
+        }
         case "acid-rain": {
             const options = preset.options as catalog.EventOptions<"acid-rain">;
             return [
@@ -474,6 +486,8 @@ function stageItemsFact(t: GameText<"minecraft">, preset: catalog.EventPreset): 
             return t("events.facts.netherMazeSafe");
         case "acid-rain":
             return t("events.facts.acidRainSafe");
+        case "elytra-race":
+            return t("events.facts.elytraRaceSafe");
         default:
             return t("events.facts.parkourItems");
     }

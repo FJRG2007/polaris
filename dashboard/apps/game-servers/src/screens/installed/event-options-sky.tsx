@@ -56,6 +56,14 @@ const ACIDITY_LABELS: Readonly<Record<(typeof catalog.ACIDITIES)[number], GameKe
     harsh: "editor.labels.acidity.harsh"
 };
 
+const ELYTRA_OBSTACLE_LABELS: Readonly<
+    Record<(typeof catalog.ELYTRA_OBSTACLES)[number], GameKey<"minecraft">>
+> = {
+    none: "editor.labels.elytraObstacles.none",
+    few: "editor.labels.elytraObstacles.few",
+    many: "editor.labels.elytraObstacles.many"
+};
+
 const LOOT_LABELS: Readonly<Record<(typeof catalog.SKY_WARS_LOOT)[number], GameKey<"minecraft">>> =
     {
         normal: "editor.labels.skyWarsLoot.normal",
@@ -355,6 +363,61 @@ export function AcidRainFields({
                     value={value.height}
                     onChange={(height) => onChange({ ...value, height })}
                     issues={issues}
+                />
+            </div>
+        </>
+    );
+}
+
+export function ElytraRaceFields({
+    value,
+    onChange,
+    issues
+}: {
+    value: catalog.EventOptions<"elytra-race">;
+    onChange: (options: catalog.EventOptions<"elytra-race">) => void;
+    issues: Issues;
+}) {
+    const t = useGameText("minecraft");
+    return (
+        <>
+            <PlaceField
+                value={value.place}
+                onChange={(place) => onChange({ ...value, place })}
+                what={t("editor.place.elytra")}
+                issues={issues}
+                path={["options", "place"]}
+            />
+            <div className="grid grid-cols-2 gap-3">
+                <NumberField
+                    label={t("editor.elytraLaps")}
+                    hint={t("editor.range", { min: 1, max: 3 })}
+                    min={1}
+                    max={3}
+                    value={value.laps}
+                    onChange={(laps) => onChange({ ...value, laps })}
+                    issues={issues}
+                    field="laps"
+                />
+                <Field label={t("editor.elytraObstacles")} hint={t("editor.elytraObstaclesHint")}>
+                    <Select
+                        value={value.obstacles}
+                        onValueChange={(obstacles) =>
+                            onChange({ ...value, obstacles: obstacles as typeof value.obstacles })
+                        }
+                        options={options(t, ELYTRA_OBSTACLE_LABELS)}
+                        aria-label={t("editor.elytraObstacles")}
+                    />
+                </Field>
+                <NumberField
+                    label={t("editor.heightBlocks")}
+                    hint={t("editor.range", { min: 40, max: 80 })}
+                    min={40}
+                    max={80}
+                    value={value.height}
+                    onChange={(height) => onChange({ ...value, height })}
+                    issues={issues}
+                    field="height"
                 />
             </div>
         </>
