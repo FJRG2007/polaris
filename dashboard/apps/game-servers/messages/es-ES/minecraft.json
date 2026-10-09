@@ -1763,6 +1763,11 @@
                 "label": "Pesca del jefe",
                 "summary": "Un pez legendario muerde el anzuelo y todos los que pescan lo agotan: cada captura le quita fuerza en la barra del jefe, y un tesoro le quita más. Sacadlo a tiempo y gana quien más haya pescado; si se escapa, no gana nadie.",
                 "unit": "capturas"
+            },
+            "nether-maze": {
+                "label": "Laberintos mortales",
+                "summary": "Se construye en el aire un laberinto techado de netherrack, distinto cada vez. Se sale desde su puerta y gana quien llegue antes a la sala iluminada del centro. El fuego, el magma y la lava no hacen daño, pero tocarlos te devuelve a la salida.",
+                "unit": "salas"
             }
         },
         "triggers": {
@@ -1865,7 +1870,9 @@
             "wavesScaling": "Cada oleada trae el tamaño de la primera, la mitad más por cada oleada anterior y por cada defensor en el punto después del primero (hasta 5), como mucho 60. Cada defensor después del primero da a cada monstruo 4 de vida más (hasta 16), y desde 3 defensores golpean más fuerte.",
             "wavesGear": "La armadura crece oleada a oleada, de nada a cuero, cota de malla, hierro y diamante en la última, con arcos y espadas encantados en las dos últimas. Los jinetes arácnidos llegan desde el 40% de las oleadas, los jinetes de pollo desde el 60% y los jinetes a caballo desde el 80%. Nada de lo que llevan o montan se suelta nunca, y todo se retira.",
             "gatheringRounds": "{rounds} {rounds, plural, one {ronda} other {rondas}} de {minutes} {minutes, plural, one {minuto} other {minutos}}. Cada objeto vale puntos según lo que cuesta conseguirlo - una piedra 1, un tronco 4, un lingote de hierro 12 - y gana quien más puntos sume en todas las rondas.",
-            "world": "{time, select, day {Mantiene el mediodía} night {Mantiene la medianoche} other {No toca la hora}}{weather, select, clear { y el cielo despejado} rain { y la lluvia} other {}} mientras dura, y luego devuelve la hora y deja que el tiempo vuelva a cambiar."
+            "world": "{time, select, day {Mantiene el mediodía} night {Mantiene la medianoche} other {No toca la hora}}{weather, select, clear { y el cielo despejado} rain { y la lluvia} other {}} mientras dura, y luego devuelve la hora y deja que el tiempo vuelva a cambiar.",
+            "netherMaze": "Un laberinto {size} a unos {height} bloques de altura, con {hazards} de sus salas con fuego, magma o un foso de lava. Muros de dos bloques y techo macizo: no se puede escalar ni ver por encima, y todas las salas se alcanzan sin tocar un peligro.",
+            "netherMazeSafe": "No se tocan los objetos de nadie y nadie recibe daño. La vista de cuevas y el radar del minimapa se apagan para quien juega. Los peligros los vigila un pequeño data pack que Polaris añade al mundo."
         },
         "errors": {
             "read": "No se pudieron leer los eventos",
@@ -2049,6 +2056,16 @@
             "loot": "El botín elegido solo existe desde Minecraft {needs}; este servidor tiene la {version}.",
             "ores": "La mena elegida solo existe desde Minecraft {needs}; este servidor tiene la {version}.",
             "material": "El material elegido solo existe desde Minecraft {needs}; este servidor tiene la {version}."
+        },
+        "mazeSizes": {
+            "small": "pequeño",
+            "medium": "mediano",
+            "large": "grande"
+        },
+        "mazeHazards": {
+            "few": "pocas",
+            "some": "algunas",
+            "many": "muchas"
         }
     },
     "editor": {
@@ -2256,6 +2273,16 @@
             "bingoGoal": {
                 "line": "La primera línea",
                 "card": "El cartón entero"
+            },
+            "mazeSize": {
+                "small": "Pequeño: 7 por 7 salas",
+                "medium": "Mediano: 11 por 11 salas",
+                "large": "Grande: 15 por 15 salas"
+            },
+            "mazeHazards": {
+                "few": "Pocos",
+                "some": "Algunos",
+                "many": "Muchos"
             }
         },
         "place": {
@@ -2271,7 +2298,8 @@
             "track": "La pista se construye 30 bloques en alto, a unos 30 bloques de un jugador que esté en el mundo normal cuando empiece.",
             "shaft": "El pozo se construye en el aire, a unos 30 bloques de un jugador que esté en el mundo normal cuando empiece.",
             "islands": "Las islas se construyen 30 bloques en alto, a unos 30 bloques de un jugador que esté en el mundo normal cuando empiece.",
-            "villager": "El aldeano se coloca a unos 50 bloques de un jugador que esté en el mundo normal cuando empiece."
+            "villager": "El aldeano se coloca a unos 50 bloques de un jugador que esté en el mundo normal cuando empiece.",
+            "maze": "El laberinto se construye a 30 bloques de altura, a unos 30 bloques de un jugador que esté en el mundo normal cuando empiece."
         },
         "floorSizeHint": "De 5 a 15: este mide {size} por {size}.",
         "range": "De {min} a {max}",
@@ -2343,7 +2371,10 @@
         "bingoItems": "Objetos del cartón",
         "bingoItemsHint": "Fácil: se encuentran en los primeros minutos. Difícil: piden ir al Nether.",
         "fishCatches": "Capturas para sacarlo",
-        "fishCatchesHint": "De 3 a 30 por cada jugador que pesca: más jugadores, pez más grande."
+        "fishCatchesHint": "De 3 a 30 por cada jugador que pesca: más jugadores, pez más grande.",
+        "mazeSize": "Tamaño",
+        "mazeHazards": "Peligros",
+        "mazeHazardsHint": "Cuántas salas tienen fuego, magma o un foso de lava."
     },
     "moderation": {
         "announcements": {

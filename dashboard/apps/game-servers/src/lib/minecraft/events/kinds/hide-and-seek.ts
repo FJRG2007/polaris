@@ -1789,13 +1789,8 @@ export function setupLines(names: readonly [string, string]): string[] {
     return lines;
 }
 
-/**
- * The codes Xaero's Minimap reads in chat: the first turns its radar of
- * players and mobs off for this server (fair play), the second puts back
- * whatever the server allows. Formatting codes alone, so they show as nothing.
- */
-export const RADAR_OFF = "\u00a7f\u00a7a\u00a7i\u00a7r\u00a7x\u00a7a\u00a7e\u00a7r\u00a7o";
-export const RADAR_RESET = "\u00a7r\u00a7e\u00a7s\u00a7e\u00a7t\u00a7x\u00a7a\u00a7e\u00a7r\u00a7o";
+/** Xaero's Minimap fair-play codes (`radar.ts`). */
+export { RADAR_OFF, RADAR_RESET } from "./radar";
 
 export const TEARDOWN = [
     ...TEAMS.map((team) => `team remove ${team}`),

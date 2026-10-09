@@ -39,6 +39,7 @@ import { readSchedule } from "../schedule";
 import * as parkour from "./kinds/parkour";
 import * as dropper from "./kinds/dropper";
 import * as boatRace from "./kinds/boat-race";
+import * as netherMaze from "./kinds/nether-maze";
 import { withTimeout } from "@polaris/core";
 import * as gather from "./kinds/gathering";
 import * as hunt from "./kinds/treasure-hunt";
@@ -1008,6 +1009,7 @@ function startLoop(
         run.preset.kind === "parkour" ||
         run.preset.kind === "dropper" ||
         run.preset.kind === "boat-race" ||
+        run.preset.kind === "nether-maze" ||
         run.preset.kind === "team-duel" ||
         arenaService.quickens(run.preset)
     ) {
@@ -1767,6 +1769,7 @@ async function play(
         case "tnt-run":
         case "dropper":
         case "boat-race":
+        case "nether-maze":
             decided = await stageService.stageTick(
                 loop,
                 server,
@@ -4599,6 +4602,9 @@ export function cleanupOf(run: stored.EventRun): string[] {
             break;
         case "boat-race":
             after.push(...boatRace.SCORES_REMOVED);
+            break;
+        case "nether-maze":
+            after.push(...netherMaze.SCORES_REMOVED);
             break;
         case "rare-catch":
             after.push(...rareCatch.catchCleanup());

@@ -40,6 +40,7 @@ import {
     DropperFields,
     HideAndSeekFields,
     HotPotatoFields,
+    NetherMazeFields,
     SkyWarsFields,
     TntRunFields
 } from "./event-options-sky";
@@ -1107,6 +1108,14 @@ function OptionsFields({
             return (
                 <DropperFields
                     value={preset.options as catalog.EventOptions<"dropper">}
+                    onChange={onChange}
+                    issues={issues}
+                />
+            );
+        case "nether-maze":
+            return (
+                <NetherMazeFields
+                    value={preset.options as catalog.EventOptions<"nether-maze">}
                     onChange={onChange}
                     issues={issues}
                 />

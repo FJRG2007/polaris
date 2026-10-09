@@ -1763,6 +1763,11 @@
                 "label": "Boss fishing",
                 "summary": "A legendary fish takes the line and everybody fishing wears it down: each catch takes a share of its strength off the boss bar, and treasure takes more. Land it in time and whoever caught the most wins; let it get away and nobody does.",
                 "unit": "catches"
+            },
+            "nether-maze": {
+                "label": "Deadly nether maze",
+                "summary": "A roofed maze of netherrack is built in the air, a new one every time. Racers start outside its door; the first to reach the bright room in the middle wins. Fire, magma and lava never hurt, but touching them sends you back to the start.",
+                "unit": "rooms"
             }
         },
         "triggers": {
@@ -1865,7 +1870,9 @@
             "wavesScaling": "Each wave brings the first wave's size, half as many again for every wave before it and for every defender at the point past the first (up to 5), at most 60. Every defender past the first gives each monster 4 more health (up to 16), and from 3 defenders they hit harder.",
             "wavesGear": "Armor grows wave by wave, from none to leather, chainmail, iron and diamond on the last, with enchanted bows and swords on the last two. Spider jockeys come from 40% of the waves, chicken jockeys from 60% and horsemen from 80%. Nothing they wear or ride is ever dropped, and all of it is removed.",
             "gatheringRounds": "{rounds} {rounds, plural, one {round} other {rounds}} of {minutes} {minutes, plural, one {minute} other {minutes}}. Each item is worth points by how hard it is to get - one cobblestone 1, one log 4, one iron ingot 12 - and the most points over all rounds wins.",
-            "world": "{time, select, day {Holds midday} night {Holds midnight} other {Leaves the time alone}}{weather, select, clear { and clear weather} rain { and rain} other {}} while it runs, then gives the time back and lets the weather change again."
+            "world": "{time, select, day {Holds midday} night {Holds midnight} other {Leaves the time alone}}{weather, select, clear { and clear weather} rain { and rain} other {}} while it runs, then gives the time back and lets the weather change again.",
+            "netherMaze": "A {size} maze about {height} blocks up, with {hazards} of its rooms on fire, on magma or behind a lava pit. Walls two blocks thick and a solid roof: it cannot be climbed or seen over, and every room can be reached without touching a hazard.",
+            "netherMazeSafe": "Nobody's items are touched, and nobody takes damage. Minimap cave view and radar are switched off for the racers. The hazards are watched by a small data pack Polaris adds to the world."
         },
         "errors": {
             "read": "The events could not be read",
@@ -2049,6 +2056,16 @@
             "loot": "The chosen loot only exists from Minecraft {needs}; this server runs {version}.",
             "ores": "The chosen ore only exists from Minecraft {needs}; this server runs {version}.",
             "material": "The chosen material only exists from Minecraft {needs}; this server runs {version}."
+        },
+        "mazeSizes": {
+            "small": "small",
+            "medium": "medium",
+            "large": "large"
+        },
+        "mazeHazards": {
+            "few": "a few",
+            "some": "some",
+            "many": "many"
         }
     },
     "editor": {
@@ -2256,6 +2273,16 @@
             "bingoGoal": {
                 "line": "The first full line",
                 "card": "The whole card"
+            },
+            "mazeSize": {
+                "small": "Small: 7 by 7 rooms",
+                "medium": "Medium: 11 by 11 rooms",
+                "large": "Large: 15 by 15 rooms"
+            },
+            "mazeHazards": {
+                "few": "A few",
+                "some": "Some",
+                "many": "Many"
             }
         },
         "place": {
@@ -2271,7 +2298,8 @@
             "track": "The track is built 30 blocks up, about 30 blocks around a player who is in the Overworld when it starts.",
             "shaft": "The shaft is built in the air, about 30 blocks around a player who is in the Overworld when it starts.",
             "islands": "The islands are built 30 blocks up, about 30 blocks around a player who is in the Overworld when it starts.",
-            "villager": "The villager is set about 50 blocks around a player who is in the Overworld when it starts."
+            "villager": "The villager is set about 50 blocks around a player who is in the Overworld when it starts.",
+            "maze": "The maze is built 30 blocks up, about 30 blocks around a player who is in the Overworld when it starts."
         },
         "floorSizeHint": "5 to 15: this one is {size} by {size}.",
         "range": "{min} to {max}",
@@ -2343,7 +2371,10 @@
         "bingoItems": "Items on the card",
         "bingoItemsHint": "Easy: found in the first minutes. Hard: needs a trip to the Nether.",
         "fishCatches": "Catches to land it",
-        "fishCatchesHint": "3 to 30 for each player fishing: more players, a bigger fish."
+        "fishCatchesHint": "3 to 30 for each player fishing: more players, a bigger fish.",
+        "mazeSize": "Size of the maze",
+        "mazeHazards": "Hazards",
+        "mazeHazardsHint": "How many rooms have fire, magma or a lava pit."
     },
     "moderation": {
         "announcements": {
