@@ -27,7 +27,15 @@ import { useState } from "react";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { Download, Send } from "lucide-react";
 import type { CallRecording } from "./call-recorder";
-import { Button, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@polaris/ui";
+import {
+    Button,
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle
+} from "@polaris/ui";
 
 /** Seconds as a clock reads them. */
 function clock(seconds: number): string {
@@ -62,7 +70,8 @@ export function RecordingPanel({
                     <DialogHeader>
                         <DialogTitle>{t("recording.notRecorded")}</DialogTitle>
                         <DialogDescription>
-                            {t(`recording.errors.${recording.error}`)} {t("recording.notRecordedWhy")}
+                            {t(`recording.errors.${recording.error}`)}{" "}
+                            {t("recording.notRecordedWhy")}
                         </DialogDescription>
                     </DialogHeader>
                     <DialogFooter>
@@ -140,7 +149,9 @@ export function RecordingPanel({
                     {channelId && (
                         <Button onClick={send} disabled={sending}>
                             <Send className="size-4" />
-                            {sending ? t("recording.sending") : t("recording.sendToTheConversation")}
+                            {sending
+                                ? t("recording.sending")
+                                : t("recording.sendToTheConversation")}
                         </Button>
                     )}
                 </DialogFooter>

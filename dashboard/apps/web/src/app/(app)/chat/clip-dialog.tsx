@@ -20,7 +20,17 @@ import { micDevice } from "./mic-device";
 import { MicSettings } from "./mic-settings";
 import { MediaPlayer } from "@/components/media-player";
 import { MAX_CLIP_SECONDS, useClipRecorder, type ClipSources } from "./clip-recorder";
-import { Camera, CameraOff, Circle, Mic, MicOff, Pause, Play, RotateCcw, Square } from "lucide-react";
+import {
+    Camera,
+    CameraOff,
+    Circle,
+    Mic,
+    MicOff,
+    Pause,
+    Play,
+    RotateCcw,
+    Square
+} from "lucide-react";
 import {
     Button,
     Dialog,
@@ -164,7 +174,10 @@ export function ClipDialog({
                                 on={sources.camera}
                                 label={sources.camera ? t("clip.cameraOn") : t("clip.cameraOff")}
                                 onToggle={() =>
-                                    setSources((current) => ({ ...current, camera: !current.camera }))
+                                    setSources((current) => ({
+                                        ...current,
+                                        camera: !current.camera
+                                    }))
                                 }
                             >
                                 {sources.camera ? (
@@ -176,7 +189,11 @@ export function ClipDialog({
                             </SourceToggle>
                             <SourceToggle
                                 on={sources.microphone}
-                                label={sources.microphone ? t("clip.microphoneOn") : t("clip.microphoneOff")}
+                                label={
+                                    sources.microphone
+                                        ? t("clip.microphoneOn")
+                                        : t("clip.microphoneOff")
+                                }
                                 onToggle={() =>
                                     setSources((current) => ({
                                         ...current,
@@ -270,7 +287,9 @@ export function ClipDialog({
                             </Button>
                         )}
                         {clip.stage === "starting" && (
-                            <p className="text-sm text-muted-foreground">{t("clip.waitingForTheScreen")}</p>
+                            <p className="text-sm text-muted-foreground">
+                                {t("clip.waitingForTheScreen")}
+                            </p>
                         )}
                         {running && (
                             <>
@@ -323,7 +342,10 @@ export function ClipDialog({
                                 <span className="text-xs text-muted-foreground">
                                     {t("clip.recorded", {
                                         time: clock(clip.seconds),
-                                        size: Math.max(1, Math.round(clip.file.size / (1024 * 1024)))
+                                        size: Math.max(
+                                            1,
+                                            Math.round(clip.file.size / (1024 * 1024))
+                                        )
                                     })}
                                 </span>
                             </>
