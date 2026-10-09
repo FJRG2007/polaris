@@ -30,6 +30,7 @@ let throttled = false;
 let switchCalls: string[] = [];
 let signOutCalls: string[] = [];
 let revokeFails = false;
+let signOutAllFails = false;
 
 function account(sessionId: string, name: string, active: boolean): FakeAccount {
     return {
@@ -88,7 +89,8 @@ vi.mock("@polaris/auth", async () => {
             const found = accounts.find((entry) => entry.sessionId === sessionId);
             return found ? { account: found, cookies: issued("polaris.session_token") } : null;
         },
-        signOutAllDeviceAccounts: async () => ({ accounts, cookies: issued("polaris.session_token") })
+        signOutAllDeviceAccounts: async () =>
+            signOutAllFails ? null : { accounts, cookies: issued("polaris.session_token") }
     };
 });
 
@@ -104,6 +106,7 @@ beforeEach(() => {
     switchCalls = [];
     signOutCalls = [];
     revokeFails = false;
+    signOutAllFails = false;
 });
 
 describe("deviceAccountsAction", () => {
@@ -203,6 +206,7 @@ describe("signOutAccountAction", () => {
         revokeFails = true;
         expect((await actions.signOutAccountAction()).error).toBe("account.switcher.error");
         expect(set).toEqual([]);
+        expect(notedOut).toEqual([]);
     });
 
     it("refuses an id this browser does not hold", async () => {
@@ -214,8 +218,15 @@ describe("signOutAccountAction", () => {
 
 describe("signOutAllAccountsAction", () => {
     it("ends every account and records each", async () => {
-        await actions.signOutAllAccountsAction();
+        expect(await actions.signOutAllAccountsAction()).toEqual({});
         expect(notedOut.sort()).toEqual([ANA, BEN].sort());
         expect(set.map((cookie) => cookie.name)).toEqual(["polaris.session_token"]);
+    });
+
+    it("reports a refused sign-out instead of recording one", async () => {
+        signOutAllFails = true;
+        expect((await actions.signOutAllAccountsAction()).error).toBe("account.switcher.error");
+        expect(notedOut).toEqual([]);
+        expect(set).toEqual([]);
     });
 });

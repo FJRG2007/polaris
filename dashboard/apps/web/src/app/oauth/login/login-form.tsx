@@ -17,7 +17,7 @@ import { validationMessage } from "@/components/i18n/validation-message";
 import { accountHasPasskey, emailLinkOffered, resolveIdentifier } from "./actions";
 import { pendingEnrollmentAction, type PendingEnrollment } from "@/app/oauth/enroll/actions";
 import { AccountChooser } from "./account-chooser";
-import type { DeviceAccountView } from "@/app/device-account-actions";
+import { prepareAddAccountAction, type DeviceAccountView } from "@/app/device-account-actions";
 import { Button, Card, CardBody, CardHeader, CardTitle, Input, PolarisMark, cn } from "@polaris/ui";
 
 /** Where the last-used identifier is remembered so the field is prefilled. */
@@ -126,6 +126,12 @@ export function LoginForm({
         if (remembered) setValues((prev) => ({ ...prev, identifier: remembered }));
         setNotice(sessionNotice());
     }, []);
+
+    // However this screen was reached, the account already signed in keeps its
+    // own cookie, so the sign-in about to happen adds to it instead of replacing it.
+    useEffect(() => {
+        if (add && !add.full) void prepareAddAccountAction().catch(() => undefined);
+    }, [add?.full]);
 
     // Look up the ways in the typed account has beyond its password - a passkey,
     // a link it can be sent - so each is offered without the user having to

@@ -118,7 +118,12 @@ function useDeviceAccounts(enabled: boolean) {
         });
         if (!ok) return;
         void run("all", async () => {
-            await signOutAllAccountsAction();
+            const result = await signOutAllAccountsAction();
+            if (result.error) {
+                setError(result.error);
+                setBusy(null);
+                return;
+            }
             await leaveAccount("/oauth/login");
         });
     }

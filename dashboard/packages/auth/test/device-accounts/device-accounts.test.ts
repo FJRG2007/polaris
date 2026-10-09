@@ -237,9 +237,9 @@ describe("signing out", () => {
         const before = await listDeviceAccounts(auth, browser.headers());
 
         const ended = await signOutAllDeviceAccounts(auth, browser.headers());
-        browser.take(ended.cookies);
+        browser.take(ended!.cookies);
 
-        expect(ended.accounts).toHaveLength(2);
+        expect(ended!.accounts).toHaveLength(2);
         expect(await activeUserId(browser)).toBeNull();
         expect(await listDeviceAccounts(auth, browser.headers())).toEqual([]);
         for (const account of before) expect(db.session.some((row) => row.id === account.sessionId)).toBe(false);

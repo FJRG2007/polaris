@@ -177,18 +177,20 @@ export async function signOutAccountAction(sessionId: unknown = null): Promise<{
         return {};
     }
 
-    await noteSignedOut(target.userId, target.sessionId).catch(() => undefined);
     const ended = await signOutDeviceAccount(auth, request, target.sessionId);
     if (!ended) return broken();
     await apply(ended.cookies);
+    await noteSignedOut(target.userId, target.sessionId).catch(() => undefined);
     return {};
 }
 
 /** Sign every account on this browser out. */
-export async function signOutAllAccountsAction(): Promise<void> {
+export async function signOutAllAccountsAction(): Promise<{ error?: string }> {
     const ended = await signOutAllDeviceAccounts(auth, await requestHeaders());
+    if (!ended) return broken();
     await apply(ended.cookies);
     for (const account of ended.accounts) {
         await noteSignedOut(account.userId, account.sessionId).catch(() => undefined);
     }
+    return {};
 }

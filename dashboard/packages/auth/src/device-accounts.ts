@@ -279,16 +279,16 @@ export async function signOutDeviceAccount(
     }
 }
 
-/** Sign every account on this browser out. */
+/** Sign every account on this browser out. Null when the sign-out was refused. */
 export async function signOutAllDeviceAccounts(
     auth: Auth,
     headers: Headers
-): Promise<{ accounts: DeviceAccount[]; cookies: IssuedCookie[] }> {
+): Promise<{ accounts: DeviceAccount[]; cookies: IssuedCookie[] } | null> {
     const accounts = await listDeviceAccounts(auth, headers);
     try {
         const { headers: issued } = await api(auth).signOut({ headers, returnHeaders: true });
         return { accounts, cookies: readIssuedCookies(issued) };
     } catch {
-        return { accounts, cookies: [] };
+        return null;
     }
 }
