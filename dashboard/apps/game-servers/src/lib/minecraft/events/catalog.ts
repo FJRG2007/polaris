@@ -222,6 +222,9 @@ export const THEME_MODES = ["random", "mine"] as const;
 export const BINGO_GOALS = ["line", "card"] as const;
 /** What a SkyWars island's chests hold: plain survival gear, or rich. */
 export const SKY_WARS_LOOT = ["normal", "rich"] as const;
+/** How big hide and seek's house is: by how many play, or three, four or five
+ *  rooms along a side. */
+export const HOUSE_SIZES = ["auto", "small", "medium", "large"] as const;
 
 export type Language = (typeof LANGUAGES)[number];
 
@@ -628,7 +631,15 @@ export const optionsSchemas = {
             .int()
             .min(1, problem("atLeast", { count: 1 }))
             .max(3, problem("atMost", { count: 3 }))
-            .default(1)
+            .default(1),
+        house: z.enum(HOUSE_SIZES).default("auto"),
+        /** Minutes between the hiders' power-ups; 0 for none. */
+        powerUpMinutes: z
+            .number()
+            .int()
+            .min(0, problem("atLeast", { count: 0 }))
+            .max(10, problem("atMost", { count: 10 }))
+            .default(2)
     }),
     "hot-potato": z.object({
         place: placeSchema.default({ mode: "players" }),

@@ -90,6 +90,21 @@ export function secretTip(language: Language): string {
         : `${INFO}Some bookcases hide a room: press the button beside one. And look up.`;
 }
 
+/** Told at "Go!" in a manor (design 4): how its secrets open. */
+export function manorTip(language: Language): string {
+    return language === "es"
+        ? `${INFO}Hay cuadros que son puertas y paneles que se abren desde lejos: un botón, agacharte 3 veces en una alfombra, mirar arriba en una alfombra blanca o mirar fijo una calavera o una calabaza. La lava quema a los buscadores.`
+        : `${INFO}Some paintings are doors, and panels open from across the room: a button, crouching 3 times on a rug, looking up from a white rug, or staring at a skull or a lantern. Lava burns seekers.`;
+}
+
+/** A hider's power-up, on their own action bar while it lasts. */
+export function powerBar(power: "invisible" | "fast", seconds: number, language: Language): string {
+    const left = Math.max(0, Math.ceil(seconds));
+    if (language === "es")
+        return `${GOOD}${power === "invisible" ? "Invisible" : "Veloz"} ${left} s`;
+    return `${GOOD}${power === "invisible" ? "Invisible" : "Fast"} ${left}s`;
+}
+
 /** Said with the results. */
 export function summary(found: number, hiders: number, language: Language): string {
     return language === "es"

@@ -62,6 +62,7 @@ import * as hits from "./hits";
 import type { Box } from "../state";
 import type { Spot } from "./arena";
 import * as doors from "./secret-doors";
+import * as panels from "./secret-panels";
 import type { Fill } from "./arena-game";
 import { seeded, shuffled } from "../trivia-bank";
 
@@ -1715,7 +1716,17 @@ export const stateSchema = z.object({
     /** Milliseconds each hider has been hidden and on the server, by name. */
     hidden: z.record(z.number()).default({}),
     /** When the hidden time was last added to. */
-    countedAt: z.number().nullable().default(null)
+    countedAt: z.number().nullable().default(null),
+    /** What the server could show when the house was built (design 4): its
+     *  rooms along a side, and scaffolding, powder snow and display blocks. */
+    rooms: z.number().int().min(3).max(5).nullable().default(null),
+    era: z
+        .object({ scaffold: z.boolean(), snow: z.boolean(), display: z.boolean() })
+        .nullable()
+        .default(null),
+    /** When the hiders' next power-up is due, and the last each was given. */
+    powerAt: z.number().nullable().default(null),
+    powers: z.record(z.object({ kind: z.enum(["invisible", "fast"]), until: z.number() })).default({})
 });
 export type SeekState = z.infer<typeof stateSchema>;
 
@@ -1788,7 +1799,8 @@ export const TEARDOWN = [
     ...TEAMS.map((team) => `team remove ${team}`),
     ...[DEALT, TAKEN].map((objective) => `scoreboard objectives remove ${objective}`),
     ...hits.TAGS_OFF,
-    ...doors.TEARDOWN
+    ...doors.TEARDOWN,
+    ...panels.TEARDOWN
 ];
 
 /** Onto a side's team, only if they are on none of the server's own - or, found,
@@ -1836,4 +1848,43 @@ export function unhurtLines(name: string): string[] {
 /** A hider cannot strike: only a seeker's blow ever finds anybody. */
 export function hiderLine(name: string): string {
     return `effect give ${name} minecraft:weakness 3 100 true`;
+}
+
+/** The tag on everybody the game gave an effect of its own (`EFFECTS`), so
+ *  only those are ever taken off again, and only from them. */
+export const FX_TAG = "pe_hs_fx";
+/** What the game gives a hider besides the hits' effects: fire resistance, to
+ *  cross the manor's lava, and the power-ups. */
+export const EFFECTS = ["fire_resistance", "invisibility", "speed"] as const;
+
+/** A hider in a manor: through its lava unhurt, a few seconds at a time. */
+export function fireproofLines(name: string): string[] {
+    return [`tag ${name} add ${FX_TAG}`, `effect give ${name} minecraft:fire_resistance 6 0 true`];
+}
+
+/** A power-up: invisible for ten seconds, or fast for fifteen. Particles off:
+ *  nothing gives a hider away. Never a jump boost or a pearl - either reaches
+ *  places a seeker cannot follow. */
+export type Power = "invisible" | "fast";
+export const POWERS: readonly Power[] = ["invisible", "fast"];
+export const POWER_SECONDS: Readonly<Record<Power, number>> = { invisible: 10, fast: 15 };
+
+export function powerLines(name: string, power: Power): string[] {
+    const effect = power === "invisible" ? "minecraft:invisibility" : "minecraft:speed";
+    return [`tag ${name} add ${FX_TAG}`, `effect give ${name} ${effect} ${POWER_SECONDS[power]} 0 true`];
+}
+
+/** The power-up a hider gets in round `round`, drawn from the run's id. */
+export function powerFor(seed: string, name: string, round: number): Power {
+    return POWERS[Math.floor(seeded(`${seed}-power-${round}-${name.toLowerCase()}`)() * POWERS.length)]!;
+}
+
+/** Everything the game gave one player taken off, and only that: for a hider
+ *  found, and for everybody at the end, on the server now or when they are. */
+export function effectsOff(name?: string): string[] {
+    const tagged = name ? `@a[name=${name},tag=${FX_TAG}]` : `@a[tag=${FX_TAG}]`;
+    return [
+        ...EFFECTS.map((effect) => `effect clear ${tagged} minecraft:${effect}`),
+        `tag ${tagged} remove ${FX_TAG}`
+    ];
 }

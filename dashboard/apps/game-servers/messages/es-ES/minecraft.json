@@ -1736,7 +1736,7 @@
             },
             "hide-and-seek": {
                 "label": "Escondite",
-                "summary": "Se construye en el cielo una casa de nueve salas llena de escondites: armarios donde encerrarse, trampillas en el suelo, arbustos huecos, altillos, vigas y atalayas a las que trepar, y estanterías que con un botón se abren a una sala secreta. Los buscadores esperan cegados mientras los demás se esconden; si un buscador golpea a alguien lo encuentra, y este pasa a buscar. Los escondidos puntúan por cada segundo oculto y los buscadores por cada uno encontrado; los nombres no se ven entre bandos.",
+                "summary": "Se construye en el cielo una mansión, más grande cuantos más jueguen, con salas distintas cada vez: biblioteca, forja, jardín con cascada, estanque, laberintos y más. Sus muros esconden salas tras cuadros y paneles que se abren desde el otro lado de la sala, con un botón, una alfombra o una mirada; hay sótanos bajo el suelo, un árbol hueco y lava que solo cruzan los escondidos. Los buscadores esperan cegados mientras los demás se esconden; si un buscador golpea a alguien lo encuentra, y este pasa a buscar. Los escondidos puntúan por cada segundo oculto y los buscadores por cada uno encontrado; los nombres no se ven entre bandos.",
                 "unit": "puntos"
             },
             "hot-potato": {
@@ -2243,6 +2243,12 @@
                 "jungle": "Selva (lianas)",
                 "nether": "Nether"
             },
+            "house": {
+                "auto": "Según los jugadores",
+                "small": "Pequeña: 3 por 3 salas",
+                "medium": "Mediana: 4 por 4 salas",
+                "large": "Grande: 5 por 5 salas"
+            },
             "skyWarsLoot": {
                 "normal": "Equipo básico",
                 "rich": "Rico: hierro, diamante y más"
@@ -2330,6 +2336,9 @@
         "fuseSeconds": "Mecha (segundos)",
         "fuseSecondsHint": "De 10 a 40 hasta que explota la patata.",
         "chestLoot": "Qué hay en los cofres",
+        "house": "Tamaño de la casa",
+        "powerUpMinutes": "Mejoras (minutos)",
+        "powerUpMinutesHint": "De 0 a 10. Cada escondido recibe una mejora corta así de a menudo; 0, ninguna.",
         "bingoGoal": "Qué gana",
         "bingoItems": "Objetos del cartón",
         "bingoItemsHint": "Fácil: se encuentran en los primeros minutos. Difícil: piden ir al Nether.",

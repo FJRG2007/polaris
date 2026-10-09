@@ -106,6 +106,9 @@ export interface ArenaGame {
     /** The kind's own state as it is built, written with the arena: the
      *  version of its layout, so a run built before an update keeps it. */
     built?(run: stored.EventRun): Record<string, unknown>;
+    /** What the kind asks the server before it builds - what its version can
+     *  show - kept in the run's game state for `fills` and `built` to read. */
+    prepare?(ctx: KindContext): Promise<Record<string, unknown>>;
     /** Lines run once the fills are in: what a chest holds, say. */
     decorate?(run: stored.EventRun, box: stored.Box, syntax: ItemSyntax): string[];
     /** Every item it hands out, marked, for taking back. */
