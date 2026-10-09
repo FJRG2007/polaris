@@ -234,7 +234,9 @@ describe("hide and seek's manor in the world", () => {
         const scaffold = fills.findIndex((one) => one.block.startsWith("minecraft:scaffolding"));
         const lastSolid = fills
             .slice(0, -1)
-            .findLastIndex((one) => !hung.test(one.block) && !/scaffolding|water|lava/.test(one.block));
+            .findLastIndex(
+                (one) => !hung.test(one.block) && !/scaffolding|water|lava/.test(one.block)
+            );
         if (scaffold >= 0) expect(scaffold).toBeGreaterThan(lastSolid);
         // Leaves that never wither.
         expect(
