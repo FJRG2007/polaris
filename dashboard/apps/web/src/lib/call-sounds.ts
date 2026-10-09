@@ -344,9 +344,11 @@ export const SEASONAL_SOUNDS: Record<Season, Partial<Record<CallSound, readonly 
             ...note,
             to: note.from * 0.944
         })),
+        // Rising, with each note sliding up a semitone: a message arriving must
+        // not sound like somebody leaving.
         message: [
-            { from: 659.25, to: 622.25, at: 0, seconds: 0.07, gain: 0.05, wave: "triangle" },
-            { from: 466.16, to: 440, at: 0.06, seconds: 0.1, gain: 0.05, wave: "triangle" }
+            { from: 440, to: 466.16, at: 0, seconds: 0.07, gain: 0.05, wave: "triangle" },
+            { from: 659.25, to: 698.46, at: 0.06, seconds: 0.1, gain: 0.05, wave: "triangle" }
         ]
     },
     /** Sleigh bells: a major arpeggio high up, struck quickly. */

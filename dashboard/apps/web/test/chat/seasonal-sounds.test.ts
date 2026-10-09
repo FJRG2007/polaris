@@ -67,6 +67,13 @@ describe.each(SEASONS)("the %s pack", (season) => {
             notes.reduce((last, [, at, seconds]) => Math.max(last, at + seconds), 0);
         expect(end(SEASONAL_CHIMES[season])).toBeLessThanOrEqual(end(CHIME) + 0.05);
     });
+
+    it("announces news rising, never falling like a hang-up", () => {
+        const chime = SEASONAL_CHIMES[season];
+        expect(chime.at(-1)![0]).toBeGreaterThan(chime[0]![0]);
+        const message = SEASONAL_SOUNDS[season].message ?? [];
+        expect(message.at(-1)!.from).toBeGreaterThan(message[0]!.from);
+    });
 });
 
 describe("which sounds play", () => {

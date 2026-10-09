@@ -170,12 +170,16 @@ export const CHIME: readonly ChimeNote[] = [
  * The chime recast for each season, for an account that asked for the seasonal
  * sounds. The same length and level as the ordinary one - it means the same
  * thing - in the notes the season's ring uses, so a season sounds like one pack
- * rather than several.
+ * rather than several. Every one rises, as the ordinary one does: news arriving
+ * never sounds like something ending.
  */
 export const SEASONAL_CHIMES: Record<Season, readonly ChimeNote[]> = {
+    // A minor arpeggio climbing to the fifth: eerie, but it arrives rather than
+    // falls away - a falling figure is heard as a hang-up or a cancel.
     halloween: [
-        [659.25, 0, 0.16],
-        [466.16, 0.11, 0.26]
+        [440, 0, 0.12],
+        [523.25, 0.08, 0.12],
+        [659.25, 0.16, 0.22]
     ],
     winter: [
         [1174.66, 0, 0.12],
