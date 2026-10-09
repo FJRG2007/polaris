@@ -27,7 +27,15 @@ import { useState } from "react";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { Download, Send } from "lucide-react";
 import type { CallRecording } from "./call-recorder";
-import { Button, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@polaris/ui";
+import {
+    Button,
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle
+} from "@polaris/ui";
 
 /** Seconds as a clock reads them. */
 function clock(seconds: number): string {
@@ -52,6 +60,27 @@ export function RecordingPanel({
     const [error, setError] = useState("");
 
     const file = recording.file;
+    // A recording that failed before it wrote anything. Said here, where the
+    // finished one would have been offered, because otherwise the record button
+    // simply goes back to how it was and nobody knows why there is no file.
+    if (!file && recording.error && !recording.running) {
+        return (
+            <Dialog open onOpenChange={(open) => !open && recording.discard()}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>{t("recording.notRecorded")}</DialogTitle>
+                        <DialogDescription>
+                            {t(`recording.errors.${recording.error}`)}{" "}
+                            {t("recording.notRecordedWhy")}
+                        </DialogDescription>
+                    </DialogHeader>
+                    <DialogFooter>
+                        <Button onClick={recording.discard}>{t("recording.close")}</Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+        );
+    }
     if (!file) return null;
 
     const send = async () => {
@@ -105,7 +134,7 @@ export function RecordingPanel({
 
                 {(error || recording.error) && (
                     <p role="alert" className="text-xs text-danger">
-                        {error || recording.error}
+                        {error || (recording.error && t(`recording.errors.${recording.error}`))}
                     </p>
                 )}
 
@@ -120,7 +149,9 @@ export function RecordingPanel({
                     {channelId && (
                         <Button onClick={send} disabled={sending}>
                             <Send className="size-4" />
-                            {sending ? t("recording.sending") : t("recording.sendToTheConversation")}
+                            {sending
+                                ? t("recording.sending")
+                                : t("recording.sendToTheConversation")}
                         </Button>
                     )}
                 </DialogFooter>

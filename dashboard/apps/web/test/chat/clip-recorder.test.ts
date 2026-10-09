@@ -47,6 +47,14 @@ describe("what it records into", () => {
         expect(clipRecordingType()).toBe("video/mp4;codecs=avc1.42E01E,mp4a.40.2");
     });
 
+    it("takes Opus over AAC in MP4, because Chrome on Windows says AAC and cannot encode it", () => {
+        // Both answer yes to `isTypeSupported` there; the AAC one then fails
+        // with an EncodingError having written nothing, which was a record
+        // button that did nothing at all.
+        browserRecording(["video/mp4;codecs=avc1.42E01E,mp4a.40.2", "video/mp4;codecs=avc1,opus"]);
+        expect(clipRecordingType()).toBe("video/mp4;codecs=avc1,opus");
+    });
+
     it("falls back through the containers rather than assuming one", () => {
         browserRecording(["video/webm"]);
         expect(clipRecordingType()).toBe("video/webm");
