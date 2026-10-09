@@ -70,7 +70,12 @@ const MAGMA: Box["block"] = "minecraft:magma_block";
 const LAVA: Box["block"] = "minecraft:lava";
 const FIRE: Box["block"] = "minecraft:fire";
 const LIGHT: Box["block"] = "minecraft:glowstone";
-const GOAL: Box["block"] = "minecraft:quartz_block";
+/** The goal has to read as the goal from the doorway into it: a quartz floor
+ *  under the same glowstone as every other room was walked past by racers who
+ *  were standing in it. Gold underfoot and a whole ceiling of sea lanterns - a
+ *  colour and a brightness nothing else in the maze has. */
+const GOAL: Box["block"] = "minecraft:gold_block";
+const GOAL_LIGHT: Box["block"] = "minecraft:sea_lantern";
 const START: Box["block"] = "minecraft:nether_bricks";
 const DOOR: Box["block"] = "minecraft:glass";
 
@@ -555,7 +560,9 @@ export function maze(
     const startXs = [...startRoom].map((at) => Number(at.split(",")[0]));
     const startZs = [...startRoom].map((at) => Number(at.split(",")[1]));
     lights.add(key(Math.min(...startXs) + 1, Math.min(...startZs) + 1));
-    const roof = new Set([...all].filter((at) => !lights.has(at)));
+    const goalTiles = where((tile) => tile === "goal");
+    const roof = new Set([...all].filter((at) => !lights.has(at) && !goalTiles.has(at)));
+    for (const at of goalTiles) lights.delete(at);
     const doorTiles = where((tile) => tile === "door");
     const door = layer(doorTiles, y + 1, y + HEADROOM, DOOR)[0]!;
     const boxes: Box[] = [
@@ -574,12 +581,7 @@ export function maze(
             y,
             START
         ),
-        ...layer(
-            where((tile) => tile === "goal"),
-            y,
-            y,
-            GOAL
-        ),
+        ...layer(goalTiles, y, y, GOAL),
         ...layer(
             where((tile) => tile === "magma"),
             y,
@@ -606,7 +608,8 @@ export function maze(
         ),
         door,
         ...layer(roof, ceiling, ceiling, NETHERRACK),
-        ...layer(lights, ceiling, ceiling, LIGHT)
+        ...layer(lights, ceiling, ceiling, LIGHT),
+        ...layer(goalTiles, ceiling, ceiling, GOAL_LIGHT)
     ];
     const xs = [...all].map((at) => Number(at.split(",")[0]));
     const zs = [...all].map((at) => Number(at.split(",")[1]));

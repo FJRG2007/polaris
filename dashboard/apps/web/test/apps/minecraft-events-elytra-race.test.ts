@@ -160,6 +160,21 @@ describe("the elytra race's data pack", () => {
         const built = elytra.course({ laps: 2, obstacles: "few" }, "quick", SITE, Y);
         const lines = elytra.quickLines(built, "components", { fell: '"fell"', cut: '"cut"' });
         expect(lines.some((line) => line.includes("nbt={OnGround:1b}"))).toBe(true);
+        // Never read as landed again before the server has seen them off the
+        // ground since they were put back: the loop that kicked racers for
+        // flying.
+        for (const line of lines.filter((one) => one.includes("nbt={OnGround:1b}"))) {
+            expect(line).toContain(`tag=!${elytra.SENT_TAG}`);
+        }
+        const sent = lines.indexOf(`tag @a[tag=pe_ereset] add ${elytra.SENT_TAG}`);
+        const cleared = lines.indexOf(
+            `tag @a[tag=${elytra.SENT_TAG},nbt={OnGround:0b}] remove ${elytra.SENT_TAG}`
+        );
+        expect(cleared).toBeGreaterThanOrEqual(0);
+        expect(sent).toBeGreaterThan(
+            lines.findLastIndex((line) => line.includes(" run tp @a[tag=pe_ereset,"))
+        );
+        expect(elytra.racerScores("Steve")).toContain(`tag Steve remove ${elytra.SENT_TAG}`);
         expect(
             lines.some((line) => line.includes("dy=") && line.includes('tellraw @s "fell"'))
         ).toBe(true);

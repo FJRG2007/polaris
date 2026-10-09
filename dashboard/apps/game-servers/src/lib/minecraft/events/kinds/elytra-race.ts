@@ -733,7 +733,8 @@ export function racerScores(name: string, passed = 0, rings = 1): string[] {
         `scoreboard players set ${name} ${FINISH_SCORE} 0`,
         `scoreboard players set ${name} ${CUT_SCORE} 0`,
         `scoreboard players set ${name} ${OWED_SCORE} 0`,
-        `scoreboard players set ${name} ${BOOSTED_SCORE} 0`
+        `scoreboard players set ${name} ${BOOSTED_SCORE} 0`,
+        `tag ${name} remove ${SENT_TAG}`
     ];
 }
 
@@ -860,6 +861,16 @@ export const READ_PASSED = `execute as @a[tag=pe_in,scores={${PASSED_SCORE}=0..}
 export const READ_FINISHED = `execute as @a[tag=pe_in,scores={${FINISH_SCORE}=1..}] run scoreboard players get @s ${FINISH_SCORE}`;
 
 const RESET_TAG = "pe_ereset";
+/**
+ * A racer put back in the air whom the server has not yet seen off the ground.
+ * Until their game answers the teleport the server keeps the `OnGround` they
+ * had where they landed, so the next look read them as landed again and put
+ * them back again, and again: a racer held in one spot in mid-air, every
+ * second, until the server's own check kicked them for flying ("Flying is not
+ * enabled on this server", logged as "kicked for floating too long"). The same
+ * trap the dropper fell into (`dropper.SENT_TAG`).
+ */
+export const SENT_TAG = "pe_esent";
 
 /**
  * The quick look at a race, with selectors alone: whoever is racing and has
@@ -882,8 +893,9 @@ export function quickLines(
     const lines = [
         `${world} as @a[${racing},${under}] run tellraw @s ${told.fell}`,
         `${world} run tag @a[${racing},${under}] add ${RESET_TAG}`,
-        `execute as @a[${racing},tag=!${RESET_TAG},nbt={OnGround:1b}] run tellraw @s ${told.fell}`,
-        `tag @a[${racing},nbt={OnGround:1b}] add ${RESET_TAG}`,
+        `tag @a[tag=${SENT_TAG},nbt={OnGround:0b}] remove ${SENT_TAG}`,
+        `execute as @a[${racing},tag=!${RESET_TAG},tag=!${SENT_TAG},nbt={OnGround:1b}] run tellraw @s ${told.fell}`,
+        `tag @a[${racing},tag=!${SENT_TAG},nbt={OnGround:1b}] add ${RESET_TAG}`,
         `execute as @a[tag=pe_in,tag=!${RESET_TAG},scores={${CUT_SCORE}=1}] run tellraw @s ${told.cut}`,
         `tag @a[tag=pe_in,scores={${CUT_SCORE}=1}] add ${RESET_TAG}`,
         ...[built.start, ...built.respawns].map(
@@ -891,6 +903,7 @@ export function quickLines(
                 `${world} run tp @a[tag=${RESET_TAG},scores={${LAST_SCORE}=${index - 1}}] ${spot.x.toFixed(3)} ${spot.y.toFixed(3)} ${spot.z.toFixed(3)} ${spot.yaw.toFixed(1)} 0.0`
         ),
         `scoreboard players set @a[tag=${RESET_TAG}] ${CUT_SCORE} 0`,
+        `tag @a[tag=${RESET_TAG}] add ${SENT_TAG}`,
         `tag @a remove ${RESET_TAG}`
     ];
     if (items)

@@ -90,7 +90,8 @@ export const ARENA_BLOCKS = [
     "minecraft:barrier",
     "minecraft:cobblestone",
     "minecraft:mossy_cobblestone",
-    "minecraft:orange_concrete"
+    "minecraft:orange_concrete",
+    "minecraft:gold_block"
 ] as const;
 
 export type ArenaBlock = (typeof ARENA_BLOCKS)[number];

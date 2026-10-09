@@ -161,7 +161,9 @@ describe("a deadly nether maze", () => {
                 );
                 for (const column of columns) {
                     const [x, z] = column.split(",");
-                    expect(blocks.get(`${x},${v.y2},${z}`), column).toMatch(/netherrack|glowstone/);
+                    expect(blocks.get(`${x},${v.y2},${z}`), column).toMatch(
+                        /netherrack|glowstone|sea_lantern/
+                    );
                     expect(blocks.get(`${x},${Y - 1},${z}`), column).toBe("minecraft:netherrack");
                 }
                 // Lava and fire only ever over netherrack, never beside anything
@@ -172,6 +174,18 @@ describe("a deadly nether maze", () => {
                     const [x, y, z] = at.split(",").map(Number) as [number, number, number];
                     expect(blocks.get(`${x},${y - 1},${z}`)).toBe("minecraft:netherrack");
                 }
+                // The goal reads as the goal: gold underfoot and lit overhead from
+                // wall to wall, and nowhere else is.
+                const g = built.goal;
+                for (let x = g.x1; x <= g.x2; x += 1)
+                    for (let z = g.z1; z <= g.z2; z += 1) {
+                        expect(blocks.get(`${x},${Y},${z}`)).toBe("minecraft:gold_block");
+                        expect(blocks.get(`${x},${v.y2},${z}`)).toBe("minecraft:sea_lantern");
+                    }
+                const marked = [...blocks.values()].filter(
+                    (block) => block === "minecraft:gold_block" || block === "minecraft:sea_lantern"
+                );
+                expect(marked).toHaveLength((g.x2 - g.x1 + 1) * (g.z2 - g.z1 + 1) * 2);
                 // The middle is centred on the site.
                 expect(Math.abs((built.goal.x1 + built.goal.x2) / 2 - SITE.x)).toBeLessThanOrEqual(
                     2
