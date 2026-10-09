@@ -82,11 +82,7 @@ export function creepCells(
     random: () => number,
     missed: readonly Point[] = []
 ): { from: Point; to: Point }[] {
-    const left = Math.min(
-        TRIES_PER_TICK,
-        MAX_CELLS - infected.length,
-        MAX_MISSES - missed.length
-    );
+    const left = Math.min(TRIES_PER_TICK, MAX_CELLS - infected.length, MAX_MISSES - missed.length);
     if (left <= 0 || infected.length === 0) return [];
     const taken = new Set([...infected, ...missed].map(at));
     const picked: { from: Point; to: Point }[] = [];
