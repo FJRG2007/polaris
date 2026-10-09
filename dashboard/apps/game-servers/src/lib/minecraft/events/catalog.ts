@@ -289,6 +289,12 @@ function legacySpleef(value: unknown): unknown {
     return { ...rest, variants: one ? [one] : [...SPLEEF_VARIANTS] };
 }
 
+/** Hide and seek's time to hide, and the most it may be. */
+export const HIDE_SECONDS = 75;
+export const MOST_HIDE_SECONDS = 180;
+/** What every hide and seek was given before `HIDE_SECONDS`: nobody's choice. */
+const OLD_HIDE_SECONDS = 45;
+
 /** What each kind can be set to. Every field has a default, so an event made on
  *  an older version of this screen reads as a whole one. */
 export const optionsSchemas = {
@@ -641,13 +647,15 @@ export const optionsSchemas = {
     "hide-and-seek": z.object({
         place: placeSchema.default({ mode: "players" }),
         /** How long the hiders have before the seekers can move: the house has
-         *  nine rooms to run through, so longer than a hall would need. */
+         *  nine rooms to run through, secret rooms to open and climbs to make,
+         *  so longer than a hall would need. Forty-five was too short to reach
+         *  the far rooms and settle (`OLD_HIDE_SECONDS`). */
         hideSeconds: z
             .number()
             .int()
             .min(15, problem("atLeast", { count: 15 }))
-            .max(90, problem("atMost", { count: 90 }))
-            .default(45),
+            .max(MOST_HIDE_SECONDS, problem("atMost", { count: MOST_HIDE_SECONDS }))
+            .default(HIDE_SECONDS),
         /** Seekers at the start; everybody found becomes one. */
         seekers: z
             .number()
@@ -1441,6 +1449,13 @@ export function oldDefaultMinutes(kind: EventKind): number {
 export function migratePreset(entry: unknown): unknown {
     if (typeof entry !== "object" || entry === null) return entry;
     const named = entry as { kind?: unknown; name?: unknown };
+    if (named.kind === "hide-and-seek") {
+        const raw = entry as { options?: unknown };
+        const options = raw.options as { hideSeconds?: unknown } | undefined;
+        if (typeof options === "object" && options !== null && options.hideSeconds === OLD_HIDE_SECONDS)
+            return { ...raw, options: { ...options, hideSeconds: HIDE_SECONDS } };
+        return entry;
+    }
     if (named.kind !== "king-of-the-hill") return entry;
     // Named "King of the hill" when it was added, before it became a ring
     // floating in the air: the name it was given, not one anybody chose.

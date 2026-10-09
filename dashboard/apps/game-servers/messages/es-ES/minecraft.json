@@ -2427,7 +2427,7 @@
         "capturesToWin": "Capturas para ganar",
         "capturesToWinHint": "De 1 a 10. Si no, gana el equipo con más al acabar el tiempo.",
         "hideSeconds": "Para esconderse (segundos)",
-        "hideSecondsHint": "De 15 a 90, antes de que los buscadores puedan moverse.",
+        "hideSecondsHint": "De 15 a 180, antes de que los buscadores puedan moverse.",
         "seekers": "Buscadores al empezar",
         "seekersHint": "De 1 a 3. Todos los encontrados buscan con ellos.",
         "fuseSeconds": "Mecha (segundos)",

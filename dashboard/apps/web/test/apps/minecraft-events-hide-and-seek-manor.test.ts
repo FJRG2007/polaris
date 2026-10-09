@@ -225,9 +225,17 @@ describe("hide and seek's manor in the world", () => {
         const solidAfter = fills.slice(fluid).filter((one) => !/water|lava/.test(one.block));
         expect(solidAfter).toHaveLength(1);
         expect(fills.at(-1)!.box.x1).toBe(fills.at(-1)!.box.x2);
-        const hung = /(_button|ladder|_banner|_door|_trapdoor|scaffolding)\[/;
+        const hung = /(_button|ladder|_banner|_door|_trapdoor)\[/;
         const firstOther = fills.findIndex((one, index) => index > 1 && !hung.test(one.block));
         expect(fills.slice(firstOther).some((one) => hung.test(one.block))).toBe(false);
+        // Scaffolding checks its support a tick after it is placed and drops
+        // itself as an item with none, so it comes after every solid block
+        // (the probe at the very end aside).
+        const scaffold = fills.findIndex((one) => one.block.startsWith("minecraft:scaffolding"));
+        const lastSolid = fills
+            .slice(0, -1)
+            .findLastIndex((one) => !hung.test(one.block) && !/scaffolding|water|lava/.test(one.block));
+        if (scaffold >= 0) expect(scaffold).toBeGreaterThan(lastSolid);
         // Leaves that never wither.
         expect(
             fills

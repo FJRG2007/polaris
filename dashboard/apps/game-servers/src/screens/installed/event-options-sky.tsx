@@ -544,7 +544,7 @@ export function HideAndSeekFields({
                     label={t("editor.hideSeconds")}
                     hint={t("editor.hideSecondsHint")}
                     min={15}
-                    max={90}
+                    max={catalog.MOST_HIDE_SECONDS}
                     value={value.hideSeconds}
                     onChange={(hideSeconds) => onChange({ ...value, hideSeconds })}
                     issues={issues}

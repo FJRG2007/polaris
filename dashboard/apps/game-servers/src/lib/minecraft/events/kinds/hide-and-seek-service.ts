@@ -400,7 +400,10 @@ async function tick(ctx: KindContext, lines: string[]): Promise<string | null> {
         `bossbar set ${commands.BAR} name ${commands.text(
             seekMessages.bar(hiders.length, messages.clock((run.endsAt - now) / 1000), language)
         )}`,
-        ...arena.keepThrown(box)
+        ...arena.keepThrown(box),
+        // Anything the house itself let fall - a block a seeker knocked loose -
+        // gone before somebody picks it up and takes it home with them.
+        ...(run.marker ? [arena.killBrokenDrops(box, run.marker)] : [])
     );
     const scores = hs.scoresOf(
         state,
