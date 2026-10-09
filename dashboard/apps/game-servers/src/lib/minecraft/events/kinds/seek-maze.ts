@@ -25,7 +25,9 @@ export function carve(cells: number, random: () => number, loops = 0.12): Maze {
     const east = new Array<boolean>(cells * cells).fill(false);
     const south = new Array<boolean>(cells * cells).fill(false);
     const seen = new Array<boolean>(cells * cells).fill(false);
-    const stack: [number, number][] = [[Math.floor(random() * cells), Math.floor(random() * cells)]];
+    const stack: [number, number][] = [
+        [Math.floor(random() * cells), Math.floor(random() * cells)]
+    ];
     seen[at(cells, ...stack[0]!)] = true;
     while (stack.length > 0) {
         const [x, z] = stack.at(-1)!;

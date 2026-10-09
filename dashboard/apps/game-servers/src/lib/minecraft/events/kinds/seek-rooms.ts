@@ -74,7 +74,15 @@ export interface Canvas {
     readonly style: Style;
     /** Its doorways, by side and where along it they start (two wide). */
     readonly doors: readonly { readonly side: Side; readonly at: number }[];
-    set(block: string, u1: number, l1: number, v1: number, u2?: number, l2?: number, v2?: number): void;
+    set(
+        block: string,
+        u1: number,
+        l1: number,
+        v1: number,
+        u2?: number,
+        l2?: number,
+        v2?: number
+    ): void;
     clear(u1: number, l1: number, v1: number, u2?: number, l2?: number, v2?: number): void;
     free(u: number, level: number, v: number): boolean;
     /** A floor panel the data pack opens (`secret-panels.ts`): its block, a
@@ -186,7 +194,11 @@ function hatch(c: Canvas, wood: string, u: number, v: number, facing: Side): voi
  *  clear, columns in the corners and the walls' nooks to find. */
 export const FOYER: Template = {
     name: "foyer",
-    style: { face: "minecraft:quartz_block", floor: "minecraft:polished_andesite", entrances: ["painting", "veil", "panel"] },
+    style: {
+        face: "minecraft:quartz_block",
+        floor: "minecraft:polished_andesite",
+        entrances: ["painting", "veil", "panel"]
+    },
     draw(c) {
         for (const [u, v] of [
             [1, 1],
@@ -207,7 +219,11 @@ export const FOYER: Template = {
 
 const LIBRARY: Template = {
     name: "library",
-    style: { face: "minecraft:bookshelf", floor: "minecraft:dark_oak_planks", entrances: ["panel", "veil", "painting"] },
+    style: {
+        face: "minecraft:bookshelf",
+        floor: "minecraft:dark_oak_planks",
+        entrances: ["panel", "veil", "painting"]
+    },
     draw(c) {
         // Two rows of shelves, every one a block deep and three high.
         for (const v of [4, 9])
@@ -233,7 +249,11 @@ const LIBRARY: Template = {
 
 const KITCHEN: Template = {
     name: "kitchen",
-    style: { face: "minecraft:bricks", floor: "minecraft:polished_andesite", entrances: ["door", "painting", "panel"] },
+    style: {
+        face: "minecraft:bricks",
+        floor: "minecraft:polished_andesite",
+        entrances: ["door", "painting", "panel"]
+    },
     draw(c) {
         // An island in the middle: worktop, stove, sink.
         c.set("minecraft:smooth_stone", 5, 1, 6, 8, 1, 7);
@@ -263,7 +283,11 @@ const KITCHEN: Template = {
 const FORGE: Template = {
     name: "forge",
     // Nothing that burns within reach of the lava.
-    style: { face: "minecraft:stone_bricks", floor: "minecraft:smooth_stone", entrances: ["panel", "painting"] },
+    style: {
+        face: "minecraft:stone_bricks",
+        floor: "minecraft:smooth_stone",
+        entrances: ["panel", "painting"]
+    },
     draw(c) {
         // A trough of real lava in the floor; one of its three has a ladder down
         // under it to a cellar. Hiders cross it on fire resistance; a seeker who
@@ -291,7 +315,11 @@ const FORGE: Template = {
 
 const GARDEN: Template = {
     name: "garden",
-    style: { face: "minecraft:mossy_stone_bricks", floor: "minecraft:grass_block", entrances: ["falls", "veil", "painting"] },
+    style: {
+        face: "minecraft:mossy_stone_bricks",
+        floor: "minecraft:grass_block",
+        entrances: ["falls", "veil", "painting"]
+    },
     draw(c) {
         const leaves = "minecraft:oak_leaves[persistent=true]";
         // A tree: a trunk three across, hollow, a ladder up the middle into a
@@ -328,7 +356,11 @@ const GARDEN: Template = {
 
 const POND: Template = {
     name: "pond",
-    style: { face: "minecraft:stone_bricks", floor: "minecraft:grass_block", entrances: ["painting", "veil", "panel"] },
+    style: {
+        face: "minecraft:stone_bricks",
+        floor: "minecraft:grass_block",
+        entrances: ["painting", "veil", "panel"]
+    },
     draw(c) {
         // A pond six deep; a tunnel from its bottom under the floor to a shaft
         // that comes up into a dry cave. Water only ever in still sources, every
@@ -376,7 +408,11 @@ const MAZE_WALLS = [
 
 const MAZE: Template = {
     name: "maze",
-    style: { face: "minecraft:spruce_planks", floor: "minecraft:spruce_planks", entrances: ["painting", "panel"] },
+    style: {
+        face: "minecraft:spruce_planks",
+        floor: "minecraft:spruce_planks",
+        entrances: ["painting", "panel"]
+    },
     draw(c) {
         // Five by five cells two wide, walls one thick and four high: the
         // doorways line up with its corridors (`SLOTS`).
@@ -402,9 +438,12 @@ const MAZE: Template = {
                 const u = cell(cx);
                 const v = cell(cz);
                 c.clear(u, 1, v, u + 1, 4, v + 1);
-                if (cx < 4 && maze.open(carved, cx, cz, 1, 0)) c.clear(u + 2, 1, v, u + 2, 4, v + 1);
-                if (cz < 4 && maze.open(carved, cx, cz, 0, 1)) c.clear(u, 1, v + 2, u + 1, 4, v + 2);
-                if (!dark || (cx + cz) % 2 === 0) c.set("minecraft:sea_lantern", u + (cz % 2), 0, v + (cx % 2));
+                if (cx < 4 && maze.open(carved, cx, cz, 1, 0))
+                    c.clear(u + 2, 1, v, u + 2, 4, v + 1);
+                if (cz < 4 && maze.open(carved, cx, cz, 0, 1))
+                    c.clear(u, 1, v + 2, u + 1, 4, v + 2);
+                if (!dark || (cx + cz) % 2 === 0)
+                    c.set("minecraft:sea_lantern", u + (cz % 2), 0, v + (cx % 2));
             }
         // The dead ends hide trapdoors to a hollow under them.
         let hollows = 0;
@@ -432,7 +471,11 @@ const MAZE: Template = {
 
 const GALLERY: Template = {
     name: "gallery",
-    style: { face: "minecraft:quartz_block", floor: "minecraft:dark_oak_planks", entrances: ["painting", "veil", "panel"] },
+    style: {
+        face: "minecraft:quartz_block",
+        floor: "minecraft:dark_oak_planks",
+        entrances: ["painting", "veil", "panel"]
+    },
     draw(c) {
         // A balcony along a side with no doorway, steps up to it at one end and
         // crates to hide behind on it and under it.
@@ -443,7 +486,9 @@ const GALLERY: Template = {
             const row = side === "north" ? v1 : v2;
             const edge = side === "north" ? v2 : v1;
             const front = edge + (side === "north" ? 1 : -1);
-            const crate = c.era.scaffold ? "minecraft:barrel[facing=up]" : "minecraft:spruce_planks";
+            const crate = c.era.scaffold
+                ? "minecraft:barrel[facing=up]"
+                : "minecraft:spruce_planks";
             // Steps: a block a level along the balcony's front, up to a gap in
             // its railing.
             for (let step = 1; step <= 3; step += 1)
@@ -463,7 +508,10 @@ const GALLERY: Template = {
             [9, 6, 12]
         ] as const) {
             c.set("minecraft:quartz_pillar", u, 1, v, u, 2, v);
-            gaze(c, `minecraft:skeleton_skull[rotation=${rotation}]`, u, 3, v, { u, v: v + (v === 7 ? 3 : -3) });
+            gaze(c, `minecraft:skeleton_skull[rotation=${rotation}]`, u, 3, v, {
+                u,
+                v: v + (v === 7 ? 3 : -3)
+            });
             button(c, "minecraft:stone_button", u - 1, 1, v, "west");
         }
         rug(c, "purple", 6, 9);
@@ -473,7 +521,11 @@ const GALLERY: Template = {
 
 const WORKSHOP: Template = {
     name: "workshop",
-    style: { face: "minecraft:spruce_planks", floor: "minecraft:oak_planks", entrances: ["panel", "door", "painting"] },
+    style: {
+        face: "minecraft:spruce_planks",
+        floor: "minecraft:oak_planks",
+        entrances: ["panel", "door", "painting"]
+    },
     draw(c) {
         const crate = c.era.scaffold ? "minecraft:barrel[facing=up]" : "minecraft:spruce_planks";
         // Three stacks of crates three across and three high, all alike; from
@@ -498,7 +550,9 @@ const WORKSHOP: Template = {
         button(c, "minecraft:oak_button", 5, 1, 3, "east");
         // A tower up to a shelf under the roof: scaffolding from 1.14, a ladder
         // before.
-        const climb = c.era.scaffold ? "minecraft:scaffolding[distance=0,bottom=false]" : "minecraft:ladder[facing=west]";
+        const climb = c.era.scaffold
+            ? "minecraft:scaffolding[distance=0,bottom=false]"
+            : "minecraft:ladder[facing=west]";
         c.set(climb, 12, 1, 11, 12, 8, 11);
         c.set("minecraft:spruce_log", 13, 1, 11, 13, 7, 11);
         c.set("minecraft:birch_planks", 12, 8, 7, 13, 8, 10);
@@ -516,7 +570,11 @@ const WORKSHOP: Template = {
 
 const BEDROOM: Template = {
     name: "bedroom",
-    style: { face: "minecraft:birch_planks", floor: "minecraft:oak_planks", entrances: ["door", "painting", "veil"] },
+    style: {
+        face: "minecraft:birch_planks",
+        floor: "minecraft:oak_planks",
+        entrances: ["door", "painting", "veil"]
+    },
     draw(c) {
         // Three wardrobes, three across, two deep and three high, all alike: a
         // door in the front, and behind it room for one - or, in one of them,
@@ -528,8 +586,18 @@ const BEDROOM: Template = {
         ] as const;
         const solid = Math.floor(c.random() * wardrobes.length);
         wardrobes.forEach(([u, v], index) => {
-            c.set("minecraft:oak_door[facing=south,half=lower,hinge=left,open=false]", u + 1, 1, v + 1);
-            c.set("minecraft:oak_door[facing=south,half=upper,hinge=left,open=false]", u + 1, 2, v + 1);
+            c.set(
+                "minecraft:oak_door[facing=south,half=lower,hinge=left,open=false]",
+                u + 1,
+                1,
+                v + 1
+            );
+            c.set(
+                "minecraft:oak_door[facing=south,half=upper,hinge=left,open=false]",
+                u + 1,
+                2,
+                v + 1
+            );
             if (index !== solid) {
                 c.clear(u + 1, 1, v, u + 1, 2, v);
                 c.spot(u + 1, 1, v);
@@ -553,7 +621,11 @@ const BEDROOM: Template = {
 const SNOW: Template = {
     name: "snow",
     fits: (era) => era.snow,
-    style: { face: "minecraft:snow_block", floor: "minecraft:snow_block", entrances: ["panel", "painting"] },
+    style: {
+        face: "minecraft:snow_block",
+        floor: "minecraft:snow_block",
+        entrances: ["panel", "painting"]
+    },
     draw(c) {
         // Drifts of powder snow, which looks like the floor round it: step on
         // one and you sink - into nothing, or, on one of them, down into a
@@ -599,6 +671,10 @@ export const TEMPLATES: readonly Template[] = [
 /** A plain room, for a house that falls back to its bare walls. */
 export const PLAIN: Template = {
     name: "plain",
-    style: { face: "minecraft:stone_bricks", floor: "minecraft:smooth_stone", entrances: ["painting"] },
+    style: {
+        face: "minecraft:stone_bricks",
+        floor: "minecraft:smooth_stone",
+        entrances: ["painting"]
+    },
     draw() {}
 };

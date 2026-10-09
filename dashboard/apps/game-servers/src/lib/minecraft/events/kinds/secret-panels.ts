@@ -276,12 +276,15 @@ export function armLines(
     if (panels.length === 0 && !home) return [];
     const lines = [
         ...stopLines(box),
-        ...OBJECTIVES.map(([objective, criterion]) => `scoreboard objectives add ${objective} ${criterion}`),
+        ...OBJECTIVES.map(
+            ([objective, criterion]) => `scoreboard objectives add ${objective} ${criterion}`
+        ),
         `execute store result score #now ${LAST} run time query gametime`
     ];
     for (const panel of panels) {
         const tags = [PANEL, `pe_pnl_m${MATERIALS.indexOf(panel.material)}`];
-        if (panel.shape === "floor") tags.push(FLOOR_TAG, `pe_pnl_f${(panel.facing ?? "north")[0]}`);
+        if (panel.shape === "floor")
+            tags.push(FLOOR_TAG, `pe_pnl_f${(panel.facing ?? "north")[0]}`);
         lines.push(stand(panel, tags), ...scored([[ID, panel.id]]));
     }
     for (const key of keys)

@@ -325,7 +325,10 @@ async function raise(ctx: KindContext): Promise<void> {
     const game = gameOf(run.preset.kind);
     if (game?.prepare) {
         const prepared = await game.prepare(ctx);
-        run = { ...run, game: { ...((run.game as Record<string, unknown> | null) ?? {}), ...prepared } };
+        run = {
+            ...run,
+            game: { ...((run.game as Record<string, unknown> | null) ?? {}), ...prepared }
+        };
     }
     const fills = fillsFor(run, box);
     const built: stored.Arena = { box, blocks: blocksFor(run, box, fills) };

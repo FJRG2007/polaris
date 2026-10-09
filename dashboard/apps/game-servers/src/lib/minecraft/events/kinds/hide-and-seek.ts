@@ -1726,7 +1726,9 @@ export const stateSchema = z.object({
         .default(null),
     /** When the hiders' next power-up is due, and the last each was given. */
     powerAt: z.number().nullable().default(null),
-    powers: z.record(z.object({ kind: z.enum(["invisible", "fast"]), until: z.number() })).default({})
+    powers: z
+        .record(z.object({ kind: z.enum(["invisible", "fast"]), until: z.number() }))
+        .default({})
 });
 export type SeekState = z.infer<typeof stateSchema>;
 
@@ -1871,12 +1873,17 @@ export const POWER_SECONDS: Readonly<Record<Power, number>> = { invisible: 10, f
 
 export function powerLines(name: string, power: Power): string[] {
     const effect = power === "invisible" ? "minecraft:invisibility" : "minecraft:speed";
-    return [`tag ${name} add ${FX_TAG}`, `effect give ${name} ${effect} ${POWER_SECONDS[power]} 0 true`];
+    return [
+        `tag ${name} add ${FX_TAG}`,
+        `effect give ${name} ${effect} ${POWER_SECONDS[power]} 0 true`
+    ];
 }
 
 /** The power-up a hider gets in round `round`, drawn from the run's id. */
 export function powerFor(seed: string, name: string, round: number): Power {
-    return POWERS[Math.floor(seeded(`${seed}-power-${round}-${name.toLowerCase()}`)() * POWERS.length)]!;
+    return POWERS[
+        Math.floor(seeded(`${seed}-power-${round}-${name.toLowerCase()}`)() * POWERS.length)
+    ]!;
 }
 
 /** Everything the game gave one player taken off, and only that: for a hider

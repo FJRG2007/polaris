@@ -185,9 +185,19 @@ export interface Manor {
     readonly paintings: readonly Painting[];
     readonly shown: readonly Shown[];
     /** A place to stand in each hiding place, by room. */
-    readonly spots: readonly { readonly room: number; readonly x: number; readonly feet: number; readonly z: number }[];
+    readonly spots: readonly {
+        readonly room: number;
+        readonly x: number;
+        readonly feet: number;
+        readonly z: number;
+    }[];
     /** Nooks in the walls, by how they open. */
-    readonly nooks: readonly { readonly room: number; readonly entrance: rooms.Entrance; readonly tall: boolean; readonly length: number }[];
+    readonly nooks: readonly {
+        readonly room: number;
+        readonly entrance: rooms.Entrance;
+        readonly tall: boolean;
+        readonly length: number;
+    }[];
     /** The middle of the cage. */
     readonly middle: { readonly x: number; readonly z: number };
     readonly bare: boolean;
@@ -230,9 +240,20 @@ function placer(i: number, j: number, turn: number, mirror: boolean) {
         return SIDE_OF(du, dv);
     };
     const block = (state: string): string => {
-        let out = state.replace(/facing=(north|south|east|west)/, (_, way: Side) => `facing=${side(way)}`);
-        if (turn % 2 === 1) out = out.replace(/axis=(x|z)/, (_, axis: string) => `axis=${axis === "x" ? "z" : "x"}`);
-        if (mirror) out = out.replace(/hinge=(left|right)/, (_, hinge: string) => `hinge=${hinge === "left" ? "right" : "left"}`);
+        let out = state.replace(
+            /facing=(north|south|east|west)/,
+            (_, way: Side) => `facing=${side(way)}`
+        );
+        if (turn % 2 === 1)
+            out = out.replace(
+                /axis=(x|z)/,
+                (_, axis: string) => `axis=${axis === "x" ? "z" : "x"}`
+            );
+        if (mirror)
+            out = out.replace(
+                /hinge=(left|right)/,
+                (_, hinge: string) => `hinge=${hinge === "left" ? "right" : "left"}`
+            );
         out = out.replace(/rotation=(\d+)/, (_, value: string) => {
             let rotation = Number(value);
             if (mirror) rotation = (16 - rotation) % 16;
@@ -292,13 +313,18 @@ interface Draft {
 
 /** The doorways: a random depth-first walk over the grid of rooms, which
  *  reaches every room, and a few more for loops. */
-function drawLinks(count: number, random: () => number, pick: (list: readonly number[]) => number): Link[] {
+function drawLinks(
+    count: number,
+    random: () => number,
+    pick: (list: readonly number[]) => number
+): Link[] {
     const links: Link[] = [];
     const id = (i: number, j: number) => j * count + i;
     const seen = new Set<number>();
     const stack: [number, number][] = [[Math.floor(count / 2), Math.floor(count / 2)]];
     seen.add(id(...stack[0]!));
-    const has = (a: number, b: number) => links.some((one) => (one.a === a && one.b === b) || (one.a === b && one.b === a));
+    const has = (a: number, b: number) =>
+        links.some((one) => (one.a === a && one.b === b) || (one.a === b && one.b === a));
     while (stack.length > 0) {
         const [i, j] = stack.at(-1)!;
         const next = (
@@ -310,14 +336,21 @@ function drawLinks(count: number, random: () => number, pick: (list: readonly nu
             ] as const
         )
             .map(([di, dj]) => [i + di, j + dj] as [number, number])
-            .filter(([ni, nj]) => ni >= 0 && nj >= 0 && ni < count && nj < count && !seen.has(id(ni, nj)));
+            .filter(
+                ([ni, nj]) =>
+                    ni >= 0 && nj >= 0 && ni < count && nj < count && !seen.has(id(ni, nj))
+            );
         if (next.length === 0) {
             stack.pop();
             continue;
         }
         const [ni, nj] = next[Math.floor(random() * next.length)]!;
         seen.add(id(ni, nj));
-        links.push({ a: Math.min(id(i, j), id(ni, nj)), b: Math.max(id(i, j), id(ni, nj)), at: pick(rooms.SLOTS) });
+        links.push({
+            a: Math.min(id(i, j), id(ni, nj)),
+            b: Math.max(id(i, j), id(ni, nj)),
+            at: pick(rooms.SLOTS)
+        });
         stack.push([ni, nj]);
     }
     for (let j = 0; j < count; j += 1)
@@ -339,7 +372,13 @@ function linkSide(count: number, a: number, b: number): Side {
 }
 
 /** One draw of a house, unchecked: what `manorFor` tries in turn. */
-export function drawManor(seed: string, count: number, era: model.Era, draw: number, plain = false): Manor {
+export function drawManor(
+    seed: string,
+    count: number,
+    era: model.Era,
+    draw: number,
+    plain = false
+): Manor {
     const random = seeded(`${seed}-manor-${draw}`);
     const pick = <T>(list: readonly T[]): T => list[Math.floor(random() * list.length)]!;
     const size = sizeOf(count);
@@ -385,7 +424,10 @@ export function drawManor(seed: string, count: number, era: model.Era, draw: num
     const doorsOf = (room: number) =>
         links
             .filter((one) => one.a === room || one.b === room)
-            .map((one) => ({ side: linkSide(count, room, one.a === room ? one.b : one.a), at: one.at }));
+            .map((one) => ({
+                side: linkSide(count, room, one.a === room ? one.b : one.a),
+                at: one.at
+            }));
 
     // The doorways first: through the wall, and clear in front on both sides.
     for (const link of links) {
@@ -445,8 +487,17 @@ export function drawManor(seed: string, count: number, era: model.Era, draw: num
         }
         // And over the corners, which furniture can box in.
         for (const u of [1, rooms.LAST - 1])
-            for (const v of [1, rooms.LAST - 1]) grid.set(LAMP, place.x0 + u, model.ROOF - 1, place.z0 + v);
-        grid.set(style.floor, place.x0, 0, place.z0, place.x0 + rooms.LAST, 0, place.z0 + rooms.LAST);
+            for (const v of [1, rooms.LAST - 1])
+                grid.set(LAMP, place.x0 + u, model.ROOF - 1, place.z0 + v);
+        grid.set(
+            style.floor,
+            place.x0,
+            0,
+            place.z0,
+            place.x0 + rooms.LAST,
+            0,
+            place.z0 + rooms.LAST
+        );
         // Each room's faces of its walls.
         for (const side of rooms.SIDES) {
             const wall = wallOf(place.x0, place.z0, side);
@@ -483,7 +534,9 @@ export function drawManor(seed: string, count: number, era: model.Era, draw: num
         rooms: plans,
         links,
         grid,
-        panels: draft.panels.filter((panel) => keys.some((key) => key.id === panel.id && !key.inside)),
+        panels: draft.panels.filter((panel) =>
+            keys.some((key) => key.id === panel.id && !key.inside)
+        ),
         keys,
         paintings: draft.paintings,
         shown: draft.shown,
@@ -500,7 +553,9 @@ function ringOf(mid: { x: number; z: number }): { x: number; z: number }[] {
     for (let x = mid.x - 4; x <= mid.x + 4; x += 1)
         for (let z = mid.z - 4; z <= mid.z + 4; z += 1)
             if (Math.max(Math.abs(x - mid.x), Math.abs(z - mid.z)) === 4) ring.push({ x, z });
-    return ring.sort((a, b) => Math.atan2(a.z - mid.z, a.x - mid.x) - Math.atan2(b.z - mid.z, b.x - mid.x));
+    return ring.sort(
+        (a, b) => Math.atan2(a.z - mid.z, a.x - mid.x) - Math.atan2(b.z - mid.z, b.x - mid.x)
+    );
 }
 
 function canvasOf(
@@ -516,7 +571,12 @@ function canvasOf(
     const box = (u1: number, v1: number, u2: number, v2: number) => {
         const a = place.at(u1, v1);
         const b = place.at(u2, v2);
-        return { x1: Math.min(a.x, b.x), z1: Math.min(a.z, b.z), x2: Math.max(a.x, b.x), z2: Math.max(a.z, b.z) };
+        return {
+            x1: Math.min(a.x, b.x),
+            z1: Math.min(a.z, b.z),
+            x2: Math.max(a.x, b.x),
+            z2: Math.max(a.z, b.z)
+        };
     };
     const canvas: rooms.Canvas = {
         random,
@@ -556,7 +616,12 @@ function canvasOf(
                 room
             });
             const button = place.at(inside.u, inside.v);
-            canvas.set(`minecraft:stone_button[face=wall,facing=${inside.facing},powered=false]`, inside.u, inside.level, inside.v);
+            canvas.set(
+                `minecraft:stone_button[face=wall,facing=${inside.facing},powered=false]`,
+                inside.u,
+                inside.level,
+                inside.v
+            );
             draft.insideKeys.push({ panel: id, x: button.x, level: inside.level, z: button.z });
         },
         display(block, u, level, v) {
@@ -597,17 +662,22 @@ function nooksOf(
         if (made >= wanted) break;
         const wall = wallOf(x0, z0, side);
         const blocked = (along: number) =>
-            doors.some((door) => door.side === side && along >= door.at - 2 && along <= door.at + 3);
+            doors.some(
+                (door) => door.side === side && along >= door.at - 2 && along <= door.at + 3
+            );
         // The longest stretch free of doorways, a block in from the corners.
         const free: number[] = [];
-        for (let along = 1; along <= rooms.LAST - 1; along += 1) if (!blocked(along)) free.push(along);
+        for (let along = 1; along <= rooms.LAST - 1; along += 1)
+            if (!blocked(along)) free.push(along);
         const runs: [number, number][] = [];
         for (const along of free) {
             const last = runs.at(-1);
             if (last && last[1] === along - 1) last[1] = along;
             else runs.push([along, along]);
         }
-        const run = runs.filter(([a, b]) => b - a + 1 >= 4).sort((p, q) => q[1] - q[0] - (p[1] - p[0]))[0];
+        const run = runs
+            .filter(([a, b]) => b - a + 1 >= 4)
+            .sort((p, q) => q[1] - q[0] - (p[1] - p[0]))[0];
         if (!run) continue;
         const length = Math.min(run[1] - run[0] + 1, 4 + Math.floor(random() * 4));
         const start = run[0] + Math.floor(random() * (run[1] - run[0] + 2 - length));
@@ -620,10 +690,13 @@ function nooksOf(
                 if (!grid.free(cell.x, 1, cell.z)) taken = true;
             }
         if (taken) continue;
-        let entrance = entrances[Math.floor(random() * Math.min(entrances.length, 2))] ?? "painting";
-        if (entrance === "falls" && length < 5) entrance = entrances.find((one) => one !== "falls") ?? "painting";
+        let entrance =
+            entrances[Math.floor(random() * Math.min(entrances.length, 2))] ?? "painting";
+        if (entrance === "falls" && length < 5)
+            entrance = entrances.find((one) => one !== "falls") ?? "painting";
         const tall = entrance !== "falls" && random() < 0.5;
-        const at = entrance === "falls" ? start + 2 : start + 1 + Math.floor(random() * (length - 2));
+        const at =
+            entrance === "falls" ? start + 2 : start + 1 + Math.floor(random() * (length - 2));
         carveNook(draft, wall, { start, end, at, tall, entrance, style, room, random });
         made += 1;
     }
@@ -633,11 +706,21 @@ function nooksOf(
             const wall = wallOf(x0, z0, side);
             const along = 2 + Math.floor(random() * 10);
             const near = [along - 1, along, along + 1];
-            if (near.some((one) => doors.some((door) => door.side === side && one >= door.at - 1 && one <= door.at + 2)))
+            if (
+                near.some((one) =>
+                    doors.some(
+                        (door) => door.side === side && one >= door.at - 1 && one <= door.at + 2
+                    )
+                )
+            )
                 continue;
             const cell = wall.cell(along, 0);
             const front = wall.room(along, 0);
-            if (!grid.free(cell.x, 1, cell.z) || !grid.free(cell.x, 2, cell.z) || !grid.free(front.x, 1, front.z))
+            if (
+                !grid.free(cell.x, 1, cell.z) ||
+                !grid.free(cell.x, 2, cell.z) ||
+                !grid.free(front.x, 1, front.z)
+            )
                 continue;
             setDoor(grid, cell, wall.inward);
             grid.clear(front.x, 1, front.z, front.x, 2, front.z);
@@ -645,8 +728,18 @@ function nooksOf(
 }
 
 function setDoor(grid: model.Grid, cell: { x: number; z: number }, facing: Side): void {
-    grid.set(`minecraft:oak_door[facing=${facing},half=lower,hinge=left,open=false]`, cell.x, 1, cell.z);
-    grid.set(`minecraft:oak_door[facing=${facing},half=upper,hinge=left,open=false]`, cell.x, 2, cell.z);
+    grid.set(
+        `minecraft:oak_door[facing=${facing},half=lower,hinge=left,open=false]`,
+        cell.x,
+        1,
+        cell.z
+    );
+    grid.set(
+        `minecraft:oak_door[facing=${facing},half=upper,hinge=left,open=false]`,
+        cell.x,
+        2,
+        cell.z
+    );
 }
 
 /** A nook in a wall's core from `start` to `end`, opening at `at`. */
@@ -701,7 +794,8 @@ function carveNook(
         }
         case "veil":
             grid.clear(door.x, 1, door.z, door.x, 2, door.z);
-            for (const level of [1, 2]) draft.shown.push({ x: door.x, level, z: door.z, block: style.face });
+            for (const level of [1, 2])
+                draft.shown.push({ x: door.x, level, z: door.z, block: style.face });
             break;
         case "door":
             setDoor(grid, door, wall.inward);
@@ -739,7 +833,12 @@ function carveNook(
             });
             // Out again: a button on the far side of the nook, facing the panel.
             const inside = cell(at, 2);
-            grid.set(`minecraft:stone_button[face=wall,facing=${wall.inward}]`, inside.x, 2, inside.z);
+            grid.set(
+                `minecraft:stone_button[face=wall,facing=${wall.inward}]`,
+                inside.x,
+                2,
+                inside.z
+            );
             draft.insideKeys.push({ panel: id, x: inside.x, level: 2, z: inside.z });
         }
     }
@@ -772,8 +871,13 @@ function decoyPaintings(draft: Draft, plans: readonly RoomPlan[], random: () => 
                 return taken.has(`${one.x},${one.z}`);
             });
             if (near) continue;
-            if (grid.cell(face.x, 1, face.z) !== "solid" || grid.cell(face.x, 2, face.z) !== "solid") continue;
-            if (grid.panelAt(face.x, 1, face.z) || grid.get(face.x, 1, face.z)?.includes("water")) continue;
+            if (
+                grid.cell(face.x, 1, face.z) !== "solid" ||
+                grid.cell(face.x, 2, face.z) !== "solid"
+            )
+                continue;
+            if (grid.panelAt(face.x, 1, face.z) || grid.get(face.x, 1, face.z)?.includes("water"))
+                continue;
             if (grid.get(front.x, 1, front.z) || grid.get(front.x, 2, front.z)) continue;
             draft.paintings.push({
                 x: front.x,
@@ -843,7 +947,10 @@ function chooseKeys(draft: Draft, random: () => number): Key[] {
 /** Ticks a panel is held open after its key: the walk from the key to the
  *  panel at a walk, and `MARGIN_TICKS` to get in. */
 export function holdTicks(steps: number): number {
-    return Math.min(HOLD_MAX, Math.max(HOLD_MIN, Math.ceil((steps * 20) / WALK_SPEED) + MARGIN_TICKS));
+    return Math.min(
+        HOLD_MAX,
+        Math.max(HOLD_MIN, Math.ceil((steps * 20) / WALK_SPEED) + MARGIN_TICKS)
+    );
 }
 
 /** The keys with their holds, measured over the house as built. */
@@ -892,7 +999,8 @@ function inCage(manor: Pick<Manor, "middle">, x: number, z: number): boolean {
 }
 
 /** Blocks that burn: none within reach of lava. */
-const BURNS = /(planks|_log|leaves|wool|carpet|bookshelf|oak_fence|spruce_fence|hay_block|scaffolding|_stairs|_slab|_banner|tnt|vine)$/;
+const BURNS =
+    /(planks|_log|leaves|wool|carpet|bookshelf|oak_fence|spruce_fence|hay_block|scaffolding|_stairs|_slab|_banner|tnt|vine)$/;
 
 /**
  * Every rule a house breaks, one line each; empty when it keeps them all.
@@ -915,7 +1023,8 @@ export function manorProblems(manor: Manor): string[] {
                 const index = grid.index(x, feet, z);
                 if (inCage(manor, x, z) && feet <= 5) continue;
                 // A body with its feet or its head in lava: a seeker there is sent back.
-                const inLava = grid.cell(x, feet, z) === "lava" || grid.cell(x, feet + 1, z) === "lava";
+                const inLava =
+                    grid.cell(x, feet, z) === "lava" || grid.cell(x, feet + 1, z) === "lava";
                 if (hider[index]! >= 0 && seeker[index]! < 0 && !inLava)
                     unfair.push(`${x},${feet},${z}`);
                 const stands = seekerMoves.held(x, feet, z) || hiderMoves.held(x, feet, z);
@@ -931,9 +1040,15 @@ export function manorProblems(manor: Manor): string[] {
                     dark.push(`${x},${feet},${z}`);
             }
     if (unfair.length > 0)
-        problems.push(`${unfair.length} places a hider reaches and a seeker cannot, first ${unfair[0]}`);
-    if (sealed.length > 0) problems.push(`${sealed.length} places to stand cannot be reached, first ${sealed[0]}`);
-    if (dark.length > 0) problems.push(`${dark.length} places to stand are dark enough for monsters, first ${dark[0]}`);
+        problems.push(
+            `${unfair.length} places a hider reaches and a seeker cannot, first ${unfair[0]}`
+        );
+    if (sealed.length > 0)
+        problems.push(`${sealed.length} places to stand cannot be reached, first ${sealed[0]}`);
+    if (dark.length > 0)
+        problems.push(
+            `${dark.length} places to stand are dark enough for monsters, first ${dark[0]}`
+        );
     for (const spot of manor.spots)
         if (seeker[grid.index(spot.x, spot.feet, spot.z)]! < 0)
             problems.push(`the hiding place at ${spot.x},${spot.feet},${spot.z} cannot be reached`);
@@ -943,7 +1058,8 @@ export function manorProblems(manor: Manor): string[] {
             if (places === 0) problems.push(`room ${room} has nowhere to hide`);
         });
     for (const cell of hiderCells(manor))
-        if (!seekerMoves.held(cell.x, 1, cell.z)) problems.push(`a hider's start at ${cell.x},${cell.z} is taken`);
+        if (!seekerMoves.held(cell.x, 1, cell.z))
+            problems.push(`a hider's start at ${cell.x},${cell.z} is taken`);
     for (const panel of manor.panels) {
         const keys = manor.keys.filter((key) => key.id === panel.id && !key.inside);
         if (keys.length === 0) problems.push(`panel ${panel.id} has no key`);
@@ -967,7 +1083,9 @@ export function manorProblems(manor: Manor): string[] {
                         for (let up = 0; up <= 4; up += 1) {
                             const block = grid.get(x + dx, level + up, z + dz);
                             if (block && BURNS.test(model.bare(block)))
-                                problems.push(`${model.bare(block)} at ${x + dx},${level + up},${z + dz} can catch fire from the lava`);
+                                problems.push(
+                                    `${model.bare(block)} at ${x + dx},${level + up},${z + dz} can catch fire from the lava`
+                                );
                         }
             }
     return [...new Set(problems)];
@@ -999,7 +1117,9 @@ export function manorBlocks(manor: Manor): string[] {
             ? 0
             : /powder_snow/.test(id)
               ? 1
-              : /(_button|ladder|_banner|_door|_trapdoor|_carpet|poppy|dandelion|cornflower|azure_bluet|_skull|_bed|scaffolding|torch)$/.test(id)
+              : /(_button|ladder|_banner|_door|_trapdoor|_carpet|poppy|dandelion|cornflower|azure_bluet|_skull|_bed|scaffolding|torch)$/.test(
+                      id
+                  )
                 ? 2
                 : 3;
     return [...ids].sort((a, b) => first(a) - first(b));
@@ -1027,11 +1147,17 @@ export function manorFills(box: Box, manor: Manor): Fill[] {
     for (const part of parts) {
         const a = worldOf(box, part.x1, part.l1, part.z1);
         const b = worldOf(box, part.x2, part.l2, part.z2);
-        fills.push({ box: { x1: a.x, y1: a.y, z1: a.z, x2: b.x, y2: b.y, z2: b.z }, block: part.block });
+        fills.push({
+            box: { x1: a.x, y1: a.y, z1: a.z, x2: b.x, y2: b.y, z2: b.z },
+            block: part.block
+        });
     }
     const probe = worldOf(box, model.WALL, 0, model.WALL);
     const floor = manor.grid.get(model.WALL, 0, model.WALL) ?? OUTER;
-    fills.push({ box: { x1: probe.x, y1: probe.y, z1: probe.z, x2: probe.x, y2: probe.y, z2: probe.z }, block: floor });
+    fills.push({
+        box: { x1: probe.x, y1: probe.y, z1: probe.z, x2: probe.x, y2: probe.y, z2: probe.z },
+        block: floor
+    });
     return fills;
 }
 
@@ -1075,7 +1201,7 @@ export function decorLines(box: Box, manor: Manor): string[] {
 function idBase(seed: string): number {
     let hash = 0;
     for (const char of seed) hash = (Math.imul(hash, 31) + char.charCodeAt(0)) | 0;
-    return (Math.abs(hash) % 9000 + 1000) * 100;
+    return ((Math.abs(hash) % 9000) + 1000) * 100;
 }
 
 /** The panels and keys put to work at "Go!", and the seekers' way home. */
@@ -1131,13 +1257,18 @@ export function hiderSpot(box: Box, manor: Manor, index: number): Spot {
     const at = worldOf(box, cell.x, 1, cell.z);
     return {
         ...at,
-        yaw: Math.round((-Math.atan2(cell.x - manor.middle.x, cell.z - manor.middle.z) * 180) / Math.PI)
+        yaw: Math.round(
+            (-Math.atan2(cell.x - manor.middle.x, cell.z - manor.middle.z) * 180) / Math.PI
+        )
     };
 }
 
 export function seekerSpot(box: Box, manor: Manor, index: number): Spot {
     const cells = seekerCells(manor);
-    return { ...worldOf(box, cells[index % cells.length]!.x, 1, cells[index % cells.length]!.z), yaw: 0 };
+    return {
+        ...worldOf(box, cells[index % cells.length]!.x, 1, cells[index % cells.length]!.z),
+        yaw: 0
+    };
 }
 
 /** Before the house comes down: the markers, paintings and display blocks
@@ -1151,7 +1282,10 @@ export function closeLines(box: Box): string[] {
         ...panels.stopLines(box),
         panels.decorOff(box),
         ...["minecraft:lava", "minecraft:water"].flatMap((fluid) =>
-            fluids.map((one) => `execute in minecraft:overworld run fill ${one} minecraft:air replace ${fluid}`)
+            fluids.map(
+                (one) =>
+                    `execute in minecraft:overworld run fill ${one} minecraft:air replace ${fluid}`
+            )
         )
     ];
 }

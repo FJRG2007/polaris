@@ -21,7 +21,11 @@ describe("hide and seek's manor", () => {
     it("keeps every rule, with every room template in use, on every server age", () => {
         const used = new Set<string>();
         let plain = 0;
-        for (const era of [model.NEWEST, model.OLDEST, { scaffold: true, snow: true, display: false }])
+        for (const era of [
+            model.NEWEST,
+            model.OLDEST,
+            { scaffold: true, snow: true, display: false }
+        ])
             for (let seed = 0; seed < 24; seed += 1) {
                 const house = manor.manorFor(`run-${seed}`, 3, era);
                 if (house.bare) plain += 1;
@@ -29,7 +33,9 @@ describe("hide and seek's manor", () => {
                 for (const room of house.rooms) used.add(room.template);
             }
         expect(plain).toBe(0);
-        expect([...used].sort()).toEqual([...rooms.TEMPLATES.map((one) => one.name), "foyer"].sort());
+        expect([...used].sort()).toEqual(
+            [...rooms.TEMPLATES.map((one) => one.name), "foyer"].sort()
+        );
     });
 
     it("grows with the players, or with the size asked for", () => {
@@ -103,7 +109,8 @@ describe("hide and seek's manor", () => {
         // Every hidden place is in a wall's core, under the floor, in a tree's
         // crown, in a crate stack or wardrobe the same size as its twins, or up
         // on a shelf or balcony.
-        for (const spot of house.spots) expect(house.grid.inside(spot.x, spot.feet, spot.z)).toBe(true);
+        for (const spot of house.spots)
+            expect(house.grid.inside(spot.x, spot.feet, spot.z)).toBe(true);
     });
 
     it("puts each key well away from its panel, and holds the panel open for the walk", () => {
@@ -115,11 +122,16 @@ describe("hide and seek's manor", () => {
                 expect(outside.length).toBe(1);
                 for (const key of outside) {
                     keys += 1;
-                    const distance = Math.hypot(key.from.x - panel.front.x, key.from.z - panel.front.z);
+                    const distance = Math.hypot(
+                        key.from.x - panel.front.x,
+                        key.from.z - panel.front.z
+                    );
                     expect(distance).toBeGreaterThanOrEqual(manor.KEY_DISTANCE);
-                    const steps = model.walk(house.grid, { x: key.from.x, feet: 1, z: key.from.z }, "seeker")[
-                        house.grid.index(panel.front.x, panel.front.feet, panel.front.z)
-                    ]!;
+                    const steps = model.walk(
+                        house.grid,
+                        { x: key.from.x, feet: 1, z: key.from.z },
+                        "seeker"
+                    )[house.grid.index(panel.front.x, panel.front.feet, panel.front.z)]!;
                     expect(steps).toBeGreaterThanOrEqual(manor.KEY_DISTANCE - 1);
                     // The walk at 4.3 blocks a second, and three seconds more.
                     expect(key.hold).toBeGreaterThanOrEqual(Math.ceil((steps * 20) / 4.317) + 60);
@@ -148,7 +160,10 @@ describe("hide and seek's manor", () => {
             expect(counts.every((count) => count >= 1)).toBe(true);
             expect(house.nooks.every((nook) => nook.length >= 4)).toBe(true);
         }
-        const nooks = Array.from({ length: 10 }, (_, seed) => manor.manorFor(`tall-${seed}`, 3, model.NEWEST).nooks).flat();
+        const nooks = Array.from(
+            { length: 10 },
+            (_, seed) => manor.manorFor(`tall-${seed}`, 3, model.NEWEST).nooks
+        ).flat();
         expect(nooks.some((nook) => nook.tall)).toBe(true);
         expect(new Set(nooks.map((nook) => nook.entrance)).size).toBeGreaterThanOrEqual(4);
     });
@@ -157,26 +172,34 @@ describe("hide and seek's manor", () => {
         for (let seed = 0; seed < 10; seed += 1) {
             const house = manor.manorFor(`old-${seed}`, 3, model.OLDEST);
             expect(house.shown).toEqual([]);
-            expect(manor.decorLines(box, house).some((line) => line.includes("block_display"))).toBe(false);
+            expect(
+                manor.decorLines(box, house).some((line) => line.includes("block_display"))
+            ).toBe(false);
             const blocks = manor.manorBlocks(house);
             expect(blocks).not.toContain("minecraft:powder_snow");
             expect(blocks).not.toContain("minecraft:scaffolding");
             expect(blocks).not.toContain("minecraft:barrel");
             expect(house.rooms.some((room) => room.template === "snow")).toBe(false);
         }
-        const shown = Array.from({ length: 10 }, (_, seed) => manor.manorFor(`new-${seed}`, 3, model.NEWEST));
+        const shown = Array.from({ length: 10 }, (_, seed) =>
+            manor.manorFor(`new-${seed}`, 3, model.NEWEST)
+        );
         expect(shown.some((house) => house.shown.length > 0)).toBe(true);
     });
 
     it("keeps lava away from anything that burns, and only hiders cross it", () => {
-        const house = Array.from({ length: 30 }, (_, seed) => manor.manorFor(`lava-${seed}`, 3, model.NEWEST)).find(
-            (one) => one.rooms.some((room) => room.template === "forge")
-        )!;
+        const house = Array.from({ length: 30 }, (_, seed) =>
+            manor.manorFor(`lava-${seed}`, 3, model.NEWEST)
+        ).find((one) => one.rooms.some((room) => room.template === "forge"))!;
         expect(house).toBeDefined();
         expect(manor.manorProblems(house)).toEqual([]);
         // The pack sends a seeker in lava home and puts their fire out.
-        expect(panels.FUNCTIONS.tick!.join("\n")).toContain("team=pe_hs_seek] at @s if block ~ ~ ~ minecraft:lava");
-        expect(panels.FUNCTIONS.burnt).toContain("effect give @s minecraft:fire_resistance 6 0 true");
+        expect(panels.FUNCTIONS.tick!.join("\n")).toContain(
+            "team=pe_hs_seek] at @s if block ~ ~ ~ minecraft:lava"
+        );
+        expect(panels.FUNCTIONS.burnt).toContain(
+            "effect give @s minecraft:fire_resistance 6 0 true"
+        );
     });
 });
 
@@ -194,7 +217,8 @@ describe("hide and seek's manor in the world", () => {
             expect(one.box.z1).toBeGreaterThanOrEqual(box.z1);
             expect(one.box.z2).toBeLessThanOrEqual(box.z2);
             expect(one.block.startsWith("~")).toBe(false);
-            for (const piece of arena.slices(one.box)) expect(arena.volume(piece)).toBeLessThanOrEqual(32_768);
+            for (const piece of arena.slices(one.box))
+                expect(arena.volume(piece)).toBeLessThanOrEqual(32_768);
         }
         // Water and lava after the stone round them; what hangs before what holds it.
         const fluid = fills.findIndex((one) => /water|lava/.test(one.block));
@@ -205,7 +229,11 @@ describe("hide and seek's manor in the world", () => {
         const firstOther = fills.findIndex((one, index) => index > 1 && !hung.test(one.block));
         expect(fills.slice(firstOther).some((one) => hung.test(one.block))).toBe(false);
         // Leaves that never wither.
-        expect(fills.filter((one) => one.block.includes("leaves")).every((one) => one.block.includes("persistent=true"))).toBe(true);
+        expect(
+            fills
+                .filter((one) => one.block.includes("leaves"))
+                .every((one) => one.block.includes("persistent=true"))
+        ).toBe(true);
     });
 
     it("comes down fluids first, then what hangs, then what holds it", () => {
@@ -217,7 +245,9 @@ describe("hide and seek's manor in the world", () => {
         expect(blocks).toContain("minecraft:barrier");
         const lines = manor.closeLines(box);
         expect(lines.some((line) => line.includes(`kill @e[tag=${panels.DECOR}`))).toBe(true);
-        expect(lines.filter((line) => /replace minecraft:(lava|water)$/.test(line)).length).toBeGreaterThanOrEqual(2);
+        expect(
+            lines.filter((line) => /replace minecraft:(lava|water)$/.test(line)).length
+        ).toBeGreaterThanOrEqual(2);
         for (const line of lines) expect(line.length).toBeLessThan(400);
     });
 
@@ -225,16 +255,23 @@ describe("hide and seek's manor in the world", () => {
         const lines = manor.decorLines(box, house);
         const paintings = lines.filter((line) => line.includes("summon minecraft:painting"));
         expect(paintings.length).toBe(house.paintings.length);
-        expect(house.paintings.some((one) => one.door)).toBe(house.nooks.some((nook) => nook.entrance === "painting"));
+        expect(house.paintings.some((one) => one.door)).toBe(
+            house.nooks.some((nook) => nook.entrance === "painting")
+        );
         for (const line of paintings) {
-            expect(line).toMatch(/\{Facing:\db,facing:\db,Motive:"minecraft:(wanderer|graham)",variant:"minecraft:(wanderer|graham)",Invulnerable:1b,Tags:\["pe_hs_deco"\]\}$/);
+            expect(line).toMatch(
+                /\{Facing:\db,facing:\db,Motive:"minecraft:(wanderer|graham)",variant:"minecraft:(wanderer|graham)",Invulnerable:1b,Tags:\["pe_hs_deco"\]\}$/
+            );
         }
         for (const line of lines.filter((one) => one.includes("block_display")))
-            expect(line).toMatch(/summon minecraft:block_display -?\d+ \d+ -?\d+ \{block_state:\{Name:"minecraft:[a-z_]+"(,Properties:\{[^}]*\})?\},Tags:\["pe_hs_deco"\]\}$/);
+            expect(line).toMatch(
+                /summon minecraft:block_display -?\d+ \d+ -?\d+ \{block_state:\{Name:"minecraft:[a-z_]+"(,Properties:\{[^}]*\})?\},Tags:\["pe_hs_deco"\]\}$/
+            );
         // A painting over a gap hangs on banners, which hold it up and let a player by.
         for (const one of house.paintings.filter((each) => each.door)) {
             const [dx, dz] = rooms.STEP[rooms.opposite(one.facing)];
-            for (const level of [1, 2]) expect(house.grid.get(one.x + dx, level, one.z + dz)).toMatch(/white_wall_banner/);
+            for (const level of [1, 2])
+                expect(house.grid.get(one.x + dx, level, one.z + dz)).toMatch(/white_wall_banner/);
         }
     });
 
@@ -245,8 +282,16 @@ describe("hide and seek's manor in the world", () => {
         expect(lines.some((line) => line.includes('"pe_hs_home"'))).toBe(true);
         for (const key of house.keys)
             expect(lines.some((line) => line.endsWith(`${panels.HOLD} ${key.hold}`))).toBe(true);
-        expect(lines.some((line) => line.includes("scoreboard objectives add polaris_sneak minecraft.custom:minecraft.sneak_time"))).toBe(true);
-        expect(manor.cageDown(box, house)).toMatch(/fill .* minecraft:air replace minecraft:barrier$/);
+        expect(
+            lines.some((line) =>
+                line.includes(
+                    "scoreboard objectives add polaris_sneak minecraft.custom:minecraft.sneak_time"
+                )
+            )
+        ).toBe(true);
+        expect(manor.cageDown(box, house)).toMatch(
+            /fill .* minecraft:air replace minecraft:barrier$/
+        );
         // Every hider and seeker starts inside the box, on its floor.
         for (let index = 0; index < manor.MOST; index += 1) {
             const spot = manor.hiderSpot(box, house, index);
@@ -260,27 +305,43 @@ describe("hide and seek's manor in the world", () => {
         const walls = house.panels.filter((panel) => panel.shape === "wall").length;
         const floors = house.panels.length - walls;
         expect(house.panels.length).toBeGreaterThan(0);
-        expect(lines.filter((line) => / run setblock -?\d+ -?\d+ -?\d+ minecraft:air$/.test(line))).toHaveLength(walls * 2);
-        expect(lines.filter((line) => / minecraft:ladder\[facing=\w+\]$/.test(line))).toHaveLength(floors);
-        for (const line of lines) expect(line).toMatch(/^execute in minecraft:overworld if block -?\d+ -?\d+ -?\d+ minecraft:\w+ run setblock /);
+        expect(
+            lines.filter((line) => / run setblock -?\d+ -?\d+ -?\d+ minecraft:air$/.test(line))
+        ).toHaveLength(walls * 2);
+        expect(lines.filter((line) => / minecraft:ladder\[facing=\w+\]$/.test(line))).toHaveLength(
+            floors
+        );
+        for (const line of lines)
+            expect(line).toMatch(
+                /^execute in minecraft:overworld if block -?\d+ -?\d+ -?\d+ minecraft:\w+ run setblock /
+            );
     });
 });
 
 describe("the manor's data pack", () => {
     it("works panels and keys in commands every release from 1.13 reads", () => {
         const files = pack.packFiles();
-        const tick = JSON.parse(files.get("data/minecraft/tags/functions/tick.json")!) as { values: string[] };
+        const tick = JSON.parse(files.get("data/minecraft/tags/functions/tick.json")!) as {
+            values: string[];
+        };
         expect(tick.values).toContain("polaris:panel/tick");
         const all = Object.values(panels.FUNCTIONS).flat();
         for (const line of all) {
             // Nothing newer than 1.13: no predicates, no macros, no display entity ids.
-            expect(line).not.toMatch(/predicate=|\$\(|block_display|item_display|function_macro|\bon\b passengers/);
+            expect(line).not.toMatch(
+                /predicate=|\$\(|block_display|item_display|function_macro|\bon\b passengers/
+            );
         }
         // Every function a line calls exists.
         for (const line of all)
-            for (const [, name] of line.matchAll(/function polaris:panel\/(\w+)/g)) expect(panels.FUNCTIONS[name!]).toBeDefined();
+            for (const [, name] of line.matchAll(/function polaris:panel\/(\w+)/g))
+                expect(panels.FUNCTIONS[name!]).toBeDefined();
         // Shut only when nobody touches the panel or a block round it.
-        expect(panels.FUNCTIONS.work!.filter((line) => line.includes("unless entity @e[type=!minecraft:item"))).toHaveLength(2);
+        expect(
+            panels.FUNCTIONS.work!.filter((line) =>
+                line.includes("unless entity @e[type=!minecraft:item")
+            )
+        ).toHaveLength(2);
         // A panel goes back only into air (a wall) or over its own ladder (a floor).
         for (const [name, lines] of Object.entries(panels.FUNCTIONS))
             if (/_shut_/.test(name))
@@ -309,12 +370,16 @@ describe("hide and seek's power-ups and effects", () => {
         expect(lines).toContain(`tag Ana add ${hs.FX_TAG}`);
         expect(lines).toContain("effect give Ana minecraft:invisibility 10 0 true");
         expect(hs.powerLines("Ana", "fast")).toContain("effect give Ana minecraft:speed 15 0 true");
-        expect(hs.fireproofLines("Ana")).toContain("effect give Ana minecraft:fire_resistance 6 0 true");
+        expect(hs.fireproofLines("Ana")).toContain(
+            "effect give Ana minecraft:fire_resistance 6 0 true"
+        );
         const off = hs.effectsOff("Ana");
         for (const effect of hs.EFFECTS)
             expect(off).toContain(`effect clear @a[name=Ana,tag=${hs.FX_TAG}] minecraft:${effect}`);
         expect(off.at(-1)).toBe(`tag @a[name=Ana,tag=${hs.FX_TAG}] remove ${hs.FX_TAG}`);
-        expect(hs.effectsOff()[0]).toBe(`effect clear @a[tag=${hs.FX_TAG}] minecraft:fire_resistance`);
+        expect(hs.effectsOff()[0]).toBe(
+            `effect clear @a[tag=${hs.FX_TAG}] minecraft:fire_resistance`
+        );
         // Drawn from the run's id: the same each time.
         expect(hs.powerFor("run", "Ana", 1)).toBe(hs.powerFor("run", "ana", 1));
     });

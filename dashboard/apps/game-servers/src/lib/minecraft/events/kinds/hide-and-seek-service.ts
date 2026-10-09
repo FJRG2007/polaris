@@ -145,7 +145,9 @@ async function mirrorOf(ctx: KindContext): Promise<hs.Mirror> {
 function spotOf(
     run: stored.EventRun,
     entrant: stored.Entrant,
-    mirror: hs.Mirror = inManor(run) ? { flipX: false, flipZ: false } : layoutOf(run.id, designOf(run))
+    mirror: hs.Mirror = inManor(run)
+        ? { flipX: false, flipZ: false }
+        : layoutOf(run.id, designOf(run))
 ): arena.Spot {
     const box = run.arena!.box;
     const design = designOf(run);
@@ -201,7 +203,9 @@ async function goLines(ctx: KindContext): Promise<string[]> {
     const packOn = house ? await hitsService.ensure(ctx) : false;
     if (house)
         out.push(
-            ...(packOn ? manor.armLines(run.arena!.box, house, run.id) : manor.openLines(run.arena!.box, house)),
+            ...(packOn
+                ? manor.armLines(run.arena!.box, house, run.id)
+                : manor.openLines(run.arena!.box, house)),
             `tellraw @a[tag=${arena.IN_ARENA}] ${commands.text(
                 messages.tag(language) + seekMessages.manorTip(language, packOn)
             )}`
@@ -366,7 +370,10 @@ async function tick(ctx: KindContext, lines: string[]): Promise<string | null> {
                 if (!here.has(lower(one.name))) continue;
                 const power = hs.powerFor(run.id, one.name, round);
                 lines.push(...hs.powerLines(one.name, power));
-                state.powers[one.name] = { kind: power, until: now + hs.POWER_SECONDS[power] * 1000 };
+                state.powers[one.name] = {
+                    kind: power,
+                    until: now + hs.POWER_SECONDS[power] * 1000
+                };
             }
             state.powerAt += every * Math.max(1, Math.ceil((now - state.powerAt + 1) / every));
         }

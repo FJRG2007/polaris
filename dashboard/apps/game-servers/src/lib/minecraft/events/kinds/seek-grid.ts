@@ -70,10 +70,12 @@ const CELL_OF: Readonly<Record<string, Cell>> = {
 };
 
 /** Blocks with no collision at all: a body fits in them. */
-const NO_COLLISION = /(_button|_carpet|_banner|_wall_banner|torch|poppy|dandelion|cornflower|azure_bluet|oxeye_daisy|allium|fern|grass$|short_grass|_sapling|tall_grass|_pressure_plate|_sign)$/;
+const NO_COLLISION =
+    /(_button|_carpet|_banner|_wall_banner|torch|poppy|dandelion|cornflower|azure_bluet|oxeye_daisy|allium|fern|grass$|short_grass|_sapling|tall_grass|_pressure_plate|_sign)$/;
 
 /** Whole blocks light does not go through. Everything else lets it by. */
-const LIT_THROUGH = /(_button|_carpet|_banner|torch|poppy|dandelion|cornflower|azure_bluet|oxeye_daisy|allium|fern|grass$|_sapling|_pressure_plate|_sign|ladder|_door|_trapdoor|_fence|_wall$|iron_bars|glass|glass_pane|leaves|water|lava|scaffolding|_slab|_stairs|anvil|cauldron|_bed|_head|lantern|vine|lectern)$/;
+const LIT_THROUGH =
+    /(_button|_carpet|_banner|torch|poppy|dandelion|cornflower|azure_bluet|oxeye_daisy|allium|fern|grass$|_sapling|_pressure_plate|_sign|ladder|_door|_trapdoor|_fence|_wall$|iron_bars|glass|glass_pane|leaves|water|lava|scaffolding|_slab|_stairs|anvil|cauldron|_bed|_head|lantern|vine|lectern)$/;
 /** Blocks that take more of the light than air: leaves and water. */
 const DIMMING = /(leaves|water)$/;
 /** What gives light, and how much. */
@@ -258,8 +260,7 @@ export function moves(grid: Grid, walker: Walker) {
         const cell = at(x, level, z);
         return cell === "solid" || cell === "hatch" || Boolean(grid.panelAt(x, level, z));
     };
-    const fits = (x: number, feet: number, z: number) =>
-        open(x, feet, z) && open(x, feet + 1, z);
+    const fits = (x: number, feet: number, z: number) => open(x, feet, z) && open(x, feet + 1, z);
     const held = (x: number, feet: number, z: number) =>
         fits(x, feet, z) &&
         (floor(x, feet - 1, z) || climb(x, feet, z) || fluid(x, feet, z)) &&
@@ -318,7 +319,11 @@ export function walk(
                 const rest = m.land(nx, feet, nz);
                 if (rest !== null) visit(nx, rest, nz, here);
             }
-            if (m.fits(nx, feet + 1, nz) && m.open(x, feet + 2, z) && m.at(nx, feet + 1, nz) !== "snow") {
+            if (
+                m.fits(nx, feet + 1, nz) &&
+                m.open(x, feet + 2, z) &&
+                m.at(nx, feet + 1, nz) !== "snow"
+            ) {
                 const rest = m.land(nx, feet + 1, nz);
                 if (rest !== null) visit(nx, rest, nz, here);
             }

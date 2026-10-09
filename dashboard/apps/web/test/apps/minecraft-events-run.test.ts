@@ -11481,11 +11481,7 @@ describe("hide and seek", () => {
         });
         await play(Math.max(100, run.readyAt! + 15_000 - Date.now() + 2_100));
         expect(hs.stateOf(state().run!.game)!.released).toBe(true);
-        expect(
-            world.sent.some((line) =>
-                /block_display|powder_snow/.test(line)
-            )
-        ).toBe(false);
+        expect(world.sent.some((line) => /block_display|powder_snow/.test(line))).toBe(false);
         await events.cancelEvent("owner", SERVER);
         await play(2_100);
         expect(state().arenaLeftovers).toEqual([]);
