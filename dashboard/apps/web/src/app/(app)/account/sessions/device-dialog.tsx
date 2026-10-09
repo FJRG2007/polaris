@@ -18,7 +18,6 @@
  * says so rather than letting the grouping read as a fact.
  */
 
-import { useRouter } from "next/navigation";
 import { signOut } from "@/lib/auth-client";
 import { useConfirm } from "@/components/confirm-dialog";
 import { RelativeTime } from "@/components/relative-time";
@@ -41,7 +40,6 @@ import {
 } from "@polaris/ui";
 import {
     forgetTrustedDeviceAction,
-    noteSignOutAction,
     revokeSessionAction,
     signOutTrustedDeviceAction,
     trustedDeviceAction
@@ -67,7 +65,6 @@ export function DeviceDialog({
     /** Something was ended, so the page behind this has to be re-read. */
     onChanged: () => void;
 }) {
-    const router = useRouter();
     const format = useDisplayFormat();
     const t = useTranslations("accountSecurity");
     const [confirm, confirmElement] = useConfirm();
@@ -97,16 +94,16 @@ export function DeviceDialog({
     /** Ending the session this page is being read from means dropping the cookie
      *  too, not only the row behind it. */
     async function leaveHere() {
-        await signOut();
-        router.push("/oauth/login");
-        router.refresh();
+        const refused = await signOut();
+        if (refused) setError(refused);
     }
 
     async function signOutSession(session: SessionView) {
         if (session.current) {
-            // Only on this path. Signing the whole device out goes through
-            // revokeDeviceSessions, which reports the batch it ended itself.
-            await noteSignOutAction().catch(() => undefined);
+            // signOut records this one leaving. Signing the whole device out
+            // goes through revokeDeviceSessions, which reports the batch it
+            // ended itself - the session is gone by the time signOut runs there,
+            // so nothing is recorded twice.
             await leaveHere();
             return;
         }
@@ -118,7 +115,9 @@ export function DeviceDialog({
             return;
         }
         setDetail((current) =>
-            current ? { ...current, sessions: current.sessions.filter((row) => row.id !== session.id) } : current
+            current
+                ? { ...current, sessions: current.sessions.filter((row) => row.id !== session.id) }
+                : current
         );
         onChanged();
     }
@@ -177,11 +176,15 @@ export function DeviceDialog({
                     <DialogHeader>
                         <DialogTitle className="flex flex-wrap items-center gap-2">
                             {device?.device ?? t("sessions.device.fallbackTitle")}
-                            {device?.current ? <Badge variant="primary">{t("sessions.trusted.thisDevice")}</Badge> : null}
+                            {device?.current ? (
+                                <Badge variant="primary">{t("sessions.trusted.thisDevice")}</Badge>
+                            ) : null}
                         </DialogTitle>
                         <DialogDescription>
                             {device
-                                ? t("sessions.device.until", { date: format.date(device.expiresAt) })
+                                ? t("sessions.device.until", {
+                                      date: format.date(device.expiresAt)
+                                  })
                                 : t("sessions.device.untilUnknown")}
                         </DialogDescription>
                     </DialogHeader>
@@ -194,7 +197,9 @@ export function DeviceDialog({
                                 <Fact label={t("sessions.trusted.columns.address")}>
                                     <DeviceAddress address={device} />
                                 </Fact>
-                                <Fact label={t("sessions.trusted.columns.domain")}>{device.host ?? t("passkeys.notRecorded")}</Fact>
+                                <Fact label={t("sessions.trusted.columns.domain")}>
+                                    {device.host ?? t("passkeys.notRecorded")}
+                                </Fact>
                                 <Fact label={t("sessions.trusted.columns.remembered")}>
                                     {device.rememberedAt ? (
                                         <RelativeTime iso={device.rememberedAt} />
@@ -203,7 +208,11 @@ export function DeviceDialog({
                                     )}
                                 </Fact>
                                 <Fact label={t("passkeys.columns.lastUsed")}>
-                                    {device.lastSeenAt ? <RelativeTime iso={device.lastSeenAt} /> : t("passkeys.notRecorded")}
+                                    {device.lastSeenAt ? (
+                                        <RelativeTime iso={device.lastSeenAt} />
+                                    ) : (
+                                        t("passkeys.notRecorded")
+                                    )}
                                 </Fact>
                                 <Fact label={t("sessions.trusted.columns.until")}>
                                     <RelativeTime iso={device.expiresAt} tense="future" />
@@ -218,14 +227,18 @@ export function DeviceDialog({
                             ) : null}
 
                             {detail && !detail.identified ? (
-                                <p className="text-sm text-muted-foreground">{t("sessions.device.unidentified")}</p>
+                                <p className="text-sm text-muted-foreground">
+                                    {t("sessions.device.unidentified")}
+                                </p>
                             ) : null}
 
                             {detail?.identified ? (
                                 <>
                                     <section className="flex flex-col gap-2">
                                         <div>
-                                            <h3 className="text-sm font-medium">{t("sessions.device.signedIn")}</h3>
+                                            <h3 className="text-sm font-medium">
+                                                {t("sessions.device.signedIn")}
+                                            </h3>
                                             <p className="text-xs text-muted-foreground">
                                                 {t("sessions.device.signedInHint")}
                                             </p>
@@ -241,7 +254,9 @@ export function DeviceDialog({
 
                                     <section className="flex flex-col gap-2">
                                         <div>
-                                            <h3 className="text-sm font-medium">{t("passkeys.title")}</h3>
+                                            <h3 className="text-sm font-medium">
+                                                {t("passkeys.title")}
+                                            </h3>
                                             <p className="text-xs text-muted-foreground">
                                                 {t("sessions.device.passkeysHint")}
                                             </p>
@@ -259,13 +274,17 @@ export function DeviceDialog({
                                                     >
                                                         <div className="flex min-w-0 items-center gap-2">
                                                             <KeyRound className="size-4 shrink-0 text-muted-foreground" />
-                                                            <span className="truncate text-sm">{passkey.name}</span>
+                                                            <span className="truncate text-sm">
+                                                                {passkey.name}
+                                                            </span>
                                                             <code className="shrink-0 rounded bg-muted px-1 text-xs text-muted-foreground">
                                                                 {passkey.host}
                                                             </code>
                                                         </div>
                                                         <span className="shrink-0 text-xs text-muted-foreground">
-                                                            {t("sessions.device.added", { date: format.date(passkey.addedAt) })}
+                                                            {t("sessions.device.added", {
+                                                                date: format.date(passkey.addedAt)
+                                                            })}
                                                         </span>
                                                     </li>
                                                 ))}
@@ -286,7 +305,11 @@ export function DeviceDialog({
                                         {t("sessions.device.signOutEverywhere")}
                                     </Button>
                                 ) : null}
-                                <Button variant="danger" disabled={busy} onClick={() => void forget()}>
+                                <Button
+                                    variant="danger"
+                                    disabled={busy}
+                                    onClick={() => void forget()}
+                                >
                                     <ShieldOff className="size-4" />
                                     {t("sessions.device.forget")}
                                 </Button>

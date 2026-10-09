@@ -16,7 +16,7 @@ import { resolveActiveApp } from "@/lib/apps";
 import { readRecentPlaces } from "@/lib/overview/recent-places";
 import { parseAppUsage, recordAppOpen, type AppUsage } from "@/lib/app-launcher";
 
-const STORE_KEY = "polaris.apps.usage";
+export const STORE_KEY = "polaris.apps.usage";
 
 /** The history this browser holds, or the one its recent visits suggest. */
 export function readAppUsage(): AppUsage {

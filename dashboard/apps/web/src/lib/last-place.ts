@@ -14,7 +14,7 @@
  * the one failure, and it lands on the app's own not-found page with a way back.
  */
 
-const PREFIX = "polaris.place.";
+export const PREFIX = "polaris.place.";
 
 /** Remember where this app was left. */
 export function rememberPlace(appId: string, path: string): void {

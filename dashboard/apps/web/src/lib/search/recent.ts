@@ -14,7 +14,7 @@
 
 import * as core from "@polaris/core";
 
-const STORE_KEY = "polaris.search.recent";
+export const STORE_KEY = "polaris.search.recent";
 
 function readStore(): core.RecentSearch[] {
     if (typeof window === "undefined") return [];

@@ -11,8 +11,8 @@ import { useDisplayFormat } from "@/components/display-format";
 import type { NamespaceKey, NamespaceTranslator } from "@/lib/i18n/types";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { usePresenceRefresh } from "@/components/presence-store";
+import { AccountSwitcherDialog } from "@/components/device-accounts";
 import { PRESENCE_CHOICE_DOTS } from "@/components/presence-dots";
-import { noteSignOutAction } from "@/app/(app)/account/sessions/actions";
 import {
     presenceNowAction,
     setPresenceAction,
@@ -27,7 +27,8 @@ import {
     Link2,
     LogOut,
     MessageSquareText,
-    UserCog
+    UserCog,
+    Users
 } from "lucide-react";
 import {
     MAX_STATUS,
@@ -61,7 +62,8 @@ import {
     DropdownMenuSubTrigger,
     DropdownMenuTrigger,
     Input,
-    Select
+    Select,
+    useToast
 } from "@polaris/ui";
 
 /**
@@ -82,11 +84,15 @@ type Translate = NamespaceTranslator<"nav">;
  * core without one.
  */
 function presenceForKey(minutes: number | null): NamespaceKey<"nav"> {
-    return (minutes === null ? "account.presenceFor.untilChanged" : `account.presenceFor.m${minutes}`) as NamespaceKey<"nav">;
+    return (
+        minutes === null ? "account.presenceFor.untilChanged" : `account.presenceFor.m${minutes}`
+    ) as NamespaceKey<"nav">;
 }
 
 function clearsInKey(minutes: number | null): NamespaceKey<"nav"> {
-    return (minutes === null ? "account.status.clearsIn.never" : `account.status.clearsIn.m${minutes}`) as NamespaceKey<"nav">;
+    return (
+        minutes === null ? "account.status.clearsIn.never" : `account.status.clearsIn.m${minutes}`
+    ) as NamespaceKey<"nav">;
 }
 
 /** What a chosen state is called, in the reader's language. */
@@ -135,9 +141,12 @@ export function AccountMenu({
     const router = useRouter();
     const t = useTranslations("nav");
     const tc = useTranslations("common");
+    const toast = useToast();
     const format = useDisplayFormat();
     const refreshPresence = usePresenceRefresh();
     const [open, setOpen] = useState(false);
+    /** Whether the list of accounts on this browser is open. */
+    const [switching, setSwitching] = useState(false);
     /**
      * When this face was last pressed, for recognising the second press of a
      * double without the browser's help.
@@ -363,13 +372,9 @@ export function AccountMenu({
     };
 
     async function onSignOut() {
-        // While the session still exists, so the account's own history and its
-        // other devices record that this one left. Never a reason to refuse the
-        // sign-out itself.
-        await noteSignOutAction().catch(() => undefined);
-        await signOut();
-        router.push("/oauth/login");
-        router.refresh();
+        // Only this account: any other signed in on this browser takes over.
+        const refused = await signOut();
+        if (refused) toast.show({ title: refused });
     }
 
     return (
@@ -560,7 +565,9 @@ export function AccountMenu({
                         }}
                     >
                         <MessageSquareText className="size-4" />
-                        <span className="min-w-0 truncate">{shownStatus || t("account.setStatus")}</span>
+                        <span className="min-w-0 truncate">
+                            {shownStatus || t("account.setStatus")}
+                        </span>
                     </DropdownMenuItem>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem asChild>
@@ -591,12 +598,21 @@ export function AccountMenu({
                             {t("account.sharedLinks")}
                         </Link>
                     </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    {/* Where Discord keeps it: beside signing out, since both are
+                    about which account this browser is. */}
+                    <DropdownMenuItem onSelect={() => setSwitching(true)}>
+                        <Users className="size-4" />
+                        {t("account.switchAccounts")}
+                    </DropdownMenuItem>
                     <DropdownMenuItem onSelect={onSignOut}>
                         <LogOut className="size-4" />
                         {t("account.signOut")}
                     </DropdownMenuItem>
                 </DropdownMenuContent>
             </DropdownMenu>
+
+            <AccountSwitcherDialog open={switching} onOpenChange={setSwitching} />
 
             {/* The exact end of a chosen state. Its own dialog rather than a field
             in the menu, because a menu that has to stay open while somebody
@@ -605,7 +621,9 @@ export function AccountMenu({
                 <DialogContent className="max-w-sm">
                     <DialogHeader>
                         <DialogTitle>
-                            {t("account.timing.title", { state: timing ? presenceLabel(timing, t) : "" })}
+                            {t("account.timing.title", {
+                                state: timing ? presenceLabel(timing, t) : ""
+                            })}
                         </DialogTitle>
                         <DialogDescription>{t("account.timing.description")}</DialogDescription>
                     </DialogHeader>
@@ -657,7 +675,9 @@ export function AccountMenu({
                             }}
                         />
                         <label className="flex flex-col gap-1">
-                            <span className="text-xs text-muted-foreground">{t("account.status.clear")}</span>
+                            <span className="text-xs text-muted-foreground">
+                                {t("account.status.clear")}
+                            </span>
                             <Select
                                 value={clearsAt === null ? String(clears) : AT_A_TIME}
                                 aria-label={t("account.status.clearsWhen")}

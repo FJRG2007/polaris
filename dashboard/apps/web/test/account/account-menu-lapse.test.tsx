@@ -48,9 +48,7 @@ vi.mock("@/components/presence-store", () => ({
     usePresenceRefresh: () => presenceRefresh,
     usePresence: () => null
 }));
-vi.mock("@/app/(app)/account/sessions/actions", () => ({
-    noteSignOutAction: async () => undefined
-}));
+vi.mock("@/components/device-accounts", () => ({ AccountSwitcherDialog: () => null }));
 vi.mock("@/app/(app)/account/preferences/actions", () => ({
     presenceNowAction: async () => {
         asked();
