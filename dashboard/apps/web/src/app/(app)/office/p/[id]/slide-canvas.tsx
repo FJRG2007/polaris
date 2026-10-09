@@ -282,7 +282,12 @@ export function SlideStage({
                             const wasChosen = chosen === box.id;
                             if (!wasChosen) onEdit("");
                             onChoose(box.id);
-                            begin(event, { kind: "move", id: box.id, start: box, wasChosen });
+                            begin(event, {
+                                kind: "move",
+                                id: box.id,
+                                start: box,
+                                wasChosen: wasChosen && box.kind === "text"
+                            });
                         }}
                         onDoubleClick={() => {
                             if (box.kind === "text") onEdit(box.id);

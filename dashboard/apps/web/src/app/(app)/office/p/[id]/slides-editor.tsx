@@ -68,6 +68,15 @@ function typingIn(target: EventTarget | null): boolean {
     return target.isContentEditable || target.tagName === "TEXTAREA" || target.tagName === "INPUT";
 }
 
+function onControl(target: EventTarget | null): boolean {
+    if (!(target instanceof Element) || target.closest("[data-box]")) return false;
+    return (
+        target.closest(
+            "button, a[href], select, summary, [role=button], [role=tab], [role=menuitem], [role=option]"
+        ) !== null
+    );
+}
+
 export function SlidesEditor({
     documentId,
     content,
@@ -160,7 +169,7 @@ export function SlidesEditor({
                     history.redo();
                     return true;
             }
-            if (!chosenBox) return false;
+            if (!chosenBox || onControl(event.target)) return false;
             switch (action) {
                 case "office.slides.duplicate":
                     duplicateChosen();
