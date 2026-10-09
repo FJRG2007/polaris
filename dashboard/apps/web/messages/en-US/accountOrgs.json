@@ -248,11 +248,11 @@
             "driveManage": "Add to and change the organization's files",
             "mailManage": "Hand out the organization's mailboxes",
             "crmCompaniesEdit": "Add and change companies",
-            "crmCompaniesDelete": "Delete, restore and merge companies",
+            "crmCompaniesDelete": "Delete companies",
             "crmPeopleEdit": "Add and change people",
-            "crmPeopleDelete": "Delete, restore and merge people",
+            "crmPeopleDelete": "Delete people",
             "crmOpportunitiesEdit": "Add and change opportunities",
-            "crmOpportunitiesDelete": "Delete, restore and merge opportunities"
+            "crmOpportunitiesDelete": "Delete opportunities"
         }
     },
     "settings": {

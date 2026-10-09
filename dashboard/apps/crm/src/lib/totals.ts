@@ -29,8 +29,11 @@ export interface Total {
  *  scan of every value. */
 export const UNIQUE_CAP = 10_000;
 
-/** The rows where a field holds nothing, as a `where`. */
-function emptyWhere(spec: ColumnSpec): Record<string, unknown> {
+/** The rows where a field holds nothing, as a `where`; null for a kind of
+ *  field that is never empty. */
+function emptyWhere(object: CrmObject, key: string, spec: ColumnSpec): Record<string, unknown> | null {
+    const kind = fieldOf(object, key)?.kind;
+    if (kind === "dateTime" || kind === "boolean") return null;
     switch (spec.type) {
         case "scalar":
             return NULLABLE_SCALARS.has(spec.column) ? { [spec.column]: null } : { [spec.column]: "" };
@@ -86,7 +89,9 @@ async function one(
 ): Promise<Total> {
     const spec = columnOf(object, key);
     const delegate = table(object);
-    const blank = () => delegate.count({ where: { AND: [where, emptyWhere(spec)] } }) as Promise<number>;
+    const empty = emptyWhere(object, key, spec);
+    const blank = async () =>
+        empty === null ? 0 : ((await delegate.count({ where: { AND: [where, empty] } })) as number);
     switch (aggregate) {
         case "countAll":
             return { key, aggregate, value: await all() };
@@ -104,7 +109,7 @@ async function one(
         case "countUnique": {
             const groups = (await delegate.groupBy({
                 by: groupColumns(spec),
-                where: { AND: [where, { NOT: emptyWhere(spec) }] },
+                where: empty === null ? where : { AND: [where, { NOT: empty }] },
                 orderBy: groupColumns(spec).map((column) => ({ [column]: "asc" })),
                 take: UNIQUE_CAP + 1
             })) as unknown[];

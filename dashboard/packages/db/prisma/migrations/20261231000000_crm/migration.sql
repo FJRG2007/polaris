@@ -1,6 +1,6 @@
 -- Polaris CRM (apps/crm): companies, people, opportunities and the saved views
--- over them, the `crm.use` permission on the seeded roles that hold the
--- calendar, and the CRM permissions on every organization's seeded member role.
+-- over them, and the `crm.use` permission on the seeded roles that hold the
+-- calendar.
 --
 -- Every statement is written so that running it a second time is a no-op.
 -- CreateTable

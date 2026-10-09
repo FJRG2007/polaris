@@ -17,7 +17,7 @@ import { cn, Select } from "@polaris/ui";
 import { CURRENCIES } from "@polaris/core";
 import { hostUi } from "@polaris/app-host/client";
 import type { FieldDef, FieldValue, FullName, Money } from "../model/objects";
-import { normalizeInput, parseAmount, type InputValue } from "../model/values";
+import { normalizeInput, parseAmount, typedCount, type InputValue } from "../model/values";
 import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 
 export interface EditorProps {
@@ -106,7 +106,7 @@ export function TextEditor({ field, value, onCommit, onCancel }: EditorProps) {
     const check = useCheck(field);
     const [text, setText] = useState(value === null || value === undefined ? "" : String(value));
     const [touched, setTouched] = useState(false);
-    const result = check(field.kind === "number" ? text.trim().replace(/[\s.,]/g, "") : text);
+    const result = check(field.kind === "number" ? typedCount(text) : text);
     const keep = () => (result.value === undefined ? onCancel() : onCommit(result.value));
     const placeholder =
         field.kind === "domain"

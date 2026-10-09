@@ -6,7 +6,7 @@
 
 import { describe, expect, it } from "vitest";
 import { fieldOf, type CrmObject } from "@polaris-app/crm/src/model/objects";
-import { normalizeInput, parseAmount } from "@polaris-app/crm/src/model/values";
+import { normalizeInput, parseAmount, typedCount } from "@polaris-app/crm/src/model/values";
 
 const field = (object: CrmObject, key: string) => {
     const found = fieldOf(object, key);
@@ -125,5 +125,20 @@ describe("parseAmount", () => {
         expect(parseAmount("12,5")).toBe(12.5);
         expect(parseAmount("€ 2 000")).toBe(2000);
         expect(parseAmount("abc")).toBeNull();
+        expect(parseAmount("1.500.000")).toBe(1500000);
+        expect(parseAmount("1,500,000.25")).toBe(1500000.25);
+    });
+});
+
+describe("typedCount", () => {
+    const employees = field("companies", "employees");
+
+    it("reads grouping and refuses a fraction instead of dropping its separator", () => {
+        expect(normalizeInput(employees, typedCount("1.500"))).toEqual({ ok: true, value: 1500 });
+        expect(normalizeInput(employees, typedCount("1 500 000"))).toEqual({ ok: true, value: 1500000 });
+        expect(normalizeInput(employees, typedCount("2.5"))).toEqual({ ok: false, reason: "wholeNumber" });
+        expect(normalizeInput(employees, typedCount("1.000,5"))).toEqual({ ok: false, reason: "wholeNumber" });
+        expect(normalizeInput(employees, typedCount("12abc"))).toEqual({ ok: false, reason: "number" });
+        expect(normalizeInput(employees, typedCount("  "))).toEqual({ ok: true, value: null });
     });
 });

@@ -169,14 +169,11 @@ export const ORG_PERMISSION_META: Readonly<Record<OrgPermission, { area: string;
         // it back when they leave. Never reading what is in one.
         "mail.manage": { area: "Work", label: "Hand out the organization's mailboxes" },
         "crm.companies.edit": { area: "CRM", label: "Add and change companies" },
-        "crm.companies.delete": { area: "CRM", label: "Delete, restore and merge companies" },
+        "crm.companies.delete": { area: "CRM", label: "Delete companies" },
         "crm.people.edit": { area: "CRM", label: "Add and change people" },
-        "crm.people.delete": { area: "CRM", label: "Delete, restore and merge people" },
+        "crm.people.delete": { area: "CRM", label: "Delete people" },
         "crm.opportunities.edit": { area: "CRM", label: "Add and change opportunities" },
-        "crm.opportunities.delete": {
-            area: "CRM",
-            label: "Delete, restore and merge opportunities"
-        }
+        "crm.opportunities.delete": { area: "CRM", label: "Delete opportunities" }
     };
 
 /** The areas in the order the editor draws them. Read off the meta rather than

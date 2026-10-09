@@ -196,9 +196,11 @@ export function parseAmount(typed: string): number | null {
     const lastComma = compact.lastIndexOf(",");
     const decimalAt = Math.max(lastDot, lastComma);
     // One separator followed by exactly three digits reads as grouping: "1,500".
+    // So does a separator that repeats: "1.500.000".
     const separators = (compact.match(/[.,]/g) ?? []).length;
     const tail = compact.length - decimalAt - 1;
-    const grouped = decimalAt >= 0 && separators === 1 && tail === 3;
+    const repeated = decimalAt >= 0 && compact.indexOf(compact[decimalAt]!) !== decimalAt;
+    const grouped = decimalAt >= 0 && ((separators === 1 && tail === 3) || repeated);
     const normalized =
         decimalAt < 0 || grouped
             ? compact.replace(/[.,]/g, "")
@@ -208,4 +210,11 @@ export function parseAmount(typed: string): number | null {
                   .concat(".", compact.slice(decimalAt + 1).replace(/[.,]/g, ""));
     const value = Number(normalized);
     return Number.isFinite(value) ? value : null;
+}
+
+/** A whole number as a person types it, read with `parseAmount` so "2.5" stays
+ *  2.5 for the check to refuse; anything else is passed on as typed. */
+export function typedCount(typed: string): string | number {
+    if (typed.trim() === "" || !/^[\d\s.,'_-]+$/.test(typed)) return typed.trim();
+    return parseAmount(typed) ?? typed.trim();
 }

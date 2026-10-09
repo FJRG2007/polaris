@@ -78,14 +78,14 @@ export function RecordTable(props: TableProps) {
     const [editing, setEditing] = useState<Editing | null>(null);
     const scroller = useRef<HTMLDivElement>(null);
     const sentinel = useRef<HTMLTableRowElement>(null);
-    const order = useMemo(() => rows.map((row) => row.id), [rows]);
+    const order = useMemo(() => rows.map((row) => row.id).filter((id) => !id.startsWith("draft:")), [rows]);
     const selection = useRangeSelection(order, selected, onSelect);
     const fields = useMemo(
         () => columns.map((column) => ({ column, field: fieldOf(object, column.key)! })).filter((one) => one.field),
         [columns, object]
     );
     const primary = primaryField(object);
-    const allChosen = rows.length > 0 && selected.length >= rows.length && order.every((id) => selected.includes(id));
+    const allChosen = order.length > 0 && selected.length >= order.length && order.every((id) => selected.includes(id));
 
     // The next page is asked for when the end of the table scrolls into sight.
     const { hasMore, loadingMore, onLoadMore } = props;

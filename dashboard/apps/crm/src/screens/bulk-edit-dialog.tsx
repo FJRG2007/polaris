@@ -13,7 +13,7 @@ import { CellPicker } from "./cell-picker";
 import { CURRENCIES } from "@polaris/core";
 import { hostUi } from "@polaris/app-host/client";
 import { useMemo, useState, type FormEvent } from "react";
-import { normalizeInput, parseAmount, type InputValue } from "../model/values";
+import { normalizeInput, parseAmount, typedCount, type InputValue } from "../model/values";
 import { FIELDS, type CrmObject, type FieldDef, type FieldValue, type Ref } from "../model/objects";
 import {
     Button,
@@ -58,7 +58,7 @@ function settle(field: FieldDef, draft: Draft): { stored: InputValue; shown: Fie
     } else if (field.kind === "member" || field.kind === "select") {
         raw = draft.text === NONE ? null : draft.text;
     } else if (field.kind === "number") {
-        raw = draft.text.trim().replace(/[\s.,]/g, "");
+        raw = typedCount(draft.text);
     }
     const result = normalizeInput(field, raw);
     if (!result.ok) return { error: result.reason };
