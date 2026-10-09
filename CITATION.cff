@@ -1,0 +1,19 @@
+cff-version: 1.2.0
+title: Polaris
+message: "Your home lab, one control plane."
+type: software
+authors:
+  - given-names: FJRG2007
+    email: fjrg2007@tpeoficial.com
+repository-code: 'https://github.com/FJRG2007/polaris'
+abstract: >-
+  A self-hosted workspace for everything you run yourself: files, servers,
+  the apps you deploy on them, the work you plan around them, and the people
+  you do it with. One install, one login, one interface.
+keywords:
+  - self-hosted
+  - home lab
+  - control plane
+  - deployment
+  - workspace
+license: AGPL-3.0-only

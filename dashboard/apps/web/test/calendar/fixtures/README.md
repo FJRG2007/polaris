@@ -20,7 +20,7 @@ itself). ical.js keeps them as real-world output its parser must handle.
 
 No genuine iCloud, Nextcloud or Outlook export was available to copy: the
 Nextcloud Calendar repository's own test files are AGPL-3.0 and are not copied
-into this Apache-2.0 repository. These files were written by hand to reproduce
+into this repository. These files were written by hand to reproduce
 what those producers write - their PRODID, their `X-` properties and
 parameters, their property order - and are **not captured files**. Addresses
 and identifiers in them are placeholders.

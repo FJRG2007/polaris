@@ -1,7 +1,7 @@
 <div align="center">
   <h1>Polaris</h1>
   <h3>Your home lab, one control plane.</h3>
-  <img alt="License" src="https://img.shields.io/badge/License-Apache--2.0-blue?style=for-the-badge"/>
+  <img alt="License" src="https://img.shields.io/badge/License-AGPL--3.0-blue?style=for-the-badge"/>
   <img alt="Docker" src="https://img.shields.io/badge/Docker-2496ED?style=for-the-badge&logo=docker&logoColor=white"/>
   <img alt="Next.js" src="https://img.shields.io/badge/Next.js-000000?style=for-the-badge&logo=nextdotjs&logoColor=white"/>
   <br />
@@ -231,10 +231,26 @@ running elsewhere, managed from it like any other.
 
 ## Contributing
 
-The monorepo layout, the development loop, how to build and test the dashboard
-and the Rust components, and the release flow all live in the
-[developer guide](docs/developers/README.md).
+How to report a bug, propose a change and open a pull request is in
+[CONTRIBUTING.md](CONTRIBUTING.md); everyone taking part follows the
+[code of conduct](CODE_OF_CONDUCT.md). The monorepo layout, the development
+loop, how to build and test the dashboard and the Rust components, and the
+release flow all live in the [developer guide](docs/developers/README.md).
 
 ## License
 
-[Apache-2.0](LICENSE).
+Polaris is licensed under the [GNU AGPL-3.0](LICENSE) with the additional terms
+in [NOTICE.md](NOTICE.md):
+
+- Use it, change it and share it, commercially too, under the AGPL-3.0.
+- A modified version - distributed, or offered to people over a network - must
+  publish its full source under the same license. Closed-source forks are not
+  allowed.
+- A modified version must say visibly that it is based on Polaris.
+
+To use Polaris outside those terms, for example in a closed-source product or a
+hosted service whose source you do not publish, ask for a commercial license
+(see [NOTICE.md](NOTICE.md)). Releases published before this change remain
+under Apache-2.0.
+
+To cite Polaris, use [CITATION.cff](CITATION.cff).

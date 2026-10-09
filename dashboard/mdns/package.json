@@ -4,7 +4,7 @@
     "private": true,
     "type": "module",
     "description": "mDNS responder that advertises polaris.local on the local network.",
-    "license": "Apache-2.0",
+    "license": "AGPL-3.0-only",
     "bin": {
         "polaris-mdns": "responder.mjs"
     },
