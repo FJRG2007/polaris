@@ -1781,6 +1781,11 @@
                 "label": "Carrera aérea",
                 "summary": "Se cuelga en el cielo un circuito de aros. Se sale desde una plataforma de cristal con unos élitros marcados y cohetes, y hay que cruzar cada aro en orden, vuelta tras vuelta. Los aros y los propulsores dan más cohetes; caer, aterrizar o saltarse un aro te devuelve al último. Gana quien termine primero.",
                 "unit": "aros"
+            },
+            "downhill-race": {
+                "label": "Descenso en barca",
+                "summary": "Un camino de hielo con muros baja desde una salida en lo alto hasta una meta muy por debajo, bloque a bloque. Cada corredor recibe una barca arriba; pasa por cada puerta en orden al bajar y gana el primero en cruzar la meta. Si caes o pierdes la barca, vuelves a tu última puerta con una nueva.",
+                "unit": "puertas"
             }
         },
         "triggers": {
@@ -1890,7 +1895,9 @@
             "acidRainSafe": "No se tocan los objetos de nadie y nadie recibe daño. Se reparte piedra marcada que solo se coloca en la arena y se retira al salir. La lluvia la calcula un pequeño data pack que Polaris añade al mundo. Necesita Minecraft 1.17 o posterior.",
             "meteorInfection": "El suelo de cada cráter cría sculk que se extiende despacio, unos pocos bloques como mucho; pisarlo envenena y ralentiza, y romperlo limpia el suelo. Solo crece sobre piedra, tierra, arena y similares - nunca sobre tablones, cristal u otros bloques de construcción - y lo que quede se quita al final. Desde Minecraft 1.19; en servidores más antiguos los cráteres quedan limpios.",
             "elytraRace": "{laps} vueltas de aros a unos {height} bloques de altura, con {obstacles}. Cada tramo entre dos aros se comprueba que se puede volar, y ningún pilar queda en la línea recta entre ellos.",
-            "elytraRaceSafe": "No se tocan los objetos de nadie y nadie recibe daño. Los élitros y los cohetes van marcados y se retiran al terminar, al salir y al volver. Los aros los cuenta un pequeño data pack que Polaris añade al mundo. Necesita Minecraft 1.17 o posterior."
+            "elytraRaceSafe": "No se tocan los objetos de nadie y nadie recibe daño. Los élitros y los cohetes van marcados y se retiran al terminar, al salir y al volver. Los aros los cuenta un pequeño data pack que Polaris añade al mundo. Necesita Minecraft 1.17 o posterior.",
+            "downhillRace": "Una bajada por un camino de hielo que cae un bloque {steepness}, con la meta a unos {height} bloques de altura: un camino nuevo cada vez, con muros a ambos lados, nunca más de un bloque de golpe y con puertas que pasar en orden.",
+            "downhillRaceBoats": "Cada corredor empieza con una barca arriba, que se retira al final. Las puertas las cuenta un pequeño data pack que Polaris añade al mundo."
         },
         "errors": {
             "read": "No se pudieron leer los eventos",
@@ -2100,6 +2107,10 @@
             "none": "sin pilares",
             "few": "algunos pilares",
             "many": "muchos pilares"
+        },
+        "downhillSteepness": {
+            "gentle": "cada 14 bloques",
+            "steep": "cada 9 bloques"
         }
     },
     "editor": {
@@ -2334,6 +2345,10 @@
                 "none": "Ninguno",
                 "few": "Algunos",
                 "many": "Muchos"
+            },
+            "downhillSteepness": {
+                "gentle": "Suave",
+                "steep": "Fuerte"
             }
         },
         "place": {
@@ -2352,7 +2367,8 @@
             "villager": "El aldeano se coloca a unos 50 bloques de un jugador que esté en el mundo normal cuando empiece.",
             "maze": "El laberinto se construye a 30 bloques de altura, a unos 30 bloques de un jugador que esté en el mundo normal cuando empiece.",
             "acid": "La arena se construye a 30 bloques de altura, a unos 30 bloques de un jugador que esté en el mundo normal cuando empiece.",
-            "elytra": "El circuito se cuelga a 50 bloques de altura, a unos 30 bloques de un jugador que esté en el mundo normal cuando empiece."
+            "elytra": "El circuito se cuelga a 50 bloques de altura, a unos 30 bloques de un jugador que esté en el mundo normal cuando empiece.",
+            "downhill": "La meta se construye a 30 bloques de altura y la salida más arriba, a unos 30 bloques de un jugador que esté en el mundo normal cuando empiece."
         },
         "floorSizeHint": "De 5 a 15: este mide {size} por {size}.",
         "range": "De {min} a {max}",
@@ -2435,7 +2451,9 @@
         "meteorInfectionHint": "El sculk se extiende desde cada cráter; envenena y ralentiza, y se puede romper para limpiarlo.",
         "elytraLaps": "Vueltas",
         "elytraObstacles": "Pilares",
-        "elytraObstaclesHint": "Pilares junto a la línea entre aros, nunca en ella."
+        "elytraObstaclesHint": "Pilares junto a la línea entre aros, nunca en ella.",
+        "downhillSteepness": "Desnivel",
+        "downhillSteepnessHint": "Cada cuánto baja el hielo un bloque al descender."
     },
     "moderation": {
         "announcements": {

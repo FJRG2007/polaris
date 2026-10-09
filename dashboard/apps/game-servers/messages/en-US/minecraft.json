@@ -1781,6 +1781,11 @@
                 "label": "Elytra race",
                 "summary": "A loop of rings is hung in the sky. Racers drop off a glass pad with a marked elytra and rockets, and fly through every ring in order, lap after lap. Rings and boosters give more rockets; falling, landing or missing a ring sends you back to your last one. The first to finish wins.",
                 "unit": "rings"
+            },
+            "downhill-race": {
+                "label": "Downhill boat race",
+                "summary": "A walled road of ice runs down from a start high in the air to a finish far below, dropping a block at a time. Every racer gets a boat at the top; pass every gate in order on the way down, and the first over the finish wins. Fall off or lose the boat and you are put back at your last gate with a new one.",
+                "unit": "gates"
             }
         },
         "triggers": {
@@ -1890,7 +1895,9 @@
             "acidRainSafe": "Nobody's items are touched, and nobody takes damage. Players get marked cobblestone that only goes on the arena, taken back when they leave. The rain is worked out by a small data pack Polaris adds to the world. Needs Minecraft 1.17 or later.",
             "meteorInfection": "Each crater's ground grows sculk that creeps slowly outwards, a few blocks at most; standing in it poisons and slows you, and breaking it cleanses the ground. It only grows over stone, dirt, sand and the like - never over planks, glass or other building blocks - and whatever is left goes at the end. From Minecraft 1.19; older servers get plain craters.",
             "elytraRace": "{laps} laps of rings about {height} blocks up, with {obstacles}. Every stretch between two rings is checked to be flyable, and no pillar stands on the straight line between them.",
-            "elytraRaceSafe": "Nobody's items are touched, and nobody takes damage. The elytra and rockets are marked and taken back at the end, on leaving and on coming back. The rings are counted by a small data pack Polaris adds to the world. Needs Minecraft 1.17 or later."
+            "elytraRaceSafe": "Nobody's items are touched, and nobody takes damage. The elytra and rockets are marked and taken back at the end, on leaving and on coming back. The rings are counted by a small data pack Polaris adds to the world. Needs Minecraft 1.17 or later.",
+            "downhillRace": "One run down an ice road that drops a block {steepness}, with its finish about {height} blocks up: a new road every time, walled on both sides, never more than a block down at once, with gates to pass in order.",
+            "downhillRaceBoats": "Every racer starts with a boat at the top, taken back at the end. The gates are counted by a small data pack Polaris adds to the world."
         },
         "errors": {
             "read": "The events could not be read",
@@ -2100,6 +2107,10 @@
             "none": "no pillars",
             "few": "a few pillars",
             "many": "many pillars"
+        },
+        "downhillSteepness": {
+            "gentle": "every 14 blocks",
+            "steep": "every 9 blocks"
         }
     },
     "editor": {
@@ -2334,6 +2345,10 @@
                 "none": "None",
                 "few": "A few",
                 "many": "Many"
+            },
+            "downhillSteepness": {
+                "gentle": "Gentle",
+                "steep": "Steep"
             }
         },
         "place": {
@@ -2352,7 +2367,8 @@
             "villager": "The villager is set about 50 blocks around a player who is in the Overworld when it starts.",
             "maze": "The maze is built 30 blocks up, about 30 blocks around a player who is in the Overworld when it starts.",
             "acid": "The arena is built 30 blocks up, about 30 blocks around a player who is in the Overworld when it starts.",
-            "elytra": "The course is hung 50 blocks up, about 30 blocks around a player who is in the Overworld when it starts."
+            "elytra": "The course is hung 50 blocks up, about 30 blocks around a player who is in the Overworld when it starts.",
+            "downhill": "The finish is built 30 blocks up and the start higher, about 30 blocks around a player who is in the Overworld when it starts."
         },
         "floorSizeHint": "5 to 15: this one is {size} by {size}.",
         "range": "{min} to {max}",
@@ -2435,7 +2451,9 @@
         "meteorInfectionHint": "Sculk creeps out of each crater; it poisons and slows, and can be broken to cleanse it.",
         "elytraLaps": "Laps",
         "elytraObstacles": "Pillars",
-        "elytraObstaclesHint": "Pillars beside the line between rings, never on it."
+        "elytraObstaclesHint": "Pillars beside the line between rings, never on it.",
+        "downhillSteepness": "Slope",
+        "downhillSteepnessHint": "How often the ice drops a block on the way down."
     },
     "moderation": {
         "announcements": {

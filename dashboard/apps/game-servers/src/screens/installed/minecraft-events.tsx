@@ -409,6 +409,17 @@ function stageFacts(t: GameText<"minecraft">, preset: catalog.EventPreset): stri
             const options = preset.options as catalog.EventOptions<"boat-race">;
             return [t("events.facts.boatRace", { laps: options.laps, height: options.height })];
         }
+        case "downhill-race": {
+            const options = preset.options as catalog.EventOptions<"downhill-race">;
+            return [
+                t("events.facts.downhillRace", {
+                    steepness: t(
+                        `events.downhillSteepness.${options.steepness}` as GameKey<"minecraft">
+                    ),
+                    height: options.height
+                })
+            ];
+        }
         case "dropper": {
             const options = preset.options as catalog.EventOptions<"dropper">;
             return [
@@ -482,6 +493,8 @@ function stageItemsFact(t: GameText<"minecraft">, preset: catalog.EventPreset): 
             return t("events.facts.dropperSafe");
         case "boat-race":
             return t("events.facts.boatRaceBoats");
+        case "downhill-race":
+            return t("events.facts.downhillRaceBoats");
         case "nether-maze":
             return t("events.facts.netherMazeSafe");
         case "acid-rain":

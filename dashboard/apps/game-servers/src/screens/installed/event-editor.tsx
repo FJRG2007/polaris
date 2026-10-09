@@ -38,6 +38,7 @@ import {
     AcidRainFields,
     BoatRaceFields,
     CaptureTheFlagFields,
+    DownhillRaceFields,
     DropperFields,
     ElytraRaceFields,
     HideAndSeekFields,
@@ -1118,6 +1119,14 @@ function OptionsFields({
             return (
                 <BoatRaceFields
                     value={preset.options as catalog.EventOptions<"boat-race">}
+                    onChange={onChange}
+                    issues={issues}
+                />
+            );
+        case "downhill-race":
+            return (
+                <DownhillRaceFields
+                    value={preset.options as catalog.EventOptions<"downhill-race">}
                     onChange={onChange}
                     issues={issues}
                 />

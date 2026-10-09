@@ -12,8 +12,9 @@
  *   answers it changed is remembered as the event's.
  * - At the end a remembered cell is taken away only while it is still a vein
  *   (`removeIfVein`); one somebody broke - cleansed - is never touched again.
- * - It is bounded: a few cells looked at a tick for each meteor, never more
- *   than `MAX_CELLS` of them in all, never further than `RADIUS` from it.
+ * - It is bounded: a few cells looked at a tick for each meteor, never further
+ *   than `RADIUS` from it, and two caps that stop it, counted apart: at most
+ *   `MAX_CELLS` infected, and at most `MAX_MISSES` tried and missed.
  *
  * Sculk veins and the tag are 1.19's: on an older server a meteor leaves no
  * infection (`SINCE`).

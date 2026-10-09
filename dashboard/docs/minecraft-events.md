@@ -137,7 +137,7 @@ Rare catch, Bingo rush, Boss fishing) leave the world alone.
 | Hide and seek                                                  | day   | clear   |
 | SkyWars                                                        | day   | clear   |
 | TNT run, Dropper, Ice boat race, Nether maze                   | day   | clear   |
-| Elytra race                                                    | day   | clear   |
+| Elytra race, Downhill boat race                                | day   | clear   |
 | Acid rain                                                      | day   | -       |
 | Treasure hunt, Supply drop, Explorer, Gathering                | day   | clear   |
 | Horde defense, Villager defense, Mob hunt, Meteor shower       | night | clear   |
@@ -145,7 +145,6 @@ Rare catch, Bingo rush, Boss fishing) leave the world alone.
 | World boss                                                     | -     | clear   |
 | Mining rush, Fishing, Trivia, Happy hour, XP boost, Rare catch | -     | -       |
 | Bingo rush, Boss fishing                                       | -     | -       |
-| Acid rain                                                      | day   | -       |
 
 ## The random draw
 
@@ -296,6 +295,23 @@ left out.
   landed, or flew a ring out of turn. Laps and checkpoints are counted by the
   events data pack, as in the boat race. The wings and rockets are taken back
   at the end, on leaving and on coming back. Needs 1.17, to put the elytra on.
+- **Downhill boat race** (`downhill-race`) is an ice boat race's track
+  (`boat-race.laidOut`, design 2) cut open into one road, raced once: from a
+  level grid at the top (`downhill-race.GRID` blocks of it behind the start
+  line) down to a finish 25 to 40 blocks over the ground, with `RUNOFF` level
+  blocks past it and open air between its end and the grid. The ice drops one
+  block every 14 blocks along the middle (`gentle`) or every 9 (`steep`),
+  never two at once, and the walls stand from the lowest ice beside them to
+  two over the highest, so a drop leaves no gap. Checkpoints are the loop's
+  own gates between the start and the finish, at most `boat-race.GATES.most`
+  lines in all, since the data pack counts no more. It is played as a boat
+  race with `Track.downhill` set: the same boats, quick look and data pack,
+  each gate's box armed at its own height, every line passed once is the
+  finish (`boat-race.passesOf`), a fall is counted from under the bottom of
+  the road, and a racer put back or coming back in starts at the height of
+  their last gate. Past the rows the grid has room for (30 racers), the next
+  ones are put on the same spots again from the front rather than off the end
+  of the road. A glass net four blocks under the finish catches whoever falls.
 - **King of the ring** (`king-of-the-hill` in code and saved settings; it was
   called King of the hill before it moved into the air) with fists only is a
   platform floating `hill.LIFT` over whatever is under it. Off the ring Poison
@@ -690,6 +706,14 @@ new map:
   it and the one after - so no gate can be reached but through the one before.
   Measured over 3,000 runs: none breaks a rule, none falls back to the plain
   track.
+- **A road down is checked the same way.** A downhill race's road
+  (`downhill-race.courseProblems`), from its blocks: no two blocks of ice side
+  by side more than a block apart, never a climb along the middle, the lines in
+  order and far enough apart, at least one checkpoint and no more lines than
+  the pack counts, and the road cut by its lines into exactly one more piece
+  than there are lines. The built blocks are walked too: a wall two high
+  beside every block of ice, room for a boat over it, the grid and every
+  restart on the ice. Measured over 1,200 runs, both slopes: none breaks a rule.
 - **A fall is a move too.** A map a player falls through (the dropper) is
   checked the same way: every hole is reached from where the one above was
   passed by a cautious player - walking, never sprinting, setting off still
@@ -813,6 +837,7 @@ Everything below is part of the arena's own boxes: built into air with
 | Nether maze      | netherrack walls and roof, glowstone over every other room, a nether-brick starting room and a quartz floor at the goal                                                                                                         |
 | Acid rain        | mossy stone floor with a sea lantern in each corner, glass walls, an invisible roof, cobblestone huts                                                                                                                           |
 | Elytra race      | orange concrete rings, a white start ring lit at its corners, yellow glass boosters, magenta pillars                                                                                                                            |
+| Downhill race    | the boat race's ice, walls and arches, stepping down a block at a time; a white glass net under the finish                                                                                                                      |
 | Parkour          | the course's theme, a light under every checkpoint                                                                                                                                                                              |
 | King of the ring | polished stone edge, sea lanterns at the corners, the circle drawn in yellow                                                                                                                                                    |
 | Build battle     | a stone curb between plots and glowstone where the lines meet, at floor level                                                                                                                                                   |

@@ -221,6 +221,56 @@ export function BoatRaceFields({
     );
 }
 
+const DOWNHILL_STEEPNESS_LABELS: Readonly<
+    Record<(typeof catalog.DOWNHILL_STEEPNESS)[number], GameKey<"minecraft">>
+> = {
+    gentle: "editor.labels.downhillSteepness.gentle",
+    steep: "editor.labels.downhillSteepness.steep"
+};
+
+export function DownhillRaceFields({
+    value,
+    onChange,
+    issues
+}: {
+    value: catalog.EventOptions<"downhill-race">;
+    onChange: (options: catalog.EventOptions<"downhill-race">) => void;
+    issues: Issues;
+}) {
+    const t = useGameText("minecraft");
+    return (
+        <>
+            <PlaceField
+                value={value.place}
+                onChange={(place) => onChange({ ...value, place })}
+                what={t("editor.place.downhill")}
+                issues={issues}
+                path={["options", "place"]}
+            />
+            <div className="grid grid-cols-2 gap-3">
+                <Field
+                    label={t("editor.downhillSteepness")}
+                    hint={t("editor.downhillSteepnessHint")}
+                >
+                    <Select
+                        value={value.steepness}
+                        onValueChange={(steepness) =>
+                            onChange({ ...value, steepness: steepness as typeof value.steepness })
+                        }
+                        options={options(t, DOWNHILL_STEEPNESS_LABELS)}
+                        aria-label={t("editor.downhillSteepness")}
+                    />
+                </Field>
+                <HeightField
+                    value={value.height}
+                    onChange={(height) => onChange({ ...value, height })}
+                    issues={issues}
+                />
+            </div>
+        </>
+    );
+}
+
 export function DropperFields({
     value,
     onChange,

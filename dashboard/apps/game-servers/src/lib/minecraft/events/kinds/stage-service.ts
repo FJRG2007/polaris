@@ -19,6 +19,8 @@ import * as tntRunSaid from "./tnt-run-messages";
 import * as dropper from "./dropper";
 import * as dropperSaid from "./dropper-messages";
 import * as boatRace from "./boat-race";
+import * as downhillRace from "./downhill-race";
+import * as downhillSaid from "./downhill-race-messages";
 import * as boatRaceSaid from "./boat-race-messages";
 import * as netherMaze from "./nether-maze";
 import * as netherMazeSaid from "./nether-maze-messages";
@@ -44,6 +46,7 @@ const messages = speech.spoken(written);
 const tntRunMessages = speech.spoken(tntRunSaid);
 const dropperMessages = speech.spoken(dropperSaid);
 const boatMessages = speech.spoken(boatRaceSaid);
+const downhillMessages = speech.spoken(downhillSaid);
 const mazeMessages = speech.spoken(netherMazeSaid);
 const acidMessages = speech.spoken(acidRainSaid);
 const elytraMessages = speech.spoken(elytraRaceSaid);
@@ -193,6 +196,22 @@ function layoutAt(run: EventRun, site: { x: number; z: number }, y: number): Lay
             boxes: course.boxes,
             volume: course.volume,
             reach: course.reach
+        };
+    }
+    // A downhill race is played as a boat race on a track that runs one way.
+    if (run.preset.kind === "downhill-race") {
+        const track = downhillRace.course(
+            run.preset.options as catalog.EventOptions<"downhill-race">,
+            run.id,
+            site,
+            y
+        );
+        return {
+            kind: "boat-race",
+            track,
+            boxes: track.boxes,
+            volume: track.volume,
+            reach: track.reach
         };
     }
     if (run.preset.kind === "boat-race") {
@@ -496,13 +515,15 @@ async function raise(
                             ? dropperMessages.cannotPlay(language)
                             : preset.kind === "boat-race"
                               ? boatMessages.cannotPlay(language)
-                              : preset.kind === "nether-maze"
-                                ? mazeMessages.cannotPlay(language)
-                                : preset.kind === "acid-rain"
-                                  ? acidMessages.cannotPlay(language)
-                                  : preset.kind === "elytra-race"
-                                    ? elytraMessages.cannotPlay(language)
-                                    : tntRunMessages.cannotPlay(language))
+                              : preset.kind === "downhill-race"
+                                ? downhillMessages.cannotPlay(language)
+                                : preset.kind === "nether-maze"
+                                  ? mazeMessages.cannotPlay(language)
+                                  : preset.kind === "acid-rain"
+                                    ? acidMessages.cannotPlay(language)
+                                    : preset.kind === "elytra-race"
+                                      ? elytraMessages.cannotPlay(language)
+                                      : tntRunMessages.cannotPlay(language))
                 )
             ]);
             throw new CalledOff("Its data pack could not be put on");
@@ -534,11 +555,13 @@ async function raise(
                     ? dropper.DESIGN
                     : preset.kind === "boat-race"
                       ? boatRace.DESIGN
-                      : preset.kind === "nether-maze"
-                        ? netherMaze.DESIGN
-                        : preset.kind === "elytra-race"
-                          ? elytraRace.DESIGN
-                          : parkour.DESIGN,
+                      : preset.kind === "downhill-race"
+                        ? downhillRace.DESIGN
+                        : preset.kind === "nether-maze"
+                          ? netherMaze.DESIGN
+                          : preset.kind === "elytra-race"
+                            ? elytraRace.DESIGN
+                            : parkour.DESIGN,
             area,
             waits: 0
         });
@@ -645,7 +668,9 @@ function readySubtitle(loop: StageLoop, layout: Layout): string {
         case "dropper":
             return dropperMessages.readySubtitle(language);
         case "boat-race":
-            return boatMessages.readySubtitle(language);
+            return layout.track.downhill
+                ? downhillMessages.readySubtitle(language)
+                : boatMessages.readySubtitle(language);
         case "nether-maze":
             return mazeMessages.readySubtitle(language);
         case "acid-rain":
@@ -1212,7 +1237,7 @@ async function holdTick(
                 ...boatRace.racerScores(racer.name),
                 ...boatRace.boatLines(racer.name, way, places[index]!.yaw),
                 `title ${racer.name} times 5 40 10`,
-                `title ${racer.name} subtitle ${commands.text(boatMessages.goSubtitle(layout.track.laps, language))}`,
+                `title ${racer.name} subtitle ${commands.text(layout.track.downhill ? downhillMessages.goSubtitle(language) : boatMessages.goSubtitle(layout.track.laps, language))}`,
                 `title ${racer.name} title ${commands.text(messages.goTitle(language))}`,
                 soundFor(racer.name, commands.SOUNDS.start)
             )
@@ -1586,6 +1611,7 @@ function needsPack(kind: catalog.EventKind): boolean {
         kind === "tnt-run" ||
         kind === "dropper" ||
         kind === "boat-race" ||
+        kind === "downhill-race" ||
         kind === "nether-maze" ||
         kind === "acid-rain" ||
         kind === "elytra-race"
@@ -1782,11 +1808,13 @@ function boatRaceOf(loop: StageLoop, server: ServerContainer, track: boatRace.Tr
             const passed = lowered(commands.readScores(await server.say([boatRace.READ_PASSED])));
             return (racer) => passed.get(racer.name.toLowerCase());
         },
-        whole: track.laps * gates + 1,
+        whole: boatRace.passesOf(track),
         finishTitle: messages.checkpointTitle(gates, gates, language),
         bar: (racer) => {
             const progress = boatRace.progressOf(track, racer.best);
-            return boatMessages.bar(progress.lap, track.laps, progress.gate, gates, language);
+            return track.downhill
+                ? downhillMessages.bar(Math.max(0, racer.best), gates, language)
+                : boatMessages.bar(progress.lap, track.laps, progress.gate, gates, language);
         },
         readFinished: boatRace.READ_FINISHED,
         stop: boatRace.stopLines(track.boxes)
@@ -2308,6 +2336,7 @@ export function results(run: EventRun): { scores: Map<string, number>; took: str
             run.preset.kind === "parkour" ||
             run.preset.kind === "dropper" ||
             run.preset.kind === "boat-race" ||
+            run.preset.kind === "downhill-race" ||
             run.preset.kind === "nether-maze" ||
             run.preset.kind === "elytra-race"
         ) {
@@ -2340,6 +2369,7 @@ export function standings(run: EventRun): { name: string; score: number }[] {
     const course =
         run.preset.kind === "parkour" ||
         run.preset.kind === "boat-race" ||
+        run.preset.kind === "downhill-race" ||
         run.preset.kind === "nether-maze" ||
         run.preset.kind === "elytra-race"
             ? built(run)
@@ -2349,7 +2379,7 @@ export function standings(run: EventRun): { name: string; score: number }[] {
         course?.kind === "parkour"
             ? course.course.platforms.length - 1
             : course?.kind === "boat-race"
-              ? course.track.laps * course.track.gates.length + 1
+              ? boatRace.passesOf(course.track)
               : course?.kind === "elytra-race"
                 ? course.course.laps * course.course.rings.length + 1
                 : course?.kind === "nether-maze"
@@ -2364,6 +2394,7 @@ export function standings(run: EventRun): { name: string; score: number }[] {
                 run.preset.kind === "parkour" ||
                 run.preset.kind === "dropper" ||
                 run.preset.kind === "boat-race" ||
+                run.preset.kind === "downhill-race" ||
                 run.preset.kind === "nether-maze" ||
                 run.preset.kind === "elytra-race"
                     ? one.finishedAt !== null
@@ -2391,7 +2422,7 @@ export function scoreText(
         if (parkour.isFinish(score)) return messages.clock(parkour.FINISH_BASE - score);
         return speech.pickIn({ en: `${score} jumps`, es: `${score} saltos` }, language);
     }
-    if (kind === "boat-race") {
+    if (kind === "boat-race" || kind === "downhill-race") {
         if (parkour.isFinish(score)) return messages.clock(parkour.FINISH_BASE - score);
         return speech.pickIn(
             {
