@@ -166,7 +166,7 @@ export function useGroups(
                 .then((page) => {
                     if (shown.current !== forKey) return;
                     setListing((previous) =>
-                        (previous ?? []).map((one) => {
+                        (previous ?? current.current ?? []).map((one) => {
                             if (one.value !== value) return one;
                             const known = new Set(one.rows.map((row) => row.id));
                             return {

@@ -711,11 +711,14 @@ export function ListScreen({ object }: { object: CrmObject }) {
                 groups={grouped.groups}
                 columns={columns}
                 canEdit={canEdit}
+                people={people}
+                defaultCurrency={format.preferences.currency}
                 sorted={config.sorts.length > 0}
                 loadingGroup={grouped.loadingGroup}
                 onLoadMore={grouped.loadMore}
                 onMove={moveCard}
                 onCreate={(value, name) => create(name, { key: boardBy.key, value })}
+                onEdit={edit}
             />
         );
     } else if (rows.length === 0 && !drafting && narrowed) {

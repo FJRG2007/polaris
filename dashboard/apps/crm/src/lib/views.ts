@@ -112,6 +112,25 @@ function nameTaken(caught: unknown): boolean {
     return (caught as { code?: unknown } | null)?.code === "P2002";
 }
 
+/** Refuse a name another view of this kind already has, in any casing. */
+async function refuseTaken(
+    actor: CrmActor,
+    object: CrmObject,
+    name: string,
+    except?: string
+): Promise<void> {
+    const clash = await prisma.crmView.findFirst({
+        where: {
+            shelf: actor.shelf.key,
+            object,
+            name: { equals: name, mode: "insensitive" },
+            ...(except ? { NOT: { id: except } } : {})
+        },
+        select: { id: true }
+    });
+    if (clash) await refuse("viewNameTaken");
+}
+
 /** A new named view, drawn the way the reader is drawing the list now. */
 export async function createView(
     actor: CrmActor,
@@ -126,6 +145,7 @@ export async function createView(
         prisma.crmView.findFirst({ where, orderBy: { position: "desc" }, select: { position: true } })
     ]);
     if (count >= MAX_VIEWS) await refuse("viewLimit");
+    await refuseTaken(actor, object, name);
     try {
         const made = await prisma.crmView.create({
             data: {
@@ -161,6 +181,7 @@ export async function renameView(
     const found = await prisma.crmView.findFirst({ where, select: { name: true } });
     if (!found) await refuse("viewMissing");
     if (found!.name === "") await refuse("viewDefault");
+    await refuseTaken(actor, object, clean, viewId);
     try {
         const row = await prisma.crmView.update({
             where: { id: viewId },

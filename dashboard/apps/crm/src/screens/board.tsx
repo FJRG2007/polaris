@@ -5,7 +5,7 @@
  * a card per record. A card is dragged to another column, or to another place
  * in its own when the board is not sorted; its menu does the same from the
  * keyboard. A new record is typed at the top of a column and starts with that
- * column's choice.
+ * column's choice. A card's name and values open in place, as a table's cells.
  *
  * What it changes it hands up: the screen applies it at once and undoes it if
  * the server refuses.
@@ -13,13 +13,14 @@
 
 import { useCrmT } from "./i18n";
 import { cn } from "@polaris/ui";
+import { CellPicker } from "./cell-picker";
 import { editorFor } from "./cell-editors";
 import type { RowGroup } from "./use-groups";
 import type { ViewColumn } from "../model/views";
-import { useState, type DragEvent } from "react";
 import type { InputValue } from "../model/values";
 import { CellDisplay, optionDot } from "./cell-display";
 import { ArrowRightLeft, Check, Plus } from "lucide-react";
+import { useState, type DragEvent, type ReactNode } from "react";
 import {
     Button,
     DropdownMenu,
@@ -35,7 +36,9 @@ import {
     recordName,
     type CrmObject,
     type CrmRecord,
-    type FieldDef
+    type FieldDef,
+    type FieldValue,
+    type Ref
 } from "../model/objects";
 
 /** The drag payload type a card carries, so a dropped file or link is never
@@ -53,6 +56,8 @@ export interface BoardProps {
     /** The view's visible columns: the fields a card shows, in order. */
     readonly columns: readonly ViewColumn[];
     readonly canEdit: boolean;
+    readonly people: readonly Ref[];
+    readonly defaultCurrency: string;
     /** Cards keep the sorted order, so a drop only changes the column. */
     readonly sorted: boolean;
     readonly loadingGroup: string | null;
@@ -61,6 +66,13 @@ export interface BoardProps {
      *  the end). */
     readonly onMove: (record: CrmRecord, value: string, beforeId: string | null) => void;
     readonly onCreate: (value: string, name: InputValue) => void;
+    /** A card's new value: what to store, and what to show until the answer. */
+    readonly onEdit: (
+        record: CrmRecord,
+        field: FieldDef,
+        stored: InputValue,
+        shown: FieldValue
+    ) => void;
 }
 
 export function Board(props: BoardProps) {
@@ -69,6 +81,7 @@ export function Board(props: BoardProps) {
     const [dragging, setDragging] = useState<string | null>(null);
     const [target, setTarget] = useState<{ value: string; beforeId: string | null } | null>(null);
     const [drafting, setDrafting] = useState<string | null>(null);
+    const [editing, setEditing] = useState<{ id: string; key: string } | null>(null);
     const primary = primaryField(object);
     const DraftEditor = editorFor(primary);
     const shown = props.columns
@@ -78,6 +91,76 @@ export function Board(props: BoardProps) {
     const label = (value: string) =>
         t(`options.${object}.${field.key}.${value}` as Parameters<typeof t>[0]);
     const byId = new Map(groups.flatMap((group) => group.rows).map((row) => [row.id, row]));
+
+    const open = (record: CrmRecord, one: FieldDef) => {
+        if (!props.canEdit || one.readOnly) return;
+        if (one.kind === "boolean") {
+            const next = !record.values[one.key];
+            props.onEdit(record, one, next, next);
+            return;
+        }
+        setEditing({ id: record.id, key: one.key });
+    };
+
+    /** A value on a card, opened in place the way a table cell is. */
+    const editable = (record: CrmRecord, one: FieldDef, children: ReactNode) => {
+        const value = record.values[one.key];
+        const active = editing?.id === record.id && editing.key === one.key;
+        const close = () => setEditing(null);
+        const Editor = active ? editorFor(one) : null;
+        const can = props.canEdit && !one.readOnly;
+        return (
+            <div
+                tabIndex={can ? 0 : undefined}
+                aria-label={t(`fields.${object}.${one.key}` as Parameters<typeof t>[0])}
+                className={cn(
+                    "relative flex min-w-0 flex-1 items-center rounded",
+                    can && "-mx-1 cursor-text px-1 hover:bg-card-hover",
+                    active && "z-30"
+                )}
+                onClick={(event) => {
+                    // A press in a menu this value opened arrives here through
+                    // the portal; it is the menu's, not a press on the card.
+                    if (!event.currentTarget.contains(event.target as Node)) return;
+                    open(record, one);
+                }}
+                onKeyDown={(event) => {
+                    if (event.target !== event.currentTarget) return;
+                    if (event.key === "Enter" || event.key === "F2") {
+                        event.preventDefault();
+                        open(record, one);
+                    }
+                }}
+            >
+                {children}
+                {Editor ? (
+                    <Editor
+                        field={one}
+                        value={value}
+                        defaultCurrency={props.defaultCurrency}
+                        onCancel={close}
+                        onCommit={(next) => {
+                            close();
+                            props.onEdit(record, one, next, next as FieldValue);
+                        }}
+                    />
+                ) : null}
+                {active && !Editor ? (
+                    <CellPicker
+                        object={object}
+                        field={one}
+                        value={value}
+                        people={props.people}
+                        onClose={close}
+                        onPick={(stored, shown) => {
+                            close();
+                            props.onEdit(record, one, stored, shown);
+                        }}
+                    />
+                ) : null}
+            </div>
+        );
+    };
 
     const accepts = (event: DragEvent) =>
         props.canEdit && event.dataTransfer.types.includes(CARD_DRAG);
@@ -196,7 +279,7 @@ export function Board(props: BoardProps) {
                                     <article
                                         key={record.id}
                                         data-card={record.id}
-                                        draggable={props.canEdit && !pending}
+                                        draggable={props.canEdit && !pending && editing?.id !== record.id}
                                         aria-label={name}
                                         onDragStart={(event) => {
                                             event.dataTransfer.setData(CARD_DRAG, record.id);
@@ -218,12 +301,16 @@ export function Board(props: BoardProps) {
                                         )}
                                     >
                                         <div className="flex min-w-0 items-start gap-2">
-                                            <span
-                                                className="min-w-0 flex-1 truncate text-[0.8125rem] font-medium"
-                                                title={name}
-                                            >
-                                                {name}
-                                            </span>
+                                            {editable(
+                                                record,
+                                                primary,
+                                                <span
+                                                    className="min-w-0 flex-1 truncate text-[0.8125rem] font-medium"
+                                                    title={name}
+                                                >
+                                                    {name}
+                                                </span>
+                                            )}
                                             {props.canEdit && !pending ? (
                                                 <MoveMenu
                                                     label={label}
@@ -255,13 +342,15 @@ export function Board(props: BoardProps) {
                                                     <span className="w-24 shrink-0 truncate text-muted-foreground">
                                                         {t(`fields.${object}.${one.key}` as Parameters<typeof t>[0])}
                                                     </span>
-                                                    <span className="flex min-w-0 flex-1 items-center">
+                                                    {editable(
+                                                        record,
+                                                        one,
                                                         <CellDisplay
                                                             object={object}
                                                             field={one}
                                                             value={record.values[one.key]}
                                                         />
-                                                    </span>
+                                                    )}
                                                 </div>
                                             ))}
                                     </article>

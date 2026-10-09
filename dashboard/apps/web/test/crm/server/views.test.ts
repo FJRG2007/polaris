@@ -22,6 +22,10 @@ const db = vi.hoisted(() => ({ rows: [] as Row[], made: 0 }));
 function matches(row: Row, where: Record<string, unknown>): boolean {
     return Object.entries(where).every(([key, value]) => {
         if (key === "NOT") return !matches(row, value as Record<string, unknown>);
+        if (value && typeof value === "object" && "equals" in value) {
+            const field = String((row as unknown as Record<string, unknown>)[key]);
+            return field.toLowerCase() === String(value.equals).toLowerCase();
+        }
         return (row as unknown as Record<string, unknown>)[key] === value;
     });
 }
@@ -145,6 +149,13 @@ describe("saved views", () => {
                 config: defaultConfig("opportunities")
             })
         ).rejects.toThrow("A view with this name already exists.");
+        await expect(
+            views.createView(actor(), "opportunities", {
+                name: "OPEN DEALS",
+                kind: "table",
+                config: defaultConfig("opportunities")
+            })
+        ).rejects.toThrow("A view with this name already exists.");
     });
 
     it("draws companies as a table, having no field a board could use", async () => {
@@ -191,6 +202,15 @@ describe("saved views", () => {
             config: defaultConfig("people")
         });
         expect((await views.renameView(actor(), "people", made.id, "Lisbon")).name).toBe("Lisbon");
+        expect((await views.renameView(actor(), "people", made.id, "LISBON")).name).toBe("LISBON");
+        const other = await views.createView(actor(), "people", {
+            name: "Porto",
+            kind: "table",
+            config: defaultConfig("people")
+        });
+        await expect(views.renameView(actor(), "people", other.id, "lisbon")).rejects.toThrow(
+            "A view with this name already exists."
+        );
         await views.deleteView(actor(), "people", made.id);
         expect(db.rows.some((row) => row.id === made.id)).toBe(false);
     });
