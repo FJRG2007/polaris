@@ -85,10 +85,10 @@ Always registered, idle until the dashboard runs one. Console and operators only
 - Hide and seek: while players carry `pe_hider` and `pe_seeker` (or sit in the
   `pe_hs_hide` and `pe_hs_seek` teams), a hider is not
   sent to a seeker farther than 2 blocks without a line of sight (`EventSeek`).
-- In the air: a player carrying `pe_in` (inside an event arena) is never kicked
-  for floating, so a dropper's slow fall or a racer put back mid-air is not a
-  disconnect. Everybody else keeps the game's own rule, so `allow-flight` stays
-  off (`FloatingKickMixin`).
+- In the air: a player carrying `pe_in` or `pe_arena` (inside an event) is
+  never kicked for floating, so a dropper's slow fall, a racer put back mid-air
+  or an arena's slow-falling drop is not a disconnect. Everybody else keeps the
+  game's own rule, so `allow-flight` stays off (`FloatingKickMixin`).
 
 ## Configuration
 

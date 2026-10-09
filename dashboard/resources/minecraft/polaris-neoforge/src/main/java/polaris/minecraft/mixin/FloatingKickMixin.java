@@ -1,5 +1,6 @@
 package polaris.minecraft.mixin;
 
+import java.util.Set;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.server.network.ServerGamePacketListenerImpl;
 import net.minecraft.world.entity.Entity;
@@ -19,19 +20,25 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
  * was a kick. Switching `allow-flight` on would end that for the whole server,
  * and on NeoForge this check is the only thing that stops a flying client.
  *
- * So the exemption is narrow: only a player carrying the arena tag, which an
- * event adds on the way in and takes off on every way out (`IN_ARENA` in the
- * dashboard's `events/kinds/stage.ts`). Everybody else keeps the game's rule. The
- * same method is asked about vehicles, which are left alone.
+ * So the exemption is narrow: only a player carrying one of the two arena tags,
+ * which an event adds on the way in and takes off on every way out (`IN_ARENA`
+ * in the dashboard's `events/kinds/stage.ts` for stages, and in
+ * `events/kinds/arena.ts` for PvP arenas, capture the flag, hide and seek and
+ * king of the hill). Everybody else keeps the game's rule. The same method is
+ * asked about vehicles, which are left alone.
  */
 @Mixin(ServerGamePacketListenerImpl.class)
 public abstract class FloatingKickMixin {
     /** `IN_ARENA` in `events/kinds/stage.ts`. */
-    private static final String IN_ARENA = "pe_in";
+    private static final String IN_STAGE = "pe_in";
+    /** `IN_ARENA` in `events/kinds/arena.ts`. */
+    private static final String IN_ARENA = "pe_arena";
 
     @Inject(method = "getMaximumFlyingTicks", at = @At("HEAD"), cancellable = true)
     private void polaris$eventAir(Entity entity, CallbackInfoReturnable<Integer> answer) {
-        if (entity instanceof ServerPlayer && entity.getTags().contains(IN_ARENA)) {
+        if (!(entity instanceof ServerPlayer)) return;
+        Set<String> tags = entity.getTags();
+        if (tags.contains(IN_STAGE) || tags.contains(IN_ARENA)) {
             answer.setReturnValue(Integer.MAX_VALUE);
         }
     }
