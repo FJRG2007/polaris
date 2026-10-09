@@ -195,7 +195,19 @@
                 "present": "Present",
                 "help": "Show keyboard shortcuts",
                 "presentFromStart": "Present from the beginning",
-                "newSlide": "Add a new slide"
+                "newSlide": "Add a new slide",
+                "bold": "Bold",
+                "italic": "Italic",
+                "underline": "Underline",
+                "align": {
+                    "left": "Align left",
+                    "center": "Center",
+                    "right": "Align right"
+                },
+                "bringForward": "Bring forward",
+                "sendBackward": "Send backward",
+                "bringToFront": "Bring to front",
+                "sendToBack": "Send to back"
             },
             "slideList": {
                 "previous": "Go to the previous slide",

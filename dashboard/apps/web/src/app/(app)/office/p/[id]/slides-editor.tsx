@@ -21,8 +21,12 @@
 import * as deck from "@/lib/office/deck";
 import * as edits from "./deck-edits";
 import { Present } from "./present";
+import { FormatBar } from "./format-bar";
 import { SlideList } from "./slide-list";
-import { SlideDrawing, SlideStage } from "./slide-canvas";
+import { NotesPanel } from "./notes-panel";
+import { PresenterView } from "./presenter";
+import { isPicture, readPicture, type PictureRefusal } from "./image-file";
+import { ImageSourceProvider, SlideDrawing, SlideStage } from "./slide-canvas";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useOfficeDocument } from "@/app/(app)/office/use-office-document";
 import { ShortcutsDialog } from "@/components/shortcuts/shortcuts-dialog";
@@ -31,21 +35,42 @@ import {
     DropdownMenu,
     DropdownMenuContent,
     DropdownMenuItem,
+    DropdownMenuSeparator,
     DropdownMenuTrigger,
     matchShortcut,
-    ShortcutHint
+    ScrollRow,
+    ShortcutHint,
+    useToast
 } from "@polaris/ui";
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
+    useCallback,
+    useEffect,
+    useMemo,
+    useRef,
+    useState,
+    type ComponentType,
+    type ReactNode
+} from "react";
+import {
+    ArrowRight,
     ChevronDown,
+    Circle,
     CopyPlus,
+    Diamond,
+    ImagePlus,
     Keyboard,
+    Minus,
+    MoveRight,
     Play,
     Plus,
+    Presentation,
     Redo2,
+    Shapes,
     SkipBack,
     Square,
+    Squircle,
     Trash2,
+    Triangle,
     Type,
     Undo2
 } from "lucide-react";
@@ -63,8 +88,48 @@ const KEYS = [
     "office.slides.present",
     "office.slides.presentFromStart",
     "office.slides.newSlide",
-    "office.slides.help"
+    "office.slides.help",
+    "office.slides.bold",
+    "office.slides.italic",
+    "office.slides.underline",
+    "office.slides.align.left",
+    "office.slides.align.center",
+    "office.slides.align.right",
+    "office.slides.bringForward",
+    "office.slides.sendBackward",
+    "office.slides.bringToFront",
+    "office.slides.sendToBack"
 ] as const;
+
+/** The keys that change how the chosen box's words look - the ones that also
+ *  work while typing in it, since a box's words are formatted whole. */
+const FORMAT_KEYS = new Set<string>([
+    "office.slides.bold",
+    "office.slides.italic",
+    "office.slides.underline",
+    "office.slides.align.left",
+    "office.slides.align.center",
+    "office.slides.align.right"
+]);
+
+const ARRANGE_KEYS: Readonly<Record<string, deck.Arrange>> = {
+    "office.slides.bringForward": "forward",
+    "office.slides.sendBackward": "backward",
+    "office.slides.bringToFront": "front",
+    "office.slides.sendToBack": "back"
+};
+
+/** The shapes the Shape menu offers, areas first and lines after. */
+const SHAPE_ICON: Readonly<Record<deck.ShapeKind, ComponentType<{ className?: string }>>> = {
+    rect: Square,
+    rounded: Squircle,
+    ellipse: Circle,
+    triangle: Triangle,
+    diamond: Diamond,
+    arrowRight: ArrowRight,
+    line: Minus,
+    arrow: MoveRight
+};
 
 const ARROWS: Readonly<Record<string, readonly [number, number]>> = {
     ArrowUp: [0, -1],
@@ -108,11 +173,29 @@ export function SlidesEditor({
         () => deck.groupBySlide(new Map(edits.boxesOf(doc).entries())),
         [doc, version]
     );
+    const notes = useMemo(() => new Map(edits.notesOf(doc).entries()), [doc, version]);
+    const notesFor = useCallback((one: deck.Slide) => deck.notesOf(one, notes), [notes]);
+    // A new function whenever the document changes, so a picture that arrives
+    // after its box redraws everything that shows it.
+    const imageSource = useCallback(
+        (src: string) => edits.imageSource(doc, src),
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+        [doc, version]
+    );
+    const toast = useToast();
+    const picker = useRef<HTMLInputElement | null>(null);
     const [atIndex, setAtIndex] = useState(0);
     const [chosen, setChosen] = useState("");
     const [editing, setEditing] = useState("");
-    /** The slide the show started from, while it runs. */
-    const [presenting, setPresenting] = useState<number | null>(null);
+    /** The slide the show started from, and how it is shown, while it runs. */
+    const [presenting, setPresenting] = useState<{
+        from: number;
+        presenter: boolean;
+    } | null>(null);
+    const present = useCallback(
+        (from: number, presenter = false) => setPresenting({ from, presenter }),
+        []
+    );
     const [helpOpen, setHelpOpen] = useState(false);
     const root = useRef<HTMLDivElement | null>(null);
 
@@ -163,12 +246,70 @@ export function SlidesEditor({
         }
     };
 
-    const addBox = (kind: deck.BoxKind): void => {
+    /** The keyboard on a box, once it is drawn - so the keys that act on the
+     *  chosen box (Delete, the arrows, Ctrl+B) work on one just inserted, rather
+     *  than on the toolbar button or menu that inserted it. */
+    const focusBox = (id: string): void => {
+        requestAnimationFrame(() =>
+            requestAnimationFrame(() =>
+                root.current
+                    ?.querySelector<HTMLElement>(`[data-box="${CSS.escape(id)}"]`)
+                    ?.focus()
+            )
+        );
+    };
+
+    const addBox = (kind: deck.BoxKind, shape?: deck.ShapeKind): void => {
         if (!slide) return;
-        const id = edits.addBox(doc, slide.id, kind);
+        const id = edits.addBox(doc, slide.id, kind, shape);
         setChosen(id);
         // A new text box is for typing into, straight away.
         setEditing(kind === "text" ? id : "");
+        if (kind !== "text") focusBox(id);
+    };
+
+    const refusal = (reason: PictureRefusal): string =>
+        reason === "notAPicture"
+            ? t("slides.image.notAPicture")
+            : reason === "tooLarge"
+              ? t("slides.image.tooLarge")
+              : t("slides.image.unreadable");
+
+    const slideRef = useRef("");
+    slideRef.current = slide?.id ?? "";
+
+    /** Pictures put on the slide - chosen, dropped or pasted - each its own box,
+     *  in its own proportions. */
+    const addPictures = async (files: readonly File[]): Promise<void> => {
+        if (!slide || !editable) return;
+        const target = slide.id;
+        let last = "";
+        for (const file of files) {
+            const read = await readPicture(file);
+            if (!read.ok) {
+                toast.show({ title: refusal(read.reason) });
+                continue;
+            }
+            last = edits.addImage(doc, target, read.data, deck.imageFrame(read.width, read.height));
+        }
+        if (last && slideRef.current === target) {
+            setChosen(last);
+            setEditing("");
+            focusBox(last);
+        }
+    };
+
+    const patchChosen = (patch: Parameters<typeof edits.updateBox>[3]): void => {
+        if (!slide || !chosenBox) return;
+        edits.updateBox(doc, slide.id, chosenBox.id, patch);
+    };
+
+    const nameOf = (box: deck.Box): string => {
+        if (box.kind === "image") return t("slides.image.name");
+        const words = box.text.trim();
+        if (box.kind === "text") return words || t("slides.clickToAddText");
+        const shape = t(`slides.shapes.${box.shape}`);
+        return words ? `${shape}: ${words}` : shape;
     };
 
     const duplicateChosen = (): void => {
@@ -185,8 +326,40 @@ export function SlidesEditor({
         setEditing("");
     };
 
+    const formatKey = (action: string): boolean => {
+        if (!chosenBox || !deck.holdsText(chosenBox)) return false;
+        switch (action) {
+            case "office.slides.bold":
+                patchChosen({ bold: !chosenBox.bold });
+                return true;
+            case "office.slides.italic":
+                patchChosen({ italic: !chosenBox.italic });
+                return true;
+            case "office.slides.underline":
+                patchChosen({ underline: !chosenBox.underline });
+                return true;
+            case "office.slides.align.left":
+                patchChosen({ align: "left" });
+                return true;
+            case "office.slides.align.center":
+                patchChosen({ align: "center" });
+                return true;
+            case "office.slides.align.right":
+                patchChosen({ align: "right" });
+                return true;
+        }
+        return false;
+    };
+
     const onKeyDown = (event: KeyboardEvent): void => {
-        if (typingIn(event.target)) return;
+        if (typingIn(event.target)) {
+            // Typing in a box: its words are formatted whole, so Ctrl+B there
+            // is the box's bold, exactly as with the box chosen.
+            if (!editable || !(event.target as Element).closest("[data-box]")) return;
+            const action = matchShortcut(event, KEYS);
+            if (action && FORMAT_KEYS.has(action) && formatKey(action)) event.preventDefault();
+            return;
+        }
         const action = matchShortcut(event, KEYS);
         if (!action) return;
         const handled = ((): boolean => {
@@ -203,10 +376,10 @@ export function SlidesEditor({
             if (deckSlides.length === 0) return false;
             switch (action) {
                 case "office.slides.present":
-                    setPresenting(at);
+                    present(at);
                     return true;
                 case "office.slides.presentFromStart":
-                    setPresenting(0);
+                    present(0);
                     return true;
                 case "office.slides.help":
                     setHelpOpen(true);
@@ -223,6 +396,12 @@ export function SlidesEditor({
                     return true;
             }
             if (!chosenBox || onControl(event.target)) return false;
+            if (FORMAT_KEYS.has(action)) return formatKey(action);
+            const how = ARRANGE_KEYS[action];
+            if (how) {
+                edits.arrangeBox(doc, slide.id, chosenBox.id, how);
+                return true;
+            }
             switch (action) {
                 case "office.slides.duplicate":
                     duplicateChosen();
@@ -231,7 +410,7 @@ export function SlidesEditor({
                     removeChosen();
                     return true;
                 case "office.slides.edit":
-                    if (chosenBox.kind !== "text") return false;
+                    if (!deck.holdsText(chosenBox)) return false;
                     setEditing(chosenBox.id);
                     return true;
                 case "office.slides.nudge":
@@ -241,7 +420,13 @@ export function SlidesEditor({
                         doc,
                         slide.id,
                         chosenBox.id,
-                        deck.nudgeFrame(chosenBox, right, down, action === "office.slides.nudgeFar")
+                        deck.nudgeFrame(
+                            chosenBox,
+                            right,
+                            down,
+                            action === "office.slides.nudgeFar",
+                            deck.smallestFor(chosenBox)
+                        )
                     );
                     return true;
                 }
@@ -254,7 +439,10 @@ export function SlidesEditor({
     const onCopy = (event: ClipboardEvent, cut: boolean): void => {
         if (typingIn(event.target) || !chosenBox || !event.clipboardData) return;
         event.preventDefault();
-        event.clipboardData.setData(deck.CLIPBOARD_TYPE, deck.writeClipboard([chosenBox]));
+        event.clipboardData.setData(
+            deck.CLIPBOARD_TYPE,
+            deck.writeClipboard([chosenBox], imageSource)
+        );
         // Words as words, for pasting into anything that is not a deck.
         if (chosenBox.text) event.clipboardData.setData("text/plain", chosenBox.text);
         if (cut && editable) removeChosen();
@@ -262,6 +450,14 @@ export function SlidesEditor({
 
     const onPaste = (event: ClipboardEvent): void => {
         if (typingIn(event.target) || !editable || !slide || !event.clipboardData) return;
+        // A picture copied from anywhere - a screenshot, an image from a page -
+        // goes on the slide as a picture.
+        const files = [...event.clipboardData.files].filter(isPicture);
+        if (files.length > 0 && !event.clipboardData.getData(deck.CLIPBOARD_TYPE)) {
+            event.preventDefault();
+            void addPictures(files);
+            return;
+        }
         const boxes = event.clipboardData.getData(deck.CLIPBOARD_TYPE);
         let pasted = boxes ? deck.readClipboard(boxes, () => crypto.randomUUID()) : [];
         if (pasted.length === 0) {
@@ -285,7 +481,7 @@ export function SlidesEditor({
             }
             return one;
         });
-        edits.placeBoxes(doc, slide.id, placed);
+        edits.pasteBoxes(doc, slide.id, placed);
         setChosen(placed[placed.length - 1]?.id ?? "");
         setEditing("");
     };
@@ -354,7 +550,7 @@ export function SlidesEditor({
     }
 
     return (
-        <>
+        <ImageSourceProvider source={imageSource}>
             <div ref={root} className="flex min-h-0 flex-1 max-sm:flex-col">
                 {/* The slides. A column of them rather than a strip: a deck is
                     read top to bottom in every tool that makes one. */}
@@ -367,50 +563,135 @@ export function SlidesEditor({
                 />
 
                 <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-                    <div className="flex shrink-0 flex-wrap items-center gap-1 border-b border-border px-3 py-1.5">
-                        {editable ? (
-                            <>
-                                <ToolButton
-                                    label={t("slides.undo")}
-                                    disabled={!history.canUndo}
-                                    onClick={history.undo}
-                                >
-                                    <Undo2 className="size-4 shrink-0" aria-hidden />
-                                </ToolButton>
-                                <ToolButton
-                                    label={t("slides.redo")}
-                                    disabled={!history.canRedo}
-                                    onClick={history.redo}
-                                >
-                                    <Redo2 className="size-4 shrink-0" aria-hidden />
-                                </ToolButton>
-                                <span className="mx-1 h-5 w-px bg-border" aria-hidden />
-                                <Button variant="ghost" size="sm" onClick={() => addBox("text")}>
-                                    <Type className="size-4 shrink-0" aria-hidden />
-                                    {t("slides.text")}
-                                </Button>
-                                <Button variant="ghost" size="sm" onClick={() => addBox("shape")}>
-                                    <Square className="size-4 shrink-0" aria-hidden />
-                                    {t("slides.shape")}
-                                </Button>
-                                <span className="mx-1 h-5 w-px bg-border" aria-hidden />
-                                <ToolButton
-                                    label={t("slides.duplicateBox")}
-                                    disabled={!chosenBox}
-                                    onClick={duplicateChosen}
-                                >
-                                    <CopyPlus className="size-4 shrink-0" aria-hidden />
-                                </ToolButton>
-                                <ToolButton
-                                    label={t("slides.deleteBox")}
-                                    disabled={!chosenBox}
-                                    onClick={removeChosen}
-                                >
-                                    <Trash2 className="size-4 shrink-0" aria-hidden />
-                                </ToolButton>
-                            </>
-                        ) : null}
-                        <div className="ml-auto flex items-center gap-1">
+                    <div className="flex shrink-0 items-center gap-1 border-b border-border px-3 py-1.5">
+                        {/* Everything that edits, in one row that scrolls
+                            sideways when the window is too narrow for it,
+                            rather than wrapping into rows that push the slide
+                            down. */}
+                        <ScrollRow className="flex min-w-0 flex-1 items-center gap-1">
+                            {editable ? (
+                                <>
+                                    <ToolButton
+                                        label={t("slides.undo")}
+                                        disabled={!history.canUndo}
+                                        onClick={history.undo}
+                                    >
+                                        <Undo2 className="size-4 shrink-0" aria-hidden />
+                                    </ToolButton>
+                                    <ToolButton
+                                        label={t("slides.redo")}
+                                        disabled={!history.canRedo}
+                                        onClick={history.redo}
+                                    >
+                                        <Redo2 className="size-4 shrink-0" aria-hidden />
+                                    </ToolButton>
+                                    <span className="mx-1 h-5 w-px shrink-0 bg-border" aria-hidden />
+                                    <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        className="shrink-0"
+                                        title={t("slides.text")}
+                                        onClick={() => addBox("text")}
+                                    >
+                                        <Type className="size-4 shrink-0" aria-hidden />
+                                        {/* Named on the widest screens only: with a
+                                            box chosen its formatting needs the row. */}
+                                        <span className="max-2xl:sr-only">{t("slides.text")}</span>
+                                    </Button>
+                                    <DropdownMenu>
+                                        <DropdownMenuTrigger asChild>
+                                            <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                className="shrink-0"
+                                                title={t("slides.shape")}
+                                            >
+                                                <Shapes className="size-4 shrink-0" aria-hidden />
+                                                <span className="max-2xl:sr-only">
+                                                    {t("slides.shape")}
+                                                </span>
+                                                <ChevronDown
+                                                    className="size-3 shrink-0"
+                                                    aria-hidden
+                                                />
+                                            </Button>
+                                        </DropdownMenuTrigger>
+                                        <DropdownMenuContent
+                                            align="start"
+                                            // The new shape takes the focus, not
+                                            // the button that made it.
+                                            onCloseAutoFocus={(event) => event.preventDefault()}
+                                        >
+                                            {deck.SHAPES.map((shape) => {
+                                                const Icon = SHAPE_ICON[shape];
+                                                return (
+                                                    <div key={shape}>
+                                                        {shape === deck.LINE_SHAPES[0] ? (
+                                                            <DropdownMenuSeparator />
+                                                        ) : null}
+                                                        <DropdownMenuItem
+                                                            onSelect={() => addBox("shape", shape)}
+                                                        >
+                                                            <Icon className="size-4" />
+                                                            {t(`slides.shapes.${shape}`)}
+                                                        </DropdownMenuItem>
+                                                    </div>
+                                                );
+                                            })}
+                                        </DropdownMenuContent>
+                                    </DropdownMenu>
+                                    <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        className="shrink-0"
+                                        title={t("slides.image.insert")}
+                                        onClick={() => picker.current?.click()}
+                                    >
+                                        <ImagePlus className="size-4 shrink-0" aria-hidden />
+                                        <span className="max-2xl:sr-only">
+                                            {t("slides.image.insert")}
+                                        </span>
+                                    </Button>
+                                    <input
+                                        ref={picker}
+                                        type="file"
+                                        accept="image/*"
+                                        multiple
+                                        hidden
+                                        onChange={(event) => {
+                                            const files = [...(event.currentTarget.files ?? [])];
+                                            event.currentTarget.value = "";
+                                            void addPictures(files);
+                                        }}
+                                    />
+                                    <span className="mx-1 h-5 w-px shrink-0 bg-border" aria-hidden />
+                                    <ToolButton
+                                        label={t("slides.duplicateBox")}
+                                        disabled={!chosenBox}
+                                        onClick={duplicateChosen}
+                                    >
+                                        <CopyPlus className="size-4 shrink-0" aria-hidden />
+                                    </ToolButton>
+                                    <ToolButton
+                                        label={t("slides.deleteBox")}
+                                        disabled={!chosenBox}
+                                        onClick={removeChosen}
+                                    >
+                                        <Trash2 className="size-4 shrink-0" aria-hidden />
+                                    </ToolButton>
+                                    {chosenBox && slide ? (
+                                        <FormatBar
+                                            box={chosenBox}
+                                            onPatch={patchChosen}
+                                            onArrange={(how) =>
+                                                edits.arrangeBox(doc, slide.id, chosenBox.id, how)
+                                            }
+                                        />
+                                    ) : null}
+                                </>
+                            ) : null}
+                        </ScrollRow>
+                        <div className="flex shrink-0 items-center gap-1">
                             <ToolButton
                                 label={t("slides.shortcuts")}
                                 onClick={() => setHelpOpen(true)}
@@ -422,10 +703,10 @@ export function SlidesEditor({
                                     variant="secondary"
                                     size="sm"
                                     className="rounded-r-none"
-                                    onClick={() => setPresenting(at)}
+                                    onClick={() => present(at)}
                                 >
                                     <Play className="size-4 shrink-0" aria-hidden />
-                                    {t("slides.present")}
+                                    <span className="max-sm:sr-only">{t("slides.present")}</span>
                                 </Button>
                                 <DropdownMenu>
                                     <DropdownMenuTrigger asChild>
@@ -440,15 +721,20 @@ export function SlidesEditor({
                                         </Button>
                                     </DropdownMenuTrigger>
                                     <DropdownMenuContent align="end">
-                                        <DropdownMenuItem onSelect={() => setPresenting(at)}>
+                                        <DropdownMenuItem onSelect={() => present(at)}>
                                             <Play aria-hidden />
                                             {t("slides.fromHere")}
                                             <ShortcutHint id="office.slides.present" />
                                         </DropdownMenuItem>
-                                        <DropdownMenuItem onSelect={() => setPresenting(0)}>
+                                        <DropdownMenuItem onSelect={() => present(0)}>
                                             <SkipBack aria-hidden />
                                             {t("slides.fromStart")}
                                             <ShortcutHint id="office.slides.presentFromStart" />
+                                        </DropdownMenuItem>
+                                        <DropdownMenuSeparator />
+                                        <DropdownMenuItem onSelect={() => present(at, true)}>
+                                            <Presentation aria-hidden />
+                                            {t("slides.presenter.title")}
                                         </DropdownMenuItem>
                                     </DropdownMenuContent>
                                 </DropdownMenu>
@@ -459,7 +745,21 @@ export function SlidesEditor({
                     {/* The slide, as large as the room allows in both directions:
                     sized off this area's own width and height, so a short
                     window shows the whole slide rather than a scrolled part. */}
-                    <div className="min-h-0 flex-1 bg-muted/30 p-4 [container-type:size]">
+                    <div
+                        className="min-h-0 flex-1 bg-muted/30 p-4 [container-type:size]"
+                        onDragOver={(event) => {
+                            if (!editable || !event.dataTransfer.types.includes("Files")) return;
+                            event.preventDefault();
+                            event.dataTransfer.dropEffect = "copy";
+                        }}
+                        onDrop={(event) => {
+                            if (!editable) return;
+                            const files = [...event.dataTransfer.files].filter(isPicture);
+                            if (files.length === 0) return;
+                            event.preventDefault();
+                            void addPictures(files);
+                        }}
+                    >
                         <div className="flex h-full w-full items-center justify-center">
                             <div
                                 className="relative aspect-video overflow-hidden rounded-lg border border-border bg-background shadow-sm"
@@ -472,8 +772,9 @@ export function SlidesEditor({
                                         chosen={chosenBox?.id ?? ""}
                                         editing={editing}
                                         placeholder={t("slides.clickToAddText")}
-                                        shapeLabel={t("slides.shape")}
+                                        nameOf={nameOf}
                                         resizeLabel={t("slides.resize")}
+                                        lineEndLabel={t("slides.lineEnd")}
                                         onChoose={setChosen}
                                         onEdit={setEditing}
                                         onFrame={(id, frame) =>
@@ -489,18 +790,38 @@ export function SlidesEditor({
                             </div>
                         </div>
                     </div>
+                    {slide ? (
+                        <NotesPanel
+                            slideId={slide.id}
+                            notes={notesFor(slide)}
+                            editable={editable}
+                            onWrite={(slideId, text) => {
+                                const one = edits.slidesOf(doc).toArray().find((s) => s.id === slideId);
+                                if (one) edits.setNotes(doc, one, text);
+                            }}
+                        />
+                    ) : null}
                 </div>
             </div>
-            {presenting !== null ? (
+            {presenting?.presenter ? (
+                <PresenterView
+                    documentId={documentId}
+                    slides={deckSlides}
+                    bySlide={bySlide}
+                    notesOf={notesFor}
+                    from={presenting.from}
+                    onClose={() => setPresenting(null)}
+                />
+            ) : presenting ? (
                 <Present
                     slides={deckSlides}
                     bySlide={bySlide}
-                    from={presenting}
+                    from={presenting.from}
                     onClose={() => setPresenting(null)}
                 />
             ) : null}
             <ShortcutsDialog app="office" open={helpOpen} onOpenChange={setHelpOpen} />
-        </>
+        </ImageSourceProvider>
     );
 }
 

@@ -195,7 +195,19 @@
                 "present": "Presentar",
                 "help": "Ver atajos de teclado",
                 "presentFromStart": "Presentar desde el principio",
-                "newSlide": "Nueva diapositiva"
+                "newSlide": "Nueva diapositiva",
+                "bold": "Negrita",
+                "italic": "Cursiva",
+                "underline": "Subrayado",
+                "align": {
+                    "left": "Izquierda",
+                    "center": "Centrar",
+                    "right": "Derecha"
+                },
+                "bringForward": "Traer adelante",
+                "sendBackward": "Enviar atrás",
+                "bringToFront": "Traer al frente",
+                "sendToBack": "Enviar al fondo"
             },
             "slideList": {
                 "previous": "Ir a la diapositiva anterior",

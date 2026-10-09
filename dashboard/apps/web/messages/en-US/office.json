@@ -248,7 +248,85 @@
         "exitFullScreen": "Leave the full-screen view",
         "fullScreen": "Show full screen",
         "endOfShow": "End of the presentation",
-        "endHint": "Click or press any key to leave."
+        "endHint": "Click or press any key to leave.",
+        "lineEnd": "Drag to move this end",
+        "shapes": {
+            "rect": "Rectangle",
+            "rounded": "Rounded rectangle",
+            "ellipse": "Oval",
+            "triangle": "Triangle",
+            "diamond": "Diamond",
+            "arrowRight": "Right arrow",
+            "line": "Line",
+            "arrow": "Arrow"
+        },
+        "image": {
+            "insert": "Image",
+            "name": "Image",
+            "notAPicture": "That file is not a picture.",
+            "tooLarge": "That picture is too large to add to a slide.",
+            "unreadable": "That picture could not be read."
+        },
+        "format": {
+            "fontSize": "Font size",
+            "smaller": "Decrease font size",
+            "bigger": "Increase font size",
+            "bold": "Bold",
+            "italic": "Italic",
+            "underline": "Underline",
+            "textColor": "Text color",
+            "automatic": "Automatic",
+            "align": "Align",
+            "aligns": {
+                "left": "Align left",
+                "center": "Center",
+                "right": "Align right"
+            },
+            "valign": "Vertical align",
+            "valigns": {
+                "top": "Top",
+                "middle": "Middle",
+                "bottom": "Bottom"
+            },
+            "bulletList": "Bulleted list",
+            "numberedList": "Numbered list",
+            "fill": "Fill color",
+            "noFill": "Transparent",
+            "border": "Border color",
+            "noBorder": "No border",
+            "borderWeight": "Border weight",
+            "lineColor": "Stroke color",
+            "lineWeight": "Stroke weight",
+            "points": "{points} pt",
+            "arrange": "Arrange",
+            "arranges": {
+                "front": "Bring to front",
+                "forward": "Bring forward",
+                "backward": "Send backward",
+                "back": "Send to back"
+            }
+        },
+        "notes": {
+            "title": "Speaker notes",
+            "placeholder": "Click to add speaker notes"
+        },
+        "presenter": {
+            "title": "Presenter view",
+            "elapsed": "Time since the start",
+            "pause": "Pause the timer",
+            "resume": "Resume the timer",
+            "reset": "Reset the timer",
+            "openAudience": "Open audience window",
+            "showAudience": "Show audience window",
+            "current": "Current slide",
+            "nextUp": "Up next",
+            "smallerNotes": "Smaller notes",
+            "largerNotes": "Larger notes",
+            "noNotes": "No speaker notes on this slide."
+        },
+        "audience": {
+            "title": "Audience view"
+        }
     },
     "positioning": {
         "twoThingsToMeasure": "Two things to measure",

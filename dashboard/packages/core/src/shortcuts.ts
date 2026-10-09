@@ -443,6 +443,17 @@ export const SHORTCUTS: readonly ShortcutDefinition[] = [
         ["slides.presentFromStart", "officeSlides", "office.slides", ["Mod+Shift+Enter"]],
         ["slides.newSlide", "officeSlides", "office.slides", ["Mod+m"]],
         ["slides.help", "officeSlides", "office.slides", ["?"]],
+        // The chosen box, as Google Slides formats and arranges one.
+        ["slides.bold", "officeSlides", "office.slides", ["Mod+b"]],
+        ["slides.italic", "officeSlides", "office.slides", ["Mod+i"]],
+        ["slides.underline", "officeSlides", "office.slides", ["Mod+u"]],
+        ["slides.align.left", "officeSlides", "office.slides", ["Mod+Shift+l"]],
+        ["slides.align.center", "officeSlides", "office.slides", ["Mod+Shift+e"]],
+        ["slides.align.right", "officeSlides", "office.slides", ["Mod+Shift+r"]],
+        ["slides.bringForward", "officeSlides", "office.slides", ["Mod+ArrowUp"]],
+        ["slides.sendBackward", "officeSlides", "office.slides", ["Mod+ArrowDown"]],
+        ["slides.bringToFront", "officeSlides", "office.slides", ["Mod+Shift+ArrowUp"]],
+        ["slides.sendToBack", "officeSlides", "office.slides", ["Mod+Shift+ArrowDown"]],
         // On the column of slides, with one of them focused.
         ["slideList.previous", "officeSlideList", "office.slideList", [], ["ArrowUp", "ArrowLeft"]],
         ["slideList.next", "officeSlideList", "office.slideList", [], ["ArrowDown", "ArrowRight"]],

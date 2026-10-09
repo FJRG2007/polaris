@@ -316,9 +316,10 @@ function comparisonRows(doc: Y.Doc): string[][] {
 /** A deck, as its slides' words. */
 function deckSlides(doc: Y.Doc): { notes: string; lines: string[] }[] {
     const slides = doc.getArray<deck.Slide>(OFFICE_FIELDS.slides.slides).toArray();
-    const boxes = new Map<string, deck.Box>(doc.getMap<deck.Box>(OFFICE_FIELDS.slides.boxes));
+    const boxes = new Map<string, unknown>(doc.getMap<unknown>(OFFICE_FIELDS.slides.boxes));
+    const notes = new Map<string, unknown>(doc.getMap<unknown>(OFFICE_FIELDS.slides.notes));
     return slides.map((slide) => ({
-        notes: slide.notes ?? "",
+        notes: deck.notesOf(slide, notes),
         lines: deck
             .boxesOn(slide.id, boxes)
             .map((box) => box.text.trim())

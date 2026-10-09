@@ -115,3 +115,96 @@ describe("the slide list", () => {
         expect(edits.boxesOf(doc).get(deck.boxKey(gone, "title"))).toBeDefined();
     });
 });
+
+describe("formatting, the stack, notes and pictures", () => {
+    function oneSlide(): { doc: Y.Doc; slide: string } {
+        const doc = new Y.Doc();
+        return { doc, slide: edits.addSlide(doc, 0) };
+    }
+    const read = (doc: Y.Doc, slide: string, id: string) =>
+        deck.readBox(edits.boxesOf(doc).get(deck.boxKey(slide, id)));
+
+    it("puts every new box on top of the ones already there", () => {
+        const { doc, slide } = oneSlide();
+        const first = edits.addBox(doc, slide, "shape", "ellipse");
+        const second = edits.addBox(doc, slide, "text");
+        expect(read(doc, slide, second).z).toBeGreaterThan(read(doc, slide, first).z);
+        expect(read(doc, slide, first).shape).toBe("ellipse");
+    });
+
+    it("brings a box to the front as one step back", () => {
+        const { doc, slide } = oneSlide();
+        const a = edits.addBox(doc, slide, "text");
+        const b = edits.addBox(doc, slide, "text");
+        const history = edits.deckUndoManager(doc);
+        edits.arrangeBox(doc, slide, a, "front");
+        const order = () =>
+            deck.boxesOn(slide, new Map(edits.boxesOf(doc).entries())).map((box) => box.id);
+        expect(order().at(-1)).toBe(a);
+        history.undo();
+        expect(order().at(-1)).toBe(b);
+    });
+
+    it("writes nothing for formatting a box already has", () => {
+        const { doc, slide } = oneSlide();
+        let updates = 0;
+        doc.on("update", () => (updates += 1));
+        // The title box an older editor wrote has no bold field at all.
+        edits.updateBox(doc, slide, "title", { bold: false, list: "none" });
+        expect(updates).toBe(0);
+        edits.updateBox(doc, slide, "title", { bold: true });
+        expect(updates).toBe(1);
+        expect(read(doc, slide, "title").bold).toBe(true);
+    });
+
+    it("keeps notes apart from the slide, and takes them with a copy", () => {
+        const { doc, slide } = oneSlide();
+        const [one] = edits.slidesOf(doc).toArray();
+        edits.setNotes(doc, one!, "Say hello");
+        expect(edits.notesOf(doc).get(slide)).toBe("Say hello");
+        const copy = edits.duplicateSlide(doc, slide, 0);
+        expect(edits.notesOf(doc).get(copy)).toBe("Say hello");
+        edits.removeSlide(doc, slide);
+        expect(edits.notesOf(doc).get(slide)).toBeUndefined();
+    });
+
+    it("keeps a picture once and lets the box name it", () => {
+        const { doc, slide } = oneSlide();
+        const id = edits.addImage(doc, slide, "data:image/webp;base64,AAAA", {
+            x: 0.2,
+            y: 0.2,
+            w: 0.3,
+            h: 0.3
+        });
+        const box = read(doc, slide, id);
+        expect(box.src.startsWith(deck.IMAGE_PREFIX)).toBe(true);
+        expect(edits.imageSource(doc, box.src)).toBe("data:image/webp;base64,AAAA");
+        // Moving it sends a few numbers, not the picture again.
+        let size = 0;
+        doc.on("update", (update: Uint8Array) => (size = update.length));
+        edits.setFrame(doc, slide, id, { x: 0.4, y: 0.4, w: 0.3, h: 0.3 });
+        expect(size).toBeLessThan(400);
+    });
+
+    it("moves a pasted picture into the store, in one step", () => {
+        const { doc, slide } = oneSlide();
+        const history = edits.deckUndoManager(doc);
+        const pasted = { ...deck.newBox("image", "p"), src: "data:image/png;base64,BBBB" };
+        edits.pasteBoxes(doc, slide, [pasted]);
+        const box = read(doc, slide, "p");
+        expect(box.src.startsWith(deck.IMAGE_PREFIX)).toBe(true);
+        expect(edits.imageSource(doc, box.src)).toBe("data:image/png;base64,BBBB");
+        history.undo();
+        expect(edits.boxesOf(doc).get(deck.boxKey(slide, "p"))).toBeUndefined();
+        expect(edits.imagesOf(doc).size).toBe(0);
+    });
+
+    it("keeps a flat line flat when it is moved", () => {
+        const { doc, slide } = oneSlide();
+        const id = edits.addBox(doc, slide, "shape", "line");
+        edits.setFrame(doc, slide, id, { x: 0.1, y: 0.5, w: 0.4, h: 0, flip: false, reversed: true });
+        const line = read(doc, slide, id);
+        expect(line.h).toBe(0);
+        expect(line.reversed).toBe(true);
+    });
+});
