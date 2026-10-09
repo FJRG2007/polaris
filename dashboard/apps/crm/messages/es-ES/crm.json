@@ -185,13 +185,15 @@
         },
         "noMatches": "Nada coincide con \"{search}\"",
         "forbiddenTitle": "Tu rol no puede ver esta lista",
-        "forbiddenBody": "Un administrador de la organización puede dar acceso a tu rol en los roles de la organización."
+        "forbiddenBody": "Un administrador de la organización puede dar acceso a tu rol en los roles de la organización.",
+        "filtered": "Ningún registro cumple estos filtros"
     },
     "actions": {
         "cancel": "Cancelar",
         "clear": "Borrar",
         "clearSearch": "Quitar búsqueda",
-        "retry": "Reintentar"
+        "retry": "Reintentar",
+        "clearFilters": "Quitar filtros"
     },
     "errors": {
         "generic": "Algo ha fallado. Inténtalo de nuevo.",
@@ -205,6 +207,104 @@
         "notSaved": "El cambio no se guardó",
         "notCreated": "No se creó el registro",
         "notTrashed": "No se borró nada",
-        "viewNotSaved": "Las columnas no se guardaron"
+        "viewNotSaved": "Las columnas no se guardaron",
+        "viewNameTaken": "Ya hay una vista con este nombre.",
+        "viewName": "Pon a la vista un nombre de hasta {length} caracteres.",
+        "viewDefault": "La vista por defecto no se puede renombrar ni borrar.",
+        "viewLimit": "Esta lista ya tiene {max} vistas. Borra una antes.",
+        "viewNotRenamed": "No se renombró la vista",
+        "viewNotDeleted": "No se borró la vista",
+        "notMoved": "No se movió la tarjeta"
+    },
+    "views": {
+        "title": "Vistas",
+        "picker": "Elige una vista",
+        "default": "Vista general",
+        "create": "Nueva vista",
+        "createTitle": "Guardar vista nueva",
+        "createButton": "Crear vista",
+        "rename": "Renombrar",
+        "renameTitle": "Cambiar nombre",
+        "save": "Guardar",
+        "delete": "Borrar vista",
+        "deleteTitle": "¿Borrar \"{name}\"?",
+        "deleteDescription": "Nadie aquí verá ya esta vista. Los registros no cambian.",
+        "created": "Vista \"{name}\" creada.",
+        "deleted": "Vista \"{name}\" borrada.",
+        "name": "Nombre",
+        "namePlaceholder": "Tratos abiertos del trimestre",
+        "nameTaken": "Ya hay una vista con este nombre.",
+        "layout": "Diseño",
+        "kinds": {
+            "table": "Tabla",
+            "kanban": "Tablero"
+        },
+        "noBoard": "Un tablero necesita un campo de opciones fijas, como la etapa."
+    },
+    "board": {
+        "label": "Tablero por {field}",
+        "add": "Añadir a {column}",
+        "more": "{count, plural, one {Ver # más} other {Ver # más}}",
+        "moveCard": "Mover {name}",
+        "moveTo": "Mover a"
+    },
+    "filters": {
+        "button": "Filtrar",
+        "title": "Filtros",
+        "description": "Solo se listan y cuentan los registros que coinciden.",
+        "empty": "Aún no hay filtros. Añade uno para acotar la lista.",
+        "showWhere": "Mostrar los que cumplan",
+        "groupWhere": "Este grupo cumple",
+        "matchLabel": "Cómo se combinan las reglas",
+        "match": {
+            "and": "todas estas",
+            "or": "alguna de estas"
+        },
+        "field": "Campo",
+        "operator": "Condición",
+        "value": "Valor",
+        "choose": "Elegir",
+        "textPlaceholder": "Texto",
+        "numberPlaceholder": "Número",
+        "addRule": "Añadir filtro",
+        "addGroup": "Añadir grupo",
+        "removeRule": "Quitar filtro",
+        "removeGroup": "Quitar grupo",
+        "clearAll": "Quitar todo",
+        "done": "Listo",
+        "full": "Hasta {max} filtros.",
+        "operators": {
+            "contains": "contiene",
+            "notContains": "no contiene",
+            "is": "es",
+            "greaterThan": "mayor que",
+            "lessThan": "menor que",
+            "before": "antes de",
+            "after": "tras",
+            "isAnyOf": "es uno de",
+            "isNoneOf": "no es ninguno",
+            "isTrue": "es sí",
+            "isFalse": "es no",
+            "isEmpty": "está vacío",
+            "isNotEmpty": "no está vacío"
+        }
+    },
+    "sorts": {
+        "button": "Ordenar",
+        "current": "Ordenado por",
+        "add": "Añadir orden",
+        "full": "Hasta {max} órdenes",
+        "clear": "Quitar todo orden",
+        "asc": "Ascendente",
+        "desc": "Descendente"
+    },
+    "groups": {
+        "button": "Agrupar",
+        "buttonField": "Grupo: {field}",
+        "columnsField": "Columnas: {field}",
+        "by": "Agrupar por",
+        "columnsBy": "Columnas por",
+        "none": "Sin agrupar",
+        "unavailable": "Aquí no hay opciones fijas por las que agrupar."
     }
 }
