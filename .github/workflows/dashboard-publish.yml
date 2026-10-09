@@ -763,8 +763,10 @@ jobs:
       - name: Tag the vision worker
         if: ${{ env.PUBLISH == 'true' && needs.vision.result == 'success' }}
         run: |
-          docker buildx imagetools create -t ghcr.io/fjrg2007/polaris-vision:latest             ghcr.io/fjrg2007/polaris-vision@${{ needs.vision.outputs.digest }}
+          docker buildx imagetools create -t ghcr.io/fjrg2007/polaris-vision:latest \
+            ghcr.io/fjrg2007/polaris-vision@${{ needs.vision.outputs.digest }}
       - name: Tag the face recognizer
         if: ${{ env.PUBLISH == 'true' && needs.face.result == 'success' }}
         run: |
-          docker buildx imagetools create -t ghcr.io/fjrg2007/polaris-face:latest             ghcr.io/fjrg2007/polaris-face@${{ needs.face.outputs.digest }}
+          docker buildx imagetools create -t ghcr.io/fjrg2007/polaris-face:latest \
+            ghcr.io/fjrg2007/polaris-face@${{ needs.face.outputs.digest }}
