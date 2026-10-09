@@ -8,10 +8,17 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const dropped = { snapshots: 0, mail: 0 };
 vi.mock("@/lib/snapshot-cache", () => ({ dropAllSnapshots: () => void (dropped.snapshots += 1) }));
-vi.mock("@/lib/mailbox/mail-cache", () => ({ dropMailCache: async () => void (dropped.mail += 1) }));
+vi.mock("@/lib/mailbox/mail-cache", () => ({
+    dropMailCache: async () => void (dropped.mail += 1)
+}));
 
-const { ACCOUNT_MARKER_KEY, forgetAccountTraces, leaveAccount, listenForAccountChange, reconcileAccount } =
-    await import("@/lib/account-switch");
+const {
+    ACCOUNT_MARKER_KEY,
+    forgetAccountTraces,
+    leaveAccount,
+    listenForAccountChange,
+    reconcileAccount
+} = await import("@/lib/account-switch");
 
 const assign = vi.fn();
 
@@ -31,7 +38,10 @@ function memoryStorage(): Storage {
 }
 
 function storedKeys(): string[] {
-    return Array.from({ length: window.localStorage.length }, (_, index) => window.localStorage.key(index) ?? "");
+    return Array.from(
+        { length: window.localStorage.length },
+        (_, index) => window.localStorage.key(index) ?? ""
+    );
 }
 
 beforeEach(() => {
@@ -39,12 +49,15 @@ beforeEach(() => {
     dropped.snapshots = 0;
     dropped.mail = 0;
     assign.mockReset();
-    Object.defineProperty(window, "location", { value: { ...window.location, assign }, configurable: true });
+    Object.defineProperty(window, "location", {
+        value: { ...window.location, assign },
+        configurable: true
+    });
 });
 
 function seedTraces(): void {
-    window.localStorage.setItem("polaris.overview.recent", "[\"A's plan\"]");
-    window.localStorage.setItem("polaris.search.recent", "[\"salary\"]");
+    window.localStorage.setItem("polaris.overview.recent", '["A\'s plan"]');
+    window.localStorage.setItem("polaris.search.recent", '["salary"]');
     window.localStorage.setItem("polaris.place.drive", "/drive/f/ana");
     window.localStorage.setItem("polaris.apps.usage", "{}");
     window.localStorage.setItem("polaris.mail.announced", "x");
@@ -81,11 +94,17 @@ describe("reconcileAccount", () => {
 describe("listenForAccountChange", () => {
     it("reloads this tab when another tab is drawn for a different account", () => {
         const stop = listenForAccountChange("ana");
-        window.dispatchEvent(new StorageEvent("storage", { key: ACCOUNT_MARKER_KEY, newValue: "ana" }));
+        window.dispatchEvent(
+            new StorageEvent("storage", { key: ACCOUNT_MARKER_KEY, newValue: "ana" })
+        );
         expect(assign).not.toHaveBeenCalled();
-        window.dispatchEvent(new StorageEvent("storage", { key: "polaris.theme", newValue: "light" }));
+        window.dispatchEvent(
+            new StorageEvent("storage", { key: "polaris.theme", newValue: "light" })
+        );
         expect(assign).not.toHaveBeenCalled();
-        window.dispatchEvent(new StorageEvent("storage", { key: ACCOUNT_MARKER_KEY, newValue: "ben" }));
+        window.dispatchEvent(
+            new StorageEvent("storage", { key: ACCOUNT_MARKER_KEY, newValue: "ben" })
+        );
         expect(assign).toHaveBeenCalledWith("/");
         expect(dropped.snapshots).toBe(1);
         stop();
@@ -93,14 +112,18 @@ describe("listenForAccountChange", () => {
 
     it("reloads when another tab signs out", () => {
         const stop = listenForAccountChange("ana");
-        window.dispatchEvent(new StorageEvent("storage", { key: ACCOUNT_MARKER_KEY, newValue: "" }));
+        window.dispatchEvent(
+            new StorageEvent("storage", { key: ACCOUNT_MARKER_KEY, newValue: "" })
+        );
         expect(assign).toHaveBeenCalledWith("/");
         stop();
     });
 
     it("stops listening when cleaned up", () => {
         listenForAccountChange("ana")();
-        window.dispatchEvent(new StorageEvent("storage", { key: ACCOUNT_MARKER_KEY, newValue: "ben" }));
+        window.dispatchEvent(
+            new StorageEvent("storage", { key: ACCOUNT_MARKER_KEY, newValue: "ben" })
+        );
         expect(assign).not.toHaveBeenCalled();
     });
 });

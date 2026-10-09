@@ -30,7 +30,12 @@ import { multiSession } from "better-auth/plugins";
 import { parseCookies } from "better-auth/cookies";
 import type { BetterAuthPlugin } from "better-auth";
 import { readIssuedCookies, type IssuedCookie } from "./device-login.js";
-import { APIError, createAuthEndpoint, createAuthMiddleware, sessionMiddleware } from "better-auth/api";
+import {
+    APIError,
+    createAuthEndpoint,
+    createAuthMiddleware,
+    sessionMiddleware
+} from "better-auth/api";
 
 /** How many accounts one browser may hold at once. The same ceiling Discord
  *  draws, and the one the plugin enforces when a sign-in adds another. */
@@ -127,7 +132,10 @@ interface DeviceAccountsApi {
         body: { sessionToken: string };
         returnHeaders: true;
     }): Promise<{ headers: Headers }>;
-    polarisEnrollDeviceAccount(input: { headers: Headers; returnHeaders: true }): Promise<{ headers: Headers }>;
+    polarisEnrollDeviceAccount(input: {
+        headers: Headers;
+        returnHeaders: true;
+    }): Promise<{ headers: Headers }>;
     signOut(input: { headers: Headers; returnHeaders: true }): Promise<{ headers: Headers }>;
 }
 
@@ -189,7 +197,10 @@ export function deviceAccountRoom(count: number): number {
  * plugin's ceiling when a sign-in adds an account, and a browser full of dead
  * ones would refuse to remember the next account it signs in to.
  */
-export function staleDeviceCookies(cookieHeader: string | null, liveTokens: readonly string[]): string[] {
+export function staleDeviceCookies(
+    cookieHeader: string | null,
+    liveTokens: readonly string[]
+): string[] {
     if (!cookieHeader) return [];
     const live = new Set(liveTokens.map((token) => token.toLowerCase()));
     const stale: string[] = [];
@@ -210,10 +221,7 @@ function withIssued(headers: Headers, issued: readonly IssuedCookie[]): Headers 
         else jar.set(cookie.name, cookie.value);
     }
     const next = new Headers(headers);
-    next.set(
-        "cookie",
-        Array.from(jar, ([name, value]) => `${name}=${value}`).join("; ")
-    );
+    next.set("cookie", Array.from(jar, ([name, value]) => `${name}=${value}`).join("; "));
     return next;
 }
 
@@ -221,7 +229,10 @@ function withIssued(headers: Headers, issued: readonly IssuedCookie[]): Headers 
  *  cannot push it out. Empty when there is no active session. */
 export async function enrollDeviceAccount(auth: Auth, headers: Headers): Promise<IssuedCookie[]> {
     try {
-        const { headers: issued } = await api(auth).polarisEnrollDeviceAccount({ headers, returnHeaders: true });
+        const { headers: issued } = await api(auth).polarisEnrollDeviceAccount({
+            headers,
+            returnHeaders: true
+        });
         return readIssuedCookies(issued);
     } catch {
         return [];
@@ -238,7 +249,9 @@ export async function switchDeviceAccount(
     headers: Headers,
     sessionId: string
 ): Promise<{ account: DeviceAccount; cookies: IssuedCookie[] } | null> {
-    const account = (await listDeviceAccounts(auth, headers)).find((entry) => entry.sessionId === sessionId);
+    const account = (await listDeviceAccounts(auth, headers)).find(
+        (entry) => entry.sessionId === sessionId
+    );
     if (!account || account.active) return null;
     try {
         const { headers: issued } = await api(auth).setActiveSession({
@@ -262,7 +275,9 @@ export async function signOutDeviceAccount(
     headers: Headers,
     sessionId: string
 ): Promise<{ account: DeviceAccount; cookies: IssuedCookie[] } | null> {
-    const account = (await listDeviceAccounts(auth, headers)).find((entry) => entry.sessionId === sessionId);
+    const account = (await listDeviceAccounts(auth, headers)).find(
+        (entry) => entry.sessionId === sessionId
+    );
     if (!account) return null;
     // The plugin can only revoke a session it has a cookie for, and the active
     // one may predate it. Enrolled first, and the revoke shown that cookie.
