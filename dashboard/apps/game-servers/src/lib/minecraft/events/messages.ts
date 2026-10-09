@@ -174,6 +174,10 @@ const RULES: Readonly<Record<EventKind, Text>> = {
     "nether-maze": {
         en: "Find the room in the middle of the maze. Fire, magma and lava send you back to the start.",
         es: "Encuentra la sala del centro del laberinto. El fuego, el magma y la lava te devuelven a la salida."
+    },
+    "acid-rain": {
+        en: "Keep something over your head: the rain fills your acid bar, and full you are out. Build with the cobblestone you are given; the rain eats it.",
+        es: "Ten algo sobre la cabeza: la lluvia llena tu barra de ácido y, llena, quedas fuera. Construye con la piedra que recibes; la lluvia se la come."
     }
 };
 

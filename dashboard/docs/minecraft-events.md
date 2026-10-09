@@ -143,6 +143,7 @@ Rare catch, Bingo rush, Boss fishing) leave the world alone.
 | World boss                                                     | -     | clear   |
 | Mining rush, Fishing, Trivia, Happy hour, XP boost, Rare catch | -     | -       |
 | Bingo rush, Boss fishing                                       | -     | -       |
+| Acid rain                                                      | day   | -       |
 
 ## The random draw
 
@@ -255,6 +256,21 @@ left out.
   view and radar off for each racer as they come in and again when they come
   back on; the reset goes with them home. An X-ray resource pack still shows
   the corridors: Polaris's anti-xray hides ores, never air.
+- **Acid rain** (`acid-rain`) is a walled square of mossy stone, 17, 23 or 29
+  blocks a side, open to the sky but for an invisible barrier roof, with a few
+  ruined cobblestone huts placed from the run's id. The rain is the event's
+  own: particles over the arena, and the events data pack looks every half
+  second at the blocks over each player's head - with nothing there but air
+  and the barrier, their acid bar fills (`pe_acid`); full, they are out. The
+  world's weather is never changed. Everybody gets marked cobblestone that
+  goes only on the arena's floor and shelters (`can_place_on` / `CanPlaceOn`),
+  16 at "Go!" and 8 more every 40 seconds. Each look of the main tick scatters
+  a few invisible stands with `spreadplayers ... under` onto the highest block
+  under the roof, and that block moves one step: cobblestone, mossy
+  cobblestone, lime glass, air - never the floor or the walls. The last one in
+  wins; at the end of the time, the driest. What players placed and what the
+  rain left is taken out by sweep boxes over the inside, written down at "Go!".
+  Needs 1.17, for `spreadplayers ... under`.
 - **King of the ring** (`king-of-the-hill` in code and saved settings; it was
   called King of the hill before it moved into the air) with fists only is a
   platform floating `hill.LIFT` over whatever is under it. Off the ring Poison
@@ -760,6 +776,7 @@ Everything below is part of the arena's own boxes: built into air with
 | Dropper          | white walls banded by each floor's color, a ring of light round every hole                                                                                                                                                      |
 | Ice boat race    | packed ice, white walls with a glass rail and lights, an arch over each gate                                                                                                                                                    |
 | Nether maze      | netherrack walls and roof, glowstone over every other room, a nether-brick starting room and a quartz floor at the goal                                                                                                         |
+| Acid rain        | mossy stone floor with a sea lantern in each corner, glass walls, an invisible roof, cobblestone huts                                                                                                                           |
 | Parkour          | the course's theme, a light under every checkpoint                                                                                                                                                                              |
 | King of the ring | polished stone edge, sea lanterns at the corners, the circle drawn in yellow                                                                                                                                                    |
 | Build battle     | a stone curb between plots and glowstone where the lines meet, at floor level                                                                                                                                                   |

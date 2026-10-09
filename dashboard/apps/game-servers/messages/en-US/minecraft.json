@@ -1768,6 +1768,11 @@
                 "label": "Deadly nether maze",
                 "summary": "A roofed maze of netherrack is built in the air, a new one every time. Racers start outside its door; the first to reach the bright room in the middle wins. Fire, magma and lava never hurt, but touching them sends you back to the start.",
                 "unit": "rooms"
+            },
+            "acid-rain": {
+                "label": "Acid rain",
+                "summary": "An open arena is built in the air, and an acid rain falls on it alone. Standing with nothing over your head fills your acid bar; full, you are out. Shelter in the ruined huts or build your own with the cobblestone handed out, while the rain eats it away. The last one left wins.",
+                "unit": "points"
             }
         },
         "triggers": {
@@ -1872,7 +1877,9 @@
             "gatheringRounds": "{rounds} {rounds, plural, one {round} other {rounds}} of {minutes} {minutes, plural, one {minute} other {minutes}}. Each item is worth points by how hard it is to get - one cobblestone 1, one log 4, one iron ingot 12 - and the most points over all rounds wins.",
             "world": "{time, select, day {Holds midday} night {Holds midnight} other {Leaves the time alone}}{weather, select, clear { and clear weather} rain { and rain} other {}} while it runs, then gives the time back and lets the weather change again.",
             "netherMaze": "A {size} maze about {height} blocks up, with {hazards} of its rooms on fire, on magma or behind a lava pit. Walls two blocks thick and a solid roof: it cannot be climbed or seen over, and every room can be reached without touching a hazard.",
-            "netherMazeSafe": "Nobody's items are touched, and nobody takes damage. Minimap cave view and radar are switched off for the racers. The hazards are watched by a small data pack Polaris adds to the world."
+            "netherMazeSafe": "Nobody's items are touched, and nobody takes damage. Minimap cave view and radar are switched off for the racers. The hazards are watched by a small data pack Polaris adds to the world.",
+            "acidRain": "A {size} arena about {height} blocks up, with {acidity} rain. The world's own weather is never changed: the rain falls only over the arena.",
+            "acidRainSafe": "Nobody's items are touched, and nobody takes damage. Players get marked cobblestone that only goes on the arena, taken back when they leave. The rain is worked out by a small data pack Polaris adds to the world. Needs Minecraft 1.17 or later."
         },
         "errors": {
             "read": "The events could not be read",
@@ -1902,7 +1909,8 @@
             "anotherOn": "Another event is on. Let it finish or cancel it first.",
             "noneOn": "No event is on",
             "alreadyStarted": "It has already started",
-            "tooFewPlayers": "{count, plural, one {Only # player is on the server} other {Only # players are on the server}}; this event needs {needed}"
+            "tooFewPlayers": "{count, plural, one {Only # player is on the server} other {Only # players are on the server}}; this event needs {needed}",
+            "needsVersion": "{kind} needs Minecraft {version} or later, and this server runs an older one."
         },
         "starting": "{name} is starting.",
         "deleteTitle": "Delete {name}?",
@@ -2066,6 +2074,16 @@
             "few": "a few",
             "some": "some",
             "many": "many"
+        },
+        "acidSizes": {
+            "small": "small",
+            "medium": "medium",
+            "large": "large"
+        },
+        "acidDry": "{dry}% dry",
+        "acidities": {
+            "mild": "mild",
+            "harsh": "harsh"
         }
     },
     "editor": {
@@ -2283,6 +2301,15 @@
                 "few": "A few",
                 "some": "Some",
                 "many": "Many"
+            },
+            "acidSize": {
+                "small": "Small: 17 by 17",
+                "medium": "Medium: 23 by 23",
+                "large": "Large: 29 by 29"
+            },
+            "acidity": {
+                "mild": "Mild",
+                "harsh": "Harsh"
             }
         },
         "place": {
@@ -2299,7 +2326,8 @@
             "shaft": "The shaft is built in the air, about 30 blocks around a player who is in the Overworld when it starts.",
             "islands": "The islands are built 30 blocks up, about 30 blocks around a player who is in the Overworld when it starts.",
             "villager": "The villager is set about 50 blocks around a player who is in the Overworld when it starts.",
-            "maze": "The maze is built 30 blocks up, about 30 blocks around a player who is in the Overworld when it starts."
+            "maze": "The maze is built 30 blocks up, about 30 blocks around a player who is in the Overworld when it starts.",
+            "acid": "The arena is built 30 blocks up, about 30 blocks around a player who is in the Overworld when it starts."
         },
         "floorSizeHint": "5 to 15: this one is {size} by {size}.",
         "range": "{min} to {max}",
@@ -2374,7 +2402,10 @@
         "fishCatchesHint": "3 to 30 for each player fishing: more players, a bigger fish.",
         "mazeSize": "Size of the maze",
         "mazeHazards": "Hazards",
-        "mazeHazardsHint": "How many rooms have fire, magma or a lava pit."
+        "mazeHazardsHint": "How many rooms have fire, magma or a lava pit.",
+        "acidSize": "Size of the arena",
+        "acidity": "Acidity",
+        "acidityHint": "How fast the rain fills a bar and eats a shelter."
     },
     "moderation": {
         "announcements": {

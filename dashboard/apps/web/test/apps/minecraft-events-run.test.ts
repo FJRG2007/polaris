@@ -474,7 +474,8 @@ function quickAnswer(line: string): string | null {
  * score range for everybody inside, and set for everybody in a range.
  */
 function stageScoreAnswer(line: string): string | null {
-    const objectives = /^(pe_(drop|low|back|gate|next|last|fin|cut|mfin|mback)|polaris_tntrun)$/;
+    const objectives =
+        /^(pe_(drop|low|back|gate|next|last|fin|cut|mfin|mback|acid)|polaris_tntrun)$/;
     const set = /^scoreboard players set (\w+) (\w+) (-?\d+)$/.exec(line);
     if (set && objectives.test(set[2]!)) {
         (world.stageScores[set[2]!] ??= {})[set[1]!] = Number(set[3]);
@@ -1886,8 +1887,9 @@ const plan = await import("@polaris-app/game-servers/src/lib/minecraft/events/pl
 const build = await import("@polaris-app/game-servers/src/lib/minecraft/events/kinds/build-battle");
 const boss = await import("@polaris-app/game-servers/src/lib/minecraft/events/kinds/boss");
 const hill = await import("@polaris-app/game-servers/src/lib/minecraft/events/kinds/hill");
-const hillService =
-    await import("@polaris-app/game-servers/src/lib/minecraft/events/kinds/hill-service");
+const hillService = await import(
+    "@polaris-app/game-servers/src/lib/minecraft/events/kinds/hill-service"
+);
 const playing = await import("@polaris-app/game-servers/src/lib/minecraft/activity");
 const arrival = await import("@polaris-app/game-servers/src/lib/minecraft/events/kinds/arrival");
 const bingo = await import("@polaris-app/game-servers/src/lib/minecraft/events/kinds/bingo");
@@ -5443,8 +5445,9 @@ describe("a meteor shower", () => {
 
 const parkour = await import("@polaris-app/game-servers/src/lib/minecraft/events/kinds/parkour");
 const spleef = await import("@polaris-app/game-servers/src/lib/minecraft/events/kinds/spleef");
-const snowballPack =
-    await import("@polaris-app/game-servers/src/lib/minecraft/events/kinds/snowball-pack");
+const snowballPack = await import(
+    "@polaris-app/game-servers/src/lib/minecraft/events/kinds/snowball-pack"
+);
 
 /** Players typing in the chat, as the server log records it. */
 function chat(...said: [string, string][]): void {
@@ -6209,8 +6212,9 @@ describe("spleef", () => {
         expect(world.sent.slice(back).filter((line) => line.startsWith("xp set Ana"))).toHaveLength(
             2
         );
-        const stashService =
-            await import("@polaris-app/game-servers/src/lib/minecraft/events/kinds/stash-service");
+        const stashService = await import(
+            "@polaris-app/game-servers/src/lib/minecraft/events/kinds/stash-service"
+        );
         expect(await stashService.failedStashes(SERVER)).toEqual([]);
         expect(stashRows.size).toBe(0);
     });
@@ -6839,8 +6843,9 @@ describe("a TNT run", () => {
     });
 });
 
-const dropperKind =
-    await import("@polaris-app/game-servers/src/lib/minecraft/events/kinds/dropper");
+const dropperKind = await import(
+    "@polaris-app/game-servers/src/lib/minecraft/events/kinds/dropper"
+);
 
 describe("a dropper", () => {
     const run = () => ({
@@ -7646,8 +7651,9 @@ describe("players' own things through an arena", () => {
         const kept = state().run!.entrants.find((one) => one.name === "Ana")!.stash!;
         // As if the slots were never emptied.
         world.inv.Ana = copyOf(ana);
-        const stashService =
-            await import("@polaris-app/game-servers/src/lib/minecraft/events/kinds/stash-service");
+        const stashService = await import(
+            "@polaris-app/game-servers/src/lib/minecraft/events/kinds/stash-service"
+        );
         const how = await stashService.giveBack(
             fakeServer(),
             "Ana",
@@ -7703,8 +7709,9 @@ describe("players' own things through an arena", () => {
         setUp([duelOf()]);
         await joinAndStart("duel");
         const kept = state().run!.entrants.find((one) => one.name === "Ana")!.stash!;
-        const stashService =
-            await import("@polaris-app/game-servers/src/lib/minecraft/events/kinds/stash-service");
+        const stashService = await import(
+            "@polaris-app/game-servers/src/lib/minecraft/events/kinds/stash-service"
+        );
         // The kit off first, as an end takes it before anything is given back.
         await fakeServer().say(["clear Ana *[minecraft:custom_data={polaris_event:1b}]"]);
         // A give-back that ran to the end once...
@@ -7732,8 +7739,9 @@ describe("players' own things through an arena", () => {
             [103, { ...ana.get(103)! }]
         ]);
         stashRows.get(kept.record!)!.writing = JSON.stringify(kept.kept.map((one) => one.slot));
-        const stashService =
-            await import("@polaris-app/game-servers/src/lib/minecraft/events/kinds/stash-service");
+        const stashService = await import(
+            "@polaris-app/game-servers/src/lib/minecraft/events/kinds/stash-service"
+        );
         const from = world.sent.length;
         expect(await stashService.giveBack(fakeServer(), "Ana", kept, async () => undefined)).toBe(
             "done"
@@ -7757,8 +7765,9 @@ describe("players' own things through an arena", () => {
         // ever written there by a give-back.
         world.inv.Ana = new Map([[0, { ...ana.get(0)! }]]);
         world.pickUp = true;
-        const stashService =
-            await import("@polaris-app/game-servers/src/lib/minecraft/events/kinds/stash-service");
+        const stashService = await import(
+            "@polaris-app/game-servers/src/lib/minecraft/events/kinds/stash-service"
+        );
         expect(await stashService.giveBack(fakeServer(), "Ana", kept, async () => undefined)).toBe(
             "done"
         );
@@ -7778,8 +7787,9 @@ describe("players' own things through an arena", () => {
         expect(kept.experience).toEqual({ levels: 12, points: 7 });
         // A prize delivered before the give-back.
         world.levels.Ana = 5;
-        const stashService =
-            await import("@polaris-app/game-servers/src/lib/minecraft/events/kinds/stash-service");
+        const stashService = await import(
+            "@polaris-app/game-servers/src/lib/minecraft/events/kinds/stash-service"
+        );
         const from = world.sent.length;
         expect(await stashService.giveBack(fakeServer(), "Ana", kept, async () => undefined)).toBe(
             "done"
@@ -7798,8 +7808,9 @@ describe("players' own things through an arena", () => {
         setUp([duelOf()]);
         await joinAndStart("duel");
         const kept = state().run!.entrants.find((one) => one.name === "Ana")!.stash!;
-        const stashService =
-            await import("@polaris-app/game-servers/src/lib/minecraft/events/kinds/stash-service");
+        const stashService = await import(
+            "@polaris-app/game-servers/src/lib/minecraft/events/kinds/stash-service"
+        );
         await fakeServer().say(["clear Ana *[minecraft:custom_data={polaris_event:1b}]"]);
         // Every stack back, then gone the moment her experience is asked for.
         world.onLine = (line) => {
@@ -7835,8 +7846,9 @@ describe("players' own things through an arena", () => {
         setUp([duelOf()]);
         await joinAndStart("duel");
         const kept = state().run!.entrants.find((one) => one.name === "Ana")!.stash!;
-        const stashService =
-            await import("@polaris-app/game-servers/src/lib/minecraft/events/kinds/stash-service");
+        const stashService = await import(
+            "@polaris-app/game-servers/src/lib/minecraft/events/kinds/stash-service"
+        );
         await fakeServer().say(["clear Ana *[minecraft:custom_data={polaris_event:1b}]"]);
         expect(await stashService.giveBack(fakeServer(), "Ana", kept, async () => undefined)).toBe(
             "done"
@@ -7888,8 +7900,9 @@ describe("players' own things through an arena", () => {
         await joinAndStart("duel");
         const kept = state().run!.entrants.find((one) => one.name === "Ana")!.stash!;
         expect(kept.experience).toEqual({ levels: 0, points: 1 });
-        const stashService =
-            await import("@polaris-app/game-servers/src/lib/minecraft/events/kinds/stash-service");
+        const stashService = await import(
+            "@polaris-app/game-servers/src/lib/minecraft/events/kinds/stash-service"
+        );
         await fakeServer().say(["clear Ana *[minecraft:custom_data={polaris_event:1b}]"]);
         // Earned since, so it is added; and the server refuses the add.
         world.levels.Ana = 3;
@@ -8122,8 +8135,9 @@ describe("players' own things through an arena", () => {
             dismissedAt: null,
             updatedAt: new Date()
         });
-        const stashService =
-            await import("@polaris-app/game-servers/src/lib/minecraft/events/kinds/stash-service");
+        const stashService = await import(
+            "@polaris-app/game-servers/src/lib/minecraft/events/kinds/stash-service"
+        );
         const failed = await stashService.failedStashes(SERVER);
         expect(failed[0]).toMatchObject({
             player: "Ana",
@@ -11382,8 +11396,9 @@ describe("hide and seek", () => {
     it("builds a manor for the players, works its panels at Go, and takes them down first at the end", async () => {
         const hs = await kind();
         const manor = await manorKind();
-        const panels =
-            await import("@polaris-app/game-servers/src/lib/minecraft/events/kinds/secret-panels");
+        const panels = await import(
+            "@polaris-app/game-servers/src/lib/minecraft/events/kinds/secret-panels"
+        );
         world.online = [...names];
         setUp([hideOf(60)]);
         await joinAndStart("hide", names);
@@ -11936,8 +11951,9 @@ describe("the pace of an event", () => {
     });
 });
 
-const mazeKind =
-    await import("@polaris-app/game-servers/src/lib/minecraft/events/kinds/nether-maze");
+const mazeKind = await import(
+    "@polaris-app/game-servers/src/lib/minecraft/events/kinds/nether-maze"
+);
 const radarKit = await import("@polaris-app/game-servers/src/lib/minecraft/events/kinds/radar");
 
 describe("a deadly nether maze", () => {
@@ -12057,6 +12073,92 @@ describe("a deadly nether maze", () => {
         for (const line of mazeKind.SCORES_REMOVED) expect(world.sent).toContain(line);
         expect(world.inside.size).toBe(0);
         keptTheRules(["lava", "fire"]);
+        expect(after.stageLeftovers).toEqual([]);
+    });
+});
+
+const acidKind = await import("@polaris-app/game-servers/src/lib/minecraft/events/kinds/acid-rain");
+
+describe("an acid rain", () => {
+    const run = () => ({
+        ...newPreset("acid-rain", "acid"),
+        minutes: 6,
+        options: {
+            place: { mode: "players" as const },
+            size: "small" as const,
+            acidity: "mild" as const,
+            height: 30
+        }
+    });
+    const arenaNow = () => {
+        const current = state().run!;
+        const origin = current.stage!.origin!;
+        return acidKind.arena(run().options, current.id, origin, origin.y);
+    };
+    const scores = (objective: string) => (world.stageScores[objective] ??= {});
+
+    it("hands out cobblestone at Go and again later, puts out whoever the rain filled, and never touches the weather", async () => {
+        world.online = ["Ana", "Ben", "Cy"];
+        setUp([run()]);
+        await startArena("acid");
+        await play(2_100);
+        chat(["Ana", "join"], ["Ben", "join"], ["Cy", "unirse"]);
+        await play(44_000);
+        expect(state().run!.stage?.racers.map((one) => one.name)).toEqual(["Ana", "Ben", "Cy"]);
+        await play(8_000);
+        const built = arenaNow();
+        const one = world.sent.findIndex(
+            (line) => line.includes(" title ") && visible(line).endsWith(" title 1")
+        );
+        const given = (name: string) =>
+            world.sent.filter((line) => line.startsWith(`give ${name} minecraft:cobblestone[`));
+        expect(one).toBeGreaterThan(-1);
+        expect(given("Ana")).toHaveLength(1);
+        expect(given("Ana")[0]).toContain("minecraft:can_place_on=");
+        expect(world.sent.indexOf(given("Ana")[0]!)).toBeGreaterThan(one);
+        for (const line of acidKind.armLines(built)) expect(world.sent).toContain(line);
+        // What players place, and what the rain leaves of it, is the arena's.
+        for (const box of acidKind.sweepBoxes(built))
+            expect(state().run!.stage!.boxes).toContainEqual(box);
+        await play(2_100);
+        for (const line of acidKind.dripLines(built)) expect(world.sent).toContain(line);
+
+        // The rain filled Ben's bar; Ana has had some.
+        scores("pe_acid").Ben = acidKind.ACID_MAX;
+        scores("pe_acid").Ana = 30;
+        await play(2_100);
+        expect(world.inside.has("Ben")).toBe(false);
+        expect(
+            world.sent.some(
+                (line) =>
+                    line.startsWith("tellraw @a") &&
+                    visible(line).includes("could not take the rain")
+            )
+        ).toBe(true);
+        expect(world.sent).toContain("scoreboard players reset Ben pe_acid");
+
+        // A top-up, once.
+        await play(40_000);
+        expect(given("Ana")).toHaveLength(2);
+        expect(given("Ben")).toHaveLength(1);
+
+        chat(["Cy", "leave"]);
+        await play(4_100);
+        const after = state();
+        expect(after.run).toBeNull();
+        expect(after.history[0]?.note).toBe("Ana was the last one standing");
+        expect(after.history[0]?.podium).toEqual([
+            { place: 1, name: "Ana", score: acidKind.scoreOf(3, 70) },
+            { place: 2, name: "Cy", score: acidKind.scoreOf(2, null) },
+            { place: 3, name: "Ben", score: acidKind.scoreOf(1, null) }
+        ]);
+        for (const line of acidKind.stopLines(built.boxes)) expect(world.sent).toContain(line);
+        for (const line of acidKind.SCORES_REMOVED) expect(world.sent).toContain(line);
+        expect(world.sent).toContain("clear Ana *[minecraft:custom_data={polaris_event:1b}]");
+        // The rain is the event's own: the world's weather left alone.
+        expect(world.sent.filter((line) => /^weather /.test(line))).toEqual([]);
+        expect(world.inside.size).toBe(0);
+        keptTheRules();
         expect(after.stageLeftovers).toEqual([]);
     });
 });

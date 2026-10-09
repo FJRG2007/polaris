@@ -50,10 +50,12 @@ describe("a kind added in an update", () => {
             "village-defense",
             "bingo",
             "boss-fishing",
-            "nether-maze"
+            "nether-maze",
+            "acid-rain"
         ]);
         expect(added.find((one) => one.kind === "hot-potato")?.name).toBe("Patata bomba");
         expect(added.find((one) => one.kind === "nether-maze")?.name).toBe("Laberintos mortales");
+        expect(added.find((one) => one.kind === "acid-rain")?.name).toBe("Lluvia ácida");
         expect(read.settings.defaults).toBe(catalog.DEFAULTS_VERSION);
         // Saved since: one deleted after that stays deleted.
         expect(
@@ -63,11 +65,14 @@ describe("a kind added in an update", () => {
         ).toEqual(["fish", "quiz"]);
     });
 
-    it("gives a server saved at the last version only the kinds added since", () => {
-        const read = catalog.readEventsConfig(saved(3, []));
-        expect(
-            read.presets.filter((one) => one.id.startsWith("default-")).map((one) => one.kind)
-        ).toEqual(["nether-maze"]);
+    it("gives a server saved at an earlier version only the kinds added since", () => {
+        const added = (version: number) =>
+            catalog
+                .readEventsConfig(saved(version, []))
+                .presets.filter((one) => one.id.startsWith("default-"))
+                .map((one) => one.kind);
+        expect(added(3)).toEqual(["nether-maze", "acid-rain"]);
+        expect(added(4)).toEqual(["acid-rain"]);
     });
 
     it("joins the draw only where the draw took every event the server had", () => {
@@ -77,7 +82,7 @@ describe("a kind added in an update", () => {
                 { presetId: "quiz", weight: 2 }
             ])
         );
-        expect(all.settings.random.pool).toHaveLength(13);
+        expect(all.settings.random.pool).toHaveLength(14);
         expect(all.settings.random.pool.every((entry) => entry.weight === 2)).toBe(true);
         const some = catalog.readEventsConfig(saved(2, [{ presetId: "fish", weight: 1 }]));
         expect(some.settings.random.pool).toEqual([{ presetId: "fish", weight: 1 }]);
