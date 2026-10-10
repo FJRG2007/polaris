@@ -304,7 +304,8 @@ const FORGE: Template = {
         c.set("minecraft:anvil[facing=east]", 3, 1, 10);
         c.set("minecraft:furnace[facing=south]", 10, 1, 3);
         c.set("minecraft:furnace[facing=south]", 11, 1, 3);
-        button(c, "minecraft:stone_button", 10, 2, 4, "south");
+        // On the furnace's front: a block higher, nothing held it up.
+        button(c, "minecraft:stone_button", 10, 1, 4, "south");
         button(c, "minecraft:stone_button", 12, 1, 3, "east");
         c.set("minecraft:cobblestone", 10, 1, 10, 11, 2, 11);
         button(c, "minecraft:stone_button", 9, 1, 10, "west");
@@ -549,14 +550,18 @@ const WORKSHOP: Template = {
         });
         button(c, "minecraft:oak_button", 5, 1, 3, "east");
         // A tower up to a shelf under the roof: scaffolding from 1.14, a ladder
-        // before.
+        // before, on a post against the wall - or on the room's side of the
+        // ladder where a nook or a door in that wall keeps the floor in front
+        // of it clear, which left the lowest rungs hanging on nothing.
+        const post = c.free(13, 1, 11) && c.free(13, 2, 11) ? 13 : 11;
         const climb = c.era.scaffold
             ? "minecraft:scaffolding[distance=0,bottom=false]"
-            : "minecraft:ladder[facing=west]";
+            : `minecraft:ladder[facing=${post === 13 ? "west" : "east"}]`;
         c.set(climb, 12, 1, 11, 12, 8, 11);
-        c.set("minecraft:spruce_log", 13, 1, 11, 13, 7, 11);
+        c.set("minecraft:spruce_log", post, 1, 11, post, 7, 11);
         c.set("minecraft:birch_planks", 12, 8, 7, 13, 8, 10);
         c.set("minecraft:birch_planks", 13, 8, 11);
+        c.set("minecraft:birch_planks", post, 8, 11);
         c.set("minecraft:sea_lantern", 13, 8, 8);
         c.set(crate, 13, 9, 9, 13, 9, 9);
         c.spot(12, 9, 8);
