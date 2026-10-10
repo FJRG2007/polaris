@@ -266,19 +266,26 @@ export function soundboardDenied(
  *
  * The owner may change any of them. An administrator may change a denial of
  * `member`, of a person who does not run the space and of an organization role
- * they do not hold. They may not change one that reaches themselves - `admin`,
- * their own name, a role of theirs - or "deny beats allow" would mean nothing to
- * the people who manage it, nor one naming another administrator, so the
- * administrators cannot silence each other: both are the owner's to decide.
+ * no administrator holds. They may not change one that reaches themselves -
+ * `admin`, their own name, a role of theirs - or "deny beats allow" would mean
+ * nothing to the people who manage it, nor one naming another administrator or
+ * a role another administrator holds, so the administrators cannot silence each
+ * other: both are the owner's to decide.
  */
 export function mayChangeDenial(
     denial: SoundDenial,
     actor: SoundboardSubject,
-    named: { readonly spaceRole: SpaceRole | "owner" | null } = { spaceRole: null }
+    named: {
+        /** The standing of the person a denial names. */
+        readonly spaceRole: SpaceRole | "owner" | null;
+        /** Whether an administrator holds the organization role a denial names. */
+        readonly heldByAdmin?: boolean;
+    } = { spaceRole: null }
 ): boolean {
     if (actor.spaceRole === "owner") return true;
     if (soundboardDenied([denial], actor)) return false;
-    return !(denial.kind === "user" && (named.spaceRole === "admin" || named.spaceRole === "owner"));
+    if (denial.kind === "role") return !(denial.subject.startsWith(ORG_ROLE_PREFIX) && named.heldByAdmin);
+    return named.spaceRole !== "admin" && named.spaceRole !== "owner";
 }
 
 // ---------------------------------------------------------------------------

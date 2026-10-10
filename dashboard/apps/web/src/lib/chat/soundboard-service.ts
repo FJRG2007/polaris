@@ -38,6 +38,8 @@ import {
     reachableSpaceIds,
     requireSpace,
     spaceAccess,
+    spaceAdminIds,
+    spaceStandings,
     type ChatActor,
     type ChatErrorText,
     type ChatSpaceAccess
@@ -132,6 +134,48 @@ async function orgRoleOf(orgId: string | null, userId: string): Promise<string |
     ]);
     if (org?.ownerId === userId) return "owner";
     return member?.role ?? null;
+}
+
+/** The organization roles any of these people hold - `orgRoleOf` for many, in
+ *  one read of the roster. */
+async function orgRolesHeld(orgId: string | null, userIds: readonly string[]): Promise<Set<string>> {
+    if (!orgId || userIds.length === 0) return new Set();
+    const [org, members] = await Promise.all([
+        prisma.organization.findUnique({ where: { id: orgId }, select: { ownerId: true } }),
+        prisma.organizationMember.findMany({
+            where: { orgId, userId: { in: [...userIds] } },
+            select: { userId: true, role: true }
+        })
+    ]);
+    const held = new Set(
+        members.filter((member) => member.userId !== org?.ownerId).map((member) => member.role)
+    );
+    if (org?.ownerId && userIds.includes(org.ownerId)) held.add("owner");
+    return held;
+}
+
+/** Who runs the space besides its owner, and the organization roles they hold,
+ *  as `rules.mayChangeDenial` needs them. The page and the server both ask here. */
+async function spaceAdmins(
+    space: { readonly id: string; readonly orgId: string | null }
+): Promise<{ readonly ids: readonly string[]; readonly orgRoles: ReadonlySet<string> }> {
+    const ids = await spaceAdminIds(space.id);
+    return { ids, orgRoles: await orgRolesHeld(space.orgId, ids) };
+}
+
+/** What `rules.mayChangeDenial` needs to know about what a denial names. */
+function namedBy(
+    denial: rules.SoundDenial,
+    standings: ReadonlyMap<string, ChatSpaceAccess | null>,
+    adminOrgRoles: ReadonlySet<string>
+): { readonly spaceRole: ChatSpaceAccess | null; readonly heldByAdmin: boolean } {
+    if (denial.kind === "user") return { spaceRole: standings.get(denial.subject) ?? null, heldByAdmin: false };
+    return {
+        spaceRole: null,
+        heldByAdmin:
+            denial.subject.startsWith(rules.ORG_ROLE_PREFIX) &&
+            adminOrgRoles.has(denial.subject.slice(rules.ORG_ROLE_PREFIX.length))
+    };
 }
 
 /** Whether a denial names this person in this space. */
@@ -428,8 +472,8 @@ export interface SpaceSoundboard {
     /** The roles the reader may deny. */
     readonly roles: readonly SoundRoleOption[];
     /** People only the owner may deny, so the reader cannot pick them: the
-     *  reader, the owner and the administrators on the member list. Empty for
-     *  the owner. */
+     *  reader, the owner and the administrators, granted ones included. Empty
+     *  for the owner. */
     readonly ownerOnlyPeople: readonly string[];
     readonly channels: readonly {
         readonly id: string;
@@ -487,12 +531,8 @@ export async function spaceSoundboard(actor: ChatActor, spaceId: string): Promis
             : Promise.resolve([]),
         orgRoleOf(space.orgId, actor.id),
         access === "owner"
-            ? Promise.resolve([])
-            : prisma.chatSpaceMember.findMany({
-                  where: { spaceId, role: "admin" },
-                  take: 500,
-                  select: { userId: true }
-              })
+            ? Promise.resolve({ ids: [], orgRoles: new Set<string>() })
+            : spaceAdmins(space)
     ]);
     const deniedPeople = denials.filter((d) => d.kind === "user").map((d) => d.subject);
     const [people, standings] = await Promise.all([
@@ -502,17 +542,11 @@ export async function spaceSoundboard(actor: ChatActor, spaceId: string): Promis
         }),
         access === "owner"
             ? Promise.resolve(new Map<string, ChatSpaceAccess | null>())
-            : Promise.all(
-                  deniedPeople.map(
-                      async (userId) => [userId, await spaceAccess({ id: userId }, spaceId)] as const
-                  )
-              ).then((entries) => new Map(entries))
+            : spaceStandings(spaceId, deniedPeople)
     ]);
     const self: rules.SoundboardSubject = { userId: actor.id, spaceRole: access, orgRole: actorOrgRole };
     const mayChange = (denial: rules.SoundDenial) =>
-        rules.mayChangeDenial(denial, self, {
-            spaceRole: denial.kind === "user" ? (standings.get(denial.subject) ?? null) : null
-        });
+        rules.mayChangeDenial(denial, self, namedBy(denial, standings, admins.orgRoles));
     const personName = new Map(people.map((person) => [person.id, person.name]));
     const roleName = new Map(
         orgRoles.map((role) => [`${rules.ORG_ROLE_PREFIX}${role.slug}`, role.name])
@@ -541,7 +575,7 @@ export async function spaceSoundboard(actor: ChatActor, spaceId: string): Promis
         ownerOnlyPeople:
             access === "owner"
                 ? []
-                : [...new Set([actor.id, space.ownerId, ...admins.map((admin) => admin.userId)])],
+                : [...new Set([actor.id, space.ownerId, ...admins.ids])],
         channels: channels.map((channel) => ({
             id: channel.id,
             name: channel.name,
@@ -587,11 +621,11 @@ export async function setSoundDenial(
 ): Promise<void> {
     const access = await requireSpace(actor, input.spaceId, "admin");
     const key = { spaceId: input.spaceId, kind: input.denial.kind, subject: input.denial.subject };
-    const named =
+    const standings =
         input.denial.kind === "user"
-            ? await spaceAccess({ id: input.denial.subject }, input.spaceId)
-            : null;
-    if (input.denied && named === "owner") {
+            ? await spaceStandings(input.spaceId, [input.denial.subject])
+            : new Map<string, ChatSpaceAccess | null>();
+    if (input.denied && input.denial.kind === "user" && standings.get(input.denial.subject) === "owner") {
         // The owner is never denied - the rule `rules.soundboardDenied` keeps too -
         // so the page cannot list a denial that does nothing.
         throw new ChatRuleError({ key: "errors.soundboardOwner" });
@@ -600,12 +634,17 @@ export async function setSoundDenial(
         where: { id: input.spaceId },
         select: { orgId: true }
     });
+    const orgId = space?.orgId ?? null;
     const self: rules.SoundboardSubject = {
         userId: actor.id,
         spaceRole: access,
-        orgRole: await orgRoleOf(space?.orgId ?? null, actor.id)
+        orgRole: await orgRoleOf(orgId, actor.id)
     };
-    if (!rules.mayChangeDenial(input.denial, self, { spaceRole: named })) {
+    const adminOrgRoles =
+        access !== "owner" && orgId && input.denial.subject.startsWith(rules.ORG_ROLE_PREFIX)
+            ? (await spaceAdmins({ id: input.spaceId, orgId })).orgRoles
+            : new Set<string>();
+    if (!rules.mayChangeDenial(input.denial, self, namedBy(input.denial, standings, adminOrgRoles))) {
         throw new ChatRuleError({ key: "errors.soundboardDenialOwnerOnly" });
     }
     if (!input.denied) {

@@ -95,10 +95,16 @@ describe("who may change a denial", () => {
         expect(rules.mayChangeDenial({ kind: "user", subject: BEN }, owner, { spaceRole: "admin" })).toBe(true);
     });
 
-    it("is an administrator, for every member, a member by name and a role they do not hold", () => {
+    it("is an administrator, for every member, a member by name and a role no administrator holds", () => {
         expect(rules.mayChangeDenial({ kind: "role", subject: "member" }, admin)).toBe(true);
         expect(rules.mayChangeDenial({ kind: "user", subject: BEN }, admin, { spaceRole: "member" })).toBe(true);
         expect(rules.mayChangeDenial({ kind: "role", subject: "org:support" }, admin)).toBe(true);
+    });
+
+    it("is the owner alone, for an organization role another administrator holds", () => {
+        const named = { spaceRole: null, heldByAdmin: true };
+        expect(rules.mayChangeDenial({ kind: "role", subject: "org:support" }, admin, named)).toBe(false);
+        expect(rules.mayChangeDenial({ kind: "role", subject: "org:support" }, owner, named)).toBe(true);
     });
 
     it("is not an administrator, for anything that reaches an administrator", () => {

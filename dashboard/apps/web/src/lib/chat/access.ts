@@ -37,7 +37,13 @@ import { findPeople, type FoundPeople } from "@/lib/people-search";
 import { spokenWait } from "./durations";
 import { chatText, type ChatText } from "./text";
 import type { NamespaceKey } from "@/lib/i18n/types";
-import { grantedCapability, grantedSubjects } from "@/lib/access/grants";
+import {
+    grantHolders,
+    grantedCapabilities,
+    grantedCapability,
+    grantedSubjects,
+    type HeldOrgRole
+} from "@/lib/access/grants";
 
 /** The caller, as the action layer resolved them. */
 export interface ChatActor {
@@ -90,6 +96,41 @@ export class ChatRuleError extends ChatAccessError {
     }
 }
 
+/** The space as the standing rule reads it. */
+interface StandingSpace {
+    readonly ownerId: string;
+    readonly orgId: string | null;
+    readonly visibility: string;
+}
+
+/** What is known about one person when their standing is decided. */
+interface StandingFacts {
+    /** Their role on the member list, or null when they are not on it. */
+    readonly memberRole: string | null;
+    /** Whether they read the organization that owns the space. */
+    readonly inOrg: boolean;
+    /** The strongest grant over the space they hold, or "". */
+    readonly granted: string;
+}
+
+/**
+ * The one rule for a person's standing in a space, in the order it is asked:
+ * the owner, the member list, an internal space's organization, a grant. Both
+ * `spaceAccess` and `spaceStandings` decide through it, so one person asked
+ * about alone and in a batch cannot come back different.
+ */
+function standingIn(
+    space: StandingSpace,
+    userId: string,
+    facts: StandingFacts
+): ChatSpaceAccess | null {
+    if (space.ownerId === userId) return "owner";
+    if (facts.memberRole) return facts.memberRole === "admin" ? "admin" : "member";
+    if (space.visibility === "internal" && (!space.orgId || facts.inOrg)) return "member";
+    if (facts.granted === "admin") return "admin";
+    return facts.granted === "member" ? "member" : null;
+}
+
 /**
  * What this actor may do in this space, or null when it is not theirs to reach.
  *
@@ -111,20 +152,100 @@ export async function spaceAccess(
         where: { spaceId_userId: { spaceId, userId: actor.id } },
         select: { role: true }
     });
-    if (membership) return membership.role === "admin" ? "admin" : "member";
-
-    if (space.visibility === "internal") {
-        if (!space.orgId) return "member";
-        const orgs = await memberOrgIds(actor.id);
-        if (orgs.includes(space.orgId)) return "member";
+    const facts = { memberRole: membership?.role ?? null, inOrg: false, granted: "" };
+    if (!facts.memberRole && space.visibility === "internal" && space.orgId) {
+        facts.inOrg = (await memberOrgIds(actor.id)).includes(space.orgId);
     }
+    const ordinary = standingIn(space, actor.id, facts);
+    if (ordinary) return ordinary;
 
     // Handed to a team or to a role rather than to a person. Asked last: it is
     // one more query, and everybody who reaches a space the ordinary way has
     // already been answered above.
-    const granted = await grantedCapability(actor.id, "chat.space", spaceId);
-    if (granted === "admin") return "admin";
-    return granted === "member" ? "member" : null;
+    facts.granted = await grantedCapability(actor.id, "chat.space", spaceId);
+    return standingIn(space, actor.id, facts);
+}
+
+/**
+ * `spaceAccess` for many people at once, by the same rule: the member list,
+ * the organization's roster and the grants are each read once for the batch
+ * rather than once per person, and only for whoever is still unanswered. A
+ * person the space does not reach maps to null; an unknown space maps everyone
+ * to null.
+ */
+export async function spaceStandings(
+    spaceId: string,
+    userIds: readonly string[]
+): Promise<Map<string, ChatSpaceAccess | null>> {
+    const ids = [...new Set(userIds)];
+    const standings = new Map<string, ChatSpaceAccess | null>(ids.map((id) => [id, null]));
+    if (ids.length === 0) return standings;
+    const space = await prisma.chatSpace.findUnique({
+        where: { id: spaceId },
+        select: { ownerId: true, orgId: true, visibility: true, org: { select: { ownerId: true } } }
+    });
+    if (!space) return standings;
+
+    const members = await prisma.chatSpaceMember.findMany({
+        where: { spaceId, userId: { in: ids.filter((id) => id !== space.ownerId) } },
+        select: { userId: true, role: true }
+    });
+    const memberRole = new Map(members.map((row) => [row.userId, row.role]));
+
+    let held: Promise<(HeldOrgRole & { readonly restricted: boolean })[]> | null = null;
+    const memberships = () =>
+        (held ??= prisma.organizationMember.findMany({
+            where: { userId: { in: ids } },
+            select: { userId: true, orgId: true, role: true, restricted: true }
+        }));
+    const needsOrg = space.visibility === "internal" && Boolean(space.orgId);
+    const inOrg = new Set<string>();
+    if (needsOrg && ids.some((id) => id !== space.ownerId && !memberRole.has(id))) {
+        if (space.org?.ownerId) inOrg.add(space.org.ownerId);
+        for (const row of await memberships()) {
+            if (row.orgId === space.orgId && !row.restricted) inOrg.add(row.userId);
+        }
+    }
+
+    const facts = (id: string, granted = ""): StandingFacts => ({
+        memberRole: memberRole.get(id) ?? null,
+        inOrg: inOrg.has(id),
+        granted
+    });
+    const unanswered: string[] = [];
+    for (const id of ids) {
+        const standing = standingIn(space, id, facts(id));
+        standings.set(id, standing);
+        if (!standing) unanswered.push(id);
+    }
+    if (unanswered.length === 0) return standings;
+
+    // The grants last, as `spaceAccess` asks them: one query for the space's,
+    // and the teams and roles of the unanswered only when there are any.
+    const granted = await grantedCapabilities(unanswered, "chat.space", spaceId, memberships);
+    for (const id of unanswered) standings.set(id, standingIn(space, id, facts(id, granted.get(id))));
+    return standings;
+}
+
+/**
+ * Everybody who runs this space besides its owner: the administrators on the
+ * member list and whoever a grant makes one, judged by `spaceStandings` so a
+ * grant out of its hours does not count. Bounded.
+ */
+export async function spaceAdminIds(spaceId: string, limit = 1_000): Promise<string[]> {
+    const [listed, granted] = await Promise.all([
+        prisma.chatSpaceMember.findMany({
+            where: { spaceId, role: "admin" },
+            take: limit,
+            select: { userId: true }
+        }),
+        grantHolders("chat.space", spaceId, "admin", limit)
+    ]);
+    const standings = await spaceStandings(spaceId, [
+        ...listed.map((row) => row.userId),
+        ...granted
+    ]);
+    return [...standings].filter(([, standing]) => standing === "admin").map(([id]) => id);
 }
 
 /** The same, refused loudly. */

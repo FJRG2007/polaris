@@ -1752,7 +1752,7 @@
         "denyRole": "Negar a un rol",
         "pickRole": "Elige un rol",
         "denyPerson": "Negar a alguien",
-        "rolesOwnerOnly": "Ya negaste todos los roles que puedes. El resto solo lo puede negar el dueño.",
+        "rolesOwnerOnly": "Ya has negado todos los roles que puedes. El resto solo lo puede negar el dueño.",
         "rolesAllDenied": "Todos los roles ya están negados.",
         "roleMember": "Miembros",
         "roleAdmin": "Administradores",

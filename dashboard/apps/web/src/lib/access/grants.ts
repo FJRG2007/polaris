@@ -215,6 +215,140 @@ export async function liveGrants(
     );
 }
 
+/** One organization membership, as `principalsOfMany` reads it. */
+export interface HeldOrgRole {
+    readonly userId: string;
+    readonly orgId: string;
+    readonly role: string;
+}
+
+/**
+ * `principalsOf` for many accounts at once: one read of the teams and one of
+ * the roles however many people are asked about. The memberships are passed in
+ * by a caller that already read them for another reason.
+ */
+export async function principalsOfMany(
+    userIds: readonly string[],
+    memberships: readonly HeldOrgRole[]
+): Promise<GrantPrincipals[]> {
+    if (userIds.length === 0) return [];
+    const ids = [...new Set(userIds)];
+    const pairs = [...new Map(memberships.map((held) => [`${held.orgId}:${held.role}`, held])).values()];
+    const [teams, roles] = await Promise.all([
+        prisma.teamMember.findMany({
+            where: { userId: { in: ids } },
+            select: { userId: true, teamId: true }
+        }),
+        pairs.length === 0
+            ? Promise.resolve([])
+            : prisma.orgRole.findMany({
+                  where: { OR: pairs.map((held) => ({ orgId: held.orgId, slug: held.role })) },
+                  select: { id: true, orgId: true, slug: true }
+              })
+    ]);
+    const roleId = new Map(roles.map((role) => [`${role.orgId}:${role.slug}`, role.id]));
+    return ids.map((userId) => ({
+        userId,
+        teamIds: teams.filter((row) => row.userId === userId).map((row) => row.teamId),
+        roleIds: memberships
+            .filter((held) => held.userId === userId)
+            .flatMap((held) => roleId.get(`${held.orgId}:${held.role}`) ?? [])
+    }));
+}
+
+/**
+ * `grantedCapability` for many accounts over one subject: one query for the
+ * subject's grants and, only when it has any, one batch of principals. Whoever
+ * nothing reaches is left out of the map.
+ */
+export async function grantedCapabilities(
+    userIds: readonly string[],
+    subject: core.GrantSubject,
+    subjectId: string,
+    memberships: () => Promise<readonly HeldOrgRole[]>,
+    now = new Date()
+): Promise<Map<string, string>> {
+    const found = new Map<string, string>();
+    if (userIds.length === 0) return found;
+    const all = await prisma.accessGrant.findMany({
+        where: { subjectType: subject, subjectId },
+        select: { ...GRANT_FIELDS, principalType: true, principalId: true }
+    });
+    if (all.length === 0) return found;
+    const zone = await houseZone(all);
+    const inForce = all.filter((row) => core.judgeGrant(row, now, zone).standing === "live");
+    if (inForce.length === 0) return found;
+
+    for (const principals of await principalsOfMany(userIds, await memberships())) {
+        const held = new Set([
+            `user:${principals.userId}`,
+            ...principals.teamIds.map((id) => `team:${id}`),
+            ...principals.roleIds.map((id) => `role:${id}`)
+        ]);
+        const best = core.strongest(
+            subject,
+            inForce
+                .filter((row) => held.has(`${row.principalType}:${row.principalId}`))
+                .map((row) => row.capability)
+        );
+        if (best) found.set(principals.userId, best);
+    }
+    return found;
+}
+
+/**
+ * Everybody a grant over one subject could reach at `minimum` or above: the
+ * people it names, whoever is on the teams and whoever holds the roles. A list
+ * of candidates, bounded, for a caller that then judges each one the ordinary
+ * way - a grant out of its hours is still in here.
+ */
+export async function grantHolders(
+    subject: core.GrantSubject,
+    subjectId: string,
+    minimum: string,
+    limit = 1_000
+): Promise<string[]> {
+    const rows = (
+        await prisma.accessGrant.findMany({
+            where: { subjectType: subject, subjectId },
+            select: { principalType: true, principalId: true, capability: true }
+        })
+    ).filter((row) => core.atLeast(subject, row.capability, minimum));
+    if (rows.length === 0) return [];
+    const of = (kind: string) =>
+        rows.filter((row) => row.principalType === kind).map((row) => row.principalId);
+    const [teamMembers, roles] = await Promise.all([
+        idsIn(of("team"), (ids) =>
+            prisma.teamMember.findMany({
+                where: { teamId: { in: ids } },
+                take: limit,
+                select: { userId: true }
+            })
+        ),
+        idsIn(of("role"), (ids) =>
+            prisma.orgRole.findMany({
+                where: { id: { in: ids } },
+                select: { orgId: true, slug: true }
+            })
+        )
+    ]);
+    const roleHolders =
+        roles.length === 0
+            ? []
+            : await prisma.organizationMember.findMany({
+                  where: { OR: roles.map((role) => ({ orgId: role.orgId, role: role.slug })) },
+                  take: limit,
+                  select: { userId: true }
+              });
+    return [
+        ...new Set([
+            ...of("user"),
+            ...teamMembers.map((row) => row.userId),
+            ...roleHolders.map((row) => row.userId)
+        ])
+    ].slice(0, limit);
+}
+
 /**
  * Everything of one kind this account reaches by grant, and what it may do
  * there.
