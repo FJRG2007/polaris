@@ -94,6 +94,7 @@ updates:
           - "lucide-react"
           - "sharp"
           - "tunnel-rat"
+          - "wasm-media-encoders"
           - "wxt"
       # Minor and patch releases of everything else, together.
       minor-and-patch:
@@ -139,6 +140,7 @@ updates:
           - "lucide-react"
           - "sharp"
           - "tunnel-rat"
+          - "wasm-media-encoders"
           - "wxt"
 
   - package-ecosystem: github-actions
