@@ -2412,7 +2412,10 @@ export function ChannelView({
                     bounds={CALL_CHAT_PANE}
                     beside="lg"
                     label={t("channelView.voiceChannelChatWidth")}
-                    className="border-t border-border lg:border-l lg:border-t-0"
+                    className={cn(
+                        "border-t border-border lg:border-l lg:border-t-0",
+                        (thread || searching) && "hidden md:flex"
+                    )}
                 >
                     {shownConversation}
                 </SidePane>
@@ -2454,7 +2457,10 @@ export function ChannelView({
                         // this conversation is already on screen behind the
                         // panel, and scrolling to it is what a reader expects.
                         if (hit.channelId !== channelId) router.push(`/chat/c/${hit.channelId}`);
-                        else void jumpTo(hit.message.id);
+                        else {
+                            if (!window.matchMedia?.("(min-width: 768px)").matches) setSearching(false);
+                            void jumpTo(hit.message.id);
+                        }
                     }}
                 />
             )}
