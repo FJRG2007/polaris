@@ -5984,7 +5984,7 @@ describe("a parkour race", () => {
         expect(world.sent).toContain("gamemode survival Ana");
         expect(world.sent).toContain("gamemode survival Ben");
         // Fall-proof before being moved off the course.
-        const proof = world.sent.indexOf("effect give Ben minecraft:slow_falling 10 0 true");
+        const proof = world.sent.indexOf("effect give Ben minecraft:resistance 10 4 true");
         expect(proof).toBeGreaterThan(0);
         expect(
             world.sent.findIndex(
@@ -6700,7 +6700,10 @@ describe("spleef", () => {
         );
         expect(world.sent).toContain("clear Ana *[minecraft:custom_data={polaris_event:1b}]");
         // Anything standing on it floats down before a block of it goes.
-        const floated = world.sent.findIndex((line) => line.includes("minecraft:slow_falling 60"));
+        const floated = world.sent.findIndex(
+            (line) =>
+                line.includes("@e[type=!player,") && line.includes("minecraft:slow_falling 60")
+        );
         expect(floated).toBeGreaterThanOrEqual(0);
         expect(floated).toBeLessThan(
             world.sent.findIndex((line) => line.includes("minecraft:air replace"))
@@ -8390,7 +8393,7 @@ describe("a king of the hill", () => {
         expect(
             world.sent.some(
                 (line) =>
-                    line.includes("minecraft:slow_falling 3 0 true") &&
+                    line.includes("minecraft:resistance 3 4 true") &&
                     line.includes("@a[tag=pe_arena,x=")
             )
         ).toBe(true);
@@ -9546,13 +9549,16 @@ describe("a build battle", () => {
         // Nobody falls at the end: fall-proof before anything moves them, their
         // own game mode only once they are home, and the platform down last.
         const sent = world.sent;
-        const proof = sent.indexOf("effect give Ana minecraft:slow_falling 10 0 true");
+        const proof = sent.indexOf("effect give Ana minecraft:resistance 10 4 true");
         const home = sent.findIndex(
             (line, index) =>
                 index > proof && /^execute in minecraft:overworld run tp Ana /.test(line)
         );
         expect(proof).toBeGreaterThan(0);
-        expect(sent[proof + 1]).toBe("effect give Ana minecraft:resistance 10 4 true");
+        // No player is ever let down by Slow Falling: the floating check kicks for it.
+        expect(
+            sent.filter((line) => /slow_falling/.test(line) && !line.includes("type=!player"))
+        ).toEqual([]);
         expect(home).toBeGreaterThan(proof);
         expect(sent.lastIndexOf("gamemode survival Ana")).toBeGreaterThan(home);
         const teardown = sent.findIndex((line) =>
@@ -9560,8 +9566,9 @@ describe("a build battle", () => {
         );
         const everyone = sent.findIndex(
             (line) =>
-                line.startsWith("execute in minecraft:overworld run effect give @e[") &&
-                line.endsWith("minecraft:slow_falling 10 0 true")
+                line.startsWith(
+                    "execute in minecraft:overworld run effect give @e[type=!player,"
+                ) && line.endsWith("minecraft:slow_falling 10 0 true")
         );
         expect(everyone).toBeGreaterThan(home);
         expect(teardown).toBeGreaterThan(everyone);
@@ -12459,6 +12466,13 @@ describe("an elytra race", () => {
                     visible(line).includes("Ana reached the finish")
             )
         ).toBe(true);
+        // Down from the finish unhurt, and never held in the air to be kicked
+        // for flying on the way.
+        expect(world.sent).toContain("effect give Ana minecraft:resistance 60 4 true");
+        expect(
+            world.sent.some((line) => line.includes("@a") && line.includes("slow_falling"))
+        ).toBe(false);
+        expect(world.sent.some((line) => line.includes("Ana minecraft:slow_falling"))).toBe(false);
         expect(state().run!.stage!.racers.find((one) => one.name === "Ben")!.best).toBe(3);
         expect(
             world.sent.some(

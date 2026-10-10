@@ -304,7 +304,10 @@ left out.
   elytra and holds three marked rockets. A ring passed gives one more rocket, a
   yellow glass booster on each leg two; the quick look hands them out one at a
   time and puts back behind their last ring whoever fell under the course,
-  landed, or flew a ring out of turn. Laps and checkpoints are counted by the
+  landed, or flew a ring out of turn - with a moment of Levitation and a few
+  looks before a fall counts again (`elytra-race.GRACE_LOOKS`). After three in
+  a row with no ring passed a racer is told how to open the wings, and a
+  landing no longer puts them back. Laps and checkpoints are counted by the
   events data pack, as in the boat race. The wings and rockets are taken back
   at the end, on leaving and on coming back. Needs 1.17, to put the elytra on.
 - **Downhill boat race** (`downhill-race`) is an ice boat race's track
@@ -1138,10 +1141,28 @@ A new kind follows all of them. A change to an old kind must not undo one.
   own check - "Flying is not enabled on this server", logged as "kicked for
   floating too long" after 80 ticks with `allow-flight=false`. Tag who was
   sent and wait until the server sees them off the ground
-  (`dropper.SENT_TAG`). Read with the server's own bytecode: the check counts
-  a tick as floating when a move is less than 0.03125 down with no block
-  round the player, so a steady Slow Falling (0.49 a tick) never trips it;
-  only standing still in the air does.
+  (`dropper.SENT_TAG`).
+- **Never give a player Slow Falling, and never hold one in the air.** Read
+  in the 1.21.4 sources (`ServerGamePacketListenerImpl`): every tick a player
+  is in the air with no block within a sixteenth of a block counts towards
+  the floating kick, whatever their speed - only gliding, Levitation, flight
+  allowed, spectating and a riptide are exempt - and the kick comes after 80
+  of them, scaled only by the `gravity` attribute. Slow Falling lowers the
+  fall, not that attribute, so a player let down slowly from a stage, a roof
+  or a finish line was kicked for flying on the way (lirio-0, 1.21.4,
+  `allow-flight=false`). A teleport does not start the count over either.
+  Resistance V (`stage.fallProof`) keeps a player unhurt by a fall instead -
+  fall damage does not bypass resistance - and Slow Falling is kept for
+  creatures (`@e[type=!player,...]`). The dropper keeps it with its lighter
+  `gravity` attribute (#419), which raises the limit.
+- **Never loop a player through the same put-back.** An elytra racer who had
+  not found the jump that opens the wings fell past the course a second after
+  every put-back and was put back again, every 1.6 seconds, for as long as
+  they stayed. A put-back gives a few looks of grace before a fall or a
+  landing counts (`elytra-race.GRACE_LOOKS`), and a moment of Levitation,
+  which starts the floating count over; after a few in a row with no ring
+  passed (`TRIES_MOST`) the racer is told how to fly, and a landing leaves
+  them standing where they are, to jump off and glide.
 - **A game has to be winnable from both sides.** Hide and seek in an open
   hall with a few blocks of cover was found in seconds: give hiders places
   that need searching (doors, hatches, lofts, hollow bushes), several rooms
@@ -1208,7 +1229,7 @@ A new kind follows all of them. A change to an old kind must not undo one.
   byte. A removed component (`!minecraft:x`) is written back without `={}`
   (`199eb82b2`, `f2dfeabcb`).
 - **Give things back only once the player is home and standing on
-  something**: slow falling and Resistance first, their game mode last. A
+  something**: Resistance first, their game mode last. A
   player who fell from a build battle died (`3dda1f25f`, `199eb82b2`).
 - **`keepInventory` is held for every event players can die in**, and put
   back only once everybody is home.

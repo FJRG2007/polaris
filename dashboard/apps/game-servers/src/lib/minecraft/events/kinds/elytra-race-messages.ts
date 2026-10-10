@@ -42,6 +42,17 @@ export function fell(language: Language): string {
         : "&cYou fell or landed: &fback to your last ring.";
 }
 
+/**
+ * After a few falls in a row with no ring passed: how to open the wings. A
+ * racer who lands on something from then on is left standing there, to jump
+ * off and try, rather than put back in the air again.
+ */
+export function howToFly(language: Language): string {
+    return language === "es"
+        ? "&eCómo volar: &fsalta y, mientras caes, pulsa saltar otra vez para abrir los élitros. Usa un cohete para subir."
+        : "&eHow to fly: &fjump, then press jump again while falling to open your elytra. Use a rocket to climb.";
+}
+
 /** Flew through a ring out of turn. */
 export function cut(language: Language): string {
     return language === "es"

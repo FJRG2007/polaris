@@ -13,6 +13,8 @@ import * as catalog from "@polaris-app/game-servers/src/lib/minecraft/events/cat
 import * as stage from "@polaris-app/game-servers/src/lib/minecraft/events/kinds/stage";
 import * as elytra from "@polaris-app/game-servers/src/lib/minecraft/events/kinds/elytra-race";
 import * as said from "@polaris-app/game-servers/src/lib/minecraft/events/kinds/elytra-race-messages";
+import * as arena from "@polaris-app/game-servers/src/lib/minecraft/events/kinds/arena";
+import * as hill from "@polaris-app/game-servers/src/lib/minecraft/events/kinds/hill";
 import * as snowballPack from "@polaris-app/game-servers/src/lib/minecraft/events/kinds/snowball-pack";
 
 const SITE = { x: -400, z: 250 };
@@ -158,7 +160,11 @@ describe("the elytra race's data pack", () => {
 
     it("puts back whoever fell or landed, and hands out owed rockets one a look", () => {
         const built = elytra.course({ laps: 2, obstacles: "few" }, "quick", SITE, Y);
-        const lines = elytra.quickLines(built, "components", { fell: '"fell"', cut: '"cut"' });
+        const lines = elytra.quickLines(built, "components", {
+            fell: '"fell"',
+            cut: '"cut"',
+            howTo: '"how"'
+        });
         expect(lines.some((line) => line.includes("nbt={OnGround:1b}"))).toBe(true);
         // Never read as landed again before the server has seen them off the
         // ground since they were put back: the loop that kicked racers for
@@ -186,9 +192,126 @@ describe("the elytra race's data pack", () => {
         );
         expect(
             elytra
-                .quickLines(built, null, { fell: "1", cut: "2" })
-                .some((line) => line.includes("give"))
+                .quickLines(built, null, { fell: "1", cut: "2", howTo: "3" })
+                .some((line) => line.includes("firework_rocket"))
         ).toBe(false);
+    });
+});
+
+describe("a racer who has not found their wings", () => {
+    const built = elytra.course({ laps: 2, obstacles: "few" }, "learner", SITE, Y);
+    const lines = elytra.quickLines(built, null, { fell: '"fell"', cut: '"cut"', howTo: '"how"' });
+    const at = (part: string) => lines.findIndex((line) => line.includes(part));
+
+    it("has a grace after each put-back before a fall or a landing counts", () => {
+        const put = lines.filter(
+            (line) => line.includes("add pe_ereset") && !line.includes("pe_ecut=1")
+        );
+        expect(put).toHaveLength(2);
+        for (const line of put) expect(line).toContain(`${elytra.GRACE_SCORE}=..0`);
+        expect(lines).toContain(
+            `scoreboard players set @a[tag=pe_ereset] ${elytra.GRACE_SCORE} ${elytra.GRACE_LOOKS}`
+        );
+        // Counted down once a look, before it is read.
+        const down = lines.indexOf(
+            `scoreboard players remove @a[tag=pe_in,scores={${elytra.GRACE_SCORE}=1..}] ${elytra.GRACE_SCORE} 1`
+        );
+        expect(down).toBeGreaterThanOrEqual(0);
+        expect(down).toBeLessThan(at("add pe_ereset"));
+        // Short of the 80 ticks (4 s) the server's floating check counts.
+        expect(elytra.GRACE_LOOKS * 0.4).toBeLessThan(4);
+    });
+
+    it("is told how to fly after a few tries, and then left standing where they land", () => {
+        const landed = lines.find((line) => line.includes("nbt={OnGround:1b}] add pe_ereset"))!;
+        expect(landed).toContain(`${elytra.TRIES_SCORE}=..${elytra.TRIES_MOST - 1}`);
+        const fell = lines.find((line) => line.includes(",dy=") && line.includes("add pe_ereset"))!;
+        expect(fell).not.toContain(elytra.TRIES_SCORE);
+        const counted = lines.indexOf(
+            `scoreboard players add @a[tag=pe_ereset] ${elytra.TRIES_SCORE} 1`
+        );
+        const told = lines.indexOf(
+            `execute as @a[tag=pe_ereset,scores={${elytra.TRIES_SCORE}=${elytra.TRIES_MOST}..}] run tellraw @s "how"`
+        );
+        expect(counted).toBeGreaterThan(at("nbt={OnGround:1b}] add pe_ereset"));
+        expect(told).toBeGreaterThan(counted);
+        expect(told).toBeLessThan(at(" run tp @a[tag=pe_ereset,"));
+        for (const language of ["en", "es"] as const)
+            expect(said.howToFly(language).length).toBeGreaterThan(20);
+        expect(said.howToFly("es")).not.toBe(said.howToFly("en"));
+    });
+
+    it("starts their tries over at every ring they pass", () => {
+        const reset = lines.indexOf(
+            `execute as @a[tag=pe_in] if score @s ${elytra.PASSED_SCORE} > @s pe_eseen run scoreboard players set @s ${elytra.TRIES_SCORE} 0`
+        );
+        const seen = lines.indexOf(
+            `execute as @a[tag=pe_in] run scoreboard players operation @s pe_eseen = @s ${elytra.PASSED_SCORE}`
+        );
+        expect(reset).toBeGreaterThanOrEqual(0);
+        expect(seen).toBe(reset + 1);
+        expect(elytra.racerScores("Steve")).toEqual(
+            expect.arrayContaining([
+                `scoreboard players set Steve ${elytra.GRACE_SCORE} 0`,
+                `scoreboard players set Steve ${elytra.TRIES_SCORE} 0`
+            ])
+        );
+        for (const name of [elytra.GRACE_SCORE, elytra.TRIES_SCORE, "pe_eseen"])
+            expect(elytra.SCORES_REMOVED).toContain(`scoreboard objectives remove ${name}`);
+    });
+
+    it("is lifted a moment at each put-back, which the floating check never counts", () => {
+        const lift = lines.indexOf("effect give @a[tag=pe_ereset] minecraft:levitation 1 0 true");
+        expect(lift).toBeGreaterThan(
+            lines.findLastIndex((line) => line.includes(" run tp @a[tag=pe_ereset,"))
+        );
+        expect(lift).toBeLessThan(lines.indexOf("tag @a remove pe_ereset"));
+        expect(lines.some((line) => line.includes("slow_falling"))).toBe(false);
+    });
+
+    it("is put back over open air down to the fall line, over thousands of runs", () => {
+        const sameBox = (a: stage.Volume, b: stage.Volume) =>
+            a.x1 === b.x1 &&
+            a.y1 === b.y1 &&
+            a.z1 === b.z1 &&
+            a.x2 === b.x2 &&
+            a.y2 === b.y2 &&
+            a.z2 === b.z2;
+        const problems: string[] = [];
+        for (const obstacles of catalog.ELYTRA_OBSTACLES)
+            for (let seed = 0; seed < 600; seed += 1) {
+                const one = elytra.course({ laps: 2, obstacles }, `air-${seed}`, SITE, Y);
+                // The pad is taken away at the go (`padGone`).
+                const boxes = one.boxes.filter((box) => !sameBox(box, one.pad));
+                for (const spot of [one.start, ...one.respawns])
+                    for (const box of boxes) {
+                        const x = Math.floor(spot.x);
+                        const z = Math.floor(spot.z);
+                        const inX = x >= Math.min(box.x1, box.x2) && x <= Math.max(box.x1, box.x2);
+                        const inZ = z >= Math.min(box.z1, box.z2) && z <= Math.max(box.z1, box.z2);
+                        const top = Math.max(box.y1, box.y2);
+                        if (inX && inZ && top < Math.floor(spot.y) && top > one.fallY)
+                            problems.push(`${obstacles} ${seed}: ${box.block} under a restart`);
+                    }
+            }
+        expect(problems.slice(0, 5)).toEqual([]);
+    }, 180_000);
+});
+
+describe("Slow Falling in an event", () => {
+    it("is never given to a player: the floating check kicks whoever it holds up", () => {
+        const volume = { x1: 0, y1: 100, z1: 0, x2: 10, y2: 110, z2: 10 };
+        const given = [
+            ...stage.fallProof("@a[tag=pe_in]"),
+            ...stage.fallProofOver(volume),
+            stage.floatDown(volume, 5),
+            arena.floatDown("Ana"),
+            hill.catchLine({ x: 0, y: 100, z: 0 }, 8)
+        ];
+        for (const line of given.filter((one) => one.includes("slow_falling")))
+            expect(line).toContain("@e[type=!player,");
+        expect(stage.fallProof("Ana")).toEqual(["effect give Ana minecraft:resistance 10 4 true"]);
+        expect(arena.floatDown("Ana")).toBe("effect give Ana minecraft:resistance 3 4 true");
     });
 });
 
@@ -230,7 +353,7 @@ describe("what an elytra race hands out and says", () => {
             ...built.boxes.map(stage.buildLine),
             ...elytra.armLines(built),
             ...elytra.stopLines(built.boxes),
-            ...elytra.quickLines(built, "components", { fell: '"x"', cut: '"y"' }),
+            ...elytra.quickLines(built, "components", { fell: '"x"', cut: '"y"', howTo: '"z"' }),
             elytra.padGone(built)
         ])
             expect(commandBytes(line)).toBeLessThanOrEqual(COMMAND_BYTES_MAX);

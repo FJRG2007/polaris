@@ -703,6 +703,12 @@ export const CUT_SCORE = "pe_ecut";
 export const OWED_SCORE = "pe_erkt";
 /** The last booster a racer flew through, plus one. */
 const BOOSTED_SCORE = "pe_ebst";
+/** Looks left after a racer is put back before a fall or a landing counts. */
+export const GRACE_SCORE = "pe_egrc";
+/** Falls and landings in a row since a ring was last passed. */
+export const TRIES_SCORE = "pe_etry";
+/** The passes the quick look last saw, to tell when a ring was passed. */
+const SEEN_SCORE = "pe_eseen";
 export const OBJECTIVE = "polaris_elytra";
 const SCALE = 64;
 /** The most rings, and boosters, a course has: a boat race's gates. */
@@ -715,7 +721,10 @@ const OWN = [
     FINISH_SCORE,
     CUT_SCORE,
     OWED_SCORE,
-    BOOSTED_SCORE
+    BOOSTED_SCORE,
+    GRACE_SCORE,
+    TRIES_SCORE,
+    SEEN_SCORE
 ];
 
 export const SCORES_ADDED = [...OWN, OBJECTIVE].map(
@@ -734,6 +743,9 @@ export function racerScores(name: string, passed = 0, rings = 1): string[] {
         `scoreboard players set ${name} ${CUT_SCORE} 0`,
         `scoreboard players set ${name} ${OWED_SCORE} 0`,
         `scoreboard players set ${name} ${BOOSTED_SCORE} 0`,
+        `scoreboard players set ${name} ${GRACE_SCORE} 0`,
+        `scoreboard players set ${name} ${TRIES_SCORE} 0`,
+        `scoreboard players set ${name} ${SEEN_SCORE} ${passed}`,
         `tag ${name} remove ${SENT_TAG}`
     ];
 }
@@ -873,35 +885,83 @@ const RESET_TAG = "pe_ereset";
 export const SENT_TAG = "pe_esent";
 
 /**
+ * How many looks (`QUICK_MS`, 0.4 s) a racer put back has before a fall or a
+ * landing counts again: a fall past the course or onto something in that time
+ * is theirs to fly out of. Short enough that whoever never opens their wings
+ * is put back before the server's floating check (80 ticks in the air) could
+ * count the whole of it.
+ */
+export const GRACE_LOOKS = 8;
+
+/**
+ * Falls and landings in a row, no ring passed, after which a racer is told how
+ * to open their wings - and, landing on something, left standing on it rather
+ * than put back in the air again: a racer who has not found the jump to glide
+ * was otherwise dropped from the same spot every second and a half until they
+ * gave up and left.
+ */
+export const TRIES_MOST = 3;
+
+/**
+ * Put back in the air, the server's floating check sees a player who does not
+ * glide as floating, and a teleport does not start its count over: four
+ * seconds of it across a few put-backs is a kick for flying where flight is
+ * off. A moment of Levitation, which that check never counts, starts it over
+ * at every put-back, and holds them up while they get ready.
+ */
+const PUT_BACK_LIFT = "minecraft:levitation 1 0 true";
+
+/**
  * The quick look at a race, with selectors alone: whoever is racing and has
  * fallen below the course, landed on anything, or was seen at a ring out of
  * turn is told why and put back behind the last ring they passed - before the
  * start ring if none - and the rockets anybody is owed handed out, one a look.
+ *
+ * A racer just put back has `GRACE_LOOKS` before a fall or a landing counts.
+ * After `TRIES_MOST` falls and landings in a row with no ring passed they are
+ * told how to fly, and a landing no longer puts them back: they stay on what
+ * they landed on, to jump off and glide. A fall under the course still does.
  */
 export function quickLines(
     built: Course,
     items: Flavour["items"] | null,
-    told: { fell: string; cut: string }
+    told: { fell: string; cut: string; howTo: string }
 ): string[] {
     const volume = built.volume;
     const x = volume.x1 - 16;
     const z = volume.z1 - 16;
     const y = built.fallY - 64;
     const under = `x=${x},y=${y},z=${z},dx=${volume.x2 - volume.x1 + 32},dy=${built.fallY - y},dz=${volume.z2 - volume.z1 + 32}`;
-    const racing = `tag=pe_in,scores={${FINISH_SCORE}=0}`;
+    const counts = `${FINISH_SCORE}=0,${GRACE_SCORE}=..0`;
+    // Racing, and past the grace of their last put-back.
+    const ready = `tag=pe_in,scores={${counts}}`;
+    // The same, and not yet out of tries: a landing still puts them back.
+    const trying = `tag=pe_in,scores={${counts},${TRIES_SCORE}=..${TRIES_MOST - 1}}`;
     const world = "execute in minecraft:overworld";
     const lines = [
-        `${world} as @a[${racing},${under}] run tellraw @s ${told.fell}`,
-        `${world} run tag @a[${racing},${under}] add ${RESET_TAG}`,
+        // Racers from before these counts: none of them set yet.
+        `scoreboard players add @a[tag=pe_in] ${GRACE_SCORE} 0`,
+        `scoreboard players add @a[tag=pe_in] ${TRIES_SCORE} 0`,
+        `scoreboard players add @a[tag=pe_in] ${SEEN_SCORE} 0`,
+        // A ring passed since the last look: their tries start over.
+        `execute as @a[tag=pe_in] if score @s ${PASSED_SCORE} > @s ${SEEN_SCORE} run scoreboard players set @s ${TRIES_SCORE} 0`,
+        `execute as @a[tag=pe_in] run scoreboard players operation @s ${SEEN_SCORE} = @s ${PASSED_SCORE}`,
+        `scoreboard players remove @a[tag=pe_in,scores={${GRACE_SCORE}=1..}] ${GRACE_SCORE} 1`,
+        `${world} as @a[${ready},${under}] run tellraw @s ${told.fell}`,
+        `${world} run tag @a[${ready},${under}] add ${RESET_TAG}`,
         `tag @a[tag=${SENT_TAG},nbt={OnGround:0b}] remove ${SENT_TAG}`,
-        `execute as @a[${racing},tag=!${RESET_TAG},tag=!${SENT_TAG},nbt={OnGround:1b}] run tellraw @s ${told.fell}`,
-        `tag @a[${racing},tag=!${SENT_TAG},nbt={OnGround:1b}] add ${RESET_TAG}`,
+        `execute as @a[${trying},tag=!${RESET_TAG},tag=!${SENT_TAG},nbt={OnGround:1b}] run tellraw @s ${told.fell}`,
+        `tag @a[${trying},tag=!${SENT_TAG},nbt={OnGround:1b}] add ${RESET_TAG}`,
+        `scoreboard players add @a[tag=${RESET_TAG}] ${TRIES_SCORE} 1`,
+        `execute as @a[tag=${RESET_TAG},scores={${TRIES_SCORE}=${TRIES_MOST}..}] run tellraw @s ${told.howTo}`,
         `execute as @a[tag=pe_in,tag=!${RESET_TAG},scores={${CUT_SCORE}=1}] run tellraw @s ${told.cut}`,
         `tag @a[tag=pe_in,scores={${CUT_SCORE}=1}] add ${RESET_TAG}`,
         ...[built.start, ...built.respawns].map(
             (spot, index) =>
                 `${world} run tp @a[tag=${RESET_TAG},scores={${LAST_SCORE}=${index - 1}}] ${spot.x.toFixed(3)} ${spot.y.toFixed(3)} ${spot.z.toFixed(3)} ${spot.yaw.toFixed(1)} 0.0`
         ),
+        `effect give @a[tag=${RESET_TAG}] ${PUT_BACK_LIFT}`,
+        `scoreboard players set @a[tag=${RESET_TAG}] ${GRACE_SCORE} ${GRACE_LOOKS}`,
         `scoreboard players set @a[tag=${RESET_TAG}] ${CUT_SCORE} 0`,
         `tag @a[tag=${RESET_TAG}] add ${SENT_TAG}`,
         `tag @a remove ${RESET_TAG}`
