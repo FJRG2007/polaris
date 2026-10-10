@@ -2594,7 +2594,6 @@
     "sounds": {
         "title": "Sonidos propios",
         "about": "Sube tus propios sonidos, ponlos en momentos de eventos y llegadas, y haz que suenen para los jugadores. Polaris los mete en un paquete de recursos que los jugadores reciben al entrar.",
-        "packDescription": "Sonidos de {name}",
         "pushed": "Enviado a los jugadores del servidor.",
         "kick": "Este servidor necesita su paquete de sonidos. Vuelve a entrar y acéptalo.",
         "delivery": {

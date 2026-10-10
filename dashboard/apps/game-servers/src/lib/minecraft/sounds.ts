@@ -320,6 +320,8 @@ export interface PackSound {
     readonly replaces: string;
 }
 
+export const PACK_DESCRIPTION = "Polaris";
+
 /** The pack's description and the releases it says it is for. A pack that only
  *  holds sounds reads the same on every release that takes a pushed pack
  *  (1.20.3 on), so the range is open-ended: the format number only decides

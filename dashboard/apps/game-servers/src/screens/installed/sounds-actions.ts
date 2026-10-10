@@ -24,7 +24,12 @@ const { requireGameServer } = host.appsInstallAccess;
 const serverId = z.string().uuid();
 
 async function failure(caught: unknown): Promise<string> {
-    if (caught instanceof Error && caught.message) return messageText(caught.message);
+    const digest = (caught as { digest?: unknown } | null)?.digest;
+    if (typeof digest === "string" && digest.startsWith("NEXT_")) throw caught;
+    if (caught instanceof service.SoundRefusal) return messageText(caught.message);
+    if (caught instanceof Error && caught.message === "Server not found")
+        return (await gameWords("games"))("errors.serverNotFound");
+    console.error("[minecraft-sounds] action failed:", caught);
     return (await gameWords("minecraft"))("sounds.refused.failed");
 }
 
@@ -163,7 +168,7 @@ export async function enableSoundsAction(installedAppId: string): Promise<{ erro
     try {
         const { user, access } = await requireGameServer("games.manage", parsed.data);
         const applicationId = access.install.applicationId;
-        if (!applicationId) throw new Error((await gameWords("games"))("errors.thisServerHasNotBeen"));
+        if (!applicationId) return { error: (await gameWords("games"))("errors.thisServerHasNotBeen") };
         const restart = await service.enableSounds(parsed.data, applicationId, access.ownerId);
         if (restart) await deployApplication(applicationId, access.ownerId, user.id);
         await recordAudit({ actorId: user.id, action: "minecraft.sounds.enable", targetType: "installedApp", targetId: parsed.data });
@@ -181,7 +186,7 @@ export async function serverPackAction(input: { installedAppId: string; on: bool
     try {
         const { user, access } = await requireGameServer("games.manage", parsed.data.installedAppId);
         const applicationId = access.install.applicationId;
-        if (!applicationId) throw new Error((await gameWords("games"))("errors.thisServerHasNotBeen"));
+        if (!applicationId) return { error: (await gameWords("games"))("errors.thisServerHasNotBeen") };
         await service.setServerPack(parsed.data.installedAppId, applicationId, access.ownerId, parsed.data.on);
         await deployApplication(applicationId, access.ownerId, user.id);
         await recordAudit({

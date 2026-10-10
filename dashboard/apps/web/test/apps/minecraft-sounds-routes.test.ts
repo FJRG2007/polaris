@@ -48,6 +48,7 @@ function pick<T extends object>(row: T, select?: Record<string, boolean>): Parti
 }
 
 const locks = vi.hoisted(() => [] as unknown[][]);
+const owner = vi.hoisted(() => ({ locale: "en-US", name: "Survival" }));
 
 vi.mock("@polaris/db", () => {
     // One transaction at a time, as the advisory lock makes it on one server.
@@ -98,7 +99,7 @@ vi.mock("@polaris/db", () => {
             findUnique: vi.fn(async ({ where }: { where: { installedAppId: string } }) => db.packs.get(where.installedAppId) ?? null)
         },
         installedApp: {
-            findUnique: vi.fn(async () => ({ name: "Survival", ownerId: "owner" })),
+            findUnique: vi.fn(async () => ({ id: SERVER, name: owner.name, ownerId: "owner" })),
             findFirst: vi.fn(async ({ where }: { where: { id: string } }) =>
                 where.id === SERVER ? { applicationId: "app-1", ownerId: "owner" } : null
             )
@@ -110,6 +111,7 @@ vi.mock("@polaris/db", () => {
 const requireGameServer = vi.hoisted(() => vi.fn());
 vi.mock("@/lib/apps/install-access", () => ({ requireGameServer }));
 vi.mock("@/lib/i18n/request", () => ({ getLocale: async () => "en-US" }));
+vi.mock("@/lib/i18n/locale-service", () => ({ getUserLocale: async () => owner.locale }));
 vi.mock("@/lib/audit-service", () => ({ recordAudit: vi.fn(async () => undefined) }));
 vi.mock("@/lib/apps/install-secret", () => ({
     readInstallEnvSecret: vi.fn(async (applicationId: string) => (applicationId === "app-1" ? "server-token" : null))
@@ -152,6 +154,8 @@ beforeEach(() => {
     db.sounds.length = 0;
     db.packs.clear();
     locks.length = 0;
+    owner.locale = "en-US";
+    owner.name = "Survival";
     requireGameServer.mockReset();
     requireGameServer.mockResolvedValue({ user: { id: "user" }, access: { ownerId: "owner", install: { applicationId: "app-1" } } });
 });
@@ -227,6 +231,30 @@ describe("the pack players download", () => {
         const latest = await get("latest.zip");
         expect(latest.status).toBe(200);
         expect(latest.headers.get("cache-control")).toBe("no-store");
+    });
+
+    it("keeps its checksum when the owner changes language or renames the server", async () => {
+        await send(await vorbis());
+        const checksum = async () => {
+            const config = await jar.GET(
+                new Request(`${ORIGIN}/api/minecraft/sounds/${SERVER}`, { headers: { authorization: "Bearer server-token" } }),
+                { params: Promise.resolve({ id: SERVER }) }
+            );
+            return ((await config.json()) as { pack: { sha1: string; kick: string } }).pack;
+        };
+        const rebuild = () => {
+            const stored = db.packs.get(SERVER);
+            if (stored) db.packs.set(SERVER, { ...stored, revision: stored.revision + 100 });
+        };
+        rebuild();
+        const before = await checksum();
+        owner.locale = "es-ES";
+        owner.name = "Supervivencia";
+        rebuild();
+        const after = await checksum();
+        expect(after.kick).not.toBe(before.kick);
+        expect(after.sha1).toBe(before.sha1);
+        expect((await get(`${before.sha1}.zip`)).status).toBe(200);
     });
 
     it("answers a wrong token, an old checksum and a stray name with 404", async () => {

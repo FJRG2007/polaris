@@ -2594,7 +2594,6 @@
     "sounds": {
         "title": "Custom sounds",
         "about": "Upload your own sounds, put them on event moments and arrivals, and play them to players. Polaris builds them into a resource pack that players get when they join.",
-        "packDescription": "Sounds for {name}",
         "pushed": "Sent to the players on the server.",
         "kick": "This server needs its sound pack. Join again and accept it.",
         "delivery": {

@@ -327,13 +327,10 @@ export interface BuiltPack {
 }
 
 /** The last pack built per server. Bounded: a pack can be tens of megabytes. */
-const packs = new Map<
-    string,
-    { readonly revision: number; readonly description: string; readonly built: Promise<BuiltPack | null> }
->();
+const packs = new Map<string, { readonly revision: number; readonly built: Promise<BuiltPack | null> }>();
 const PACKS_KEPT = 4;
 
-async function build(installedAppId: string, revision: number, description: string): Promise<BuiltPack | null> {
+async function build(installedAppId: string, revision: number): Promise<BuiltPack | null> {
     const rows = await prisma.minecraftSound.findMany({
         where: { installedAppId },
         select: { key: true, data: true, subtitle: true, stream: true, replaces: true },
@@ -344,7 +341,7 @@ async function build(installedAppId: string, revision: number, description: stri
     const zip = new JSZip();
     const add = (path: string, content: string | Uint8Array) =>
         zip.file(path, content, { date: ZIP_DATE, compression: "STORE", createFolders: false });
-    add("pack.mcmeta", rules.packMeta(description));
+    add("pack.mcmeta", rules.packMeta(rules.PACK_DESCRIPTION));
     add(`assets/${rules.NAMESPACE}/sounds.json`, rules.soundsJson(rows));
     const replaced = rules.replacedJson(rows);
     if (replaced) add("assets/minecraft/sounds.json", replaced);
@@ -359,19 +356,17 @@ async function build(installedAppId: string, revision: number, description: stri
 export async function currentPack(installedAppId: string): Promise<BuiltPack | null> {
     const [pack, install] = await Promise.all([
         prisma.minecraftSoundPack.findUnique({ where: { installedAppId }, select: { revision: true } }),
-        prisma.installedApp.findUnique({ where: { id: installedAppId }, select: { name: true, ownerId: true } })
+        prisma.installedApp.findUnique({ where: { id: installedAppId }, select: { id: true } })
     ]);
     if (!pack || !install) return null;
-    const words = await ownerWords(install.ownerId, "minecraft");
-    const description = words("sounds.packDescription", { name: install.name });
     const cached = packs.get(installedAppId);
-    if (cached && cached.revision === pack.revision && cached.description === description) return cached.built;
-    const built = build(installedAppId, pack.revision, description).catch((caught) => {
+    if (cached && cached.revision === pack.revision) return cached.built;
+    const built = build(installedAppId, pack.revision).catch((caught) => {
         packs.delete(installedAppId);
         throw caught;
     });
     packs.delete(installedAppId);
-    packs.set(installedAppId, { revision: pack.revision, description, built });
+    packs.set(installedAppId, { revision: pack.revision, built });
     while (packs.size > PACKS_KEPT) packs.delete(packs.keys().next().value as string);
     return built;
 }
