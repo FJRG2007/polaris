@@ -4921,7 +4921,7 @@ async function settleArenaLeftovers(
         console.warn("polaris: settling an event's arena failed", installedAppId, String(error))
     );
     if (settled.size === 0) return false;
-    await updateEventState(installedAppId, (state) => ({
+    const written = await updateEventState(installedAppId, (state) => ({
         ...state,
         arenaLeftovers: state.arenaLeftovers.flatMap((one) => {
             if (!settled.has(one.id)) return [one];
@@ -4929,6 +4929,25 @@ async function settleArenaLeftovers(
             return next ? [next] : [];
         })
     }));
+    const kept = new Set(written?.arenaLeftovers.map((one) => one.id));
+    const dismissed = [...settled.values()].filter(
+        (one): one is stored.ArenaLeftover => written !== null && one !== null && !kept.has(one.id)
+    );
+    if (dismissed.length > 0)
+        await withServerContainer(ownerId, installedAppId, async (server) => {
+            if (!server.running) return;
+            for (const one of dismissed)
+                await arenaService.letGo(
+                    chunks.sparing(server, () => chunks.heldBefore(one)),
+                    one
+                );
+        }).catch((error: unknown) =>
+            console.warn(
+                "polaris: letting an arena's chunks go failed",
+                installedAppId,
+                String(error)
+            )
+        );
     return true;
 }
 

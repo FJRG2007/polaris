@@ -2745,6 +2745,40 @@ describe("the minute sweep", () => {
         );
     });
 
+    it("lets go of the chunks of an arena dismissed while the sweep takes it down", async () => {
+        setUp([newPreset("fishing", "fish")]);
+        config[catalog.EVENT_STATE_KEY] = {
+            arenaLeftovers: [
+                {
+                    id: "old",
+                    kind: "sky-wars",
+                    arena: {
+                        box: { x1: 0, y1: 100, z1: 0, x2: 10, y2: 110, z2: 10 },
+                        blocks: ["minecraft:stone"]
+                    },
+                    marker: null,
+                    kit: [],
+                    entrants: [],
+                    checks: 2,
+                    remains: 5,
+                    createdAt: Date.now()
+                }
+            ]
+        };
+        world.unloadedBlock = "minecraft:stone";
+        const add = "execute in minecraft:overworld run forceload add 0 0 10 10";
+        const remove = "execute in minecraft:overworld run forceload remove 0 0 10 10";
+        world.onLine = (line) => {
+            if (line !== add) return;
+            world.onLine = null;
+            const state = config[catalog.EVENT_STATE_KEY] as Record<string, unknown>;
+            config[catalog.EVENT_STATE_KEY] = { ...state, arenaLeftovers: [] };
+        };
+        await events.sweepEvents();
+        expect(state().arenaLeftovers).toEqual([]);
+        expect(world.sent.lastIndexOf(remove)).toBeGreaterThan(world.sent.lastIndexOf(add));
+    });
+
     it("keeps an arena the sweep has not given up on off the panel and out of reach", async () => {
         setUp([newPreset("fishing", "fish")]);
         config[catalog.EVENT_STATE_KEY] = {
