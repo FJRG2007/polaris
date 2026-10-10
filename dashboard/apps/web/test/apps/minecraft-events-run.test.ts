@@ -2641,6 +2641,35 @@ describe("the minute sweep", () => {
         expect(state().pending).toEqual([]);
     });
 
+    it("keeps an arena on the panel when taking it down again still finds blocks", async () => {
+        setUp([newPreset("fishing", "fish")]);
+        config[catalog.EVENT_STATE_KEY] = {
+            arenaLeftovers: [
+                {
+                    id: "old",
+                    kind: "sky-wars",
+                    arena: {
+                        box: { x1: 0, y1: 100, z1: 0, x2: 10, y2: 110, z2: 10 },
+                        blocks: ["minecraft:stone"]
+                    },
+                    marker: null,
+                    kit: [],
+                    entrants: [],
+                    checks: 3,
+                    remains: 5,
+                    createdAt: Date.now()
+                }
+            ]
+        };
+        world.solidCount = 2;
+        expect(await events.retryArena(SERVER, "old")).toBe("left");
+        const [held] = state().arenaLeftovers;
+        expect(held).toMatchObject({ id: "old", checks: 3, remains: 2 });
+        world.solidCount = 0;
+        expect(await events.retryArena(SERVER, "old")).toBe("cleared");
+        expect(state().arenaLeftovers).toEqual([]);
+    });
+
     it("gives a prize once to a player whose name reads like an error", async () => {
         world.online = ["ErrorBoy", "Unknown_1"];
         setUp([newPreset("fishing", "fish")], {

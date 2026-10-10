@@ -992,16 +992,27 @@ export async function retryArena(
     const state = stored.readEventState(row.config);
     const left = state.arenaLeftovers.find((one) => one.id === id);
     if (!left || !arenaService.leftForOperator(left)) return "cleared";
-    // Counted from nought again: a few more goes before it is left once more.
+    // One go: still holding blocks, it is left for the operator again at once.
     const reached = await settleArenaLeftovers(
         row.ownerId,
         installedAppId,
-        [{ ...left, checks: 0, remains: null }],
+        [{ ...left, checks: arenaService.CLEAR_CHECKS - 1, remains: null }],
         settingsOf(row.config).settings.language
     );
     if (!reached) return "offline";
-    const after = stored.readEventState((await readRow(installedAppId))?.config ?? {});
-    return after.arenaLeftovers.some((one) => one.id === id) ? "left" : "cleared";
+    const after = await updateEventState(installedAppId, (state) => ({
+        ...state,
+        arenaLeftovers: state.arenaLeftovers.map((one) =>
+            one.id !== id || arenaService.leftForOperator(one)
+                ? one
+                : {
+                      ...one,
+                      checks: arenaService.CLEAR_CHECKS,
+                      remains: one.remains ?? left.remains ?? null
+                  }
+        )
+    }));
+    return after?.arenaLeftovers.some((one) => one.id === id) ? "left" : "cleared";
 }
 
 /** Taken off the panel: the operator has dealt with what was left in its box. */
