@@ -11061,6 +11061,20 @@ describe("hide and seek", () => {
         world.attackers[victim] = by;
     };
 
+    it("sweeps what the house let fall on the quick look too, before anybody can pick it up", async () => {
+        world.online = [...names];
+        setUp([hideOf(60)]);
+        await joinAndStart("hide", names);
+        await play(2_100);
+        const sweep = (line: string) =>
+            line.includes("as @e[type=minecraft:item,") &&
+            line.endsWith("unless data entity @s Thrower run kill @s");
+        world.sent = [];
+        await play(2_000);
+        // The tick sweeps once in two seconds; the quick look several times more.
+        expect(world.sent.filter(sweep).length).toBeGreaterThanOrEqual(3);
+    });
+
     it("turns minimap radars off for each player at Go, again on a rejoin, and back on at the end", async () => {
         const hs = await kind();
         world.online = [...names, "Dee"];

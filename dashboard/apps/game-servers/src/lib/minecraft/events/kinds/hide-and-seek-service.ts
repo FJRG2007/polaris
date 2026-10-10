@@ -451,6 +451,10 @@ export const hideAndSeek: ArenaGame = {
     beginLines: (_preset, language) => hs.setupLines(said.teamNames(language)),
     goLines,
     tick,
+    // Swept on the quick look as well as the tick: an item lies half a second
+    // before it can be picked up, and the tick comes round every two. Picked
+    // up, it went home with them and took a slot their own things came back to.
+    quickLines: (run) => (run.marker ? [arena.killBrokenDrops(run.arena!.box, run.marker)] : []),
     results: (run) =>
         hs.scoresOf(
             hs.stateOf(run.game),
