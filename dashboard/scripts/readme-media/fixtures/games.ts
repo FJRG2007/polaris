@@ -54,7 +54,10 @@ export function gameServers(ctx: SceneContext): GameServerSeed[] {
 }
 
 interface Extra {
-    readonly address: string | null;
+    /** The address Polaris gives the server: its name under its game's own label
+     *  (`mc`, `ark`, `gta`), with the port only for a game whose client does not
+     *  look up an SRV record. English and Spanish, because the name is. */
+    readonly address: readonly [en: string, es: string];
     readonly slots: number;
     readonly release?: string;
     readonly software?: string;
@@ -66,7 +69,7 @@ interface Extra {
 
 const EXTRA: readonly Extra[] = [
     {
-        address: "play.example.com",
+        address: ["survival.mc.example.com", "supervivencia.mc.example.com"],
         slots: 20,
         release: "1.21.4",
         software: "Paper",
@@ -84,7 +87,7 @@ const EXTRA: readonly Extra[] = [
         upMinutes: 60 * 31
     },
     {
-        address: "build.example.com",
+        address: ["creative-builds.mc.example.com", "construcciones.mc.example.com"],
         slots: 10,
         release: "1.21.4",
         software: "Fabric",
@@ -94,13 +97,19 @@ const EXTRA: readonly Extra[] = [
         upMinutes: 60 * 6
     },
     {
-        address: "ark.example.com:7777",
+        address: ["the-island.ark.example.com:7777", "the-island.ark.example.com:7777"],
         slots: 30,
         online: 4,
         players: ["Rex Tamer", "Doedicurus", "Kenji", "Sam"],
         upMinutes: 60 * 50
     },
-    { address: "fivem.example.com:30120", slots: 48, online: 0, players: [], upMinutes: null }
+    {
+        address: ["roleplay-city.gta.example.com:30120", "roleplay-city.gta.example.com:30120"],
+        slots: 48,
+        online: 0,
+        players: [],
+        upMinutes: null
+    }
 ];
 
 export function gameFacts(ctx: SceneContext): GameServerFacts[] {
@@ -116,7 +125,7 @@ export function gameFacts(ctx: SceneContext): GameServerFacts[] {
             applicationId: seed.applicationId,
             serverName: "Local",
             running,
-            address: extra.address,
+            address: ctx.say(...extra.address),
             slots: extra.slots,
             release: extra.release ?? null,
             software: extra.software ?? null,
