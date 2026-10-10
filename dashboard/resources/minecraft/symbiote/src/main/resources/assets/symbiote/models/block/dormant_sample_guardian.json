@@ -1,0 +1,7 @@
+{
+  "parent": "symbiote:block/dormant_sample",
+  "textures": {
+    "1": "symbiote:block/dormant_sample_guardian",
+    "particle": "symbiote:block/dormant_sample_guardian"
+  }
+}

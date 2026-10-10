@@ -1,0 +1,92 @@
+{
+  "voice_up": {
+    "category": "player",
+    "subtitle": "subtitles.symbiote.voice",
+    "sounds": [ "symbiote:voice_up", "symbiote:voice_up2", "symbiote:voice_up3", "symbiote:voice_up4" ]
+  },
+  "voice_down": {
+    "category": "player",
+    "subtitle": "subtitles.symbiote.voice",
+    "sounds": [ "symbiote:voice_down", "symbiote:voice_down2" ]
+  },
+  "voice_aggressive": {
+    "category": "player",
+    "subtitle": "subtitles.symbiote.voice",
+    "sounds": [ "symbiote:voice_aggressive", "symbiote:voice_aggressive2", "symbiote:voice_aggressive3" ]
+  },
+  "voice_warning": {
+    "category": "player",
+    "subtitle": "subtitles.symbiote.voice",
+    "sounds": [ "symbiote:voice_warning", "symbiote:voice_warning2" ]
+  },
+  "bond_attach": {
+    "category": "player",
+    "subtitle": "subtitles.symbiote.bond_attach",
+    "sounds": [ "symbiote:bond_attach" ]
+  },
+  "arrow_deflect": {
+    "category": "player",
+    "subtitle": "subtitles.symbiote.arrow_deflect",
+    "sounds": [ "symbiote:arrow_deflect1" ]
+  },
+  "slam_crunch": {
+    "category": "player",
+    "subtitle": "subtitles.symbiote.slam_crunch",
+    "sounds": [ "symbiote:slam_crunch1", "symbiote:slam_crunch2", "symbiote:slam_crunch3" ]
+  },
+  "tendril_strike": {
+    "category": "player",
+    "subtitle": "subtitles.symbiote.tendril_strike",
+    "sounds": [ "symbiote:tendril_strike", "symbiote:tendril_strike2" ]
+  },
+  "tendril_erupt": {
+    "category": "player",
+    "subtitle": "subtitles.symbiote.tendril_erupt",
+    "sounds": [ "symbiote:tendril_erupt", "symbiote:tendril_erupt2", "symbiote:tendril_erupt3" ]
+  },
+  "tendril_extend": {
+    "category": "player",
+    "subtitle": "subtitles.symbiote.tendril_extend",
+    "sounds": [ "symbiote:tendril_extend1", "symbiote:tendril_extend2" ]
+  },
+  "tendril_grip": {
+    "category": "player",
+    "subtitle": "subtitles.symbiote.tendril_grip",
+    "sounds": [ "symbiote:tendril_grip1", "symbiote:tendril_grip2", "symbiote:tendril_grip3", "symbiote:tendril_grip4" ]
+  },
+  "tendril_retract": {
+    "category": "player",
+    "subtitle": "subtitles.symbiote.tendril_retract",
+    "sounds": [ "symbiote:tendril_retract1", "symbiote:tendril_retract2", "symbiote:tendril_retract3", "symbiote:tendril_retract4" ]
+  },
+  "armor_on": {
+    "category": "player",
+    "subtitle": "subtitles.symbiote.armor_on",
+    "sounds": [ "symbiote:armor_on", "symbiote:armor_on2", "symbiote:armor_on3" ]
+  },
+  "armor_off": {
+    "category": "player",
+    "subtitle": "subtitles.symbiote.armor_off",
+    "sounds": [ "symbiote:armor_off", "symbiote:armor_off2" ]
+  },
+  "override_seizure": {
+    "category": "player",
+    "subtitle": "subtitles.symbiote.override_seizure",
+    "sounds": [ "symbiote:override_seizure", "symbiote:override_seizure2", "symbiote:override_seizure3", "symbiote:override_seizure4" ]
+  },
+  "heartbeat": {
+    "category": "player",
+    "subtitle": "subtitles.symbiote.heartbeat",
+    "sounds": [ "symbiote:heartbeat" ]
+  },
+  "rejection": {
+    "category": "player",
+    "subtitle": "subtitles.symbiote.rejection",
+    "sounds": [ "symbiote:rejection" ]
+  },
+  "consumption": {
+    "category": "player",
+    "subtitle": "subtitles.symbiote.consumption",
+    "sounds": [ "symbiote:consumption" ]
+  }
+}

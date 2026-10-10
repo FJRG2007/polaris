@@ -1,0 +1,9 @@
+{
+  "variants": {
+    "strain=guardian": { "model": "symbiote:block/dormant_sample_guardian" },
+    "strain=predator": { "model": "symbiote:block/dormant_sample_predator" },
+    "strain=shadow": { "model": "symbiote:block/dormant_sample_shadow" },
+    "strain=sculk": { "model": "symbiote:block/dormant_sample_sculk" },
+    "strain=royal": { "model": "symbiote:block/dormant_sample_royal" }
+  }
+}

@@ -39,7 +39,10 @@ import {
     type ModrinthBuild
 } from "./modrinth";
 import { host } from "@polaris/app-host";
+import { modUrl } from "./polaris-login";
+import { bundledSha1 } from "./polaris-mod-files";
 import type { AppHostTypes } from "@polaris/app-host";
+import { SYMBIOTE_FILE, hasSymbiote } from "./symbiote";
 
 const { readInstallConfig } = host.appsInstallConfig;
 type InstallConfig = AppHostTypes["InstallConfig"];
@@ -200,6 +203,10 @@ export async function resolvePack(input: {
     readonly version: string;
     readonly projects: string;
     readonly config: InstallConfig;
+    /** The server's `MODS` list, for the jars this dashboard serves it that
+     *  players need too, and the address the player reached it at. */
+    readonly mods?: string;
+    readonly base?: string;
 }): Promise<ClientPack> {
     const loader = loaderForType(input.software) ?? "";
     const version = /^[0-9][0-9.]*$/.test(input.version.trim()) ? input.version.trim() : "";
@@ -224,7 +231,33 @@ export async function resolvePack(input: {
         const sha1 = CHECKSUM.test(build.sha1) ? build.sha1.toLowerCase() : "";
         mods.push({ entry, where, ...build, sha1 });
     }
+    if (input.base && hasSymbiote(input.mods ?? "")) {
+        const sha1 = await bundledSha1(SYMBIOTE_FILE);
+        if (sha1 === null) missing.push(SYMBIOTE_ENTRY);
+        else mods.push(symbioteMod(input.base, sha1));
+    }
     return { server: input.name, loader, version, mods, missing };
+}
+
+/** How the pack names Symbiote, which has no Modrinth entry. */
+export const SYMBIOTE_ENTRY = "symbiote";
+
+/**
+ * Symbiote as a player installs it: the jar the server downloads, from this
+ * dashboard rather than Modrinth, checked against the image's own copy. It runs
+ * on both sides, so a server carrying it is a server nobody joins without it.
+ */
+export function symbioteMod(base: string, sha1: string): PackMod {
+    return {
+        entry: SYMBIOTE_ENTRY,
+        filename: SYMBIOTE_FILE,
+        url: modUrl(base, SYMBIOTE_FILE),
+        sha1,
+        version: "",
+        where: "server",
+        projectId: "",
+        incompatible: []
+    };
 }
 
 /** One project the pack installs, before it is resolved to a file. */

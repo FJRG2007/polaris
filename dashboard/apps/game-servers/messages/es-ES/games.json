@@ -259,7 +259,9 @@
         "nothingToSave": "Nada que guardar",
         "playerNameRule": "Un nombre de jugador tiene de 1 a 16 letras, dígitos o guiones bajos",
         "itemIdRule": "Un objeto es como minecraft:stone",
-        "iconSize": "El icono del servidor tiene que ser de {size}"
+        "iconSize": "El icono del servidor tiene que ser de {size}",
+        "couldNotReadSymbiote": "No se pudo leer Symbiote",
+        "couldNotChangeSymbiote": "No se pudo cambiar Symbiote"
     },
     "status": {
         "failed": "Falló",
@@ -1046,7 +1048,10 @@
             "notOnBedrock": "Bedrock no puede mostrar '{'{name}'}'",
             "braces": "Un '{ }' tiene que contener una variable, como '{player}' o '{polaris.name | \"Jugador\"}'"
         },
-        "you": "Tú"
+        "you": "Tú",
+        "symbioteUnsupported": "Symbiote solo funciona en NeoForge 1.21.4. Este servidor no puede cargarlo.",
+        "symbioteNeedsAddress": "Symbiote necesita que este Polaris tenga una dirección pública: el servidor lo descarga de ella al arrancar.",
+        "noSymbiote": "Este Polaris se construyó sin Symbiote. Actualiza Polaris desde Ajustes para tenerlo."
     },
     "notify": {
         "crashLoopTitle": "{name} sigue sin poder arrancar",

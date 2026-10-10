@@ -10,8 +10,10 @@
  */
 
 import path from "node:path";
+import { createHash } from "node:crypto";
 import { readFile, stat } from "node:fs/promises";
 import { MOD_FILES } from "./polaris-login";
+import { SYMBIOTE_FILES } from "./symbiote";
 import { ANTICHEAT_FILE, ANTICHEAT_FILES } from "./polaris-anticheat";
 
 /** Where the bundle carries the builds: beside its server half, which is where
@@ -24,8 +26,9 @@ export function modDir(): string {
     );
 }
 
-/** Every jar the bundle carries: the login's builds and the anti-cheat's. */
-const SERVED: readonly string[] = [...MOD_FILES, ...ANTICHEAT_FILES];
+/** Every jar the bundle carries: the login's builds, the anti-cheat's, and the
+ *  mods Polaris carries for the operator. */
+const SERVED: readonly string[] = [...MOD_FILES, ...ANTICHEAT_FILES, ...SYMBIOTE_FILES];
 
 /** Where one build lives, or null for a name that is not one. */
 export function modPath(file: string): string | null {
@@ -56,8 +59,31 @@ export function bundledModVersion(file: string): Promise<string | null> {
  * on while the image has none to serve.
  */
 export async function anticheatBundled(file: string = ANTICHEAT_FILE): Promise<boolean> {
+    return jarBundled(file);
+}
+
+/** Whether this image carries a jar it serves. A server with one on its list
+ *  does not start when the download is not the jar. */
+export async function jarBundled(file: string): Promise<boolean> {
     const location = modPath(file);
     if (location === null) return false;
     const info = await stat(location).catch(() => null);
     return info?.isFile() ?? false;
+}
+
+/** A served jar's sha1, as the mod pack's installers check a download against,
+ *  or null when the image does not carry it. Read once, like the versions. */
+const checksums = new Map<string, Promise<string | null>>();
+
+export function bundledSha1(file: string): Promise<string | null> {
+    const location = modPath(file);
+    if (location === null) return Promise.resolve(null);
+    let sum = checksums.get(file);
+    if (!sum) {
+        sum = readFile(location)
+            .then((bytes) => createHash("sha1").update(bytes).digest("hex"))
+            .catch(() => null);
+        checksums.set(file, sum);
+    }
+    return sum;
 }
