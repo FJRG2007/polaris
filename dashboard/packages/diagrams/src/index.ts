@@ -1,7 +1,7 @@
 /**
  * The diagram editor Office draws with.
  *
- * Contains MIT-licensed code (see LICENSE) and is kept inside Polaris:
+ * Kept inside Polaris:
  * no third-party service is contacted, fonts are served from the host's own
  * origin (`setAssetPath`), the words come from the host's catalogs
  * (`translate`), and the chrome is drawn with Polaris's own tokens.
