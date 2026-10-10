@@ -19,7 +19,12 @@ import type { ShowStep } from "./present";
 import { SlideDrawing } from "./slide-canvas";
 import { Button, cn, matchShortcut } from "@polaris/ui";
 import { useTranslations } from "@/components/i18n/i18n-provider";
-import { audiencePath, canOpenAudienceWindow, openShowChannel, type ShowChannel } from "./show-channel";
+import {
+    audiencePath,
+    canOpenAudienceWindow,
+    openShowChannel,
+    type ShowChannel
+} from "./show-channel";
 import {
     AArrowDown,
     AArrowUp,
@@ -255,7 +260,11 @@ export function PresenterView({
                         {clockOf(clock.elapsed)}
                     </span>
                     <IconButton
-                        label={clock.running ? t("slides.presenter.pause") : t("slides.presenter.resume")}
+                        label={
+                            clock.running
+                                ? t("slides.presenter.pause")
+                                : t("slides.presenter.resume")
+                        }
                         onClick={clock.toggle}
                     >
                         {clock.running ? (

@@ -112,7 +112,8 @@ function MenuButton({
                     title={label}
                     className={cn(
                         "flex shrink-0 items-center gap-0.5 rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground",
-                        wide && "min-w-12 justify-between px-2 text-[13px] tabular-nums text-foreground"
+                        wide &&
+                            "min-w-12 justify-between px-2 text-[13px] tabular-nums text-foreground"
                     )}
                 >
                     {children}
@@ -320,7 +321,9 @@ export function FormatBar({
                         />
                     )}
                     <MenuButton
-                        label={line ? t("slides.format.lineWeight") : t("slides.format.borderWeight")}
+                        label={
+                            line ? t("slides.format.lineWeight") : t("slides.format.borderWeight")
+                        }
                         menu={deck.STROKE_POINTS.map((one) => (
                             <Choice
                                 key={one}

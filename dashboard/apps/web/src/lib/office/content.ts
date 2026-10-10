@@ -78,11 +78,7 @@ export function excerptOf(doc: Y.Doc): string {
         collect(shared, words);
         if (words.join(" ").length >= MAX_EXCERPT) break;
     }
-    return words
-        .join(" ")
-        .replace(/\s+/g, " ")
-        .trim()
-        .slice(0, MAX_EXCERPT);
+    return words.join(" ").replace(/\s+/g, " ").trim().slice(0, MAX_EXCERPT);
 }
 
 /** The text under one shared type, however deeply it nests. */

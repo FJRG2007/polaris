@@ -104,14 +104,38 @@ describe("new shapes", () => {
 describe("a line's ends", () => {
     it("come back in the order they were drawn, whichever way it points", () => {
         const cases = [
-            [{ x: 0.1, y: 0.1 }, { x: 0.5, y: 0.4 }],
-            [{ x: 0.5, y: 0.4 }, { x: 0.1, y: 0.1 }],
-            [{ x: 0.1, y: 0.6 }, { x: 0.7, y: 0.2 }],
-            [{ x: 0.7, y: 0.2 }, { x: 0.1, y: 0.6 }],
-            [{ x: 0.3, y: 0.2 }, { x: 0.3, y: 0.8 }],
-            [{ x: 0.3, y: 0.8 }, { x: 0.3, y: 0.2 }],
-            [{ x: 0.2, y: 0.5 }, { x: 0.8, y: 0.5 }],
-            [{ x: 0.8, y: 0.5 }, { x: 0.2, y: 0.5 }]
+            [
+                { x: 0.1, y: 0.1 },
+                { x: 0.5, y: 0.4 }
+            ],
+            [
+                { x: 0.5, y: 0.4 },
+                { x: 0.1, y: 0.1 }
+            ],
+            [
+                { x: 0.1, y: 0.6 },
+                { x: 0.7, y: 0.2 }
+            ],
+            [
+                { x: 0.7, y: 0.2 },
+                { x: 0.1, y: 0.6 }
+            ],
+            [
+                { x: 0.3, y: 0.2 },
+                { x: 0.3, y: 0.8 }
+            ],
+            [
+                { x: 0.3, y: 0.8 },
+                { x: 0.3, y: 0.2 }
+            ],
+            [
+                { x: 0.2, y: 0.5 },
+                { x: 0.8, y: 0.5 }
+            ],
+            [
+                { x: 0.8, y: 0.5 },
+                { x: 0.2, y: 0.5 }
+            ]
         ] as const;
         for (const [start, end] of cases) {
             const [a, b] = deck.lineEnds(deck.lineThrough(start, end));

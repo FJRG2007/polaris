@@ -58,13 +58,16 @@ export function Present({
     const at = driven ? Math.min(driven.at, slides.length) : own;
     const drive = useRef(driven);
     drive.current = driven;
-    const step = useCallback((to: ShowStep): void => {
-        if (drive.current) return drive.current.go(to);
-        if (to === "first") setOwn(0);
-        else if (to === "last") setOwn(slides.length - 1);
-        else if (to === "previous") setOwn((one) => Math.max(0, one - 1));
-        else setOwn((one) => one + 1);
-    }, [slides.length]);
+    const step = useCallback(
+        (to: ShowStep): void => {
+            if (drive.current) return drive.current.go(to);
+            if (to === "first") setOwn(0);
+            else if (to === "last") setOwn(slides.length - 1);
+            else if (to === "previous") setOwn((one) => Math.max(0, one - 1));
+            else setOwn((one) => one + 1);
+        },
+        [slides.length]
+    );
     const [controls, setControls] = useState(true);
     const [full, setFull] = useState(false);
     /** Whether this browser lets a page go full screen at all - an iPhone does

@@ -34,7 +34,6 @@ export function AudienceShow({
     const source = useCallback(
         (src: string) => edits.imageSource(doc, src),
         // A picture that arrives later is a new version of the document.
-        // eslint-disable-next-line react-hooks/exhaustive-deps
         [doc, version]
     );
     const [at, setAt] = useState(0);

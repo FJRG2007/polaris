@@ -81,7 +81,6 @@ export function NotesPanel({
     const attach = useCallback((one: HTMLTextAreaElement | null) => {
         if (field.current && field.current !== one) flushField(field.current);
         field.current = one;
-        // eslint-disable-next-line react-hooks/exhaustive-deps -- reads refs only
     }, []);
 
     // Somebody else's notes arrive in the field unless it is being typed in.

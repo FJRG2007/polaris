@@ -181,11 +181,7 @@ export function SlidesEditor({
     const notesFor = useCallback((one: deck.Slide) => deck.notesOf(one, notes), [notes]);
     // A new function whenever the document changes, so a picture that arrives
     // after its box redraws everything that shows it.
-    const imageSource = useCallback(
-        (src: string) => edits.imageSource(doc, src),
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-        [doc, version]
-    );
+    const imageSource = useCallback((src: string) => edits.imageSource(doc, src), [doc, version]);
     const toast = useToast();
     const picker = useRef<HTMLInputElement | null>(null);
     const [atIndex, setAtIndex] = useState(0);
@@ -256,9 +252,7 @@ export function SlidesEditor({
     const focusBox = (id: string): void => {
         requestAnimationFrame(() =>
             requestAnimationFrame(() =>
-                root.current
-                    ?.querySelector<HTMLElement>(`[data-box="${CSS.escape(id)}"]`)
-                    ?.focus()
+                root.current?.querySelector<HTMLElement>(`[data-box="${CSS.escape(id)}"]`)?.focus()
             )
         );
     };
@@ -589,7 +583,10 @@ export function SlidesEditor({
                                     >
                                         <Redo2 className="size-4 shrink-0" aria-hidden />
                                     </ToolButton>
-                                    <span className="mx-1 h-5 w-px shrink-0 bg-border" aria-hidden />
+                                    <span
+                                        className="mx-1 h-5 w-px shrink-0 bg-border"
+                                        aria-hidden
+                                    />
                                     <Button
                                         variant="ghost"
                                         size="sm"
@@ -668,7 +665,10 @@ export function SlidesEditor({
                                             void addPictures(files);
                                         }}
                                     />
-                                    <span className="mx-1 h-5 w-px shrink-0 bg-border" aria-hidden />
+                                    <span
+                                        className="mx-1 h-5 w-px shrink-0 bg-border"
+                                        aria-hidden
+                                    />
                                     <ToolButton
                                         label={t("slides.duplicateBox")}
                                         disabled={!chosenBox}
@@ -800,7 +800,10 @@ export function SlidesEditor({
                             notes={notesFor(slide)}
                             editable={editable}
                             onWrite={(slideId, text) => {
-                                const one = edits.slidesOf(doc).toArray().find((s) => s.id === slideId);
+                                const one = edits
+                                    .slidesOf(doc)
+                                    .toArray()
+                                    .find((s) => s.id === slideId);
                                 if (one) edits.setNotes(doc, one, text);
                             }}
                         />

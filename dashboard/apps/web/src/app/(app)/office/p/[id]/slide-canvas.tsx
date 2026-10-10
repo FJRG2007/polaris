@@ -200,10 +200,7 @@ function ShapeArt({ box }: { box: deck.Box }) {
                 );
             case "triangle":
                 return (
-                    <polygon
-                        points={`${width / 2},0 ${width},${height} 0,${height}`}
-                        {...look}
-                    />
+                    <polygon points={`${width / 2},0 ${width},${height} 0,${height}`} {...look} />
                 );
             case "diamond":
                 return (
@@ -472,7 +469,9 @@ export function SlideStage({
                 let to = { x: pulled.x + dx, y: pulled.y + dy };
                 // Shift turns the line to the nearest fifteen degrees.
                 if (at.shiftKey) to = deck.snapAngle(fixed, to);
-                return gesture.end === 0 ? deck.lineThrough(to, fixed) : deck.lineThrough(fixed, to);
+                return gesture.end === 0
+                    ? deck.lineThrough(to, fixed)
+                    : deck.lineThrough(fixed, to);
             }
             // A picture's corners keep its proportions, and Shift frees them -
             // the other way round from every other box.
