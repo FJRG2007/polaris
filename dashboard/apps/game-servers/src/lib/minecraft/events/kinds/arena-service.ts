@@ -76,6 +76,9 @@ interface Memory {
     views: Map<number, arena.Spot | null>;
     /** Who died and has not been seen back up yet, in lower case. */
     fallen: Set<string>;
+    /** Who the server would not give a respawn spot (offline), in lower
+     *  case, and when to try again. */
+    respawnLater: Map<string, number>;
 }
 
 const memories = new Map<string, Memory>();
@@ -90,7 +93,8 @@ function memoryOf(runId: string): Memory {
             lastHit: new Map(),
             tour: -1,
             views: new Map(),
-            fallen: new Set()
+            fallen: new Set(),
+            respawnLater: new Map()
         };
         memories.set(runId, memory);
     }
@@ -164,7 +168,7 @@ export async function arenaTick(ctx: KindContext, lines: string[]): Promise<stri
         }
         return null;
     }
-    await keepRespawns(ctx, lines);
+    await keepRespawns(ctx);
     const game = gameOf(ctx.run.preset.kind);
     if (game) return game.tick(ctx, lines);
     if (ctx.run.preset.kind === "team-duel") await duelTick(ctx, lines);
@@ -567,12 +571,16 @@ function respawnLines(
     });
 }
 
+/** How long an entrant the server found offline is left before their spot is set again. */
+const RESPAWN_RETRY_MS = 30_000;
+
 /**
  * Every look in play: a spot set again for whoever has none on the server -
  * they logged out and back, or the server restarted, and the plugin or mod
- * forgot it. One question a look; nothing at all where neither is there.
+ * forgot it. One question a look; nothing at all where neither is there. An
+ * entrant it refuses - offline - is tried again a while later, not every look.
  */
-async function keepRespawns(ctx: KindContext, lines: string[]): Promise<void> {
+async function keepRespawns(ctx: KindContext): Promise<void> {
     const key = await respawnKeyOf(ctx);
     if (!key) return;
     const held = inServer.parseRespawnList(
@@ -583,13 +591,19 @@ async function keepRespawns(ctx: KindContext, lines: string[]): Promise<void> {
         inServer.forgetCapabilities(ctx.server.installedAppId);
         return;
     }
-    lines.push(
-        ...respawnLines(
-            ctx.run,
-            key,
-            ctx.run.entrants.filter((one) => !held.has(lower(one.name)))
-        )
+    const later = memoryOf(ctx.run.id).respawnLater;
+    const missing = ctx.run.entrants.filter(
+        (one) => !held.has(lower(one.name)) && (later.get(lower(one.name)) ?? 0) <= ctx.now
     );
+    const sets = missing.map((one) => respawnLines(ctx.run, key, [one]));
+    const answers = await commands.answersOf(ctx.server, sets.flat()).catch(() => []);
+    let at = 0;
+    for (const [index, one] of missing.entries()) {
+        if (sets[index]!.length === 0) continue;
+        const answer = inServer.replyObject(answers[at++] ?? "");
+        if (answer?.ok === true) later.delete(lower(one.name));
+        else later.set(lower(one.name), ctx.now + RESPAWN_RETRY_MS);
+    }
 }
 
 /** Where an entrant who dies comes back: a duel's side, the kind's own spot. */

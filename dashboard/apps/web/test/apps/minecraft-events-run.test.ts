@@ -8810,6 +8810,18 @@ describe("a team duel", () => {
         // While held, it is not sent again.
         await play(2_100);
         expect(world.sent.filter((line) => line === setBen).length).toBe(setsBefore + 1);
+        // Offline, he is refused once and left a while, not asked every look.
+        world.online = ["Ana"];
+        world.respawnSpots.delete("Ben");
+        await play(2_100);
+        expect(world.sent.filter((line) => line === setBen).length).toBe(setsBefore + 2);
+        await play(10_000);
+        expect(world.sent.filter((line) => line === setBen).length).toBe(setsBefore + 2);
+        // Back on, he has it again once the wait is over.
+        world.online = ["Ana", "Ben"];
+        await play(25_000);
+        expect(world.sent.filter((line) => line === setBen).length).toBe(setsBefore + 3);
+        expect(world.respawnSpots.has("Ben")).toBe(true);
 
         await play(3 * 60_000);
         expect(state().run).toBeNull();
