@@ -10,8 +10,8 @@
  * `SlideStage` is that picture with hands on it: choose a box, drag it, pull one
  * of its eight grips, type into it in place. How it behaves is borrowed from the
  * editors people already know rather than invented: the grips and their
- * modifiers (Shift keeps the proportions, Alt grows from the middle) are
- * Excalidraw's and PowerPoint's, a picture's corners keep its proportions unless
+ * modifiers (Shift keeps the proportions, Alt grows from the middle) are the
+ * ones whiteboards and PowerPoint use, a picture's corners keep its proportions unless
  * Shift is held (PowerPoint's locked aspect ratio), a line has a grip on each
  * end rather than a box round it, and a second click on a chosen box that holds
  * words puts the caret in it as in Google Slides. A drag is drawn locally and
@@ -374,7 +374,7 @@ function BoxBody({ box }: { box: deck.Box }) {
 }
 
 /** Below this many pixels a box shows only its corner grips: the side ones would
- *  cover the box itself, and it could no longer be picked up (as in Excalidraw). */
+ *  cover the box itself, and it could no longer be picked up. */
 const SIDE_GRIPS_FROM_PX = 56;
 
 /** Below this many pixels the corner grips sit outside the box rather than

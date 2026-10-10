@@ -4,7 +4,7 @@
     "private": true,
     "type": "module",
     "license": "MIT",
-    "description": "The diagram editor Office draws with. Derived from Excalidraw v0.18.1 (MIT); see LICENSE.",
+    "description": "The diagram editor Office draws with. Contains MIT-licensed code; see LICENSE.",
     "exports": {
         ".": {
             "types": "./dist/types/index.d.ts",

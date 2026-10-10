@@ -4,10 +4,10 @@
  * A picture somebody chose, dropped or pasted, made fit to keep in a deck.
  *
  * A deck travels whole to everybody who opens it, so a picture is drawn again
- * at no more than a full-HD slide's longest side and written as WebP - the way
- * Excalidraw shrinks what is dropped on a drawing before keeping it (1440 px
- * there; a slide is shown full screen, so a little more here). A picture that
- * is still too large after that is refused with a reason, never half-kept.
+ * at no more than a full-HD slide's longest side and written as WebP, as
+ * whiteboard editors shrink what is dropped on a drawing before keeping it (a
+ * slide is shown full screen, so a little larger here). A picture that is
+ * still too large after that is refused with a reason, never half-kept.
  */
 
 /** The longest side a kept picture has, in pixels. */

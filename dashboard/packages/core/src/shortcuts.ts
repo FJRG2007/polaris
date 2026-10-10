@@ -10,7 +10,7 @@
  *
  * Why it is shaped like this, from how others do it:
  *
- * - **One action, several keys** (VS Code, Excalidraw's help): the calendar's
+ * - **One action, several keys** (VS Code, whiteboard help screens): the calendar's
  *   Day view is both `1` and `D`. A binding list per action, not one key.
  * - **Fixed keys** (Gmail, every list): Enter opens, Escape backs out, the arrows
  *   move. They are listed but not movable, and nothing else may take them - a

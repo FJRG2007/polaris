@@ -119,17 +119,6 @@ export const SERVICE_TEMPLATES: readonly ServiceTemplate[] = [
         firstRun: "Sign in as admin@example.com with the ADMIN_PASSWORD variable."
     },
     {
-        id: "excalidraw",
-        name: "Excalidraw",
-        description: "Whiteboard for sketches and diagrams. Drawings stay in the browser.",
-        image: "excalidraw/excalidraw:latest",
-        port: 80,
-        env: {},
-        secrets: [],
-        volumes: [],
-        firstRun: "No sign-in."
-    },
-    {
         id: "freshrss",
         name: "FreshRSS",
         description: "RSS and Atom feed reader.",

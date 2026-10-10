@@ -248,38 +248,20 @@ export const EXPORT_DATA_TYPES = {
   diagramClipboardWithAPI: "polaris-diagram-api/clipboard",
 } as const;
 
-/** Identifiers files written before the editor was vendored still carry.
- * Read on import, never written. */
-export const LEGACY_MIME_TYPES = {
-  diagram: "application/vnd.excalidraw+json",
-  diagramlib: "application/vnd.excalidrawlib+json",
-} as const;
-
-export const LEGACY_EXPORT_DATA_TYPES = {
-  diagram: "excalidraw",
-  diagramClipboard: "excalidraw/clipboard",
-  diagramLibrary: "excalidrawlib",
-  diagramClipboardWithAPI: "excalidraw-api/clipboard",
-} as const;
-
 export const SCENE_MIME_TYPES: readonly string[] = [
   MIME_TYPES.diagram,
-  LEGACY_MIME_TYPES.diagram,
 ];
 
 export const LIBRARY_MIME_TYPES: readonly string[] = [
   MIME_TYPES.diagramlib,
-  LEGACY_MIME_TYPES.diagramlib,
 ];
 
 export const SCENE_DATA_TYPES: readonly string[] = [
   EXPORT_DATA_TYPES.diagram,
-  LEGACY_EXPORT_DATA_TYPES.diagram,
 ];
 
 export const LIBRARY_DATA_TYPES: readonly string[] = [
   EXPORT_DATA_TYPES.diagramLibrary,
-  LEGACY_EXPORT_DATA_TYPES.diagramLibrary,
 ];
 
 export const EXPORT_SOURCE =

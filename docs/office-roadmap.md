@@ -80,7 +80,7 @@ candidacy.
 | Sheets | **Univer** core + GenOffice's domain and gateway | Apache-2.0 both | The engine GenOffice itself chose, and the only serious web spreadsheet with a formula engine and canvas rendering. Its missing half is exactly what GenOffice supplies. |
 | Docs | **TipTap/ProseMirror**, already in Polaris, plus `docx-engine` for import and export | MIT / Apache-2.0 | Polaris has one rich-text surface already ([[rich-text-editor]]); a second would be two editors to keep in step. Page-faithful pagination is a later chapter, not a reason to start again. |
 | Slides | Polaris' own canvas over `pptx-engine`'s model | Apache-2.0 | No web presentation editor is both complete and permissively licensed. PPTist is MIT but Vue, and Polaris is React. |
-| Diagrams | **Excalidraw** | MIT | Real MIT: forkable, embeddable in a commercial product, React, and it has its own collaboration protocol. Vendored at v0.18.1 as `@polaris/diagrams`. |
+| Diagrams | `@polaris/diagrams`, kept in this repository | MIT | An MIT-licensed editor kept in-house at a fixed release (notices in its `LICENSE`), drawn with Polaris's icons, type and spacing and calling no outside service. |
 
 **tldraw is refused.** Its SDK licence changed in September 2025: production use
 now needs a paid commercial licence (reported around $6,000/year) or a free tier
@@ -88,7 +88,7 @@ that stamps a watermark on the canvas. It is the nicest canvas of the three and
 it cannot ship here.
 
 **draw.io** (Apache-2.0) stays on the table for a second diagram kind later -
-UML, ERDs, architecture - where Excalidraw's hand-drawn feel is wrong. It embeds
+UML, ERDs, architecture - where a freehand whiteboard is the wrong tool. It embeds
 as an iframe rather than as a component, which is why it is not first.
 
 ## Editing together
@@ -99,9 +99,9 @@ already agrees on. A document is a `Y.Doc`; every app binds its own model to it:
 - Docs - `y-prosemirror`, which binds straight to the editor Polaris already has.
 - Sheets - Univer's mutations applied into a shared type.
 - Slides - the slide model in a `Y.Map` per slide.
-- Diagrams - each element in its own key of a shared `Y.Map`, rather than
-  Excalidraw's own flat array bound whole: two people moving two different
-  shapes is then two independent changes instead of one array both rewrite.
+- Diagrams - each element in its own key of a shared `Y.Map`, rather than one
+  flat array bound whole: two people moving two different shapes is then two
+  independent changes instead of one array both rewrite.
 
 The transport is Polaris', not a new server: the in-process bus and the
 scope-filtered stream that Chat and Tasks already run on ([[tasks-realtime]]),
@@ -126,7 +126,7 @@ Polaris already has both halves of this and neither needs inventing:
 ## Exporting
 
 `.docx`, `.xlsx` and `.pptx` through the engines above, server-side, plus PDF for
-all four. Diagrams export SVG and PNG, which Excalidraw does itself.
+all four. Diagrams export SVG and PNG from their own canvas.
 
 ## Competitor comparison - the answer to "you tell me"
 
@@ -163,7 +163,7 @@ Each step is usable on its own; none of them is a scaffold waiting for the next.
 2. **Docs** - the editor Polaris has, made collaborative and given `.docx` in and
    out.
 3. **Sheets** - Univer, then GenOffice's pivots, charts and `.xlsx` gateway.
-4. **Diagrams** - Excalidraw, collaborative, exporting.
+4. **Diagrams** - Polaris' own canvas, collaborative, exporting.
 5. **Comparison** - the document kind above, and the quadrant view.
 6. **Slides** - the largest and the last, over `pptx-engine`.
 
