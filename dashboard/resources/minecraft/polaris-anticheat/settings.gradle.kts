@@ -79,5 +79,6 @@ include("internal-shims")
 include("bukkit-internal")
 include("common")
 include("bukkit")
+include("neoforge")
 
 if (file("workspace.gradle.kts").exists()) apply(from = "workspace.gradle.kts")

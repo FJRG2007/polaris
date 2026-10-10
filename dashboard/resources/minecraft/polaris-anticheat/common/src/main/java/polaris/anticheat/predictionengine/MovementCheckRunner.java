@@ -1,5 +1,6 @@
 package polaris.anticheat.predictionengine;
 
+import polaris.anticheat.utils.anticheat.ModdedContent;
 import polaris.anticheat.api.config.ConfigManager;
 import polaris.anticheat.checks.PolarisProcessor;
 import polaris.anticheat.checks.impl.prediction.Phase;
@@ -480,7 +481,9 @@ public class MovementCheckRunner extends PolarisProcessor {
             // Dead players can't cheat, if you find a way how they could, open an issue
             player.predictedVelocity = new VectorData(new Vector3dm(), VectorData.VectorType.Dead);
             player.clientVelocity = new Vector3dm();
-        } else if (player.disablePolaris || (PacketEvents.getAPI().getServerManager().getVersion().isNewerThanOrEquals(ServerVersion.V_1_8) && player.gamemode == GameMode.SPECTATOR) || player.isFlying || (player.isExemptElytra() && player.isGliding)) {
+        } else if (player.disablePolaris || (PacketEvents.getAPI().getServerManager().getVersion().isNewerThanOrEquals(ServerVersion.V_1_8) && player.gamemode == GameMode.SPECTATOR) || player.isFlying || (player.isExemptElytra() && player.isGliding)
+                // A modded block the engine has no model for: not predicted while touching it
+                || (riding == null && ModdedContent.touchesUnmodelled(player))) {
             // We could technically check spectator but what's the point...
             // Added complexity to analyze a gamemode used mainly by moderators
             //

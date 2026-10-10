@@ -2,6 +2,7 @@ package polaris.anticheat.antixray;
 
 import polaris.anticheat.PolarisAPI;
 import polaris.anticheat.bridge.PolarisTraps;
+import polaris.anticheat.platform.api.Platform;
 import polaris.anticheat.player.PolarisPlayer;
 import polaris.anticheat.utils.latency.CompensatedWorld;
 import com.github.retrooper.packetevents.event.PacketListenerAbstract;
@@ -64,8 +65,12 @@ public final class AntiXray extends PacketListenerAbstract {
         this.blocks = new AntiXrayBlocks(CompensatedWorld.blockVersion);
     }
 
-    /** Whether this server wants it: on unless Polaris switched it off. */
+    /**
+     * Whether this server wants it: on unless Polaris switched it off. Never on
+     * NeoForge, where the Polaris mod the engine ships inside hides ore itself.
+     */
     public static boolean wanted() {
+        if (PolarisAPI.INSTANCE.getPlatform() == Platform.NEOFORGE) return false;
         String value = System.getenv("POLARIS_ANTIXRAY");
         return value == null || !value.trim().toLowerCase(Locale.ROOT).equals("off");
     }

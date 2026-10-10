@@ -1,5 +1,7 @@
 package polaris.anticheat.manager.init.load;
 
+import polaris.anticheat.PolarisAPI;
+import polaris.anticheat.platform.api.Platform;
 import polaris.anticheat.utils.anticheat.LogUtil;
 import com.github.retrooper.packetevents.PacketEvents;
 import com.github.retrooper.packetevents.PacketEventsAPI;
@@ -28,7 +30,9 @@ public class PacketEventsInit implements LoadableInitable {
         PacketEvents.setAPI(packetEventsAPI);
         PacketEvents.getAPI().getSettings()
                 .fullStackTrace(true)
-                .kickOnPacketException(true)
+                // A modded server sends content PacketEvents has no mapping for; a packet
+                // it fails to read must not cost the player their connection there.
+                .kickOnPacketException(PolarisAPI.INSTANCE.getPlatform() != Platform.NEOFORGE)
                 .checkForUpdates(false)
                 .reEncodeByDefault(false)
                 .debug(false);

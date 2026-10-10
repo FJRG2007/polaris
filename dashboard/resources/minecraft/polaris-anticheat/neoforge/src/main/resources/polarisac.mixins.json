@@ -1,0 +1,12 @@
+{
+    "required": false,
+    "minVersion": "0.8",
+    "package": "polaris.anticheat.platform.neoforge.mixin",
+    "compatibilityLevel": "JAVA_21",
+    "server": [
+        "ConnectionMixin"
+    ],
+    "injectors": {
+        "defaultRequire": 0
+    }
+}

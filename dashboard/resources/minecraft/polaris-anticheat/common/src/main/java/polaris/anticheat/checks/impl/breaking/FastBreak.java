@@ -1,5 +1,6 @@
 package polaris.anticheat.checks.impl.breaking;
 
+import polaris.anticheat.utils.anticheat.ModdedContent;
 import polaris.anticheat.api.storage.verbose.Verbose;
 import polaris.anticheat.checks.Check;
 import polaris.anticheat.checks.CheckData;
@@ -58,6 +59,11 @@ public class FastBreak extends Check implements BlockBreakListener, PreViaPacket
     @Override
     public void onBlockBreak(BlockBreak blockBreak) {
         if (blockBreak.action == DiggingAction.START_DIGGING) {
+            // A modded block's hardness and tool rules are not the stand-in's
+            if (ModdedContent.isModdedBlock(blockBreak.block.getGlobalId()) || ModdedContent.isModdedItem(player.inventory.getHeldItem())) {
+                targetBlockPosition = null;
+                return;
+            }
             if (!ViaVersionUtil.isAvailable) {
                 // Exempt all blocks that do not exist in the player version
                 final WrappedBlockState defaultState = WrappedBlockState.getDefaultState(player.getClientVersion(), blockBreak.block.getType());
