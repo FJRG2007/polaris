@@ -54,6 +54,9 @@ export const GAME_TABS: readonly GameTab[] = [
     // The box on the right of every player's screen. Its own screen rather than
     // the bottom of Announce, where nobody looking for it thought to scroll.
     { slug: "panel", label: "Side panel", permission: "games.console", games: ["minecraft"] }, // i18n-ignore
+    // Competitions and happenings run on the server: the console's grant, since
+    // an event talks to everybody on it and hands out items.
+    { slug: "events", label: "Events", permission: "games.console", games: ["minecraft"] }, // i18n-ignore
     // The server's own sounds, as a resource pack handed to players: uploading
     // and wiring them is the manager's; the screen checks again per action.
     { slug: "sounds", label: "Sounds", permission: "games.manage", games: ["minecraft"] }, // i18n-ignore
@@ -61,9 +64,6 @@ export const GAME_TABS: readonly GameTab[] = [
     // reads, where members ask it `/online`, where announcements are repeated.
     // A setting of the server, so the manager's.
     { slug: "chat", label: "Linked chat", permission: "games.manage", games: ["minecraft"] }, // i18n-ignore
-    // Competitions and happenings run on the server: the console's grant, since
-    // an event talks to everybody on it and hands out items.
-    { slug: "events", label: "Events", permission: "games.console", games: ["minecraft"] }, // i18n-ignore
     // Daily, weekly and monthly goals, a season pass and community goals: the
     // same grant as events, since they talk to everybody and hand out items.
     { slug: "challenges", label: "Challenges", permission: "games.console", games: ["minecraft"] }, // i18n-ignore

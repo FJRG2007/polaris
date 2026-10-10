@@ -14,7 +14,10 @@ import { createRequire } from "node:module";
 import { describe, expect, it } from "vitest";
 import {
     DEFAULT_SETTINGS,
+    MOMENT_AUDIENCES,
+    PLAY_MOMENTS,
     freeKey,
+    jarMoments,
     packMeta,
     readSoundSettings,
     readVorbis,
@@ -178,6 +181,53 @@ describe("settings", () => {
         const kept = withoutMissing(settings, new Set(["kept"]));
         expect(kept.moments).toEqual({ start: { sound: "kept", volume: 1, pitch: 1 } });
         expect(kept.players).toEqual([]);
+    });
+});
+
+describe("everyday moments", () => {
+    it("keeps who hears each one, and gives a missing or disallowed audience the default", () => {
+        const read = readSoundSettings(
+            JSON.stringify({
+                moments: {
+                    death: { sound: "oof", volume: 1, pitch: 1, audience: "near" },
+                    kill: { sound: "slash", volume: 1, pitch: 1 },
+                    leave: { sound: "bye", volume: 1, pitch: 1, audience: "player" },
+                    nightfall: { sound: "owl", volume: 1, pitch: 1, audience: "nobody" },
+                    start: { sound: "bell", volume: 1, pitch: 1, audience: "near" }
+                }
+            })
+        );
+        expect(read.moments).toEqual({
+            death: { sound: "oof", volume: 1, pitch: 1, audience: "near" },
+            kill: { sound: "slash", volume: 1, pitch: 1, audience: "all" },
+            leave: { sound: "bye", volume: 1, pitch: 1, audience: "all" },
+            nightfall: { sound: "owl", volume: 1, pitch: 1, audience: "all" },
+            // An event moment has no audience: it plays where the event does.
+            start: { sound: "bell", volume: 1, pitch: 1 }
+        });
+    });
+
+    it("never offers a player who left or nobody in particular as the audience", () => {
+        expect(MOMENT_AUDIENCES.leave).not.toContain("player");
+        expect(MOMENT_AUDIENCES.nightfall).toEqual(["all"]);
+        expect(MOMENT_AUDIENCES.daybreak).toEqual(["all"]);
+        for (const moment of PLAY_MOMENTS)
+            expect(MOMENT_AUDIENCES[moment].length).toBeGreaterThan(0);
+    });
+
+    it("hands the jar only the everyday moments, by full sound id and with an audience", () => {
+        expect(
+            jarMoments({
+                win: { sound: "fanfare", volume: 1, pitch: 1 },
+                join: { sound: "hello", volume: 1, pitch: 1 },
+                advancement: { sound: "ding", volume: 0.5, pitch: 1.5, audience: "player" },
+                dragon: { sound: "roar", volume: 1, pitch: 1 }
+            })
+        ).toEqual({
+            advancement: { sound: "polaris:ding", volume: 0.5, pitch: 1.5, audience: "player" },
+            dragon: { sound: "polaris:roar", volume: 1, pitch: 1, audience: "all" }
+        });
+        expect(jarMoments({})).toEqual({});
     });
 });
 

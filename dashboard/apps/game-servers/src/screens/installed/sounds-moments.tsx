@@ -34,7 +34,21 @@ const MOMENT_WORDS: Readonly<
     horn: ["sounds.moments.horn", "sounds.moments.hornHint"],
     boss: ["sounds.moments.boss", "sounds.moments.bossHint"],
     join: ["sounds.moments.join", "sounds.moments.joinHint"],
-    welcome: ["sounds.moments.welcome", "sounds.moments.welcomeHint"]
+    welcome: ["sounds.moments.welcome", "sounds.moments.welcomeHint"],
+    death: ["sounds.moments.death", "sounds.moments.deathHint"],
+    kill: ["sounds.moments.kill", "sounds.moments.killHint"],
+    leave: ["sounds.moments.leave", "sounds.moments.leaveHint"],
+    advancement: ["sounds.moments.advancement", "sounds.moments.advancementHint"],
+    nightfall: ["sounds.moments.nightfall", "sounds.moments.nightfallHint"],
+    daybreak: ["sounds.moments.daybreak", "sounds.moments.daybreakHint"],
+    dragon: ["sounds.moments.dragon", "sounds.moments.dragonHint"],
+    wither: ["sounds.moments.wither", "sounds.moments.witherHint"]
+};
+
+const AUDIENCE_WORDS: Readonly<Record<rules.Audience, GameKey<"minecraft">>> = {
+    player: "sounds.moments.audiencePlayer",
+    near: "sounds.moments.audienceNear",
+    all: "sounds.moments.audienceAll"
 };
 
 type Preview = {
@@ -158,6 +172,7 @@ export function SoundSettingsEditor({
         const use = draft.moments[moment] ?? null;
         const off = disabled || needsJar;
         const id = `moment:${moment}`;
+        const audiences = rules.isPlayMoment(moment) ? rules.MOMENT_AUDIENCES[moment] : [];
         return (
             <li key={moment} className="flex flex-col gap-2 py-3 first:pt-0 last:pb-0">
                 <div className="flex flex-wrap items-start justify-between gap-2">
@@ -180,7 +195,10 @@ export function SoundSettingsEditor({
                                         : {
                                               sound: key,
                                               volume: use?.volume ?? 1,
-                                              pitch: use?.pitch ?? 1
+                                              pitch: use?.pitch ?? 1,
+                                              ...(audiences.length > 0
+                                                  ? { audience: use?.audience ?? audiences[0] }
+                                                  : {})
                                           }
                                 )
                             }
@@ -222,6 +240,24 @@ export function SoundSettingsEditor({
                         </Button>
                     </div>
                 </div>
+                {use && audiences.length > 1 ? (
+                    <label className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                        <span>{t("sounds.moments.audience")}</span>
+                        <Select
+                            className="w-48 max-w-full"
+                            value={use.audience ?? audiences[0]!}
+                            disabled={off}
+                            onValueChange={(audience) =>
+                                setMoment(moment, { ...use, audience: audience as rules.Audience })
+                            }
+                            options={audiences.map((audience) => ({
+                                value: audience,
+                                label: t(AUDIENCE_WORDS[audience])
+                            }))}
+                            aria-label={t("sounds.moments.audience")}
+                        />
+                    </label>
+                ) : null}
                 {use ? (
                     <div className="grid grid-cols-2 gap-3">
                         <LevelSlider
@@ -318,6 +354,25 @@ export function SoundSettingsEditor({
                     <ul className="flex flex-col divide-y divide-border">
                         {rules.EVENT_MOMENTS.map((moment) => momentRow(moment, false))}
                         {rules.SERVER_MOMENTS.map((moment) => momentRow(moment, !jar))}
+                    </ul>
+                    {!jar ? (
+                        <p className="text-xs text-muted-foreground">
+                            {t("sounds.moments.needsJar")}
+                        </p>
+                    ) : null}
+                </CardBody>
+            </Card>
+
+            <Card>
+                <CardBody className="flex flex-col gap-3">
+                    <div>
+                        <p className="text-sm font-medium">{t("sounds.moments.playTitle")}</p>
+                        <p className="text-xs text-muted-foreground">
+                            {t("sounds.moments.playHint")}
+                        </p>
+                    </div>
+                    <ul className="flex flex-col divide-y divide-border">
+                        {rules.PLAY_MOMENTS.map((moment) => momentRow(moment, !jar))}
                     </ul>
                     {!jar ? (
                         <p className="text-xs text-muted-foreground">

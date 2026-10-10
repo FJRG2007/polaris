@@ -232,8 +232,49 @@ export function readVorbis(bytes: Uint8Array): VorbisInfo {
 export const EVENT_MOMENTS = ["countdown", "start", "win", "horn", "boss"] as const;
 /** The moments the mod and the plugin play on their own. */
 export const SERVER_MOMENTS = ["join", "welcome"] as const;
-export const MOMENTS = [...EVENT_MOMENTS, ...SERVER_MOMENTS] as const;
+/** What happens in everyday play, which the mod and the plugin hear from the
+ *  game itself and play to whoever the owner picked. A jar older than these
+ *  ignores them. */
+export const PLAY_MOMENTS = [
+    "death",
+    "kill",
+    "leave",
+    "advancement",
+    "nightfall",
+    "daybreak",
+    "dragon",
+    "wither"
+] as const;
+export const MOMENTS = [...EVENT_MOMENTS, ...SERVER_MOMENTS, ...PLAY_MOMENTS] as const;
 export type Moment = (typeof MOMENTS)[number];
+export type EventMoment = (typeof EVENT_MOMENTS)[number];
+export type PlayMoment = (typeof PLAY_MOMENTS)[number];
+
+/** Who hears an everyday moment: the player it happened to (the one who died,
+ *  the killer, the one who earned it), the players near where it happened, or
+ *  everybody on. Always only players whose game loaded the pack. */
+export const AUDIENCES = ["player", "near", "all"] as const;
+export type Audience = (typeof AUDIENCES)[number];
+
+/** How far "near" reaches, in blocks. Kept in step with the mod and the plugin. */
+export const NEAR_BLOCKS = 48;
+
+/** The audiences each moment can have, the first being its default. A player
+ *  who left is not there to hear it; night and day have nobody in particular. */
+export const MOMENT_AUDIENCES: Readonly<Record<PlayMoment, readonly Audience[]>> = {
+    death: ["all", "near", "player"],
+    kill: ["all", "near", "player"],
+    leave: ["all", "near"],
+    advancement: ["player", "near", "all"],
+    nightfall: ["all"],
+    daybreak: ["all"],
+    dragon: ["all", "near", "player"],
+    wither: ["all", "near", "player"]
+};
+
+export function isPlayMoment(moment: Moment): moment is PlayMoment {
+    return (PLAY_MOMENTS as readonly string[]).includes(moment);
+}
 
 export const MIN_PITCH = 0.5;
 export const MAX_PITCH = 2;
@@ -247,7 +288,17 @@ export const soundUseSchema = z.object({
     pitch
 });
 
-export type SoundUse = z.infer<typeof soundUseSchema>;
+export type SoundUse = z.infer<typeof soundUseSchema> & {
+    /** Who hears it; only on an everyday moment (`MOMENT_AUDIENCES`). */
+    readonly audience?: Audience;
+};
+
+/** An everyday moment's sound: one the moment does not allow (or none) is its
+ *  default, so an old row or a narrowed list never leaves it unplayable. */
+function playUseSchema(moment: PlayMoment) {
+    const allowed = MOMENT_AUDIENCES[moment] as readonly [Audience, ...Audience[]];
+    return soundUseSchema.extend({ audience: z.enum(allowed).catch(allowed[0]) });
+}
 
 const PLAYER = /^[A-Za-z0-9_]{1,16}$/;
 
@@ -271,7 +322,9 @@ export const soundSettingsSchema = z.object({
         .transform((raw) => {
             const kept: Partial<Record<Moment, SoundUse>> = {};
             for (const moment of MOMENTS) {
-                const parsed = soundUseSchema.safeParse(raw[moment]);
+                const parsed = (
+                    isPlayMoment(moment) ? playUseSchema(moment) : soundUseSchema
+                ).safeParse(raw[moment]);
                 if (parsed.success) kept[moment] = parsed.data;
             }
             return kept;
@@ -317,6 +370,35 @@ export function withoutMissing(settings: SoundSettings, keys: ReadonlySet<string
         moments,
         players: settings.players.filter((one) => keys.has(one.sound))
     };
+}
+
+/** The everyday moments as the server's jar reads them: the sound by its full
+ *  id, and who hears it. */
+export type JarMoments = Partial<
+    Record<
+        PlayMoment,
+        {
+            readonly sound: string;
+            readonly volume: number;
+            readonly pitch: number;
+            readonly audience: Audience;
+        }
+    >
+>;
+
+export function jarMoments(moments: SoundSettings["moments"]): JarMoments {
+    const out: Record<string, JarMoments[PlayMoment]> = {};
+    for (const moment of PLAY_MOMENTS) {
+        const use = moments[moment];
+        if (!use) continue;
+        out[moment] = {
+            sound: soundId(use.sound),
+            volume: use.volume,
+            pitch: use.pitch,
+            audience: use.audience ?? (MOMENT_AUDIENCES[moment][0] as Audience)
+        };
+    }
+    return out;
 }
 
 // ------------------------------------------------------------------ pack

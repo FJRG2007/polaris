@@ -7,27 +7,42 @@ import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import java.util.regex.Pattern;
 
 /**
  * What Polaris tells the server about its own sounds
  * ({@code GET /api/minecraft/sounds/<id>}): the resource pack to hand players,
- * and the sounds this jar plays on its own when somebody arrives.
+ * the sounds this jar plays on its own when somebody arrives, and the ones it
+ * plays on everyday moments of play ({@code moments}) to whoever the owner picked.
  *
  * Read strictly, in the mod and the plugin alike. A sound becomes part of a
  * command, so only a namespaced id of the shape Polaris writes is kept, and
  * volume and pitch are clamped to what the game accepts; anything else in the
  * reply is dropped rather than trusted.
  */
-record SoundConfig(Pack pack, Sound join, Sound welcome, Map<String, Sound> players) {
+record SoundConfig(Pack pack, Sound join, Sound welcome, Map<String, Sound> players, Map<String, Cue> moments) {
     /** The scoreboard tag a player carries once their game has loaded the pack:
      *  the dashboard plays the server's sounds to these players only. */
     static final String LOADED_TAG = "polaris_sounds";
     /** Kept in the player's file: they have been here before. */
     static final String SEEN_TAG = "polaris_seen";
 
-    static final SoundConfig NONE = new SoundConfig(null, null, null, Map.of());
+    static final SoundConfig NONE = new SoundConfig(null, null, null, Map.of(), Map.of());
+
+    /** The everyday moments this jar knows how to hear. One Polaris names that is
+     *  not here (a newer moment) is ignored. */
+    static final Set<String> PLAY_MOMENTS =
+            Set.of("death", "kill", "leave", "advancement", "nightfall", "daybreak", "dragon", "wither");
+    /** How far "near" reaches, in blocks; the same as the dashboard's {@code NEAR_BLOCKS}. */
+    static final int NEAR_BLOCKS = 48;
+
+    /** Who hears an everyday moment: the player it happened to, the players near
+     *  where it did, or everybody on. Only ever players carrying {@link #LOADED_TAG}. */
+    enum Audience { PLAYER, NEAR, ALL }
+
+    record Cue(Sound sound, Audience audience) {}
 
     private static final Pattern SOUND = Pattern.compile("^polaris:[a-z0-9_]{1,40}$");
     private static final Pattern SHA1 = Pattern.compile("^[0-9a-f]{40}$");
@@ -45,6 +60,14 @@ record SoundConfig(Pack pack, Sound join, Sound welcome, Map<String, Sound> play
         String command(String selector) {
             return "execute as " + selector + " at @s run playsound " + id + " master @s ~ ~ ~ "
                     + number(volume) + " " + number(pitch);
+        }
+
+        /** The same, to the players with the pack within {@link #NEAR_BLOCKS} of a
+         *  point in one dimension. */
+        String commandNear(String dimension, double x, double y, double z) {
+            return "execute in " + dimension + " positioned " + number(x) + " " + number(y) + " " + number(z)
+                    + " as @a[tag=" + LOADED_TAG + ",distance=.." + NEAR_BLOCKS + "] at @s run playsound "
+                    + id + " master @s ~ ~ ~ " + number(volume) + " " + number(pitch);
         }
 
         private static String number(double value) {
@@ -74,6 +97,11 @@ record SoundConfig(Pack pack, Sound join, Sound welcome, Map<String, Sound> play
         };
     }
 
+    /** The sound on an everyday moment, and who hears it; null where it has none. */
+    Cue cue(String moment) {
+        return moments.get(moment);
+    }
+
     /** The sound a player arrives to: their own, or everybody's. */
     Sound arrival(String player) {
         Sound own = players.get(player.toLowerCase(Locale.ROOT));
@@ -94,7 +122,27 @@ record SoundConfig(Pack pack, Sound join, Sound welcome, Map<String, Sound> play
                 if (PLAYER.matcher(name).matches() && sound != null) players.put(name, sound);
             }
         }
-        return new SoundConfig(pack(body.get("pack")), soundAt(body, "join"), soundAt(body, "welcome"), Map.copyOf(players));
+        Map<String, Cue> moments = new HashMap<>();
+        JsonElement cues = body.get("moments");
+        if (cues != null && cues.isJsonObject()) {
+            for (String moment : PLAY_MOMENTS) {
+                JsonElement one = cues.getAsJsonObject().get(moment);
+                if (one == null || !one.isJsonObject()) continue;
+                Sound sound = sound(one.getAsJsonObject());
+                if (sound != null) moments.put(moment, new Cue(sound, audience(text(one.getAsJsonObject(), "audience"))));
+            }
+        }
+        return new SoundConfig(pack(body.get("pack")), soundAt(body, "join"), soundAt(body, "welcome"), Map.copyOf(players),
+                Map.copyOf(moments));
+    }
+
+    /** An audience by the dashboard's name for it; one this jar does not know is everybody. */
+    private static Audience audience(String name) {
+        return switch (name) {
+            case "player" -> Audience.PLAYER;
+            case "near" -> Audience.NEAR;
+            default -> Audience.ALL;
+        };
     }
 
     private static Pack pack(JsonElement element) {

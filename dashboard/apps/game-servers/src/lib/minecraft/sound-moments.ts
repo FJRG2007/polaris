@@ -17,10 +17,17 @@
  */
 
 import { SOUNDS } from "./events/commands";
-import { SOUND_TAG, commandNumber, soundId, type Moment, type SoundUse } from "./sounds";
+import {
+    SOUND_TAG,
+    commandNumber,
+    soundId,
+    type EventMoment,
+    type Moment,
+    type SoundUse
+} from "./sounds";
 
 /** The game sound each event moment plays today. */
-export const MOMENT_SOUNDS: Readonly<Record<Exclude<Moment, "join" | "welcome">, string>> = {
+export const MOMENT_SOUNDS: Readonly<Record<EventMoment, string>> = {
     countdown: SOUNDS.tick,
     start: SOUNDS.start,
     win: SOUNDS.win,

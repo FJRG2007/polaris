@@ -98,6 +98,13 @@ game's own sounds to everybody else. The mod also plays the arrival sound
 sound to a player on their first visit (`polaris_seen`) once their pack has
 loaded. A player who turns down a pack the server requires is disconnected.
 
+The owner can also put a sound on everyday moments, each played to the player
+it happened to, the players within 48 blocks, or everybody (always only players
+with the pack): a death (`LivingDeathEvent`) and the kill behind it, a player
+leaving, an advancement that shows a toast (`AdvancementEarnEvent`), the Ender
+Dragon's and the Wither's death, and night falling and day breaking in the
+overworld, read from its clock once a second since the game has no event for it.
+
 `polaris sounds status` answers one line of JSON: the pack's checksum and each
 online player's state (`loaded`, `pending`, `declined`, `failed`).
 `POLARIS_SOUNDS=off` switches it all off.
