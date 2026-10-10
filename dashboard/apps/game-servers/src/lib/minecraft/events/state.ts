@@ -103,7 +103,22 @@ export const entrantSchema = z.object({
      *  back already. False for anybody taken in before the tag was given. */
     tagged: z.boolean().default(false),
     /** What they carried, kept until it is given back (`kinds/stash`). */
-    stash: stashSchema.nullable().default(null)
+    stash: stashSchema.nullable().default(null),
+    /**
+     * Where they respawned before the event moved their spawn point into the
+     * arena (`arena.spawnBack`): null for the world's spawn - none of their
+     * own, or none that could be read - and absent where the event never
+     * moved it.
+     */
+    spawn: z
+        .object({
+            dimension: z.string(),
+            x: z.number().int(),
+            y: z.number().int(),
+            z: z.number().int()
+        })
+        .nullable()
+        .optional()
 });
 export type Entrant = z.infer<typeof entrantSchema>;
 

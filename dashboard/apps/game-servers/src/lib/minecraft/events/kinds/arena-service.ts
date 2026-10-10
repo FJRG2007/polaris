@@ -74,6 +74,8 @@ interface Memory {
     tour: number;
     /** The spot the tour stands at for each plot, once found clear. */
     views: Map<number, arena.Spot | null>;
+    /** Who died and has not been seen back up yet, in lower case. */
+    fallen: Set<string>;
 }
 
 const memories = new Map<string, Memory>();
@@ -87,7 +89,8 @@ function memoryOf(runId: string): Memory {
             kills: hits.tally(),
             lastHit: new Map(),
             tour: -1,
-            views: new Map()
+            views: new Map(),
+            fallen: new Set()
         };
         memories.set(runId, memory);
     }
@@ -440,6 +443,11 @@ async function bringIn(ctx: KindContext): Promise<void> {
         const worlds = commands.readDimensions(await say(commands.DIMENSIONS));
         const modes = arena.readGamemodes(await say(arena.READ_GAMEMODES));
         const uuids = arena.readUuids(await say(arena.READ_UUIDS));
+        // Where each would respawn, read before the event moves it into the
+        // arena (`linesIn`) and put back at the end (`arena.spawnBack`).
+        const spawns = respawning(run)
+            ? arena.readSpawns(await Promise.all(arena.READ_SPAWNS.map(say)))
+            : null;
         const fresh: stored.Entrant[] = [];
         for (const name of waiting) {
             const at = where.get(lower(name));
@@ -462,7 +470,8 @@ async function bringIn(ctx: KindContext): Promise<void> {
                 side: game ? game.side(run, index) : duelling ? index % 2 : index,
                 away: true,
                 tagged: true,
-                stash: null
+                stash: null,
+                ...(spawns ? { spawn: spawns.get(at.name) ?? null } : {})
             });
         }
         const needed = catalog.joinersNeeded(run.preset);
@@ -487,13 +496,17 @@ async function bringIn(ctx: KindContext): Promise<void> {
                 build.themeFor(options as catalog.EventOptions<"build-battle">, run.id, ctx.home)
         };
     const overGround = hillside ? await ctx.atLeast([1, 19, 4]) : false;
+    const angled = respawning(run) ? await ctx.atLeast([1, 16, 2]) : false;
     const linesIn = (one: stored.Entrant): string[] => {
         if (hillside)
             return hillService.enterLines(ctx.run, one.name, one.side, overGround, language);
         // In, and nothing more: the kit, the side's colors and the theme are
-        // handed out at "Go!", to everybody at once (`goLines`).
+        // handed out at "Go!", to everybody at once (`goLines`). Only their
+        // spawn point goes with them now: a death from here on comes back in.
+        const back = one.spawn !== undefined ? respawnSpot(ctx.run, one) : null;
         return [
             ...arena.enter(one.name, spotsOf(ctx.run).get(lower(one.name))!),
+            ...(back ? [arena.spawnAt(one.name, back, angled)] : []),
             ...(duelling ? [duel.joinTeam(one.name, one.side)] : []),
             ...(game?.enterLines?.(ctx.run, one) ?? []),
             arena.protect(one.name)
@@ -524,6 +537,17 @@ async function bringIn(ctx: KindContext): Promise<void> {
         throw new TooFew(ONE_SIDED);
     // The clock, the kit and "Go!" wait for everybody to be in.
     arrival.open(ctx.run.id, Date.now());
+}
+
+/** Whether a death in it is played on past, where the dead come back in. */
+function respawning(run: stored.EventRun): boolean {
+    return run.preset.kind === "team-duel" || gameOf(run.preset.kind)?.respawn !== undefined;
+}
+
+/** Where an entrant who dies comes back: a duel's side, the kind's own spot. */
+function respawnSpot(run: stored.EventRun, entrant: stored.Entrant): arena.Spot | null {
+    if (run.preset.kind === "team-duel") return spotsOf(run).get(lower(entrant.name)) ?? null;
+    return gameOf(run.preset.kind)?.respawn?.(run, entrant) ?? null;
 }
 
 /** Where each entrant starts, by name in lower case: a duel's side, a build
@@ -852,13 +876,16 @@ async function duelTick(ctx: KindContext, lines: string[]): Promise<void> {
                 commands.say(messages.tag(language) + messages.duelDown(one.name, by, language))
             );
             lines.push(`scoreboard players set ${one.name} ${duel.DIED} 0`);
+            memory.fallen.add(lower(one.name));
             scored = true;
         }
         const at = here.get(lower(one.name));
-        // Back from a death at home, or out of it any other way: back to
-        // their side, healed and shielded for a moment.
-        if (hearts > 0 && (!at || !arena.contains(box, at))) {
+        // Back from a death - on their side already, where their spawn point
+        // is (`arena.spawnAt`) - or out of it any other way: back to their
+        // side, healed and shielded for a moment.
+        if (hearts > 0 && (memory.fallen.has(lower(one.name)) || !at || !arena.contains(box, at))) {
             lines.push(...duel.sendBack(one.name, spot));
+            memory.fallen.delete(lower(one.name));
         }
         lines.push(
             arena.feed(one.name),
@@ -1308,7 +1335,14 @@ export async function closeArena(
         const there = going.filter(({ at }) => home.has(at));
         const settled = there.flatMap(({ one }) => {
             const thrown = box ? arena.sendThrown(box, one) : null;
-            return [arena.homeMode(one), arena.leftArena(one.name), ...(thrown ? [thrown] : [])];
+            // Their own spawn point back before the tag comes off: whoever is
+            // found untagged at a later go has had it.
+            return [
+                arena.homeMode(one),
+                ...arena.spawnBack(one),
+                arena.leftArena(one.name),
+                ...(thrown ? [thrown] : [])
+            ];
         });
         if (settled.length > 0) await server.sayAll(settled);
         // Their own things back only once they are home and down: nothing is

@@ -313,6 +313,8 @@ export const skyWars: ArenaGame = {
     kit: () => [...sw.LOOT_IDS],
     side: (_run, index) => index,
     spot: spotOf,
+    // Out, up in the gallery: where the tick sends whoever died anyway.
+    respawn: (run) => sw.gallerySpot(layoutOf(run), atOf(run), 0),
     beginLines: () => sw.setupLines(),
     enterLines: (_run, one) => [
         `tag ${one.name} remove ${sw.OUT_TAG}`,
