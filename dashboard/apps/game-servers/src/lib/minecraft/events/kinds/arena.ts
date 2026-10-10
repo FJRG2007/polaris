@@ -25,7 +25,7 @@
  * Pure, like the rest of the commands.
  */
 
-import { text } from "../commands";
+import { readDimensions, text } from "../commands";
 import { fallProof } from "./stage";
 import { PLAYER_NAME } from "../catalog";
 import { stripFormatting } from "../../parse";
@@ -138,15 +138,21 @@ export function fillKeep(box: Box, block: string): string {
 /**
  * What a block the arena placed turns into by itself while it stands: grass,
  * mycelium and podzol with a solid block on top go to dirt over the game's
- * random ticks - grass under a garden's tree trunk, say - and water open to
- * the sky freezes in a cold place. Nobody placed that dirt, so no arena lists
- * it, and a teardown that took only what it listed left it floating in the sky.
+ * random ticks - grass under a garden's tree trunk, say - dirt beside grass
+ * grows over, water open to the sky freezes in a cold place and ice by a light
+ * melts. Nobody placed that dirt, so no arena lists it, and a teardown that
+ * took only what it listed left it floating in the sky.
+ *
+ * Only what any arena's blocks do on their own is here; what a kind's own kit
+ * or mix makes - water meeting lava, a hoe's farmland - is in that kind's list.
  */
 const DECAYS_TO: Readonly<Record<string, readonly string[]>> = {
     "minecraft:grass_block": ["minecraft:dirt"],
     "minecraft:mycelium": ["minecraft:dirt"],
     "minecraft:podzol": ["minecraft:dirt"],
-    "minecraft:water": ["minecraft:ice"]
+    "minecraft:dirt": ["minecraft:grass_block"],
+    "minecraft:water": ["minecraft:ice"],
+    "minecraft:ice": ["minecraft:water"]
 };
 
 /** What falls on any arena in a cold place: a layer of snow on whatever is on
@@ -393,6 +399,99 @@ export function readUuids(output: string): Map<string, number[]> {
         found.set(match[1] as string, [match[2], match[3], match[4], match[5]].map(Number));
     }
     return found;
+}
+
+// ------------------------------------------------------------------ where they respawn
+
+/**
+ * Where each player online respawns, whole: `SpawnX`/`SpawnY`/`SpawnZ` with a
+ * `SpawnDimension` up to 1.21.4, a `respawn` compound from 1.21.5 (as
+ * `commands.HOMES` reads them, and the height). Whichever the server does not
+ * have answers with an error that reads as nothing.
+ */
+export const READ_SPAWNS = [
+    "execute as @a run data get entity @s SpawnX",
+    "execute as @a run data get entity @s SpawnY",
+    "execute as @a run data get entity @s SpawnZ",
+    "execute as @a run data get entity @s SpawnDimension",
+    "execute as @a run data get entity @s respawn.pos",
+    "execute as @a run data get entity @s respawn.dimension"
+] as const;
+
+export type Spawn = NonNullable<Entrant["spawn"]>;
+
+/**
+ * The spawn points out of the answers to `READ_SPAWNS`, in the same order, by
+ * name. A spawn whose world is not said is in the Overworld: before 1.16 there
+ * was nowhere else, and from 1.21.5 the game leaves the Overworld out as the
+ * default. Whoever has none - never slept, or it could not be read - is absent.
+ */
+export function readSpawns(answers: readonly string[]): Map<string, Spawn> {
+    const [xs = "", ys = "", zs = "", legacyWorld = "", modern = "", modernWorld = ""] = answers;
+    const each = (output: string) => {
+        const found = new Map<string, number>();
+        const pattern = /(\.?[A-Za-z0-9_]{1,16}) has the following entity data: (-?\d+)(?![\d.])/g;
+        for (const match of stripFormatting(output).matchAll(pattern))
+            found.set(match[1] as string, Number(match[2]));
+        return found;
+    };
+    const spawns = new Map<string, Spawn>();
+    const legacyWorlds = readDimensions(legacyWorld);
+    const modernWorlds = readDimensions(modernWorld);
+    const x = each(xs);
+    const y = each(ys);
+    const z = each(zs);
+    for (const [name, at] of x) {
+        const height = y.get(name);
+        const across = z.get(name);
+        if (height === undefined || across === undefined) continue;
+        const dimension = legacyWorlds.get(name) ?? "minecraft:overworld";
+        spawns.set(name, { dimension, x: at, y: height, z: across });
+    }
+    const pattern =
+        /(\.?[A-Za-z0-9_]{1,16}) has the following entity data: \[I;\s*(-?\d+),\s*(-?\d+),\s*(-?\d+)\]/g;
+    for (const match of stripFormatting(modern).matchAll(pattern)) {
+        const name = match[1] as string;
+        spawns.set(name, {
+            dimension: modernWorlds.get(name) ?? "minecraft:overworld",
+            x: Number(match[2]),
+            y: Number(match[3]),
+            z: Number(match[4])
+        });
+    }
+    return spawns;
+}
+
+/**
+ * Their spawn point on a spot in the arena, so a death there brings them
+ * straight back to it rather than to the world's spawn, a tick or more from
+ * being sent back. The command always makes it a forced spawn, which is what
+ * lets it stand on no bed. Facing the way the spot faces from 1.16.2, which
+ * added the angle; before it, facing south.
+ */
+export function spawnAt(name: string, spot: Spot, angled: boolean): string {
+    return `${IN_OVERWORLD} spawnpoint ${name} ${spot.x} ${spot.y} ${spot.z}${angled ? ` ${spot.yaw}` : ""}`;
+}
+
+/**
+ * Their own spawn point back, as it was read before `spawnAt` moved it - in
+ * its own world - or, where they had none of their own or it could not be
+ * read, the world's spawn: the game has no command that takes a player's
+ * spawn point away, and the console's own position, which `~ ~ ~` names, is
+ * the world spawn. Nothing for whoever's spawn the event never moved.
+ *
+ * Put back by the command, a spawn point is a forced one: a bed works as it
+ * did while it stands, and sleeping in it or using an anchor again makes it
+ * the game's own once more.
+ */
+export function spawnBack(entrant: Entrant): string[] {
+    const spawn = entrant.spawn;
+    if (spawn === undefined) return [];
+    if (spawn === null || !DIMENSION.test(spawn.dimension))
+        return [`spawnpoint ${entrant.name} ~ ~ ~`];
+    return [
+        `execute in ${spawn.dimension} run spawnpoint ${entrant.name} ${spawn.x} ${spawn.y} ${spawn.z}`
+    ];
 }
 
 // ------------------------------------------------------------------ in and out

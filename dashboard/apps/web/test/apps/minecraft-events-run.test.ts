@@ -1247,6 +1247,12 @@ function answer(sent: string): string {
             .map(([name, home]) => `${name} has the following entity data: ${home[axis]}`)
             .join("\n");
     }
+    // Every home at sea level.
+    if (line === "execute as @a run data get entity @s SpawnY") {
+        return Object.keys(world.homes)
+            .map((name) => `${name} has the following entity data: 64`)
+            .join("\n");
+    }
     if (line === "execute as @a run data get entity @s SpawnDimension") {
         return Object.keys(world.homes)
             .map(
@@ -2665,9 +2671,135 @@ describe("the minute sweep", () => {
         expect(await events.retryArena(SERVER, "old")).toBe("left");
         const [held] = state().arenaLeftovers;
         expect(held).toMatchObject({ id: "old", checks: 3, remains: 2 });
+        // Left for the operator again: its chunks let go.
+        expect(world.sent).toContain(
+            "execute in minecraft:overworld run forceload remove 0 0 10 10"
+        );
         world.solidCount = 0;
         expect(await events.retryArena(SERVER, "old")).toBe("cleared");
         expect(state().arenaLeftovers).toEqual([]);
+    });
+
+    it("leaves a retried arena to the sweep, still shown, while its chunks are loading", async () => {
+        setUp([newPreset("fishing", "fish")]);
+        const box = { x1: 0, y1: 100, z1: 0, x2: 10, y2: 110, z2: 10 };
+        config[catalog.EVENT_STATE_KEY] = {
+            arenaLeftovers: [
+                {
+                    id: "old",
+                    kind: "sky-wars",
+                    arena: { box, blocks: ["minecraft:stone"] },
+                    marker: null,
+                    kit: [],
+                    entrants: [],
+                    checks: 3,
+                    remains: 5,
+                    createdAt: Date.now()
+                }
+            ]
+        };
+        world.unloadedBlock = "minecraft:stone";
+        expect(await events.retryArena(SERVER, "old")).toBe("later");
+        // Held loaded for the sweep, not left for the operator with its chunks held.
+        const [held] = state().arenaLeftovers;
+        expect(held).toMatchObject({ id: "old", checks: 2, remains: 5 });
+        expect(world.sent).not.toContain(
+            "execute in minecraft:overworld run forceload remove 0 0 10 10"
+        );
+        expect((await events.eventsView(SERVER)).arenaRemains).toEqual([
+            { id: "old", kind: "sky-wars", box, count: 5, retrying: true }
+        ]);
+        world.unloadedBlock = null;
+        world.solidCount = 0;
+        await events.sweepEvents();
+        expect(state().arenaLeftovers).toEqual([]);
+    });
+
+    it("lets a retried arena still loading be dismissed, its chunks let go", async () => {
+        setUp([newPreset("fishing", "fish")]);
+        config[catalog.EVENT_STATE_KEY] = {
+            arenaLeftovers: [
+                {
+                    id: "old",
+                    kind: "sky-wars",
+                    arena: {
+                        box: { x1: 0, y1: 100, z1: 0, x2: 10, y2: 110, z2: 10 },
+                        blocks: ["minecraft:stone"]
+                    },
+                    marker: null,
+                    kit: [],
+                    entrants: [],
+                    checks: 3,
+                    remains: 5,
+                    createdAt: Date.now()
+                }
+            ]
+        };
+        world.unloadedBlock = "minecraft:stone";
+        expect(await events.retryArena(SERVER, "old")).toBe("later");
+        await events.dismissArena(SERVER, "old");
+        expect(state().arenaLeftovers).toEqual([]);
+        expect((await events.eventsView(SERVER)).arenaRemains).toEqual([]);
+        expect(world.sent).toContain(
+            "execute in minecraft:overworld run forceload remove 0 0 10 10"
+        );
+    });
+
+    it("lets go of the chunks of an arena dismissed while the sweep takes it down", async () => {
+        setUp([newPreset("fishing", "fish")]);
+        config[catalog.EVENT_STATE_KEY] = {
+            arenaLeftovers: [
+                {
+                    id: "old",
+                    kind: "sky-wars",
+                    arena: {
+                        box: { x1: 0, y1: 100, z1: 0, x2: 10, y2: 110, z2: 10 },
+                        blocks: ["minecraft:stone"]
+                    },
+                    marker: null,
+                    kit: [],
+                    entrants: [],
+                    checks: 2,
+                    remains: 5,
+                    createdAt: Date.now()
+                }
+            ]
+        };
+        world.unloadedBlock = "minecraft:stone";
+        const add = "execute in minecraft:overworld run forceload add 0 0 10 10";
+        const remove = "execute in minecraft:overworld run forceload remove 0 0 10 10";
+        world.onLine = (line) => {
+            if (line !== add) return;
+            world.onLine = null;
+            const state = config[catalog.EVENT_STATE_KEY] as Record<string, unknown>;
+            config[catalog.EVENT_STATE_KEY] = { ...state, arenaLeftovers: [] };
+        };
+        await events.sweepEvents();
+        expect(state().arenaLeftovers).toEqual([]);
+        expect(world.sent.lastIndexOf(remove)).toBeGreaterThan(world.sent.lastIndexOf(add));
+    });
+
+    it("keeps an arena the sweep has not given up on off the panel and out of reach", async () => {
+        setUp([newPreset("fishing", "fish")]);
+        config[catalog.EVENT_STATE_KEY] = {
+            arenaLeftovers: [
+                {
+                    id: "old",
+                    kind: "sky-wars",
+                    arena: {
+                        box: { x1: 0, y1: 100, z1: 0, x2: 10, y2: 110, z2: 10 },
+                        blocks: ["minecraft:stone"]
+                    },
+                    marker: null,
+                    kit: [],
+                    entrants: [],
+                    checks: 1,
+                    createdAt: Date.now()
+                }
+            ]
+        };
+        await events.dismissArena(SERVER, "old");
+        expect(state().arenaLeftovers.map((one) => one.id)).toEqual(["old"]);
     });
 
     it("gives a prize once to a player whose name reads like an error", async () => {
@@ -8543,6 +8675,66 @@ describe("a king of the hill", () => {
 describe("a team duel", () => {
     const duelOf = (minutes = 3) => ({ ...newPreset("team-duel", "duel"), minutes });
 
+    it("respawns a fallen duellist on their own side, and gives everybody their spawn back", async () => {
+        const duel = await import(
+            "@polaris-app/game-servers/src/lib/minecraft/events/kinds/team-duel"
+        );
+        world.online = ["Ana", "Ben"];
+        // Ana sleeps in a bed; Ben never has.
+        world.homes = { Ana: [120, -40] };
+        setUp([duelOf()]);
+        await joinAndStart("duel");
+        const run = state().run!;
+        expect(run.readyAt).not.toBeNull();
+        expect(run.entrants.map((one) => [one.name, one.spawn])).toEqual([
+            ["Ana", { dimension: "minecraft:overworld", x: 120, y: 64, z: -40 }],
+            ["Ben", null]
+        ]);
+        const box = run.arena!.box;
+        const red = duel.sideSpot(box, 0, 0);
+        const blue = duel.sideSpot(box, 1, 0);
+        // Their spawn read first, then moved onto their side as they go in.
+        const setAna = world.sent.indexOf(
+            `execute in minecraft:overworld run spawnpoint Ana ${red.x} ${red.y} ${red.z} 0`
+        );
+        expect(setAna).toBeGreaterThan(
+            world.sent.indexOf("execute as @a run data get entity @s SpawnY")
+        );
+        expect(world.sent).toContain(
+            `execute in minecraft:overworld run spawnpoint Ben ${blue.x} ${blue.y} ${blue.z} 180`
+        );
+
+        // Ben dies and is back at once, on his side, inside: still shielded.
+        world.at = {
+            Ana: [red.x + 0.5, red.y, red.z + 0.5],
+            Ben: [blue.x + 0.5, blue.y, blue.z + 0.5]
+        };
+        await play(6_100);
+        const shielded = () =>
+            world.sent.filter((line) => line.startsWith("effect give Ben minecraft:resistance 5 4"))
+                .length;
+        const before = shielded();
+        world.died = { Ben: 1 };
+        await play(2_100);
+        world.died = {};
+        expect(shielded()).toBe(before + 1);
+        await play(2_100);
+        expect(shielded()).toBe(before + 1);
+
+        await play(3 * 60_000);
+        expect(state().run).toBeNull();
+        // Their own spawn back - the world's, for Ben - before the tag comes off.
+        const backAna = world.sent.indexOf(
+            "execute in minecraft:overworld run spawnpoint Ana 120 64 -40"
+        );
+        const backBen = world.sent.indexOf("spawnpoint Ben ~ ~ ~");
+        expect(backAna).toBeGreaterThan(setAna);
+        expect(backBen).toBeGreaterThan(setAna);
+        expect(world.sent.indexOf("tag Ana remove pe_arena", backAna)).toBeGreaterThan(backAna);
+        expect(world.sent.indexOf("tag Ben remove pe_arena", backBen)).toBeGreaterThan(backBen);
+        expect(state().arenaLeftovers).toEqual([]);
+    });
+
     it("finds its place over the open sea round an island, where it is built in the air", async () => {
         world.online = ["Ana", "Ben"];
         world.sea = true;
@@ -10558,6 +10750,45 @@ describe("capture the flag", () => {
         onlyOurBlocks();
     });
 
+    it("respawns a fallen player at their own base, and gives their spawn back at the end", async () => {
+        const flag = await ctf();
+        world.homes = { Ben: [-300, 12] };
+        world.homeWorlds = { Ben: "minecraft:the_nether" };
+        setUp([ctfOf(3)]);
+        await joinAndStart("ctf");
+        const box = state().run!.arena!.box;
+        const red = flag.startSpot(box, 0, 0);
+        const blue = flag.startSpot(box, 1, 0);
+        expect(world.sent).toContain(
+            `execute in minecraft:overworld run spawnpoint Ana ${red.x} ${red.y} ${red.z} ${red.yaw}`
+        );
+        expect(world.sent).toContain(
+            `execute in minecraft:overworld run spawnpoint Ben ${blue.x} ${blue.y} ${blue.z} ${blue.yaw}`
+        );
+        // Ana dies and is back at once at her base, inside: still shielded.
+        world.at = {
+            Ana: [red.x + 0.5, red.y, red.z + 0.5],
+            Ben: [blue.x + 0.5, blue.y, blue.z + 0.5]
+        };
+        await play(2_100);
+        const shielded = () =>
+            world.sent.filter((line) => line.startsWith("effect give Ana minecraft:resistance 5 4"))
+                .length;
+        const before = shielded();
+        world.died = { Ana: 1 };
+        await play(2_100);
+        world.died = {};
+        expect(shielded()).toBe(before + 1);
+
+        await play(10 * 60_000);
+        expect(state().run).toBeNull();
+        // Ana never slept anywhere: the world's spawn. Ben's anchor in the Nether.
+        expect(world.sent).toContain("spawnpoint Ana ~ ~ ~");
+        expect(world.sent).toContain(
+            "execute in minecraft:the_nether run spawnpoint Ben -300 64 12"
+        );
+    });
+
     it("drops the flag when its carrier dies, back on its stand, the elimination credited", async () => {
         const flag = await ctf();
         setUp([ctfOf(3)]);
@@ -10645,6 +10876,13 @@ describe("capture the flag", () => {
         // health score for her at all, and she takes it.
         world.hp = {};
         world.hpUnset = true;
+        // Up again: put on her own side, shielded, before anything else.
+        await play(2_100);
+        expect(flag.stateOf(state().run!.game).flags[1].carrier).toBeNull();
+        expect(
+            world.sent.some((line) => line.startsWith("effect give Ana minecraft:resistance"))
+        ).toBe(true);
+        world.at.Ana = [blue.x + 0.5, blue.y, blue.z + 0.5];
         await play(2_100);
         expect(flag.stateOf(state().run!.game).flags[1].carrier).toBe("Ana");
     });
@@ -11533,6 +11771,12 @@ describe("SkyWars", () => {
         expect(run.readyAt).not.toBeNull();
         const { layout, at } = await placedOf(run);
         expect(run.arena!.box).toEqual(sw.arenaBox(layout, at));
+        // A death respawns straight into the gallery, where the out are kept.
+        const seat = sw.gallerySpot(layout, at, 0);
+        for (const name of names)
+            expect(world.sent).toContain(
+                `execute in minecraft:overworld run spawnpoint ${name} ${seat.x} ${seat.y} ${seat.z} ${seat.yaw}`
+            );
         // Built only into air; every chest filled with marked loot, bridging
         // blocks placeable against the islands; nothing handed out.
         expect(

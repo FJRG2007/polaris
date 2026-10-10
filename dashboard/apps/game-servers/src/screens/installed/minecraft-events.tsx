@@ -991,6 +991,7 @@ export function MinecraftEvents({
             accept(answer.view, false);
             if (answer.outcome === "cleared") setNote(t("events.arenaCleared"));
             else if (answer.outcome === "offline") setError(t("events.errors.notRunning"));
+            else if (answer.outcome === "later") setNote(t("events.arenaRetrying"));
             else setError(t("events.arenaStillThere"));
         });
     }
@@ -2117,10 +2118,11 @@ export function MinecraftEvents({
                                     y2: one.box.y2,
                                     z2: one.box.z2
                                 });
-                                const count =
-                                    one.count === null
-                                        ? t("events.arenaUncounted")
-                                        : t("events.arenaBlocksLeft", { count: one.count });
+                                const count = one.retrying
+                                    ? t("events.arenaBeingCleared")
+                                    : one.count === null
+                                      ? t("events.arenaUncounted")
+                                      : t("events.arenaBlocksLeft", { count: one.count });
                                 const corners = `${one.box.x1} ${one.box.y1} ${one.box.z1} ${one.box.x2} ${one.box.y2} ${one.box.z2}`;
                                 return (
                                     <li
@@ -2144,7 +2146,7 @@ export function MinecraftEvents({
                                             size="icon-sm"
                                             aria-label={t("events.clearArenaNow")}
                                             title={t("events.clearArenaNow")}
-                                            disabled={!canManage || pending}
+                                            disabled={!canManage || pending || one.retrying}
                                             onClick={() => retryArena(one.id)}
                                         >
                                             <RotateCcw className="size-4" />

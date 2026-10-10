@@ -475,6 +475,8 @@ export interface EventsView {
         readonly box: stored.Box;
         /** The blocks still in it at the last count; null when it could not be counted. */
         readonly count: number | null;
+        /** Being taken down again by the sweep, at the operator's asking. */
+        readonly retrying: boolean;
     }[];
     readonly nextRandomAt: number | null;
     readonly waiting: string | null;
@@ -614,14 +616,15 @@ export async function eventsView(installedAppId: string): Promise<EventsView> {
         history: state.history,
         pending: stored.livePending(state.pending, Date.now()),
         stashFailures: await stashService.failedStashes(installedAppId).catch(() => []),
-        arenaRemains: state.arenaLeftovers
-            .filter((one) => one.arena && arenaService.leftForOperator(one))
-            .map((one) => ({
-                id: one.id,
-                kind: one.kind,
-                box: one.arena!.box,
-                count: one.remains ?? null
-            })),
+        // Left for the operator, or one they asked to have taken down again
+        // that the sweep is still finishing (it keeps the count it had).
+        arenaRemains: state.arenaLeftovers.filter(arenaService.onPanel).map((one) => ({
+            id: one.id,
+            kind: one.kind,
+            box: one.arena!.box,
+            count: one.remains ?? null,
+            retrying: !arenaService.leftForOperator(one)
+        })),
         nextRandomAt: state.nextRandomAt,
         waiting: state.waiting,
         drawCheckedAt: drawChecks.get(installedAppId) ?? null,
@@ -986,43 +989,54 @@ export async function dismissStash(installedAppId: string, id: string): Promise<
 export async function retryArena(
     installedAppId: string,
     id: string
-): Promise<"cleared" | "left" | "offline"> {
+): Promise<"cleared" | "left" | "later" | "offline"> {
     const row = await readRow(installedAppId);
     if (!row) throw new Error(refused("noServer"));
     const state = stored.readEventState(row.config);
     const left = state.arenaLeftovers.find((one) => one.id === id);
     if (!left || !arenaService.leftForOperator(left)) return "cleared";
     // One go: still holding blocks, it is left for the operator again at once.
+    // What it last counted stays with it, so the screen keeps showing it.
     const reached = await settleArenaLeftovers(
         row.ownerId,
         installedAppId,
-        [{ ...left, checks: arenaService.CLEAR_CHECKS - 1, remains: null }],
+        [{ ...left, checks: arenaService.CLEAR_CHECKS - 1, remains: left.remains ?? null }],
         settingsOf(row.config).settings.language
     );
     if (!reached) return "offline";
-    const after = await updateEventState(installedAppId, (state) => ({
-        ...state,
-        arenaLeftovers: state.arenaLeftovers.map((one) =>
-            one.id !== id || arenaService.leftForOperator(one)
-                ? one
-                : {
-                      ...one,
-                      checks: arenaService.CLEAR_CHECKS,
-                      remains: one.remains ?? left.remains ?? null
-                  }
-        )
-    }));
-    return after?.arenaLeftovers.some((one) => one.id === id) ? "left" : "cleared";
+    const after = stored.readEventState((await readRow(installedAppId))?.config ?? {});
+    const now = after.arenaLeftovers.find((one) => one.id === id);
+    if (!now) return "cleared";
+    // Not counted yet - its chunks were still loading, or a trip failed - and
+    // held loaded for it: the sweep finishes it within the minute, and lets
+    // the chunks go if it is left for the operator again.
+    return arenaService.leftForOperator(now) ? "left" : "later";
 }
 
-/** Taken off the panel: the operator has dealt with what was left in its box. */
+/** Taken off the panel: the operator has dealt with what was left in its box.
+ *  One the sweep was still taking down again lets go of the chunks it held. */
 export async function dismissArena(installedAppId: string, id: string): Promise<void> {
+    const row = await readRow(installedAppId);
+    const held = stored
+        .readEventState(row?.config ?? {})
+        .arenaLeftovers.find(
+            (one) =>
+                one.id === id && arenaService.onPanel(one) && !arenaService.leftForOperator(one)
+        );
     await updateEventState(installedAppId, (state) => ({
         ...state,
         arenaLeftovers: state.arenaLeftovers.filter(
-            (one) => one.id !== id || !arenaService.leftForOperator(one)
+            (one) => one.id !== id || !arenaService.onPanel(one)
         )
     }));
+    if (!row || !held) return;
+    await withServerContainer(row.ownerId, installedAppId, async (server) => {
+        if (!server.running) return;
+        const spared = chunks.sparing(server, () => chunks.heldBefore(held));
+        await arenaService.letGo(spared, held);
+    }).catch((error: unknown) =>
+        console.warn("polaris: letting an arena's chunks go failed", installedAppId, String(error))
+    );
 }
 
 // ------------------------------------------------------------------ the loop
@@ -4907,7 +4921,7 @@ async function settleArenaLeftovers(
         console.warn("polaris: settling an event's arena failed", installedAppId, String(error))
     );
     if (settled.size === 0) return false;
-    await updateEventState(installedAppId, (state) => ({
+    const written = await updateEventState(installedAppId, (state) => ({
         ...state,
         arenaLeftovers: state.arenaLeftovers.flatMap((one) => {
             if (!settled.has(one.id)) return [one];
@@ -4915,6 +4929,25 @@ async function settleArenaLeftovers(
             return next ? [next] : [];
         })
     }));
+    const kept = new Set(written?.arenaLeftovers.map((one) => one.id));
+    const dismissed = [...settled.values()].filter(
+        (one): one is stored.ArenaLeftover => written !== null && one !== null && !kept.has(one.id)
+    );
+    if (dismissed.length > 0)
+        await withServerContainer(ownerId, installedAppId, async (server) => {
+            if (!server.running) return;
+            for (const one of dismissed)
+                await arenaService.letGo(
+                    chunks.sparing(server, () => chunks.heldBefore(one)),
+                    one
+                );
+        }).catch((error: unknown) =>
+            console.warn(
+                "polaris: letting an arena's chunks go failed",
+                installedAppId,
+                String(error)
+            )
+        );
     return true;
 }
 

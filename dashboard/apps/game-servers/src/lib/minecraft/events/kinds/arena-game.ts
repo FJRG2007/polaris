@@ -122,6 +122,9 @@ export interface ArenaGame {
     side(run: stored.EventRun, index: number): number;
     /** Where an entrant stands at "Go!" and is put back to while waiting. */
     spot(run: stored.EventRun, entrant: stored.Entrant): Spot;
+    /** Where an entrant who dies comes back, for a kind played on past a
+     *  death: their spawn point there for as long as they are in. */
+    respawn?(run: stored.EventRun, entrant: stored.Entrant): Spot;
     /** Said once as the event begins, before anybody is brought in (teams,
      *  counts), in the server's own language. */
     beginLines?(preset: catalog.EventPreset, language: catalog.Language): string[];

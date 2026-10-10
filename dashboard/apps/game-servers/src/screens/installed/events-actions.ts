@@ -235,7 +235,7 @@ const arenaSchema = z.object({ installedAppId: serverId, id: z.string().trim().m
 /** An arena that still had blocks in its box, taken down and counted again now. */
 export async function retryArenaAction(
     input: z.input<typeof arenaSchema>
-): Promise<Answer & { outcome?: "cleared" | "left" | "offline" }> {
+): Promise<Answer & { outcome?: "cleared" | "left" | "later" | "offline" }> {
     const t = await gameWords("minecraft");
     const parsed = arenaSchema.safeParse(input);
     if (!parsed.success) return { error: t("events.errors.noArena") };

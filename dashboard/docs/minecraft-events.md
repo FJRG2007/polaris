@@ -505,6 +505,19 @@ left out.
   and `kinds/<kind>-service.ts`, looked up in `kinds/arena-games.ts`. The
   team duel, build battle and king of the ring keep their older branches in
   `arena-service.ts`.
+- **A death in an arena respawns inside it.** The team duel, capture the
+  flag (at the player's base) and SkyWars (in the gallery) move each
+  entrant's spawn point onto their spot as they are brought in
+  (`arena.spawnAt`), so nobody comes back at the world's spawn and waits a
+  tick to be sent back. The spawn they had is read first (`READ_SPAWNS`, both
+  spellings) and put back in `closeArena` before the arena tag comes off
+  (`arena.spawnBack`). Whoever had none, or none that could be read, gets the
+  world's spawn: there is no command that removes a player's spawn point, and
+  `spawnpoint <name> ~ ~ ~` from the console lands on the world spawn. A
+  spawn put back by command is forced: a bed works as before while it
+  stands, and sleeping in it again makes it the game's own. The tick still
+  heals and shields whoever it saw die (`fallen`), even though they are
+  already on their side.
 - **Capture the flag** is two teams set up exactly as a duel's (kit,
   a death, with keepInventory on, sending them back and shielded once they
   respawn, kill credit, natural regeneration off),

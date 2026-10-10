@@ -39,6 +39,8 @@ interface Memory {
     dealt: hits.Tally;
     kills: hits.Tally;
     lastHit: Map<string, number>;
+    /** Who died and has not been seen back up yet, in lower case. */
+    fallen: Set<string>;
 }
 
 const memories = new Map<string, Memory>();
@@ -51,7 +53,8 @@ function memoryOf(runId: string): Memory {
         memory = {
             dealt: hits.tally(),
             kills: hits.tally(),
-            lastHit: new Map()
+            lastHit: new Map(),
+            fallen: new Set()
         };
         memories.set(runId, memory);
     }
@@ -200,12 +203,16 @@ async function tick(ctx: KindContext, lines: string[]): Promise<string | null> {
                 );
             }
             down.add(lower(one.name));
+            memory.fallen.add(lower(one.name));
         }
         const at = here.get(lower(one.name));
-        // Back from a death at home, or out of it any other way: back to
-        // their side, healed and shielded for a moment - and whatever flag
-        // they carried back on its stand.
-        if (hearts > 0 && (!at || !arena.contains(box, at))) {
+        // Back from a death - at their base already, where their spawn point
+        // is (`respawn`) - or out of it any other way: back to their side,
+        // healed and shielded for a moment - and whatever flag they carried
+        // back on its stand.
+        const fell = memory.fallen.has(lower(one.name));
+        if (hearts > 0 && (fell || !at || !arena.contains(box, at))) {
+            memory.fallen.delete(lower(one.name));
             lines.push(...duel.sendBack(one.name, spot), ...ctf.unmarkLines(one.name));
             const still = carrying(one.name);
             if (still !== undefined) {
@@ -327,6 +334,8 @@ export const captureTheFlag: ArenaGame = {
     teams: 2,
     side: (_run, index) => index % 2,
     spot: spotOf,
+    // Back at their base, where they started.
+    respawn: spotOf,
     beginLines: (_preset, language) =>
         duel.duelSetup(language === "es" ? ["Rojo", "Azul"] : ["Red", "Blue"]),
     enterLines: (_run, one) => [

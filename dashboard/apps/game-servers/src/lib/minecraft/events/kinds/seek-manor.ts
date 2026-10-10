@@ -682,13 +682,19 @@ function nooksOf(
         const length = Math.min(run[1] - run[0] + 1, 4 + Math.floor(random() * 4));
         const start = run[0] + Math.floor(random() * (run[1] - run[0] + 2 - length));
         const end = start + length - 1;
-        // Not where another room's nook already took this wall's core.
+        // Not where another room's nook already took this wall's core, nor
+        // behind a door the room on the other side hung in its own face: what
+        // the nook hangs on its far face - a ladder, the button out - would
+        // hang on that door, and the door would open into the nook.
         let taken = false;
-        for (let along = start - 1; along <= end + 1; along += 1)
+        for (let along = start - 1; along <= end + 1; along += 1) {
             for (const depth of [1, 2]) {
                 const cell = wall.cell(along, depth);
                 if (!grid.free(cell.x, 1, cell.z)) taken = true;
             }
+            const far = wall.cell(along, model.WALL - 1);
+            if (!grid.free(far.x, 1, far.z) || !grid.free(far.x, 2, far.z)) taken = true;
+        }
         if (taken) continue;
         let entrance =
             entrances[Math.floor(random() * Math.min(entrances.length, 2))] ?? "painting";
@@ -716,10 +722,17 @@ function nooksOf(
                 continue;
             const cell = wall.cell(along, 0);
             const front = wall.room(along, 0);
+            if (!grid.free(front.x, 1, front.z)) continue;
+            // Solid wall all the way through, and beside it: not into a nook
+            // behind, and not where a nook's banner or the other room's ladder
+            // or button hangs on the face it would take.
             if (
-                !grid.free(cell.x, 1, cell.z) ||
-                !grid.free(cell.x, 2, cell.z) ||
-                !grid.free(front.x, 1, front.z)
+                near.some((one) =>
+                    [0, 1, 2, model.WALL - 1].some((depth) => {
+                        const at = wall.cell(one, depth);
+                        return !grid.free(at.x, 1, at.z) || !grid.free(at.x, 2, at.z);
+                    })
+                )
             )
                 continue;
             setDoor(grid, cell, wall.inward);
@@ -1124,6 +1137,11 @@ function worldOf(box: Box, x: number, level: number, z: number) {
 export function manorBlocks(manor: Manor): string[] {
     const ids = new Set<string>([BARRIER, ROOF_BLOCK]);
     for (const part of manor.grid.boxes()) ids.add(model.bare(part.block));
+    // Water that reaches lava turns it to stone, cobblestone or obsidian: a
+    // house with both takes those down too.
+    if (ids.has("minecraft:water") && ids.has("minecraft:lava"))
+        for (const id of ["minecraft:obsidian", "minecraft:cobblestone", "minecraft:stone"])
+            ids.add(id);
     const first = (id: string) =>
         /lava|water/.test(id)
             ? 0
