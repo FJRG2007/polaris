@@ -4,6 +4,7 @@ import { Chrome } from "../runtime/chrome";
 import { VIEWER } from "../fixtures/people";
 import { defineScene } from "../runtime/scene";
 import { VaultApp } from "@/app/(app)/vault/vault-app";
+import { SendsView } from "@/app/(app)/vault/sends/sends-view";
 import { VaultGate, VaultSessionProvider } from "@/app/(app)/vault/vault-session";
 import {
     OPEN_ITEM_NAME,
@@ -46,5 +47,27 @@ export const vault = defineScene({
         );
         if (!row) throw new Error("no vault item to open");
         row.click();
+    }
+});
+
+/** Sends: something handed out of the vault to somebody who has no vault. */
+export const vaultSends = defineScene({
+    id: "vault-sends",
+    path: "/vault/sends",
+    actions: (ctx) => ({
+        vaultListAction: () => vaultList(ctx),
+        vaultContentsAction: () => vaultContents(ctx)
+    }),
+    render: () => {
+        holdVaultKey();
+        return (
+            <Chrome>
+                <VaultSessionProvider state={vaultState()} name={VIEWER.name}>
+                    <VaultGate>
+                        <SendsView />
+                    </VaultGate>
+                </VaultSessionProvider>
+            </Chrome>
+        );
     }
 });

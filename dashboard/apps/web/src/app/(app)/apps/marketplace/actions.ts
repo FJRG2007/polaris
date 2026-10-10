@@ -32,9 +32,10 @@ export interface StorageConnectionOption {
 /** Servers an app can be installed on: the local host plus connected SSH hosts. */
 export async function listInstallTargetsAction(): Promise<InstallTarget[]> {
     const user = await requirePermission("deploy.manage");
-    const hosts = await listHosts(user.id);
+    const [hosts, t] = await Promise.all([listHosts(user.id), getTranslations("marketplace")]);
     return [
-        { id: "local", name: "Local (this server)", kind: "local" },
+        // Named in the reader's language, the way the storage choice beside it is.
+        { id: "local", name: t("wizard.thisServer"), kind: "local" },
         ...hosts.map((host) => ({ id: host.id, name: host.name, kind: "host" as const }))
     ];
 }

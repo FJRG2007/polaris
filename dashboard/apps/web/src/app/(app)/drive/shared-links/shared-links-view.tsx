@@ -193,7 +193,9 @@ export function SharedView({ shares }: { shares: ShareRow[] }) {
                                             </p>
                                         </div>
                                     </div>
-                                    <div className="flex items-center gap-1">
+                                    {/* Six actions do not fit a phone in one row; they wrap
+                                        rather than run off the card. */}
+                                    <div className="flex flex-wrap items-center gap-1">
                                         <Badge variant={state.variant}>{t(state.label)}</Badge>
                                         <Button size="sm" variant="ghost" asChild>
                                             <Link

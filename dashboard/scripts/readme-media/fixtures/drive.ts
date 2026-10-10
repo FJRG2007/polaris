@@ -3,6 +3,7 @@
 import { TEAM, VIEWER, ago, id } from "./people";
 import type { SceneContext } from "../runtime/scene";
 import type { ConnectionSummary, DriveEntry } from "@/app/(app)/drive/types";
+import type { ShareRow } from "@/app/(app)/drive/shared-links/shared-links-view";
 
 export const DRIVE_ID = id("connection", 1);
 
@@ -116,4 +117,64 @@ export function folderSizes(ctx: SceneContext) {
         archives: {},
         pending: []
     };
+}
+
+/** The links they handed out: one a client still uses, one with a password and
+ *  a download limit, one that ran out, and one they pulled. */
+export function shareLinks(ctx: SceneContext): ShareRow[] {
+    const say = ctx.say;
+    const DAY = 60 * 24;
+    const link = (
+        n: number,
+        path: string,
+        createdDaysAgo: number,
+        extra: Partial<ShareRow> = {}
+    ): ShareRow => ({
+        id: id("share", n),
+        path,
+        kind: "public",
+        connectionId: DRIVE_ID,
+        connectionName: say("My drive", "Mi unidad"),
+        allowUpload: false,
+        allowRename: false,
+        allowDelete: false,
+        allowCreateFolder: false,
+        allowOverwrite: false,
+        allowDownload: true,
+        allowPreview: true,
+        allowedCidrs: [],
+        maxDownloads: null,
+        downloadCount: 0,
+        expiresAt: null,
+        revokedAt: null,
+        createdAt: ago(ctx.now, createdDaysAgo * DAY),
+        canReveal: true,
+        ...extra
+    });
+    return [
+        link(1, say("Design/Brand kit", "Diseño/Kit de marca"), 3, {
+            downloadCount: 14,
+            expiresAt: ago(ctx.now, -11 * DAY)
+        }),
+        link(2, say("Q1 report.pdf", "Informe T1.pdf"), 6, {
+            maxDownloads: 10,
+            downloadCount: 4,
+            expiresAt: ago(ctx.now, -24 * DAY)
+        }),
+        link(3, say("Invoices/Client uploads", "Facturas/Subidas de clientes"), 9, {
+            allowUpload: true,
+            allowCreateFolder: true,
+            allowDownload: false,
+            downloadCount: 0,
+            allowedCidrs: ["203.0.113.0/24"]
+        }),
+        link(4, "storefront-demo.mp4", 20, {
+            maxDownloads: 5,
+            downloadCount: 5
+        }),
+        link(5, say("Photos/Offsite", "Fotos/Viaje"), 40, {
+            downloadCount: 31,
+            revokedAt: ago(ctx.now, 12 * DAY)
+        })
+    ];
 }

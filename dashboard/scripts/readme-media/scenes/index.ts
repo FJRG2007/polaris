@@ -1,5 +1,5 @@
 import { call } from "./call";
-import { calendar } from "./calendar";
+import { calendar, calendarTime } from "./calendar";
 import { chat } from "./chat";
 import {
     chatChannelSettings,
@@ -10,15 +10,15 @@ import {
     chatRules,
     chatThread
 } from "./chat-more";
-import { drive } from "./drive";
+import { drive, driveLinks } from "./drive";
 import { games } from "./games";
 import { callGroup, callMeeting, inCall } from "./in-call";
 import { launcher } from "./launcher";
 import { mail, mailThread } from "./mail";
-import { marketplace } from "./marketplace";
-import { office } from "./office";
-import { settings } from "./settings";
-import { vault } from "./vault";
+import { marketplace, marketplaceInstall } from "./marketplace";
+import { office, officeDoc } from "./office";
+import { accountSecurity, settings } from "./settings";
+import { vault, vaultSends } from "./vault";
 import { deploy, deployLogs, deployProject } from "./deploy";
 import { taskPanel, tasks } from "./tasks";
 import type { SceneDefinition } from "../runtime/scene";
@@ -39,15 +39,21 @@ export const SCENES: readonly SceneDefinition[] = [
     deployProject,
     deployLogs,
     drive,
+    driveLinks,
     mail,
     mailThread,
     calendar,
+    calendarTime,
     games,
     office,
+    officeDoc,
     vault,
+    vaultSends,
     marketplace,
+    marketplaceInstall,
     launcher,
     settings,
+    accountSecurity,
     call,
     inCall,
     callMeeting,

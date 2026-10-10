@@ -172,5 +172,40 @@ export async function vaultContents(ctx: SceneContext) {
         { id: WORK_FOLDER, name: await vaultCrypto.encrypt(ctx.say("Work", "Trabajo"), VAULT_KEY) },
         { id: HOME_FOLDER, name: await vaultCrypto.encrypt(ctx.say("Home", "Casa"), VAULT_KEY) }
     ];
-    return { ciphers, folders, sends: [] };
+    return { ciphers, folders, sends: await sends(ctx) };
+}
+
+/** What they handed out of the vault to people who have none: sealed like the
+ *  items, so the list opens them the way it opens a real one. */
+async function sends(ctx: SceneContext) {
+    const DAY = 60 * 24;
+    const send = async (
+        n: number,
+        name: string,
+        accessCount: number,
+        maxAccessCount: number | null,
+        daysLeft: number,
+        password: boolean
+    ) => ({
+        id: id("vault-send", n),
+        name: await vaultCrypto.encrypt(name, VAULT_KEY),
+        accessCount,
+        maxAccessCount,
+        deletionDate: ago(ctx.now, -daysLeft * DAY),
+        disabled: false,
+        // Only whether there is one is read; the value is a placeholder.
+        password: password ? "fixture" : null
+    });
+    return Promise.all([
+        send(1, ctx.say("Wi-Fi for the visitors", "Wi-Fi para las visitas"), 3, null, 6, false),
+        send(2, ctx.say("Staging database login", "Acceso a la base de staging"), 1, 1, 1, true),
+        send(
+            3,
+            ctx.say("Contractor VPN config", "Configuración VPN del proveedor"),
+            2,
+            5,
+            27,
+            true
+        )
+    ]);
 }
