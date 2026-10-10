@@ -36,7 +36,9 @@ record SoundConfig(Pack pack, Sound join, Sound welcome, Map<String, Sound> play
     private static final int MAX_URL = 1024;
     private static final int MAX_PLAYERS = 200;
 
-    record Pack(UUID id, String url, String sha1, boolean required, Optional<String> prompt) {}
+    /** {@code kick} is the line a player who turns down a required pack is
+     *  disconnected with, in the owner's language; empty where Polaris sent none. */
+    record Pack(UUID id, String url, String sha1, boolean required, Optional<String> prompt, String kick) {}
 
     record Sound(String id, double volume, double pitch) {
         /** The command that plays it to everybody the selector names, where they stand. */
@@ -86,9 +88,14 @@ record SoundConfig(Pack pack, Sound join, Sound welcome, Map<String, Sound> play
         } catch (IllegalArgumentException invalid) {
             return null;
         }
-        String prompt = text(pack, "prompt").strip();
-        if (prompt.length() > MAX_PROMPT) prompt = prompt.substring(0, MAX_PROMPT);
-        return new Pack(id, url, sha1, flag(pack, "required"), prompt.isEmpty() ? Optional.empty() : Optional.of(prompt));
+        String prompt = line(pack, "prompt");
+        return new Pack(id, url, sha1, flag(pack, "required"), prompt.isEmpty() ? Optional.empty() : Optional.of(prompt),
+                line(pack, "kick"));
+    }
+
+    private static String line(JsonObject body, String field) {
+        String line = text(body, field).strip();
+        return line.length() > MAX_PROMPT ? line.substring(0, MAX_PROMPT) : line;
     }
 
     private static Sound soundAt(JsonObject body, String field) {

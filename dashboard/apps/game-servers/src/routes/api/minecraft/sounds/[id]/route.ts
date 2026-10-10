@@ -1,8 +1,8 @@
 /**
  * What Polaris's jar inside a Minecraft server hands its players: the sound
- * pack (its address, checksum and id, whether it is required and the line the
- * game shows when it asks) and the sounds it plays on its own when somebody
- * arrives.
+ * pack (its address, checksum and id, whether it is required, the line the
+ * game shows when it asks and the one a player who turns it down is
+ * disconnected with) and the sounds it plays on its own when somebody arrives.
  *
  * Not a session route: the caller is a server, proving which one with the token
  * its environment carries. Asked when the server starts and whenever the

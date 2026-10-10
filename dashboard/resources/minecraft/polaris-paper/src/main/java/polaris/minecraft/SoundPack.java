@@ -34,7 +34,14 @@ import org.bukkit.scheduler.BukkitTask;
  * A player whose game has loaded it carries the {@link SoundConfig#LOADED_TAG}
  * scoreboard tag, which is what the dashboard's commands play the server's
  * sounds to; the rest hear the game's own. A player who turns down a pack the
- * server requires is disconnected.
+ * server requires is disconnected, with the line Polaris sends in the owner's
+ * language.
+ *
+ * Where the server requires its own pack, the game disconnects a player who
+ * turns down any pack at all, before a plugin hears of it, and the Bukkit API
+ * has no way to tell that disconnect apart. So there the sound pack is handed
+ * out as required too: the prompt says so, rather than an optional pack
+ * costing the player their place.
  *
  * {@code polaris sounds status|refresh} answer one line of JSON, from the
  * console (and so RCON) only.
@@ -124,7 +131,7 @@ final class SoundPack implements Listener, CommandExecutor {
         player.removeScoreboardTag(SoundConfig.LOADED_TAG);
         states.put(player.getUniqueId(), "pending");
         player.addResourcePack(pack.id(), pack.url(), HexFormat.of().parseHex(pack.sha1()),
-                pack.prompt().orElse(null), pack.required());
+                pack.prompt().orElse(null), pack.required() || Bukkit.getServer().isResourcePackRequired());
     }
 
     @EventHandler(priority = EventPriority.MONITOR)
@@ -164,7 +171,7 @@ final class SoundPack implements Listener, CommandExecutor {
             }
             case DECLINED -> {
                 states.put(player.getUniqueId(), "declined");
-                if (pack.required()) player.kickPlayer("This server requires its sound pack.");
+                if (pack.required()) player.kickPlayer(pack.kick());
             }
             case FAILED_DOWNLOAD, INVALID_URL, FAILED_RELOAD, DISCARDED -> states.put(player.getUniqueId(), "failed");
             default -> states.putIfAbsent(player.getUniqueId(), "pending");

@@ -4221,7 +4221,7 @@ model MinecraftSound {
     id             String   @id @default(uuid(7)) @db.Uuid
     installedAppId String   @db.Uuid
     // What `playsound polaris:<key>` names: lowercase letters, digits and
-    // underscores, unique on the server. Changes when the sound is renamed.
+    // underscores, unique on the server. Fixed at upload: a rename keeps it.
     key            String
     // As the operator typed it.
     name           String

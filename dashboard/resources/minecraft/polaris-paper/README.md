@@ -52,6 +52,9 @@ game's own sounds to everybody else. The plugin also plays the arrival sound
 (the server's, or a player's own) to everybody with the pack, and the welcome
 sound to a player on their first visit (`polaris_seen`) once their pack has
 loaded. A player who turns down a pack the server requires is disconnected.
+Where the server requires its own resource pack (`require-resource-pack`), the
+game disconnects a player who turns down any pack, so the sound pack is handed
+out as required there too.
 
 `polaris sounds status` answers one line of JSON: the pack's checksum and each
 online player's state (`loaded`, `pending`, `declined`, `failed`).
