@@ -14,7 +14,7 @@ import * as edits from "@/app/(app)/office/p/[id]/deck-edits";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Present, type ShowStep } from "@/app/(app)/office/p/[id]/present";
 import { useOfficeDocument } from "@/app/(app)/office/use-office-document";
-import { ImageSourceProvider } from "@/app/(app)/office/p/[id]/slide-canvas";
+import { ImageSourceProvider, SlideLookProvider } from "@/app/(app)/office/p/[id]/slide-canvas";
 import { openShowChannel, type ShowChannel } from "@/app/(app)/office/p/[id]/show-channel";
 
 export function AudienceShow({
@@ -35,6 +35,15 @@ export function AudienceShow({
         (src: string) => edits.imageSource(doc, src),
         // A picture that arrives later is a new version of the document.
         [doc, version]
+    );
+    const theme = useMemo(
+        () => deck.readTheme(new Map(edits.themeOf(doc).entries())),
+        [doc, version]
+    );
+    const backgrounds = useMemo(() => new Map(edits.backgroundsOf(doc).entries()), [doc, version]);
+    const lookOf = useCallback(
+        (slideId: string) => deck.lookOf(theme, backgrounds, slideId),
+        [theme, backgrounds]
     );
     const [at, setAt] = useState(0);
     const channel = useRef<ShowChannel | null>(null);
@@ -58,13 +67,15 @@ export function AudienceShow({
     if (slides.length === 0) return <div className="fixed inset-0 bg-black" />;
     return (
         <ImageSourceProvider source={source}>
-            <Present
-                slides={slides}
-                bySlide={bySlide}
-                from={0}
-                driven={driven}
-                onClose={() => window.close()}
-            />
+            <SlideLookProvider lookOf={lookOf}>
+                <Present
+                    slides={slides}
+                    bySlide={bySlide}
+                    from={0}
+                    driven={driven}
+                    onClose={() => window.close()}
+                />
+            </SlideLookProvider>
         </ImageSourceProvider>
     );
 }

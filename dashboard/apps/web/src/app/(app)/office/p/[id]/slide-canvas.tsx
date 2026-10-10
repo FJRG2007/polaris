@@ -84,6 +84,35 @@ export function ImageSourceProvider({
     return <ImageSource.Provider value={source}>{children}</ImageSource.Provider>;
 }
 
+/** What each slide is drawn with - its background, its words' colour and
+ *  faces - provided by whatever holds the deck; a drawing outside one is a
+ *  plain white slide, whatever the app around it looks like. */
+const SlideLooks = createContext<(slideId: string) => deck.SlideLook>(() => deck.DEFAULT_LOOK);
+
+export function SlideLookProvider({
+    lookOf,
+    children
+}: {
+    lookOf: (slideId: string) => deck.SlideLook;
+    children: ReactNode;
+}) {
+    return <SlideLooks.Provider value={lookOf}>{children}</SlideLooks.Provider>;
+}
+
+/** The look of the slide being drawn, for everything inside it. */
+const CurrentLook = createContext<deck.SlideLook>(deck.DEFAULT_LOOK);
+
+/** A face, with the kind of face to fall back on where it is missing. */
+function fontStack(font: string): string {
+    const kind =
+        font === "Courier New"
+            ? "monospace"
+            : font === "Georgia" || font === "Times New Roman"
+              ? "serif"
+              : "sans-serif";
+    return `"${font}", ${kind}`;
+}
+
 function frameStyle(frame: deck.BoxFrame): CSSProperties {
     return {
         left: `${frame.x * 100}%`,
@@ -97,13 +126,14 @@ function frameStyle(frame: deck.BoxFrame): CSSProperties {
 const LIST_INDENT = "1.3em";
 
 /** What the words in a box look like, wherever it is drawn. */
-function textStyle(box: deck.Box): CSSProperties {
+function textStyle(box: deck.Box, look: deck.SlideLook): CSSProperties {
     return {
+        fontFamily: fontStack(deck.fontOf(box, look)),
         // A fraction of the slide's height, so words scale with it. `cqh`
         // measures the nearest size container, which is the slide's own layer.
         fontSize: `${box.size * 100}cqh`,
         lineHeight: 1.2,
-        color: box.color || undefined,
+        color: box.color || look.text,
         textAlign: box.align,
         fontWeight: box.bold ? 700 : undefined,
         fontStyle: box.italic ? "italic" : undefined,
@@ -135,7 +165,7 @@ function TextLayer({ box, children }: { box: deck.Box; children: ReactNode }) {
 
 /** A box's words: as written, or one bullet or number per line. */
 function Words({ box }: { box: deck.Box }) {
-    const style = textStyle(box);
+    const style = textStyle(box, useContext(CurrentLook));
     if (box.list === "none") {
         return (
             <div className="shrink-0 whitespace-pre-wrap break-words" style={style}>
@@ -359,25 +389,36 @@ const SIDE_GRIPS_FROM_PX = 56;
 const OUTSIDE_GRIPS_BELOW_PX = 40;
 
 /** A slide as a picture. Fills the box it is put in, which must be 16:9. */
-export function SlideDrawing({ boxes }: { boxes: readonly deck.Box[] }) {
+export function SlideDrawing({
+    boxes,
+    slideId
+}: {
+    boxes: readonly deck.Box[];
+    /** Whose background and theme it is drawn with. */
+    slideId: string;
+}) {
+    const look = useContext(SlideLooks)(slideId);
     return (
         <div
             className="pointer-events-none absolute inset-0 select-none [container-type:size]"
+            style={{ backgroundColor: look.background, color: look.text }}
             aria-hidden
         >
-            {boxes.map((box) =>
-                deck.isLine(box) ? (
-                    <LineArt key={box.id} box={box} />
-                ) : (
-                    <div
-                        key={box.id}
-                        className={cn("absolute", box.kind === "image" && "overflow-hidden")}
-                        style={frameStyle(box)}
-                    >
-                        <BoxBody box={box} />
-                    </div>
-                )
-            )}
+            <CurrentLook.Provider value={look}>
+                {boxes.map((box) =>
+                    deck.isLine(box) ? (
+                        <LineArt key={box.id} box={box} />
+                    ) : (
+                        <div
+                            key={box.id}
+                            className={cn("absolute", box.kind === "image" && "overflow-hidden")}
+                            style={frameStyle(box)}
+                        >
+                            <BoxBody box={box} />
+                        </div>
+                    )
+                )}
+            </CurrentLook.Provider>
         </div>
     );
 }
@@ -385,41 +426,55 @@ export function SlideDrawing({ boxes }: { boxes: readonly deck.Box[] }) {
 type Draft = deck.BoxFrame & { flip?: boolean; reversed?: boolean };
 
 type Gesture =
-    | { kind: "move"; id: string; start: deck.Box; wasChosen: boolean }
-    | { kind: "resize"; id: string; start: deck.Box; handle: deck.Handle }
-    | { kind: "end"; id: string; start: deck.Box; end: 0 | 1 };
+    | {
+          kind: "move";
+          starts: readonly deck.Box[];
+          /** What a press that never became a drag does: puts the caret in
+           *  the box, or chooses it alone out of several. */
+          click: { id: string; then: "edit" | "alone" } | null;
+      }
+    | { kind: "resize"; starts: readonly deck.Box[]; handle: deck.Handle }
+    | { kind: "end"; starts: readonly deck.Box[]; end: 0 | 1 }
+    | { kind: "area"; base: readonly string[] };
 
 export function SlideStage({
     label,
+    slideId,
     boxes,
     chosen,
     editing,
-    placeholder,
+    placeholderOf,
     nameOf,
     resizeLabel,
     lineEndLabel,
     onChoose,
     onEdit,
-    onFrame,
+    onFrames,
     onText
 }: {
     label: string;
+    slideId: string;
     boxes: readonly deck.Box[];
-    chosen: string;
+    /** The boxes chosen, in the order they were. */
+    chosen: readonly string[];
     editing: string;
     /** What an empty text box says while it is being made, never when shown. */
-    placeholder: string;
+    placeholderOf: (box: deck.Box) => string;
     /** What a box is called to a screen reader. */
     nameOf: (box: deck.Box) => string;
     resizeLabel: string;
     lineEndLabel: string;
-    onChoose: (id: string) => void;
+    onChoose: (ids: string[]) => void;
     onEdit: (id: string) => void;
-    onFrame: (id: string, frame: Draft) => void;
+    /** Boxes moved or resized - every one that changed, in one go. */
+    onFrames: (frames: Map<string, Draft>) => void;
     onText: (id: string, text: string) => void;
 }) {
+    const look = useContext(SlideLooks)(slideId);
     const layer = useRef<HTMLDivElement | null>(null);
-    const [draft, setDraft] = useState<{ id: string; frame: Draft } | null>(null);
+    const [draft, setDraft] = useState<Map<string, Draft> | null>(null);
+    const [guides, setGuides] = useState<readonly deck.Guide[]>([]);
+    const [area, setArea] = useState<deck.BoxFrame | null>(null);
     const [size, setSize] = useState({ width: 0, height: 0 });
     useEffect(() => {
         const one = layer.current;
@@ -432,10 +487,20 @@ export function SlideStage({
         return () => watch.disconnect();
     }, []);
     const gestureEnd = useRef<(() => void) | null>(null);
+    // What is chosen as of the last press, ahead of the render that shows it:
+    // the focus a press moves arrives before that render does.
+    const latest = useRef(chosen);
+    latest.current = chosen;
+    const pressing = useRef(false);
 
     // A gesture still running when the slide goes away is dropped, never left
     // listening on the window.
     useEffect(() => () => gestureEnd.current?.(), []);
+
+    const choose = (ids: string[]): void => {
+        latest.current = ids;
+        onChoose(ids);
+    };
 
     const begin = (event: ReactPointerEvent, gesture: Gesture): void => {
         if (event.button !== 0 || !layer.current) return;
@@ -443,51 +508,158 @@ export function SlideStage({
         const fromX = event.clientX;
         const fromY = event.clientY;
         let moved = false;
-        let last: Draft = gesture.start;
-        const smallest = deck.smallestFor(gesture.start);
+        let last: Map<string, Draft> = new Map();
+        const starts = gesture.kind === "area" ? [] : gesture.starts;
+        const moving = new Set(starts.map((box) => box.id));
+        const startBounds = deck.boundsOf(starts);
+        const targets = deck.snapTargets(boxes.filter((box) => !moving.has(box.id)));
+        const tolerance = { x: deck.SNAP_PX / bounds.width, y: deck.SNAP_PX / bounds.height };
+        const startX = (fromX - bounds.left) / bounds.width;
+        const startY = (fromY - bounds.top) / bounds.height;
 
-        const frameAt = (at: {
+        const step = (at: {
             clientX: number;
             clientY: number;
             shiftKey: boolean;
             altKey: boolean;
-        }): Draft => {
+        }): void => {
             const dx = (at.clientX - fromX) / bounds.width;
             const dy = (at.clientY - fromY) / bounds.height;
-            const start = gesture.start;
-            if (gesture.kind === "move") {
-                return {
-                    ...deck.clampFrame({ ...start, x: start.x + dx, y: start.y + dy }, smallest),
-                    flip: start.flip,
-                    reversed: start.reversed
+            if (gesture.kind === "area") {
+                const x = Math.min(1, Math.max(0, startX + dx));
+                const y = Math.min(1, Math.max(0, startY + dy));
+                const drawn = {
+                    x: Math.min(startX, x),
+                    y: Math.min(startY, y),
+                    w: Math.abs(x - startX),
+                    h: Math.abs(y - startY)
                 };
+                setArea(drawn);
+                const picked = deck.inArea(boxes, drawn);
+                const next = [
+                    ...gesture.base,
+                    ...picked.filter((id) => !gesture.base.includes(id))
+                ];
+                if (next.join() !== latest.current.join()) choose(next);
+                return;
             }
             if (gesture.kind === "end") {
+                const start = gesture.starts[0]!;
                 const ends = deck.lineEnds(start);
                 const fixed = ends[gesture.end === 0 ? 1 : 0];
                 const pulled = ends[gesture.end];
                 let to = { x: pulled.x + dx, y: pulled.y + dy };
                 // Shift turns the line to the nearest fifteen degrees.
                 if (at.shiftKey) to = deck.snapAngle(fixed, to);
-                return gesture.end === 0
-                    ? deck.lineThrough(to, fixed)
-                    : deck.lineThrough(fixed, to);
+                last = new Map([
+                    [
+                        start.id,
+                        gesture.end === 0
+                            ? deck.lineThrough(to, fixed)
+                            : deck.lineThrough(fixed, to)
+                    ]
+                ]);
+                setGuides([]);
+                return;
             }
-            // A picture's corners keep its proportions, and Shift frees them -
-            // the other way round from every other box.
-            const corner = gesture.handle.length === 2;
-            const picture = start.kind === "image" && corner;
-            return deck.resizeFrame(start, gesture.handle, dx, dy, {
-                keepRatio: picture ? !at.shiftKey : at.shiftKey,
+            let found: deck.Guide[] = [];
+            if (gesture.kind === "move") {
+                // The frame round everything moving stays on the slide and
+                // snaps as one; Alt lets it go anywhere, as in PowerPoint.
+                const room = (from: number, length: number, by: number): number =>
+                    Math.min(1 - length, Math.max(0, from + by)) - from;
+                let shiftX = room(startBounds.x, startBounds.w, dx);
+                let shiftY = room(startBounds.y, startBounds.h, dy);
+                if (!at.altKey) {
+                    const snapped = deck.snapMove(
+                        { ...startBounds, x: startBounds.x + shiftX, y: startBounds.y + shiftY },
+                        targets,
+                        tolerance
+                    );
+                    shiftX = room(startBounds.x, startBounds.w, snapped.frame.x - startBounds.x);
+                    shiftY = room(startBounds.y, startBounds.h, snapped.frame.y - startBounds.y);
+                    found = snapped.guides.filter((guide) =>
+                        guide.axis === "x"
+                            ? [0, startBounds.w / 2, startBounds.w].some(
+                                  (edge) =>
+                                      Math.abs(startBounds.x + shiftX + edge - guide.at) < 1e-6
+                              )
+                            : [0, startBounds.h / 2, startBounds.h].some(
+                                  (edge) =>
+                                      Math.abs(startBounds.y + shiftY + edge - guide.at) < 1e-6
+                              )
+                    );
+                }
+                last = new Map(
+                    starts.map((start) => [
+                        start.id,
+                        {
+                            ...deck.clampFrame(
+                                { ...start, x: start.x + shiftX, y: start.y + shiftY },
+                                deck.smallestFor(start)
+                            ),
+                            flip: start.flip,
+                            reversed: start.reversed
+                        }
+                    ])
+                );
+                setGuides(found);
+                return;
+            }
+            const handle = gesture.handle;
+            const corner = handle.length === 2;
+            if (starts.length === 1) {
+                const start = starts[0]!;
+                // A picture's corners keep its proportions, and Shift frees
+                // them - the other way round from every other box.
+                const picture = start.kind === "image" && corner;
+                const keepRatio = picture ? !at.shiftKey : at.shiftKey;
+                let frame = deck.resizeFrame(start, handle, dx, dy, {
+                    keepRatio,
+                    fromCenter: at.altKey
+                });
+                if (!keepRatio && !at.altKey) {
+                    const snapped = deck.snapResize(frame, handle, targets, tolerance);
+                    frame = deck.clampFrame(snapped.frame);
+                    found = snapped.guides;
+                }
+                last = new Map([[start.id, frame]]);
+                setGuides(found);
+                return;
+            }
+            // Several boxes: the frame round them all is resized, and each is
+            // put back in the same place inside it.
+            const flat = startBounds.w === 0 || startBounds.h === 0;
+            let to = deck.resizeFrame(startBounds, handle, dx, dy, {
+                keepRatio: at.shiftKey && !flat,
                 fromCenter: at.altKey
             });
+            if (!at.shiftKey && !at.altKey) {
+                const snapped = deck.snapResize(to, handle, targets, tolerance);
+                to = deck.clampFrame(snapped.frame);
+                found = snapped.guides;
+            }
+            last = new Map(
+                starts.map((start) => [
+                    start.id,
+                    {
+                        ...deck.clampFrame(
+                            deck.scaleInto(start, startBounds, to),
+                            deck.smallestFor(start)
+                        ),
+                        flip: start.flip,
+                        reversed: start.reversed
+                    }
+                ])
+            );
+            setGuides(found);
         };
         const move = (at: PointerEvent): void => {
             if (!moved && Math.hypot(at.clientX - fromX, at.clientY - fromY) < DRAG_THRESHOLD_PX)
                 return;
             moved = true;
-            last = frameAt(at);
-            setDraft({ id: gesture.id, frame: last });
+            step(at);
+            if (gesture.kind !== "area") setDraft(last);
         };
         const finish = (commit: boolean): void => {
             window.removeEventListener("pointermove", move);
@@ -495,15 +667,28 @@ export function SlideStage({
             window.removeEventListener("pointercancel", cancel);
             window.removeEventListener("keydown", escape, true);
             gestureEnd.current = null;
+            pressing.current = false;
             setDraft(null);
+            setGuides([]);
+            setArea(null);
+            if (gesture.kind === "area") {
+                if (!commit) choose([...gesture.base]);
+                return;
+            }
             if (!commit) return;
-            if (moved) onFrame(gesture.id, last);
-            // A click on a box that was already chosen puts the caret in it.
-            else if (gesture.kind === "move" && gesture.wasChosen) onEdit(gesture.id);
+            if (moved) {
+                if (last.size > 0) onFrames(last);
+                return;
+            }
+            if (gesture.kind !== "move" || !gesture.click) return;
+            // A click on a box that was already chosen puts the caret in it;
+            // on one of several chosen, it chooses that one alone.
+            if (gesture.click.then === "edit") onEdit(gesture.click.id);
+            else choose([gesture.click.id]);
         };
         const up = (): void => finish(true);
         const cancel = (): void => finish(false);
-        // Escape mid-drag puts the box back where it was, as in every editor.
+        // Escape mid-drag puts everything back where it was, as in every editor.
         const escape = (press: KeyboardEvent): void => {
             if (press.key !== "Escape") return;
             press.preventDefault();
@@ -517,25 +702,68 @@ export function SlideStage({
         window.addEventListener("keydown", escape, true);
     };
 
+    const byId = (ids: readonly string[]): deck.Box[] =>
+        boxes.filter((box) => ids.includes(box.id));
+
     const press = (box: deck.Box, typing: boolean) => (event: ReactPointerEvent) => {
-        if (typing) return;
-        const wasChosen = chosen === box.id;
-        if (!wasChosen) onEdit("");
-        onChoose(box.id);
-        begin(event, {
-            kind: "move",
-            id: box.id,
-            start: box,
-            wasChosen: wasChosen && deck.holdsText(box)
-        });
+        if (typing || event.button !== 0) return;
+        pressing.current = true;
+        const current = latest.current;
+        const unit = deck.unitOf(boxes, box.id);
+        // Shift (or Ctrl) adds what was pressed to the boxes chosen, or takes
+        // it away again - Google Slides' and PowerPoint's.
+        if (event.shiftKey || event.ctrlKey || event.metaKey) {
+            onEdit("");
+            const has = current.includes(box.id);
+            const next = has
+                ? current.filter((id) => !unit.includes(id))
+                : [...current, ...unit.filter((id) => !current.includes(id))];
+            choose(next);
+            if (has) {
+                // No drag follows to say when the press is over.
+                window.addEventListener(
+                    "pointerup",
+                    () => {
+                        pressing.current = false;
+                    },
+                    { once: true }
+                );
+                return;
+            }
+            begin(event, { kind: "move", starts: byId(next), click: null });
+            return;
+        }
+        if (current.includes(box.id)) {
+            const alone = current.length === 1;
+            begin(event, {
+                kind: "move",
+                starts: byId(current),
+                click: alone
+                    ? deck.holdsText(box)
+                        ? { id: box.id, then: "edit" }
+                        : null
+                    : { id: box.id, then: "alone" }
+            });
+            return;
+        }
+        onEdit("");
+        choose(unit);
+        begin(event, { kind: "move", starts: byId(unit), click: null });
     };
 
-    const drawn = (box: deck.Box): deck.Box =>
-        draft?.id === box.id ? { ...box, ...draft.frame } : box;
-    const chosenBox = boxes.find((box) => box.id === chosen);
-    const chosenDrawn = chosenBox ? drawn(chosenBox) : null;
+    const drawn = (box: deck.Box): deck.Box => {
+        const frame = draft?.get(box.id);
+        return frame ? { ...box, ...frame } : box;
+    };
+    const chosenBoxes = boxes.filter((box) => chosen.includes(box.id)).map(drawn);
+    const single = chosenBoxes.length === 1 ? chosenBoxes[0]! : null;
+    const handlesFor = chosenBoxes.length > 0 ? deck.boundsOf(chosenBoxes) : null;
     // The band round a line that picks it up, in slide units.
     const hitWidth = size.width > 0 ? (LINE_HIT_PX * UNITS_W) / size.width : 0;
+    const resizing = (event: ReactPointerEvent, handle: deck.Handle): void => {
+        event.stopPropagation();
+        begin(event, { kind: "resize", starts: byId(chosen), handle });
+    };
 
     return (
         <div
@@ -544,77 +772,122 @@ export function SlideStage({
             aria-label={label}
             tabIndex={-1}
             className="absolute inset-0 touch-none select-none outline-none [container-type:size]"
+            style={{ backgroundColor: look.background, color: look.text }}
             onPointerDown={(event) => {
-                // A press on the slide itself, between boxes, lets go of the box.
-                if (event.target !== event.currentTarget) return;
+                // A press on the slide itself, between boxes, lets go of what
+                // was chosen and starts a selection rectangle - one with Shift
+                // adds to what was chosen.
+                if (event.target !== event.currentTarget || event.button !== 0) return;
                 onEdit("");
-                onChoose("");
+                const base = event.shiftKey || event.ctrlKey || event.metaKey ? latest.current : [];
+                choose([...base]);
                 event.currentTarget.focus();
+                begin(event, { kind: "area", base });
             }}
         >
-            {boxes.map((one) => {
-                const box = drawn(one);
-                const typing = editing === box.id && deck.holdsText(box);
-                const line = deck.isLine(box);
-                return (
-                    <Fragment key={box.id}>
-                        {line ? (
-                            <LineArt box={box} hitWidth={hitWidth} onPress={press(one, false)} />
-                        ) : null}
-                        <div
-                            data-box={box.id}
-                            role="button"
-                            tabIndex={0}
-                            aria-pressed={chosen === box.id}
-                            aria-label={nameOf(box)}
-                            onFocus={() => {
-                                if (chosen !== box.id) onChoose(box.id);
-                            }}
-                            onPointerDown={line ? undefined : press(one, typing)}
-                            onDoubleClick={() => {
-                                if (deck.holdsText(box)) onEdit(box.id);
-                            }}
-                            className={cn(
-                                "absolute outline-none",
-                                box.kind === "image" && "overflow-hidden",
-                                line && "pointer-events-none",
-                                !typing && "cursor-move"
-                            )}
-                            style={frameStyle(box)}
-                        >
-                            {line ? null : typing ? (
-                                <>
-                                    <ShapeArt box={box} />
-                                    <TextEditor
-                                        box={box}
-                                        onDone={(text) => {
-                                            onText(box.id, text);
-                                            onEdit("");
-                                        }}
-                                    />
-                                </>
-                            ) : box.kind === "text" && !box.text.trim() ? (
-                                <>
-                                    <ShapeArt box={box} />
-                                    <TextLayer box={box}>
-                                        <div
-                                            className="shrink-0 text-muted-foreground"
-                                            style={{ ...textStyle(box), color: undefined }}
-                                        >
-                                            {placeholder}
-                                        </div>
-                                    </TextLayer>
-                                </>
-                            ) : (
-                                <BoxBody box={box} />
-                            )}
-                        </div>
-                    </Fragment>
-                );
-            })}
+            <CurrentLook.Provider value={look}>
+                {boxes.map((one) => {
+                    const box = drawn(one);
+                    const typing = editing === box.id && deck.holdsText(box);
+                    const line = deck.isLine(box);
+                    const empty = box.kind === "text" && !box.text.trim();
+                    return (
+                        <Fragment key={box.id}>
+                            {line ? (
+                                <LineArt
+                                    box={box}
+                                    hitWidth={hitWidth}
+                                    onPress={press(one, false)}
+                                />
+                            ) : null}
+                            <div
+                                data-box={box.id}
+                                role="button"
+                                tabIndex={0}
+                                aria-pressed={chosen.includes(box.id)}
+                                aria-label={nameOf(box)}
+                                onFocus={() => {
+                                    // Tabbed to, a box is chosen with its group;
+                                    // pressed, the press already chose.
+                                    if (pressing.current || latest.current.includes(box.id)) return;
+                                    choose(deck.unitOf(boxes, box.id));
+                                }}
+                                onPointerDown={line ? undefined : press(one, typing)}
+                                onDoubleClick={() => {
+                                    if (!deck.holdsText(box)) return;
+                                    choose([box.id]);
+                                    onEdit(box.id);
+                                }}
+                                className={cn(
+                                    "absolute outline-none",
+                                    box.kind === "image" && "overflow-hidden",
+                                    line && "pointer-events-none",
+                                    !typing && "cursor-move"
+                                )}
+                                style={frameStyle(box)}
+                            >
+                                {line ? null : typing ? (
+                                    <>
+                                        <ShapeArt box={box} />
+                                        <TextEditor
+                                            box={box}
+                                            onDone={(text) => {
+                                                onText(box.id, text);
+                                                onEdit("");
+                                            }}
+                                        />
+                                    </>
+                                ) : empty ? (
+                                    <>
+                                        <ShapeArt box={box} />
+                                        {/* An empty box is outlined while the
+                                            deck is being made, as Google Slides
+                                            outlines its placeholders, so it can
+                                            be found to type into. */}
+                                        <span
+                                            aria-hidden
+                                            className="pointer-events-none absolute inset-0 border border-dashed"
+                                            style={{
+                                                borderColor: `color-mix(in srgb, ${look.text} 30%, transparent)`
+                                            }}
+                                        />
+                                        <TextLayer box={box}>
+                                            <div
+                                                className="shrink-0"
+                                                style={{
+                                                    ...textStyle(box, look),
+                                                    color: `color-mix(in srgb, ${box.color || look.text} 50%, transparent)`
+                                                }}
+                                            >
+                                                {placeholderOf(box)}
+                                            </div>
+                                        </TextLayer>
+                                    </>
+                                ) : (
+                                    <BoxBody box={box} />
+                                )}
+                            </div>
+                        </Fragment>
+                    );
+                })}
+            </CurrentLook.Provider>
 
-            {chosenDrawn && deck.isLine(chosenDrawn) ? (
-                deck.lineEnds(chosenDrawn).map((end, at) => (
+            {chosenBoxes.length > 1
+                ? chosenBoxes.map((box) =>
+                      deck.isLine(box) ? (
+                          <LineHighlight key={box.id} box={box} />
+                      ) : (
+                          <div
+                              key={box.id}
+                              className="pointer-events-none absolute outline outline-1 outline-primary/70"
+                              style={frameStyle(box)}
+                          />
+                      )
+                  )
+                : null}
+
+            {single && deck.isLine(single) ? (
+                deck.lineEnds(single).map((end, at) => (
                     <span
                         key={at}
                         role="presentation"
@@ -623,8 +896,7 @@ export function SlideStage({
                             event.stopPropagation();
                             begin(event, {
                                 kind: "end",
-                                id: chosenDrawn.id,
-                                start: chosenBox!,
+                                starts: byId([single.id]),
                                 end: at === 0 ? 0 : 1
                             });
                         }}
@@ -634,58 +906,121 @@ export function SlideStage({
                         <span className="size-2.5 rounded-full border border-primary bg-background shadow-sm" />
                     </span>
                 ))
-            ) : chosenDrawn ? (
+            ) : handlesFor ? (
                 <div
-                    className="pointer-events-none absolute outline outline-2 outline-primary"
-                    style={frameStyle(chosenDrawn)}
+                    className={cn(
+                        "pointer-events-none absolute outline outline-2 outline-primary",
+                        chosenBoxes.length > 1 && "outline-dashed outline-1"
+                    )}
+                    style={frameStyle(handlesFor)}
                 >
-                    {editing === chosenDrawn.id
-                        ? null
-                        : deck.HANDLES.filter((handle) => {
-                              if (handle.length === 2) return true;
-                              const across = chosenDrawn.w * size.width;
-                              const down = chosenDrawn.h * size.height;
-                              return handle === "n" || handle === "s"
-                                  ? across >= SIDE_GRIPS_FROM_PX
-                                  : down >= SIDE_GRIPS_FROM_PX;
-                          }).map((handle) => {
-                              const [across, down] = HANDLE_AT[handle];
-                              const shift = (at: number, room: number): string =>
-                                  at === 0.5 || room >= OUTSIDE_GRIPS_BELOW_PX
-                                      ? "-50%"
-                                      : at === 0
-                                        ? "-100%"
-                                        : "0%";
-                              const translate = `translate(${shift(across, chosenDrawn.w * size.width)}, ${shift(down, chosenDrawn.h * size.height)})`;
-                              return (
-                                  <span
-                                      key={handle}
-                                      role="presentation"
-                                      title={resizeLabel}
-                                      onPointerDown={(event) => {
-                                          event.stopPropagation();
-                                          begin(event, {
-                                              kind: "resize",
-                                              id: chosenDrawn.id,
-                                              start: chosenBox!,
-                                              handle
-                                          });
-                                      }}
-                                      className="pointer-events-auto absolute flex size-5 items-center justify-center"
-                                      style={{
-                                          left: `${across * 100}%`,
-                                          top: `${down * 100}%`,
-                                          transform: translate,
-                                          cursor: HANDLE_CURSOR[handle]
-                                      }}
-                                  >
-                                      <span className="size-2.5 rounded-sm border border-primary bg-background shadow-sm" />
-                                  </span>
-                              );
-                          })}
+                    {single && editing === single.id ? null : (
+                        <Grips
+                            frame={handlesFor}
+                            size={size}
+                            title={resizeLabel}
+                            onPress={resizing}
+                        />
+                    )}
                 </div>
             ) : null}
+
+            {guides.map((guide, at) => (
+                <span
+                    key={`${guide.axis}${at}`}
+                    aria-hidden
+                    className="pointer-events-none absolute bg-rose-500"
+                    style={
+                        guide.axis === "x"
+                            ? { left: `${guide.at * 100}%`, top: 0, bottom: 0, width: 1 }
+                            : { top: `${guide.at * 100}%`, left: 0, right: 0, height: 1 }
+                    }
+                />
+            ))}
+
+            {area ? (
+                <span
+                    aria-hidden
+                    className="pointer-events-none absolute border border-primary bg-primary/10"
+                    style={frameStyle(area)}
+                />
+            ) : null}
         </div>
+    );
+}
+
+/** A line among several chosen, marked along its length. */
+function LineHighlight({ box }: { box: deck.Box }) {
+    const [start, end] = deck.lineEnds(box);
+    return (
+        <svg
+            aria-hidden
+            className="pointer-events-none absolute inset-0 h-full w-full overflow-visible"
+            viewBox={`0 0 ${UNITS_W} ${UNITS_H}`}
+            preserveAspectRatio="none"
+        >
+            <line
+                x1={start.x * UNITS_W}
+                y1={start.y * UNITS_H}
+                x2={end.x * UNITS_W}
+                y2={end.y * UNITS_H}
+                className="stroke-primary"
+                strokeOpacity={0.7}
+                strokeWidth={Math.max(2, box.strokeWidth * UNITS_H + 4)}
+                vectorEffect="non-scaling-stroke"
+            />
+        </svg>
+    );
+}
+
+/** The grips round what is chosen - one box, or the frame round several. */
+function Grips({
+    frame,
+    size,
+    title,
+    onPress
+}: {
+    frame: deck.BoxFrame;
+    size: { width: number; height: number };
+    title: string;
+    onPress: (event: ReactPointerEvent, handle: deck.Handle) => void;
+}) {
+    const across = frame.w * size.width;
+    const down = frame.h * size.height;
+    return (
+        <>
+            {deck.HANDLES.filter((handle) => {
+                if (handle.length === 2) return true;
+                return handle === "n" || handle === "s"
+                    ? across >= SIDE_GRIPS_FROM_PX
+                    : down >= SIDE_GRIPS_FROM_PX;
+            }).map((handle) => {
+                const [x, y] = HANDLE_AT[handle];
+                const shift = (at: number, room: number): string =>
+                    at === 0.5 || room >= OUTSIDE_GRIPS_BELOW_PX
+                        ? "-50%"
+                        : at === 0
+                          ? "-100%"
+                          : "0%";
+                return (
+                    <span
+                        key={handle}
+                        role="presentation"
+                        title={title}
+                        onPointerDown={(event) => onPress(event, handle)}
+                        className="pointer-events-auto absolute flex size-5 items-center justify-center"
+                        style={{
+                            left: `${x * 100}%`,
+                            top: `${y * 100}%`,
+                            transform: `translate(${shift(x, across)}, ${shift(y, down)})`,
+                            cursor: HANDLE_CURSOR[handle]
+                        }}
+                    >
+                        <span className="size-2.5 rounded-sm border border-primary bg-background shadow-sm" />
+                    </span>
+                );
+            })}
+        </>
     );
 }
 
@@ -699,6 +1034,7 @@ export function SlideStage({
  * starts or stops.
  */
 function TextEditor({ box, onDone }: { box: deck.Box; onDone: (text: string) => void }) {
+    const look = useContext(CurrentLook);
     const field = useRef<HTMLTextAreaElement | null>(null);
     const done = useRef(onDone);
     done.current = onDone;
@@ -751,7 +1087,7 @@ function TextEditor({ box, onDone }: { box: deck.Box; onDone: (text: string) => 
                 }}
                 className="block w-full shrink-0 resize-none overflow-hidden bg-transparent p-0 outline-none"
                 style={{
-                    ...textStyle(box),
+                    ...textStyle(box, look),
                     paddingLeft: box.list === "none" ? undefined : LIST_INDENT
                 }}
             />

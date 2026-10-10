@@ -213,10 +213,12 @@ export function Present({
                     </div>
                 ) : (
                     <div
-                        className="relative aspect-video overflow-hidden bg-background text-foreground"
+                        className="relative aspect-video overflow-hidden bg-white"
                         style={{ width: "min(100cqw, calc(100cqh * 16 / 9))" }}
                     >
-                        {slide ? <SlideDrawing boxes={bySlide.get(slide.id) ?? []} /> : null}
+                        {slide ? (
+                            <SlideDrawing boxes={bySlide.get(slide.id) ?? []} slideId={slide.id} />
+                        ) : null}
                     </div>
                 )}
             </div>

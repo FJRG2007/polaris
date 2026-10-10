@@ -943,6 +943,7 @@
         "web/src/app/(app)/office/link-actions.ts",
         "web/src/app/(app)/office/link-panel.tsx",
         "web/src/app/(app)/office/office-view.tsx",
+        "web/src/app/(app)/office/p/[id]/design-bar.tsx",
         "web/src/app/(app)/office/p/[id]/format-bar.tsx",
         "web/src/app/(app)/office/p/[id]/notes-panel.tsx",
         "web/src/app/(app)/office/p/[id]/present.tsx",

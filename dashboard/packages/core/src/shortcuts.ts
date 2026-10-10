@@ -454,6 +454,9 @@ export const SHORTCUTS: readonly ShortcutDefinition[] = [
         ["slides.sendBackward", "officeSlides", "office.slides", ["Mod+ArrowDown"]],
         ["slides.bringToFront", "officeSlides", "office.slides", ["Mod+Shift+ArrowUp"]],
         ["slides.sendToBack", "officeSlides", "office.slides", ["Mod+Shift+ArrowDown"]],
+        ["slides.selectAll", "officeSlides", "office.slides", ["Mod+a"]],
+        ["slides.group", "officeSlides", "office.slides", ["Mod+Alt+g"]],
+        ["slides.ungroup", "officeSlides", "office.slides", ["Mod+Alt+Shift+g"]],
         // On the column of slides, with one of them focused.
         ["slideList.previous", "officeSlideList", "office.slideList", [], ["ArrowUp", "ArrowLeft"]],
         ["slideList.next", "officeSlideList", "office.slideList", [], ["ArrowDown", "ArrowRight"]],
