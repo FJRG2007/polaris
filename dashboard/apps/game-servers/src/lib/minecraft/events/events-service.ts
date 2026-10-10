@@ -467,6 +467,15 @@ export interface EventsView {
     /** Players' own things an event could not give back whole: kept in their
      *  barrels, shown until given back from here or dismissed. */
     readonly stashFailures: Awaited<ReturnType<typeof stashService.failedStashes>>;
+    /** Arenas taken down that still had blocks in their box after a few goes,
+     *  shown with where the box is until cleared or dismissed. */
+    readonly arenaRemains: readonly {
+        readonly id: string;
+        readonly kind: catalog.EventKind;
+        readonly box: stored.Box;
+        /** The blocks still in it at the last count; null when it could not be counted. */
+        readonly count: number | null;
+    }[];
     readonly nextRandomAt: number | null;
     readonly waiting: string | null;
     /** When the sweep last looked at the draw in this process, or null. */
@@ -605,6 +614,14 @@ export async function eventsView(installedAppId: string): Promise<EventsView> {
         history: state.history,
         pending: stored.livePending(state.pending, Date.now()),
         stashFailures: await stashService.failedStashes(installedAppId).catch(() => []),
+        arenaRemains: state.arenaLeftovers
+            .filter((one) => one.arena && arenaService.leftForOperator(one))
+            .map((one) => ({
+                id: one.id,
+                kind: one.kind,
+                box: one.arena!.box,
+                count: one.remains ?? null
+            })),
         nextRandomAt: state.nextRandomAt,
         waiting: state.waiting,
         drawCheckedAt: drawChecks.get(installedAppId) ?? null,
@@ -959,6 +976,53 @@ export async function dismissStash(installedAppId: string, id: string): Promise<
         return true;
     }).catch(() => false);
     if (!done) await stashService.dismissStash(null, installedAppId, id);
+}
+
+/**
+ * An arena left for the operator taken down and counted again now, as the
+ * sweep would: answers whether its box is empty at last. Nothing for one that
+ * is not left for them - the sweep has it.
+ */
+export async function retryArena(
+    installedAppId: string,
+    id: string
+): Promise<"cleared" | "left" | "offline"> {
+    const row = await readRow(installedAppId);
+    if (!row) throw new Error(refused("noServer"));
+    const state = stored.readEventState(row.config);
+    const left = state.arenaLeftovers.find((one) => one.id === id);
+    if (!left || !arenaService.leftForOperator(left)) return "cleared";
+    // One go: still holding blocks, it is left for the operator again at once.
+    const reached = await settleArenaLeftovers(
+        row.ownerId,
+        installedAppId,
+        [{ ...left, checks: arenaService.CLEAR_CHECKS - 1, remains: null }],
+        settingsOf(row.config).settings.language
+    );
+    if (!reached) return "offline";
+    const after = await updateEventState(installedAppId, (state) => ({
+        ...state,
+        arenaLeftovers: state.arenaLeftovers.map((one) =>
+            one.id !== id || arenaService.leftForOperator(one)
+                ? one
+                : {
+                      ...one,
+                      checks: arenaService.CLEAR_CHECKS,
+                      remains: one.remains ?? left.remains ?? null
+                  }
+        )
+    }));
+    return after?.arenaLeftovers.some((one) => one.id === id) ? "left" : "cleared";
+}
+
+/** Taken off the panel: the operator has dealt with what was left in its box. */
+export async function dismissArena(installedAppId: string, id: string): Promise<void> {
+    await updateEventState(installedAppId, (state) => ({
+        ...state,
+        arenaLeftovers: state.arenaLeftovers.filter(
+            (one) => one.id !== id || !arenaService.leftForOperator(one)
+        )
+    }));
 }
 
 // ------------------------------------------------------------------ the loop
@@ -4823,14 +4887,15 @@ async function abandon(
 
 /**
  * Arenas still standing for somebody to be taken back from, tried again: who
- * is on now is sent back, and an arena nobody is left in comes down.
+ * is on now is sent back, and an arena nobody is left in comes down. Answers
+ * whether the server was there to try them on.
  */
 async function settleArenaLeftovers(
     ownerId: string,
     installedAppId: string,
     leftovers: readonly stored.ArenaLeftover[],
     language: catalog.Language
-): Promise<void> {
+): Promise<boolean> {
     const settled = new Map<string, stored.ArenaLeftover | null>();
     await withServerContainer(ownerId, installedAppId, async (server) => {
         if (!server.running) return;
@@ -4841,7 +4906,7 @@ async function settleArenaLeftovers(
     }).catch((error: unknown) =>
         console.warn("polaris: settling an event's arena failed", installedAppId, String(error))
     );
-    if (settled.size === 0) return;
+    if (settled.size === 0) return false;
     await updateEventState(installedAppId, (state) => ({
         ...state,
         arenaLeftovers: state.arenaLeftovers.flatMap((one) => {
@@ -4850,6 +4915,7 @@ async function settleArenaLeftovers(
             return next ? [next] : [];
         })
     }));
+    return true;
 }
 
 /** A score the way the podium says it: `12 points`, `3:20` for time on the hill. */
@@ -5253,13 +5319,10 @@ async function sweepOne(
     }
     // Arenas somebody is still to be taken back from, whatever else is on -
     // but not while an end is being handed out, which settles its own.
-    if (state.arenaLeftovers.length > 0 && !loops.get(installedAppId)?.finishing) {
-        await settleArenaLeftovers(
-            ownerId,
-            installedAppId,
-            state.arenaLeftovers,
-            settings.settings.language
-        );
+    // Those left for the operator wait for them (`retryArena`).
+    const unsettled = state.arenaLeftovers.filter((one) => !arenaService.leftForOperator(one));
+    if (unsettled.length > 0 && !loops.get(installedAppId)?.finishing) {
+        await settleArenaLeftovers(ownerId, installedAppId, unsettled, settings.settings.language);
     }
     if (state.run) {
         if (settings.settings.random.enabled) await noteDrawBlocked(installedAppId, state, now);

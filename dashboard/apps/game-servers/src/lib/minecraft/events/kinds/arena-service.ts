@@ -329,7 +329,10 @@ async function raise(ctx: KindContext): Promise<void> {
         };
     }
     const fills = fillsFor(run, box);
-    const built: stored.Arena = { box, blocks: blocksFor(run, box, fills) };
+    // The batch it goes up in is written down with it, so whatever takes it
+    // down calls that off first - should this process stop waiting for it.
+    const batch = inServer.batchKey();
+    const built: stored.Arena = { box, blocks: blocksFor(run, box, fills), batch };
     // What a kind puts in its chests is marked the way the kit is, so it is
     // read before anything is built - and kept for the kit.
     const marker = game?.decorate ? (run.marker ?? (await kitMarker(ctx))) : run.marker;
@@ -344,7 +347,9 @@ async function raise(ctx: KindContext): Promise<void> {
         fills.flatMap((one) =>
             arena.slices(one.box).map((piece) => arena.fillKeep(piece, one.block))
         ),
-        (lines) => pace.inTrips([...lines], building, (trip) => ctx.server.sayAll(trip))
+        (lines) => pace.inTrips([...lines], building, (trip) => ctx.server.sayAll(trip)),
+        undefined,
+        batch
     );
     await ctx.server.sayAll([commands.CLEAR_MARK]);
     if (!raised) {
@@ -1198,6 +1203,15 @@ export function resultLines(run: stored.EventRun, language: speech.Speech): stri
     return [commands.say(messages.themeWas(build.themeFor(options, run.id, language), language))];
 }
 
+/** How many times an arena is taken down and its box still found holding
+ *  blocks before it is left for the operator, its box named on the screen. */
+export const CLEAR_CHECKS = 3;
+
+/** Whether an arena was left for the operator: no longer tried by the sweep. */
+export function leftForOperator(left: stored.ArenaLeftover): boolean {
+    return (left.checks ?? 0) >= CLEAR_CHECKS;
+}
+
 /** What of a run still has to be undone: the arena, and whoever it moved. */
 export function leftoverOf(
     run: stored.EventRun,
@@ -1362,6 +1376,8 @@ export async function closeArena(
             return { ...left, entrants: remaining, gamerules: {} };
         }
         if (left.arena) {
+            // A batch still building it would put blocks back after the teardown.
+            if (left.arena.batch) await inServer.cancelBatch(server, left.arena.batch);
             await server.sayAll([
                 arena.forceloadArea(left.arena.box, true),
                 ...(left.marker ? [arena.killMarkedDrops(left.arena.box, left.marker)] : [])
@@ -1403,6 +1419,27 @@ export async function closeArena(
             }
             // Its chunks were not in yet: kept loaded, and tried again.
             if (!whole) return { ...left, entrants: [], gamerules: {} };
+            // The box was nothing but air before it went up: down, it is again.
+            // Anything still there is taken down again on the next sweep, and
+            // after a few goes it is left for the operator, its box named. An
+            // arena that built nothing - the hill on the world's own ground -
+            // is ground, not air, and is not counted.
+            const still =
+                left.arena.blocks.length === 0
+                    ? 0
+                    : await arena.leftIn(left.arena.box, (line) => server.say([line]));
+            if (still !== 0) {
+                const checks = (left.checks ?? 0) + 1;
+                console.warn(
+                    "polaris: an arena's box still holds blocks after its teardown",
+                    left.id,
+                    still,
+                    checks
+                );
+                if (checks < CLEAR_CHECKS) return { ...left, entrants: [], gamerules: {}, checks };
+                await server.sayAll(releases(left));
+                return { ...left, entrants: [], gamerules: {}, checks, remains: still };
+            }
         }
         await server.sayAll(releases(left));
         return null;

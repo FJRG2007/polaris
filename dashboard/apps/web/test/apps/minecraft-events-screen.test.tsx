@@ -17,6 +17,9 @@ vi.mock("@polaris/app-host/client", () => ({
     hostUi: {
         i18nProvider: { useLocale: () => locale },
         confirmDialog: { useConfirm: () => [async () => true, null] },
+        copyButton: {
+            CopyButton: ({ label }: { label?: string }) => <button aria-label={label} />
+        },
         displayFormat: {
             useDisplayFormat: () => ({ dateTime: (at: number) => new Date(at).toISOString() })
         },
@@ -87,10 +90,16 @@ vi.mock("@polaris-app/game-servers/src/screens/installed/events-actions", () => 
         retried.push(input.id);
         return { view: { ...view, stashFailures: [] }, outcome: "done" };
     },
-    dismissStashAction: async () => ({ view: { ...view, stashFailures: [] } })
+    dismissStashAction: async () => ({ view: { ...view, stashFailures: [] } }),
+    retryArenaAction: async (input: { id: string }) => {
+        retriedArenas.push(input.id);
+        return { view: { ...view, arenaRemains: [] }, outcome: "cleared" };
+    },
+    dismissArenaAction: async () => ({ view: { ...view, arenaRemains: [] } })
 }));
 
 const retried: string[] = [];
+const retriedArenas: string[] = [];
 
 const { MinecraftEvents } = await import(
     "@polaris-app/game-servers/src/screens/installed/minecraft-events"
@@ -198,6 +207,30 @@ describe("the Events tab", () => {
         await waitFor(() => expect(screen.getByText("Ana has their things back.")).toBeTruthy());
         expect(screen.queryByText("Things not given back")).toBeNull();
         retried.length = 0;
+    });
+
+    it("names where an arena's leftover blocks are, and takes it down again from there", async () => {
+        render(<MinecraftEvents installedAppId="00000000-0000-4000-8000-000000000001" canManage />);
+        answerRead({
+            view: {
+                ...view,
+                arenaRemains: [
+                    {
+                        id: "run-7",
+                        kind: "hide-and-seek",
+                        box: { x1: -40, y1: 96, z1: 12, x2: 30, y2: 130, z2: 80 },
+                        count: 9
+                    }
+                ]
+            }
+        });
+        await waitFor(() => expect(screen.getByText("Blocks left behind by events")).toBeTruthy());
+        expect(screen.getByText(/between -40 96 12 and 30 130 80 - 9 blocks left/)).toBeTruthy();
+        expect(screen.getByLabelText("Copy the corners")).toBeTruthy();
+        fireEvent.click(screen.getByLabelText("Take it down again"));
+        await waitFor(() => expect(retriedArenas).toEqual(["run-7"]));
+        await waitFor(() => expect(screen.getByText("That space is empty now.")).toBeTruthy());
+        expect(screen.queryByText("Blocks left behind by events")).toBeNull();
     });
 
     it("does not offer to run an event with fewer on the server than it needs, and says why", async () => {

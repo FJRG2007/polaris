@@ -1908,6 +1908,7 @@ const hillService = await import(
 );
 const playing = await import("@polaris-app/game-servers/src/lib/minecraft/activity");
 const arrival = await import("@polaris-app/game-servers/src/lib/minecraft/events/kinds/arrival");
+const arenaKind = await import("@polaris-app/game-servers/src/lib/minecraft/events/kinds/arena");
 const bingo = await import("@polaris-app/game-servers/src/lib/minecraft/events/kinds/bingo");
 
 /** What a player reads of a command's text: the words of its JSON, without the
@@ -2638,6 +2639,35 @@ describe("the minute sweep", () => {
         expect(state().arenaLeftovers).toEqual([]);
         expect(world.sent).toContain("give Ana minecraft:emerald 2");
         expect(state().pending).toEqual([]);
+    });
+
+    it("keeps an arena on the panel when taking it down again still finds blocks", async () => {
+        setUp([newPreset("fishing", "fish")]);
+        config[catalog.EVENT_STATE_KEY] = {
+            arenaLeftovers: [
+                {
+                    id: "old",
+                    kind: "sky-wars",
+                    arena: {
+                        box: { x1: 0, y1: 100, z1: 0, x2: 10, y2: 110, z2: 10 },
+                        blocks: ["minecraft:stone"]
+                    },
+                    marker: null,
+                    kit: [],
+                    entrants: [],
+                    checks: 3,
+                    remains: 5,
+                    createdAt: Date.now()
+                }
+            ]
+        };
+        world.solidCount = 2;
+        expect(await events.retryArena(SERVER, "old")).toBe("left");
+        const [held] = state().arenaLeftovers;
+        expect(held).toMatchObject({ id: "old", checks: 3, remains: 2 });
+        world.solidCount = 0;
+        expect(await events.retryArena(SERVER, "old")).toBe("cleared");
+        expect(state().arenaLeftovers).toEqual([]);
     });
 
     it("gives a prize once to a player whose name reads like an error", async () => {
@@ -8798,7 +8828,7 @@ describe("a team duel", () => {
             false
         );
         const removed = fills().slice(built);
-        expect(removed).toHaveLength(run.arena!.blocks.length);
+        expect(removed).toHaveLength(arenaKind.withDecayed(run.arena!.blocks).length);
         expect(removed.every((line) => line.includes("minecraft:air replace"))).toBe(true);
         for (const one of run.entrants) {
             expect(world.sent).toContain(

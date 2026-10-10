@@ -59,7 +59,12 @@ export type Box = z.infer<typeof boxSchema>;
  * only inside the box - so nothing that was there before, and nothing anybody
  * else put down, is touched.
  */
-export const arenaSchema = z.object({ box: boxSchema, blocks: z.array(z.string()) });
+export const arenaSchema = z.object({
+    box: boxSchema,
+    blocks: z.array(z.string()),
+    /** The Polaris mod batch it was built by, called off before it comes down. */
+    batch: z.string().max(64).optional()
+});
 export type Arena = z.infer<typeof arenaSchema>;
 
 export const GAMEMODES = ["survival", "creative", "adventure", "spectator"] as const;
@@ -378,7 +383,8 @@ export type OwedLines = z.infer<typeof owedLinesSchema>;
  * An arena an event has ended with and not yet been able to take down, because
  * somebody who was in it is not online to be taken back: logging in, they are
  * in it, enclosed and safe, rather than in the air where it was. The sweep puts
- * them back when they are on, and takes it down once nobody is left in it.
+ * them back when they are on, and takes it down once nobody is left in it -
+ * and keeps it while its box, all air before, still holds blocks once down.
  */
 const arenaLeftoverSchema = z.object({
     id: z.string(),
@@ -392,7 +398,12 @@ const arenaLeftoverSchema = z.object({
     gamerules: z.record(z.string()).default({}),
     /** The chunks held before the event, which letting its own go must spare. */
     keepForced: z.array(z.string()).nullable().default(null),
-    createdAt: z.number()
+    createdAt: z.number(),
+    /** How many times it was taken down and still found blocks in its box. */
+    checks: z.number().int().min(0).optional(),
+    /** The blocks still in its box once it was given up on: no longer tried by
+     *  the sweep, shown on the event's screen with where they are. */
+    remains: z.number().int().min(0).nullable().optional()
 });
 
 export type ArenaLeftover = z.infer<typeof arenaLeftoverSchema>;

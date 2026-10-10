@@ -154,7 +154,10 @@ describe("SkyWars' arena in the world", () => {
             .filter((index) => index >= 0);
         const grass = lines.findIndex((line) => line.endsWith("replace minecraft:grass_block"));
         expect(Math.max(...flowers)).toBeLessThan(grass);
-        expect(lines).toHaveLength(arena.slices(box).length * sw.ARENA_BLOCKS.length);
+        // Its own kinds, the snow on top first and the dirt grass goes to under a tree.
+        expect(lines).toHaveLength(
+            arena.slices(box).length * arena.withDecayed([...sw.ARENA_BLOCKS]).length
+        );
     });
 
     it("leaves room past the play area on every side for a player's reach, walled in barrier", () => {

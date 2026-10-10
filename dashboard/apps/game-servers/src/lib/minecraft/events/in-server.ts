@@ -177,6 +177,27 @@ export function parseBatchStatus(reply: string): BatchStatus | null {
 
 let batches = 0;
 
+/** A key no other batch from this process shares: what `build` starts it
+ *  under, and what an arena keeps so whatever takes it down can call it off. */
+export function batchKey(): string {
+    batches = (batches + 1) % 1_000_000;
+    return `pb${Date.now().toString(36)}${batches.toString(36)}`;
+}
+
+/** A word a batch key may be: one the mod's commands take. */
+const BATCH_KEY = /^[A-Za-z0-9_]{1,64}$/;
+
+/**
+ * Any batch still running under `key` called off, before what it builds is
+ * taken down: one this process stopped waiting for - restarted half way - goes
+ * on placing blocks otherwise, after the teardown. Every mod with batches
+ * answers `cancel`, an unknown key included; a server without them is not asked.
+ */
+export async function cancelBatch(server: ServerContainer, key: string): Promise<void> {
+    if (!BATCH_KEY.test(key) || !(await capabilities(server)).has("batch")) return;
+    await server.say([`polaris batch cancel ${key}`]);
+}
+
 const pause = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 /**
@@ -191,12 +212,11 @@ export async function build(
     server: ServerContainer,
     lines: readonly string[],
     plain: (lines: readonly string[]) => Promise<unknown> = (all) => server.sayAll(all),
-    wait: (ms: number) => Promise<unknown> = pause
+    wait: (ms: number) => Promise<unknown> = pause,
+    key: string = batchKey()
 ): Promise<boolean> {
     if (lines.length === 0) return true;
     const caps = await capabilities(server);
-    batches = (batches + 1) % 1_000_000;
-    const key = `pb${Date.now().toString(36)}${batches.toString(36)}`;
     const written = caps.has("batch") ? batchLines(key, lines) : null;
     if (!written) {
         await plain(lines);

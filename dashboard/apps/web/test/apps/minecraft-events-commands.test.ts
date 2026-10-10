@@ -2720,8 +2720,9 @@ describe("an arena is built only into air and taken down only where it is ours",
 
     it("takes it down by replacing only its own kinds of block with air, in its own box", () => {
         const box = duel.duelBox({ x: 100, z: 200 }, 100);
+        // Its own kinds, and the snow that may have fallen on it first.
         expect(arena.teardown({ box, blocks: duel.DUEL_BLOCKS })).toEqual(
-            duel.DUEL_BLOCKS.map(
+            ["minecraft:snow", ...duel.DUEL_BLOCKS].map(
                 (block) =>
                     `execute in minecraft:overworld run fill 92 100 189 108 107 211 minecraft:air replace ${block}`
             )

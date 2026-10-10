@@ -44,6 +44,7 @@ import {
 } from "lucide-react";
 
 const { useConfirm } = hostUi.confirmDialog;
+const { CopyButton } = hostUi.copyButton;
 const { useDisplayFormat } = hostUi.displayFormat;
 const { writeSnapshot } = hostUi.snapshotCache;
 const { useKeptSnapshot } = hostUi.liveRead;
@@ -977,6 +978,34 @@ export function MinecraftEvents({
             const answer = await actions.dismissStashAction({ installedAppId, id });
             if (answer.view) accept(answer.view, false);
             else setError(answer.error ?? t("events.errors.stashDismiss"));
+        });
+    }
+
+    function retryArena(id: string): void {
+        startTransition(async () => {
+            const answer = await actions.retryArenaAction({ installedAppId, id });
+            if (!answer.view) {
+                setError(answer.error ?? t("events.errors.arenaRetry"));
+                return;
+            }
+            accept(answer.view, false);
+            if (answer.outcome === "cleared") setNote(t("events.arenaCleared"));
+            else if (answer.outcome === "offline") setError(t("events.errors.notRunning"));
+            else setError(t("events.arenaStillThere"));
+        });
+    }
+
+    async function dismissArena(id: string): Promise<void> {
+        const sure = await confirm({
+            title: t("events.dismissArenaTitle"),
+            description: t("events.dismissArenaHint"),
+            confirmLabel: t("events.dismissIt")
+        });
+        if (!sure) return;
+        startTransition(async () => {
+            const answer = await actions.dismissArenaAction({ installedAppId, id });
+            if (answer.view) accept(answer.view, false);
+            else setError(answer.error ?? t("events.errors.arenaDismiss"));
         });
     }
 
@@ -2057,6 +2086,76 @@ export function MinecraftEvents({
                                             title={t("events.dismissStash", { name: one.player })}
                                             disabled={!canManage || pending}
                                             onClick={() => void dismissStash(one.id, one.player)}
+                                        >
+                                            <Trash2 className="size-4" />
+                                        </ui.Button>
+                                    </li>
+                                );
+                            })}
+                        </ul>
+                    </ui.CardBody>
+                </ui.Card>
+            )}
+
+            {/* Arenas whose box still held blocks after a few goes at taking them down. */}
+            {view && (view.arenaRemains ?? []).length > 0 && (
+                <ui.Card>
+                    <ui.CardBody className="flex flex-col gap-2">
+                        <div>
+                            <p className="text-sm font-medium">{t("events.arenaRemains")}</p>
+                            <p className="text-xs text-muted-foreground">
+                                {t("events.arenaRemainsHint")}
+                            </p>
+                        </div>
+                        <ul className="flex flex-col divide-y divide-border rounded-md border border-border">
+                            {(view.arenaRemains ?? []).map((one) => {
+                                const where = t("events.arenaBox", {
+                                    x1: one.box.x1,
+                                    y1: one.box.y1,
+                                    z1: one.box.z1,
+                                    x2: one.box.x2,
+                                    y2: one.box.y2,
+                                    z2: one.box.z2
+                                });
+                                const count =
+                                    one.count === null
+                                        ? t("events.arenaUncounted")
+                                        : t("events.arenaBlocksLeft", { count: one.count });
+                                const corners = `${one.box.x1} ${one.box.y1} ${one.box.z1} ${one.box.x2} ${one.box.y2} ${one.box.z2}`;
+                                return (
+                                    <li
+                                        key={one.id}
+                                        className="flex items-center gap-3 px-3 py-2 text-sm"
+                                    >
+                                        <div className="flex min-w-0 flex-1 flex-col">
+                                            <span className="font-medium">
+                                                {kindLabel(t, one.kind)}
+                                            </span>
+                                            <span className="break-words text-muted-foreground">
+                                                {where} - {count}
+                                            </span>
+                                        </div>
+                                        <CopyButton
+                                            value={corners}
+                                            label={t("events.copyArenaBox")}
+                                        />
+                                        <ui.Button
+                                            variant="ghost"
+                                            size="icon-sm"
+                                            aria-label={t("events.clearArenaNow")}
+                                            title={t("events.clearArenaNow")}
+                                            disabled={!canManage || pending}
+                                            onClick={() => retryArena(one.id)}
+                                        >
+                                            <RotateCcw className="size-4" />
+                                        </ui.Button>
+                                        <ui.Button
+                                            variant="ghost"
+                                            size="icon-sm"
+                                            aria-label={t("events.dismissArena")}
+                                            title={t("events.dismissArena")}
+                                            disabled={!canManage || pending}
+                                            onClick={() => void dismissArena(one.id)}
                                         >
                                             <Trash2 className="size-4" />
                                         </ui.Button>
