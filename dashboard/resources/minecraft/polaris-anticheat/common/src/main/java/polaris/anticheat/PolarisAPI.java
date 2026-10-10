@@ -76,6 +76,7 @@ public final class PolarisAPI {
         if (ReflectionUtils.hasClass("io.papermc.paper.threadedregions.RegionizedServer")) return Platform.FOLIA;
         if (ReflectionUtils.hasClass("org.bukkit.Bukkit")) return Platform.BUKKIT;
         if (ReflectionUtils.hasClass("net.fabricmc.loader.api.FabricLoader")) return Platform.FABRIC;
+        if (ReflectionUtils.hasClass("net.neoforged.fml.loading.FMLLoader")) return Platform.NEOFORGE;
         throw new IllegalStateException("Unknown platform!");
     }
 

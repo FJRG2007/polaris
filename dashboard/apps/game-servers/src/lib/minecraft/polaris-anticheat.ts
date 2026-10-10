@@ -17,9 +17,10 @@
  * everybody.
  *
  * On a NeoForge server Polaris has a build of its own mod for, the plugin cannot
- * run but the mod carries the anti-xray part of it (see `polaris-neoforge`), so
- * the same switch turns that on and off: a server there counts as protected, and
- * gets it by default, like a plugin server.
+ * run, but the mod carries the engine nested inside it (its NeoForge build, with
+ * the movement simulation and the packet checks) and an anti-xray of its own (see
+ * `polaris-neoforge`), so the same switch turns both on and off: a server there
+ * counts as protected, and gets it by default, like a plugin server.
  *
  * What it catches it hands back to Polaris over HTTP, at the plugin's own alert
  * thresholds, so the Anti-cheat tab lists it: for that it carries the same

@@ -1,5 +1,6 @@
 package polaris.anticheat.checks.impl.breaking;
 
+import polaris.anticheat.utils.anticheat.ModdedContent;
 import polaris.anticheat.api.storage.verbose.Verbose;
 import polaris.anticheat.checks.Check;
 import polaris.anticheat.checks.CheckData;
@@ -33,6 +34,10 @@ public class WrongBreak extends Check implements BlockBreakListener {
         // lastLastBlock is always null when this happens, and lastBlock isn't
         if (lastLastBlock != null || lastBlock == null)
             return false;
+
+        // A modded block may break instantly where its stand-in would not
+        if (ModdedContent.isModdedBlock(block.getGlobalId()))
+            return true;
 
         // on pre 1.14.4 clients, the YPos of this packet is always the same
         if (player.getClientVersion().isOlderThan(ClientVersion.V_1_14_4) && yPos != exemptedY)

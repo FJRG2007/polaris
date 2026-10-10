@@ -171,6 +171,15 @@ public final class DataStoreLifecycle implements StartableInitable, StoppableIni
             return;
         }
 
+        if (onlySqliteWithoutDriver(config)) {
+            // A modded server (NeoForge) ships no SQLite driver, unlike Bukkit. The checks
+            // run regardless; only the local flag history is not kept on this server.
+            logger.info("[polarisac-datastore] no SQLite driver on this server - local history is off, checks still run");
+            this.enabled = false;
+            installLocalVerboseRegistry();
+            return;
+        }
+
         try {
             this.loaded = buildAndStart(dataFolder);
         } catch (FatalStorageStartupException e) {
@@ -454,6 +463,21 @@ public final class DataStoreLifecycle implements StartableInitable, StoppableIni
                 h.get("description"),
                 h.get("introduced_version"),
                 parseLong(h.get("introduced_at")));
+    }
+
+    private static boolean onlySqliteWithoutDriver(@NotNull DataStoreConfig config) {
+        boolean sqlite = false;
+        for (String backendId : config.routing().values()) {
+            if ("sqlite".equals(backendId)) sqlite = true;
+            else if (!"none".equals(backendId)) return false;
+        }
+        if (!sqlite) return false;
+        try {
+            Class.forName("org.sqlite.JDBC", false, DataStoreLifecycle.class.getClassLoader());
+            return false;
+        } catch (ClassNotFoundException | LinkageError missing) {
+            return true;
+        }
     }
 
     private static long parseLong(@Nullable String raw) {

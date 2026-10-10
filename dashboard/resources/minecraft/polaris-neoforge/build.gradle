@@ -44,3 +44,44 @@ sourceSets.main.resources.srcDir generateModMetadata
 sourceSets.main.java.srcDir '../polaris-common/src/main/java'
 // Chat moderation, shared with the anti-cheat plugin.
 sourceSets.main.java.srcDir '../polaris-common/src/chat/java'
+
+// The anti-cheat engine, nested as its own mod (NeoForge's jar-in-jar), so a server
+// that has this mod gets it without a second download. It is GPL-3.0 and built from
+// resources/minecraft/polaris-anticheat (its `neoforge` module); the image passes its
+// path, and the version is read from the engine's own metadata. A build without it is
+// the login mod alone.
+def anticheatJar = findProperty('anticheat_jar')
+if (anticheatJar) {
+    def engine = file(anticheatJar)
+    def engineVersion = providers.provider {
+        def toml = zipTree(engine).matching { include 'META-INF/neoforge.mods.toml' }.singleFile.text
+        def found = (toml =~ /(?m)^version\s*=\s*"([^"]+)"/)
+        if (!found.find()) throw new GradleException("${engine} names no version")
+        found.group(1)
+    }
+    def nestedName = 'polaris-anticheat-neoforge.jar'
+    var jarJarMetadata = tasks.register('anticheatJarJarMetadata') {
+        def out = layout.buildDirectory.file('generated/anticheat-jarjar/META-INF/jarjar/metadata.json')
+        inputs.file(engine)
+        outputs.file(out)
+        doLast {
+            def version = engineVersion.get()
+            def metadata = [jars: [[
+                    identifier : [group: 'polaris.minecraft', artifact: 'polaris-anticheat-neoforge'],
+                    version    : [range: "[${version},)".toString(), artifactVersion: version],
+                    path       : "META-INF/jarjar/${nestedName}".toString(),
+                    isObfuscated: false
+            ]]]
+            out.get().asFile.text = groovy.json.JsonOutput.prettyPrint(groovy.json.JsonOutput.toJson(metadata)) + '\n'
+        }
+    }
+    tasks.named('jar', Jar) {
+        dependsOn jarJarMetadata
+        inputs.file(engine)
+        from(layout.buildDirectory.dir('generated/anticheat-jarjar'))
+        from(engine) {
+            into 'META-INF/jarjar'
+            rename { nestedName }
+        }
+    }
+}

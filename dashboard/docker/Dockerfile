@@ -126,20 +126,47 @@ RUN mkdir -p /build/apps/web/public
 # Minecraft mods - Polaris login, built from resources/minecraft and served by
 # the dashboard to the game servers that switch it on (app/api/minecraft/mod).
 # One stage per jar so each layer is reused until its own sources, or the ones
-# both share (polaris-common), change. Each jar is renamed to the file name the
+# both share (polaris-common), change. The anti-cheat comes first, since the
+# NeoForge mod carries its engine. Each jar is renamed to the file name the
 # dashboard serves (MOD_BUILDS in lib/apps/minecraft/polaris-login.ts, which a
 # test holds to these lines). The version it reports carries a fingerprint of
 # its sources, and is written beside the jar too, so the panel can tell a server
 # still running an older build (lib/apps/minecraft/polaris-mod-files.ts).
 # ---------------------------------------------------------------------------
+
+# The anti-cheat, for Paper, Purpur, Spigot, Folia and the servers that load
+# their plugins, 1.8 to the latest, and for NeoForge 1.21.4. The directory is
+# GPL-3.0 (resources/minecraft/polaris-anticheat/README.md), so it is its own jar
+# and never part of the dashboard. The plugin is served as it is; the NeoForge
+# build goes to /nested only, for the mod stage below to carry inside the Polaris
+# mod. It asks for a newer Gradle than the stages below. The version carries a
+# fingerprint of its sources, like theirs.
+FROM gradle:9.4.1-jdk21 AS minecraft-anticheat
+
+WORKDIR /ac
+COPY resources/minecraft/polaris-anticheat/ ./
+# Chat moderation's engine, shared with the Polaris mod: the bukkit module reads
+# it from ../../polaris-common, which from /ac/bukkit is this folder.
+COPY resources/minecraft/polaris-common/src/chat/ /polaris-common/src/chat/
+RUN fingerprint="$(find . /polaris-common -type f | LC_ALL=C sort | xargs sha256sum | sha256sum | cut -c1-12)" \
+    && POLARIS_AC_COMMIT="$fingerprint" POLARIS_AC_BRANCH=polaris gradle --no-daemon -q :bukkit:build :neoforge:shadowJar -x test \
+    && mkdir -p /out /nested \
+    && cp bukkit/build/libs/polarisac-bukkit-*.jar /out/polaris-anticheat-bukkit.jar \
+    && printf '%s\n' "$fingerprint" > /out/polaris-anticheat-bukkit.jar.version \
+    && cp neoforge/build/libs/polaris-anticheat-neoforge-1.21.4.jar /nested/ \
+    && printf '%s\n' "$fingerprint" > /nested/polaris-anticheat-neoforge-1.21.4.jar.version
+
 FROM gradle:9.2.1-jdk21 AS minecraft-mods
 
 WORKDIR /mods
 COPY resources/minecraft/polaris-common/ ./polaris-common/
 COPY resources/minecraft/polaris-neoforge/ ./polaris-neoforge/
+# The anti-cheat engine rides inside it (polaris-neoforge/build.gradle); the
+# fingerprint of its sources, written beside it, is part of this one's.
+COPY --from=minecraft-anticheat /nested/ ./polaris-anticheat/
 RUN cd /mods/polaris-neoforge \
-    && version="$(sed -n 's/^mod_version=//p' gradle.properties)+$(cd /mods && find polaris-neoforge polaris-common -type f | LC_ALL=C sort | xargs sha256sum | sha256sum | cut -c1-12)" \
-    && gradle --no-daemon -q build -Pmod_version="$version" \
+    && version="$(sed -n 's/^mod_version=//p' gradle.properties)+$(cd /mods && find polaris-neoforge polaris-common polaris-anticheat -type f ! -name '*.jar' | LC_ALL=C sort | xargs sha256sum | sha256sum | cut -c1-12)" \
+    && gradle --no-daemon -q build -Pmod_version="$version" -Panticheat_jar=/mods/polaris-anticheat/polaris-anticheat-neoforge-1.21.4.jar \
     && mkdir -p /out \
     && cp "build/libs/polaris-$version.jar" /out/polaris-neoforge-1.21.4.jar \
     && printf '%s\n' "$version" > /out/polaris-neoforge-1.21.4.jar.version
@@ -156,24 +183,6 @@ RUN cd /mods/polaris-paper \
     && mkdir -p /out \
     && cp "build/libs/polaris-$version.jar" /out/polaris-paper.jar \
     && printf '%s\n' "$version" > /out/polaris-paper.jar.version
-
-# The anti-cheat, for Paper, Purpur, Spigot, Folia and the servers that load
-# their plugins, 1.8 to the latest. The directory is GPL-3.0
-# (resources/minecraft/polaris-anticheat/README.md), so it is its own jar and
-# never part of the dashboard. It asks for a newer Gradle than the stages above.
-# The version carries a fingerprint of its sources, like theirs.
-FROM gradle:9.4.1-jdk21 AS minecraft-anticheat
-
-WORKDIR /ac
-COPY resources/minecraft/polaris-anticheat/ ./
-# Chat moderation's engine, shared with the Polaris mod: the bukkit module reads
-# it from ../../polaris-common, which from /ac/bukkit is this folder.
-COPY resources/minecraft/polaris-common/src/chat/ /polaris-common/src/chat/
-RUN fingerprint="$(find . /polaris-common -type f | LC_ALL=C sort | xargs sha256sum | sha256sum | cut -c1-12)" \
-    && POLARIS_AC_COMMIT="$fingerprint" POLARIS_AC_BRANCH=polaris gradle --no-daemon -q :bukkit:build -x test \
-    && mkdir -p /out \
-    && cp bukkit/build/libs/polarisac-bukkit-*.jar /out/polaris-anticheat-bukkit.jar \
-    && printf '%s\n' "$fingerprint" > /out/polaris-anticheat-bukkit.jar.version
 
 # ---------------------------------------------------------------------------
 # App bundles - every installable app built into the bundle a server that
