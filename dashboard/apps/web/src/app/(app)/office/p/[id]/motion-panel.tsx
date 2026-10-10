@@ -238,9 +238,13 @@ export function MotionPanel({
                                         <div className="flex min-w-0 items-center gap-1">
                                             <span
                                                 className="w-5 shrink-0 text-center text-[12px] tabular-nums text-muted-foreground"
-                                                title={t("slides.motion.step", {
-                                                    number: steps[at] ?? 0
-                                                })}
+                                                title={
+                                                    one.trigger === "onClick" && steps[at]
+                                                        ? t("slides.motion.step", {
+                                                              number: steps[at]
+                                                          })
+                                                        : undefined
+                                                }
                                             >
                                                 {one.trigger === "onClick" ? steps[at] : ""}
                                             </span>

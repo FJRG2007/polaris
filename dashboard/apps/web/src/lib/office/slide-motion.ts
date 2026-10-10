@@ -5,8 +5,9 @@
  * The vocabulary is PowerPoint's, as `@polaris/pptx` writes it into a file -
  * the transitions `<p:transition>` holds and the preset effects of
  * `<p:timing>`, with the three triggers every editor offers (on click, with the
- * previous one, after the previous one) - so a deck exported from here plays
- * the same in PowerPoint, and a deck imported from there keeps its motion.
+ * previous one, after the previous one) - so carrying motion through a pptx
+ * export or import later is a mapping, not a translation. Neither carries it
+ * yet: `export.ts` writes only the slides, their boxes and their notes.
  * Playback is GenOffice's (`@polaris/genoffice-slides/animation-play`): the
  * same grouping of animations into the steps a click advances, and the same
  * state of every box at any moment.

@@ -48,7 +48,7 @@ export function AudienceShow({
         [theme, backgrounds]
     );
     const motionOf = useDeckMotion(doc, version, bySlide);
-    const [at, setAt] = useState<motion.ShowAt>({ slide: 0, played: 0 });
+    const [at, setAt] = useState<motion.ShowAt | null>(null);
     const channel = useRef<ShowChannel | null>(null);
 
     useEffect(() => {
@@ -57,7 +57,8 @@ export function AudienceShow({
             else if (one.kind === "end") window.close();
         });
         channel.current = opened;
-        opened?.send({ kind: "hello" });
+        if (opened) opened.send({ kind: "hello" });
+        else setAt({ slide: 0, played: 0 });
         return () => {
             opened?.close();
             channel.current = null;
@@ -65,9 +66,9 @@ export function AudienceShow({
     }, [documentId]);
 
     const go = useCallback((step: ShowStep) => channel.current?.send({ kind: "go", to: step }), []);
-    const driven = useMemo(() => ({ at, go }), [at, go]);
+    const driven = useMemo(() => (at ? { at, go } : undefined), [at, go]);
 
-    if (slides.length === 0) return <div className="fixed inset-0 bg-black" />;
+    if (slides.length === 0 || !driven) return <div className="fixed inset-0 bg-black" />;
     return (
         <ImageSourceProvider source={source}>
             <SlideLookProvider lookOf={lookOf}>

@@ -147,7 +147,11 @@ export function ShowStage({
 }) {
     const less = usePrefersLessMotion();
     const plan = useShowPlan(slides, motionOf);
-    const before = useRef(at);
+    const before = useRef<motion.ShowAt>(
+        at.played === 1 && motion.arrived(plan(at.slide)) === 1
+            ? { slide: at.slide, played: 0 }
+            : at
+    );
     const turns = useRef(0);
     const [running, setRunning] = useState<Running | null>(null);
     const [now, setNow] = useState(0);
