@@ -24,6 +24,8 @@ import net.neoforged.neoforge.event.tick.ServerTickEvent;
  * - {@code polaris batch run <key> [blocksPerTick]}, {@code status},
  *   {@code cancel} ({@link EventBatch}).
  *
+ * - {@code polaris sounds status|refresh} ({@link SoundPack}).
+ *
  * Hide and seek ({@link EventSeek}) needs no command: it follows the tags.
  */
 final class EventCommands {
@@ -42,6 +44,9 @@ final class EventCommands {
                 .requires(source -> source.hasPermission(Commands.LEVEL_OWNERS))
                 .then(Commands.literal("caps").executes(context -> answer(context, server -> caps())))
                 .then(Commands.literal("capabilities").executes(context -> answer(context, server -> caps())))
+                .then(Commands.literal("sounds")
+                        .then(Commands.literal("status").executes(context -> answer(context, server -> sounds(server, false))))
+                        .then(Commands.literal("refresh").executes(context -> answer(context, server -> sounds(server, true)))))
                 .then(Commands.literal("stash")
                         .then(Commands.literal("save").then(playerAndKey(EventStash::save)))
                         .then(Commands.literal("restore").then(playerAndKey(EventStash::restore))))
@@ -98,6 +103,19 @@ final class EventCommands {
         String line = reply.toString();
         context.getSource().sendSuccess(() -> Component.literal(line), false);
         return reply.has("ok") && reply.get("ok").getAsBoolean() ? 1 : 0;
+    }
+
+    /** {@code polaris sounds status|refresh} ({@link SoundPack}); not ok where
+     *  the server's sounds are off or it does not know where Polaris is. */
+    private static JsonObject sounds(MinecraftServer server, boolean refresh) {
+        SoundPack pack = SoundPack.instance();
+        if (pack == null) {
+            JsonObject reply = new JsonObject();
+            reply.addProperty("ok", false);
+            reply.addProperty("why", "off");
+            return reply;
+        }
+        return refresh ? pack.refreshNow(server) : pack.status(server);
     }
 
     private JsonObject caps() {

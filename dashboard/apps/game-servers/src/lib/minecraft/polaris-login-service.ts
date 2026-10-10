@@ -17,6 +17,7 @@ import { accessRefusal } from "./access";
 import * as polarisLogin from "./polaris-login";
 import { bundledModVersion } from "./polaris-mod-files";
 import { anticheatHoldsMod } from "./polaris-anticheat";
+import { soundsHoldPlugin } from "./sounds-env";
 import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
 import { enableLogin, foreignLogin, PROJECTS_KEY, SOFTWARE_KEY } from "./join-guard";
 import { hashLinkPassword, verifyLinkPassword } from "@polaris/core/link-password";
@@ -421,8 +422,9 @@ export async function setLogin(
         });
     } else {
         writes = polarisLogin.disableEnv(current);
-        // The anti-cheat switched on through the same mod keeps it.
-        if (anticheatHoldsMod(current)) {
+        // The anti-cheat switched on through the same mod keeps it, and so do
+        // the server's sounds, which the plugin hands to its players.
+        if (anticheatHoldsMod(current) || soundsHoldPlugin(current)) {
             writes.set(polarisLogin.MODS_KEY, current.get(polarisLogin.MODS_KEY) ?? "");
         }
     }

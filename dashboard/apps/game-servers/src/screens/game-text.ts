@@ -27,6 +27,7 @@ const TAB_WORDS: Readonly<Record<string, GameKey<"games">>> = {
     Console: "tabs.console",
     Announce: "tabs.announce",
     "Side panel": "tabs.panel",
+    Sounds: "tabs.sounds",
     "Linked chat": "tabs.chat",
     Events: "tabs.events",
     Challenges: "tabs.challenges",

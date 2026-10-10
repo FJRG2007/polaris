@@ -83,6 +83,26 @@ final class PolarisClient {
                 .exceptionally(failure -> Reply.unreachable(describe(failure)));
     }
 
+    /** A GET of one of this server's own addresses under Polaris, such as
+     *  {@code /api/minecraft/sounds/<id>}. */
+    CompletableFuture<Reply> get(String path) {
+        HttpRequest request;
+        try {
+            request = HttpRequest.newBuilder(URI.create(config.baseUrl() + path))
+                    .timeout(REQUEST_TIMEOUT)
+                    .header("Authorization", "Bearer " + config.token())
+                    .header("Accept", "application/json")
+                    .header("User-Agent", userAgent)
+                    .GET()
+                    .build();
+        } catch (IllegalArgumentException invalid) {
+            return CompletableFuture.completedFuture(Reply.unreachable("the address is not valid"));
+        }
+        return http.sendAsync(request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8))
+                .thenApply(PolarisClient::parse)
+                .exceptionally(failure -> Reply.unreachable(describe(failure)));
+    }
+
     private static Reply parse(HttpResponse<String> response) {
         try {
             JsonElement parsed = JsonParser.parseString(response.body());

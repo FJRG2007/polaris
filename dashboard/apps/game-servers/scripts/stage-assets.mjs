@@ -10,6 +10,10 @@
  * browser must not have them, since what a screen sends back is an item's class
  * and the path it turns into is looked up on the server.
  *
+ * The Ogg Vorbis encoder the Sounds tab converts uploads with is a WebAssembly
+ * file the browser fetches, so it is copied out of its package here, with its
+ * licence beside it, rather than inlined into the code.
+ *
  * The login mod's jars are built by the image (they need a JDK) and put in
  * .assets/minecraft-mods by the Dockerfile before the bundler runs.
  *
@@ -18,7 +22,16 @@
 
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
-import { cpSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { createRequire } from "node:module";
+import {
+    copyFileSync,
+    cpSync,
+    mkdirSync,
+    readdirSync,
+    readFileSync,
+    rmSync,
+    writeFileSync
+} from "node:fs";
 
 const app = join(dirname(fileURLToPath(import.meta.url)), "..");
 const resources = join(app, "..", "..", "resources");
@@ -45,13 +58,31 @@ writeFileSync(join(stage("mcicons", mcicons), "items.json"), `${JSON.stringify(m
 // The blueprint path is left behind on purpose; `icon: false` is carried across
 // because the picker puts the items nobody has a picture of behind the ones it
 // can draw.
-const catalog = JSON.parse(readFileSync(join(app, "src", "lib", "ark", "item-catalog.json"), "utf8"));
+const catalog = JSON.parse(
+    readFileSync(join(app, "src", "lib", "ark", "item-catalog.json"), "utf8")
+);
 const ark = catalog.items.map((item) => ({
     key: item.key,
     name: item.name,
     stack: item.stack,
     ...(item.icon === false ? { icon: false } : {})
 }));
-writeFileSync(join(stage("arkicons", join(resources, "arkicons", "icons")), "items.json"), `${JSON.stringify(ark)}\n`);
+writeFileSync(
+    join(stage("arkicons", join(resources, "arkicons", "icons")), "items.json"),
+    `${JSON.stringify(ark)}\n`
+);
 
 console.log(`Staged ${minecraft.length} Minecraft and ${ark.length} ARK item icons in ${staged}`);
+
+// The reference libvorbis encoder, as the wasm-media-encoders package builds it.
+// Only the Ogg one: the Sounds tab never encodes MP3.
+const require = createRequire(import.meta.url);
+const encoder = join(staged, "ogg-encoder");
+rmSync(encoder, { recursive: true, force: true });
+mkdirSync(encoder, { recursive: true });
+copyFileSync(require.resolve("wasm-media-encoders/wasm/ogg.wasm"), join(encoder, "ogg.wasm"));
+copyFileSync(
+    join(dirname(require.resolve("wasm-media-encoders/wasm/ogg.wasm")), "..", "LICENSE"),
+    join(encoder, "LICENSE.txt")
+);
+console.log(`Staged the Ogg Vorbis encoder in ${encoder}`);

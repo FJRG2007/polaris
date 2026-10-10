@@ -243,10 +243,19 @@ export function titleCommands(title: string, subtitle: string): string[] {
     ];
 }
 
+/**
+ * A sound to everybody, each at their own position. The trailing 0 is the
+ * game's own default minimum volume, so it changes nothing about how it sounds:
+ * it marks the line as an event's, which is what lets a server's own sound take
+ * its place (`sound-moments.ts`). Every line that plays one of `SOUNDS` for an
+ * event carries it.
+ */
 export function sound(id: string): string {
-    return `execute as @a at @s run playsound ${id} master @s ~ ~ ~ 1 1`;
+    return `execute as @a at @s run playsound ${id} master @s ~ ~ ~ 1 1 0`;
 }
 
+/** The sounds an event plays at its moments. A server can put its own sound on
+ *  each (`sound-moments.ts`, `MOMENT_SOUNDS`). */
 export const SOUNDS = {
     tick: "minecraft:block.note_block.pling",
     start: "minecraft:block.bell.use",

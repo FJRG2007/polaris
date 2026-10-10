@@ -19,8 +19,9 @@ import org.slf4j.Logger;
  * a player joins with an unmodified client. The login stays idle unless the
  * server's environment switches it on, which is what makes a jar left in the mods
  * folder after the switch was turned off harmless. The anti-xray runs unless the
- * environment switches it off (POLARIS_ANTIXRAY=off). Chat moderation runs
- * wherever Polaris wrote its address, id and token, for either of them. The
+ * environment switches it off (POLARIS_ANTIXRAY=off). Chat moderation and the
+ * server's own sounds ({@link SoundPack}) run wherever Polaris wrote its
+ * address, id and token, for either of them. The
  * event commands ({@link EventCommands}) are always there: idle until the
  * dashboard runs one.
  */
@@ -51,6 +52,10 @@ public final class PolarisMod {
         // anti-cheat - the chat follows the rules on the server's Moderation tab.
         ChatModeration chat = ChatModeration.start(version);
         if (chat != null) NeoForge.EVENT_BUS.register(chat);
+        // The server's own sounds, handed to its players live, wherever Polaris
+        // has said where it is (POLARIS_SOUNDS=off switches them off).
+        SoundPack sounds = SoundPack.start(version);
+        if (sounds != null) NeoForge.EVENT_BUS.register(sounds);
         switch (config.state()) {
             case OFF -> {
                 LOG.info("Polaris login is installed but switched off for this server.");

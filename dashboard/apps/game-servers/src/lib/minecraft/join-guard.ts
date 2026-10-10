@@ -31,6 +31,8 @@
 
 import * as polarisLogin from "./polaris-login";
 import { anticheatMovedTo, withoutAnticheatBuild } from "./polaris-anticheat";
+import { soundsHoldPlugin, soundsMovedTo } from "./sounds-env";
+import { SOUNDS_KEY } from "./sounds";
 import {
     formatProjectList,
     isPluginLoader,
@@ -338,10 +340,26 @@ export async function guardForSave(
         version ?? current.get("VERSION") ?? "",
         listed ?? current.get(polarisLogin.MODS_KEY) ?? ""
     );
-    if (off === null) return writes;
+    const afterAnticheat =
+        off === null
+            ? writes
+            : [
+                  ...writes.filter((entry) => !off.has(entry.key)),
+                  ...[...off].map(([key, value]) => ({ key, value }))
+              ];
+    // The plugin the server's sounds hold comes off the same way, from the list
+    // as everything above leaves it.
+    const listedNow = afterAnticheat.find((entry) => entry.key === polarisLogin.MODS_KEY)?.value;
+    const sounds = soundsMovedTo(
+        current,
+        software || (current.get(SOFTWARE_KEY) ?? ""),
+        version ?? current.get("VERSION") ?? "",
+        listedNow ?? current.get(polarisLogin.MODS_KEY) ?? ""
+    );
+    if (sounds === null) return afterAnticheat;
     return [
-        ...writes.filter((entry) => !off.has(entry.key)),
-        ...[...off].map(([key, value]) => ({ key, value }))
+        ...afterAnticheat.filter((entry) => !sounds.has(entry.key)),
+        ...[...sounds].map(([key, value]) => ({ key, value }))
     ];
 }
 
@@ -391,6 +409,14 @@ export function guardAsTemplate(env: ReadonlyMap<string, string>): Map<string, s
     if (mods !== undefined && withoutAnticheatBuild(env) !== mods) {
         copy.set(polarisLogin.MODS_KEY, withoutAnticheatBuild(env));
     }
+    // The plugin the sounds put on a server is that server's, like its token.
+    if (soundsHoldPlugin(env) && !polarisLogin.loginOn(env)) {
+        copy.set(
+            polarisLogin.MODS_KEY,
+            polarisLogin.withoutMod(copy.get(polarisLogin.MODS_KEY) ?? "")
+        );
+    }
+    copy.delete(SOUNDS_KEY);
     if (!polarisLogin.loginOn(env)) return copy;
     copy.set(polarisLogin.MODS_KEY, polarisLogin.withoutMod(copy.get(polarisLogin.MODS_KEY) ?? ""));
     copy.set(PROJECTS_KEY, withJoinGuard(env.get(PROJECTS_KEY) ?? "", env.get(SOFTWARE_KEY) ?? ""));

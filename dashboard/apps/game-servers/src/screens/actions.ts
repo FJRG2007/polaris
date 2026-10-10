@@ -23,6 +23,7 @@ import { blueprintVersions, createGameServer, expectedMinecraftHeapMb } from "..
 import { listGameMachines, type GameMachine } from "../lib/games-service";
 import { clearGameServerPrefs, setGameServerPref } from "../lib/games-prefs";
 import { clearLogins } from "../lib/minecraft/polaris-login-service";
+import { clearSounds } from "../lib/minecraft/sounds-service";
 import { clearAnticheatFlags } from "../lib/minecraft/polaris-anticheat-service";
 import { clearSanctions } from "../lib/sanctions-service";
 import { isTemplateName, type ServerTemplateView } from "../lib/game-templates";
@@ -411,6 +412,7 @@ export async function deleteGameServerAction(installedAppId: string): Promise<{ 
             clearQueue(installedAppId),
             clearGameServerPrefs(installedAppId),
             clearLogins(installedAppId),
+            clearSounds(installedAppId),
             clearAnticheatFlags(installedAppId),
             clearSanctions(installedAppId)
         ]);

@@ -36,6 +36,8 @@ import {
     withoutPending
 } from "./prelogin";
 import { COMMAND_BYTES_MAX, commandBytes } from "./command-size";
+import { withMoments } from "./sound-moments";
+import { soundMomentOverrides } from "./sound-moments-service";
 import { readCrashLoop, readRestartWatch, resumeAfterCrashLoop } from "../games-health";
 import { experienceCommand, type ExperienceChange } from "./experience";
 import { parsePlayerSessions, type PlayerSessionEvent } from "./sessions";
@@ -535,8 +537,39 @@ function forThePlayersIn(install: MinecraftInstall, argv: readonly string[]): re
     return install.edition === "java" ? hiddenFromPendingArgv(argv) : argv;
 }
 
+/**
+ * An event's sound as the server's own, where it put one on that moment
+ * (`sound-moments.ts`): one line becomes two, the upload for the players who
+ * loaded the pack and the game's sound for everybody else. Java only, and
+ * every other line as it was.
+ */
+async function withServerSounds(
+    install: MinecraftInstall,
+    lines: readonly string[]
+): Promise<string[]> {
+    if (install.edition !== "java" || !lines.some((line) => line.includes(" playsound ")))
+        return [...lines];
+    const overrides = await soundMomentOverrides(install.installedAppId);
+    return lines.flatMap((line) => withMoments(line, overrides));
+}
+
 /** The same, on ports that are already open. */
 async function sendGameCommand(
+    ports: RuntimePorts,
+    install: MinecraftInstall,
+    given: readonly string[]
+): Promise<string> {
+    const sounded = await withServerSounds(install, [given.join(" ")]);
+    if (sounded.length > 1) {
+        // Two lines for one event sound: each its own command, and both answers.
+        const answers: string[] = [];
+        for (const line of sounded) answers.push(await sendOneCommand(ports, install, [line]));
+        return answers.join("\n");
+    }
+    return sendOneCommand(ports, install, given);
+}
+
+async function sendOneCommand(
     ports: RuntimePorts,
     install: MinecraftInstall,
     given: readonly string[]
@@ -714,10 +747,12 @@ async function sendGameLines(
     install: MinecraftInstall,
     given: readonly string[]
 ): Promise<void> {
-    const lines = install.edition === "java" ? given.map((line) => hiddenFromPending(line)) : given;
+    const sounded = await withServerSounds(install, given);
+    const lines =
+        install.edition === "java" ? sounded.map((line) => hiddenFromPending(line)) : sounded;
     for (const line of lines) assertSafeCommand([line]);
     if (install.edition !== "java") {
-        for (const line of lines) await sendGameCommand(ports, install, [line]);
+        for (const line of lines) await sendOneCommand(ports, install, [line]);
         return;
     }
     const batches: string[][] = [];
@@ -745,7 +780,7 @@ async function sendGameLines(
             )
         );
         if (result.code !== 0) {
-            for (const line of batch) await sendGameCommand(ports, install, [line]);
+            for (const line of batch) await sendOneCommand(ports, install, [line]);
         }
     }
 }

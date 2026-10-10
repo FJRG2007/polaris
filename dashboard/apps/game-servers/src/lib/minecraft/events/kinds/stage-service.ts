@@ -126,7 +126,7 @@ function tell(name: string, line: string): string {
 }
 
 function soundFor(name: string, id: string): string {
-    return `execute as ${name} at @s run playsound ${id} master @s ~ ~ ~ 1 1`;
+    return `execute as ${name} at @s run playsound ${id} master @s ~ ~ ~ 1 1 0`;
 }
 
 // ------------------------------------------------------------------ the structure
@@ -1592,7 +1592,7 @@ export function quickLines(loop: StageLoop): string[] {
             `${as(one.selector)} run title @s times 5 30 10`,
             `${as(one.selector)} run title @s subtitle ${commands.text(" ")}`,
             `${as(one.selector)} run title @s title ${commands.text(messages.checkpointTitle(count, total, language))}`,
-            `${as(one.selector)} at @s run playsound ${sound} master @s ~ ~ ~ 1 1`,
+            `${as(one.selector)} at @s run playsound ${sound} master @s ~ ~ ~ 1 1 0`,
             ...(one.finish
                 ? [
                       `${as(one.selector)} store result score @s ${parkour.FINISH_TICK} run time query gametime`

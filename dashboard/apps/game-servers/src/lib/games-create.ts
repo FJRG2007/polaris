@@ -33,6 +33,7 @@ import { randomBytes, randomUUID } from "node:crypto";
 import { ALLOW_LIST_KEY, withPlayer } from "./ark/access";
 import * as polarisLogin from "./minecraft/polaris-login";
 import { anticheatBundled } from "./minecraft/polaris-mod-files";
+import { soundsMovedTo } from "./minecraft/sounds-env";
 import {
     anticheatBuildFor,
     anticheatEnableEnv,
@@ -370,6 +371,14 @@ function javaSoftwareEnv(
     for (const [key, value] of mod ?? []) env.set(key, value);
     // Polaris's anti-cheat, the same way: off software it cannot run on.
     for (const [key, value] of anticheatMovedTo(
+        before,
+        software,
+        env.get("VERSION") ?? "",
+        env.get(polarisLogin.MODS_KEY) ?? ""
+    ) ?? [])
+        env.set(key, value);
+    // The plugin the server's sounds hold, the same way.
+    for (const [key, value] of soundsMovedTo(
         before,
         software,
         env.get("VERSION") ?? "",

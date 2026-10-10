@@ -102,6 +102,7 @@ import {
     Megaphone,
     PanelRight,
     Keyboard,
+    Music,
     type LucideIcon
 } from "lucide-react";
 import { GAME_SERVERS_APP_ID } from "@/lib/apps/games-catalog";
@@ -2177,6 +2178,21 @@ const GAME_RAIL: Readonly<Record<string, Omit<AppSection, "href">>> = {
             "last death",
             "levels",
             "who is online"
+        ]
+    },
+    sounds: {
+        label: "Sounds", // i18n-ignore
+        icon: Music,
+        group: TALKING_GROUP,
+        keywords: [
+            "custom sounds",
+            "resource pack",
+            "music",
+            "upload",
+            "ogg",
+            "mp3",
+            "join sound",
+            "victory"
         ]
     },
     chat: {

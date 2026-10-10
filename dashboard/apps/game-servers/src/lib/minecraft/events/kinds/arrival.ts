@@ -121,7 +121,7 @@ export async function countdown(
             `title ${target} times 0 25 5`,
             `title ${target} subtitle ${commands.text(messages.getReady(language))}`,
             `title ${target} title ${commands.text(messages.countdownNumber(left))}`,
-            `execute as ${target} at @s run playsound ${commands.SOUNDS.tick} master @s ~ ~ ~ 1 1`
+            `execute as ${target} at @s run playsound ${commands.SOUNDS.tick} master @s ~ ~ ~ 1 1 0`
         ]);
         await pause(1_000);
     }
@@ -130,7 +130,5 @@ export async function countdown(
 /** Said with "Go!" when it started without some of them. */
 export function startedWithoutLines(look: Look, language: speech.Speech): string[] {
     if (look.missing.length === 0) return [];
-    return [
-        commands.say(messages.tag(language) + messages.startedWithout(look.missing, language))
-    ];
+    return [commands.say(messages.tag(language) + messages.startedWithout(look.missing, language))];
 }
