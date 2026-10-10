@@ -1,9 +1,18 @@
 import { call } from "./call";
 import { calendar } from "./calendar";
 import { chat } from "./chat";
+import {
+    chatChannelSettings,
+    chatDirect,
+    chatMedia,
+    chatPoll,
+    chatPrivacy,
+    chatRules,
+    chatThread
+} from "./chat-more";
 import { drive } from "./drive";
 import { games } from "./games";
-import { inCall } from "./in-call";
+import { callGroup, callMeeting, inCall } from "./in-call";
 import { launcher } from "./launcher";
 import { mail, mailThread } from "./mail";
 import { marketplace } from "./marketplace";
@@ -17,6 +26,13 @@ import type { SceneDefinition } from "../runtime/scene";
 /** Every scene the README shows, in the order the capture takes them. */
 export const SCENES: readonly SceneDefinition[] = [
     chat,
+    chatThread,
+    chatMedia,
+    chatPoll,
+    chatDirect,
+    chatChannelSettings,
+    chatRules,
+    chatPrivacy,
     tasks,
     taskPanel,
     deploy,
@@ -33,5 +49,7 @@ export const SCENES: readonly SceneDefinition[] = [
     launcher,
     settings,
     call,
-    inCall
+    inCall,
+    callMeeting,
+    callGroup
 ];

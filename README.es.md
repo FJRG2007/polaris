@@ -31,27 +31,33 @@ ellas en [docs/assets/media](docs/assets/media).
 <table>
   <tr>
     <td width="50%" valign="top">
+      <a href="docs/features/chat.es.md">
       <picture>
         <source media="(prefers-color-scheme: light)" srcset="docs/assets/media/chat-light-es-desktop.webp">
         <img src="docs/assets/media/chat-dark-es-desktop.webp" alt="Chat, con el equipo escribiendo y respondiendo">
       </picture>
-      <br><sub>Chat, con el equipo escribiendo y respondiendo</sub>
+      </a>
+      <br><sub><a href="docs/features/chat.es.md">Chat, con el equipo escribiendo y respondiendo</a></sub>
     </td>
     <td width="50%" valign="top">
+      <a href="docs/features/calls.es.md">
       <picture>
         <source media="(prefers-color-scheme: light)" srcset="docs/assets/media/call-light-es-desktop.webp">
         <img src="docs/assets/media/call-dark-es-desktop.webp" alt="Una llamada que suena sobre lo que estés haciendo">
       </picture>
-      <br><sub>Una llamada que suena sobre lo que estés haciendo</sub>
+      </a>
+      <br><sub><a href="docs/features/calls.es.md">Una llamada que suena sobre lo que estés haciendo</a></sub>
     </td>
   </tr>
   <tr>
     <td width="50%" valign="top">
+      <a href="docs/features/calls.es.md">
       <picture>
         <source media="(prefers-color-scheme: light)" srcset="docs/assets/media/in-call-light-es-desktop.webp">
         <img src="docs/assets/media/in-call-dark-es-desktop.webp" alt="La daily en una sala de voz">
       </picture>
-      <br><sub>La daily en una sala de voz</sub>
+      </a>
+      <br><sub><a href="docs/features/calls.es.md">La daily en una sala de voz</a></sub>
     </td>
     <td width="50%" valign="top">
       <picture>

@@ -47,27 +47,33 @@ beside them in [docs/assets/media](docs/assets/media).
 <table>
   <tr>
     <td width="50%" valign="top">
+      <a href="docs/features/chat.md">
       <picture>
         <source media="(prefers-color-scheme: light)" srcset="docs/assets/media/chat-light-en-desktop.webp">
         <img src="docs/assets/media/chat-dark-en-desktop.webp" alt="Chat, with the team typing and replying">
       </picture>
-      <br><sub>Chat, with the team typing and replying</sub>
+      </a>
+      <br><sub><a href="docs/features/chat.md">Chat, with the team typing and replying</a></sub>
     </td>
     <td width="50%" valign="top">
+      <a href="docs/features/calls.md">
       <picture>
         <source media="(prefers-color-scheme: light)" srcset="docs/assets/media/call-light-en-desktop.webp">
         <img src="docs/assets/media/call-dark-en-desktop.webp" alt="A call ringing over whatever you are doing">
       </picture>
-      <br><sub>A call ringing over whatever you are doing</sub>
+      </a>
+      <br><sub><a href="docs/features/calls.md">A call ringing over whatever you are doing</a></sub>
     </td>
   </tr>
   <tr>
     <td width="50%" valign="top">
+      <a href="docs/features/calls.md">
       <picture>
         <source media="(prefers-color-scheme: light)" srcset="docs/assets/media/in-call-light-en-desktop.webp">
         <img src="docs/assets/media/in-call-dark-en-desktop.webp" alt="The stand-up in a voice room">
       </picture>
-      <br><sub>The stand-up in a voice room</sub>
+      </a>
+      <br><sub><a href="docs/features/calls.md">The stand-up in a voice room</a></sub>
     </td>
     <td width="50%" valign="top">
       <picture>

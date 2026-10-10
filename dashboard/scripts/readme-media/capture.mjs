@@ -30,6 +30,17 @@ import { LOCALES, MEDIA_DIR, MOMENT, THEMES, VIEWPORTS, mediaName } from "./vari
 const here = dirname(fileURLToPath(import.meta.url));
 const root = resolve(here, "..", "..");
 const site = join(here, "out", "site");
+/** The invented people's faces, by account id; see faces/LICENSE.md. */
+const faces = join(here, "faces");
+/** Files the fixtures send - pictures, a clip's still, a space's emoji - by the
+ *  fixture id the message names them by; see media/LICENSE.md. */
+const media = join(here, "media");
+/** The routes that serve such a file, with the id where the route puts it. */
+const MEDIA_ROUTES = [
+    /^\/api\/chat\/attachments\/([\w-]+)$/,
+    /^\/api\/chat\/emoji\/([\w-]+)$/,
+    /^\/api\/chat\/links\/([\w-]+)\/image$/
+];
 const output = resolve(root, "..", MEDIA_DIR);
 const require = createRequire(join(root, "package.json"));
 const { chromium } = require("playwright");
@@ -69,11 +80,30 @@ const FACELESS = "/api/mail/face/";
 function serve() {
     const server = createServer((req, res) => {
         const path = decodeURIComponent((req.url ?? "/").split("?")[0]);
-        // Somebody with no picture gets a transparent pixel from the real route,
-        // and the initials the component drew show through. Same here.
-        if (path.startsWith("/api/avatar/")) {
-            res.writeHead(200, { "content-type": "image/png" }).end(PIXEL);
+        // A fixture person with a face gets it. Anybody else gets a transparent
+        // pixel, as the real route answers for somebody with no picture, and the
+        // initials the component drew show through.
+        if (path.startsWith("/api/avatar/") || path.startsWith("/api/banner/")) {
+            const face = /^\/api\/avatar\/([\w-]+)$/.exec(path)?.[1];
+            const file = face ? join(faces, `${face}.webp`) : null;
+            if (file && existsSync(file)) {
+                res.writeHead(200, { "content-type": "image/webp" }).end(readFileSync(file));
+            } else {
+                res.writeHead(200, { "content-type": "image/png" }).end(PIXEL);
+            }
             return;
+        }
+        const sent = MEDIA_ROUTES.map((route) => route.exec(path)?.[1]).find(Boolean);
+        if (sent) {
+            const file = [".webp", ".svg"]
+                .map((extension) => join(media, `${sent}${extension}`))
+                .find((candidate) => existsSync(candidate));
+            if (file) {
+                res.writeHead(200, { "content-type": TYPES[extname(file)] }).end(
+                    readFileSync(file)
+                );
+                return;
+            }
         }
         // A sender with no picture is a 404 from the real route, and the list
         // draws their initials. Same here; see FACELESS below.

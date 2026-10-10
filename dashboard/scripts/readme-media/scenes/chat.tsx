@@ -1,18 +1,26 @@
 /** Chat: a channel mid-conversation, with new messages arriving. */
 
+import type { ReactNode } from "react";
+import { CallHoldContext, type CallHold } from "@/app/(app)/chat/call-hold";
 import { ChatShell } from "@/app/(app)/chat/chat-shell";
 import { ChannelView } from "@/app/(app)/chat/channel-view";
 import { Chrome } from "../runtime/chrome";
-import { defineScene } from "../runtime/scene";
 import { sendFrame } from "../runtime/stream";
-import { TEAM, VIEWER } from "../fixtures/people";
+import { CREW, ORG, TEAM, VIEWER } from "../fixtures/people";
+import { defineScene, type SceneContext } from "../runtime/scene";
 import {
     CHANNEL_ID,
+    membersOf,
+    THREAD_ROOT_ID,
     arriving,
     chatCategories,
     chatChannels,
     chatSpaces,
-    launchConversation
+    conversation,
+    launchThread,
+    profileOf,
+    spaceEmoji,
+    voicePresence
 } from "../fixtures/chat";
 
 const STREAM = "/api/chat/stream";
@@ -30,7 +38,7 @@ const PLAY: { run: () => void; hold: number; advance?: number }[] = [
     // The typing line lasts a few seconds past the last keystroke, as it does
     // in the app; the picture is taken once it has gone.
     { run: () => post(), hold: 1600, advance: TYPING_GONE },
-    { run: () => typing(TEAM.priya), hold: 1600 },
+    { run: () => typing(CREW.grace), hold: 1600 },
     { run: () => post(), hold: 3200, advance: TYPING_GONE }
 ];
 
@@ -43,28 +51,33 @@ function post() {
     sendFrame(STREAM, { kind: "posted", seq: delivered, channels: [CHANNEL_ID] });
 }
 
-export const chat = defineScene({
-    id: "chat",
-    path: `/chat/c/${CHANNEL_ID}`,
-    params: { channelId: CHANNEL_ID },
-    actions: (ctx) => ({
+/** Every action a chat screen asks, answered for the conversation `channelId`. */
+export function chatActions(ctx: SceneContext, channelId: string) {
+    const channels = chatChannels(ctx);
+    return {
         chatListsAction: () => ({
-            channels: chatChannels(ctx),
+            channels,
             spaces: chatSpaces(ctx),
             categories: chatCategories(ctx),
             blocked: [],
             friends: []
         }),
-        listChannelsAction: () => ({ channels: chatChannels(ctx) }),
+        listChannelsAction: () => ({ channels }),
         chatRulesAction: () => ({ rules: {} }),
         callsUnavailableAction: () => null,
-        voicePresenceAction: () => ({ inRoom: {} }),
+        voicePresenceAction: () => ({ inRoom: voicePresence() }),
         readChannelAction: () => ({
-            page: { messages: launchConversation(ctx), olderThan: null },
-            channel: chatChannels(ctx)[0]
+            page: { messages: conversation(ctx, channelId), olderThan: null },
+            channel: channels.find((one) => one.id === channelId)
         }),
         readSinceAction: () => ({
-            page: { messages: arriving(ctx).slice(0, delivered), newerThan: null }
+            page: {
+                messages: channelId === CHANNEL_ID ? arriving(ctx).slice(0, delivered) : [],
+                newerThan: null
+            }
+        }),
+        readThreadAction: (rootId: string) => ({
+            messages: rootId === THREAD_ROOT_ID ? launchThread(ctx) : []
         }),
         markReadAction: () => ({}),
         receiptsAction: () => ({ receipts: {} }),
@@ -73,27 +86,59 @@ export const chat = defineScene({
         pinsAction: () => ({ pins: [] }),
         conversationsElsewhereAction: () => ({ chats: [] }),
         listMembersAction: () => ({
-            members: [VIEWER, ...Object.values(TEAM)].map((one, index) => ({
+            members: membersOf(ctx, channelId).map((one, index) => ({
                 userId: one.id,
                 name: one.name,
                 role: index === 0 ? "owner" : "member"
             }))
         }),
-        spaceEmojiAction: () => ({ list: { emoji: [], manages: true } })
-    }),
-    render: () => (
+        spaceEmojiAction: () => ({ list: spaceEmoji(ctx) }),
+        profileAction: (_channel: string, userId: string) => ({
+            profile: profileOf(ctx, userId)
+        })
+    };
+}
+
+/** The chat app open on `channelId`, inside the dashboard's frame. */
+export function ChatScreen({
+    channelId,
+    hold,
+    children
+}: {
+    channelId: string;
+    /** The call this tab is in, given to the screens the way the provider in
+     *  the frame gives it, so the room draws it from here. */
+    hold?: CallHold;
+    children?: ReactNode;
+}) {
+    const shell = (
+        <ChatShell
+            viewerId={VIEWER.id}
+            viewerName={VIEWER.name}
+            orgId={ORG.id}
+            orgName={ORG.name}
+            may={{ spaces: true, groups: true, attach: true, call: true, meetings: true }}
+        >
+            {children ?? <ChannelView channelId={channelId} />}
+        </ChatShell>
+    );
+    return (
         <Chrome unread={{ chat: 6 }}>
-            <ChatShell
-                viewerId={VIEWER.id}
-                viewerName={VIEWER.name}
-                orgId={null}
-                orgName={null}
-                may={{ spaces: true, groups: true, attach: true, call: true, meetings: true }}
-            >
-                <ChannelView channelId={CHANNEL_ID} />
-            </ChatShell>
+            {hold ? (
+                <CallHoldContext.Provider value={hold}>{shell}</CallHoldContext.Provider>
+            ) : (
+                shell
+            )}
         </Chrome>
-    ),
+    );
+}
+
+export const chat = defineScene({
+    id: "chat",
+    path: `/chat/c/${CHANNEL_ID}`,
+    params: { channelId: CHANNEL_ID },
+    actions: (ctx) => chatActions(ctx, CHANNEL_ID),
+    render: () => <ChatScreen channelId={CHANNEL_ID} />,
     animation: {
         frames: PLAY.length,
         step: (index) => PLAY[index]!.run(),
