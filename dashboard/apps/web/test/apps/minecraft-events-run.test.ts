@@ -3107,6 +3107,42 @@ describe("a world boss", () => {
         expect(world.sent).toContain("execute as @e[tag=pe_boss] at @s run tp @s ~ -1000 ~");
     });
 
+    it("brings everybody to it on the land once, in their own game mode, and sends them back", async () => {
+        setUp([groundBoss("boss", 10)]);
+        await events.startEvent({
+            ownerId: "owner",
+            installedAppId: SERVER,
+            presetId: "boss",
+            trigger: "manual",
+            startedBy: null
+        });
+        world.lift = ["Ana"];
+        await play(8_100);
+        const run = state().run!;
+        expect(run.boss?.standing).toBe(true);
+        expect(run.boss?.direct).toBe(true);
+        const lair = run.place!;
+        expect(world.sent).toContain("tag Ana add pe_in");
+        const moved = world.sent.find((line) => / tp Ana /.test(line));
+        expect(moved).toBeDefined();
+        const [x, y, z] = moved!.split(" tp Ana ")[1]!.split(" ").map(Number);
+        expect(y).toBe(lair.y);
+        expect(Math.hypot(x! - (lair.x + 0.5), z! - (lair.z + 0.5))).toBeLessThanOrEqual(5);
+        expect(world.sent).not.toContain("gamemode adventure Ana");
+        expect(state().run?.stage?.saved.map((one) => one.name)).toEqual(["Ana"]);
+        expect(state().run?.boss?.taken).toEqual(["ana"]);
+        const admitted = world.sent.filter((line) => line === "tag Ana add pe_in").length;
+        await play(2_100);
+        // Brought once: somebody who walks off is never pulled back mid-fight.
+        expect(world.sent.filter((line) => line === "tag Ana add pe_in")).toHaveLength(admitted);
+        world.lift = [];
+
+        await events.cancelEvent("owner", SERVER);
+        await play(6_100);
+        expect(world.sent).toContain("tag Ana remove pe_in");
+        expect(state().stageLeftovers).toEqual([]);
+    });
+
     it("points whoever is out of its reach the way, with how far and which way to turn", async () => {
         const boss = groundBoss("boss", 10);
         setUp([boss]);
@@ -3498,7 +3534,7 @@ describe("a world boss fight", () => {
         expect(ana).toContainEqual({ id: "minecraft:nether_star", count: 1, dropped: 0 });
     });
 
-    it("stands in a closed arena in the sky, takes players up through the beam and puts them back", async () => {
+    it("stands in a closed arena in the sky, takes players up and puts them back", async () => {
         const preset = groundBoss("boss", 10, { arena: true });
         setUp([preset]);
         await start();
@@ -3523,14 +3559,11 @@ describe("a world boss fight", () => {
                 )
             )
         ).toBe(true);
-        // Its place is where it stands; the beam is on the ground of its own
-        // column, by the players, stepped into anywhere round it.
+        // Its place is where it stands; everybody is taken up, like every
+        // other event, never made to walk to a beam.
         expect(run.place).toEqual({ x: origin.x, y: origin.y + 1, z: origin.z });
-        const lift = run.boss!.lift!;
-        expect(lift.y).toBe(70);
-        expect(lift.y).toBeLessThan(origin.y);
-        expect(run.boss?.direct).toBe(false);
-        expect(world.sent).toContain(boss.inLift(lift));
+        expect(run.boss?.lift).toBeNull();
+        expect(run.boss?.direct).toBe(true);
 
         world.lift = ["Ana"];
         await play(2_100);

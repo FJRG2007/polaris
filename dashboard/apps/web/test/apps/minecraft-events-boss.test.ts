@@ -515,6 +515,23 @@ describe("the sky arena", () => {
         );
     });
 
+    it("brings players to the boss on the land round its lair, in their own game mode", () => {
+        const lair = { x: 100, y: 70, z: -40 };
+        for (let index = 0; index < 8; index++) {
+            const spot = boss.landSpot(lair, index);
+            expect(spot.y).toBe(lair.y);
+            const away = Math.hypot(spot.x - (lair.x + 0.5), spot.z - (lair.z + 0.5));
+            expect(away).toBeGreaterThan(1);
+            expect(away).toBeLessThanOrEqual(3 * Math.SQRT2);
+        }
+        const lines = boss.landAdmitLines("Ana", boss.landSpot(lair, 0));
+        expect(lines.indexOf("tag Ana add pe_in")).toBeLessThan(
+            lines.findIndex((line) => line.includes(" tp Ana "))
+        );
+        expect(lines.some((line) => line.startsWith("gamemode"))).toBe(false);
+        expect(lines.some((line) => line.includes("slow_falling"))).toBe(false);
+    });
+
     it("lets somebody who left go in their own game mode, without moving them", () => {
         const saved: stage.Saved = {
             name: "Ana",

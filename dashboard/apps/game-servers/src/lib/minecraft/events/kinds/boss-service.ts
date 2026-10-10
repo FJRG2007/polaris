@@ -80,7 +80,6 @@ interface Memory {
     alone: boolean;
     waits: number;
     /** Ticks the ground round the players has been waited for, for the beam. */
-    entryWaits: number;
     /** When everybody not up yet was last told where the beam is. */
     remindedAt: number;
 }
@@ -99,7 +98,6 @@ function memoryOf(runId: string): Memory {
             still: 0,
             alone: false,
             waits: 0,
-            entryWaits: 0,
             remindedAt: 0
         };
         memories.set(runId, memory);
@@ -235,6 +233,8 @@ export async function tick(ctx: KindContext, lines: string[]): Promise<string | 
                 es: written.yourDamage("es")
             })
         );
+        const lair = ctx.run.place;
+        if (!state.arena && state.direct && lair) await bringToLair(ctx, lair, lines);
         await guide(ctx, memory, lines);
         if (at && health !== null) await fight(ctx, memory, { at, previous, health }, lines);
         return null;
@@ -337,6 +337,9 @@ async function raise(ctx: KindContext, memory: Memory, lines: string[]): Promise
             await ctx.giveUpPlace(found);
             return;
         }
+        // Everybody brought to it, like every other event, and sent back at the end.
+        change(ctx, { direct: true, taken: [] });
+        await ctx.persist();
         await announce(ctx, found, "land");
         return;
     }
@@ -372,7 +375,7 @@ async function raise(ctx: KindContext, memory: Memory, lines: string[]): Promise
 
     const current = stageOf(ctx);
     if (!current.built) {
-        if (!(await placeEntry(ctx, memory, origin))) return;
+        await placeEntry(ctx);
         if (!(await provedEmpty(ctx, memory))) return;
         const boxes = boss.arenaBoxes(origin);
         // Written down first, then built - into air only.
@@ -402,27 +405,15 @@ async function raise(ctx: KindContext, memory: Memory, lines: string[]): Promise
 }
 
 /**
- * Where the beam up stands, chosen before the arena goes up (`beam-entry.ts`):
- * on open, flat ground near the players, at the height of its own column. With
- * nowhere like that - everybody at home among their builds, a server too old
- * to read the ground at once - nobody is made to climb to a beam: everybody is
- * taken up instead (`direct`). Answers false while the ground is waited for.
+ * How everybody reaches the arena: taken up, like every other event's players,
+ * never made to walk to a beam (`direct`). A run that already has its beam
+ * from before keeps it.
  */
-async function placeEntry(
-    ctx: KindContext,
-    memory: Memory,
-    origin: stored.Point
-): Promise<boolean> {
+async function placeEntry(ctx: KindContext): Promise<void> {
     const state = stateOf(ctx);
-    if (state.lift || state.direct) return true;
-    const found = await ctx.findEntry({ x: origin.x, z: origin.z });
-    if (found === "unknown" && memory.entryWaits < LOAD_WAITS) {
-        memory.entryWaits += 1;
-        return false;
-    }
-    change(ctx, typeof found === "object" ? { lift: found } : { direct: true, taken: [] });
+    if (state.lift || state.direct) return;
+    change(ctx, { direct: true, taken: [] });
     await ctx.persist();
-    return true;
 }
 
 /**
@@ -840,7 +831,7 @@ async function arenaTick(
         const stepping = commands
             .readWhere(await server.say([boss.inLift(lift)]))
             .map((one) => one.name);
-        if (stepping.length > 0) await admit(ctx, origin, stepping, lines);
+        if (stepping.length > 0) await admit(ctx, stepping, arenaWay(origin), lines);
     } else if (state.direct) {
         // No beam: everybody in the Overworld taken up, once each.
         const taken = new Set(state.taken);
@@ -848,7 +839,7 @@ async function arenaTick(
             .readWhere(await server.say([boss.NOT_UP]))
             .map((one) => one.name)
             .filter((name) => !taken.has(lower(name)));
-        if (fresh.length > 0) await admit(ctx, origin, fresh, lines);
+        if (fresh.length > 0) await admit(ctx, fresh, arenaWay(origin), lines);
     }
     const where = commands.readWhere(await server.say([stage.ARENA_WHERE]));
     const dimensions = commands.readDimensions(await server.say([stage.ARENA_DIMENSIONS]));
@@ -878,11 +869,40 @@ async function arenaTick(
     return inside;
 }
 
-/** Up into the arena: where each stood written down first, then moved. */
+/** Where each one brought in stands, and the lines that take them there. */
+interface Way {
+    readonly spot: (index: number) => stage.Spot;
+    readonly lines: (name: string, spot: stage.Spot) => string[];
+}
+
+function arenaWay(origin: stored.Point): Way {
+    return { spot: (index) => boss.arenaSpot(origin, index), lines: boss.admitLines };
+}
+
+/**
+ * On the land, everybody in the Overworld not brought yet taken to the boss's
+ * lair, once each: somebody who walks off is never pulled back mid-fight.
+ */
+async function bringToLair(ctx: KindContext, lair: stored.Point, lines: string[]): Promise<void> {
+    const taken = new Set(stateOf(ctx).taken);
+    const fresh = commands
+        .readWhere(await ctx.server.say([boss.NOT_UP]))
+        .map((one) => one.name)
+        .filter((name) => !taken.has(lower(name)));
+    if (fresh.length === 0) return;
+    await admit(
+        ctx,
+        fresh,
+        { spot: (index) => boss.landSpot(lair, index), lines: boss.landAdmitLines },
+        lines
+    );
+}
+
+/** Into the fight: where each stood written down first, then moved. */
 async function admit(
     ctx: KindContext,
-    origin: stored.Point,
     names: readonly string[],
+    way: Way,
     lines: string[]
 ): Promise<void> {
     const server = ctx.server;
@@ -924,9 +944,9 @@ async function admit(
     await ctx.persist();
     const state = stateOf(ctx);
     for (const one of fresh) {
-        const spot = boss.arenaSpot(origin, all.indexOf(one));
+        const spot = way.spot(all.indexOf(one));
         lines.push(
-            ...boss.admitLines(one.name, spot),
+            ...way.lines(one.name, spot),
             `title ${one.name} times 5 40 10`,
             `title ${one.name} subtitle ${commands.text(`&e${say.bossName(state.kind, ctx.language)}`)}`,
             `title ${one.name} title ${commands.text(say.enteredTitle(ctx.language))}`
