@@ -182,6 +182,7 @@ están en [docs/assets/media](docs/assets/media).
     </td>
   </tr>
 </table>
+
 ## Instalar
 
 Un comando. Levanta todo: dashboard, base de datos, proxy inverso y el daemon de

@@ -198,6 +198,7 @@ beside them in [docs/assets/media](docs/assets/media).
     </td>
   </tr>
 </table>
+
 ## If you already pay for these
 
 The fastest way to say what Polaris is: it is the tools you are already using,
