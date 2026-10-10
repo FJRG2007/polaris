@@ -1137,6 +1137,11 @@ function worldOf(box: Box, x: number, level: number, z: number) {
 export function manorBlocks(manor: Manor): string[] {
     const ids = new Set<string>([BARRIER, ROOF_BLOCK]);
     for (const part of manor.grid.boxes()) ids.add(model.bare(part.block));
+    // Water that reaches lava turns it to stone, cobblestone or obsidian: a
+    // house with both takes those down too.
+    if (ids.has("minecraft:water") && ids.has("minecraft:lava"))
+        for (const id of ["minecraft:obsidian", "minecraft:cobblestone", "minecraft:stone"])
+            ids.add(id);
     const first = (id: string) =>
         /lava|water/.test(id)
             ? 0

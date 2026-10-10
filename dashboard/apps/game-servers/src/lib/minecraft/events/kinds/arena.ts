@@ -138,15 +138,21 @@ export function fillKeep(box: Box, block: string): string {
 /**
  * What a block the arena placed turns into by itself while it stands: grass,
  * mycelium and podzol with a solid block on top go to dirt over the game's
- * random ticks - grass under a garden's tree trunk, say - and water open to
- * the sky freezes in a cold place. Nobody placed that dirt, so no arena lists
- * it, and a teardown that took only what it listed left it floating in the sky.
+ * random ticks - grass under a garden's tree trunk, say - dirt beside grass
+ * grows over, water open to the sky freezes in a cold place and ice by a light
+ * melts. Nobody placed that dirt, so no arena lists it, and a teardown that
+ * took only what it listed left it floating in the sky.
+ *
+ * Only what any arena's blocks do on their own is here; what a kind's own kit
+ * or mix makes - water meeting lava, a hoe's farmland - is in that kind's list.
  */
 const DECAYS_TO: Readonly<Record<string, readonly string[]>> = {
     "minecraft:grass_block": ["minecraft:dirt"],
     "minecraft:mycelium": ["minecraft:dirt"],
     "minecraft:podzol": ["minecraft:dirt"],
-    "minecraft:water": ["minecraft:ice"]
+    "minecraft:dirt": ["minecraft:grass_block"],
+    "minecraft:water": ["minecraft:ice"],
+    "minecraft:ice": ["minecraft:water"]
 };
 
 /** What falls on any arena in a cold place: a layer of snow on whatever is on
