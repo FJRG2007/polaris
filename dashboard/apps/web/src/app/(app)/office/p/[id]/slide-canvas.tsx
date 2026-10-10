@@ -25,6 +25,8 @@
 
 import { cn } from "@polaris/ui";
 import * as deck from "@/lib/office/deck";
+import * as tables from "@/lib/office/slide-table";
+import { ChartArt, fontStack, TableArt, UNITS_H, UNITS_W, type CellEditing } from "./slide-objects";
 import {
     createContext,
     Fragment,
@@ -40,10 +42,6 @@ import {
 
 /** How far a press may wander before it counts as a drag rather than a click. */
 const DRAG_THRESHOLD_PX = 3;
-
-/** The slide, in the units shapes and lines are drawn in. */
-const UNITS_W = 1600;
-const UNITS_H = 900;
 
 /** How wide, in pixels, the band round a line is that picks it up. */
 const LINE_HIT_PX = 14;
@@ -101,17 +99,6 @@ export function SlideLookProvider({
 
 /** The look of the slide being drawn, for everything inside it. */
 const CurrentLook = createContext<deck.SlideLook>(deck.DEFAULT_LOOK);
-
-/** A face, with the kind of face to fall back on where it is missing. */
-function fontStack(font: string): string {
-    const kind =
-        font === "Courier New"
-            ? "monospace"
-            : font === "Georgia" || font === "Times New Roman"
-              ? "serif"
-              : "sans-serif";
-    return `"${font}", ${kind}`;
-}
 
 function frameStyle(frame: deck.BoxFrame): CSSProperties {
     return {
@@ -204,6 +191,8 @@ function ShapeArt({ box }: { box: deck.Box }) {
     const height = Math.max(1, box.h * UNITS_H);
     const fill = paint(box.fill);
     const stroke = paint(box.stroke);
+    // A table draws its own borders and a chart its own marks.
+    if (box.kind === "table" || box.kind === "chart") return null;
     if (box.kind === "text" && fill === "none" && stroke === "none") return null;
     const look = {
         fill,
@@ -368,6 +357,9 @@ function Picture({ box }: { box: deck.Box }) {
 
 /** What is inside a box that is not a line, wherever it is drawn. */
 function BoxBody({ box }: { box: deck.Box }) {
+    const look = useContext(CurrentLook);
+    if (box.kind === "table") return <TableArt box={box} look={look} />;
+    if (box.kind === "chart") return <ChartArt box={box} look={look} />;
     return (
         <>
             {box.kind === "image" ? <Picture box={box} /> : <ShapeArt box={box} />}
@@ -431,7 +423,7 @@ type Gesture =
           starts: readonly deck.Box[];
           /** What a press that never became a drag does: puts the caret in
            *  the box, or chooses it alone out of several. */
-          click: { id: string; then: "edit" | "alone" } | null;
+          click: { id: string; then: "edit" | "alone"; cell?: tables.CellAt } | null;
       }
     | { kind: "resize"; starts: readonly deck.Box[]; handle: deck.Handle }
     | { kind: "end"; starts: readonly deck.Box[]; end: 0 | 1 }
@@ -443,14 +435,18 @@ export function SlideStage({
     boxes,
     chosen,
     editing,
+    editingCell,
     placeholderOf,
     nameOf,
     resizeLabel,
     lineEndLabel,
+    columnLabel,
     onChoose,
     onEdit,
     onFrames,
-    onText
+    onText,
+    onCell,
+    onTable
 }: {
     label: string;
     slideId: string;
@@ -458,23 +454,43 @@ export function SlideStage({
     /** The boxes chosen, in the order they were. */
     chosen: readonly string[];
     editing: string;
+    /** The cell being typed into, when what is being typed into is a table. */
+    editingCell: tables.CellAt | null;
     /** What an empty text box says while it is being made, never when shown. */
     placeholderOf: (box: deck.Box) => string;
     /** What a box is called to a screen reader. */
     nameOf: (box: deck.Box) => string;
     resizeLabel: string;
     lineEndLabel: string;
+    /** What a table's column border is called, to drag it. */
+    columnLabel: string;
     onChoose: (ids: string[]) => void;
-    onEdit: (id: string) => void;
+    /** Typing starts in a box - in a table, in `cell` - or ends, with "". */
+    onEdit: (id: string, cell?: tables.CellAt) => void;
     /** Boxes moved or resized - every one that changed, in one go. */
     onFrames: (frames: Map<string, Draft>) => void;
     onText: (id: string, text: string) => void;
+    /**
+     * A cell's words, as typing in it ends: `then` says what follows - typing
+     * stops (`exit`), goes on in the cell now chosen (`stay`), or moves to the
+     * next cell or the one before (`next`, `back`).
+     */
+    onCell: (
+        id: string,
+        at: tables.CellAt,
+        text: string,
+        then: "exit" | "stay" | "next" | "back"
+    ) => void;
+    /** A table's columns resized. */
+    onTable: (id: string, table: tables.SlideTable) => void;
 }) {
     const look = useContext(SlideLooks)(slideId);
     const layer = useRef<HTMLDivElement | null>(null);
     const [draft, setDraft] = useState<Map<string, Draft> | null>(null);
     const [guides, setGuides] = useState<readonly deck.Guide[]>([]);
     const [area, setArea] = useState<deck.BoxFrame | null>(null);
+    /** A table's columns, while their border is being dragged. */
+    const [columns, setColumns] = useState<{ id: string; table: tables.SlideTable } | null>(null);
     const [size, setSize] = useState({ width: 0, height: 0 });
     useEffect(() => {
         const one = layer.current;
@@ -683,7 +699,7 @@ export function SlideStage({
             if (gesture.kind !== "move" || !gesture.click) return;
             // A click on a box that was already chosen puts the caret in it;
             // on one of several chosen, it chooses that one alone.
-            if (gesture.click.then === "edit") onEdit(gesture.click.id);
+            if (gesture.click.then === "edit") onEdit(gesture.click.id, gesture.click.cell);
             else choose([gesture.click.id]);
         };
         const up = (): void => finish(true);
@@ -704,6 +720,16 @@ export function SlideStage({
 
     const byId = (ids: readonly string[]): deck.Box[] =>
         boxes.filter((box) => ids.includes(box.id));
+
+    /** The cell of a table a press landed on, if it landed on one. */
+    const cellAt = (target: EventTarget | null): tables.CellAt | undefined => {
+        if (!(target instanceof Element)) return undefined;
+        const found = target.closest<HTMLElement>("[data-cell]")?.dataset.cell;
+        const [row, col] = (found ?? "").split(":").map(Number);
+        return Number.isInteger(row) && Number.isInteger(col)
+            ? { row: row as number, col: col as number }
+            : undefined;
+    };
 
     const press = (box: deck.Box, typing: boolean) => (event: ReactPointerEvent) => {
         if (typing || event.button !== 0) return;
@@ -739,8 +765,8 @@ export function SlideStage({
                 kind: "move",
                 starts: byId(current),
                 click: alone
-                    ? deck.holdsText(box)
-                        ? { id: box.id, then: "edit" }
+                    ? deck.typable(box)
+                        ? { id: box.id, then: "edit", cell: cellAt(event.target) }
                         : null
                     : { id: box.id, then: "alone" }
             });
@@ -753,8 +779,60 @@ export function SlideStage({
 
     const drawn = (box: deck.Box): deck.Box => {
         const frame = draft?.get(box.id);
-        return frame ? { ...box, ...frame } : box;
+        const sized = columns?.id === box.id ? { ...box, table: columns.table } : box;
+        return frame ? { ...sized, ...frame } : sized;
     };
+
+    /** A table's column border dragged: the two columns either side of it
+     *  trade width, written once on release. */
+    const dragColumn = (event: ReactPointerEvent, box: deck.Box, border: number): void => {
+        event.stopPropagation();
+        const start = box.table;
+        if (event.button !== 0 || !start || !layer.current) return;
+        const across = layer.current.getBoundingClientRect().width * box.w;
+        const fromX = event.clientX;
+        let last = start;
+        const move = (at: PointerEvent): void => {
+            last = tables.resizeCol(start, border, (at.clientX - fromX) / Math.max(1, across));
+            setColumns({ id: box.id, table: last });
+        };
+        const finish = (commit: boolean): void => {
+            window.removeEventListener("pointermove", move);
+            window.removeEventListener("pointerup", up);
+            window.removeEventListener("pointercancel", cancel);
+            window.removeEventListener("keydown", escape, true);
+            gestureEnd.current = null;
+            setColumns(null);
+            if (commit && last !== start) onTable(box.id, last);
+        };
+        const up = (): void => finish(true);
+        const cancel = (): void => finish(false);
+        const escape = (press: KeyboardEvent): void => {
+            if (press.key !== "Escape") return;
+            press.preventDefault();
+            press.stopPropagation();
+            finish(false);
+        };
+        gestureEnd.current = () => finish(false);
+        window.addEventListener("pointermove", move);
+        window.addEventListener("pointerup", up);
+        window.addEventListener("pointercancel", cancel);
+        window.addEventListener("keydown", escape, true);
+    };
+    /** What typing in a table's cells does, for the table being typed in. */
+    const cellEditing = (box: deck.Box): CellEditing => {
+        const at = box.table
+            ? tables.clampCell(box.table, editingCell ?? { row: 0, col: 0 })
+            : { row: 0, col: 0 };
+        return {
+            at,
+            onDone: (text) => onCell(box.id, at, text, "exit"),
+            onKeep: (text) => onCell(box.id, at, text, "stay"),
+            onMove: (text, back) => onCell(box.id, at, text, back ? "back" : "next"),
+            onPick: (next) => onEdit(box.id, next)
+        };
+    };
+
     const chosenBoxes = boxes.filter((box) => chosen.includes(box.id)).map(drawn);
     const single = chosenBoxes.length === 1 ? chosenBoxes[0]! : null;
     const handlesFor = chosenBoxes.length > 0 ? deck.boundsOf(chosenBoxes) : null;
@@ -788,7 +866,7 @@ export function SlideStage({
             <CurrentLook.Provider value={look}>
                 {boxes.map((one) => {
                     const box = drawn(one);
-                    const typing = editing === box.id && deck.holdsText(box);
+                    const typing = editing === box.id && deck.typable(box);
                     const line = deck.isLine(box);
                     const empty = box.kind === "text" && !box.text.trim();
                     return (
@@ -813,10 +891,10 @@ export function SlideStage({
                                     choose(deck.unitOf(boxes, box.id));
                                 }}
                                 onPointerDown={line ? undefined : press(one, typing)}
-                                onDoubleClick={() => {
-                                    if (!deck.holdsText(box)) return;
+                                onDoubleClick={(event) => {
+                                    if (!deck.typable(box)) return;
                                     choose([box.id]);
-                                    onEdit(box.id);
+                                    onEdit(box.id, cellAt(event.target));
                                 }}
                                 className={cn(
                                     "absolute outline-none",
@@ -826,7 +904,9 @@ export function SlideStage({
                                 )}
                                 style={frameStyle(box)}
                             >
-                                {line ? null : typing ? (
+                                {line ? null : typing && box.kind === "table" ? (
+                                    <TableArt box={box} look={look} editing={cellEditing(box)} />
+                                ) : typing ? (
                                     <>
                                         <ShapeArt box={box} />
                                         <TextEditor
@@ -922,6 +1002,20 @@ export function SlideStage({
                             onPress={resizing}
                         />
                     )}
+                    {single?.table && editing !== single.id
+                        ? tables
+                              .colBorders(single.table)
+                              .map((at, border) => (
+                                  <span
+                                      key={border}
+                                      role="presentation"
+                                      title={columnLabel}
+                                      onPointerDown={(event) => dragColumn(event, single, border)}
+                                      className="pointer-events-auto absolute inset-y-0 w-2 -translate-x-1/2 cursor-col-resize"
+                                      style={{ left: `${at * 100}%` }}
+                                  />
+                              ))
+                        : null}
                 </div>
             ) : null}
 

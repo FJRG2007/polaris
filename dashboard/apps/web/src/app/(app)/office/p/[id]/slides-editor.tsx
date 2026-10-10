@@ -19,7 +19,11 @@
  */
 
 import * as deck from "@/lib/office/deck";
+import * as tables from "@/lib/office/slide-table";
+import * as charts from "@/lib/office/slide-chart";
 import * as edits from "./deck-edits";
+import { ChartDataDialog } from "./chart-data-dialog";
+import { ChartMenu, TableMenu } from "./insert-menus";
 import { Present } from "./present";
 import {
     FormatBar,
@@ -207,6 +211,10 @@ export function SlidesEditor({
     /** The boxes chosen, in the order they were. */
     const [chosen, setChosen] = useState<string[]>([]);
     const [editing, setEditing] = useState("");
+    /** The cell being typed into, when a table is. */
+    const [editingCell, setEditingCell] = useState<tables.CellAt | null>(null);
+    /** The chart whose data is open for editing. */
+    const [chartData, setChartData] = useState("");
     /** The slide the show started from, and how it is shown, while it runs. */
     const [presenting, setPresenting] = useState<{
         from: number;
@@ -229,6 +237,8 @@ export function SlidesEditor({
         [onSlide, chosen]
     );
     const chosenIds = chosenBoxes.map((box) => box.id);
+    // The chart whose sheet is open - gone if somebody removed it meanwhile.
+    const chartBox = onSlide.find((box) => box.id === chartData) ?? null;
     const single = chosenBoxes.length === 1 ? chosenBoxes[0]! : null;
 
     const goTo = useCallback((index: number) => {
@@ -288,6 +298,63 @@ export function SlidesEditor({
         );
     };
 
+    const addTable = (rows: number, cols: number): void => {
+        if (!slide) return;
+        const id = edits.addTable(doc, slide.id, rows, cols);
+        setChosen([id]);
+        // Straight into its first cell, as in Google Slides.
+        setEditingCell({ row: 0, col: 0 });
+        setEditing(id);
+    };
+
+    const addChart = (kind: charts.ChartKind): void => {
+        if (!slide) return;
+        const id = edits.addChart(
+            doc,
+            slide.id,
+            charts.sampleChart(kind, {
+                category: (number) => t("slides.chart.categoryN", { number }),
+                series: (number) => t("slides.chart.seriesN", { number })
+            })
+        );
+        setChosen([id]);
+        setEditing("");
+        // Its numbers are made up; the sheet to change them opens at once, as
+        // PowerPoint opens its datasheet.
+        setChartData(id);
+    };
+
+    /** A cell's words written as typing in it ends, and typing taken where
+     *  the press or the key said - see the stage's onCell. */
+    const onCell = (
+        boxId: string,
+        at: tables.CellAt,
+        text: string,
+        then: "exit" | "stay" | "next" | "back"
+    ): void => {
+        if (!slide) return;
+        edits.setCell(doc, slide.id, boxId, at, text);
+        if (then === "exit") {
+            setEditing((held) => (held === boxId ? "" : held));
+            return;
+        }
+        if (then === "stay") return;
+        const stored = edits.boxesOf(doc).get(deck.boxKey(slide.id, boxId));
+        const table = stored ? deck.readBox(stored).table : null;
+        if (!table) return;
+        const next = tables.nextCell(table, at, then === "back");
+        if (next === null) return;
+        if (next === "grow") {
+            // Tab in the last cell adds a row and goes on typing in it.
+            edits.updateTable(doc, slide.id, boxId, (one) =>
+                tables.insertRow(one, tables.rowCount(one))
+            );
+            setEditingCell({ row: tables.rowCount(table), col: 0 });
+            return;
+        }
+        setEditingCell(next);
+    };
+
     const addBox = (kind: deck.BoxKind, shape?: deck.ShapeKind): void => {
         if (!slide) return;
         const id = edits.addBox(doc, slide.id, kind, shape);
@@ -343,6 +410,8 @@ export function SlidesEditor({
 
     const nameOf = (box: deck.Box): string => {
         if (box.kind === "image") return t("slides.image.name");
+        if (box.kind === "table") return t("slides.table.name");
+        if (box.kind === "chart") return t("slides.chart.name");
         const words = box.text.trim();
         if (box.kind === "text") return words || placeholderOf(box);
         const shape = t(`slides.shapes.${box.shape}`);
@@ -507,7 +576,8 @@ export function SlidesEditor({
                     removeChosen();
                     return true;
                 case "office.slides.edit":
-                    if (!single || !deck.holdsText(single)) return false;
+                    if (!single || !deck.typable(single)) return false;
+                    setEditingCell({ row: 0, col: 0 });
                     setEditing(single.id);
                     return true;
                 case "office.slides.group":
@@ -532,10 +602,7 @@ export function SlidesEditor({
         const copied = deck.stackOrder(chosenBoxes);
         event.clipboardData.setData(deck.CLIPBOARD_TYPE, deck.writeClipboard(copied, imageSource));
         // Words as words, for pasting into anything that is not a deck.
-        const words = copied
-            .map((box) => box.text.trim())
-            .filter(Boolean)
-            .join("\n");
+        const words = copied.map(deck.boxWords).filter(Boolean).join("\n");
         if (words) event.clipboardData.setData("text/plain", words);
         if (cut && editable) removeChosen();
     };
@@ -786,6 +853,8 @@ export function SlidesEditor({
                                                 {t("slides.image.insert")}
                                             </span>
                                         </Button>
+                                        <TableMenu onPick={addTable} />
+                                        <ChartMenu onPick={addChart} />
                                         <input
                                             ref={picker}
                                             type="file"
@@ -829,6 +898,14 @@ export function SlidesEditor({
                                                 onDistribute={distributeChosen}
                                                 onGroup={groupChosen}
                                                 onUngroup={ungroupChosen}
+                                                cell={editingCell}
+                                                onTable={(id, edit) =>
+                                                    edits.updateTable(doc, slide.id, id, edit)
+                                                }
+                                                onChart={(id, chart) =>
+                                                    edits.setChart(doc, slide.id, id, chart)
+                                                }
+                                                onEditData={setChartData}
                                             />
                                         ) : slide ? (
                                             <DesignBar
@@ -943,12 +1020,22 @@ export function SlidesEditor({
                                             boxes={onSlide}
                                             chosen={chosenIds}
                                             editing={editing}
+                                            editingCell={editingCell}
                                             placeholderOf={placeholderOf}
                                             nameOf={nameOf}
                                             resizeLabel={t("slides.resize")}
                                             lineEndLabel={t("slides.lineEnd")}
+                                            columnLabel={t("slides.table.columnWidth")}
                                             onChoose={setChosen}
-                                            onEdit={setEditing}
+                                            onEdit={(id, cell) => {
+                                                setEditing(id);
+                                                if (cell) setEditingCell(cell);
+                                                else if (!id) setEditingCell(null);
+                                            }}
+                                            onCell={onCell}
+                                            onTable={(id, table) =>
+                                                edits.updateTable(doc, slide.id, id, () => table)
+                                            }
                                             onFrames={(frames) =>
                                                 edits.setFrames(doc, slide.id, frames)
                                             }
@@ -997,6 +1084,18 @@ export function SlidesEditor({
                     />
                 ) : null}
                 <ShortcutsDialog app="office" open={helpOpen} onOpenChange={setHelpOpen} />
+                {slide && chartBox?.chart ? (
+                    <ChartDataDialog
+                        chart={chartBox.chart}
+                        look={lookFor(slide.id)}
+                        font={deck.fontOf(chartBox, lookFor(slide.id))}
+                        open
+                        onOpenChange={(open) => {
+                            if (!open) setChartData("");
+                        }}
+                        onSave={(chart) => edits.setChart(doc, slide.id, chartBox.id, chart)}
+                    />
+                ) : null}
             </SlideLookProvider>
         </ImageSourceProvider>
     );
