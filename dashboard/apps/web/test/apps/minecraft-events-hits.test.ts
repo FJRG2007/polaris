@@ -126,6 +126,10 @@ describe("who a hit is credited to", () => {
         expect(potato.hurtByHolder(null, "Ana")).toBe(false);
         // Not asked (before 1.19.4): anybody hurt was the holder's.
         expect(potato.hurtByHolder(undefined, "Ana")).toBe(true);
+        expect(potato.hurtByHolder(undefined, "Ana", 1)).toBe(true);
+        // Not asked, and two holders struck: either could have, so neither.
+        expect(potato.hurtByHolder(undefined, "Ana", 2)).toBe(false);
+        expect(potato.hurtByHolder("Ana", "Ana", 2)).toBe(true);
     });
 
     it("hide and seek: to the seeker the game names, nobody for a fall, else the nearest who struck", () => {

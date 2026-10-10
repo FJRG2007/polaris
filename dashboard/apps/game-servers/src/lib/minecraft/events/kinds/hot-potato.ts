@@ -425,8 +425,9 @@ export function holderNamed(state: PotatoState, name: string): Holder | null {
 
 /**
  * Whom the holder hit, of those the game says were hurt since the last look:
- * the nearest to the holder. Nobody else can hurt anybody - everybody but the
- * holder is weakened past it - so any of them was hit by the holder.
+ * the nearest to the holder. Only a holder can hurt anybody - everybody else
+ * is weakened past it - so `hurt` is whoever `hurtByHolder` credits to this
+ * one.
  */
 export function hitBy(
     holder: { x: number; z: number },
@@ -446,9 +447,15 @@ export function hitBy(
 
 /** Whether somebody hurt was hurt by the holder: the game's word where it was
  *  asked (`hits-service.attackers`, from 1.19.4; null when nothing hurt them),
- *  anybody hurt where it was not. */
-export function hurtByHolder(attacker: string | null | undefined, holder: string): boolean {
-    if (attacker === undefined) return true;
+ *  and where it was not, anybody hurt - but only while the holder was the one
+ *  holder who struck (`strikers`), since holders can hurt each other and any
+ *  of them could have. */
+export function hurtByHolder(
+    attacker: string | null | undefined,
+    holder: string,
+    strikers = 1
+): boolean {
+    if (attacker === undefined) return strikers === 1;
     return attacker !== null && attacker.toLowerCase() === holder.toLowerCase();
 }
 

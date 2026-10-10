@@ -227,6 +227,7 @@ async function tick(ctx: KindContext, lines: string[]): Promise<string | null> {
                   hurtNow.map((one) => one.name)
               )
             : new Map<string, string | null>();
+    const strikers = state.holders.filter((one) => struck.has(lower(one.name))).length;
     for (const { name: holder } of passing) {
         const from = here.get(lower(holder));
         const victims = hurtNow.filter((one) => !potato.holderNamed(state, one.name));
@@ -234,7 +235,9 @@ async function tick(ctx: KindContext, lines: string[]): Promise<string | null> {
             ? potato.hitBy(
                   from,
                   victims
-                      .filter((one) => potato.hurtByHolder(by.get(lower(one.name)), holder))
+                      .filter((one) =>
+                          potato.hurtByHolder(by.get(lower(one.name)), holder, strikers)
+                      )
                       .map((one) => ({ ...here.get(lower(one.name))!, name: one.name }))
               )
             : null;
