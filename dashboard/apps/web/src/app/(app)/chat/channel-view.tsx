@@ -2340,6 +2340,7 @@ export function ChannelView({
                             // except in a one-to-one, which nobody is added to:
                             // the call moves into a new group instead.
                             mayInvite={channel.kind === "dm" || channel.mayInvite}
+                            mayRecord={channel.kind === "dm" || channel.kind === "group"}
                             onStage={setStaged}
                             expanded={expanded}
                             onExpand={

@@ -21,9 +21,9 @@
  * for the same reason: five labelled buttons is a sentence to read every time
  * somebody wants to mute, and these five shapes are already known by everybody
  * who has ever been in a call. The words are still there for anybody who needs
- * them - as the title and the accessible name - and the two things that are not
- * about the call itself, adding somebody and recording, sit out of the way at
- * the top rather than competing with the controls at the bottom.
+ * them - as the title and the accessible name - and what is not reached for
+ * mid-sentence, raising a hand, adding somebody and recording, sits out of the
+ * way at the top rather than competing with the controls at the bottom.
  *
  * A tile is ringed while its owner is talking. With cameras off - which is most
  * calls - there is otherwise nothing at all to say who is speaking, because the
@@ -174,7 +174,12 @@ export function CallRoom({
      *  is in. False in a group whose owner keeps adding people to themselves,
      *  where the service refuses it. Absent - a meeting of its own, a guest -
      *  means there is no such rule to apply. */
-    mayInvite = true
+    mayInvite = true,
+    /** Whether everybody in the call may record it, not only whoever started
+     *  it. True in a direct message or a group, which are between equals: the
+     *  person who happened to ring first is not the one who owns the call.
+     *  Everybody is told while it runs either way - see `call-recorder`. */
+    mayRecord = false
 }: {
     meetingId: string;
     /**
@@ -206,6 +211,7 @@ export function CallRoom({
     onExpand?: (expanded: boolean) => void;
     viewerId?: string;
     mayInvite?: boolean;
+    mayRecord?: boolean;
 }) {
     const t = useTranslations("chat");
     const ts = useTranslations("shortcuts");
@@ -580,10 +586,12 @@ export function CallRoom({
     // where it is heard wherever the reader is standing. This is left for the
     // guest page, which has no provider and no other screen to be on.
     const held = useHeldCall();
-    /** Whether this screen may start a recording at all: the host, in a browser
-     *  that can record video, with the call held above it - the guest page has
-     *  no provider and nowhere to put what it would make. */
-    const canRecord = canShare && held !== null && held.recording.supported;
+    /** Whether this screen may start a recording at all: the host - or, in a
+     *  conversation of equals, anybody in it - in a browser that can record
+     *  video, with the call held above it. The guest page has no provider and
+     *  nowhere to put what it would make. */
+    const canRecord =
+        (canShare || (Boolean(viewerId) && mayRecord)) && held !== null && held.recording.supported;
     const wasEnded = useRef(false);
     useEffect(() => {
         if (!held && call.ended && !wasEnded.current) playCallSound("hangUp");
@@ -607,97 +615,133 @@ export function CallRoom({
         // window with a notice up used to look like: the messages drawn under
         // the call's own rows.
         <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden p-3">
-            {/* What is not a control: bringing somebody in, and writing the call
-                down. Both are one-off decisions rather than things anybody
-                reaches for mid-sentence, so they sit up here as icons and leave
-                the bar at the bottom to the five that are. */}
-            {(viewerId || canRecord || onExpand) && (
-                <div className="flex shrink-0 items-center justify-end gap-1">
-                    {/* The band, made the whole column and back. Where a
-                        watched stream gets the people in a row under it -
-                        see `directLayout`. */}
-                    {onExpand && (
-                        <button
-                            type="button"
-                            onClick={() => onExpand(!expanded)}
-                            aria-pressed={expanded}
-                            aria-label={
-                                expanded ? t("callRoom.shrinkTheCall") : t("callRoom.expandTheCall")
-                            }
-                            title={
-                                expanded
-                                    ? t("callRoom.shrinkTheCallTheConversation")
-                                    : t("callRoom.expandTheCallToThe")
-                            }
-                            className="rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                        >
-                            {expanded ? (
-                                <ChevronsUp className="size-4" />
-                            ) : (
-                                <ChevronsDown className="size-4" />
-                            )}
-                        </button>
+            {/* What is not a control: raising a hand, bringing somebody in, and
+                writing the call down. None of them is reached for mid-sentence,
+                so they sit up here as icons and leave the bar at the bottom to
+                the controls that are. Always drawn, because the hand is
+                everybody's - a guest included. */}
+            <div className="flex shrink-0 items-center justify-end gap-1">
+                {/* A hand stays up until it is put down, and everybody who
+                    joins later sees it. The number says how many are up, on
+                    the button that is about hands; the strip below says
+                    who. */}
+                <button
+                    type="button"
+                    onClick={() => call.setHandRaised(!call.handRaised)}
+                    aria-pressed={call.handRaised}
+                    aria-label={
+                        call.handRaised ? t("callRoom.lowerYourHand") : t("callRoom.raiseYourHand")
+                    }
+                    title={
+                        call.hands.length > 0
+                            ? t(
+                                  call.handRaised
+                                      ? "callRoom.handsUpLower"
+                                      : "callRoom.handsUpRaise",
+                                  {
+                                      count: call.hands.length
+                                  }
+                              )
+                            : t("callRoom.raiseYourHand")
+                    }
+                    className={cn(
+                        "flex items-center gap-1 rounded p-1.5 transition-colors",
+                        call.handRaised
+                            ? "bg-warning-soft text-warning-ink hover:bg-warning-soft"
+                            : "text-muted-foreground hover:bg-muted hover:text-foreground"
                     )}
-                    {canRecord && (
-                        <button
-                            type="button"
-                            onClick={() =>
-                                call.recording ? held?.recording.stop() : setAsking(true)
-                            }
-                            aria-pressed={call.recording}
-                            aria-label={
-                                call.recording
-                                    ? t("callRoom.stopRecording")
-                                    : t("callRoom.recordThisCall")
-                            }
-                            // What does not move. The time runs in the button
-                            // itself; a tooltip carrying it changed every second,
-                            // and a browser hides one whose text changes.
-                            title={
-                                call.recording
-                                    ? t("callRoom.stopRecording")
-                                    : t("callRoom.writeThisCallToA")
-                            }
-                            className={cn(
-                                "flex items-center gap-1.5 rounded transition-colors",
-                                call.recording
-                                    ? "border border-danger-edge bg-danger-soft px-2 py-1 text-danger hover:border-danger"
-                                    : "p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
-                            )}
-                        >
-                            {call.recording ? (
-                                <>
-                                    <Circle
-                                        aria-hidden
-                                        className="size-2.5 shrink-0 fill-current motion-safe:animate-pulse"
-                                    />
-                                    <span className="text-xs font-medium tabular-nums">
-                                        {clock(held?.recording.seconds ?? 0)}
-                                    </span>
-                                    <Square aria-hidden className="size-3 shrink-0 fill-current" />
-                                </>
-                            ) : (
-                                <RecordGlyph />
-                            )}
-                        </button>
+                >
+                    <Hand className="size-4 shrink-0" />
+                    {call.hands.length > 0 && (
+                        <span aria-hidden className="text-xs font-semibold tabular-nums">
+                            {call.hands.length}
+                        </span>
                     )}
-                    {viewerId && (mayInvite || canShare) && (
-                        <button
-                            type="button"
-                            onClick={() => setInviting(true)}
-                            aria-label={
-                                mayInvite ? t("callRoom.addPeople") : t("callRoom.shareALinkToThis")
-                            }
-                            title={
-                                mayInvite ? t("callRoom.addPeople") : t("callRoom.shareALinkToThis")
-                            }
-                            className="rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                        >
-                            <UserPlus className="size-4" />
-                        </button>
-                    )}
-                </div>
-            )}
+                </button>
+                {/* The band, made the whole column and back. Where a
+                    watched stream gets the people in a row under it -
+                    see `directLayout`. */}
+                {onExpand && (
+                    <button
+                        type="button"
+                        onClick={() => onExpand(!expanded)}
+                        aria-pressed={expanded}
+                        aria-label={
+                            expanded ? t("callRoom.shrinkTheCall") : t("callRoom.expandTheCall")
+                        }
+                        title={
+                            expanded
+                                ? t("callRoom.shrinkTheCallTheConversation")
+                                : t("callRoom.expandTheCallToThe")
+                        }
+                        className="rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                    >
+                        {expanded ? (
+                            <ChevronsUp className="size-4" />
+                        ) : (
+                            <ChevronsDown className="size-4" />
+                        )}
+                    </button>
+                )}
+                {canRecord && (
+                    <button
+                        type="button"
+                        onClick={() =>
+                            call.recording ? held?.recording.stop() : setAsking(true)
+                        }
+                        aria-pressed={call.recording}
+                        aria-label={
+                            call.recording
+                                ? t("callRoom.stopRecording")
+                                : t("callRoom.recordThisCall")
+                        }
+                        // What does not move. The time runs in the button
+                        // itself; a tooltip carrying it changed every second,
+                        // and a browser hides one whose text changes.
+                        title={
+                            call.recording
+                                ? t("callRoom.stopRecording")
+                                : t("callRoom.writeThisCallToA")
+                        }
+                        className={cn(
+                            "flex items-center gap-1.5 rounded transition-colors",
+                            call.recording
+                                ? "border border-danger-edge bg-danger-soft px-2 py-1 text-danger hover:border-danger"
+                                : "p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+                        )}
+                    >
+                        {call.recording ? (
+                            <>
+                                <Circle
+                                    aria-hidden
+                                    className="size-2.5 shrink-0 fill-current motion-safe:animate-pulse"
+                                />
+                                <span className="text-xs font-medium tabular-nums">
+                                    {clock(held?.recording.seconds ?? 0)}
+                                </span>
+                                <Square aria-hidden className="size-3 shrink-0 fill-current" />
+                            </>
+                        ) : (
+                            <RecordGlyph />
+                        )}
+                    </button>
+                )}
+                {viewerId && (mayInvite || canShare) && (
+                    <button
+                        type="button"
+                        onClick={() => setInviting(true)}
+                        aria-label={
+                            mayInvite ? t("callRoom.addPeople") : t("callRoom.shareALinkToThis")
+                        }
+                        title={
+                            mayInvite ? t("callRoom.addPeople") : t("callRoom.shareALinkToThis")
+                        }
+                        className="rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                    >
+                        <UserPlus className="size-4" />
+                    </button>
+                )}
+            </div>
 
             {call.error && (
                 <p
@@ -1284,47 +1328,10 @@ export function CallRoom({
                     onChoose={speakers.choose}
                 />
 
-                {/* Two ways to say something without interrupting. A hand stays
-                    up until it is put down and everybody who joins later sees
-                    it; a reaction is over in three seconds. See
+                {/* A reaction is over in three seconds, so it stays where the
+                    hands already are. The raised hand, which stays up until it
+                    is put down, sits in the row at the top. See
                     `call-signals`. */}
-                <Button
-                    size="icon"
-                    variant={call.handRaised ? "primary" : "secondary"}
-                    aria-pressed={call.handRaised}
-                    aria-label={
-                        call.handRaised ? t("callRoom.lowerYourHand") : t("callRoom.raiseYourHand")
-                    }
-                    title={
-                        call.hands.length > 0
-                            ? t(
-                                  call.handRaised
-                                      ? "callRoom.handsUpLower"
-                                      : "callRoom.handsUpRaise",
-                                  {
-                                      count: call.hands.length
-                                  }
-                              )
-                            : t("callRoom.raiseYourHand")
-                    }
-                    onClick={() => call.setHandRaised(!call.handRaised)}
-                    className="relative"
-                >
-                    <Hand className="size-4" />
-                    {/* How many are up, on the button that is about hands. The
-                        strip above says who; this says there is something up
-                        there to read, from the bar somebody's eyes are already
-                        on. */}
-                    {call.hands.length > 0 && (
-                        <span
-                            aria-hidden
-                            className="absolute -right-1 -top-1 flex size-4 items-center justify-center rounded-full bg-warning text-[0.625rem] font-semibold text-warning-foreground"
-                        >
-                            {call.hands.length}
-                        </span>
-                    )}
-                </Button>
-
                 <ReactionMenu onReact={call.react} />
 
                 <Button
