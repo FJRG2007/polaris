@@ -166,6 +166,60 @@ export async function startNowAction(installedAppId: string): Promise<Answer> {
     }
 }
 
+/** A player's name as the game spells it: what the roster offered. */
+const playerName = z
+    .string()
+    .trim()
+    .regex(/^\.?[A-Za-z0-9_]{1,16}$/);
+
+const forceSchema = z.discriminatedUnion("who", [
+    z.object({ installedAppId: serverId, who: z.literal("everybody") }),
+    z.object({
+        installedAppId: serverId,
+        who: z.literal("chosen"),
+        players: z.array(playerName).min(1).max(200)
+    })
+]);
+
+/**
+ * Bring players into the event on now, as if each had typed `join`: everybody
+ * on the server, or the ones chosen. Answers how many went in and who of the
+ * chosen is not on the server.
+ */
+export async function forceJoinAction(
+    input: z.input<typeof forceSchema>
+): Promise<Answer & { brought?: number; offline?: string[] }> {
+    const t = await gameWords("minecraft");
+    const parsed = forceSchema.safeParse(input);
+    if (!parsed.success) return { error: t("events.errors.forceJoin") };
+    const { installedAppId } = parsed.data;
+    try {
+        const { user, access } = await requireGameServer("games.console", installedAppId);
+        const outcome = await events.forceJoin({
+            ownerId: access.ownerId,
+            installedAppId,
+            everybody: parsed.data.who === "everybody",
+            players: parsed.data.who === "chosen" ? parsed.data.players : [],
+            by: user.id,
+            byName: user.name
+        });
+        await recordAudit({
+            actorId: user.id,
+            action: "games.events.force-join",
+            targetType: "installedApp",
+            targetId: installedAppId,
+            metadata: { players: outcome.brought, everybody: parsed.data.who === "everybody" }
+        });
+        return {
+            view: await events.eventsView(installedAppId),
+            brought: outcome.brought.length,
+            offline: outcome.offline
+        };
+    } catch (caught) {
+        return { error: await failure(caught, t("events.errors.forceJoin")) };
+    }
+}
+
 const stashSchema = z.object({ installedAppId: serverId, id: z.string().uuid() });
 
 /** A player's things an event could not give back, tried again now. */

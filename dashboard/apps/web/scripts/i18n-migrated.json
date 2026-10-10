@@ -1582,6 +1582,7 @@
         "game-servers/src/screens/installed/events-actions.ts",
         "game-servers/src/screens/installed/game-console.tsx",
         "game-servers/src/screens/installed/minecraft-events.tsx",
+        "game-servers/src/screens/installed/force-join-dialog.tsx",
         "web/src/lib/api-key-auth.ts",
         "web/src/lib/api-session.ts",
         "web/src/lib/app-bundles/actions.ts",

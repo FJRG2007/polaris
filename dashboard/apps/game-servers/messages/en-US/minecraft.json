@@ -1931,7 +1931,12 @@
             "noneOn": "No event is on",
             "alreadyStarted": "It has already started",
             "tooFewPlayers": "{count, plural, one {Only # player is on the server} other {Only # players are on the server}}; this event needs {needed}",
-            "needsVersion": "{kind} needs Minecraft {version} or later, and this server runs an older one."
+            "needsVersion": "{kind} needs Minecraft {version} or later, and this server runs an older one.",
+            "notJoinable": "This event is not one players join",
+            "joinClosed": "It no longer lets anybody in",
+            "notOnServer": "None of them is on the server",
+            "allIn": "They are all in it already",
+            "forceJoin": "They could not be brought in"
         },
         "starting": "{name} is starting.",
         "deleteTitle": "Delete {name}?",
@@ -2130,7 +2135,17 @@
         "downhillSteepness": {
             "gentle": "every 14 blocks",
             "steep": "every 9 blocks"
-        }
+        },
+        "bringIn": "Bring players in",
+        "bringInHint": "They join as if they had typed join, and are told so in the game.",
+        "bringEverybody": "Everybody on the server ({count})",
+        "bringNobodyLeft": "Everybody on the server is in it already.",
+        "bringChoose": "Or choose",
+        "bringConfirm": "Bring {count, plural, one {# player} other {# players}} in",
+        "broughtIn": "{count, plural, one {# player} other {# players}} brought in.",
+        "broughtSkipped": "Not on the server: {names}.",
+        "broughtList": "Brought in from here",
+        "broughtBy": "{name}, by {by}"
     },
     "editor": {
         "where": "Where",

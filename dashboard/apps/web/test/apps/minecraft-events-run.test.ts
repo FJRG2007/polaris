@@ -1945,9 +1945,8 @@ const plan = await import("@polaris-app/game-servers/src/lib/minecraft/events/pl
 const build = await import("@polaris-app/game-servers/src/lib/minecraft/events/kinds/build-battle");
 const boss = await import("@polaris-app/game-servers/src/lib/minecraft/events/kinds/boss");
 const hill = await import("@polaris-app/game-servers/src/lib/minecraft/events/kinds/hill");
-const hillService = await import(
-    "@polaris-app/game-servers/src/lib/minecraft/events/kinds/hill-service"
-);
+const hillService =
+    await import("@polaris-app/game-servers/src/lib/minecraft/events/kinds/hill-service");
 const playing = await import("@polaris-app/game-servers/src/lib/minecraft/activity");
 const arrival = await import("@polaris-app/game-servers/src/lib/minecraft/events/kinds/arrival");
 const arenaKind = await import("@polaris-app/game-servers/src/lib/minecraft/events/kinds/arena");
@@ -2528,6 +2527,43 @@ describe("the minute sweep", () => {
         const started = await events.sweepEvents();
         expect(started.started).toBe(1);
         expect(state().run?.trigger).toBe("random");
+    });
+
+    it("waits a whole gap after an event pressed on from the screen, not the gap it had left", async () => {
+        const fish = { ...newPreset("fishing", "fish"), minutes: 5 };
+        setUp([fish], {
+            minActive: 1,
+            random: {
+                enabled: true,
+                days: [],
+                from: "00:00",
+                to: "23:59",
+                minGap: 15,
+                maxGap: 15,
+                pool: [{ presetId: "fish", weight: 1 }]
+            }
+        });
+        await events.sweepEvents();
+        const armed = state().nextRandomAt!;
+        // Ten minutes on, five before the draw was due, one is started by hand.
+        await play(10 * 60_000);
+        await events.startEvent({
+            ownerId: "owner",
+            installedAppId: SERVER,
+            presetId: "fish",
+            trigger: "manual",
+            startedBy: null
+        });
+        const run = state().run!;
+        expect(state().nextRandomAt).toBe(run.endsAt + 15 * 60_000);
+        expect(state().nextRandomAt).toBeGreaterThan(armed);
+        // Called off a minute in: still a whole gap after it ended, at the least.
+        await play(60_000);
+        await events.cancelEvent("owner", SERVER);
+        await play(4_100);
+        expect(state().run).toBeNull();
+        const ended = state().history[0]!.endedAt;
+        expect(state().nextRandomAt).toBeGreaterThanOrEqual(ended + 15 * 60_000);
     });
 
     it("does not open an event players join with fewer on the server than must join it", async () => {
@@ -5440,9 +5476,8 @@ describe("a horde defense", () => {
     });
 });
 
-const infectionKind = await import(
-    "@polaris-app/game-servers/src/lib/minecraft/events/kinds/meteor-infection"
-);
+const infectionKind =
+    await import("@polaris-app/game-servers/src/lib/minecraft/events/kinds/meteor-infection");
 
 describe("a meteor shower", () => {
     const start = () =>
@@ -5785,9 +5820,8 @@ describe("a meteor shower", () => {
 
 const parkour = await import("@polaris-app/game-servers/src/lib/minecraft/events/kinds/parkour");
 const spleef = await import("@polaris-app/game-servers/src/lib/minecraft/events/kinds/spleef");
-const snowballPack = await import(
-    "@polaris-app/game-servers/src/lib/minecraft/events/kinds/snowball-pack"
-);
+const snowballPack =
+    await import("@polaris-app/game-servers/src/lib/minecraft/events/kinds/snowball-pack");
 
 /** Players typing in the chat, as the server log records it. */
 function chat(...said: [string, string][]): void {
@@ -5910,6 +5944,24 @@ describe("a parkour race", () => {
             difficulty: "medium" as const,
             height: 30
         }
+    });
+
+    it("keeps its racers from pushing each other, and lets them go after", async () => {
+        world.online = ["Ana", "Ben"];
+        setUp([race()]);
+        await startArena("race");
+        await play(2_100);
+        chat(["Ana", "join"], ["Ben", "join"]);
+        await play(42_100);
+        expect(world.sent).toContain("team modify pe_parkour collisionRule never");
+        expect(world.sent).toContain("team modify pe_parkour friendlyFire false");
+        // Onto it only from no team of the server's own.
+        expect(world.sent).toContain(
+            "execute if entity @a[name=Ana,team=] run team join pe_parkour Ana"
+        );
+        await events.cancelEvent("owner", SERVER);
+        await play(10_100);
+        expect(world.sent).toContain("team remove pe_parkour");
     });
 
     it("counts a checkpoint only from the one before it, and sends back whoever got past the next", async () => {
@@ -6552,9 +6604,8 @@ describe("spleef", () => {
         expect(world.sent.slice(back).filter((line) => line.startsWith("xp set Ana"))).toHaveLength(
             2
         );
-        const stashService = await import(
-            "@polaris-app/game-servers/src/lib/minecraft/events/kinds/stash-service"
-        );
+        const stashService =
+            await import("@polaris-app/game-servers/src/lib/minecraft/events/kinds/stash-service");
         expect(await stashService.failedStashes(SERVER)).toEqual([]);
         expect(stashRows.size).toBe(0);
     });
@@ -7186,9 +7237,8 @@ describe("a TNT run", () => {
     });
 });
 
-const dropperKind = await import(
-    "@polaris-app/game-servers/src/lib/minecraft/events/kinds/dropper"
-);
+const dropperKind =
+    await import("@polaris-app/game-servers/src/lib/minecraft/events/kinds/dropper");
 
 describe("a dropper", () => {
     const run = () => ({
@@ -7820,9 +7870,8 @@ describe("players' own things through an arena", () => {
         const kept = state().run!.entrants.find((one) => one.name === "Ana")!.stash!;
         // As if the slots were never emptied.
         world.inv.Ana = copyOf(ana);
-        const stashService = await import(
-            "@polaris-app/game-servers/src/lib/minecraft/events/kinds/stash-service"
-        );
+        const stashService =
+            await import("@polaris-app/game-servers/src/lib/minecraft/events/kinds/stash-service");
         const how = await stashService.giveBack(
             fakeServer(),
             "Ana",
@@ -7879,9 +7928,8 @@ describe("players' own things through an arena", () => {
         setUp([duelOf()]);
         await joinAndStart("duel");
         const kept = state().run!.entrants.find((one) => one.name === "Ana")!.stash!;
-        const stashService = await import(
-            "@polaris-app/game-servers/src/lib/minecraft/events/kinds/stash-service"
-        );
+        const stashService =
+            await import("@polaris-app/game-servers/src/lib/minecraft/events/kinds/stash-service");
         // The kit off first, as an end takes it before anything is given back.
         await fakeServer().say(["clear Ana *[minecraft:custom_data={polaris_event:1b}]"]);
         // A give-back that ran to the end once...
@@ -7909,9 +7957,8 @@ describe("players' own things through an arena", () => {
             [103, { ...ana.get(103)! }]
         ]);
         stashRows.get(kept.record!)!.writing = JSON.stringify(kept.kept.map((one) => one.slot));
-        const stashService = await import(
-            "@polaris-app/game-servers/src/lib/minecraft/events/kinds/stash-service"
-        );
+        const stashService =
+            await import("@polaris-app/game-servers/src/lib/minecraft/events/kinds/stash-service");
         const from = world.sent.length;
         expect(await stashService.giveBack(fakeServer(), "Ana", kept, async () => undefined)).toBe(
             "done"
@@ -7935,9 +7982,8 @@ describe("players' own things through an arena", () => {
         // ever written there by a give-back.
         world.inv.Ana = new Map([[0, { ...ana.get(0)! }]]);
         world.pickUp = true;
-        const stashService = await import(
-            "@polaris-app/game-servers/src/lib/minecraft/events/kinds/stash-service"
-        );
+        const stashService =
+            await import("@polaris-app/game-servers/src/lib/minecraft/events/kinds/stash-service");
         expect(await stashService.giveBack(fakeServer(), "Ana", kept, async () => undefined)).toBe(
             "done"
         );
@@ -7957,9 +8003,8 @@ describe("players' own things through an arena", () => {
         expect(kept.experience).toEqual({ levels: 12, points: 7 });
         // A prize delivered before the give-back.
         world.levels.Ana = 5;
-        const stashService = await import(
-            "@polaris-app/game-servers/src/lib/minecraft/events/kinds/stash-service"
-        );
+        const stashService =
+            await import("@polaris-app/game-servers/src/lib/minecraft/events/kinds/stash-service");
         const from = world.sent.length;
         expect(await stashService.giveBack(fakeServer(), "Ana", kept, async () => undefined)).toBe(
             "done"
@@ -7978,9 +8023,8 @@ describe("players' own things through an arena", () => {
         setUp([duelOf()]);
         await joinAndStart("duel");
         const kept = state().run!.entrants.find((one) => one.name === "Ana")!.stash!;
-        const stashService = await import(
-            "@polaris-app/game-servers/src/lib/minecraft/events/kinds/stash-service"
-        );
+        const stashService =
+            await import("@polaris-app/game-servers/src/lib/minecraft/events/kinds/stash-service");
         await fakeServer().say(["clear Ana *[minecraft:custom_data={polaris_event:1b}]"]);
         // Every stack back, then gone the moment her experience is asked for.
         world.onLine = (line) => {
@@ -8016,9 +8060,8 @@ describe("players' own things through an arena", () => {
         setUp([duelOf()]);
         await joinAndStart("duel");
         const kept = state().run!.entrants.find((one) => one.name === "Ana")!.stash!;
-        const stashService = await import(
-            "@polaris-app/game-servers/src/lib/minecraft/events/kinds/stash-service"
-        );
+        const stashService =
+            await import("@polaris-app/game-servers/src/lib/minecraft/events/kinds/stash-service");
         await fakeServer().say(["clear Ana *[minecraft:custom_data={polaris_event:1b}]"]);
         expect(await stashService.giveBack(fakeServer(), "Ana", kept, async () => undefined)).toBe(
             "done"
@@ -8070,9 +8113,8 @@ describe("players' own things through an arena", () => {
         await joinAndStart("duel");
         const kept = state().run!.entrants.find((one) => one.name === "Ana")!.stash!;
         expect(kept.experience).toEqual({ levels: 0, points: 1 });
-        const stashService = await import(
-            "@polaris-app/game-servers/src/lib/minecraft/events/kinds/stash-service"
-        );
+        const stashService =
+            await import("@polaris-app/game-servers/src/lib/minecraft/events/kinds/stash-service");
         await fakeServer().say(["clear Ana *[minecraft:custom_data={polaris_event:1b}]"]);
         // Earned since, so it is added; and the server refuses the add.
         world.levels.Ana = 3;
@@ -8306,9 +8348,8 @@ describe("players' own things through an arena", () => {
             dismissedAt: null,
             updatedAt: new Date()
         });
-        const stashService = await import(
-            "@polaris-app/game-servers/src/lib/minecraft/events/kinds/stash-service"
-        );
+        const stashService =
+            await import("@polaris-app/game-servers/src/lib/minecraft/events/kinds/stash-service");
         const failed = await stashService.failedStashes(SERVER);
         expect(failed[0]).toMatchObject({
             player: "Ana",
@@ -8788,9 +8829,8 @@ describe("a team duel", () => {
         expect(world.sent.filter((line) => /(^| run )spawnpoint /.test(line))).toEqual([]);
 
     it("brings a fallen duellist back to their side without touching anybody's spawn point", async () => {
-        const duel = await import(
-            "@polaris-app/game-servers/src/lib/minecraft/events/kinds/team-duel"
-        );
+        const duel =
+            await import("@polaris-app/game-servers/src/lib/minecraft/events/kinds/team-duel");
         world.online = ["Ana", "Ben"];
         // Ana sleeps in a bed; Ben never has.
         world.homes = { Ana: [120, -40] };
@@ -8831,9 +8871,8 @@ describe("a team duel", () => {
     });
 
     it("has the Polaris plugin or mod respawn a fallen duellist on their side, the spot set again when forgotten", async () => {
-        const duel = await import(
-            "@polaris-app/game-servers/src/lib/minecraft/events/kinds/team-duel"
-        );
+        const duel =
+            await import("@polaris-app/game-servers/src/lib/minecraft/events/kinds/team-duel");
         world.online = ["Ana", "Ben"];
         world.homes = { Ana: [120, -40] };
         world.respawnMod = true;
@@ -10014,6 +10053,72 @@ describe("the clock", () => {
         expect(
             world.sent.some((line) => line.startsWith("tellraw @a") && line.includes("starts in"))
         ).toBe(true);
+    });
+});
+
+describe("players brought in from the Events screen", () => {
+    const race = () => ({
+        ...newPreset("parkour", "race"),
+        minutes: 5,
+        options: {
+            place: { mode: "players" as const },
+            jumps: 12,
+            difficulty: "medium" as const,
+            height: 30
+        }
+    });
+    const force = (everybody: boolean, players: string[] = []) =>
+        events.forceJoin({
+            ownerId: "owner",
+            installedAppId: SERVER,
+            everybody,
+            players,
+            by: "user-1",
+            byName: "Op"
+        });
+
+    it("joins the chosen ones as if they had typed it, and keeps who brought them", async () => {
+        world.online = ["Ana", "Ben", "Cy"];
+        setUp([race()]);
+        await startArena("race");
+        await play(2_100);
+        chat(["Ana", "join"]);
+        await play(2_100);
+        const outcome = await force(false, ["ben", "Zed"]);
+        // As the game spells them, and who of the chosen is not on.
+        expect(outcome).toEqual({ brought: ["Ben"], offline: ["Zed"] });
+        await play(2_100);
+        expect(state().run!.stage!.joined).toEqual(["Ana", "Ben"]);
+        expect(state().run!.forced).toEqual([
+            { name: "Ben", by: "user-1", byName: "Op", at: expect.any(Number) }
+        ]);
+        expect(world.sent.some((line) => line.includes("Ben") && line.includes("You are in"))).toBe(
+            true
+        );
+        // Everybody: only who is not in yet. Then nobody is left to bring.
+        expect((await force(true)).brought).toEqual(["Cy"]);
+        await play(2_100);
+        expect(state().run!.stage!.joined).toEqual(["Ana", "Ben", "Cy"]);
+        expect(await refusal(force(true))).toBe("They are all in it already");
+        const view = await events.eventsView(SERVER);
+        expect(view.run).toMatchObject({ takesForced: true, inEvent: ["Ana", "Ben", "Cy"] });
+        expect(view.run!.forced.map((one) => one.name)).toEqual(["Ben", "Cy"]);
+        // An arena's sides are made at its start: in through its countdown only.
+        const arena = { ...state().run!, preset: newPreset("hot-potato", "potato") };
+        expect(events.takesForced({ ...arena, phase: "countdown" })).toBe(true);
+        expect(events.takesForced({ ...arena, phase: "running" })).toBe(false);
+        expect(events.takesForced({ ...state().run!, phase: "running" })).toBe(true);
+    });
+
+    it("is refused for an event nobody joins, and with none on", async () => {
+        world.online = ["Ana", "Ben"];
+        setUp([{ ...newPreset("mob-hunt", "hunt"), minutes: 10 }]);
+        await startArena("hunt");
+        expect(await refusal(force(true))).toBe("This event is not one players join");
+        expect(await refusal(force(false, ["Ana"]))).toBe("This event is not one players join");
+        await events.cancelEvent("owner", SERVER);
+        await play(4_100);
+        expect(await refusal(force(true))).toBe("No event is on");
     });
 });
 
@@ -11790,9 +11895,8 @@ describe("hide and seek", () => {
     it("builds a manor for the players, works its panels at Go, and takes them down first at the end", async () => {
         const hs = await kind();
         const manor = await manorKind();
-        const panels = await import(
-            "@polaris-app/game-servers/src/lib/minecraft/events/kinds/secret-panels"
-        );
+        const panels =
+            await import("@polaris-app/game-servers/src/lib/minecraft/events/kinds/secret-panels");
         world.online = [...names];
         setUp([hideOf(60)]);
         await joinAndStart("hide", names);
@@ -12370,9 +12474,8 @@ describe("the pace of an event", () => {
     });
 });
 
-const mazeKind = await import(
-    "@polaris-app/game-servers/src/lib/minecraft/events/kinds/nether-maze"
-);
+const mazeKind =
+    await import("@polaris-app/game-servers/src/lib/minecraft/events/kinds/nether-maze");
 const radarKit = await import("@polaris-app/game-servers/src/lib/minecraft/events/kinds/radar");
 
 describe("a deadly nether maze", () => {
@@ -12615,9 +12718,8 @@ describe("an acid rain", () => {
     });
 });
 
-const elytraKind = await import(
-    "@polaris-app/game-servers/src/lib/minecraft/events/kinds/elytra-race"
-);
+const elytraKind =
+    await import("@polaris-app/game-servers/src/lib/minecraft/events/kinds/elytra-race");
 
 describe("an elytra race", () => {
     const run = () => ({
@@ -12741,9 +12843,8 @@ describe("an elytra race", () => {
     });
 });
 
-const downhillKind = await import(
-    "@polaris-app/game-servers/src/lib/minecraft/events/kinds/downhill-race"
-);
+const downhillKind =
+    await import("@polaris-app/game-servers/src/lib/minecraft/events/kinds/downhill-race");
 
 describe("a downhill boat race", () => {
     const race = () => ({

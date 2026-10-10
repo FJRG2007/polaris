@@ -1931,7 +1931,12 @@
             "noneOn": "Nada en marcha",
             "alreadyStarted": "Ya ha empezado",
             "tooFewPlayers": "{count, plural, one {Solo hay # jugador conectado} other {Solo hay # jugadores conectados}}; este evento necesita {needed}",
-            "needsVersion": "{kind} necesita Minecraft {version} o posterior, y este servidor usa una más antigua."
+            "needsVersion": "{kind} necesita Minecraft {version} o posterior, y este servidor usa una más antigua.",
+            "notJoinable": "En este evento no se entra con join",
+            "joinClosed": "Ya no admite a nadie más",
+            "notOnServer": "Ninguno de ellos está en el servidor",
+            "allIn": "Ya están todos dentro",
+            "forceJoin": "No se les pudo meter en el evento"
         },
         "starting": "{name} está empezando.",
         "deleteTitle": "¿Borrar {name}?",
@@ -2130,7 +2135,17 @@
         "downhillSteepness": {
             "gentle": "cada 14 bloques",
             "steep": "cada 9 bloques"
-        }
+        },
+        "bringIn": "Meter jugadores",
+        "bringInHint": "Entran como si hubieran escrito join, y se les avisa en el juego.",
+        "bringEverybody": "Todos los del servidor ({count})",
+        "bringNobodyLeft": "Todos los del servidor ya están dentro.",
+        "bringChoose": "O elige",
+        "bringConfirm": "Meter a {count, plural, one {# jugador} other {# jugadores}}",
+        "broughtIn": "{count, plural, one {# jugador metido} other {# jugadores metidos}} en el evento.",
+        "broughtSkipped": "No están en el servidor: {names}.",
+        "broughtList": "Metidos desde aquí",
+        "broughtBy": "{name}, por {by}"
     },
     "editor": {
         "where": "Dónde",

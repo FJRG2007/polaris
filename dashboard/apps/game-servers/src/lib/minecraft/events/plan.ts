@@ -278,6 +278,24 @@ export function nextGap(settings: EventSettings, random: () => number): number {
     return Math.round((minGap + random() * Math.max(0, maxGap - minGap)) * 60_000);
 }
 
+/**
+ * The draw pushed back by an event it did not pick: started from the screen or
+ * a schedule, or ended at any time. The next drawn one is never sooner than
+ * `gap` after `after` - the end the event is due to have, or the one it had -
+ * so a manual start restarts the wait rather than landing a drawn event right
+ * behind it. Off, or not armed yet, it is left as it is: the draw arms itself
+ * a whole gap from its next look.
+ */
+export function rearmed(
+    settings: EventSettings,
+    nextRandomAt: number | null,
+    after: number,
+    gap: number
+): number | null {
+    if (!settings.random.enabled || nextRandomAt === null) return nextRandomAt;
+    return Math.max(nextRandomAt, after + gap);
+}
+
 /** Why one event of the draw cannot be picked now, for the screen. */
 export interface Skipped {
     readonly presetId: string;
