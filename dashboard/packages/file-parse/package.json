@@ -19,8 +19,8 @@
     "dependencies": {
         "@polaris/docx": "*",
         "cfb": "1.2.2",
-        "fast-xml-parser": "5.11.1",
-        "jszip": "3.10.1",
+        "fast-xml-parser": "5.11.2",
+        "jszip": "3.10.2",
         "pdfjs-dist": "6.4.299",
         "ppt-to-text": "1.0.1",
         "word-extractor": "1.0.4"
