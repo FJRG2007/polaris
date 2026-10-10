@@ -8,10 +8,12 @@
  */
 
 import * as symbiote from "./symbiote";
+import { prisma } from "@polaris/db";
 import { host } from "@polaris/app-host";
 import { MODS_KEY } from "./polaris-login";
 import { SOFTWARE_KEY } from "./join-guard";
 import { gameMessage } from "../game-message";
+import { packUrl } from "./client-pack";
 import { jarBundled } from "./polaris-mod-files";
 
 const { publicAppUrl } = host.domainService;
@@ -32,17 +34,24 @@ async function readEnv(applicationId: string, ownerId: string): Promise<Map<stri
     return new Map(vars.map((entry) => [entry.key, entry.value ?? ""]));
 }
 
+/** The address a server downloads it from: its own pack link. */
+function jarUrl(baseUrl: string, installedAppId: string): string {
+    return packUrl(baseUrl, installedAppId, symbiote.SYMBIOTE_FILE);
+}
+
 export async function symbioteState(
     applicationId: string,
-    ownerId: string
+    ownerId: string,
+    installedAppId: string
 ): Promise<SymbioteState> {
     const [env, publicUrl, bundled] = await Promise.all([
         readEnv(applicationId, ownerId),
         publicAppUrl().catch(() => null),
         jarBundled(symbiote.SYMBIOTE_FILE)
     ]);
+    const mods = env.get(MODS_KEY) ?? "";
     return {
-        installed: symbiote.hasSymbiote(env.get(MODS_KEY) ?? ""),
+        installed: symbiote.hasSymbiote(mods),
         fit: symbiote.symbioteFit(env.get(SOFTWARE_KEY) ?? "", env.get("VERSION") ?? ""),
         reachable: publicUrl !== null,
         bundled
@@ -54,6 +63,7 @@ export async function symbioteState(
 export async function setSymbiote(
     applicationId: string,
     ownerId: string,
+    installedAppId: string,
     on: boolean
 ): Promise<void> {
     const env = await readEnv(applicationId, ownerId);
@@ -69,7 +79,7 @@ export async function setSymbiote(
         if (!(await jarBundled(symbiote.SYMBIOTE_FILE))) {
             throw new Error(gameMessage("games", "lib.noSymbiote"));
         }
-        next = symbiote.withSymbiote(mods, baseUrl);
+        next = symbiote.withSymbiote(mods, jarUrl(baseUrl, installedAppId));
     } else {
         next = symbiote.withoutSymbiote(mods);
     }
@@ -77,4 +87,38 @@ export async function setSymbiote(
     await setEnvVars("application", applicationId, ownerId, [
         { key: MODS_KEY, value: next, isSecret: false }
     ]);
+}
+
+/**
+ * Every server that took it on while the jar was still on the public route,
+ * moved onto its own pack link: the public route no longer answers it, so a
+ * server booting with the old address would not start. Run when the dashboard
+ * boots, before anybody has to open the server's Mods tab.
+ */
+export async function moveSymbioteLinks(): Promise<void> {
+    const baseUrl = await publicAppUrl().catch(() => null);
+    if (baseUrl === null) return;
+    const listed = await prisma.envVar.findMany({
+        where: {
+            scopeType: "application",
+            key: MODS_KEY,
+            value: { contains: symbiote.SYMBIOTE_FILE }
+        },
+        select: { scopeId: true, value: true }
+    });
+    for (const entry of listed) {
+        const install = await prisma.installedApp.findFirst({
+            where: { applicationId: entry.scopeId, status: { not: "removed" } },
+            select: { id: true, ownerId: true }
+        });
+        if (!install) continue;
+        const mods = entry.value ?? "";
+        const url = jarUrl(baseUrl, install.id);
+        if (!symbiote.symbioteElsewhere(mods, url)) continue;
+        await setEnvVars("application", entry.scopeId, install.ownerId, [
+            { key: MODS_KEY, value: symbiote.withSymbiote(mods, url), isSecret: false }
+        ]).catch((error) =>
+            console.error("polaris: a server's Symbiote link could not be moved:", error)
+        );
+    }
 }

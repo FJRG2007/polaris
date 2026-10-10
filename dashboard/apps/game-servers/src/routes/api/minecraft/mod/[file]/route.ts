@@ -3,7 +3,8 @@
  *
  * Public: the server's image fetches it before anything that could present a
  * credential has started, and the jar holds nothing but the mod's own code.
- * Only the files the dashboard image was built with are served, by exact name.
+ * Only the files the dashboard image was built with are served, by exact name,
+ * and only the public ones: Symbiote goes out through a server's pack link.
  *
  * The image asks twice on every boot: HEAD, then GET. Neither answer carries a
  * date, on purpose. The image keeps a jar whose file is newer than the date it is
@@ -19,7 +20,7 @@
 import { Readable } from "node:stream";
 import { stat } from "node:fs/promises";
 import { createReadStream } from "node:fs";
-import { modDir, modPath } from "../../../../../lib/minecraft/polaris-mod-files";
+import { modDir, publicModPath } from "../../../../../lib/minecraft/polaris-mod-files";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -28,7 +29,7 @@ type Params = { params: Promise<{ file: string }> };
 
 /** The jar a request names, or null when there is none to serve. */
 async function jarFor(file: string): Promise<{ location: string; size: number } | null> {
-    const location = modPath(file);
+    const location = publicModPath(file);
     if (location === null) return null;
     const info = await stat(location).catch(() => null);
     if (!info?.isFile()) {

@@ -9,13 +9,18 @@
  *
  * What it gives away is exactly the list of mods that server runs, which is what
  * anybody who joins learns anyway - and the files themselves come from Modrinth,
- * except the jars this dashboard serves the server itself (Symbiote), which come
- * from the same public mod route the server downloads them from.
+ * except the jars this dashboard serves the server itself (Symbiote). Those are
+ * answered here, behind the same token, and only to a server whose list carries
+ * them: the server downloads them from this address when it boots, and players
+ * from the same address through the pack's line.
  *
  * Node runtime: it reads the install and asks Modrinth.
  */
 
+import { Readable } from "node:stream";
+import { stat } from "node:fs/promises";
 import { prisma } from "@polaris/db";
+import { createReadStream } from "node:fs";
 import {
     PROJECTS_KEY,
     SOFTWARE_KEY,
@@ -38,6 +43,8 @@ import {
 } from "../../../../../../../lib/minecraft/pack-scripts";
 import { bounded } from "../../../../../../../lib/minecraft/mod-items-service";
 import { MODS_KEY } from "../../../../../../../lib/minecraft/polaris-login";
+import { modPath } from "../../../../../../../lib/minecraft/polaris-mod-files";
+import { SYMBIOTE_FILE, hasSymbiote } from "../../../../../../../lib/minecraft/symbiote";
 import { host } from "@polaris/app-host";
 
 const { readInstallConfig } = host.appsInstallConfig;
@@ -51,14 +58,67 @@ const FILES = new Set(["pack.tsv", "manifest.json", "install.sh", "install.ps1"]
 
 type Params = { params: Promise<{ id: string; token: string; file: string }> };
 
+/**
+ * A jar this dashboard serves the server, or null when this server's link does
+ * not reach one: a wrong token, a server without it on its list, or an image
+ * built without it.
+ */
+async function servedJar(
+    id: string,
+    token: string,
+    file: string
+): Promise<{ location: string; size: number } | null> {
+    if (file !== SYMBIOTE_FILE || !packTokenMatches(id, token)) return null;
+    const install = await prisma.installedApp.findFirst({
+        where: { id, status: { not: "removed" } },
+        select: { applicationId: true }
+    });
+    if (!install?.applicationId) return null;
+    const listed = await prisma.envVar.findFirst({
+        where: { scopeType: "application", scopeId: install.applicationId, key: MODS_KEY },
+        select: { value: true }
+    });
+    if (!hasSymbiote(listed?.value ?? "")) return null;
+    const location = modPath(file);
+    if (location === null) return null;
+    const info = await stat(location).catch(() => null);
+    return info?.isFile() ? { location, size: info.size } : null;
+}
+
+/** As the public mod route answers: no date, so the server fetches it on every
+ *  boot rather than keeping a copy older than the image (see that route). */
+function jarHeaders(file: string, size: number): Record<string, string> {
+    return {
+        "cache-control": "no-store",
+        "content-type": "application/java-archive",
+        "content-length": String(size),
+        "content-disposition": `attachment; filename="${file}"`
+    };
+}
+
+/** The server's image asks HEAD before GET. */
+export async function HEAD(_request: Request, { params }: Params): Promise<Response> {
+    const { id, token, file } = await params;
+    const jar = await servedJar(id, token, file);
+    if (!jar) return new Response(null, { status: 404 });
+    return new Response(null, { headers: jarHeaders(file, jar.size) });
+}
+
 export async function GET(request: Request, { params }: Params): Promise<Response> {
     const { id, token, file } = await params;
+    if (file === SYMBIOTE_FILE) {
+        const jar = await servedJar(id, token, file);
+        if (!jar) return new Response("Not found", { status: 404 });
+        return new Response(Readable.toWeb(createReadStream(jar.location)) as ReadableStream, {
+            headers: jarHeaders(file, jar.size)
+        });
+    }
     if (!FILES.has(file)) return new Response("Not found", { status: 404 });
     if (!packTokenMatches(id, token)) return new Response("Not found", { status: 404 });
 
     const install = await prisma.installedApp.findFirst({
         where: { id, status: { not: "removed" } },
-        select: { name: true, config: true, applicationId: true }
+        select: { id: true, name: true, config: true, applicationId: true }
     });
     if (!install?.applicationId) return new Response("Not found", { status: 404 });
 
@@ -82,7 +142,7 @@ export async function GET(request: Request, { params }: Params): Promise<Respons
     return text(packTable(pack.mods, pack.missing), "text/plain; charset=utf-8");
 }
 
-type Install = { name: string; config: string | null; applicationId: string };
+type Install = { id: string; name: string; config: string | null; applicationId: string };
 
 /** The pack as the server's lists stand right now. `base` is where the player
  *  reached this, which is where they download what this dashboard serves. */
@@ -103,7 +163,8 @@ async function packOf(install: Install, base: string): Promise<ClientPack> {
         projects: value(PROJECTS_KEY),
         config: readInstallConfig(install.config),
         mods: value(MODS_KEY),
-        base
+        base,
+        installedAppId: install.id
     });
 }
 
@@ -132,7 +193,7 @@ export async function POST(request: Request, { params }: Params): Promise<Respon
 
     const install = await prisma.installedApp.findFirst({
         where: { id, status: { not: "removed" } },
-        select: { name: true, config: true, applicationId: true }
+        select: { id: true, name: true, config: true, applicationId: true }
     });
     if (!install?.applicationId) return new Response("Not found", { status: 404 });
 

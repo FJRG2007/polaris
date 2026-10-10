@@ -3,11 +3,10 @@
  * that put it on a server's list and take it off.
  *
  * It is built into the dashboard image from `resources/minecraft/symbiote` and
- * served beside the Polaris mod (`polaris-mod-files`), so a server downloads it
- * through `MODS` like the login mod. It runs on both sides: every player needs
- * the same jar in their own game, so the file the server downloads is the one
- * players are handed, by the download button and by the mod pack
- * (`client-pack`).
+ * served from the server's own pack link (`client-pack`), never from the public
+ * mod route: the server downloads it through `MODS` at that address, and players
+ * get the same jar from the same link when they run the mod pack's line. It runs
+ * on both sides, so every player needs it in their own game.
  *
  * It declares the one release it was built for, and the loader ends the boot of
  * any other over it, so it is offered there and nowhere else - and a server that
@@ -17,7 +16,7 @@
  */
 
 import { loaderForType } from "./modrinth";
-import { MODS_KEY, carriesFile, modEntries, modUrl } from "./polaris-login";
+import { MODS_KEY, carriesFile, modEntries } from "./polaris-login";
 
 /** The file the dashboard serves it as. */
 export const SYMBIOTE_FILE = "symbiote-neoforge-1.21.4.jar";
@@ -49,9 +48,16 @@ export function withoutSymbiote(mods: string): string {
         .join(",");
 }
 
-/** The list with it, once, at this dashboard's address. */
-export function withSymbiote(mods: string, baseUrl: string): string {
-    return [...modEntries(withoutSymbiote(mods)), modUrl(baseUrl, SYMBIOTE_FILE)].join(",");
+/** The list with it, once, at `url` - the server's pack link for the jar. */
+export function withSymbiote(mods: string, url: string): string {
+    return [...modEntries(withoutSymbiote(mods)), url].join(",");
+}
+
+/** Whether the list carries it at an address other than `url`: one written
+ *  before it moved behind the pack link, which the public route no longer
+ *  answers, so a server booting with it would not start. */
+export function symbioteElsewhere(mods: string, url: string): boolean {
+    return hasSymbiote(mods) && !modEntries(mods).includes(url);
 }
 
 /**

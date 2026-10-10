@@ -31,7 +31,7 @@
 
 import * as polarisLogin from "./polaris-login";
 import { anticheatMovedTo, withoutAnticheatBuild } from "./polaris-anticheat";
-import { symbioteMovedTo } from "./symbiote";
+import { hasSymbiote, symbioteMovedTo, withoutSymbiote } from "./symbiote";
 import { soundsHoldPlugin, soundsMovedTo } from "./sounds-env";
 import { SOUNDS_KEY } from "./sounds";
 import {
@@ -405,13 +405,18 @@ async function loginGuardForSave(
  * would have been given, so a server built from it starts closed. Polaris's
  * anti-cheat is the same: its switch and token are that server's, so its jar is
  * not carried either, and a server built from the template gets it the way any
- * new one does.
+ * new one does. Symbiote too: it is downloaded through that server's own pack
+ * link, which answers only while that server lists it.
  */
 export function guardAsTemplate(env: ReadonlyMap<string, string>): Map<string, string> {
     const copy = new Map(env);
     const mods = env.get(polarisLogin.MODS_KEY);
     if (mods !== undefined && withoutAnticheatBuild(env) !== mods) {
         copy.set(polarisLogin.MODS_KEY, withoutAnticheatBuild(env));
+    }
+    const carried = copy.get(polarisLogin.MODS_KEY);
+    if (carried !== undefined && hasSymbiote(carried)) {
+        copy.set(polarisLogin.MODS_KEY, withoutSymbiote(carried));
     }
     // The plugin the sounds put on a server is that server's, like its token.
     if (soundsHoldPlugin(env) && !polarisLogin.loginOn(env)) {

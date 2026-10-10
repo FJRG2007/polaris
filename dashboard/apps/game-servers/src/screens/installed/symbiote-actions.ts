@@ -32,7 +32,9 @@ export async function symbioteStateAction(
         const applicationId = access.install.applicationId;
         if (!applicationId)
             return { error: (await gameWords("games"))("errors.thisServerHasNotBeen") };
-        return { state: await service.symbioteState(applicationId, access.ownerId) };
+        return {
+            state: await service.symbioteState(applicationId, access.ownerId, parsed.data)
+        };
     } catch (caught) {
         return {
             error: await failure(caught, (await gameWords("games"))("errors.couldNotReadSymbiote"))
@@ -57,7 +59,12 @@ export async function setSymbioteAction(input: {
         const applicationId = access.install.applicationId;
         if (!applicationId)
             throw new Error((await gameWords("games"))("errors.thisServerHasNotBeen"));
-        await service.setSymbiote(applicationId, access.ownerId, parsed.data.on);
+        await service.setSymbiote(
+            applicationId,
+            access.ownerId,
+            parsed.data.installedAppId,
+            parsed.data.on
+        );
         await recordAudit({
             actorId: user.id,
             action: parsed.data.on ? "minecraft.symbiote.install" : "minecraft.symbiote.remove",

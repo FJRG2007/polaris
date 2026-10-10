@@ -114,10 +114,11 @@ describe("the pack a player installs", () => {
         projects: "securitycraft?",
         config: {},
         mods: `https://polaris.example/api/minecraft/mod/${SYMBIOTE}`,
-        base: "http://192.168.1.20:3000/"
+        base: "http://192.168.1.20:3000/",
+        installedAppId: "01a0a00b-35c5-7932-861e-1b2161a9b298"
     };
 
-    it("carries Symbiote when the server does, from the address the player reached", async () => {
+    it("carries Symbiote when the server does, from the server's pack link at the address the player reached", async () => {
         carried.set(SYMBIOTE, "a".repeat(40));
         const pack = await resolvePack(symbioteOn);
         expect(pack.mods.map((mod) => [mod.filename, mod.where, mod.url, mod.sha1])).toEqual([
@@ -125,7 +126,7 @@ describe("the pack a player installs", () => {
             [
                 SYMBIOTE,
                 "server",
-                `http://192.168.1.20:3000/api/minecraft/mod/${SYMBIOTE}`,
+                packUrl("http://192.168.1.20:3000/", symbioteOn.installedAppId, SYMBIOTE),
                 "a".repeat(40)
             ]
         ]);

@@ -32,7 +32,7 @@ import { MinecraftEvents } from "./minecraft-events";
 import { MinecraftChallenges } from "./minecraft-challenges";
 import type { Permission } from "@polaris/core";
 import { MinecraftMods } from "./minecraft-mods";
-import { SymbioteCard } from "./symbiote-card";
+import { SymbioteRow } from "./symbiote-card";
 import { SpigotPluginsCard } from "./minecraft-spigot-plugins";
 import { ModpacksCard } from "./minecraft-modpacks";
 import { SPIGET_KEY } from "../../lib/minecraft/spiget";
@@ -491,6 +491,7 @@ export function MinecraftPanel({
     );
     const loginOn = login.state?.on === true;
     const canManage = held.includes("games.manage");
+    const [symbioteInstalled, setSymbioteInstalled] = useState(false);
 
     /** Settings come from the page, so applying them has to re-render it -
      *  otherwise the form keeps showing the old values as the current ones. */
@@ -716,13 +717,18 @@ export function MinecraftPanel({
                             playersOnline={status?.players.online ?? 0}
                             clientMods={game?.clientMods ?? []}
                             packCommands={game?.packCommands ?? null}
+                            polarisMods={
+                                edition === "java" ? (
+                                    <SymbioteRow
+                                        installedAppId={installedAppId}
+                                        canManage={canManage}
+                                        onInstalled={setSymbioteInstalled}
+                                    />
+                                ) : null
+                            }
+                            polarisModsInstalled={edition === "java" && symbioteInstalled}
                             onSaved={reloadSettings}
                         />
-                        {/* A mod Polaris carries itself. Shown on every Java server,
-                            with the reason where it cannot run. */}
-                        {edition === "java" && (
-                            <SymbioteCard installedAppId={installedAppId} canManage={canManage} />
-                        )}
                         {/* A second catalogue rather than a second source in the one
                             above: SpigotMC publishes a page and a claim about which
                             releases were tested, where Modrinth publishes builds, and
