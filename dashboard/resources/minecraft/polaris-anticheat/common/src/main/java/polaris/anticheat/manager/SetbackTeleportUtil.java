@@ -12,6 +12,7 @@ import polaris.anticheat.predictionengine.predictions.PredictionEngine;
 import polaris.anticheat.predictionengine.predictions.PredictionEngineElytra;
 import polaris.anticheat.predictionengine.predictions.PredictionEngineNormal;
 import polaris.anticheat.predictionengine.predictions.PredictionEngineWater;
+import polaris.anticheat.utils.anticheat.ModdedContent;
 import polaris.anticheat.utils.anticheat.update.PredictionComplete;
 import polaris.anticheat.utils.chunks.Column;
 import polaris.anticheat.utils.collisions.datatypes.SimpleCollisionBox;
@@ -127,6 +128,10 @@ public class SetbackTeleportUtil extends PolarisProcessor implements PostPredict
         if (lastKnownGoodPosition == null) return true;
         // Setbacks aren't allowed
         if (player.disablePolaris) return true;
+        // A modded server: a block or entity the simulation only knows through a
+        // stand-in moves a player a hair differently, and a setback on every one of
+        // those froze honest players in place beside them. The check still flags.
+        if (ModdedContent.isModdedServer()) return true;
         // Player has permission to cheat, permission not given to OP by default.
         return player.platformPlayer != null && player.noSetbackPermission;
     }

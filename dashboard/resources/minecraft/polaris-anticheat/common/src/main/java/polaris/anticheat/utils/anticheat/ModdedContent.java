@@ -38,6 +38,11 @@ public final class ModdedContent {
         moddedItems = Collections.unmodifiableSet(copy);
     }
 
+    /** Whether this server has any modded block at all: a modded platform installed some. */
+    public static boolean isModdedServer() {
+        return !moddedBlocks.isEmpty();
+    }
+
     public static boolean isModdedBlock(int globalId) {
         return globalId > 0 && moddedBlocks.get(globalId);
     }
