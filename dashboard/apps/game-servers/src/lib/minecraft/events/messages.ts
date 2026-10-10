@@ -176,8 +176,8 @@ const RULES: Readonly<Record<EventKind, Text>> = {
         es: "Encuentra la sala del centro del laberinto. El fuego, el magma y la lava te devuelven a la salida."
     },
     "acid-rain": {
-        en: "Keep something over your head: the rain fills your acid bar, and full you are out. Build with the cobblestone you are given; the rain eats it.",
-        es: "Ten algo sobre la cabeza: la lluvia llena tu barra de ácido y, llena, quedas fuera. Construye con la piedra que recibes; la lluvia se la come."
+        en: "Stay under cover: the rain fills your acid bar, and full you are out. It comes in waves and eats roofs; patch yours, and in each calm run for the glowing supplies.",
+        es: "Quédate a cubierto: la lluvia llena tu barra de ácido y, llena, quedas fuera. Llega en oleadas y se come los techos; repara el tuyo y, en cada calma, corre a por los suministros que brillan."
     },
     "elytra-race": {
         en: "Fly through every ring in order, lap after lap. Rings and boosters give rockets; falling, landing or missing a ring sends you back to your last one.",

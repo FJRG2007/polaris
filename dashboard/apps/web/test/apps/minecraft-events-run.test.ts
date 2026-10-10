@@ -475,7 +475,7 @@ function quickAnswer(line: string): string | null {
  */
 function stageScoreAnswer(line: string): string | null {
     const objectives =
-        /^(pe_(drop|low|back|gate|next|last|fin|cut|mfin|mback|acid|epass|enext|elast|efin|ecut|erkt|ebst)|polaris_tntrun)$/;
+        /^(pe_(drop|low|back|gate|next|last|fin|cut|mfin|mback|acid|acidg|acids|epass|enext|elast|efin|ecut|erkt|ebst)|polaris_tntrun)$/;
     const set = /^scoreboard players set (\w+) (\w+) (-?\d+)$/.exec(line);
     if (set && objectives.test(set[2]!)) {
         (world.stageScores[set[2]!] ??= {})[set[1]!] = Number(set[3]);
@@ -12292,7 +12292,7 @@ describe("an acid rain", () => {
     };
     const scores = (objective: string) => (world.stageScores[objective] ??= {});
 
-    it("hands out cobblestone at Go and again later, puts out whoever the rain filled, and never touches the weather", async () => {
+    it("plays its weather from Go: a surge, lightning, a calm with supplies, and whoever the rain filled out", async () => {
         world.online = ["Ana", "Ben", "Cy"];
         setUp([run()]);
         await startArena("acid");
@@ -12311,14 +12311,23 @@ describe("an acid rain", () => {
         expect(given("Ana")).toHaveLength(1);
         expect(given("Ana")[0]).toContain("minecraft:can_place_on=");
         expect(world.sent.indexOf(given("Ana")[0]!)).toBeGreaterThan(one);
-        for (const line of acidKind.armLines(built)) expect(world.sent).toContain(line);
+        // Armed with the weather the run will have, and everybody's acid on
+        // the side panel.
+        const { goAt } = state().run!.stage!;
+        const spells = acidKind.forecast(
+            state().run!.endsAt - goAt!,
+            state().run!.id,
+            built.huts.length
+        );
+        for (const line of acidKind.armLines(built, spells[0]!)) expect(world.sent).toContain(line);
+        expect(world.sent).toContain("scoreboard objectives setdisplay sidebar pe_acid");
         // What players place, and what the rain leaves of it, is the arena's.
         for (const box of acidKind.sweepBoxes(built))
             expect(state().run!.stage!.boxes).toContainEqual(box);
         await play(2_100);
         for (const line of acidKind.dripLines(built)) expect(world.sent).toContain(line);
 
-        // The rain filled Ben's bar; Ana has had some.
+        // The rain filled Ben's bar; Ana has had some, and is told she is in it.
         scores("pe_acid").Ben = acidKind.ACID_MAX;
         scores("pe_acid").Ana = 30;
         await play(2_100);
@@ -12331,11 +12340,35 @@ describe("an acid rain", () => {
             )
         ).toBe(true);
         expect(world.sent).toContain("scoreboard players reset Ben pe_acid");
+        expect(
+            world.sent.some(
+                (line) =>
+                    line.startsWith("title Ana actionbar") && visible(line).includes("IN THE RAIN")
+            )
+        ).toBe(true);
 
-        // A top-up, once.
+        // The first surge, its lightning, then a calm: supplies dropped and a
+        // little more cobblestone for whoever is still in.
         await play(40_000);
+        const surge = spells.find((spell) => spell.sky === "surge")!;
+        for (const line of acidKind.skyLines(built, surge)) expect(world.sent).toContain(line);
+        expect(world.sent).toContain(acidKind.strikeLine(built));
+        expect(
+            world.sent.some(
+                (line) => line.includes("summon minecraft:item") && line.includes("minecraft:chest")
+            )
+        ).toBe(true);
         expect(given("Ana")).toHaveLength(2);
         expect(given("Ben")).toHaveLength(1);
+        expect(world.sent.some((line) => /^bossbar set \S+ color (red|blue)$/.test(line))).toBe(
+            true
+        );
+
+        // Ana picked a crate of blocks up: handed out, and taken off her count.
+        scores("pe_acidg").Ana = 1;
+        await play(2_100);
+        expect(given("Ana").at(-1)).toMatch(new RegExp(` ${acidKind.CRATE_BLOCKS}$`));
+        expect(world.sent).toContain("scoreboard players remove Ana pe_acidg 1");
 
         chat(["Cy", "leave"]);
         await play(4_100);

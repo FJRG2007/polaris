@@ -1389,6 +1389,7 @@ async function showClock(installedAppId: string, loop: Loop): Promise<void> {
     const { preset } = loop.run;
     const now = Date.now();
     const lines: string[] = [];
+    const sky = loop.run.phase === "running" ? stageService.acidClockLines(loop, now) : null;
     // The countdown over and the next tick not yet round to begin it: the
     // event's own time is already running, and is what the bar shows, rather
     // than the countdown's last second standing still until then.
@@ -1415,6 +1416,9 @@ async function showClock(installedAppId: string, loop: Loop): Promise<void> {
         lines.push(
             ...commands.barUpdate(messages.arenaGettingReady(preset.name, loop.language), 1, 1)
         );
+    } else if (sky) {
+        // An acid rain's sky once it has started: what it is doing and for how long.
+        lines.push(...sky);
     } else if (preset.kind === "gathering" && loop.run.roundEndsAt !== null) {
         // The round's own clock, and which round it is.
         const options = preset.options as catalog.EventOptions<"gathering">;

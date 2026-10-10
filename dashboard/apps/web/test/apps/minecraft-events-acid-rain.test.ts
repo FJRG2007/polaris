@@ -1,8 +1,9 @@
 /**
  * Acid rain (`kinds/acid-rain`): its arena checked against its rules over
  * thousands of runs, who the data pack takes for out in the rain over the
- * blocks the arena is built of, what the rain eats and what it leaves, and that
- * the world's weather is never touched.
+ * blocks the arena is built of, what the rain eats and what it leaves, its
+ * waves of weather and what they bring, and that the world's weather is never
+ * touched.
  */
 
 import { describe, expect, it } from "vitest";
@@ -20,6 +21,9 @@ const SIZES = catalog.ACID_SIZES;
 const ACIDITIES = catalog.ACIDITIES;
 const SITE = { x: 100, z: -200 };
 const Y = 120;
+/** A six-minute run's weather, and its first spell. */
+const SIX = 6 * 60_000;
+const first = (huts = 4) => acid.forecast(SIX, "run-1", huts)[0]!;
 
 /** Every block the boxes put down, by `x,y,z`; a block put twice throws. */
 function blocksOf(boxes: readonly stage.Box[]): Map<string, string> {
@@ -191,13 +195,19 @@ describe("the acid rain's data pack", () => {
             ...[...files.entries()]
                 .filter(([path]) => path.includes("/acid/"))
                 .map(([, body]) => body),
-            ...acid.armLines(built),
+            ...acid.armLines(built, first()),
             ...acid.stopLines(built.boxes),
-            ...acid.dripLines(built)
+            ...acid.dripLines(built),
+            ...acid.dropLines(built, ["blocks", "antidote", "umbrella"], "components"),
+            acid.strikeLine(built),
+            ...acid.collapseLines(built, 0)
         ].join("\n");
-        expect(everything).not.toMatch(/\bweather\b/);
+        expect(everything).not.toMatch(/\bweather (clear|rain|thunder)\b/);
         expect(everything).not.toMatch(/\bdamage\b/);
-        expect(everything).not.toMatch(/\bkill @a|kill @s|kill @p/);
+        expect(everything).not.toMatch(/summon minecraft:lightning_bolt/);
+        // Only the pack's own stands and supplies are ever killed.
+        for (const kill of everything.matchAll(/\bkill (\S+)/g))
+            expect(kill[1]).toMatch(/^@[es]\[type=minecraft:(armor_stand|item),tag=/);
     });
 
     it("adds the dose only to whoever is in the rain, and every half second", () => {
@@ -236,7 +246,7 @@ describe("the acid rain's data pack", () => {
     it("is armed for one arena, switch last, and only that arena's end switches it off", () => {
         const one = acid.arena({ size: "small", acidity: "mild" }, "arm", SITE, Y);
         const other = acid.arena({ size: "small", acidity: "mild" }, "arm", { x: 900, z: 900 }, Y);
-        const arm = acid.armLines(one);
+        const arm = acid.armLines(one, first());
         expect(arm.at(-1)).toBe("scoreboard players set #on polaris_acid 1");
         expect(arm.indexOf("scoreboard players set #on polaris_acid 0")).toBeLessThan(
             arm.findIndex((line) => line.includes("summon"))
@@ -253,7 +263,273 @@ describe("the acid rain's data pack", () => {
 
     it("draws the rain for every size the catalog offers", () => {
         const step = fn("step").join("\n");
-        for (const size of SIZES) expect(step).toContain(`matches ${acid.HALF[size]} as`);
+        for (const size of SIZES) expect(step).toContain(`matches ${acid.HALF[size]} if score`);
+    });
+});
+
+describe("an acid rain's pack, on every release it is loaded on", () => {
+    // The pack is put on servers from 1.13 for other games too, and a release
+    // that cannot read one line of a function drops the whole function: every
+    // particle and sound the acid functions name has to be one 1.13 knows.
+    const PARTICLES_1_13 = new Set([
+        "minecraft:item_slime",
+        "minecraft:happy_villager",
+        "minecraft:heart",
+        "minecraft:totem_of_undying",
+        "minecraft:end_rod",
+        "minecraft:explosion"
+    ]);
+    const SOUNDS_1_13 = new Set([
+        "minecraft:block.fire.extinguish",
+        "minecraft:entity.player.levelup",
+        "minecraft:entity.lightning_bolt.thunder",
+        "minecraft:entity.lightning_bolt.impact"
+    ]);
+    const lines = Object.values(acid.FUNCTIONS).flat();
+
+    it("names only particles and sounds 1.13 knows, and no newer command", () => {
+        for (const line of lines) {
+            for (const [, id] of line.matchAll(/\bparticle (\S+)/g))
+                expect(PARTICLES_1_13).toContain(id);
+            for (const [, id] of line.matchAll(/\bplaysound (\S+)/g))
+                expect(SOUNDS_1_13).toContain(id);
+            // `spreadplayers ... under` (1.17), `item` (1.17), components (1.20.5)
+            // and `ride` (1.19.4) are sent over RCON, where the version is known.
+            expect(line).not.toMatch(/\b(spreadplayers|item replace|ride|summon)\b|\[minecraft:/);
+        }
+    });
+
+    it("calls only functions it has", () => {
+        for (const line of lines)
+            for (const [, name] of line.matchAll(/function polaris:acid\/(\w+)/g))
+                expect(Object.keys(acid.FUNCTIONS)).toContain(name);
+    });
+});
+
+describe("an acid rain's weather", () => {
+    it("opens with a drizzle, then surges, calms and drizzles, and ends in a downpour", () => {
+        const spells = acid.forecast(SIX, "w", 4);
+        expect(spells[0]).toMatchObject({ sky: "drizzle", from: 0, to: acid.OPENING_MS });
+        expect(spells.at(-1)).toMatchObject({ sky: "downpour", to: SIX });
+        // A minute, or a little more where a stretch too short to play joins it.
+        expect(spells.at(-1)!.from).toBeLessThanOrEqual(SIX - acid.DOWNPOUR_MS);
+        expect(spells.at(-1)!.from).toBeGreaterThan(SIX - acid.DOWNPOUR_MS - 5_000);
+        expect(spells.slice(1, 4).map((one) => one.sky)).toEqual(["surge", "calm", "drizzle"]);
+        // One after another, nothing missing, nothing twice.
+        for (const [index, one] of spells.entries()) {
+            expect(one.to).toBeGreaterThan(one.from);
+            if (index > 0) expect(one.from).toBe(spells[index - 1]!.to);
+        }
+        // Surges counted up from 1, calms from 0.
+        const surges = spells.filter((one) => one.sky === "surge");
+        expect(surges.map((one) => one.level)).toEqual(surges.map((_, index) => index + 1));
+        const calms = spells.filter((one) => one.sky === "calm");
+        expect(calms.map((one) => one.calm)).toEqual(calms.map((_, index) => index));
+        // Wind every second surge; huts fall from the second.
+        expect(surges[0]!.wind).toBe(0);
+        expect(surges[1]!.wind).toBeGreaterThan(0);
+        expect(surges[0]!.collapse).toBeNull();
+        expect(surges[1]!.collapse).toBe(0);
+    });
+
+    it("keeps every rule for every length and seed", () => {
+        const problems: string[] = [];
+        for (let minutes = 1; minutes <= 30; minutes += 1)
+            for (let seed = 0; seed < 40; seed += 1) {
+                const total = minutes * 60_000;
+                const spells = acid.forecast(total, `s-${seed}`, 3);
+                const fail = (what: string) => problems.push(`${minutes} ${seed}: ${what}`);
+                if (spells[0]?.from !== 0) fail("does not start at Go");
+                if (spells.at(-1)?.to !== total || spells.at(-1)?.sky !== "downpour")
+                    fail("does not end in a downpour");
+                const downpour = spells.at(-1)!;
+                if (downpour.to - downpour.from > acid.DOWNPOUR_MS + 5_000)
+                    fail("downpour too long");
+                const collapsed = spells.flatMap((one) =>
+                    one.collapse === null ? [] : [one.collapse]
+                );
+                if (new Set(collapsed).size !== collapsed.length) fail("a hut falls twice");
+                if (collapsed.some((hut) => hut < 0 || hut >= 3)) fail("no such hut");
+                for (const one of spells) {
+                    if (one.sky !== "downpour" && one.to - one.from < 5_000) fail("a sliver");
+                    if (one.sky === "calm" && (one.wind !== 0 || one.strikes.length > 0))
+                        fail("a stormy calm");
+                    if (one.strikes.some((when) => when < one.from || when >= one.to))
+                        fail("a strike outside its spell");
+                    if (one.wind < 0 || one.wind > 4) fail("no such wind");
+                }
+            }
+        expect(problems.slice(0, 5)).toEqual([]);
+    });
+
+    it("is the same weather for the same run, whatever looks at it", () => {
+        expect(acid.forecast(SIX, "a", 4)).toEqual(acid.forecast(SIX, "a", 4));
+        expect(acid.forecast(0, "a", 4)).toEqual([]);
+    });
+
+    it("finds the spell for any moment, the last one past the end", () => {
+        const spells = acid.forecast(SIX, "w", 4);
+        expect(acid.spellAt(spells, 0)).toBe(0);
+        expect(acid.spellAt(spells, acid.OPENING_MS)).toBe(1);
+        expect(acid.spellAt(spells, SIX + 10_000)).toBe(spells.length - 1);
+        expect(acid.spellAt([], 5)).toBe(-1);
+    });
+
+    it("rains harder as it goes, and not at all in a calm", () => {
+        const built = acid.arena({ size: "medium", acidity: "mild" }, "d", SITE, Y);
+        const dose = (sky: acid.Sky, level = 0) => acid.doseOf(built, { sky, level });
+        expect(dose("calm")).toBe(0);
+        expect(dose("drizzle")).toBeGreaterThan(0);
+        expect(dose("drizzle")).toBeLessThan(dose("surge", 1));
+        expect(dose("surge", 3)).toBeGreaterThan(dose("surge", 1));
+        expect(dose("downpour")).toBeGreaterThan(dose("surge", 3));
+        expect(acid.biteOf(built, { sky: "surge", level: 2 })).toBeLessThan(
+            acid.biteOf(built, { sky: "drizzle", level: 0 })
+        );
+        expect(acid.biteOf(built, { sky: "downpour", level: 9 })).toBe(acid.FASTEST_BITE);
+        expect(acid.rainOf({ sky: "calm" })).toBe(0);
+        expect(acid.rainOf({ sky: "downpour" })).toBeGreaterThan(acid.rainOf({ sky: "surge" }));
+        // What the pack is told: the calm switches the rain and its bites off.
+        const calm = acid.forecast(SIX, "w", 4).find((one) => one.sky === "calm")!;
+        expect(acid.skyLines(built, calm)).toContain("scoreboard players set #dose polaris_acid 0");
+        expect(acid.skyLines(built, calm)).toContain("scoreboard players set #rain polaris_acid 0");
+        expect(acid.FUNCTIONS.beat!.join("\n")).toContain(
+            "execute if score #dose polaris_acid matches 1.. if score #b polaris_acid >= #bite polaris_acid run function polaris:acid/bites"
+        );
+    });
+
+    it("blows the rain in from the wind's side: a block there, at the feet or the head, covers it", () => {
+        const gust = acid.FUNCTIONS.gust!;
+        expect(gust[0]).toBe("tag @s add pe_wet");
+        expect(gust).toContain(
+            "execute if score #wind polaris_acid matches 1 unless block ~ ~ ~-1 minecraft:air run tag @s remove pe_wet"
+        );
+        expect(gust).toContain(
+            "execute if score #wind polaris_acid matches 2 unless block ~1 ~1 ~ minecraft:air run tag @s remove pe_wet"
+        );
+        expect(gust).toHaveLength(9);
+        // Only for whoever a roof already covers.
+        expect(acid.FUNCTIONS.expose).toContain(
+            "execute if score #wind polaris_acid matches 1.. if entity @s[tag=!pe_wet] run function polaris:acid/gust"
+        );
+    });
+});
+
+describe("what an acid rain changes on the board", () => {
+    const built = () => acid.arena({ size: "small", acidity: "mild" }, "b", SITE, Y);
+
+    it("strikes only somebody under cover, far enough in that it never reaches past a wall", () => {
+        const one = built();
+        const line = acid.strikeLine(one);
+        const edge = one.half - 1;
+        expect(line).toContain("@r[tag=pe_dry,");
+        expect(line).toContain(`x=${SITE.x - edge},y=${Y},z=${SITE.z - edge},dx=${2 * edge}`);
+        expect(line).toContain(`positioned ~ ${Y + 1} ~ run function polaris:acid/strike`);
+        // From the floor up to under the roof, three by three, shelter only.
+        const strike = acid.FUNCTIONS.strike!;
+        for (const block of acid.SHELTER)
+            expect(strike).toContain(
+                `fill ~-1 ~ ~-1 ~1 ~${acid.ROOF - 2} ~1 minecraft:air replace ${block}`
+            );
+        for (const fill of strike.filter((one) => one.startsWith("fill")))
+            expect(fill).toMatch(
+                /minecraft:air replace minecraft:(cobblestone|mossy_cobblestone|lime_stained_glass)$/
+            );
+    });
+
+    it("brings a hut down, its blocks and whatever was built onto them, and nothing else", () => {
+        const one = built();
+        const lines = acid.collapseLines(one, 0);
+        const hut = one.huts[0]!;
+        expect(lines.filter((line) => line.includes(" fill "))).toHaveLength(acid.SHELTER.length);
+        expect(lines[0]).toContain(
+            `fill ${SITE.x + hut.x - 1} ${Y + 1} ${SITE.z + hut.z - 1} ${SITE.x + hut.x + 1} ${Y + 4} ${SITE.z + hut.z + 1} minecraft:air replace`
+        );
+        expect(acid.collapseLines(one, 99)).toEqual([]);
+    });
+
+    it("drops supplies for the players left, an umbrella every second calm", () => {
+        expect(acid.cratesFor(0, 1)).toEqual(["blocks", "antidote"]);
+        expect(acid.cratesFor(1, 8)).toEqual([
+            "blocks",
+            "blocks",
+            "blocks",
+            "blocks",
+            "antidote",
+            "umbrella"
+        ]);
+        expect(acid.cratesFor(2, 40).length).toBeLessThanOrEqual(6);
+        const drop = acid.dropLines(built(), ["blocks", "umbrella"], "components");
+        expect(drop[0]).toBe("kill @e[type=minecraft:item,tag=polaris_acid_crate]");
+        expect(drop[1]).toContain('{Item:{id:"minecraft:chest",count:1},PickupDelay:32767');
+        expect(drop[2]).toContain('{Item:{id:"minecraft:shield",count:1}');
+        expect(acid.dropLines(built(), ["blocks"], "nbt")[1]).toContain("Count:1b}");
+        expect(drop.at(-2)).toContain(
+            `under ${Y + acid.ROOF - 1} false @e[type=minecraft:item,tag=pe_crate_new]`
+        );
+        expect(drop.at(-1)).toBe(
+            "tag @e[type=minecraft:item,tag=pe_crate_new] remove pe_crate_new"
+        );
+    });
+
+    it("counts what was picked up one supply a digit, and never loses one picked meanwhile", () => {
+        expect(acid.gotOf(0)).toEqual({ blocks: 0, antidote: 0, umbrella: 0 });
+        expect(acid.gotOf(112)).toEqual({ blocks: 2, antidote: 1, umbrella: 1 });
+        expect(acid.gotTakenLines("Ana", 12)).toEqual([
+            "scoreboard players remove Ana pe_acidg 12"
+        ]);
+        const take = acid.FUNCTIONS.take!;
+        expect(take).toContain(
+            `execute if entity @s[tag=pe_crate_c] run scoreboard players remove @a[tag=pe_taker] pe_acid ${acid.CURE}`
+        );
+        // An antidote never takes anybody below nothing.
+        expect(take).toContain(
+            "scoreboard players set @a[tag=pe_taker,scores={pe_acid=..-1}] pe_acid 0"
+        );
+        expect(take.at(-1)).toBe("kill @s[type=minecraft:item,tag=polaris_acid_crate]");
+        // Whoever holds an umbrella is not looked at for rain.
+        expect(acid.FUNCTIONS.beat!.join("\n")).toContain(
+            "scores={pe_acid=0..,pe_acids=..0}] at @s run function polaris:acid/expose"
+        );
+    });
+
+    it("tells who is in the rain from two looks at their acid", () => {
+        expect(acid.coverOf(undefined, 30, 0)).toBe("dry");
+        expect(acid.coverOf(20, 30, 0)).toBe("wet");
+        expect(acid.coverOf(30, 30, 0)).toBe("dry");
+        expect(acid.coverOf(50, 15, 0)).toBe("dry");
+        expect(acid.coverOf(20, 30, 4)).toBe("umbrella");
+    });
+
+    it("leaves nothing behind: every block it puts down is one its teardown takes", () => {
+        // The blocks every line can put down - what the arena is built of,
+        // what the rain turns a shelter into, what players are handed - all
+        // swept by the arena's own boxes or by `sweepBoxes`.
+        for (const size of SIZES) {
+            const one = acid.arena({ size, acidity: "harsh" }, "sweep", SITE, Y);
+            const taken = new Set(
+                [...one.boxes, ...acid.sweepBoxes(one)].map((box) => box.block as string)
+            );
+            const placed = new Set<string>(["minecraft:cobblestone"]);
+            const lines = [
+                ...Object.values(acid.FUNCTIONS).flat(),
+                ...acid.armLines(one, first()),
+                ...acid.dripLines(one),
+                ...acid.collapseLines(one, 0),
+                acid.strikeLine(one),
+                ...acid.dropLines(one, ["blocks", "antidote", "umbrella"], "components")
+            ];
+            for (const line of lines) {
+                const set = /\b(?:setblock (?:\S+ ){3}|fill (?:\S+ ){6})(minecraft:[a-z_]+)/.exec(
+                    line
+                );
+                if (set && set[1] !== "minecraft:air") placed.add(set[1]!);
+            }
+            for (const box of one.boxes) placed.add(box.block);
+            expect([...placed].filter((block) => !taken.has(block))).toEqual([]);
+            expect(placed).toContain("minecraft:mossy_cobblestone");
+            expect(placed).toContain("minecraft:lime_stained_glass");
+        }
     });
 });
 
@@ -286,7 +562,20 @@ describe("what an acid rain hands out and says", () => {
                 said.readySubtitle(language),
                 said.goTitle(language),
                 said.goSubtitle(language),
-                said.bar(acid.gauge(40), 3, language),
+                said.bar("wet", acid.gauge(40), 40, 0, 3, language),
+                said.bar("umbrella", acid.gauge(40), 40, 6, 3, language),
+                said.skyBar(
+                    { sky: "surge", level: 2, wind: 3 },
+                    { sky: "calm", level: 0 },
+                    "0:12",
+                    language
+                ),
+                said.skyBar({ sky: "downpour", level: 5, wind: 1 }, null, "0:48", language),
+                said.skySubtitle("calm", 0, language),
+                said.calmLine(12, 35, 10, language),
+                said.picked("antidote", 35, language),
+                said.sidebarTitle(language),
+                said.collapsed(language),
                 said.topUp(8, language),
                 said.dissolved("Ana", 2, language),
                 said.cannotPlay(language)
@@ -297,8 +586,11 @@ describe("what an acid rain hands out and says", () => {
         for (const line of [
             ...built.boxes.map(stage.buildLine),
             ...acid.sweepBoxes(built).map(stage.buildLine),
-            ...acid.armLines(built),
+            ...acid.armLines(built, first()),
             ...acid.dripLines(built),
+            ...acid.dropLines(built, ["blocks", "antidote", "umbrella"], "nbt"),
+            ...acid.collapseLines(built, 0),
+            acid.strikeLine(built),
             acid.cobblestoneLine("Ana_with_a_long", "components", 16)
         ])
             expect(commandBytes(line)).toBeLessThanOrEqual(COMMAND_BYTES_MAX);
@@ -323,27 +615,22 @@ describe("a shelter in the acid rain", () => {
         );
         expect(acid.FUNCTIONS.gnaw).toContain("function polaris:acid/corrode");
         expect(acid.FUNCTIONS.beat!.some((line) => line.includes("polaris:acid/bites"))).toBe(true);
-        expect(acid.armLines(built())).toContain(
+        expect(acid.armLines(built(), first())).toContain(
             `scoreboard players set #bite ${acid.OBJECTIVE} ${acid.BITE_BEATS.mild}`
         );
     });
 
-    it("lasts less every minute, never below the fastest bite", () => {
+    it("is bitten faster each surge, never below the fastest bite", () => {
         const one = built();
-        expect(acid.strength(59_999)).toBe(0);
-        expect(acid.strength(60_000)).toBe(1);
         expect(acid.biteBeats(one, 0)).toBe(acid.BITE_BEATS.mild);
         expect(acid.biteBeats(one, 1)).toBe(acid.BITE_BEATS.mild / 2);
         expect(acid.biteBeats(one, 20)).toBe(acid.FASTEST_BITE);
-        expect(acid.strongerLines(one, 2)).toEqual([
-            `scoreboard players set #bite ${acid.OBJECTIVE} ${acid.biteBeats(one, 2)}`
-        ]);
     });
 
     it("is explained at Go in both languages", () => {
         for (const language of ["en", "es"] as const) {
             expect(said.howItWorks(language).length).toBeGreaterThan(40);
-            expect(said.stronger(language).length).toBeGreaterThan(10);
+            expect(said.goSubtitle(language)).toMatch(/cover|cubierto/);
         }
     });
 });

@@ -69,10 +69,15 @@ export interface StageLoop {
     /** The racers seen on the last tick: one seen again after missing it has
      *  just come back on (`PackRace.rejoined`). */
     present?: Set<string>;
-    /** How many top-ups of cobblestone an acid rain has handed out since "Go!". */
-    acidTopUps?: number;
-    /** How many times an acid rain has grown stronger since "Go!". */
-    acidStronger?: number;
+    /** Which spell of an acid rain's weather was last put in the pack, and
+     *  how many of its lightning strikes have fallen. Unknown after a restart. */
+    acidSpell?: number;
+    acidStruck?: number;
+    /** Each player's acid on the last look, in lower case: whose went up is
+     *  in the rain. */
+    acidSeen?: Map<string, number>;
+    /** The last second of an acid rain's calm that was ticked off. */
+    acidChimed?: string;
     /** How this server's version writes items, once asked: what the quick look
      *  hands an elytra race's rockets out with. */
     items?: stage.Flavour["items"];
@@ -2075,12 +2080,24 @@ async function spleefTick(
 
 // ------------------------------------------------------------------ acid rain
 
+/** An acid rain's weather, from "Go!" to the end of the run. */
+function acidForecast(loop: StageLoop, acid: acidRain.Acid): acidRain.Spell[] {
+    const { goAt } = state(loop);
+    return goAt === null
+        ? []
+        : acidRain.forecast(loop.run.endsAt - goAt, loop.run.id, acid.huts.length);
+}
+
 /**
- * One tick of an acid rain: at "Go!" the rain switched on and the cobblestone
- * handed out, a top-up every while after, the rain eating at the shelters, and
- * whoever's acid is full, who left or who strayed, out - in the order they went,
- * as a spleef's players. The last one left wins; at the end of the time, those
- * still in are ranked by how dry they stayed (`results`).
+ * One tick of an acid rain: at "Go!" the rain switched on, the cobblestone
+ * handed out and everybody's acid put on the side panel; after it, the
+ * weather (`acidRain.forecast`) put in the pack as each spell starts and told
+ * to everybody in, with the supplies of a calm, the hut a surge brings down
+ * and its lightning; the supplies picked up handed out; the rain eating at the
+ * shelters as hard as it rains; and whoever's acid is full, who left or who
+ * strayed, out - in the order they went, as a spleef's players. The last one
+ * left wins; at the end of the time, those still in are ranked by how dry they
+ * stayed (`results`).
  */
 async function acidTick(
     loop: StageLoop,
@@ -2106,6 +2123,9 @@ async function acidTick(
     let dirty = false;
 
     const current = state(loop);
+    const spells = acidForecast(loop, acid);
+    const since = current.goAt === null ? 0 : now - current.goAt;
+    const inNow = () => state(loop).racers.filter((one) => one.outAt === null);
     if (!current.armed && current.goAt !== null && now >= current.goAt) {
         const { items } = await tools.flavour();
         // Whatever players place and whatever the rain leaves of it is the
@@ -2121,47 +2141,45 @@ async function acidTick(
                 tell(racer.name, messages.tag(language) + acidMessages.howItWorks(language))
             );
         }
-        lines.push(...acidRain.armLines(acid));
-        loop.acidTopUps = 0;
-        loop.acidStronger = 0;
+        lines.push(
+            ...acidRain.armLines(acid, spells[0] ?? acidRain.forecast(1, loop.run.id, 0)[0]!),
+            ...acidRain.sidebarLines(commands.text(acidMessages.sidebarTitle(language)))
+        );
+        loop.acidSpell = 0;
+        loop.acidStruck = 0;
+        loop.acidSeen = new Map();
         change(loop, { armed: true });
         dirty = true;
     } else if (current.armed && current.goAt !== null) {
-        // More cobblestone every while: a shelter can always be patched.
-        const due = Math.floor((now - current.goAt) / acidRain.TOP_UP_MS);
-        loop.acidTopUps ??= due;
-        if (due > loop.acidTopUps) {
-            loop.acidTopUps = due;
-            const { items } = await tools.flavour();
-            for (const racer of current.racers)
-                if (racer.outAt === null)
-                    lines.push(
-                        acidRain.cobblestoneLine(racer.name, items, acidRain.TOP_UP_BLOCKS),
-                        tell(
-                            racer.name,
-                            messages.tag(language) +
-                                acidMessages.topUp(acidRain.TOP_UP_BLOCKS, language)
-                        )
-                    );
+        const index = acidRain.spellAt(spells, since);
+        const spell = spells[index];
+        if (spell && index !== loop.acidSpell) {
+            // Unknown after a restart: the pack is told again, the players
+            // are not told twice.
+            const told = loop.acidSpell !== undefined;
+            loop.acidSpell = index;
+            lines.push(...acidRain.skyLines(acid, spell));
+            if (told) lines.push(...(await acidSpellLines(loop, tools, acid, spell, inNow())));
         }
-        // The rain grows stronger: no shelter holds out for the whole time.
-        const times = acidRain.strength(now - current.goAt);
-        loop.acidStronger ??= times;
-        if (times > loop.acidStronger) {
-            const before = acidRain.biteBeats(acid, loop.acidStronger);
-            loop.acidStronger = times;
-            lines.push(...acidRain.strongerLines(acid, times));
-            if (acidRain.biteBeats(acid, times) < before)
-                lines.push(commands.say(messages.tag(language) + acidMessages.stronger(language)));
-        }
-        lines.push(...acidRain.dripLines(acid));
+        // Lightning, once for each strike whose time has come; those that came
+        // while nobody was looking (a restart) are let go.
+        const due = acidRain.strikesOf(spells).filter((when) => when <= since).length;
+        loop.acidStruck ??= due;
+        for (; loop.acidStruck < due; loop.acidStruck += 1) lines.push(acidRain.strikeLine(acid));
+        for (let times = 0; spell && times < acidRain.rainOf(spell); times += 1)
+            lines.push(...acidRain.dripLines(acid));
     }
 
     // Everybody's acid as the pack has it: kept as how dry they stayed, for
     // the end of the time.
-    const acidOf = state(loop).armed
+    const armed = state(loop).armed;
+    const acidOf = armed
         ? lowered(commands.readScores(await server.say([acidRain.READ_ACID])))
         : new Map<string, number>();
+    const umbrellaOf = armed
+        ? lowered(commands.readScores(await server.say([acidRain.READ_UMBRELLA])))
+        : new Map<string, number>();
+    if (armed) lines.push(...(await acidPickups(loop, server, tools, inNow())));
     change(loop, {
         racers: state(loop).racers.map((one) => {
             const taken = acidOf.get(one.name.toLowerCase());
@@ -2209,22 +2227,34 @@ async function acidTick(
         dirty = true;
     }
 
-    const standing = state(loop).racers.filter((one) => one.outAt === null);
-    for (const racer of standing)
+    // Each player's own acid, and whether the rain is on them now: their acid
+    // went up since the last look.
+    const seen = (loop.acidSeen ??= new Map());
+    const standing = inNow();
+    for (const racer of standing) {
+        const key = racer.name.toLowerCase();
+        const taken = acidOf.get(key) ?? 0;
+        const umbrella = umbrellaOf.get(key) ?? 0;
+        const cover = acidRain.coverOf(seen.get(key), taken, umbrella);
+        seen.set(key, taken);
         lines.push(
             commands.actionbarFor(
                 racer.name,
-                !state(loop).armed
+                !armed
                     ? messages.spleefReadyTitle(language)
                     : acidMessages.bar(
-                          acidRain.gauge(acidOf.get(racer.name.toLowerCase()) ?? 0),
+                          cover,
+                          acidRain.gauge(taken),
+                          taken,
+                          Math.ceil(umbrella / 2),
                           standing.length,
                           language
                       )
             )
         );
+    }
     if (dirty) await tools.persist();
-    if (!state(loop).armed || standing.length > 1) return null;
+    if (!armed || standing.length > 1) return null;
     lines.push(...acidRain.stopLines(acid.boxes));
     const winner = standing[0];
     if (!winner) {
@@ -2233,6 +2263,138 @@ async function acidTick(
     }
     lines.push(commands.say(messages.tag(language) + messages.lastStanding(winner.name, language)));
     return `${winner.name} was the last one standing`;
+}
+
+/**
+ * A new spell, told to everybody in: its title and sound; at a calm, the
+ * supplies dropped and a little more cobblestone for everybody; the hut it
+ * brings down.
+ */
+async function acidSpellLines(
+    loop: StageLoop,
+    tools: StageTools,
+    acid: acidRain.Acid,
+    spell: acidRain.Spell,
+    standing: readonly stage.Racer[]
+): Promise<string[]> {
+    const language = loop.language;
+    const lines: string[] = [];
+    for (const racer of standing)
+        lines.push(
+            `title ${racer.name} subtitle ${commands.text(acidMessages.skySubtitle(spell.sky, spell.wind, language))}`,
+            `title ${racer.name} title ${commands.text(acidMessages.skyTitle(spell.sky, spell.level, language))}`,
+            soundFor(racer.name, acidRain.SKY_SOUNDS[spell.sky])
+        );
+    if (spell.sky === "calm") {
+        const { items } = await tools.flavour();
+        lines.push(
+            ...acidRain.dropLines(acid, acidRain.cratesFor(spell.calm, standing.length), items),
+            commands.say(
+                messages.tag(language) +
+                    acidMessages.calmLine(
+                        acidRain.CRATE_BLOCKS,
+                        acidRain.CURE,
+                        acidRain.UMBRELLA_BEATS / 2,
+                        language
+                    )
+            )
+        );
+        for (const racer of standing)
+            lines.push(
+                acidRain.cobblestoneLine(racer.name, items, acidRain.TOP_UP_BLOCKS),
+                tell(
+                    racer.name,
+                    messages.tag(language) + acidMessages.topUp(acidRain.TOP_UP_BLOCKS, language)
+                )
+            );
+    }
+    if (spell.collapse !== null) {
+        const fall = acidRain.collapseLines(acid, spell.collapse);
+        if (fall.length > 0)
+            lines.push(
+                ...fall,
+                commands.say(messages.tag(language) + acidMessages.collapsed(language))
+            );
+    }
+    return lines;
+}
+
+/**
+ * The supplies picked up since the last look, as the pack counted them: the
+ * blocks handed out here, in this version's item syntax, and everybody told
+ * what they got. What was read is taken off the count, so a supply picked up
+ * meanwhile is there for the next look.
+ */
+async function acidPickups(
+    loop: StageLoop,
+    server: ServerContainer,
+    tools: StageTools,
+    standing: readonly stage.Racer[]
+): Promise<string[]> {
+    const got = lowered(commands.readScores(await server.say([acidRain.READ_GOT])));
+    const language = loop.language;
+    const lines: string[] = [];
+    for (const racer of standing) {
+        const value = got.get(racer.name.toLowerCase()) ?? 0;
+        if (value <= 0) continue;
+        const parts = acidRain.gotOf(value);
+        const told = (line: string) => tell(racer.name, messages.tag(language) + line);
+        if (parts.blocks > 0) {
+            const { items } = await tools.flavour();
+            const count = parts.blocks * acidRain.CRATE_BLOCKS;
+            lines.push(
+                acidRain.cobblestoneLine(racer.name, items, count),
+                told(acidMessages.picked("blocks", count, language))
+            );
+        }
+        if (parts.antidote > 0)
+            lines.push(told(acidMessages.picked("antidote", acidRain.CURE, language)));
+        if (parts.umbrella > 0)
+            lines.push(
+                told(acidMessages.picked("umbrella", acidRain.UMBRELLA_BEATS / 2, language))
+            );
+        lines.push(...acidRain.gotTakenLines(racer.name, value));
+    }
+    return lines;
+}
+
+/**
+ * The boss bar through an acid rain, once it has started: what the sky is
+ * doing, what comes next and when, in the sky's colour - and the last seconds
+ * of a calm ticked off to everybody in. Null for anything else, before
+ * "Go!" and once the time is up.
+ */
+export function acidClockLines(loop: StageLoop, now: number): string[] | null {
+    if (loop.run.preset.kind !== "acid-rain" || now >= loop.run.endsAt) return null;
+    const current = state(loop);
+    const layout = built(loop.run);
+    if (!current.armed || current.goAt === null || layout?.kind !== "acid-rain") return null;
+    const spells = acidForecast(loop, layout.acid);
+    const index = acidRain.spellAt(spells, now - current.goAt);
+    const spell = spells[index];
+    if (!spell) return null;
+    const left = Math.max(0, (spell.to - (now - current.goAt)) / 1000);
+    const lines = [
+        ...commands.barUpdate(
+            acidMessages.skyBar(
+                spell,
+                spells[index + 1] ?? null,
+                messages.clock(left),
+                loop.language
+            ),
+            left,
+            (spell.to - spell.from) / 1000
+        ),
+        `bossbar set ${commands.BAR} color ${acidRain.SKY_COLORS[spell.sky]}`
+    ];
+    const mark = Math.ceil(left);
+    if (spell.sky === "calm" && mark >= 1 && mark <= 3 && loop.acidChimed !== `${index}:${mark}`) {
+        loop.acidChimed = `${index}:${mark}`;
+        lines.push(
+            `execute as @a[tag=${stage.IN_ARENA}] at @s run playsound ${commands.SOUNDS.tick} master @s ~ ~ ~ 1 1.5 0`
+        );
+    }
+    return lines;
 }
 
 /** The marked shovel, in the syntax this server takes - the other tried once if

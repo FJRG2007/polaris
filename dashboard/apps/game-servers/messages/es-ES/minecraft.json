@@ -1774,7 +1774,7 @@
             },
             "acid-rain": {
                 "label": "Lluvia ácida",
-                "summary": "Se construye en el aire una arena abierta, y sobre ella sola cae una lluvia ácida. Estar sin nada sobre la cabeza llena tu barra de ácido; llena, quedas fuera. Refúgiate en las chozas o construye la tuya con la piedra que se reparte, mientras la lluvia se come el bloque sobre tu cabeza - más fuerte cada minuto, así que ningún techo dura siempre. Gana el último en pie.",
+                "summary": "Cae lluvia ácida en oleadas sobre una arena flotante: quédate a cubierto, repara los techos que se come y corre a por suministros en cada calma. Gana el último en pie.",
                 "unit": "puntos"
             },
             "elytra-race": {
