@@ -578,9 +578,16 @@ export function knockbackOff(name: string): string[] {
 export const STRIKE_CHANCE = 0.35;
 const STRIKE_FLOOR = DRAIN_FLOOR + 2;
 
-export function strikeLine(center: Point, ringRadius: number): string {
+export function strikeLine(
+    place: Point,
+    radius: number,
+    center: Point,
+    ringRadius: number
+): string {
     const outside = `@a[tag=${IN_ARENA},distance=${ringRadius + 1.5}..,scores={${HEALTH_SCORE}=${STRIKE_FLOOR}..},sort=random,limit=1]`;
-    return `execute in minecraft:overworld positioned ${center.x + 0.5} ${center.y} ${center.z + 0.5} as ${outside} at @s run summon minecraft:lightning_bolt ~ ~ ~`;
+    const box = platformBox(place, radius);
+    const over = `@s[x=${box.x1},y=${place.y},z=${box.z1},dx=${box.x2 - box.x1},dy=${OVER_FLOOR},dz=${box.z2 - box.z1}]`;
+    return `execute in minecraft:overworld positioned ${center.x + 0.5} ${center.y} ${center.z + 0.5} as ${outside} at @s if entity ${over} run summon minecraft:lightning_bolt ~ ~ ~`;
 }
 
 /**

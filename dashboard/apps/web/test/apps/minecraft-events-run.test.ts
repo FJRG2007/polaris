@@ -8490,8 +8490,14 @@ describe("a king of the hill", () => {
         await play(20_000);
         const bolts = world.sent.filter((line) => line.includes("summon minecraft:lightning_bolt"));
         expect(bolts.length).toBeGreaterThan(0);
-        for (const bolt of bolts)
+        for (const bolt of bolts) {
             expect(bolt).toMatch(/distance=\d+(\.\d+)?\.\.,scores=\{pe_khp=8\.\.\}/);
+            // Only on somebody still up at the platform, never on the ground under it.
+            const floor = hill.platformBox(run.place!, 6);
+            expect(bolt).toContain(
+                ` at @s if entity @s[x=${floor.x1},y=${run.place!.y},z=${floor.z1},dx=${floor.x2 - floor.x1},dy=2,dz=${floor.z2 - floor.z1}] run summon `
+            );
+        }
         expect(world.sent.some((line) => / minecraft:air replace minecraft:fire$/.test(line))).toBe(
             true
         );
@@ -8508,6 +8514,7 @@ describe("a king of the hill", () => {
             expect(world.sent).toContain(
                 `attribute ${name} minecraft:knockback_resistance base set 0`
             );
+            expect(world.sent).toContain(`tag ${name} remove pe_hit_hurt`);
         }
         // No player is ever held in the air: the server would kick them for
         // flying. (A pet floats down as the platform goes.)
@@ -8865,6 +8872,9 @@ describe("a king of the hill", () => {
         expect(
             world.sent.some((line) => line.includes("run scoreboard players add @s pe_score 2"))
         ).toBe(true);
+        // On the ground of somebody's world: no storm, and nobody's punch or weight changed.
+        expect(world.sent.some((line) => line.includes("lightning_bolt"))).toBe(false);
+        expect(world.sent.some((line) => line.includes("knockback"))).toBe(false);
         await play(4 * 60_000);
         expect(state().run).toBeNull();
         expect(

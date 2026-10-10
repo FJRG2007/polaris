@@ -18,6 +18,7 @@ import * as commands from "../commands";
 import * as said from "./hill-messages";
 import type * as stored from "../state";
 import * as search from "../place-search";
+import * as hitTags from "./hits";
 import * as hitsService from "./hits-service";
 import { seeded } from "../trivia-bank";
 import { EventStopped, type KindContext } from "./arena-service";
@@ -342,8 +343,9 @@ export async function goLines(ctx: KindContext): Promise<string[]> {
     const run = ctx.run;
     const spots = startSpotsFor(run);
     const overGround = await ctx.atLeast([1, 19, 4]);
-    // Every fighter's punch and weight, where the game lets a player's count.
-    const knock = await ctx.atLeast(hill.KNOCKBACK_SINCE);
+    // Every fighter's punch and weight, with fists only and where the game
+    // lets a player's count.
+    const knock = optionsOf(run).fistsOnly && (await ctx.atLeast(hill.KNOCKBACK_SINCE));
     return [
         ...run.entrants.flatMap((one) =>
             hill
@@ -356,7 +358,9 @@ export async function goLines(ctx: KindContext): Promise<string[]> {
             hillMessages.goTitle(ctx.language),
             hillMessages.goSubtitle(ctx.language)
         ),
-        ...(knock ? run.entrants.flatMap((one) => hill.fighterLines(one.name)) : [])
+        ...(knock
+            ? [...hitTags.TAGS_OFF, ...run.entrants.flatMap((one) => hill.fighterLines(one.name))]
+            : [])
     ];
 }
 
@@ -405,7 +409,7 @@ export async function fightTick(ctx: KindContext, seconds: number, lines: string
     };
     // The blows taken since the last look, each one making the next throw
     // further; a new round starts everybody heavy again (`hill.knockbackLines`).
-    const knock = await ctx.atLeast(hill.KNOCKBACK_SINCE);
+    const knock = options.fistsOnly && (await ctx.atLeast(hill.KNOCKBACK_SINCE));
     const hits: Record<string, number> = ring.round > was.round ? {} : { ...was.hits };
     // Taken every look, so a blow in the pause between rounds is not counted
     // in the next.
@@ -431,8 +435,12 @@ export async function fightTick(ctx: KindContext, seconds: number, lines: string
     );
     // The storm: now and then a bolt on somebody outside the ring, the same
     // after a restart for the same moment (`hill.strikeLine`).
-    if (!ring.pause && seeded(`${run.id}:${Math.floor(Date.now() / 2_000)}`)() < hill.STRIKE_CHANCE)
-        lines.push(hill.strikeLine(center, ring.radius));
+    if (
+        options.fistsOnly &&
+        !ring.pause &&
+        seeded(`${run.id}:${Math.floor(Date.now() / 2_000)}`)() < hill.STRIKE_CHANCE
+    )
+        lines.push(hill.strikeLine(platform, radius, center, ring.radius));
     if (!ring.pause)
         lines.push(...hill.scoreLines(center, ring.radius, seconds * (ring.sprint ? 2 : 1)));
     if (ring.radius !== was.radius || ring.dx !== was.dx || ring.dz !== was.dz) {

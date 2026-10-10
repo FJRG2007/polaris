@@ -1393,7 +1393,10 @@ export async function closeArena(
         const homeward = [
             // The ring's punch and weight back to a player's own (`hill.knockbackOff`).
             ...(left.kind === "king-of-the-hill"
-                ? owed.flatMap(({ one }) => hill.knockbackOff(one.name))
+                ? owed.flatMap(({ one }) => [
+                      ...hill.knockbackOff(one.name),
+                      ...hits.tagsOff(one.name)
+                  ])
                 : []),
             ...owed
                 .filter(({ at }) => back.has(at))

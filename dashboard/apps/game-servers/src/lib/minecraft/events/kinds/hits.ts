@@ -130,6 +130,13 @@ export const TAGS_OFF: readonly string[] = [HURT_TAG, STRUCK_TAG, WAS_HURT_TAG, 
     (tag) => `tag @a remove ${tag}`
 );
 
+/** Every tag of the pack's, taken off one player. */
+export function tagsOff(name: string): string[] {
+    return [HURT_TAG, STRUCK_TAG, WAS_HURT_TAG, WAS_STRUCK_TAG].map(
+        (tag) => `tag ${name} remove ${tag}`
+    );
+}
+
 /** Who last hurt a player, where they are: `<attacker> has the following entity data: [..]`. */
 export function attackerLine(victim: string): string {
     return `execute as ${victim} on attacker run data get entity @s Pos`;
