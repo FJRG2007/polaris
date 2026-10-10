@@ -336,7 +336,12 @@ export function SpaceSoundboardView({ spaceId }: { spaceId: string }) {
                                                     {name}
                                                 </span>
                                                 <IconButton
-                                                    label={t("soundboardSettings.allow", { name })}
+                                                    label={
+                                                        denial.mayChange
+                                                            ? t("soundboardSettings.allow", { name })
+                                                            : t("errors.soundboardDenialOwnerOnly")
+                                                    }
+                                                    disabled={!denial.mayChange}
                                                     onClick={() =>
                                                         void optimistic(
                                                             (current) => ({
@@ -385,7 +390,7 @@ export function SpaceSoundboardView({ spaceId }: { spaceId: string }) {
                                                     ...current,
                                                     denials: [
                                                         ...current.denials,
-                                                        { kind: "role", subject, name: role.name } as SpaceSoundboard["denials"][number]
+                                                        { kind: "role", subject, name: role.name, mayChange: true } as SpaceSoundboard["denials"][number]
                                                     ]
                                                 }),
                                                 () =>
@@ -420,7 +425,8 @@ export function SpaceSoundboardView({ spaceId }: { spaceId: string }) {
                                                         {
                                                             kind: "user",
                                                             subject: person.id,
-                                                            name: person.name
+                                                            name: person.name,
+                                                            mayChange: true
                                                         }
                                                     ]
                                                 }),
@@ -504,19 +510,22 @@ function SwitchRow({
 function IconButton({
     label,
     onClick,
+    disabled,
     children
 }: {
     label: string;
     onClick: () => void;
+    disabled?: boolean;
     children: React.ReactNode;
 }) {
     return (
         <button
             type="button"
             onClick={onClick}
+            disabled={disabled}
             aria-label={label}
             title={label}
-            className="shrink-0 rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+            className="shrink-0 rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent disabled:hover:text-muted-foreground"
         >
             {children}
         </button>

@@ -260,6 +260,24 @@ export function soundboardDenied(
     );
 }
 
+/**
+ * Whether somebody who runs the space may add or lift this denial.
+ *
+ * The owner may change any of them. An administrator may not change one that
+ * reaches themselves - or "deny beats allow" would mean nothing to the people
+ * who manage it - nor one naming another administrator by name, so the
+ * administrators cannot silence each other: both are the owner's to decide.
+ */
+export function mayChangeDenial(
+    denial: SoundDenial,
+    actor: SoundboardSubject,
+    named: { readonly spaceRole: SpaceRole | "owner" | null } = { spaceRole: null }
+): boolean {
+    if (actor.spaceRole === "owner") return true;
+    if (soundboardDenied([denial], actor)) return false;
+    return !(denial.kind === "user" && (named.spaceRole === "admin" || named.spaceRole === "owner"));
+}
+
 // ---------------------------------------------------------------------------
 // Who may play
 // ---------------------------------------------------------------------------
@@ -337,7 +355,9 @@ export type SoundRefusal =
 /**
  * Whether this sound may be played in this call.
  *
- * A default always may. A space's sound needs its player to reach that space -
+ * A default always may, and so does one of the call's own space: the picker
+ * offers them to everybody in the call, whoever brought them in. A sound from
+ * another space needs its player to reach that space -
  * the picker never offers one they do not, and a reference typed by hand is
  * answered as if the sound did not exist. One from another space also needs the
  * call's space to allow sounds from elsewhere; outside a space - a direct
@@ -346,8 +366,8 @@ export type SoundRefusal =
  */
 export function soundRefusal(facts: SoundboardFacts, origin: SoundOrigin): SoundRefusal | null {
     if (origin.kind === "default") return null;
-    if (!origin.reachable) return "gone";
     if (origin.here) return null;
+    if (!origin.reachable) return "gone";
     if (facts.space && !facts.space.external) return "external";
     return null;
 }

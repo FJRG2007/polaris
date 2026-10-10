@@ -19,6 +19,9 @@ const MEETING = "0193b0f0-0000-7000-8000-0000000000e1";
 const SEAT = "0193b0f0-0000-7000-8000-0000000000f1";
 const ADA = "0193b0f0-0000-7000-8000-0000000000a1";
 const OWNER = "0193b0f0-0000-7000-8000-0000000000a9";
+const BEN = "0193b0f0-0000-7000-8000-0000000000b2";
+const PUBLIC_CHANNEL = "0193b0f0-0000-7000-8000-0000000000d1";
+const PRIVATE_CHANNEL = "0193b0f0-0000-7000-8000-0000000000d2";
 const SOUND = "0193b0f0-0000-7000-8000-0000000000c1";
 const FOREIGN_SOUND = "0193b0f0-0000-7000-8000-0000000000c2";
 
@@ -45,7 +48,10 @@ interface State {
     } | null;
     denials: { kind: string; subject: string }[];
     access: Record<string, "owner" | "admin" | "member" | null>;
+    /** Somebody else's standing in SPACE, by account. */
+    people: Record<string, "admin" | "member">;
     orgRole: string | null;
+    channels: { id: string; private: boolean; members: string[] }[];
     allowed: boolean;
     reachable: boolean;
 }
@@ -54,6 +60,8 @@ let state: State;
 let sent: { meetingId: string; payload: unknown; topic: string }[] = [];
 let denialWrites: unknown[] = [];
 let counted = 0;
+let refunded = 0;
+let channelWrites: unknown[] = [];
 
 function reset(): void {
     state = {
@@ -74,13 +82,20 @@ function reset(): void {
         },
         denials: [],
         access: { [SPACE]: "member", [OTHER_SPACE]: "member" },
+        people: { [BEN]: "member" },
         orgRole: "sales",
+        channels: [
+            { id: PUBLIC_CHANNEL, private: false, members: [] },
+            { id: PRIVATE_CHANNEL, private: true, members: [] }
+        ],
         allowed: true,
         reachable: true
     };
     sent = [];
     denialWrites = [];
     counted = 0;
+    refunded = 0;
+    channelWrites = [];
 }
 
 vi.mock("@polaris/config", () => ({
@@ -99,17 +114,31 @@ vi.mock("@/lib/rate-limit-service", () => ({
     rateLimit: async () => {
         counted += 1;
         return state.allowed ? { ok: true, retryAfterMs: 0 } : { ok: false, retryAfterMs: 2_100 };
+    },
+    resetRateLimit: async () => {
+        refunded += 1;
     }
 }));
+
+vi.mock("@/lib/access/grants", () => ({ grantedSubjects: async () => new Map() }));
 
 vi.mock("@/lib/chat/access", async (importActual) => {
     const actual = await importActual<typeof import("@/lib/chat/access")>();
     return {
         ...actual,
-        spaceAccess: async (_actor: unknown, spaceId: string) => state.access[spaceId] ?? null,
+        spaceAccess: async (actor: { id: string }, spaceId: string) => {
+            if (actor.id === OWNER) return "owner";
+            if (actor.id !== ADA) return spaceId === SPACE ? (state.people[actor.id] ?? null) : null;
+            return state.access[spaceId] ?? null;
+        },
+        channelAccess: async (actor: { id: string }, channelId: string) => {
+            const channel = state.channels.find((one) => one.id === channelId);
+            if (!channel || (channel.private && !channel.members.includes(actor.id))) return null;
+            return { channelId, spaceId: SPACE };
+        },
         reachableSpaceIds: async () => new Set(Object.keys(state.access)),
-        requireSpace: async (_actor: unknown, spaceId: string, minimum = "member") => {
-            const role = state.access[spaceId] ?? null;
+        requireSpace: async (actor: { id: string }, spaceId: string, minimum = "member") => {
+            const role = actor.id === OWNER ? "owner" : (state.access[spaceId] ?? null);
             if (!role) throw new actual.ChatAccessError({ key: "errors.notInSpace" });
             if (minimum === "admin" && role === "member") {
                 throw new actual.ChatAccessError({ key: "errors.spaceAdminOnly" });
@@ -137,7 +166,37 @@ vi.mock("@polaris/db", () => ({
         organizationMember: {
             findUnique: async () => (state.orgRole ? { role: state.orgRole } : null)
         },
-        chatSpace: { findUnique: async () => ({ ownerId: OWNER }) },
+        chatSpace: {
+            findUnique: async () => ({
+                id: SPACE,
+                name: "Space",
+                orgId: ORG,
+                ownerId: OWNER,
+                soundboard: true,
+                soundboardExternal: true
+            })
+        },
+        chatSpaceMember: {
+            findMany: async ({ where }: { where: { userId: { in: string[] } } }) =>
+                Object.entries(state.people)
+                    .filter(([userId]) => where.userId.in.includes(userId))
+                    .map(([userId, role]) => ({ userId, role }))
+        },
+        chatChannel: {
+            findMany: async ({ where }: { where: { OR: unknown[] } }) => {
+                expect(where.OR).toContainEqual({ private: false });
+                expect(where.OR).toContainEqual({ members: { some: { userId: ADA } } });
+                return state.channels
+                    .filter((one) => !one.private || one.members.includes(ADA))
+                    .map((one) => ({ id: one.id, name: one.id, kind: "text", soundboard: true }));
+            },
+            update: async (args: unknown) => {
+                channelWrites.push(args);
+                return {};
+            }
+        },
+        orgRole: { findMany: async () => [] },
+        user: { findMany: async () => [] },
         chatSpaceSound: {
             findUnique: async ({ where }: { where: { id: string } }) => {
                 if (where.id === SOUND)
@@ -145,12 +204,15 @@ vi.mock("@polaris/db", () => ({
                 if (where.id === FOREIGN_SOUND)
                     return { id: FOREIGN_SOUND, spaceId: OTHER_SPACE, name: "Far", emoji: "", volume: 1 };
                 return null;
-            }
+            },
+            findMany: async () => []
         }
     }
 }));
 
-const { playSound, setSoundDenial } = await import("@/lib/chat/soundboard-service");
+const { playSound, setSoundDenial, setChannelSoundboard, spaceSoundboard } = await import(
+    "@/lib/chat/soundboard-service"
+);
 const { ChatAccessError } = await import("@/lib/chat/access");
 
 const seat = { meetingId: MEETING, participantId: SEAT, admission: "admitted" } as never;
@@ -328,6 +390,20 @@ describe("a play that is refused sends nothing", () => {
         await refusalOf(SOUND);
         expect(counted).toBe(0);
     });
+
+    it("and a call server that did not answer gives the cooldown back", async () => {
+        state.reachable = false;
+        expect(await refusalOf(SOUND)).toBe("errors.soundboardUnreachable");
+        expect(refunded).toBe(1);
+    });
+});
+
+describe("a play of the call's own space's sound", () => {
+    it("goes through for somebody brought into the call without reaching the space", async () => {
+        state.access[SPACE] = null;
+        expect(await refusalOf(SOUND)).toBeNull();
+        expect(sent).toHaveLength(1);
+    });
 });
 
 describe("denying the soundboard", () => {
@@ -360,5 +436,65 @@ describe("denying the soundboard", () => {
         await setSoundDenial({ id: ADA }, { spaceId: SPACE, denial, denied: true });
         await setSoundDenial({ id: ADA }, { spaceId: SPACE, denial, denied: false });
         expect(denialWrites).toHaveLength(2);
+    });
+
+    it.each([
+        ["themselves", { kind: "user" as const, subject: ADA }],
+        ["the administrators' role", { kind: "role" as const, subject: "admin" }],
+        ["every member, them included", { kind: "role" as const, subject: "member" }],
+        ["an organization role they hold", { kind: "role" as const, subject: "org:sales" }],
+        ["another administrator", { kind: "user" as const, subject: BEN }]
+    ])("is the owner's alone when an administrator would change it for %s", async (_who, denial) => {
+        state.access[SPACE] = "admin";
+        state.people[BEN] = "admin";
+        for (const denied of [true, false]) {
+            await expect(
+                setSoundDenial({ id: ADA }, { spaceId: SPACE, denial, denied })
+            ).rejects.toMatchObject({ text: { key: "errors.soundboardDenialOwnerOnly" } });
+        }
+        expect(denialWrites).toHaveLength(0);
+    });
+
+    it("lets the owner change any of them", async () => {
+        state.people[BEN] = "admin";
+        await setSoundDenial({ id: OWNER }, {
+            spaceId: SPACE,
+            denial: { kind: "user", subject: BEN },
+            denied: true
+        });
+        await setSoundDenial({ id: OWNER }, {
+            spaceId: SPACE,
+            denial: { kind: "role", subject: "admin" },
+            denied: false
+        });
+        expect(denialWrites).toHaveLength(2);
+    });
+});
+
+describe("the settings page", () => {
+    it("lists a private conversation only to whoever is in it", async () => {
+        state.access[SPACE] = "admin";
+        const board = await spaceSoundboard({ id: ADA }, SPACE);
+        expect(board.channels.map((one) => one.id)).toEqual([PUBLIC_CHANNEL]);
+    });
+
+    it("offers an administrator only the roles that do not reach them, and marks the denials they cannot lift", async () => {
+        state.access[SPACE] = "admin";
+        state.denials = [
+            { kind: "user", subject: ADA },
+            { kind: "role", subject: "org:other" }
+        ];
+        const board = await spaceSoundboard({ id: ADA }, SPACE);
+        expect(board.roles.map((role) => role.subject)).toEqual([]);
+        expect(board.denials.map((one) => one.mayChange)).toEqual([false, true]);
+    });
+
+    it("refuses the switch of a private conversation the administrator is not in", async () => {
+        state.access[SPACE] = "admin";
+        await expect(
+            setChannelSoundboard({ id: ADA }, { channelId: PRIVATE_CHANNEL, enabled: false })
+        ).rejects.toMatchObject({ text: { key: "errors.notInSpace" } });
+        await setChannelSoundboard({ id: ADA }, { channelId: PUBLIC_CHANNEL, enabled: false });
+        expect(channelWrites).toHaveLength(1);
     });
 });

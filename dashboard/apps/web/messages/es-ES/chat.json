@@ -220,7 +220,8 @@
         "soundboardExternal": "Este espacio solo reproduce sus propios sonidos",
         "soundboardCooldown": "Espera {seconds} s antes del siguiente sonido",
         "soundboardUnreachable": "El servidor de llamadas no respondió. Inténtalo de nuevo.",
-        "soundboardOwner": "Al dueño del espacio no se le puede negar la botonera"
+        "soundboardOwner": "Al dueño del espacio no se le puede negar la botonera",
+        "soundboardDenialOwnerOnly": "Solo el dueño del espacio puede cambiar esta restricción"
     },
     "media": {
         "refused": {

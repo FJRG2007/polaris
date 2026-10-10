@@ -29,10 +29,12 @@ import { sendToRoom } from "./call-server";
 import type { MeetingSeat } from "./meetings";
 import { soundUrl } from "./soundboard-ticket";
 import { prisma, type Prisma } from "@polaris/db";
-import { rateLimit } from "@/lib/rate-limit-service";
+import { grantedSubjects } from "@/lib/access/grants";
+import { rateLimit, resetRateLimit } from "@/lib/rate-limit-service";
 import { readWav, type SoundFileProblem } from "./sound-file";
 import {
     ChatRuleError,
+    channelAccess,
     reachableSpaceIds,
     requireSpace,
     spaceAccess,
@@ -147,6 +149,26 @@ async function deniedIn(
         spaceRole: access ?? "member",
         orgRole: await orgRoleOf(space.orgId, userId)
     });
+}
+
+/** The standing each of these people has in the space as its owner or on its
+ *  member list. */
+async function spaceRolesOf(
+    spaceId: string,
+    userIds: readonly string[]
+): Promise<Map<string, rules.SpaceRole | "owner">> {
+    const standings = new Map<string, rules.SpaceRole | "owner">();
+    if (userIds.length === 0) return standings;
+    const [space, members] = await Promise.all([
+        prisma.chatSpace.findUnique({ where: { id: spaceId }, select: { ownerId: true } }),
+        prisma.chatSpaceMember.findMany({
+            where: { spaceId, userId: { in: [...userIds] } },
+            select: { userId: true, role: true }
+        })
+    ]);
+    for (const member of members) standings.set(member.userId, member.role === "admin" ? "admin" : "member");
+    if (space?.ownerId && userIds.includes(space.ownerId)) standings.set(space.ownerId, "owner");
+    return standings;
 }
 
 // ---------------------------------------------------------------------------
@@ -370,6 +392,7 @@ export async function playSound(seat: MeetingSeat, ref: string): Promise<void> {
         userId
     };
     if (!(await sendToRoom(seat.meetingId, message, rules.SOUNDBOARD_TOPIC))) {
+        await resetRateLimit(`soundboard:${userId}`);
         throw new ChatRuleError({ key: "errors.soundboardUnreachable" });
     }
 }
@@ -415,7 +438,12 @@ export interface SpaceSoundboard {
     readonly external: boolean;
     readonly sounds: readonly SoundView[];
     readonly slots: number;
-    readonly denials: readonly (rules.SoundDenial & { readonly name: string | null })[];
+    readonly denials: readonly (rules.SoundDenial & {
+        readonly name: string | null;
+        /** Whether the reader may lift it - see `rules.mayChangeDenial`. */
+        readonly mayChange: boolean;
+    })[];
+    /** The roles the reader may deny. */
     readonly roles: readonly SoundRoleOption[];
     readonly channels: readonly {
         readonly id: string;
@@ -427,13 +455,14 @@ export interface SpaceSoundboard {
 
 /** The page, for whoever runs the space. */
 export async function spaceSoundboard(actor: ChatActor, spaceId: string): Promise<SpaceSoundboard> {
-    await requireSpace(actor, spaceId, "admin");
+    const access = await requireSpace(actor, spaceId, "admin");
     const space = await prisma.chatSpace.findUnique({
         where: { id: spaceId },
         select: { id: true, name: true, orgId: true, soundboard: true, soundboardExternal: true }
     });
     if (!space) throw new ChatRuleError({ key: "errors.notInSpace" });
-    const [sounds, denials, channels, orgRoles] = await Promise.all([
+    const granted = await grantedSubjects(actor.id, "chat.channel");
+    const [sounds, denials, channels, orgRoles, actorOrgRole] = await Promise.all([
         prisma.chatSpaceSound.findMany({
             where: { spaceId },
             orderBy: { createdAt: "asc" },
@@ -442,7 +471,15 @@ export async function spaceSoundboard(actor: ChatActor, spaceId: string): Promis
         }),
         denialsOf(spaceId),
         prisma.chatChannel.findMany({
-            where: { spaceId, archived: false },
+            where: {
+                spaceId,
+                archived: false,
+                OR: [
+                    { private: false },
+                    { members: { some: { userId: actor.id } } },
+                    { id: { in: [...granted.keys()] } }
+                ]
+            },
             orderBy: { order: "asc" },
             take: 500,
             select: { id: true, name: true, kind: true, soundboard: true }
@@ -454,12 +491,22 @@ export async function spaceSoundboard(actor: ChatActor, spaceId: string): Promis
                   take: 200,
                   select: { slug: true, name: true }
               })
-            : Promise.resolve([])
+            : Promise.resolve([]),
+        orgRoleOf(space.orgId, actor.id)
     ]);
-    const people = await prisma.user.findMany({
-        where: { id: { in: denials.filter((d) => d.kind === "user").map((d) => d.subject) } },
-        select: { id: true, name: true }
-    });
+    const deniedPeople = denials.filter((d) => d.kind === "user").map((d) => d.subject);
+    const [people, standings] = await Promise.all([
+        prisma.user.findMany({
+            where: { id: { in: deniedPeople } },
+            select: { id: true, name: true }
+        }),
+        spaceRolesOf(spaceId, deniedPeople)
+    ]);
+    const self: rules.SoundboardSubject = { userId: actor.id, spaceRole: access, orgRole: actorOrgRole };
+    const mayChange = (denial: rules.SoundDenial) =>
+        rules.mayChangeDenial(denial, self, {
+            spaceRole: denial.kind === "user" ? (standings.get(denial.subject) ?? null) : null
+        });
     const personName = new Map(people.map((person) => [person.id, person.name]));
     const roleName = new Map(
         orgRoles.map((role) => [`${rules.ORG_ROLE_PREFIX}${role.slug}`, role.name])
@@ -476,13 +523,14 @@ export async function spaceSoundboard(actor: ChatActor, spaceId: string): Promis
             name:
                 denial.kind === "user"
                     ? (personName.get(denial.subject) ?? null)
-                    : (roleName.get(denial.subject) ?? null)
+                    : (roleName.get(denial.subject) ?? null),
+            mayChange: mayChange(denial)
         })),
         roles: [
             { subject: "member", name: null },
             { subject: "admin", name: null },
             ...orgRoles.map((role) => ({ subject: `${rules.ORG_ROLE_PREFIX}${role.slug}`, name: role.name }))
-        ],
+        ].filter((role) => mayChange({ kind: "role", subject: role.subject } as rules.SoundDenial)),
         channels: channels.map((channel) => ({
             id: channel.id,
             name: channel.name,
@@ -512,10 +560,7 @@ export async function setChannelSoundboard(
     actor: ChatActor,
     input: { readonly channelId: string; readonly enabled: boolean }
 ): Promise<void> {
-    const channel = await prisma.chatChannel.findUnique({
-        where: { id: input.channelId },
-        select: { spaceId: true }
-    });
+    const channel = await channelAccess(actor, input.channelId);
     if (!channel?.spaceId) throw new ChatRuleError({ key: "errors.notInSpace" });
     await requireSpace(actor, channel.spaceId, "admin");
     await prisma.chatChannel.update({
@@ -529,22 +574,32 @@ export async function setSoundDenial(
     actor: ChatActor,
     input: { readonly spaceId: string; readonly denial: rules.SoundDenial; readonly denied: boolean }
 ): Promise<void> {
-    await requireSpace(actor, input.spaceId, "admin");
+    const access = await requireSpace(actor, input.spaceId, "admin");
     const key = { spaceId: input.spaceId, kind: input.denial.kind, subject: input.denial.subject };
+    const named =
+        input.denial.kind === "user"
+            ? await spaceAccess({ id: input.denial.subject }, input.spaceId)
+            : null;
+    if (input.denied && named === "owner") {
+        // The owner is never denied - the rule `rules.soundboardDenied` keeps too -
+        // so the page cannot list a denial that does nothing.
+        throw new ChatRuleError({ key: "errors.soundboardOwner" });
+    }
+    const space = await prisma.chatSpace.findUnique({
+        where: { id: input.spaceId },
+        select: { orgId: true }
+    });
+    const self: rules.SoundboardSubject = {
+        userId: actor.id,
+        spaceRole: access,
+        orgRole: await orgRoleOf(space?.orgId ?? null, actor.id)
+    };
+    if (!rules.mayChangeDenial(input.denial, self, { spaceRole: named })) {
+        throw new ChatRuleError({ key: "errors.soundboardDenialOwnerOnly" });
+    }
     if (!input.denied) {
         await prisma.chatSoundboardDenial.deleteMany({ where: key });
         return;
-    }
-    if (input.denial.kind === "user") {
-        // The owner is never denied - the rule `rules.soundboardDenied` keeps too -
-        // so the page cannot list a denial that does nothing.
-        const space = await prisma.chatSpace.findUnique({
-            where: { id: input.spaceId },
-            select: { ownerId: true }
-        });
-        if (space?.ownerId === input.denial.subject) {
-            throw new ChatRuleError({ key: "errors.soundboardOwner" });
-        }
     }
     await prisma.chatSoundboardDenial.upsert({
         where: { spaceId_kind_subject: key },

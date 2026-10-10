@@ -123,6 +123,10 @@ describe("whether one sound may be played here", () => {
         expect(rules.soundRefusal(own, { kind: "default" })).toBeNull();
     });
 
+    it("lets anybody in the call play its own space's sounds, reaching the space or not", () => {
+        expect(rules.soundRefusal(facts(), { kind: "space", here: true, reachable: false })).toBeNull();
+    });
+
     it("is gone for a sound of a space the player does not reach", () => {
         expect(rules.soundRefusal(facts(), { kind: "space", here: false, reachable: false })).toBe(
             "gone"

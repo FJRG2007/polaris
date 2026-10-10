@@ -259,7 +259,16 @@ export function SoundboardPanel({
     const [coolUntil, setCoolUntil] = useState(0);
     const [now, setNow] = useState(() => Date.now());
     const [busy, setBusy] = useState<string | null>(null);
+    const [jump, setJump] = useState<string | null>(null);
     const scroller = useRef<HTMLDivElement>(null);
+
+    useLayoutEffect(() => {
+        if (!jump) return;
+        scroller.current
+            ?.querySelector(`[data-section="${CSS.escape(jump)}"]`)
+            ?.scrollIntoView({ block: "start" });
+        setJump(null);
+    }, [jump]);
 
     // A tick only while a cooldown runs, so the bar empties and the tiles come
     // back on their own.
@@ -420,9 +429,7 @@ export function SoundboardPanel({
                             aria-label={section.title}
                             onClick={() => {
                                 setQuery("");
-                                scroller.current
-                                    ?.querySelector(`[data-section="${CSS.escape(section.id)}"]`)
-                                    ?.scrollIntoView({ block: "start" });
+                                setJump(section.id);
                             }}
                             className="flex size-8 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-card-hover hover:text-foreground"
                         >

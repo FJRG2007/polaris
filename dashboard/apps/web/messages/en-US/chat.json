@@ -220,7 +220,8 @@
         "soundboardExternal": "This space only plays its own sounds",
         "soundboardCooldown": "Wait {seconds} s before the next sound",
         "soundboardUnreachable": "The call server did not answer. Try again.",
-        "soundboardOwner": "The owner of the space cannot be denied the soundboard"
+        "soundboardOwner": "The owner of the space cannot be denied the soundboard",
+        "soundboardDenialOwnerOnly": "Only the owner of the space can change this denial"
     },
     "media": {
         "refused": {
