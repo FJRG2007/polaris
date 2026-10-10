@@ -22,7 +22,7 @@
         "zod": "3.24.1"
     },
     "peerDependencies": {
-        "next": "*",
+        "next": "16.4.0",
         "react": "^19",
         "react-dom": "^19"
     }
