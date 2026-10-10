@@ -10,19 +10,19 @@
  */
 
 export {
-  Diagram as DiagramCanvas,
-  exportToBlob,
-  exportToSvg,
-  restoreElements,
-  CaptureUpdateAction,
-  THEME,
-  setAssetPath,
+    Diagram as DiagramCanvas,
+    exportToBlob,
+    exportToSvg,
+    restoreElements,
+    CaptureUpdateAction,
+    THEME,
+    setAssetPath
 } from "./editor/index";
 export type { DiagramTranslator } from "./editor/index";
 export type {
-  DiagramImperativeAPI,
-  DiagramProps,
-  AppState as DiagramAppState,
-  BinaryFiles as DiagramFiles,
+    DiagramImperativeAPI,
+    DiagramProps,
+    AppState as DiagramAppState,
+    BinaryFiles as DiagramFiles
 } from "./editor/types";
 export type { DiagramElement } from "./editor/element/types";

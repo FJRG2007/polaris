@@ -40,14 +40,14 @@ Measured, not guessed - these are the parts with no `node:` or `electron`
 imports, or whose only Node use is file I/O that a Polaris server route performs
 anyway:
 
-| From | Lines | What it is |
-| --- | --- | --- |
-| `apps/sheets/src/domain` | 5,800 | Pure: pivot engine, pivot grouping/filters/timeline, chart recommendation, flash fill, formula shift, range sort, workbook DSL. **Zero** Node or Electron imports. |
+| From                      | Lines  | What it is                                                                                                                                                                                                                                      |
+| ------------------------- | ------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `apps/sheets/src/domain`  | 5,800  | Pure: pivot engine, pivot grouping/filters/timeline, chart recommendation, flash fill, formula shift, range sort, workbook DSL. **Zero** Node or Electron imports.                                                                              |
 | `apps/sheets/src/gateway` | 13,100 | `.xlsx` read and write in TypeScript - conditional formats, charts, defined names, drawings, data validation, filters, hyperlinks, notes, page setup, pivots, tables, themes. Node only for `fs`/`crypto`, which is where a server route lives. |
-| `packages/docx-engine` | - | `.docx` read/write. No Node imports at all. |
-| `packages/pptx-render` | - | `.pptx` rendering. No Node imports. |
-| `packages/pptx-engine` | - | `.pptx` model. Three Node imports to replace. |
-| `packages/ai-provider` | - | Reference only: Polaris already has its own provider catalogue. |
+| `packages/docx-engine`    | -      | `.docx` read/write. No Node imports at all.                                                                                                                                                                                                     |
+| `packages/pptx-render`    | -      | `.pptx` rendering. No Node imports.                                                                                                                                                                                                             |
+| `packages/pptx-engine`    | -      | `.pptx` model. Three Node imports to replace.                                                                                                                                                                                                   |
+| `packages/ai-provider`    | -      | Reference only: Polaris already has its own provider catalogue.                                                                                                                                                                                 |
 
 Those first two rows are the reason this repo is worth having. **Univer's
 open-source edition does not include charts, pivot tables, import/export or
@@ -75,12 +75,12 @@ or build from nothing.
 Every licence below was checked rather than assumed, because one of them ended a
 candidacy.
 
-| App | Engine | Licence | Why |
-| --- | --- | --- | --- |
-| Sheets | **Univer** core + GenOffice's domain and gateway | Apache-2.0 both | The engine GenOffice itself chose, and the only serious web spreadsheet with a formula engine and canvas rendering. Its missing half is exactly what GenOffice supplies. |
-| Docs | **TipTap/ProseMirror**, already in Polaris, plus `docx-engine` for import and export | MIT / Apache-2.0 | Polaris has one rich-text surface already ([[rich-text-editor]]); a second would be two editors to keep in step. Page-faithful pagination is a later chapter, not a reason to start again. |
-| Slides | Polaris' own canvas over `pptx-engine`'s model | Apache-2.0 | No web presentation editor is both complete and permissively licensed. PPTist is MIT but Vue, and Polaris is React. |
-| Diagrams | `@polaris/diagrams`, kept in this repository | MIT | An MIT-licensed editor kept in-house at a fixed release (notices in its `LICENSE`), drawn with Polaris's icons, type and spacing and calling no outside service. |
+| App      | Engine                                                                               | Licence          | Why                                                                                                                                                                                        |
+| -------- | ------------------------------------------------------------------------------------ | ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Sheets   | **Univer** core + GenOffice's domain and gateway                                     | Apache-2.0 both  | The engine GenOffice itself chose, and the only serious web spreadsheet with a formula engine and canvas rendering. Its missing half is exactly what GenOffice supplies.                   |
+| Docs     | **TipTap/ProseMirror**, already in Polaris, plus `docx-engine` for import and export | MIT / Apache-2.0 | Polaris has one rich-text surface already ([[rich-text-editor]]); a second would be two editors to keep in step. Page-faithful pagination is a later chapter, not a reason to start again. |
+| Slides   | Polaris' own canvas over `pptx-engine`'s model                                       | Apache-2.0       | No web presentation editor is both complete and permissively licensed. PPTist is MIT but Vue, and Polaris is React.                                                                        |
+| Diagrams | `@polaris/diagrams`, kept in this repository                                         | MIT              | An MIT-licensed editor kept in-house at a fixed release (notices in its `LICENSE`), drawn with Polaris's icons, type and spacing and calling no outside service.                           |
 
 **tldraw is refused.** Its SDK licence changed in September 2025: production use
 now needs a paid commercial licence (reported around $6,000/year) or a free tier
@@ -142,7 +142,7 @@ blank six months later when it matters most. Kept as a drawing, it cannot be
 sorted, filtered, or asked "what changed since March".
 
 So: **a Comparison is its own document kind**, stored structured, and then
-*viewed* however the question needs -
+_viewed_ however the question needs -
 
 - as a matrix, which is the table people expect;
 - as a positioning quadrant in Diagrams, drawn **from** the data rather than

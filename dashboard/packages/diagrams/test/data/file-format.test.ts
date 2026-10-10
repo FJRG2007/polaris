@@ -30,7 +30,9 @@ describe("diagram file format", () => {
     });
 
     it("accepts a library saved under the library type only", () => {
-        expect(isValidLibrary({ type: EXPORT_DATA_TYPES.diagramLibrary, version: 2, libraryItems: [] })).toBe(true);
+        expect(
+            isValidLibrary({ type: EXPORT_DATA_TYPES.diagramLibrary, version: 2, libraryItems: [] })
+        ).toBe(true);
         expect(isValidLibrary({ type: "other", version: 2, libraryItems: [] })).toBe(false);
         expect(JSON.parse(serializeLibraryAsJSON([])).type).toBe(EXPORT_DATA_TYPES.diagramLibrary);
     });
