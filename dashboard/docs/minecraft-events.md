@@ -332,9 +332,34 @@ left out.
   platform floating `hill.LIFT` over whatever is under it. Off the ring Poison
   wears a player down, only while they have more than three hearts; in it
   Regeneration mends them; Resistance IV makes a punch a fifth of one and
-  keeps its knockback; a fall off the platform is slow, so nobody can die.
-  Walked to (fists only off), it stays on the ground and none of what follows
-  applies.
+  keeps its knockback; a fall off the platform lands under Resistance V
+  (`hill.catchLine`), never Slow Falling, so nobody can die or be kicked for
+  floating. Walked to (fists only off), it stays on the ground and none of what
+  follows applies.
+- **Each blow throws further** (`hill.knockbackLines`), from 1.21, where a
+  player's punch reads the `attack_knockback` attribute: every fighter punches
+  at `ATTACK_KNOCKBACK` and starts at `FRESH_RESISTANCE` knockback resistance,
+  so a first punch lands about as a plain one; every look at which they were
+  hit by a player (`hits.ts`) takes a tenth of that weight off, until at
+  `MOST_HITS` a punch throws nearly three times as far. Thrown off the platform,
+  or a new round, and they are heavy again. The action bar says how much
+  further the next blow throws them. Both attributes are set as bases, both
+  names of each (1.21.2 dropped `generic.`), and set back to 0 - a player's
+  own - on the way home. Before 1.21 none of it is sent.
+- **The storm**: now and then (`STRIKE_CHANCE` a look, drawn from the run's id
+  and the time) a bolt comes down on one player outside the ring with four
+  hearts or more, picked by the game; under Resistance IV it takes half a
+  heart and its fire cannot burn them. What it lights is put out every look
+  (`hill.fireOut`), and the platform's box takes in the two layers over the
+  floor with `minecraft:fire` in its blocks, so the teardown sweeps it too.
+  Never between rounds.
+- **Its sky**: from 1.19.4 the air round the platform becomes a soul sand
+  valley (`hill.DEATH_BIOME`: blue fog, ash, no rain). The biome found there is
+  asked of the game against the vanilla list (`OVERWORLD_BIOMES`), written on
+  the arena (`arena.biome`) before anything changes, and only that biome's
+  cells are changed; the arena's teardown changes those same cells back
+  (`arena.biomeLines`). A biome the list does not know - a mod's - is left
+  alone.
 - **The ring** (`hill.ringAt`) is worked out from the run's id and the time
   since "Go!" alone, so a restart puts it back where it was:
     - The game is split into `rounds` (1-5, three by default). Each starts with

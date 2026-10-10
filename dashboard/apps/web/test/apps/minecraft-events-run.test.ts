@@ -32,6 +32,8 @@ interface World {
     allWater: boolean;
     /** Open sea everywhere: the marker comes down on the water, which is nobody's build. */
     sea: boolean;
+    /** The biome every `if biome` test finds, or null for one nobody knows. */
+    biome: string | null;
     /** With `sea`: an island of dry ground this far round 0 0, sea beyond it. */
     dryWithin: number;
     /** Where whoever has a kill of the boss's kind is standing. */
@@ -231,6 +233,7 @@ const world: World = {
     arrived: false,
     allWater: false,
     sea: false,
+    biome: null,
     dryWithin: 0,
     killerAt: [305, 70, 2],
     unknownItems: [],
@@ -872,6 +875,8 @@ function answer(sent: string): string {
     }
     const kindAnswer = worldKindsAnswer(line);
     if (kindAnswer !== null) return kindAnswer;
+    const biome = / if biome -?\d+ -?\d+ -?\d+ (\S+)$/.exec(line);
+    if (biome) return biome[1] === world.biome ? "Test passed" : "Test failed";
     // Up to 1.21.4 a name is JSON in a string, and anything else is passed over;
     // from 1.21.5 it is a text component, which a plain string is too.
     const named = /^data merge entity @e\[tag=pe_boss,limit=1\] \{CustomName:(.*)\}$/.exec(line);
@@ -2023,6 +2028,7 @@ beforeEach(() => {
     world.arrived = false;
     world.allWater = false;
     world.sea = false;
+    world.biome = null;
     world.dryWithin = 0;
     world.killerAt = [305, 70, 2];
     world.unknownItems = [];
@@ -5895,6 +5901,9 @@ function keptTheRules(allowed: readonly ("tnt" | "water" | "lava" | "fire")[] = 
                     (found) => !allowed.includes(found[1] as "tnt" | "water" | "lava" | "fire")
                 ) &&
                 !/ if block -?\d+ -?\d+ -?\d+ minecraft:water$/.test(line) &&
+                // Taking something away is not putting it down: the ring's
+                // storm puts out what its bolts lit (`hill.fireOut`).
+                !/ minecraft:air replace minecraft:\w+$/.test(line) &&
                 !/ if block ~ ~-1 ~ minecraft:water run data get entity @s Pos$/.test(line)
         )
     ).toEqual([]);
@@ -8442,6 +8451,90 @@ describe("a king of the hill", () => {
         ]);
     });
 
+    it("with fists only: each blow throws further, lightning hunts outside the ring, its sky turns, and all of it goes back", async () => {
+        world.online = ["Ana", "Ben"];
+        world.sea = true;
+        world.biome = "minecraft:ocean";
+        setUp([fists()]);
+        await joinAndStart("hill");
+        await play(30_000);
+        const run = state().run!;
+        expect(run.readyAt).not.toBeNull();
+        // The sky: written on the arena before it is changed, only the ocean's cells.
+        expect(run.arena?.biome).toMatchObject({
+            was: "minecraft:ocean",
+            now: hill.DEATH_BIOME
+        });
+        const darkened = world.sent.findIndex((line) =>
+            / fillbiome .* minecraft:soul_sand_valley replace minecraft:ocean$/.test(line)
+        );
+        expect(darkened).toBeGreaterThan(-1);
+        // Into the fight: a harder punch, and the weight of somebody not hit yet.
+        expect(world.sent).toContain("attribute Ana minecraft:attack_knockback base set 1.5");
+        expect(world.sent).toContain("attribute Ben minecraft:knockback_resistance base set 0.6");
+        // Ben is hit, then hit again: lighter each time, and told how much.
+        (world.tags.pe_hit_hurt ??= new Set()).add("Ben");
+        await play(2_100);
+        expect(state().run!.ring!.hits).toEqual({ Ben: 1 });
+        expect(world.sent).toContain("attribute Ben minecraft:knockback_resistance base set 0.54");
+        (world.tags.pe_hit_hurt ??= new Set()).add("Ben");
+        await play(2_100);
+        expect(state().run!.ring!.hits).toEqual({ Ben: 2 });
+        expect(world.sent).toContain("attribute Ben minecraft:knockback_resistance base set 0.48");
+        expect(
+            world.sent.some(
+                (line) => line.startsWith("title Ben actionbar") && line.includes("+30% knockback")
+            )
+        ).toBe(true);
+        // The storm: only on somebody outside the ring, with four hearts or more.
+        await play(20_000);
+        const bolts = world.sent.filter((line) => line.includes("summon minecraft:lightning_bolt"));
+        expect(bolts.length).toBeGreaterThan(0);
+        for (const bolt of bolts)
+            expect(bolt).toMatch(/distance=\d+(\.\d+)?\.\.,scores=\{pe_khp=8\.\.\}/);
+        expect(world.sent.some((line) => / minecraft:air replace minecraft:fire$/.test(line))).toBe(
+            true
+        );
+        await play(4 * 60_000);
+        expect(state().run).toBeNull();
+        // Everything back: the sky's cells, and both attributes to a player's own.
+        expect(
+            world.sent.some((line) =>
+                / fillbiome .* minecraft:ocean replace minecraft:soul_sand_valley$/.test(line)
+            )
+        ).toBe(true);
+        for (const name of ["Ana", "Ben"]) {
+            expect(world.sent).toContain(`attribute ${name} minecraft:attack_knockback base set 0`);
+            expect(world.sent).toContain(
+                `attribute ${name} minecraft:knockback_resistance base set 0`
+            );
+        }
+        // No player is ever held in the air: the server would kick them for
+        // flying. (A pet floats down as the platform goes.)
+        expect(
+            world.sent.some(
+                (line) => line.includes("slow_falling") && !line.includes("type=!player")
+            )
+        ).toBe(false);
+        keptTheRules();
+    });
+
+    it("with fists only before 1.21, where a punch ignores the attribute, plays as it always did", async () => {
+        world.online = ["Ana", "Ben"];
+        world.sea = true;
+        world.version = "1.20.4";
+        setUp([fists()]);
+        await joinAndStart("hill");
+        await play(30_000);
+        (world.tags.pe_hit_hurt ??= new Set()).add("Ben");
+        await play(4_100);
+        expect(state().run!.ring?.hits ?? {}).toEqual({});
+        expect(world.sent.some((line) => line.includes("base set 1.5"))).toBe(false);
+        expect(world.sent.some((line) => line.includes("knockback_resistance base set 0.6"))).toBe(
+            false
+        );
+    });
+
     it("with fists only: who joined is brought to the circle empty-handed, cannot die, and gets it all back", async () => {
         world.online = ["Ana", "Ben", "Cy"];
         world.inv = {
@@ -8740,7 +8833,8 @@ describe("a king of the hill", () => {
         await joinAndStart("hill");
         await play(30_000);
         const run = state().run!;
-        expect(run.arena?.blocks).toEqual([...hill.PLATFORM_BLOCKS]);
+        // And the fire its storm can light over it, swept with it.
+        expect(run.arena?.blocks).toEqual([...hill.PLATFORM_BLOCKS, hill.FIRE]);
         expect(run.readyAt).not.toBeNull();
         // Only into air proven empty.
         const build = world.sent.find((line) => line.includes(" minecraft:smooth_stone keep"));

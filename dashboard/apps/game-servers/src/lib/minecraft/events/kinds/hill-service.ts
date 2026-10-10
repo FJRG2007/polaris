@@ -18,6 +18,8 @@ import * as commands from "../commands";
 import * as said from "./hill-messages";
 import type * as stored from "../state";
 import * as search from "../place-search";
+import * as hitsService from "./hits-service";
+import { seeded } from "../trivia-bank";
 import { EventStopped, type KindContext } from "./arena-service";
 
 /** What players read, in one language or - given `speech.EVERY` - in every one. */
@@ -119,7 +121,16 @@ async function buildPlatform(ctx: KindContext, at: stored.Point, radius: number)
     }
     // Ours, written down before a block goes in.
     const batch = inServer.batchKey();
-    const built: stored.Arena = { box: floor, blocks: [...hill.PLATFORM_BLOCKS], batch };
+    // With fists only, the floor and the layers over it a bolt of the storm
+    // can set alight (`hill.strikeLine`).
+    const stormy = optionsOf(run).fistsOnly;
+    const built: stored.Arena = stormy
+        ? {
+              box: { ...floor, y2: floor.y2 + hill.OVER_FLOOR },
+              blocks: [...hill.PLATFORM_BLOCKS, hill.FIRE],
+              batch
+          }
+        : { box: floor, blocks: [...hill.PLATFORM_BLOCKS], batch };
     ctx.run = { ...ctx.run, arena: built };
     await ctx.persist();
     // Paced inside the server where the Polaris mod can (`in-server.build`).
@@ -147,9 +158,32 @@ async function buildPlatform(ctx: KindContext, at: stored.Point, radius: number)
     await ctx.persist();
     // Walked to, it is told where; played with fists only, everybody is
     // brought up to it, and where it floats is nothing to them.
-    if (optionsOf(ctx.run).fistsOnly) await ctx.server.sayAll([commands.CLEAR_MARK]);
-    else await announce(ctx, top);
+    if (optionsOf(ctx.run).fistsOnly) {
+        await darkenSky(ctx, top, radius);
+        await ctx.server.sayAll([commands.CLEAR_MARK]);
+    } else await announce(ctx, top);
     return true;
+}
+
+/**
+ * The ring's own sky (`hill.DEATH_BIOME`): the biome found at the platform
+ * asked of the game, the change written on the arena, then made - only where
+ * the server can show it and the biome is one the list knows.
+ */
+async function darkenSky(ctx: KindContext, place: stored.Point, radius: number): Promise<void> {
+    const built = ctx.run.arena;
+    if (!built || built.biome || !(await ctx.atLeast(hill.BIOME_SINCE))) return;
+    const answers = await commands.answersOf(
+        ctx.server,
+        hill.OVERWORLD_BIOMES.map((biome) => hill.biomeTest(place, biome))
+    );
+    const was =
+        hill.OVERWORLD_BIOMES[answers.findIndex((one) => commands.readTest(one) === "passed")];
+    if (!was) return;
+    const box = hill.bounds(place, radius);
+    ctx.run = { ...ctx.run, arena: { ...built, biome: { box, was, now: hill.DEATH_BIOME } } };
+    await ctx.persist();
+    await ctx.server.sayAll(arena.biomeLines(box, hill.DEATH_BIOME, was));
 }
 
 async function giveUp(
@@ -308,17 +342,21 @@ export async function goLines(ctx: KindContext): Promise<string[]> {
     const run = ctx.run;
     const spots = startSpotsFor(run);
     const overGround = await ctx.atLeast([1, 19, 4]);
+    // Every fighter's punch and weight, where the game lets a player's count.
+    const knock = await ctx.atLeast(hill.KNOCKBACK_SINCE);
     return [
         ...run.entrants.flatMap((one) =>
             hill
                 .enterLines(one.name, spots[one.side % spots.length]!, overGround)
                 .filter((line) => line.includes(" tp "))
         ),
+
         ...arena.titleTo(
             `@a[tag=${arena.IN_ARENA}]`,
             hillMessages.goTitle(ctx.language),
             hillMessages.goSubtitle(ctx.language)
-        )
+        ),
+        ...(knock ? run.entrants.flatMap((one) => hill.fighterLines(one.name)) : [])
     ];
 }
 
@@ -355,8 +393,27 @@ export async function fightTick(ctx: KindContext, seconds: number, lines: string
     const { radius } = options;
     const ring = ringNow(run, Date.now());
     const center = hill.ringCenter(platform, ring);
-    // As it was built: whole, in the middle, nobody ahead.
-    const was = run.ring ?? { round: 1, dx: 0, dz: 0, radius, sprint: false, leader: null };
+    // As it was built: whole, in the middle, nobody ahead, nobody hit.
+    const was = run.ring ?? {
+        round: 1,
+        dx: 0,
+        dz: 0,
+        radius,
+        sprint: false,
+        leader: null,
+        hits: {}
+    };
+    // The blows taken since the last look, each one making the next throw
+    // further; a new round starts everybody heavy again (`hill.knockbackLines`).
+    const knock = await ctx.atLeast(hill.KNOCKBACK_SINCE);
+    const hits: Record<string, number> = ring.round > was.round ? {} : { ...was.hits };
+    // Taken every look, so a blow in the pause between rounds is not counted
+    // in the next.
+    const struck = knock ? await hitsService.take(ctx) : null;
+    if (struck && !ring.pause)
+        for (const one of run.entrants)
+            if (struck.hurt.has(lower(one.name)))
+                hits[one.name] = Math.min(hill.MOST_HITS, (hits[one.name] ?? 0) + 1);
     // Knocked off: back at the edge. A new round: inside the whole ring.
     const spots = entrySpotsFor(run);
     const starts = startSpotsFor(run);
@@ -368,8 +425,14 @@ export async function fightTick(ctx: KindContext, seconds: number, lines: string
             : hill.protectLines(center, ring.radius)),
         ...commands.hillMarks(center, ring.radius),
         ...arena.keepThrown(room),
-        ...commands.hostilesOut(room)
+        ...commands.hostilesOut(room),
+        // What the storm lit on the last look, out again.
+        hill.fireOut({ ...platform, y: platform.y - 1 }, radius)
     );
+    // The storm: now and then a bolt on somebody outside the ring, the same
+    // after a restart for the same moment (`hill.strikeLine`).
+    if (!ring.pause && seeded(`${run.id}:${Math.floor(Date.now() / 2_000)}`)() < hill.STRIKE_CHANCE)
+        lines.push(hill.strikeLine(center, ring.radius));
     if (!ring.pause)
         lines.push(...hill.scoreLines(center, ring.radius, seconds * (ring.sprint ? 2 : 1)));
     if (ring.radius !== was.radius || ring.dx !== was.dx || ring.dz !== was.dz) {
@@ -411,6 +474,8 @@ export async function fightTick(ctx: KindContext, seconds: number, lines: string
         const at = here.get(lower(one.name));
         if (!at) continue;
         if (hill.strayed(at, platform, radius)) {
+            // Thrown right off: heavy again, as a fighter who lost a life.
+            delete hits[one.name];
             lines.push(
                 ...hill
                     .enterLines(one.name, spots[index % spots.length]!, overGround)
@@ -419,10 +484,11 @@ export async function fightTick(ctx: KindContext, seconds: number, lines: string
             );
             continue;
         }
+        const taken = hits[one.name] ?? 0;
         lines.push(
             commands.actionbarFor(
                 one.name,
-                ring.pause
+                (ring.pause
                     ? hillMessages.nextRound(ctx.language)
                     : commands.inHill(at, center, ring.radius)
                       ? inside > 1
@@ -434,7 +500,10 @@ export async function fightTick(ctx: KindContext, seconds: number, lines: string
                             ),
                             commands.headingTo(at, { x: center.x + 0.5, z: center.z + 0.5 }),
                             ctx.language
-                        )
+                        )) +
+                    (knock && taken > 0
+                        ? hillMessages.knockback(hill.knockbackPercent(taken), ctx.language)
+                        : "")
             )
         );
     }
@@ -484,13 +553,19 @@ export async function fightTick(ctx: KindContext, seconds: number, lines: string
             );
         }
     }
+    // Each fighter whose blows changed made as heavy as they now are.
+    if (knock)
+        for (const one of run.entrants)
+            if ((hits[one.name] ?? 0) !== (was.hits[one.name] ?? 0))
+                lines.push(...hill.knockbackLines(one.name, hits[one.name] ?? 0));
     const kept: NonNullable<stored.EventRun["ring"]> = {
         round: ring.round,
         dx: ring.dx,
         dz: ring.dz,
         radius: ring.radius,
         sprint: ring.sprint,
-        leader
+        leader,
+        hits
     };
     if (JSON.stringify(kept) !== JSON.stringify(run.ring) || ctx.run !== run) {
         ctx.run = { ...ctx.run, ring: kept };

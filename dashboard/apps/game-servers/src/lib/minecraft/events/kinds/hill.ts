@@ -27,6 +27,10 @@ export const CORNER_BLOCK = "minecraft:sea_lantern";
 export const RING_BLOCK = "minecraft:yellow_concrete";
 /** Every block the platform is built of, for taking it down. */
 export const PLATFORM_BLOCKS = [PLATFORM_BLOCK, EDGE_BLOCK, CORNER_BLOCK, RING_BLOCK] as const;
+/** What a bolt of the storm (`strikeLine`) can leave on the platform. */
+export const FIRE = "minecraft:fire";
+/** The layers over the floor the platform's box takes in, for that fire. */
+export const OVER_FLOOR = 2;
 
 /**
  * The platform's look, put in before its plain floor fills round it: its
@@ -505,4 +509,157 @@ export function leaderOf(points: Readonly<Record<string, number>>): string | nul
         } else if (score === most && score > 0) tied = true;
     }
     return tied ? null : best;
+}
+
+// ------------------------------------------------------------------ the blows
+
+/**
+ * The more blows somebody has taken, the further the next one throws them -
+ * the fighting games' damage percent. Every fighter hits harder than a bare
+ * fist (`ATTACK_KNOCKBACK`), and every fighter starts heavy
+ * (`FRESH_RESISTANCE`), so a first punch lands about as a plain one does; each
+ * blow taken takes some of that weight away, all of it by `MOST_HITS`, when a
+ * punch throws nearly three times as far. Thrown off the platform, or a new
+ * round, and they start heavy again.
+ *
+ * The game's own attributes, set as bases: knockback resistance on whoever is
+ * hit, attack knockback on whoever hits - which counts for a player's punch
+ * only from 1.21 (`KNOCKBACK_SINCE`); before it the ring plays as it always
+ * did. Both names of each, because 1.21.2 dropped the `generic.` prefix; the
+ * one a release does not know only answers with an error. A player's base of
+ * both is 0, which is what they are set back to on the way home.
+ */
+export const KNOCKBACK_SINCE = [1, 21] as const;
+export const ATTACK_KNOCKBACK = 1.5;
+export const FRESH_RESISTANCE = 0.6;
+export const MOST_HITS = 10;
+
+const RESISTANCE = ["minecraft:knockback_resistance", "minecraft:generic.knockback_resistance"];
+const ATTACK = ["minecraft:attack_knockback", "minecraft:generic.attack_knockback"];
+
+const baseSet = (name: string, attributes: readonly string[], value: number) =>
+    attributes.map((attribute) => `attribute ${name} ${attribute} base set ${value}`);
+
+/** How heavy somebody is after this many blows: from `FRESH_RESISTANCE` down to none. */
+export function resistanceAfter(hits: number): number {
+    const taken = Math.min(MOST_HITS, Math.max(0, Math.floor(hits)));
+    return Math.round(FRESH_RESISTANCE * (1 - taken / MOST_HITS) * 1000) / 1000;
+}
+
+/** How much further than the first a blow throws them now, in percent. */
+export function knockbackPercent(hits: number): number {
+    return Math.round(((1 - resistanceAfter(hits)) / (1 - FRESH_RESISTANCE) - 1) * 100);
+}
+
+/** Their weight for the blows they have taken. */
+export function knockbackLines(name: string, hits: number): string[] {
+    return baseSet(name, RESISTANCE, resistanceAfter(hits));
+}
+
+/** Into the fight: a harder punch, and the weight of somebody not hit yet. */
+export function fighterLines(name: string): string[] {
+    return [...baseSet(name, ATTACK, ATTACK_KNOCKBACK), ...knockbackLines(name, 0)];
+}
+
+/** On the way home: both back to a player's own. */
+export function knockbackOff(name: string): string[] {
+    return [...baseSet(name, ATTACK, 0), ...baseSet(name, RESISTANCE, 0)];
+}
+
+// ------------------------------------------------------------------ the storm
+
+/**
+ * Lightning hunts whoever is outside the ring: now and then a bolt comes down
+ * on one of them, picked by the game itself. Only on somebody with four hearts
+ * or more (`STRIKE_FLOOR`): under Resistance IV a bolt takes half a heart, the
+ * fire it lights cannot burn them, and nobody is ever struck down. Never during
+ * the pause between rounds.
+ */
+export const STRIKE_CHANCE = 0.35;
+const STRIKE_FLOOR = DRAIN_FLOOR + 2;
+
+export function strikeLine(center: Point, ringRadius: number): string {
+    const outside = `@a[tag=${IN_ARENA},distance=${ringRadius + 1.5}..,scores={${HEALTH_SCORE}=${STRIKE_FLOOR}..},sort=random,limit=1]`;
+    return `execute in minecraft:overworld positioned ${center.x + 0.5} ${center.y} ${center.z + 0.5} as ${outside} at @s run summon minecraft:lightning_bolt ~ ~ ~`;
+}
+
+/**
+ * What the lightning lit on the platform put out: only fire, only in the two
+ * layers over the floor. Each look, and again with the platform at the end.
+ */
+export function fireOut(floor: Point, radius: number): string {
+    const box = platformBox(floor, radius);
+    return `execute in minecraft:overworld run fill ${box.x1} ${box.y1 + 1} ${box.z1} ${box.x2} ${box.y1 + OVER_FLOOR} ${box.z2} minecraft:air replace ${FIRE}`;
+}
+
+/**
+ * The ring's own sky: the air round the platform turned into a soul sand
+ * valley - its blue fog, its drifting ash, no rain - from 1.19.4, where the
+ * game sends a biome changed by `fillbiome` to whoever is there.
+ *
+ * Only cells of the one biome found at the platform are changed, and the
+ * arena records it before they are, so its teardown changes exactly those
+ * back (`arena.teardown`). A biome this list does not know - a mod's - is
+ * left alone, and the ring plays in its own sky.
+ */
+export const BIOME_SINCE = [1, 19, 4] as const;
+export const DEATH_BIOME = "minecraft:soul_sand_valley";
+
+export const OVERWORLD_BIOMES = [
+    "ocean",
+    "deep_ocean",
+    "warm_ocean",
+    "lukewarm_ocean",
+    "deep_lukewarm_ocean",
+    "cold_ocean",
+    "deep_cold_ocean",
+    "frozen_ocean",
+    "deep_frozen_ocean",
+    "plains",
+    "sunflower_plains",
+    "snowy_plains",
+    "ice_spikes",
+    "desert",
+    "swamp",
+    "mangrove_swamp",
+    "forest",
+    "flower_forest",
+    "birch_forest",
+    "dark_forest",
+    "old_growth_birch_forest",
+    "old_growth_pine_taiga",
+    "old_growth_spruce_taiga",
+    "taiga",
+    "snowy_taiga",
+    "savanna",
+    "savanna_plateau",
+    "windswept_hills",
+    "windswept_gravelly_hills",
+    "windswept_forest",
+    "windswept_savanna",
+    "jungle",
+    "sparse_jungle",
+    "bamboo_jungle",
+    "badlands",
+    "eroded_badlands",
+    "wooded_badlands",
+    "meadow",
+    "cherry_grove",
+    "grove",
+    "snowy_slopes",
+    "frozen_peaks",
+    "jagged_peaks",
+    "stony_peaks",
+    "river",
+    "frozen_river",
+    "beach",
+    "snowy_beach",
+    "stony_shore",
+    "mushroom_fields",
+    "pale_garden"
+].map((name) => `minecraft:${name}`);
+
+/** Whether the platform's air is in this biome. */
+export function biomeTest(place: Point, biome: string): string {
+    return `execute in minecraft:overworld if biome ${place.x} ${place.y + 2} ${place.z} ${biome}`;
 }

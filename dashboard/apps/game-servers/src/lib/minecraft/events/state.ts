@@ -63,7 +63,11 @@ export const arenaSchema = z.object({
     box: boxSchema,
     blocks: z.array(z.string()),
     /** The Polaris mod batch it was built by, called off before it comes down. */
-    batch: z.string().max(64).optional()
+    batch: z.string().max(64).optional(),
+    /** The air round it given a biome of its own (`hill.DEATH_BIOME`): where,
+     *  which biome its cells had, and which they were given - written down
+     *  before they were, so its teardown gives back exactly those. */
+    biome: z.object({ box: boxSchema, was: z.string(), now: z.string() }).optional()
 });
 export type Arena = z.infer<typeof arenaSchema>;
 
@@ -176,7 +180,10 @@ export const runSchema = z.object({
             dz: z.number().int(),
             radius: z.number().int(),
             sprint: z.boolean(),
-            leader: z.string().nullable()
+            leader: z.string().nullable(),
+            /** The blows each fighter has taken since they were last thrown off
+             *  or a round began: how far the next one throws them (`hill.knockbackLines`). */
+            hits: z.record(z.string(), z.number().int()).default({})
         })
         .nullable()
         .default(null),
