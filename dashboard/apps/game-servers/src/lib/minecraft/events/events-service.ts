@@ -618,18 +618,13 @@ export async function eventsView(installedAppId: string): Promise<EventsView> {
         stashFailures: await stashService.failedStashes(installedAppId).catch(() => []),
         // Left for the operator, or one they asked to have taken down again
         // that the sweep is still finishing (it keeps the count it had).
-        arenaRemains: state.arenaLeftovers
-            .filter(
-                (one) =>
-                    one.arena && (arenaService.leftForOperator(one) || one.remains !== undefined)
-            )
-            .map((one) => ({
-                id: one.id,
-                kind: one.kind,
-                box: one.arena!.box,
-                count: one.remains ?? null,
-                retrying: !arenaService.leftForOperator(one)
-            })),
+        arenaRemains: state.arenaLeftovers.filter(arenaService.onPanel).map((one) => ({
+            id: one.id,
+            kind: one.kind,
+            box: one.arena!.box,
+            count: one.remains ?? null,
+            retrying: !arenaService.leftForOperator(one)
+        })),
         nextRandomAt: state.nextRandomAt,
         waiting: state.waiting,
         drawCheckedAt: drawChecks.get(installedAppId) ?? null,
@@ -1018,14 +1013,30 @@ export async function retryArena(
     return arenaService.leftForOperator(now) ? "left" : "later";
 }
 
-/** Taken off the panel: the operator has dealt with what was left in its box. */
+/** Taken off the panel: the operator has dealt with what was left in its box.
+ *  One the sweep was still taking down again lets go of the chunks it held. */
 export async function dismissArena(installedAppId: string, id: string): Promise<void> {
+    const row = await readRow(installedAppId);
+    const held = stored
+        .readEventState(row?.config ?? {})
+        .arenaLeftovers.find(
+            (one) =>
+                one.id === id && arenaService.onPanel(one) && !arenaService.leftForOperator(one)
+        );
     await updateEventState(installedAppId, (state) => ({
         ...state,
         arenaLeftovers: state.arenaLeftovers.filter(
-            (one) => one.id !== id || !arenaService.leftForOperator(one)
+            (one) => one.id !== id || !arenaService.onPanel(one)
         )
     }));
+    if (!row || !held) return;
+    await withServerContainer(row.ownerId, installedAppId, async (server) => {
+        if (!server.running) return;
+        const spared = chunks.sparing(server, () => chunks.heldBefore(held));
+        await arenaService.letGo(spared, held);
+    }).catch((error: unknown) =>
+        console.warn("polaris: letting an arena's chunks go failed", installedAppId, String(error))
+    );
 }
 
 // ------------------------------------------------------------------ the loop

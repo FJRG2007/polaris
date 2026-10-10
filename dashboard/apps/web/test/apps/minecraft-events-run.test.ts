@@ -2715,6 +2715,59 @@ describe("the minute sweep", () => {
         expect(state().arenaLeftovers).toEqual([]);
     });
 
+    it("lets a retried arena still loading be dismissed, its chunks let go", async () => {
+        setUp([newPreset("fishing", "fish")]);
+        config[catalog.EVENT_STATE_KEY] = {
+            arenaLeftovers: [
+                {
+                    id: "old",
+                    kind: "sky-wars",
+                    arena: {
+                        box: { x1: 0, y1: 100, z1: 0, x2: 10, y2: 110, z2: 10 },
+                        blocks: ["minecraft:stone"]
+                    },
+                    marker: null,
+                    kit: [],
+                    entrants: [],
+                    checks: 3,
+                    remains: 5,
+                    createdAt: Date.now()
+                }
+            ]
+        };
+        world.unloadedBlock = "minecraft:stone";
+        expect(await events.retryArena(SERVER, "old")).toBe("later");
+        await events.dismissArena(SERVER, "old");
+        expect(state().arenaLeftovers).toEqual([]);
+        expect((await events.eventsView(SERVER)).arenaRemains).toEqual([]);
+        expect(world.sent).toContain(
+            "execute in minecraft:overworld run forceload remove 0 0 10 10"
+        );
+    });
+
+    it("keeps an arena the sweep has not given up on off the panel and out of reach", async () => {
+        setUp([newPreset("fishing", "fish")]);
+        config[catalog.EVENT_STATE_KEY] = {
+            arenaLeftovers: [
+                {
+                    id: "old",
+                    kind: "sky-wars",
+                    arena: {
+                        box: { x1: 0, y1: 100, z1: 0, x2: 10, y2: 110, z2: 10 },
+                        blocks: ["minecraft:stone"]
+                    },
+                    marker: null,
+                    kit: [],
+                    entrants: [],
+                    checks: 1,
+                    createdAt: Date.now()
+                }
+            ]
+        };
+        await events.dismissArena(SERVER, "old");
+        expect(state().arenaLeftovers.map((one) => one.id)).toEqual(["old"]);
+    });
+
     it("gives a prize once to a player whose name reads like an error", async () => {
         world.online = ["ErrorBoy", "Unknown_1"];
         setUp([newPreset("fishing", "fish")], {

@@ -1239,6 +1239,12 @@ export function leftForOperator(left: stored.ArenaLeftover): boolean {
     return (left.checks ?? 0) >= CLEAR_CHECKS;
 }
 
+/** Whether an arena is on the operator's panel: left for them, or one they
+ *  asked to have taken down again that the sweep is still finishing. */
+export function onPanel(left: stored.ArenaLeftover): boolean {
+    return left.arena !== undefined && (leftForOperator(left) || left.remains !== undefined);
+}
+
 /** What of a run still has to be undone: the arena, and whoever it moved. */
 export function leftoverOf(
     run: stored.EventRun,
@@ -1258,6 +1264,11 @@ export function leftoverOf(
         keepForced: run.keepForced ? [...run.keepForced] : null,
         createdAt: Date.now()
     };
+}
+
+/** The chunks an arena held loaded let go of, for one taken off the panel. */
+export async function letGo(server: ServerContainer, left: stored.ArenaLeftover): Promise<void> {
+    await server.sayAll(releases(left));
 }
 
 function releases(left: stored.ArenaLeftover): string[] {

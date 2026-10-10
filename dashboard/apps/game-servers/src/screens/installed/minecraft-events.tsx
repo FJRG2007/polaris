@@ -2156,7 +2156,7 @@ export function MinecraftEvents({
                                             size="icon-sm"
                                             aria-label={t("events.dismissArena")}
                                             title={t("events.dismissArena")}
-                                            disabled={!canManage || pending || one.retrying}
+                                            disabled={!canManage || pending}
                                             onClick={() => void dismissArena(one.id)}
                                         >
                                             <Trash2 className="size-4" />
