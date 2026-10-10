@@ -50,9 +50,9 @@ const WALL_HEIGHT = 3;
 const HEADROOM = 5;
 
 /** When the floors start closing in, after the start. */
-export const SHRINK_AFTER_MS = 60_000;
+export const SHRINK_AFTER_MS = 90_000;
 /** How often the next ring of every floor goes once they do. */
-export const SHRINK_EVERY_MS = 3_000;
+export const SHRINK_EVERY_MS = 5_000;
 /** Glowing for whoever is inside, given again on every look and gone a moment
  *  after the last, so nobody keeps it once they are out - online or not. */
 export const GLOW = "effect give @a[tag=pe_in] minecraft:glowing 4 0 true";

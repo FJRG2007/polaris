@@ -69,11 +69,12 @@ export const DECAY_TAG = "polaris_spleef_fuse";
 const DECAY_NEW_TAG = "polaris_spleef_new";
 /**
  * Ticks between a player stepping on snow and the snow going in the decay game:
- * half a second. A little longer than a TNT run's eight, since the red is the
- * warning here; running, a player is well past the block by then, and standing
- * still or jumping on the spot, they are not.
+ * a second and a half. Half a second, as a TNT run, took the floor from under
+ * everybody faster than they could think, and the two to four seconds of the
+ * look over RCON let it be stood on; this is between the two. Standing still
+ * on one block still loses it.
  */
-export const DECAY_TICKS = 10;
+export const DECAY_TICKS = 30;
 /** How far each corner of a player's feet is from their middle: half of the
  *  0.6 a player is wide, so a block a player only just overhangs is not missed. */
 const HALF_WIDTH = 0.3;

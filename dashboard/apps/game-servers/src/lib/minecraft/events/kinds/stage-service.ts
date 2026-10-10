@@ -71,6 +71,8 @@ export interface StageLoop {
     present?: Set<string>;
     /** How many top-ups of cobblestone an acid rain has handed out since "Go!". */
     acidTopUps?: number;
+    /** How many times an acid rain has grown stronger since "Go!". */
+    acidStronger?: number;
     /** How this server's version writes items, once asked: what the quick look
      *  hands an elytra race's rockets out with. */
     items?: stage.Flavour["items"];
@@ -2115,11 +2117,13 @@ async function acidTick(
                 acidRain.cobblestoneLine(racer.name, items, acidRain.START_BLOCKS),
                 `title ${racer.name} subtitle ${commands.text(acidMessages.goSubtitle(language))}`,
                 `title ${racer.name} title ${commands.text(acidMessages.goTitle(language))}`,
-                soundFor(racer.name, commands.SOUNDS.start)
+                soundFor(racer.name, commands.SOUNDS.start),
+                tell(racer.name, messages.tag(language) + acidMessages.howItWorks(language))
             );
         }
         lines.push(...acidRain.armLines(acid));
         loop.acidTopUps = 0;
+        loop.acidStronger = 0;
         change(loop, { armed: true });
         dirty = true;
     } else if (current.armed && current.goAt !== null) {
@@ -2139,6 +2143,16 @@ async function acidTick(
                                 acidMessages.topUp(acidRain.TOP_UP_BLOCKS, language)
                         )
                     );
+        }
+        // The rain grows stronger: no shelter holds out for the whole time.
+        const times = acidRain.strength(now - current.goAt);
+        loop.acidStronger ??= times;
+        if (times > loop.acidStronger) {
+            const before = acidRain.biteBeats(acid, loop.acidStronger);
+            loop.acidStronger = times;
+            lines.push(...acidRain.strongerLines(acid, times));
+            if (acidRain.biteBeats(acid, times) < before)
+                lines.push(commands.say(messages.tag(language) + acidMessages.stronger(language)));
         }
         lines.push(...acidRain.dripLines(acid));
     }

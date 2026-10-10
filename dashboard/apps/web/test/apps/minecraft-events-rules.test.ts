@@ -41,7 +41,6 @@ describe("a kind added in an update", () => {
         const added = read.presets.filter((one) => one.id.startsWith("default-"));
         expect(added.map((one) => one.kind)).toEqual([
             "tnt-run",
-            "boat-race",
             "dropper",
             "capture-the-flag",
             "hide-and-seek",
@@ -88,7 +87,7 @@ describe("a kind added in an update", () => {
                 { presetId: "quiz", weight: 2 }
             ])
         );
-        expect(all.settings.random.pool).toHaveLength(16);
+        expect(all.settings.random.pool).toHaveLength(15);
         expect(all.settings.random.pool.every((entry) => entry.weight === 2)).toBe(true);
         const some = catalog.readEventsConfig(saved(2, [{ presetId: "fish", weight: 1 }]));
         expect(some.settings.random.pool).toEqual([{ presetId: "fish", weight: 1 }]);
@@ -113,10 +112,10 @@ describe("a kind added in an update", () => {
         expect(read.presets).toHaveLength(40);
         expect(read.presets.slice(35).map((one) => one.kind)).toEqual([
             "tnt-run",
-            "boat-race",
             "dropper",
             "capture-the-flag",
-            "hide-and-seek"
+            "hide-and-seek",
+            "hot-potato"
         ]);
         expect(read.settings.random.pool).toHaveLength(40);
         expect(catalog.eventsConfigSchema.safeParse(read).success).toBe(true);
@@ -295,7 +294,8 @@ describe("a parkour saved before it had shapes", () => {
 describe("the stored settings", () => {
     it("give a server that never opened the screen one of every event", () => {
         const read = catalog.readEventsConfig({}, "Europe/Madrid");
-        expect(read.presets.map((one) => one.kind)).toEqual([...catalog.EVENT_KINDS]);
+        expect(read.presets.map((one) => one.kind)).toEqual([...catalog.OFFERED_KINDS]);
+        expect(read.presets.map((one) => one.kind)).not.toContain("boat-race");
         expect(read.settings.timezone).toBe("Europe/Madrid");
         expect(read.settings.random.enabled).toBe(false);
         expect(catalog.eventsConfigSchema.safeParse(read).success).toBe(true);

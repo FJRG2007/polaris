@@ -1774,7 +1774,7 @@
             },
             "acid-rain": {
                 "label": "Acid rain",
-                "summary": "An open arena is built in the air, and an acid rain falls on it alone. Standing with nothing over your head fills your acid bar; full, you are out. Shelter in the ruined huts or build your own with the cobblestone handed out, while the rain eats it away. The last one left wins.",
+                "summary": "An open arena is built in the air, and an acid rain falls on it alone. Standing with nothing over your head fills your acid bar; full, you are out. Shelter in the ruined huts or build your own with the cobblestone handed out, while the rain eats the block over your head - harder every minute, so no roof lasts forever. The last one left wins.",
                 "unit": "points"
             },
             "elytra-race": {
@@ -2022,7 +2022,8 @@
             "gapOrder": "The longest wait cannot be shorter than the shortest",
             "eventsAtMost": "At most {count} events",
             "schedulesAtMost": "At most {count} scheduled events",
-            "eventGone": "That event no longer exists"
+            "eventGone": "That event no longer exists",
+            "kindRetired": "This kind of event was replaced by the downhill boat race"
         },
         "waiting": {
             "busy": "{count, plural, one {{names} is in a fight or in the End} other {{names} are in a fight or in the End}}",

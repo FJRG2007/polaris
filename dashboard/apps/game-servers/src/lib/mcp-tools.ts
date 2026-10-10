@@ -366,7 +366,7 @@ const eventKindsTool = () =>
             const wanted = input.query.toLowerCase();
             const kinds = (
                 await Promise.all(
-                    catalog.EVENT_KINDS.map(async (kind) => {
+                    catalog.OFFERED_KINDS.map(async (kind) => {
                         const words = await kindWords(kind);
                         const fresh = catalog.newPreset(kind, kind);
                         const schema = catalog.optionsSchemas[kind] as z.ZodTypeAny;

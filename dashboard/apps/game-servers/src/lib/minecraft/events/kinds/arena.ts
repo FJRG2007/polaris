@@ -163,6 +163,7 @@ export function notLoaded(output: string): boolean {
 
 const ITEM_ID = /^[a-z0-9_.-]+:[a-z0-9_./-]+$/;
 const MARK = "polaris_event:1b";
+const SILK_TOUCH = "minecraft:silk_touch";
 
 export interface KitExtras {
     /** Blocks it can be placed on in adventure mode. */
@@ -172,6 +173,15 @@ export interface KitExtras {
     /** Never wears out: a crown, a sword and shield, a tool the event hands out
      *  must last the event however much it is used. */
     readonly unbreakable?: boolean;
+    /** Mines at this speed whatever it may break, dropping it as the right tool
+     *  would. From 1.20.5, which has the tool component; ignored before. What it
+     *  may break is still only `breaks`. */
+    readonly miningSpeed?: number;
+    /** Breaks blocks whole, as silk touch does: glass, which drops nothing by
+     *  hand, and a sea lantern, which drops crystals, drop themselves. How the
+     *  component is spelled from 1.20.5: with `levels`, or as a plain map from
+     *  1.21.5. A tag before 1.20.5 whichever is given. */
+    readonly silkTouch?: "levels" | "map";
 }
 
 /** What every piece of kit that can wear out is given: it lasts the event. */
@@ -185,12 +195,21 @@ export function marked(id: string, marker: Marker, extras: KitExtras = {}): stri
         if (extras.placeOn) parts.push(`minecraft:can_place_on={blocks:${list(extras.placeOn)}}`);
         if (extras.breaks) parts.push(`minecraft:can_break={blocks:${list(extras.breaks)}}`);
         if (extras.unbreakable) parts.push("minecraft:unbreakable={}");
+        if (extras.silkTouch === "levels")
+            parts.push(`minecraft:enchantments={levels:{"${SILK_TOUCH}":1}}`);
+        if (extras.silkTouch === "map") parts.push(`minecraft:enchantments={"${SILK_TOUCH}":1}`);
+        // A tag rather than the blocks again: the list twice outgrew one command.
+        if (extras.miningSpeed)
+            parts.push(
+                `minecraft:tool={default_mining_speed:${extras.miningSpeed.toFixed(1)}f,rules:[{blocks:"#minecraft:mineable/pickaxe",speed:${extras.miningSpeed.toFixed(1)}f,correct_for_drops:true}]}`
+            );
         return `${id}[${parts.join(",")}]`;
     }
     const parts = [MARK];
     if (extras.placeOn) parts.push(`CanPlaceOn:${list(extras.placeOn)}`);
     if (extras.breaks) parts.push(`CanDestroy:${list(extras.breaks)}`);
     if (extras.unbreakable) parts.push("Unbreakable:1b");
+    if (extras.silkTouch) parts.push(`Enchantments:[{id:"${SILK_TOUCH}",lvl:1s}]`);
     return `${id}{${parts.join(",")}}`;
 }
 
@@ -202,6 +221,18 @@ export function giveMarked(
     extras: KitExtras = {}
 ): string {
     return `give ${name} ${marked(id, marker, extras)} ${count}`;
+}
+
+/** One marked item, only to `name` while they carry none of it marked: what
+ *  follows a spelling their version may have refused. */
+export function giveMarkedUnlessHeld(
+    name: string,
+    id: string,
+    marker: Marker,
+    extras: KitExtras = {}
+): string {
+    const held = `{id:"${id}",${markedItem(marker).slice(1)}`;
+    return `give @a[name=${name},nbt=!{Inventory:[${held}]}] ${marked(id, marker, extras)} 1`;
 }
 
 /** A marked item put straight into one slot (`weapon.offhand`), from 1.17. Only
@@ -259,6 +290,20 @@ export function killMarkedDrops(box: Box, marker: Marker): string {
  */
 export function killBrokenDrops(box: Box, marker: Marker): string {
     return `execute in minecraft:overworld as @e[type=minecraft:item,${within(box)},nbt=!{Item:${markedItem(marker)}}] unless data entity @s Thrower run kill @s`;
+}
+
+/**
+ * What a block broken in the box let fall, made kit again: marked and placeable
+ * on `placeOn`, as it was handed out, so it stacks with the rest and is taken
+ * back with it. Never what somebody threw (it has a `Thrower`).
+ */
+export function reclaimBrokenDrops(box: Box, marker: Marker, placeOn: readonly string[]): string {
+    const list = `[${placeOn.map((one) => `"${one}"`).join(",")}]`;
+    const item =
+        marker === "components"
+            ? `{components:{"minecraft:custom_data":{${MARK}},"minecraft:can_place_on":{blocks:${list}}}}`
+            : `{tag:{${MARK},CanPlaceOn:${list}}}`;
+    return `execute in minecraft:overworld as @e[type=minecraft:item,${within(box)},nbt=!{Item:${markedItem(marker)}}] unless data entity @s Thrower run data merge entity @s {Item:${item}}`;
 }
 
 /**

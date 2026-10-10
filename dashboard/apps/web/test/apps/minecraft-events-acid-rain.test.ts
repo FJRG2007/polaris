@@ -311,3 +311,39 @@ describe("what an acid rain hands out and says", () => {
         expect(catalog.incompatibility(preset, "1.21.4")).toBeNull();
     });
 });
+
+describe("a shelter in the acid rain", () => {
+    const built = () => acid.arena({ size: "medium", acidity: "mild" }, "run-1", SITE, Y);
+
+    it("is bitten from below over the head of whoever is under it, a step at a time", () => {
+        const bite = acid.FUNCTIONS.bite!;
+        // One look per block over the head, each only while nothing was bitten yet.
+        expect(bite.filter((line) => line.includes("function polaris:acid/gnaw"))).toHaveLength(
+            acid.ROOF
+        );
+        expect(acid.FUNCTIONS.gnaw).toContain("function polaris:acid/corrode");
+        expect(acid.FUNCTIONS.beat!.some((line) => line.includes("polaris:acid/bites"))).toBe(true);
+        expect(acid.armLines(built())).toContain(
+            `scoreboard players set #bite ${acid.OBJECTIVE} ${acid.BITE_BEATS.mild}`
+        );
+    });
+
+    it("lasts less every minute, never below the fastest bite", () => {
+        const one = built();
+        expect(acid.strength(59_999)).toBe(0);
+        expect(acid.strength(60_000)).toBe(1);
+        expect(acid.biteBeats(one, 0)).toBe(acid.BITE_BEATS.mild);
+        expect(acid.biteBeats(one, 1)).toBe(acid.BITE_BEATS.mild / 2);
+        expect(acid.biteBeats(one, 20)).toBe(acid.FASTEST_BITE);
+        expect(acid.strongerLines(one, 2)).toEqual([
+            `scoreboard players set #bite ${acid.OBJECTIVE} ${acid.biteBeats(one, 2)}`
+        ]);
+    });
+
+    it("is explained at Go in both languages", () => {
+        for (const language of ["en", "es"] as const) {
+            expect(said.howItWorks(language).length).toBeGreaterThan(40);
+            expect(said.stronger(language).length).toBeGreaterThan(10);
+        }
+    });
+});

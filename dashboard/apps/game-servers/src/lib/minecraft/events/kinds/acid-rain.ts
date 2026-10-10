@@ -22,6 +22,11 @@
  *   the floor - and that block goes one step: cobblestone to mossy cobblestone,
  *   to lime glass, to air. The floor and the walls are never eaten. Bounded:
  *   a few blocks a look, whatever the size of the server.
+ * - **What the rain eats over a shelter**: random drops alone almost never
+ *   find a one-block roof, so a player who walled themselves in stayed dry for
+ *   the whole event. Every few beats (`BITE_BEATS`, fewer each minute: the rain
+ *   grows stronger) the first block over the head of everybody under cover
+ *   also goes one step. A roof has to be patched, and in the end cannot be.
  *
  * Everything placed in the arena is taken out at the end: what was built by its
  * own boxes, and whatever players placed or the rain left by `sweepBoxes` -
@@ -89,6 +94,8 @@ export interface Acid {
     /** How many stands eat at the shelters on each look. */
     readonly drips: number;
     readonly dose: number;
+    /** Beats between two bites over everybody's head, at "Go!". */
+    readonly bite: number;
 }
 
 /** Where the huts go: spread over the floor away from the middle (where
@@ -169,7 +176,8 @@ export function arena(
         volume: { x1: x - outer, y1: y, z1: z - outer, x2: x + outer, y2: y + ROOF, z2: z + outer },
         reach: outer + 1,
         drips: Math.max(2, Math.ceil(columns / COLUMNS_PER_DRIP[options.acidity])),
-        dose: DOSE[options.acidity]
+        dose: DOSE[options.acidity],
+        bite: BITE_BEATS[options.acidity]
     };
 }
 
@@ -265,6 +273,13 @@ const DRIP_TAG = "polaris_acid_drip";
 const WET_TAG = "pe_wet";
 /** A half second between two looks at who is in the rain. */
 const BEAT_TICKS = 10;
+const BITE_TAG = "pe_bite";
+/** Beats between two bites at the block over everybody's head, at "Go!". */
+export const BITE_BEATS: Readonly<Record<Acidity, number>> = { mild: 16, harsh: 10 };
+/** The fewest beats between two bites, however long it has rained. */
+export const FASTEST_BITE = 2;
+/** How often the rain grows stronger: the beats between bites halve. */
+export const STRONGER_MS = 60_000;
 /** The sizes whose rain the pack knows how to draw: its spread can only be
  *  written in the function itself. */
 const SIZES = Object.values(HALF);
@@ -304,7 +319,28 @@ export const FUNCTIONS: Readonly<Record<string, readonly string[]>> = {
     ],
     beat: [
         `scoreboard players set ${score("t")} 0`,
-        `execute in minecraft:overworld as @a[tag=pe_in,scores={${ACID_SCORE}=0..}] at @s run function polaris:acid/expose`
+        `execute in minecraft:overworld as @a[tag=pe_in,scores={${ACID_SCORE}=0..}] at @s run function polaris:acid/expose`,
+        `scoreboard players add ${score("b")} 1`,
+        `execute if score ${score("b")} >= ${score("bite")} run function polaris:acid/bites`
+    ],
+    bites: [
+        `scoreboard players set ${score("b")} 0`,
+        `execute in minecraft:overworld as @a[tag=pe_in,scores={${ACID_SCORE}=0..}] at @s run function polaris:acid/bite`
+    ],
+    // The first block over the head, whatever is above it: a roof is eaten
+    // from below, the side the player can see and patch.
+    bite: [
+        `tag @s add ${BITE_TAG}`,
+        ...LOOK_UP.map(
+            (up) =>
+                `execute if entity @s[tag=${BITE_TAG}] unless block ~ ~${up} ~ minecraft:air unless block ~ ~${up} ~ ${ROOF_BLOCK} positioned ~ ~${up + 1} ~ run function polaris:acid/gnaw`
+        ),
+        `tag @s remove ${BITE_TAG}`
+    ],
+    gnaw: [
+        "function polaris:acid/corrode",
+        `tag @s remove ${BITE_TAG}`,
+        "playsound minecraft:block.fire.extinguish master @s ~ ~-1 ~ 0.6 1.2"
     ],
     expose: [
         `tag @s add ${WET_TAG}`,
@@ -342,6 +378,8 @@ export function armLines(acid: Acid): string[] {
         set("t", 0),
         set("dose", acid.dose),
         set("half", acid.half),
+        set("b", 0),
+        set("bite", acid.bite),
         set("x", x),
         set("z", z),
         `kill @e[type=minecraft:armor_stand,tag=${SKY_TAG}]`,
@@ -376,6 +414,21 @@ export function dripLines(acid: Acid): string[] {
         `execute in minecraft:overworld run spreadplayers ${acid.center.x + 0.5} ${acid.center.z + 0.5} 1 ${acid.half} under ${acid.floor + ROOF - 1} false @e[type=minecraft:armor_stand,tag=${DRIP_TAG}]`,
         `execute in minecraft:overworld as @e[type=minecraft:armor_stand,tag=${DRIP_TAG}] at @s run function polaris:acid/corrode`
     ];
+}
+
+/** How many times the rain has grown stronger, `since` "Go!". */
+export function strength(since: number): number {
+    return Math.max(0, Math.floor(since / STRONGER_MS));
+}
+
+/** The beats between two bites once the rain has grown stronger `times`. */
+export function biteBeats(acid: Pick<Acid, "bite">, times: number): number {
+    return Math.max(FASTEST_BITE, Math.round(acid.bite / 2 ** Math.max(0, times)));
+}
+
+/** The rain grown stronger: fewer beats between two bites. */
+export function strongerLines(acid: Pick<Acid, "bite">, times: number): string[] {
+    return [`scoreboard players set ${score("bite")} ${biteBeats(acid, times)}`];
 }
 
 /** Everybody's acid, as the game has it. */

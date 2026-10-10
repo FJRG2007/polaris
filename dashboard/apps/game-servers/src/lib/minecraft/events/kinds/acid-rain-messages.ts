@@ -23,6 +23,20 @@ export function goSubtitle(language: Language): string {
         : "&fBuild a roof: the rain eats it away";
 }
 
+/** Told to everybody at "Go!": the whole game in one line. */
+export function howItWorks(language: Language): string {
+    return language === "es"
+        ? "&fBajo la lluvia se llena tu barra de ácido; llena, quedas fuera. &7La lluvia se come el bloque que tienes encima: &frepáralo con la piedra que te damos. &7Cada minuto llueve más fuerte."
+        : "&fOut in the rain your acid bar fills; full, you are out. &7The rain eats the block over your head: &fpatch it with the cobblestone you are given. &7Every minute it rains harder.";
+}
+
+/** Said to everybody when the rain grows stronger. */
+export function stronger(language: Language): string {
+    return language === "es"
+        ? "&2La lluvia arrecia: &7los techos duran menos."
+        : "&2The rain grows stronger: &7roofs last less.";
+}
+
 /** Above the hotbar of everybody still in: their acid, and who is left. */
 export function bar(gauge: string, left: number, language: Language): string {
     return language === "es"
