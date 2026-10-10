@@ -2772,11 +2772,10 @@ describe("the kit is marked, and only it is taken back", () => {
             const clears = lines.filter((line) => line.startsWith("clear "));
             expect(clears).toHaveLength(build.KIT_IDS.length);
             expect(clears.every((line) => line.includes("polaris_event:1b"))).toBe(true);
-            // Fall-proof first; their game mode only once home.
-            expect(lines.slice(0, 2)).toEqual([
-                "effect give Ana minecraft:slow_falling 10 0 true",
-                "effect give Ana minecraft:resistance 10 4 true"
-            ]);
+            // Fall-proof first - never by Slow Falling, which the server's
+            // floating check kicks for; their game mode only once home.
+            expect(lines[0]).toBe("effect give Ana minecraft:resistance 10 4 true");
+            expect(lines.some((line) => line.includes("slow_falling"))).toBe(false);
             expect(lines.some((line) => line.startsWith("gamemode "))).toBe(false);
             expect(arena.homeMode(ANA)).toBe("gamemode survival Ana");
         }

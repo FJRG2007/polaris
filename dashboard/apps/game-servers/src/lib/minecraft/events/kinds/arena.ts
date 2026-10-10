@@ -506,9 +506,13 @@ export function wentHome(output: string): boolean {
     return /teleported/i.test(plain) && !/no (player|entity) was found/i.test(plain);
 }
 
-/** Falling slowly for a moment past each look: nobody is hurt stepping off a roof. */
+/**
+ * Unhurt by a fall for a moment past each look: nobody is hurt stepping off a
+ * roof. Resistance V, never Slow Falling, which held a player in the air long
+ * enough for the server's floating check to kick them (`stage.fallProof`).
+ */
 export function floatDown(name: string): string {
-    return `effect give ${name} minecraft:slow_falling 3 0 true`;
+    return `effect give ${name} minecraft:resistance 3 4 true`;
 }
 
 /** Nobody goes hungry in an arena: fed for a moment past each look. */

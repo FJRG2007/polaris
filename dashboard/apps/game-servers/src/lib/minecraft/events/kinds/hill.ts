@@ -239,8 +239,8 @@ const DRAIN_FLOOR = 6;
  * - off the circle, Poison, and only while they have more than three hearts;
  * - in it, the Poison taken off again and Regeneration instead;
  * - Resistance IV, so a punch is a fifth of one and keeps its knockback;
- * - whoever is under the platform - knocked off - falls slowly, so the drop
- *   never hurts, and is brought back to the edge;
+ * - whoever is under the platform - knocked off - takes nothing from the drop
+ *   (`catchLine`), and is brought back to the edge;
  * - the fire and the water kept off.
  */
 export function protectLines(
@@ -265,11 +265,15 @@ export function protectLines(
     ];
 }
 
-/** Whoever has fallen under the platform floats down instead of dropping. */
+/**
+ * Whoever has fallen under the platform lands unhurt: Resistance V while they
+ * are under it. Never Slow Falling, which kept them in the air long enough for
+ * the server's floating check to kick them (`stage.fallProof`).
+ */
 export function catchLine(point: { x: number; y: number; z: number }, radius: number): string {
     const reach = radius + MARGIN + 64;
     const under = `x=${point.x - reach},y=${point.y - 128},z=${point.z - reach},dx=${2 * reach},dy=127,dz=${2 * reach}`;
-    return `execute in minecraft:overworld run effect give @a[tag=${IN_ARENA},${under}] minecraft:slow_falling 3 0 true`;
+    return `execute in minecraft:overworld run effect give @a[tag=${IN_ARENA},${under}] minecraft:resistance 3 4 true`;
 }
 // ------------------------------------------------------------------ the ring
 

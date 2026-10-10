@@ -355,19 +355,22 @@ export function floatDown(volume: Volume, seconds: number): string {
 
 /**
  * Nothing that happens to them for a few seconds can make them fall to their
- * death: slow falling takes fall damage away, Resistance V the rest. Given
+ * death: Resistance V takes every hit the game lets it, a fall included. Given
  * before anybody is moved off anything an event built, and before any of it
  * comes down.
+ *
+ * Never Slow Falling for a player: the server's floating check counts every
+ * tick in the air with nothing round them - Slow Falling is not exempt - and
+ * kicks after 80 where flight is off, so a player let down slowly from a stage
+ * high in the sky was kicked for flying on the way home.
  */
 export function fallProof(selector: string, seconds = 10): string[] {
-    return [
-        `effect give ${selector} minecraft:slow_falling ${seconds} 0 true`,
-        `effect give ${selector} minecraft:resistance ${seconds} 4 true`
-    ];
+    return [`effect give ${selector} minecraft:resistance ${seconds} 4 true`];
 }
 
 /** The same for everything in a volume and over it, players included: what is
- *  still up there when it is taken down floats to the ground. */
+ *  still up there when it is taken down comes down unhurt - a creature
+ *  floating, a player falling (`fallProof`). */
 export function fallProofOver(volume: Volume, seconds = 10): string[] {
     const dx = Math.abs(volume.x2 - volume.x1);
     const dz = Math.abs(volume.z2 - volume.z1);
@@ -375,7 +378,7 @@ export function fallProofOver(volume: Volume, seconds = 10): string[] {
     const dy = Math.abs(volume.y2 - volume.y1) + 64;
     const at = `x=${Math.min(volume.x1, volume.x2)},y=${y},z=${Math.min(volume.z1, volume.z2)},dx=${dx},dy=${dy},dz=${dz}`;
     return [
-        `${WORLD} effect give @e[${at}] minecraft:slow_falling ${seconds} 0 true`,
+        `${WORLD} effect give @e[type=!player,${at}] minecraft:slow_falling ${seconds} 0 true`,
         `${WORLD} effect give @e[${at}] minecraft:resistance ${seconds} 4 true`
     ];
 }

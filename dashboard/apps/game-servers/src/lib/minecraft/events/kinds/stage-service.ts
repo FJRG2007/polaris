@@ -1559,7 +1559,8 @@ export function quickLines(loop: StageLoop): string[] {
         const told = (line: string) => commands.text(messages.tag(loop.language) + line);
         return elytraRace.quickLines(layout.course, loop.items ?? null, {
             fell: told(elytraMessages.fell(loop.language)),
-            cut: told(elytraMessages.cut(loop.language))
+            cut: told(elytraMessages.cut(loop.language)),
+            howTo: told(elytraMessages.howToFly(loop.language))
         });
     }
     // A boat race: whoever fell, cut a corner or left their boat, put back.
@@ -1843,8 +1844,10 @@ function elytraRaceOf(
         },
         whole: course.laps * rings + 1,
         finishTitle: messages.checkpointTitle(rings, rings, language),
-        // Over the line: let down gently, never left to fall out of the sky.
-        finished: (name) => [`effect give ${name} minecraft:slow_falling 60 0 true`],
+        // Over the line: nothing hurts them coming down, glide or not. Never
+        // Slow Falling, which the server's floating check does not exempt:
+        // without wings it held a racer in the air long enough to be kicked.
+        finished: (name) => [`effect give ${name} minecraft:resistance 60 4 true`],
         bar: (racer, at) => {
             const progress = elytraRace.progressOf(course, racer.best);
             const next = elytraRace.nextRing(course, racer.best).center;
