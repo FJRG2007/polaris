@@ -19,10 +19,15 @@
             "types": "./dist/image-loader.d.ts",
             "import": "./dist/image-loader.js",
             "default": "./dist/image-loader.js"
+        },
+        "./animation-play": {
+            "types": "./dist/animation-play.d.ts",
+            "import": "./dist/animation-play.js",
+            "default": "./dist/animation-play.js"
         }
     },
     "scripts": {
-        "build": "tsup src/renderer/App.tsx src/renderer/SlideThumb.tsx src/renderer/image-loader.ts --format esm --dts --clean --external react --external react-dom --loader .md=text",
+        "build": "tsup src/renderer/App.tsx src/renderer/SlideThumb.tsx src/renderer/image-loader.ts src/renderer/animation-play.ts --format esm --dts --clean --external react --external react-dom --loader .md=text",
         "typecheck": "tsc --noEmit",
         "test": "vitest run --passWithNoTests"
     },

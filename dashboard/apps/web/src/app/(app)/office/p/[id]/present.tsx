@@ -12,7 +12,8 @@
 
 import * as core from "@polaris/core";
 import * as deck from "@/lib/office/deck";
-import { SlideDrawing } from "./slide-canvas";
+import * as motion from "@/lib/office/slide-motion";
+import { ShowStage, STILL, useShowPlan, type SlideMotion } from "./show-stage";
 import { Button, cn, matchShortcut } from "@polaris/ui";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { ChevronLeft, ChevronRight, Maximize, Minimize, X } from "lucide-react";
@@ -38,35 +39,41 @@ export type ShowStep = "next" | "previous" | "first" | "last";
 export function Present({
     slides,
     bySlide,
+    motionOf = stillMotion,
     from,
     onClose,
     driven
 }: {
     slides: readonly deck.Slide[];
     bySlide: ReadonlyMap<string, readonly deck.Box[]>;
+    /** Each slide's transition and animations. */
+    motionOf?: (slideId: string) => SlideMotion;
     from: number;
     onClose: () => void;
-    /** A show whose slide is decided elsewhere - the audience window, which
+    /** A show whose place is decided elsewhere - the audience window, which
      *  the presenter view turns. `at` is where it is, and every press here is
-     *  asked of `go` instead of turning the slide itself. */
-    driven?: { at: number; go: (step: ShowStep) => void };
+     *  asked of `go` instead of moving the show itself. */
+    driven?: { at: motion.ShowAt; go: (step: ShowStep) => void };
 }) {
     const t = useTranslations("office");
     const surface = useRef<HTMLDivElement | null>(null);
+    const plan = useShowPlan(slides, motionOf);
     // One past the last slide is the end screen.
-    const [own, setOwn] = useState(Math.max(0, Math.min(from, slides.length - 1)));
-    const at = driven ? Math.min(driven.at, slides.length) : own;
+    const [own, setOwn] = useState<motion.ShowAt>(() =>
+        motion.showAt(Math.max(0, Math.min(from, slides.length - 1)), plan)
+    );
+    const place = driven
+        ? { slide: Math.min(driven.at.slide, slides.length), played: driven.at.played }
+        : own;
+    const at = place.slide;
     const drive = useRef(driven);
     drive.current = driven;
     const step = useCallback(
         (to: ShowStep): void => {
             if (drive.current) return drive.current.go(to);
-            if (to === "first") setOwn(0);
-            else if (to === "last") setOwn(slides.length - 1);
-            else if (to === "previous") setOwn((one) => Math.max(0, one - 1));
-            else setOwn((one) => one + 1);
+            setOwn((one) => motion.stepShow(one, to, slides.length, plan));
         },
-        [slides.length]
+        [slides.length, plan]
     );
     const [controls, setControls] = useState(true);
     const [full, setFull] = useState(false);
@@ -217,7 +224,12 @@ export function Present({
                         style={{ width: "min(100cqw, calc(100cqh * 16 / 9))" }}
                     >
                         {slide ? (
-                            <SlideDrawing boxes={bySlide.get(slide.id) ?? []} slideId={slide.id} />
+                            <ShowStage
+                                slides={slides}
+                                bySlide={bySlide}
+                                motionOf={motionOf}
+                                at={place}
+                            />
                         ) : null}
                     </div>
                 )}
@@ -232,7 +244,11 @@ export function Present({
                     controls ? "opacity-100" : "pointer-events-none opacity-0"
                 )}
             >
-                <PresentButton label={t("slides.previous")} disabled={at === 0} onClick={previous}>
+                <PresentButton
+                    label={t("slides.previous")}
+                    disabled={at === 0 && place.played <= motion.arrived(plan(0))}
+                    onClick={previous}
+                >
                     <ChevronLeft className="size-4 shrink-0" aria-hidden />
                 </PresentButton>
                 <span
@@ -265,6 +281,10 @@ export function Present({
             </div>
         </div>
     );
+}
+
+function stillMotion(): SlideMotion {
+    return STILL;
 }
 
 function PresentButton({

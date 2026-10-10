@@ -11,6 +11,8 @@
 
 import * as deck from "@/lib/office/deck";
 import * as edits from "@/app/(app)/office/p/[id]/deck-edits";
+import * as motion from "@/lib/office/slide-motion";
+import { useDeckMotion } from "@/app/(app)/office/p/[id]/show-stage";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Present, type ShowStep } from "@/app/(app)/office/p/[id]/present";
 import { useOfficeDocument } from "@/app/(app)/office/use-office-document";
@@ -45,12 +47,13 @@ export function AudienceShow({
         (slideId: string) => deck.lookOf(theme, backgrounds, slideId),
         [theme, backgrounds]
     );
-    const [at, setAt] = useState(0);
+    const motionOf = useDeckMotion(doc, version, bySlide);
+    const [at, setAt] = useState<motion.ShowAt>({ slide: 0, played: 0 });
     const channel = useRef<ShowChannel | null>(null);
 
     useEffect(() => {
         const opened = openShowChannel(documentId, (one) => {
-            if (one.kind === "at") setAt(one.at);
+            if (one.kind === "at") setAt({ slide: one.at, played: one.played });
             else if (one.kind === "end") window.close();
         });
         channel.current = opened;
@@ -71,6 +74,7 @@ export function AudienceShow({
                 <Present
                     slides={slides}
                     bySlide={bySlide}
+                    motionOf={motionOf}
                     from={0}
                     driven={driven}
                     onClose={() => window.close()}

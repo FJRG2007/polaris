@@ -15,8 +15,10 @@
 
 import * as core from "@polaris/core";
 import * as deck from "@/lib/office/deck";
+import * as motion from "@/lib/office/slide-motion";
 import type { ShowStep } from "./present";
 import { SlideDrawing } from "./slide-canvas";
+import { restingStates, STILL, useShowPlan, type SlideMotion } from "./show-stage";
 import { Button, cn, matchShortcut } from "@polaris/ui";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import {
@@ -110,6 +112,7 @@ export function PresenterView({
     slides,
     bySlide,
     notesOf,
+    motionOf = stillMotion,
     from,
     audienceWindow,
     onClose
@@ -118,14 +121,20 @@ export function PresenterView({
     slides: readonly deck.Slide[];
     bySlide: ReadonlyMap<string, readonly deck.Box[]>;
     notesOf: (slide: deck.Slide) => string;
+    /** Each slide's transition and animations. */
+    motionOf?: (slideId: string) => SlideMotion;
     from: number;
     audienceWindow: boolean;
     onClose: () => void;
 }) {
     const t = useTranslations("office");
     const surface = useRef<HTMLDivElement | null>(null);
+    const plan = useShowPlan(slides, motionOf);
     // One past the last slide is the end of the show.
-    const [at, setAt] = useState(Math.max(0, Math.min(from, slides.length - 1)));
+    const [place, setPlace] = useState<motion.ShowAt>(() =>
+        motion.showAt(Math.max(0, Math.min(from, slides.length - 1)), plan)
+    );
+    const at = place.slide;
     const clock = useElapsed();
     const [noteSize, setNoteSize] = useState(18);
     const [canAudience, setCanAudience] = useState(false);
@@ -134,8 +143,8 @@ export function PresenterView({
     const audience = useRef<Window | null>(null);
     const close = useRef(onClose);
     close.current = onClose;
-    const atNow = useRef(at);
-    atNow.current = at;
+    const atNow = useRef(place);
+    atNow.current = place;
 
     const total = slides.length;
     const ended = at >= total;
@@ -144,21 +153,13 @@ export function PresenterView({
 
     const go = useCallback(
         (step: ShowStep): void => {
-            if (step === "next" && atNow.current >= total) {
+            if (step === "next" && atNow.current.slide >= total) {
                 close.current();
                 return;
             }
-            setAt((one) =>
-                step === "first"
-                    ? 0
-                    : step === "last"
-                      ? total - 1
-                      : step === "previous"
-                        ? Math.max(0, one - 1)
-                        : Math.min(total, one + 1)
-            );
+            setPlace((one) => motion.stepShow(one, step, total, plan));
         },
-        [total]
+        [total, plan]
     );
 
     const goNow = useRef(go);
@@ -173,7 +174,11 @@ export function PresenterView({
         const opened = openShowChannel(documentId, (one) => {
             if (one.kind === "hello") {
                 setAudienceOpen(true);
-                channel.current?.send({ kind: "at", at: atNow.current });
+                channel.current?.send({
+                    kind: "at",
+                    at: atNow.current.slide,
+                    played: atNow.current.played
+                });
             } else if (one.kind === "go") goNow.current(one.to);
         });
         channel.current = opened;
@@ -184,10 +189,10 @@ export function PresenterView({
         };
     }, [documentId, audienceWindow]);
 
-    // Wherever the slide changes from, the audience window follows.
+    // Wherever the show moves from, the audience window follows.
     useEffect(() => {
-        channel.current?.send({ kind: "at", at });
-    }, [at]);
+        channel.current?.send({ kind: "at", at: place.slide, played: place.played });
+    }, [place]);
 
     const openAudience = (): void => {
         const opened = window.open(
@@ -320,6 +325,7 @@ export function PresenterView({
                                     <SlideDrawing
                                         boxes={bySlide.get(slide.id) ?? []}
                                         slideId={slide.id}
+                                        states={restingStates(motionOf(slide.id), place.played)}
                                     />
                                 )}
                             </button>
@@ -329,7 +335,7 @@ export function PresenterView({
                         <Button
                             variant="secondary"
                             size="sm"
-                            disabled={at === 0}
+                            disabled={at === 0 && place.played <= motion.arrived(plan(0))}
                             onClick={() => go("previous")}
                         >
                             <ChevronLeft className="size-4 shrink-0" aria-hidden />
@@ -348,10 +354,22 @@ export function PresenterView({
                             {t("slides.presenter.nextUp")}
                         </h2>
                         <div className="relative aspect-video w-full overflow-hidden rounded-md border border-border bg-white max-sm:w-1/2">
-                            {following ? (
+                            {slide && place.played < plan(at).count ? (
+                                // What the next press does: this slide's next
+                                // step, as PowerPoint's presenter view shows it.
+                                <SlideDrawing
+                                    boxes={bySlide.get(slide.id) ?? []}
+                                    slideId={slide.id}
+                                    states={restingStates(motionOf(slide.id), place.played + 1)}
+                                />
+                            ) : following ? (
                                 <SlideDrawing
                                     boxes={bySlide.get(following.id) ?? []}
                                     slideId={following.id}
+                                    states={restingStates(
+                                        motionOf(following.id),
+                                        motion.arrived(plan(at + 1))
+                                    )}
                                 />
                             ) : (
                                 <span className="absolute inset-0 flex items-center justify-center bg-black px-2 text-center text-[12px] text-white">
@@ -394,6 +412,10 @@ export function PresenterView({
             </div>
         </div>
     );
+}
+
+function stillMotion(): SlideMotion {
+    return STILL;
 }
 
 function IconButton({
