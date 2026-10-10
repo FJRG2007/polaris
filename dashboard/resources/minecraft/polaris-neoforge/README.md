@@ -115,8 +115,9 @@ Always registered, idle until the dashboard runs one. Console and operators only
 (permission level 4); each answers one line of JSON.
 
 - `polaris caps` (or `polaris capabilities`): the mod's version and what this
-  server can do (`stash`, `batch`, `seek`, `respawn`). The dashboard uses a command only when
-  it is listed here, and keeps its plain-command path otherwise.
+  server can do (`stash`, `batch`, `seek`, `respawn`). The dashboard uses a
+  command only when it is listed here, and keeps its plain-command path
+  otherwise.
 - `polaris stash save|restore <player> <key>`: a player's 41 slots (never the
   ender chest or the event kit), experience, health, hunger and effects, to
   `world/polaris/stash/<key>.dat` and back, each in one tick. Idempotent per key;
