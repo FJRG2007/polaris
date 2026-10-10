@@ -430,7 +430,7 @@ export function SoundboardPanel({
             <div className="flex min-h-0 flex-1">
                 <nav
                     aria-label={t("soundboard.sections")}
-                    className="flex w-11 shrink-0 flex-col items-center gap-1 overflow-y-auto border-r border-border py-2 no-scrollbar"
+                    className="flex w-11 shrink-0 flex-col items-center gap-1 overflow-y-auto overscroll-contain border-r border-border py-2 no-scrollbar"
                 >
                     {sections.map((section) => (
                         <button
@@ -449,7 +449,7 @@ export function SoundboardPanel({
                     ))}
                 </nav>
 
-                <div ref={scroller} className="min-w-0 flex-1 overflow-y-auto p-2">
+                <div ref={scroller} className="min-w-0 flex-1 overflow-y-auto overscroll-contain p-2">
                     {board === null && (
                         <p className="flex items-center gap-2 px-1 pb-2 text-xs text-muted-foreground">
                             <Loader2 aria-hidden className="size-3.5 shrink-0 animate-spin" />
