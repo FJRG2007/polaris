@@ -317,6 +317,8 @@ model User {
     chatSpaceBans       ChatSpaceBan[] @relation("ChatSpaceBanUser")
     chatSpaceBansMade   ChatSpaceBan[] @relation("ChatSpaceBanBy")
     chatEmojiUploaded   ChatSpaceEmoji[] @relation("ChatSpaceEmojiUploader")
+    chatSoundsUploaded  ChatSpaceSound[] @relation("ChatSpaceSoundUploader")
+    chatSoundFavorites  ChatSoundFavorite[]
     chatSpaceInvites     ChatSpaceInvite[]
     chatSavedMedia       ChatSavedMedia[]
     chatChannelMemberships ChatChannelMember[]
@@ -8334,6 +8336,12 @@ model ChatSpace {
     visibility  String   @default("private")
     archived    Boolean  @default(false)
     order       Float    @default(1024)
+    // Whether anybody may play a sound in this space's calls at all. On unless
+    // whoever runs the space turns it off, which is Discord's default too.
+    soundboard  Boolean  @default(true)
+    // Whether a member may play a sound from another space they belong to in
+    // this space's calls. Discord's "Use External Sounds".
+    soundboardExternal Boolean @default(true)
     createdAt   DateTime @default(now())
     updatedAt   DateTime @updatedAt
 
@@ -8347,9 +8355,80 @@ model ChatSpace {
     categories ChatCategory[]
     invites    ChatSpaceInvite[]
     emoji      ChatSpaceEmoji[]
+    sounds     ChatSpaceSound[]
+    soundDenials ChatSoundboardDenial[]
 
     @@index([ownerId])
     @@index([orgId])
+}
+
+/// A space's own soundboard sound: a clip of at most 5.2 seconds that anybody
+/// allowed to may play into a call, and everybody in it hears.
+///
+/// The bytes live in the row, the way a Minecraft server's sounds do: a sound is
+/// at most 512 KB, a space holds at most 48 of them, and a clip that is deleted
+/// with its row cannot be left behind on a disk somewhere. Always stored as the
+/// 16-bit PCM WAV the uploader's browser produced and the server re-checked
+/// (`sound-file.ts`), so a duration is read off a header rather than guessed.
+model ChatSpaceSound {
+    id         String   @id @default(uuid(7)) @db.Uuid
+    spaceId    String   @db.Uuid
+    name       String
+    // One ordinary emoji drawn beside the name and over the player's face, or
+    // empty for none.
+    emoji      String   @default("")
+    // How loud it plays for everybody, 0 to 1, before each listener's own
+    // soundboard volume.
+    volume     Float    @default(1)
+    mime       String   @default("audio/wav")
+    size       Int
+    durationMs Int
+    data       Bytes
+    uploaderId String?  @db.Uuid
+    createdAt  DateTime @default(now())
+    updatedAt  DateTime @updatedAt
+
+    space    ChatSpace @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+    uploader User?     @relation("ChatSpaceSoundUploader", fields: [uploaderId], references: [id], onDelete: SetNull)
+
+    @@index([spaceId, createdAt])
+    @@index([uploaderId])
+}
+
+/// Somebody, or everybody holding a role, who may not play sounds in a space.
+///
+/// Only ever a denial: the soundboard is on for everybody unless a row here says
+/// otherwise, and a denial for a person or for any role they hold beats
+/// everything else - the rule the rest of Polaris follows.
+model ChatSoundboardDenial {
+    id          String   @id @default(uuid(7)) @db.Uuid
+    spaceId     String   @db.Uuid
+    // user | role
+    kind        String
+    // A user id for `user`. For `role`: `member` or `admin` (the space's own
+    // two roles - `member` leaves administrators out), or `org:<slug>` for a
+    // role of the organization that owns it.
+    subject     String
+    createdById String?  @db.Uuid
+    createdAt   DateTime @default(now())
+
+    space ChatSpace @relation(fields: [spaceId], references: [id], onDelete: Cascade)
+
+    @@unique([spaceId, kind, subject])
+}
+
+/// A sound somebody starred, so it opens at the top of their picker on every
+/// device. `sound` is `default:<id>` or a space sound's id; a starred sound
+/// that has since been deleted is simply not drawn.
+model ChatSoundFavorite {
+    id        String   @id @default(uuid(7)) @db.Uuid
+    userId    String   @db.Uuid
+    sound     String
+    createdAt DateTime @default(now())
+
+    user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+    @@unique([userId, sound])
 }
 
 /// A space's own emoji, usable in that space and nowhere else.
@@ -8630,6 +8709,9 @@ model ChatChannel {
     // `age` is an age-restricted channel nobody reads until they have confirmed
     // they are an adult (`ChatAgeConfirmation`). Only read for a space's channel.
     contentMode   String    @default("default")
+    // Whether the soundboard may be used in this conversation's calls. Only read
+    // for a space's channel; the space's own switch is asked first.
+    soundboard    Boolean   @default(true)
     // Denormalized so the rail can sort conversations by what is happening
     // without reading every message table.
     lastMessageAt DateTime?

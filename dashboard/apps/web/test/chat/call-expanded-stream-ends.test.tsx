@@ -16,6 +16,11 @@ import type { CallState } from "@/app/(app)/chat/use-call";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@/app/(app)/chat/call-session", () => ({ useHeldCall: () => null }));
+vi.mock("@/app/(app)/chat/soundboard-actions", () => ({
+    callSoundboardAction: async () => ({}),
+    favoriteSoundAction: async () => ({}),
+    playSoundAction: async () => ({})
+}));
 vi.mock("@/app/(app)/chat/meeting-actions", () => ({}));
 // The panels around the room, which are not what this is about.
 vi.mock("@/app/(app)/chat/call-diagnosis-panel", () => ({ CallDiagnosisPanel: () => null }));

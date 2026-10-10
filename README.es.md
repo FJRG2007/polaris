@@ -181,6 +181,15 @@ están en [docs/assets/media](docs/assets/media).
       <br><sub><a href="docs/features/settings.es.md"><b>Ajustes</b></a>: los del despliegue y los de tu cuenta</sub>
     </td>
   </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <picture>
+        <source media="(prefers-color-scheme: light)" srcset="docs/assets/media/soundboard-light-es-desktop.webp">
+        <img src="docs/assets/media/soundboard-dark-es-desktop.webp" alt="La botonera en una llamada: los sonidos de Polaris y los del espacio">
+      </picture>
+      <br><sub>La botonera en una llamada: los sonidos de Polaris y los del espacio</sub>
+    </td>
+  </tr>
 </table>
 
 ## Instalar

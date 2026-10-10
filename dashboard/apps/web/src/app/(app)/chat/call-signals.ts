@@ -101,14 +101,37 @@ export const callSignalSchema = z.discriminatedUnion("kind", [
 
 export type CallSignal = z.infer<typeof callSignalSchema>;
 
-/** One reaction on screen, keyed so the same person sending two in a row draws
- *  two rather than replacing the first. */
-export interface ShownReaction {
+/**
+ * One reaction on screen, keyed so the same person sending two in a row draws
+ * two rather than replacing the first.
+ *
+ * A soundboard play is drawn the same way - its emoji over the face of whoever
+ * played it, for the same three seconds - because it is the same kind of thing:
+ * an event about one person, worth nothing afterwards. It carries the sound's
+ * own emoji and name instead of one of the six reactions.
+ */
+export type ShownReaction = {
     readonly id: string;
     /** The seat it came from, which is the tile it is drawn over. */
     readonly from: string;
-    readonly reaction: Reaction;
     readonly at: number;
+} & (
+    | { readonly reaction: Reaction; readonly sound?: undefined }
+    | {
+          readonly reaction?: undefined;
+          /** `name` is empty for a default, which each browser names in its
+           *  reader's language from `ref`. */
+          readonly sound: { readonly emoji: string; readonly name: string; readonly ref: string };
+      }
+);
+
+/** What a sound with no emoji of its own is drawn as: a speaker. */
+export const SOUND_GLYPH = "\u{1F50A}";
+
+/** The glyph a shown reaction or sound is drawn as. */
+export function shownGlyph(shown: ShownReaction): string {
+    if (shown.sound) return shown.sound.emoji || SOUND_GLYPH;
+    return REACTION_GLYPHS[shown.reaction];
 }
 
 /** Whether an attribute bag says this person has their hand up. */

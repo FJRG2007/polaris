@@ -73,6 +73,7 @@ import {
     LogOut,
     Mail,
     MessageSquarePlus,
+    Music2,
     Pencil,
     Phone,
     Pin,
@@ -361,6 +362,14 @@ export function ChatSidebar() {
                                     >
                                         <Smile className="size-3.5" />
                                         {t("sidebar.emoji")}
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem
+                                        onSelect={() =>
+                                            router.push(`/chat/s/${space.id}/soundboard`)
+                                        }
+                                    >
+                                        <Music2 className="size-3.5" />
+                                        {t("sidebar.soundboard")}
                                     </DropdownMenuItem>
                                 </DropdownMenuContent>
                             </DropdownMenu>

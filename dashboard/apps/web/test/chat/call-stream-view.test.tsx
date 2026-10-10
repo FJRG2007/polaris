@@ -23,6 +23,11 @@ import {
     watchedStreams
 } from "@/app/(app)/chat/call-stream-audio";
 
+vi.mock("@/app/(app)/chat/soundboard-actions", () => ({
+    callSoundboardAction: async () => ({}),
+    favoriteSoundAction: async () => ({}),
+    playSoundAction: async () => ({})
+}));
 vi.mock("@/app/(app)/chat/meeting-actions", () => ({ admitAction: async () => ({}) }));
 vi.mock("@/app/(app)/chat/actions", () => ({ searchPeopleAction: async () => ({ people: [] }) }));
 vi.mock("@/app/(app)/chat/call-session", () => ({ useHeldCall: () => null }));

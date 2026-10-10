@@ -65,6 +65,7 @@ import {
     type Reaction,
     type ShownReaction
 } from "./call-signals";
+import { Cue, SoundboardButton } from "./soundboard-picker";
 import { LiveBadge } from "./call-roster";
 import { useSpeakers } from "./speaker-device";
 import { HandStrip } from "./call-hands-panel";
@@ -1330,6 +1331,12 @@ export function CallRoom({
                     `call-signals`. */}
                 <ReactionMenu onReact={call.react} />
 
+                {/* Sounds everybody hears, behind one button - see
+                    `soundboard-picker`. Drawn for every seat, disabled with the
+                    reason for one that may not play, so nobody is offered a
+                    press the server will refuse. */}
+                <SoundboardButton meetingId={meetingId} call={call} />
+
                 <Button
                     size="icon"
                     variant="danger"
@@ -2033,12 +2040,7 @@ function Face({
                         aria-live="polite"
                     >
                         {reactions.map((shown) => (
-                            <span
-                                key={shown.id}
-                                aria-label={t(`callRoom.reactions.${shown.reaction}`)}
-                            >
-                                {REACTION_GLYPHS[shown.reaction]}
-                            </span>
+                            <Cue key={shown.id} shown={shown} />
                         ))}
                     </span>
                 )}
@@ -2416,9 +2418,7 @@ function Tile({
                     aria-live="polite"
                 >
                     {reactions.map((shown) => (
-                        <span key={shown.id} aria-label={t(`callRoom.reactions.${shown.reaction}`)}>
-                            {REACTION_GLYPHS[shown.reaction]}
-                        </span>
+                        <Cue key={shown.id} shown={shown} />
                     ))}
                 </span>
             )}

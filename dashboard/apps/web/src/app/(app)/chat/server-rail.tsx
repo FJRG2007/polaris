@@ -52,6 +52,7 @@ import {
     Image as ImageIcon,
     LogOut,
     MessageSquare,
+    Music2,
     Plus,
     Smile,
     UserPlus,
@@ -208,6 +209,7 @@ export function ServerRail() {
                         onShare={() => setSharing(space)}
                         onPicture={() => setPicturing(space)}
                         onEmoji={() => router.push(spaceEmojiHref(space.id))}
+                        onSoundboard={() => router.push(`/chat/s/${space.id}/soundboard`)}
                         onLeave={() => setLeaving(space)}
                         onNotify={(level) => void setNotify(space.id, level)}
                     >
@@ -426,6 +428,7 @@ function SpaceMenu({
     onInvite,
     onPicture,
     onEmoji,
+    onSoundboard,
     onBans,
     onShare,
     onLeave,
@@ -438,6 +441,8 @@ function SpaceMenu({
     onPicture: () => void;
     /** The space's own emoji, on their page. */
     onEmoji: () => void;
+    /** The space's soundboard, on its page. */
+    onSoundboard: () => void;
     onBans: () => void;
     /** Hand the whole space to a team or a role. */
     onShare: () => void;
@@ -492,6 +497,12 @@ function SpaceMenu({
                     <ContextMenuItem onSelect={onEmoji}>
                         <Smile className="size-3.5" />
                         {t("serverRail.emoji")}
+                    </ContextMenuItem>
+                )}
+                {administers && (
+                    <ContextMenuItem onSelect={onSoundboard}>
+                        <Music2 className="size-3.5" />
+                        {t("serverRail.soundboard")}
                     </ContextMenuItem>
                 )}
                 {/* The one moderation decision that never ends on its own and

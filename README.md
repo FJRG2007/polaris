@@ -197,6 +197,15 @@ beside them in [docs/assets/media](docs/assets/media).
       <br><sub><a href="docs/features/settings.md"><b>Settings</b></a>: the deployment's, and your own account's</sub>
     </td>
   </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <picture>
+        <source media="(prefers-color-scheme: light)" srcset="docs/assets/media/soundboard-light-en-desktop.webp">
+        <img src="docs/assets/media/soundboard-dark-en-desktop.webp" alt="The soundboard in a call: Polaris's own sounds and the space's">
+      </picture>
+      <br><sub>The soundboard in a call: Polaris's own sounds and the space's</sub>
+    </td>
+  </tr>
 </table>
 
 ## If you already pay for these

@@ -59,6 +59,14 @@ import {
 } from "./call-signals";
 import { useToast } from "@polaris/ui";
 import { useVoiceGate } from "./voice-gate";
+import { playClip } from "./soundboard-player";
+import { soundboardPrefs } from "./soundboard-prefs";
+import {
+    playbackVolume,
+    soundPlayedSchema,
+    SOUNDBOARD_TOPIC,
+    type SoundPlayed
+} from "@/lib/chat/soundboard";
 import {
     CALL_MODERATIONS,
     heldBack,
@@ -480,13 +488,13 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
      */
     const hosting = Boolean(
         participantId &&
-        meeting &&
-        meeting.participants.some(
-            (person) =>
-                person.id === participantId &&
-                person.userId !== null &&
-                person.userId === meeting.hostId
-        )
+            meeting &&
+            meeting.participants.some(
+                (person) =>
+                    person.id === participantId &&
+                    person.userId !== null &&
+                    person.userId === meeting.hostId
+            )
     );
     /**
      * Whether this browser is holding a room nobody else is in.
@@ -1801,14 +1809,31 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
          * and validated exactly as strictly as a request body would be, and
          * anything that does not fit is dropped without a word.
          */
-        function onData(payload: Uint8Array, participant?: { identity: string }): void {
-            if (!participant) return;
+        function onData(
+            payload: Uint8Array,
+            participant?: { identity: string },
+            _kind?: unknown,
+            topic?: string
+        ): void {
             let raw: unknown;
             try {
                 raw = JSON.parse(new TextDecoder().decode(payload));
             } catch {
                 return;
             }
+            // A soundboard play, which only Polaris sends: it arrives in the
+            // media server's own voice, with no participant attached - a thing
+            // no browser in the room can fake, since the server stamps whatever
+            // one publishes with who sent it. The same shape from a participant
+            // is somebody trying to play a sound the server never allowed, and
+            // is dropped.
+            if (topic === SOUNDBOARD_TOPIC) {
+                if (participant) return;
+                const played = soundPlayedSchema.safeParse(raw);
+                if (played.success) heardSound.current?.(played.data);
+                return;
+            }
+            if (!participant) return;
             // A reaction, which is the other thing that travels this way. Checked
             // as strictly as a request body: it comes from somebody else's
             // browser, and sharing a call with us makes it no more trustworthy.
@@ -2221,6 +2246,37 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
             setReactions((current) => current.filter((entry) => entry.id !== shown.id));
         }, REACTION_FOR_MS);
     }, []);
+
+    /**
+     * Somebody played a sound - this browser included, which hears its own
+     * play back the same way everybody else does, so "it played" means the
+     * room heard it.
+     *
+     * The cue goes over their face whatever this listener chose, the way
+     * Discord still shows the emoji at zero volume: muting somebody's sounds is
+     * not the same as not knowing they are playing them. The clip itself is
+     * played at the sound's volume times this listener's, not at all from
+     * somebody they muted, and not at all while they are deafened - by
+     * themselves or by a moderator - since a deafened person hears nothing.
+     */
+    const heardSound = useRef<((played: SoundPlayed) => void) | null>(null);
+    useEffect(() => {
+        heardSound.current = (played: SoundPlayed) => {
+            show({
+                id: played.id,
+                from: played.from,
+                at: Date.now(),
+                sound: { emoji: played.emoji, name: played.name, ref: played.sound }
+            });
+            if (deafenedRef.current || forced.current.serverDeafened) return;
+            const prefs = soundboardPrefs();
+            const volume = playbackVolume(played, {
+                volume: prefs.volume,
+                muted: new Set(prefs.muted)
+            });
+            void playClip(played.sound, { url: played.url ?? null, volume, channel: played.from });
+        };
+    }, [show]);
 
     /** Tell the room this browser is recording it, or that it has stopped. */
     const setRecording = useCallback(
