@@ -2216,7 +2216,15 @@ export function ChannelView({
                 voiceRoom && "flex-col lg:flex-row"
             )}
         >
-            <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+            {/* A thread or a search takes the whole of a phone's screen, as a
+                conversation does, and closing it brings this back. Side by
+                side, the two composers were drawn over each other. */}
+            <div
+                className={cn(
+                    "flex min-h-0 min-w-0 flex-1 flex-col",
+                    (thread || searching) && "hidden md:flex"
+                )}
+            >
                 <ChannelHeader
                     channel={channel}
                     viewerId={viewerId}

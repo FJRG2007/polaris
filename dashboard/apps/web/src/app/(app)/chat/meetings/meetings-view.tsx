@@ -26,7 +26,7 @@ import { MAX_MEETING_TITLE } from "@/lib/chat/meeting-limits";
 import { useDisplayFormat } from "@/components/display-format";
 import { MeetingDetailsDialog } from "./meeting-details-dialog";
 import { CallRoster } from "@/app/(app)/chat/call-roster";
-import { Calendar, Link2, Loader2, Pencil, Plus, Users, Video } from "lucide-react";
+import { ArrowLeft, Calendar, Link2, Loader2, Pencil, Plus, Users, Video } from "lucide-react";
 import { createMeetingAction, listMeetingsAction } from "@/app/(app)/chat/meeting-actions";
 import {
     Button,
@@ -69,6 +69,15 @@ export function MeetingsView() {
     return (
         <div className="flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain">
             <header className="flex h-header shrink-0 items-center gap-2 border-b border-border px-4">
+                {/* On a phone this page has the whole screen, so it carries the
+                    way back to the list, as a conversation's header does. */}
+                <Link
+                    href="/chat"
+                    aria-label={t("channelHeader.backToConversations")}
+                    className="-ml-1.5 rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground md:hidden"
+                >
+                    <ArrowLeft className="size-4" />
+                </Link>
                 <Video className="size-4 shrink-0 text-muted-foreground" />
                 <h1 className="min-w-0 flex-1 truncate text-sm font-medium">{t("meetings.meetings")}</h1>
                 {may.meetings && (
