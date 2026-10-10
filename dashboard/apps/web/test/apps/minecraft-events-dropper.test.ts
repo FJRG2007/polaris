@@ -25,8 +25,10 @@ const SEEDS = 500;
  * sprinting: heading for the point the plan passes the hole at (`through`),
  * pushing toward it until they would only just stop in time, then pushing back
  * to a standstill. They steer for a hole only once their head is under the
- * floor above it, and until then slow down. Their 0.6 by 1.8 box is checked against every floor block it meets.
- * Answers the floor they landed on, or null when they reached the water.
+ * floor above it, and until then slow down. Their 0.6 by 1.8 box is checked against every floor block it meets,
+ * and every block hung between the floors.
+ * Answers the floor they landed on (or under whose obstacle they were caught),
+ * or null when they reached the water.
  */
 function fall(shaft: dropper.Shaft): number | null {
     const {
@@ -91,6 +93,17 @@ function fall(shaft: dropper.Shaft): number | null {
         vy = (vy - gravity) * verticalDrag;
         vx *= drag;
         vz *= drag;
+        // In a block hung in the air: caught by it.
+        for (const one of shaft.obstacles)
+            if (
+                x + half > one.x &&
+                x - half < one.x + 1 &&
+                z + half > one.z &&
+                z - half < one.z + 1 &&
+                y < one.y + 1 &&
+                y + height > one.y
+            )
+                return level + 1;
         // In a floor's block: inside its hole, or landed on it.
         const floor = shaft.floors[level]!;
         const hole = shaft.holes[level]!;
@@ -122,7 +135,13 @@ describe("a dropper's shaft", () => {
                 let drops = 0;
                 for (let seed = 0; seed < SEEDS; seed += 1) {
                     const shaft = shaftOf(difficulty, levels, `run-${seed}`);
-                    const problems = dropper.planProblems(shaft.plan);
+                    const problems = [
+                        ...dropper.planProblems(shaft.plan),
+                        ...dropper.obstacleProblems(
+                            shaft.plan,
+                            dropper.obstaclesFor(shaft.plan, `run-${seed}`)
+                        )
+                    ];
                     if (problems.length > 0) {
                         broke += 1;
                         if (broke === 1) report.push(`${difficulty} ${levels}: ${problems[0]}`);
@@ -350,7 +369,10 @@ describe("a dropper's shaft", () => {
                             );
                             for (let y = next + 1; y < floor; y += 1)
                                 check(
-                                    !blocks.has(`${x} ${y} ${z}`),
+                                    !blocks.has(`${x} ${y} ${z}`) ||
+                                        shaft.obstacles.some(
+                                            (one) => one.x === x && one.y === y && one.z === z
+                                        ),
                                     `in the air at ${x} ${y} ${z}`
                                 );
                         }
@@ -389,6 +411,64 @@ describe("a dropper's shaft", () => {
             }
         expect(wrong).toEqual([]);
         expect(shafts).toBe(90);
+    });
+
+    it("hangs blocks between the floors from design 2, more the harder, and keeps design 1 as it was", () => {
+        for (const difficulty of DIFFICULTIES)
+            for (let seed = 0; seed < 40; seed += 1) {
+                const shaft = shaftOf(difficulty, 10, `hang-${seed}`);
+                // On the way to every floor but the first, as many as asked
+                // wherever there is room.
+                expect(shaft.obstacles.length).toBeGreaterThanOrEqual(9);
+                expect(shaft.obstacles.length).toBeLessThanOrEqual(
+                    9 * dropper.OBSTACLES[difficulty]
+                );
+                for (const one of shaft.obstacles) {
+                    expect(one.y).toBeLessThan(shaft.top);
+                    expect(shaft.floors).not.toContain(one.y);
+                }
+                const old = dropper.shaft(
+                    { levels: 10, difficulty },
+                    `hang-${seed}`,
+                    { x: 40, z: -12 },
+                    90,
+                    1
+                );
+                expect(old.obstacles).toEqual([]);
+                expect(old.boxes.some((box) => box.block === "minecraft:white_concrete")).toBe(
+                    true
+                );
+                // Design 1's floors in their old order, the plan the same.
+                expect(old.plan).toEqual(shaft.plan);
+                expect(
+                    old.boxes.find(
+                        (box) => box.y1 === old.floors[0] && box.block.endsWith("_concrete")
+                    )?.block
+                ).toBe("minecraft:red_concrete");
+            }
+        const looks = new Set(
+            Array.from({ length: 60 }, (_, seed) => {
+                const shaft = shaftOf("easy", 5, `look-${seed}`);
+                const outer = dropper.HALF + 1;
+                return `${shaft.boxes.find((box) => box.x1 === shaft.center.x - outer && box.y1 === shaft.bottom + 1)?.block}`;
+            })
+        );
+        expect(looks.size).toBeGreaterThan(2);
+    });
+
+    it("never hangs a block in the way from one hole to the next", () => {
+        const laid = dropper.plan({ levels: 2, difficulty: "hard" }, "in-the-way");
+        const above = laid.levels[0]!.hole;
+        const below = laid.levels[1]!.hole;
+        expect(
+            dropper.obstacleProblems(laid, [
+                { level: 1, x: below.x, z: below.z, under: Math.floor(laid.levels[1]!.drop / 2) }
+            ])
+        ).toEqual(["an obstacle over floor 2: in the way down"]);
+        expect(dropper.clearance({ x: above.x, z: above.z }, above, below)).toBe(0);
+        expect(dropper.obstacleProblems(laid, [{ level: 0, x: 0, z: 0, under: 2 }])).toEqual([
+            "an obstacle over floor 1: no floor above it"
+        ]);
     });
 
     it("counts the floors a player fell through", () => {

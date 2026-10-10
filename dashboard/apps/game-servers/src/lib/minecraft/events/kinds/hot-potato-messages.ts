@@ -26,10 +26,23 @@ export function holderSubtitle(language: Language): string {
     return language === "es" ? "&fGolpea a alguien para pasarla" : "&fHit somebody to pass it on";
 }
 
-export function roundLine(round: number, holder: string, language: Language): string {
+/** Names one after another: "Ana", "Ana and Ben", "Ana, Ben and Cy". */
+function listed(names: readonly string[], color: string, language: Language): string {
+    const marked = names.map((name) => mark(name, color));
+    if (marked.length <= 1) return marked[0] ?? "";
+    const and = language === "es" ? " y " : " and ";
+    return `${marked.slice(0, -1).join(`${color}, `)}${color}${and}${marked.at(-1)}`;
+}
+
+export function roundLine(round: number, holders: readonly string[], language: Language): string {
+    const who = listed(holders, WARN, language);
+    if (holders.length > 1)
+        return language === "es"
+            ? `${WARN}Ronda ${mark(round, WARN)}: hay ${mark(holders.length, WARN)} patatas, las tienen ${who}.`
+            : `${WARN}Round ${mark(round, WARN)}: ${mark(holders.length, WARN)} potatoes, held by ${who}.`;
     return language === "es"
-        ? `${WARN}Ronda ${mark(round, WARN)}: la patata la tiene ${mark(holder, WARN)}.`
-        : `${WARN}Round ${mark(round, WARN)}: ${mark(holder, WARN)} has the potato.`;
+        ? `${WARN}Ronda ${mark(round, WARN)}: la patata la tiene ${who}.`
+        : `${WARN}Round ${mark(round, WARN)}: ${who} has the potato.`;
 }
 
 export function passed(from: string, to: string, language: Language): string {
@@ -67,10 +80,11 @@ export function holdingBar(seconds: number, language: Language): string {
         : `${BAD}&lYou have the potato ${REASON}- ${Math.ceil(seconds)}s`;
 }
 
-export function awayBar(holder: string, seconds: number, language: Language): string {
+export function awayBar(holders: readonly string[], seconds: number, language: Language): string {
+    const who = holders.join(", ");
     return language === "es"
-        ? `${GOOD}Aléjate de ${holder} ${INFO}- ${Math.ceil(seconds)} s`
-        : `${GOOD}Keep away from ${holder} ${INFO}- ${Math.ceil(seconds)}s`;
+        ? `${GOOD}Aléjate de ${who} ${INFO}- ${Math.ceil(seconds)} s`
+        : `${GOOD}Keep away from ${who} ${INFO}- ${Math.ceil(seconds)}s`;
 }
 
 export function galleryBar(language: Language): string {
@@ -83,14 +97,14 @@ export function nextRoundBar(language: Language): string {
     return language === "es" ? `${WARN}Siguiente ronda...` : `${WARN}Next round...`;
 }
 
-/** The boss bar: the round and the fuse. */
+/** The boss bar: the round, who holds a potato and the fuse. */
 export function bar(
     round: number,
-    holder: string | null,
+    holders: readonly string[],
     seconds: number,
     language: Language
 ): string {
-    const who = holder ? ` &7- &c${holder}` : "";
+    const who = holders.length > 0 ? ` &7- &c${holders.join("&7, &c")}` : "";
     return language === "es"
         ? `&6Ronda ${round}${who} &7- &f${Math.ceil(seconds)} s`
         : `&6Round ${round}${who} &7- &f${Math.ceil(seconds)}s`;

@@ -237,7 +237,7 @@ describe("SkyWars' loot", () => {
             );
     });
 
-    it("gives every island blocks enough to bridge to the middle, a weapon and food", () => {
+    it("gives every island blocks enough to bridge to the middle, a weapon, food and a whole set of armor", () => {
         for (let seed = 0; seed < 200; seed += 1)
             for (const loot of ["normal", "rich"] as const) {
                 const one = sw.lootFor(`run-${seed}`, 0, 0, false, loot, "minecraft:oak_planks");
@@ -248,22 +248,81 @@ describe("SkyWars' loot", () => {
                 expect(blocks).toBeGreaterThanOrEqual(sw.BRIDGE_BLOCKS);
                 expect(one.some((stack) => stack.id.endsWith("_sword"))).toBe(true);
                 expect(one.some((stack) => /bread|cooked/.test(stack.id))).toBe(true);
-                expect(
-                    two.filter((stack) => /_(helmet|chestplate|leggings|boots)$/.test(stack.id))
-                ).toHaveLength(2);
+                const armor = two
+                    .map((stack) => /_(helmet|chestplate|leggings|boots)$/.exec(stack.id)?.[1])
+                    .filter(Boolean);
+                expect(new Set(armor).size).toBe(4);
+                expect(two.some((stack) => stack.id === "minecraft:bow")).toBe(true);
+                expect(two.some((stack) => stack.id === "minecraft:arrow")).toBe(true);
             }
     });
 
-    it("is richer when rich, and richer still in the middle", () => {
-        const tiers = (loot: "normal" | "rich", middle: boolean) =>
-            Array.from({ length: 200 }, (_, seed) =>
-                sw.lootFor(`run-${seed}`, 0, middle ? 0 : 1, middle, loot, "minecraft:oak_planks")
-            )
-                .flat()
-                .filter((stack) => /diamond|iron/.test(stack.id)).length;
-        expect(tiers("rich", false)).toBeGreaterThan(tiers("normal", false));
-        expect(tiers("normal", true)).toBeGreaterThan(tiers("normal", false));
-        expect(tiers("rich", true)).toBeGreaterThan(tiers("normal", true));
+    it("is the same on every island, so no start is better than another", () => {
+        for (let seed = 0; seed < 50; seed += 1) {
+            const layout = sw.layoutFor(`run-${seed}`, 6);
+            for (const loot of ["normal", "rich"] as const) {
+                const kits = layout.islands
+                    .map((island, index) => ({ island, index }))
+                    .filter(({ island }) => island.spawn)
+                    .map(({ island, index }) =>
+                        island.chests.map((_chest, number) =>
+                            sw
+                                .lootFor(`run-${seed}`, index, number, false, loot, "x")
+                                .map((stack) => `${stack.id}x${stack.count}`)
+                        )
+                    );
+                for (const kit of kits) expect(kit).toEqual(kits[0]);
+            }
+        }
+    });
+
+    it("is richer when rich, and richer still in the middle, each middle chest a different part", () => {
+        const TIERS: Record<string, number> = {
+            wooden: 1,
+            leather: 1,
+            stone: 2,
+            chainmail: 2,
+            golden: 2,
+            iron: 3,
+            diamond: 4
+        };
+        const worth = (stacks: readonly sw.Stack[]) =>
+            stacks.reduce((sum, stack) => {
+                const tier = /^minecraft:([a-z]+)_(sword|helmet|chestplate|leggings|boots)$/.exec(
+                    stack.id
+                );
+                return sum + (tier ? TIERS[tier[1]!]! : 0);
+            }, 0);
+        const best = (stacks: readonly sw.Stack[]) =>
+            Math.max(
+                0,
+                ...stacks.map((stack) => {
+                    const tier =
+                        /^minecraft:([a-z]+)_(sword|helmet|chestplate|leggings|boots)$/.exec(
+                            stack.id
+                        );
+                    return tier ? TIERS[tier[1]!]! : 0;
+                })
+            );
+        for (let seed = 0; seed < 100; seed += 1) {
+            const island = (loot: "normal" | "rich") =>
+                [0, 1].flatMap((chest) =>
+                    sw.lootFor(`run-${seed}`, 0, chest, false, loot, "minecraft:oak_planks")
+                );
+            const middle = (loot: "normal" | "rich") =>
+                [0, 1, 2, 3].map((chest) =>
+                    sw.lootFor(`run-${seed}`, 0, chest, true, loot, "minecraft:oak_planks")
+                );
+            expect(worth(island("rich"))).toBeGreaterThan(worth(island("normal")));
+            for (const loot of ["normal", "rich"] as const) {
+                const chests = middle(loot);
+                expect(worth(chests.flat())).toBeGreaterThan(worth(island(loot)));
+                const keys = chests.map((stacks) => stacks.map((stack) => stack.id).join());
+                expect(new Set(keys).size).toBe(4);
+            }
+            expect(best(middle("rich").flat())).toBeGreaterThan(best(middle("normal").flat()));
+            expect(best(middle("normal").flat())).toBeGreaterThan(best(island("normal")));
+        }
     });
 
     it("is written the way each version reads it, marked, in distinct slots, bridging blocks placeable", () => {
