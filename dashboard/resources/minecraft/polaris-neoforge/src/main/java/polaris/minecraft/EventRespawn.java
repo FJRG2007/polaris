@@ -33,8 +33,13 @@ import net.neoforged.neoforge.event.entity.player.PlayerRespawnPositionEvent;
  * ends ({@code polaris respawn clear <key>}), or the first time they respawn
  * without the tag. {@code polaris respawn list <key>} names who has one, so
  * the dashboard sets it again for whoever came back.
+ *
+ * The game picks the player's own respawn before that event, and a charged
+ * anchor pays a charge for it; {@code RespawnChargeMixin} asks
+ * {@link #redirects} first, so a respawn that goes to the spot instead costs
+ * the anchor nothing.
  */
-final class EventRespawn {
+public final class EventRespawn {
     /** Kept in step with `IN_ARENA` in the dashboard (`kinds/arena.ts`). */
     static final String ARENA_TAG = "pe_arena";
 
@@ -78,6 +83,17 @@ final class EventRespawn {
     /** Gone from the server: their spot with them. */
     static void left(UUID player) {
         spots.remove(player);
+    }
+
+    /** Whether this player's next respawn goes to an event's spot. */
+    public static boolean redirects(ServerPlayer player) {
+        return spotFor(player) != null;
+    }
+
+    private static Spot spotFor(ServerPlayer player) {
+        Spot spot = spots.get(player.getUUID());
+        if (spot == null || !player.getTags().contains(ARENA_TAG)) return null;
+        return player.server.getLevel(spot.level()) == null ? null : spot;
     }
 
     /**

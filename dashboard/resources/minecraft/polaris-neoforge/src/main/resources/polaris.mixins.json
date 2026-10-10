@@ -12,6 +12,7 @@
         "PacketSendMixin",
         "PlayerActionMixin",
         "ResourcePackResponseMixin",
+        "RespawnChargeMixin",
         "SectionBlocksUpdateAccessor",
         "TrackedEntityMixin",
         "ServerLevelMixin"

@@ -129,9 +129,10 @@ Always registered, idle until the dashboard runs one. Console and operators only
 - `polaris respawn set <key> <player> <dimension> <x> <y> <z> <yaw>`, `list <key>`,
   `clear <key>`: where a player in an arena event comes back after a death,
   put into the respawn itself (`PlayerRespawnPositionEvent`, lowest priority),
-  never into their spawn point, so their bed or anchor is untouched. Used only
-  while they carry `pe_arena`; forgotten as they log out or the event clears it
-  (`EventRespawn`).
+  never into their spawn point, so their bed or anchor is untouched, and a
+  charged anchor is not spent on a respawn that goes to the spot
+  (`RespawnChargeMixin`). Used only while they carry `pe_arena`; forgotten as
+  they log out or the event clears it (`EventRespawn`).
 - Hide and seek: while players carry `pe_hider` and `pe_seeker` (or sit in the
   `pe_hs_hide` and `pe_hs_seek` teams), a hider is not
   sent to a seeker farther than 2 blocks without a line of sight (`EventSeek`).
