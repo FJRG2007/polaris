@@ -20,6 +20,8 @@ const HOLIDAYS = id("calendar", 3);
 export function calendarPreferences(): CalendarPreferences {
     return {
         ...DEFAULT_PREFERENCES,
+        // The cities the team is spread across, for the world clock.
+        worldClock: ["America/New_York", "Asia/Tokyo", "Asia/Kolkata", "America/Sao_Paulo"],
         view: "week",
         timezone: "Europe/Madrid",
         dayStart: "09:00",
@@ -101,18 +103,16 @@ interface Draft {
 const WEEKDAYS = [16, 17, 18, 19, 20];
 
 const DRAFTS: readonly Draft[] = [
-    ...WEEKDAYS.map(
-        (day): Draft => ({
-            title: ["Standup", "Daily"],
-            day,
-            from: "09:30",
-            to: "09:45",
-            calendar: WORK,
-            people: 6,
-            recurring: true,
-            conference: true
-        })
-    ),
+    ...WEEKDAYS.map((day): Draft => ({
+        title: ["Standup", "Daily"],
+        day,
+        from: "09:30",
+        to: "09:45",
+        calendar: WORK,
+        people: 6,
+        recurring: true,
+        conference: true
+    })),
     {
         title: ["Sprint planning", "Planificación del sprint"],
         day: 16,
@@ -253,4 +253,14 @@ export function rangeView(ctx: SceneContext, from: string, to: string): RangeVie
         }
     ];
     return { from, to, occurrences, tasks, unreadable: 0, truncated: false };
+}
+
+/** The Time area's own state: no alarm or timer running, so nothing rings. */
+export function clockSnapshot(ctx: SceneContext) {
+    return {
+        alarms: [],
+        timers: [],
+        stopwatch: { startedAt: null, elapsedMs: 0, laps: [] },
+        serverNow: new Date(ctx.now).toISOString()
+    };
 }

@@ -118,14 +118,21 @@ test("covers every screen the README promises", () => {
         "deploy",
         "deploy-logs",
         "drive",
+        "drive-links",
         "mail",
+        "mail-thread",
         "calendar",
+        "calendar-time",
         "games",
         "office",
+        "office-doc",
         "vault",
+        "vault-sends",
         "marketplace",
+        "marketplace-install",
         "launcher",
-        "settings"
+        "settings",
+        "account-security"
     ]) {
         assert.ok(ids.has(id), `no ${id} scene`);
     }

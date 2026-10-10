@@ -12,7 +12,11 @@ import { listHosts } from "@/lib/host-service";
 import { listConnections } from "@/lib/storage-service";
 import { recordAudit } from "@/lib/audit-service";
 import { installApp, listInstalledApps, type InstalledAppView } from "@/lib/apps/install-service";
-import { appInstallInputSchema, NAS_CONNECTION_REQUIRED, type AppInstallInput } from "@/lib/apps/install-schema";
+import {
+    appInstallInputSchema,
+    NAS_CONNECTION_REQUIRED,
+    type AppInstallInput
+} from "@/lib/apps/install-schema";
 import { getTranslations } from "@/lib/i18n/request";
 import { validationMessage } from "@/components/i18n/validation-message";
 
@@ -32,9 +36,10 @@ export interface StorageConnectionOption {
 /** Servers an app can be installed on: the local host plus connected SSH hosts. */
 export async function listInstallTargetsAction(): Promise<InstallTarget[]> {
     const user = await requirePermission("deploy.manage");
-    const hosts = await listHosts(user.id);
+    const [hosts, t] = await Promise.all([listHosts(user.id), getTranslations("marketplace")]);
     return [
-        { id: "local", name: "Local (this server)", kind: "local" },
+        // Named in the reader's language, the way the storage choice beside it is.
+        { id: "local", name: t("wizard.thisServer"), kind: "local" },
         ...hosts.map((host) => ({ id: host.id, name: host.name, kind: "host" as const }))
     ];
 }
@@ -53,7 +58,9 @@ export async function listInstalledAppsAction(): Promise<InstalledAppView[]> {
 }
 
 /** Install a catalog app onto the chosen server with the chosen storage. */
-export async function installAppAction(input: AppInstallInput): Promise<{ error?: string; installedAppId?: string }> {
+export async function installAppAction(
+    input: AppInstallInput
+): Promise<{ error?: string; installedAppId?: string }> {
     const user = await requirePermission("deploy.manage");
     const parsed = appInstallInputSchema.safeParse(input);
     if (!parsed.success) {
@@ -78,6 +85,11 @@ export async function installAppAction(input: AppInstallInput): Promise<{ error?
         revalidatePath(MARKETPLACE_PATH);
         return { installedAppId: result.installedAppId };
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : (await getTranslations("marketplace"))("errors.install") };
+        return {
+            error:
+                caught instanceof Error
+                    ? caught.message
+                    : (await getTranslations("marketplace"))("errors.install")
+        };
     }
 }
