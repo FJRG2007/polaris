@@ -17,6 +17,7 @@ import * as Y from "yjs";
 import * as deck from "@/lib/office/deck";
 import * as tables from "@/lib/office/slide-table";
 import type { SlideChart } from "@/lib/office/slide-chart";
+import * as motion from "@/lib/office/slide-motion";
 import { OFFICE_FIELDS } from "@/lib/office/content";
 import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from "react";
 
@@ -49,6 +50,17 @@ export function themeOf(doc: Y.Doc): Y.Map<string> {
 /** Each slide's own background, keyed by its id. */
 export function backgroundsOf(doc: Y.Doc): Y.Map<string> {
     return doc.getMap<string>(OFFICE_FIELDS.slides.backgrounds);
+}
+
+/** Each slide's transition, keyed by its id - see `motion.readTransition`. */
+export function transitionsOf(doc: Y.Doc): Y.Map<unknown> {
+    return doc.getMap<unknown>(OFFICE_FIELDS.slides.transitions);
+}
+
+/** Each slide's animations, one ordered list keyed by its id - see
+ *  `motion.readAnimations`. */
+export function animationsOf(doc: Y.Doc): Y.Map<unknown> {
+    return doc.getMap<unknown>(OFFICE_FIELDS.slides.animations);
 }
 
 /** What an image box shows: the picture itself, out of the deck's store when it
@@ -116,8 +128,10 @@ export function duplicateSlide(doc: Y.Doc, slideId: string, index: number): stri
         const slides = slidesOf(doc);
         const original = slides.get(index);
         slides.insert(index + 1, [{ id, notes: "" }]);
+        const copies = new Map<string, string>();
         for (const box of deck.boxesOn(slideId, new Map(boxes.entries()))) {
             const copy = crypto.randomUUID();
+            copies.set(box.id, copy);
             boxes.set(deck.boxKey(id, copy), { ...box, id: copy, version: 1 });
         }
         // The notes go with it, as in every deck editor: a copied slide is
@@ -126,6 +140,16 @@ export function duplicateSlide(doc: Y.Doc, slideId: string, index: number): stri
         if (notes) notesOf(doc).set(id, notes);
         const background = deck.readBackground(backgroundsOf(doc).get(slideId));
         if (background) backgroundsOf(doc).set(id, background);
+        // And so do its transition and its animations, pointed at the copies.
+        const transition = motion.readTransition(transitionsOf(doc).get(slideId));
+        if (transition.kind !== "none") transitionsOf(doc).set(id, transition);
+        const animations = motion.readAnimations(animationsOf(doc).get(slideId));
+        if (animations.length > 0) {
+            animationsOf(doc).set(
+                id,
+                motion.remapAnimations(animations, copies, () => crypto.randomUUID())
+            );
+        }
     });
     return id;
 }
@@ -143,6 +167,8 @@ export function removeSlide(doc: Y.Doc, slideId: string): void {
         }
         notesOf(doc).delete(slideId);
         backgroundsOf(doc).delete(slideId);
+        transitionsOf(doc).delete(slideId);
+        animationsOf(doc).delete(slideId);
         dropUnusedImages(doc);
     });
 }
@@ -367,8 +393,59 @@ export function groupBoxes(doc: Y.Doc, slideId: string, boxIds: readonly string[
     return group;
 }
 
+/** Groups taken apart. An animation of a whole group becomes the same
+ *  animation of each box that was in it, so the slide still plays as it did -
+ *  in the same step, as one change. */
 export function ungroupBoxes(doc: Y.Doc, slideId: string, boxIds: readonly string[]): void {
-    updateBoxes(doc, slideId, boxIds, { group: "" });
+    const boxes = onSlide(doc, slideId);
+    const groups = new Set(
+        boxes.filter((box) => boxIds.includes(box.id) && box.group).map((box) => box.group)
+    );
+    change(doc, () => {
+        updateBoxes(doc, slideId, boxIds, { group: "" });
+        let animations = motion.readAnimations(animationsOf(doc).get(slideId));
+        if (animations.length === 0) return;
+        for (const group of groups) {
+            const members = boxes.filter((box) => box.group === group).map((box) => box.id);
+            animations = motion.ungroupAnimations(animations, group, members, () =>
+                crypto.randomUUID()
+            );
+        }
+        animationsOf(doc).set(slideId, animations);
+    });
+}
+
+/** A transition put on slides - one, or all of them at once. */
+export function setTransition(
+    doc: Y.Doc,
+    slideIds: readonly string[],
+    transition: motion.SlideTransition
+): void {
+    change(doc, () => {
+        const map = transitionsOf(doc);
+        for (const id of slideIds) {
+            if (transition.kind === "none") map.delete(id);
+            else map.set(id, { kind: transition.kind, speed: transition.speed });
+        }
+    });
+}
+
+/** A slide's animations, written whole - see `slide-motion.ts` for why. */
+export function setAnimations(
+    doc: Y.Doc,
+    slideId: string,
+    list: readonly motion.SlideAnimation[]
+): void {
+    const now = motion.readAnimations(animationsOf(doc).get(slideId));
+    if (JSON.stringify(now) === JSON.stringify(list)) return;
+    change(doc, () => {
+        if (list.length === 0) animationsOf(doc).delete(slideId);
+        else
+            animationsOf(doc).set(
+                slideId,
+                list.slice(0, motion.ANIMATIONS_MAX).map((one) => ({ ...one }))
+            );
+    });
 }
 
 /** The deck's theme set to one of those offered, or one field of it changed. */
@@ -506,7 +583,9 @@ export function deckUndoManager(doc: Y.Doc): Y.UndoManager {
         notesOf(doc),
         imagesOf(doc),
         themeOf(doc),
-        backgroundsOf(doc)
+        backgroundsOf(doc),
+        transitionsOf(doc),
+        animationsOf(doc)
     ];
     return new Y.UndoManager(scope, {
         trackedOrigins: new Set([LOCAL]),

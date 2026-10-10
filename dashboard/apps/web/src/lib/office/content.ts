@@ -40,14 +40,17 @@ export const OFFICE_FIELDS = {
     sheet: { cells: "cells", shape: "shape" },
     /** A deck: the slides in order, every box keyed by slide and box, each
      *  slide's speaker notes keyed by slide, each picture kept once, the
-     *  deck's theme, and each slide's own background keyed by slide. */
+     *  deck's theme, each slide's own background keyed by slide, and each
+     *  slide's transition and animations keyed by slide. */
     slides: {
         slides: "slides",
         boxes: "boxes",
         notes: "notes",
         images: "images",
         theme: "theme",
-        backgrounds: "backgrounds"
+        backgrounds: "backgrounds",
+        transitions: "transitions",
+        animations: "animations"
     },
     /** A drawing: the elements, and the canvas state around them. */
     diagram: { shapes: "shapes", scene: "scene" },

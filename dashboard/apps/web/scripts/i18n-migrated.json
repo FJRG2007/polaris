@@ -952,6 +952,7 @@
         "web/src/app/(app)/office/p/[id]/design-bar.tsx",
         "web/src/app/(app)/office/p/[id]/format-bar.tsx",
         "web/src/app/(app)/office/p/[id]/insert-menus.tsx",
+        "web/src/app/(app)/office/p/[id]/motion-panel.tsx",
         "web/src/app/(app)/office/p/[id]/notes-panel.tsx",
         "web/src/app/(app)/office/p/[id]/object-controls.tsx",
         "web/src/app/(app)/office/p/[id]/present.tsx",

@@ -420,6 +420,78 @@
             "other": "Other",
             "cancel": "Cancel",
             "save": "Save"
+        },
+        "motion": {
+            "title": "Motion",
+            "play": "Play slide",
+            "stop": "Stop",
+            "close": "Close motion",
+            "transition": "Slide transition",
+            "speed": "Speed",
+            "applyToAll": "Apply to all slides",
+            "animations": "Animations",
+            "add": "Add",
+            "chooseFirst": "Choose something on the slide first",
+            "emptyChoose": "Choose something on the slide, then add an animation to it.",
+            "emptyAdd": "Add an animation to what is chosen.",
+            "group": "Group of {count}",
+            "step": "Click {number}",
+            "earlier": "Play earlier",
+            "later": "Play later",
+            "remove": "Remove animation",
+            "effect": "Effect",
+            "trigger": "Starts",
+            "duration": "Duration (s)",
+            "delay": "Delay (s)",
+            "secondsRange": "Type seconds from {min} to {max}.",
+            "transitions": {
+                "none": "None",
+                "fade": "Fade",
+                "push": "Push",
+                "wipe": "Wipe",
+                "split": "Split",
+                "cover": "Cover",
+                "pull": "Uncover",
+                "circle": "Circle",
+                "zoom": "Zoom",
+                "random": "Random"
+            },
+            "speeds": {
+                "fast": "Fast",
+                "med": "Medium",
+                "slow": "Slow"
+            },
+            "triggers": {
+                "onClick": "On click",
+                "withPrev": "With previous",
+                "afterPrev": "After previous"
+            },
+            "classes": {
+                "entrance": "Entrance",
+                "emphasis": "Emphasis",
+                "exit": "Exit"
+            },
+            "effects": {
+                "appear": "Appear",
+                "fade": "Fade in",
+                "flyIn": "Fly in from bottom",
+                "wipe": "Wipe from bottom",
+                "wipeDown": "Wipe from top",
+                "splitIn": "Split",
+                "bounce": "Bounce",
+                "flipIn": "Flip",
+                "zoom": "Zoom in",
+                "pulse": "Pulse",
+                "spin": "Spin",
+                "grow": "Grow",
+                "teeter": "Teeter",
+                "disappear": "Disappear",
+                "fadeOut": "Fade out",
+                "flyOut": "Fly out to bottom",
+                "wipeOut": "Wipe away",
+                "shrink": "Shrink and turn",
+                "zoomOut": "Zoom out"
+            }
         }
     },
     "positioning": {

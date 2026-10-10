@@ -420,6 +420,78 @@
             "other": "Otros",
             "cancel": "Cancelar",
             "save": "Guardar"
+        },
+        "motion": {
+            "title": "Animación",
+            "play": "Reproducir",
+            "stop": "Detener",
+            "close": "Cerrar panel",
+            "transition": "Transición",
+            "speed": "Ritmo",
+            "applyToAll": "Aplicar a todas",
+            "animations": "Animaciones",
+            "add": "Añadir",
+            "chooseFirst": "Elige antes algo de la diapositiva",
+            "emptyChoose": "Elige algo de la diapositiva y añádele una animación.",
+            "emptyAdd": "Añade una animación a lo elegido.",
+            "group": "Grupo de {count}",
+            "step": "Clic {number}",
+            "earlier": "Antes",
+            "later": "Después",
+            "remove": "Quitar animación",
+            "effect": "Efecto",
+            "trigger": "Empieza",
+            "duration": "Duración (s)",
+            "delay": "Retraso (s)",
+            "secondsRange": "Escribe segundos de {min} a {max}.",
+            "transitions": {
+                "none": "Ninguna",
+                "fade": "Fundido",
+                "push": "Empujar",
+                "wipe": "Barrido",
+                "split": "Dividir",
+                "cover": "Cubrir",
+                "pull": "Descubrir",
+                "circle": "Círculo",
+                "zoom": "Zoom",
+                "random": "Aleatoria"
+            },
+            "speeds": {
+                "fast": "Rápida",
+                "med": "Media",
+                "slow": "Lenta"
+            },
+            "triggers": {
+                "onClick": "Con un clic",
+                "withPrev": "Con la anterior",
+                "afterPrev": "Tras la anterior"
+            },
+            "classes": {
+                "entrance": "Entrada",
+                "emphasis": "Énfasis",
+                "exit": "Salida"
+            },
+            "effects": {
+                "appear": "Aparecer",
+                "fade": "Fundido",
+                "flyIn": "Entrar desde abajo",
+                "wipe": "Barrido desde abajo",
+                "wipeDown": "Barrido de arriba",
+                "splitIn": "Dividir",
+                "bounce": "Rebotar",
+                "flipIn": "Voltear",
+                "zoom": "Acercar",
+                "pulse": "Pulso",
+                "spin": "Girar",
+                "grow": "Crecer",
+                "teeter": "Balancear",
+                "disappear": "Desaparecer",
+                "fadeOut": "Desvanecer",
+                "flyOut": "Salir hacia abajo",
+                "wipeOut": "Barrer",
+                "shrink": "Encoger y girar",
+                "zoomOut": "Alejar"
+            }
         }
     },
     "positioning": {

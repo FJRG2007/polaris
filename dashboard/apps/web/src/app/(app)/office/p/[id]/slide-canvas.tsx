@@ -26,6 +26,7 @@
 import { cn } from "@polaris/ui";
 import * as deck from "@/lib/office/deck";
 import * as tables from "@/lib/office/slide-table";
+import * as motion from "@/lib/office/slide-motion";
 import { ChartArt, fontStack, TableArt, UNITS_H, UNITS_W, type CellEditing } from "./slide-objects";
 import {
     createContext,
@@ -383,13 +384,20 @@ const OUTSIDE_GRIPS_BELOW_PX = 40;
 /** A slide as a picture. Fills the box it is put in, which must be 16:9. */
 export function SlideDrawing({
     boxes,
-    slideId
+    slideId,
+    states
 }: {
     boxes: readonly deck.Box[];
     /** Whose background and theme it is drawn with. */
     slideId: string;
+    /** Where each animated thing is at this moment of a show, keyed by what
+     *  the animation moves (`motion.targetOf`); everything else at rest. */
+    states?: ReadonlyMap<string, motion.MotionState> | null;
 }) {
     const look = useContext(SlideLooks)(slideId);
+    // A group moves as one: turned and scaled about the middle of all of it.
+    const frameOf = (target: string): deck.BoxFrame =>
+        deck.boundsOf(motion.membersOf(target, boxes));
     return (
         <div
             className="pointer-events-none absolute inset-0 select-none [container-type:size]"
@@ -397,19 +405,35 @@ export function SlideDrawing({
             aria-hidden
         >
             <CurrentLook.Provider value={look}>
-                {boxes.map((box) =>
-                    deck.isLine(box) ? (
-                        <LineArt key={box.id} box={box} />
+                {boxes.map((box) => {
+                    let drawn: ReactNode = deck.isLine(box) ? (
+                        <LineArt box={box} />
                     ) : (
                         <div
-                            key={box.id}
                             className={cn("absolute", box.kind === "image" && "overflow-hidden")}
                             style={frameStyle(box)}
                         >
                             <BoxBody box={box} />
                         </div>
-                    )
-                )}
+                    );
+                    if (states && states.size > 0) {
+                        // The box's own animation inside its group's.
+                        const targets = box.group ? [box.id, motion.targetOf(box)] : [box.id];
+                        for (const target of targets) {
+                            const state = states.get(target);
+                            if (!state) continue;
+                            drawn = (
+                                <div
+                                    className="absolute inset-0"
+                                    style={motion.motionStyle(state, frameOf(target))}
+                                >
+                                    {drawn}
+                                </div>
+                            );
+                        }
+                    }
+                    return <Fragment key={box.id}>{drawn}</Fragment>;
+                })}
             </CurrentLook.Provider>
         </div>
     );

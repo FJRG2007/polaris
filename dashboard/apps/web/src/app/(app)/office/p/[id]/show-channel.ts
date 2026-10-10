@@ -14,8 +14,13 @@
 import { z } from "zod";
 
 const message = z.discriminatedUnion("kind", [
-    /** The presenter: this is the slide (one past the last is the end screen). */
-    z.object({ kind: z.literal("at"), at: z.number().int().min(0).max(100_000) }),
+    /** The presenter: this is the slide (one past the last is the end screen),
+     *  and how many of its animation steps have played. */
+    z.object({
+        kind: z.literal("at"),
+        at: z.number().int().min(0).max(100_000),
+        played: z.number().int().min(0).max(100_000).default(0)
+    }),
     /** The presenter: the show is over; the audience window closes. */
     z.object({ kind: z.literal("end") }),
     /** The audience window: it has just opened and wants to know the slide. */

@@ -36,6 +36,8 @@ import { DesignBar, LayoutItems } from "./design-bar";
 import { SlideList } from "./slide-list";
 import { NotesPanel } from "./notes-panel";
 import { PresenterView } from "./presenter";
+import { MotionPanel } from "./motion-panel";
+import { PreviewShow, useDeckMotion } from "./show-stage";
 import { isPicture, readPicture, type PictureRefusal } from "./image-file";
 import { ImageSourceProvider, SlideDrawing, SlideLookProvider, SlideStage } from "./slide-canvas";
 import { useTranslations } from "@/components/i18n/i18n-provider";
@@ -78,6 +80,7 @@ import {
     Redo2,
     Shapes,
     SkipBack,
+    Sparkles,
     Square,
     Squircle,
     Trash2,
@@ -205,6 +208,10 @@ export function SlidesEditor({
         (slideId: string) => deck.lookOf(theme, backgrounds, slideId),
         [theme, backgrounds]
     );
+    const motionOf = useDeckMotion(doc, version, bySlide);
+    /** Whether the motion panel is open, and whether its slide is playing. */
+    const [motionOpen, setMotionOpen] = useState(false);
+    const [previewing, setPreviewing] = useState(false);
     const toast = useToast();
     const picker = useRef<HTMLInputElement | null>(null);
     const [atIndex, setAtIndex] = useState(0);
@@ -245,6 +252,7 @@ export function SlidesEditor({
         setAtIndex(index);
         setChosen([]);
         setEditing("");
+        setPreviewing(false);
     }, []);
 
     /** A new slide after this one - a title and a body, as Ctrl+M makes one in
@@ -711,7 +719,7 @@ export function SlidesEditor({
     return (
         <ImageSourceProvider source={imageSource}>
             <SlideLookProvider lookOf={lookFor}>
-                <div ref={root} className="flex min-h-0 flex-1 max-sm:flex-col">
+                <div ref={root} className="relative flex min-h-0 flex-1 max-sm:flex-col">
                     {/* The slides. A column of them rather than a strip: a deck is
                     read top to bottom in every tool that makes one. */}
                     <SlideList
@@ -934,6 +942,16 @@ export function SlidesEditor({
                                 ) : null}
                             </ScrollRow>
                             <div className="flex shrink-0 items-center gap-1">
+                                <Button
+                                    variant={motionOpen ? "secondary" : "ghost"}
+                                    size="icon"
+                                    aria-label={t("slides.motion.title")}
+                                    title={t("slides.motion.title")}
+                                    aria-pressed={motionOpen}
+                                    onClick={() => setMotionOpen((open) => !open)}
+                                >
+                                    <Sparkles className="size-4 shrink-0" aria-hidden />
+                                </Button>
                                 <ToolButton
                                     label={t("slides.shortcuts")}
                                     onClick={() => setHelpOpen(true)}
@@ -1048,6 +1066,22 @@ export function SlidesEditor({
                                     ) : (
                                         <SlideDrawing boxes={onSlide} slideId={slide?.id ?? ""} />
                                     )}
+                                    {previewing && slide ? (
+                                        // Played over the canvas; a press anywhere on it stops.
+                                        <div
+                                            className="absolute inset-0 z-10 overflow-hidden"
+                                            onPointerDown={() => setPreviewing(false)}
+                                        >
+                                            <PreviewShow
+                                                key={slide.id}
+                                                slides={deckSlides}
+                                                index={at}
+                                                bySlide={bySlide}
+                                                motionOf={motionOf}
+                                                onDone={() => setPreviewing(false)}
+                                            />
+                                        </div>
+                                    ) : null}
                                 </div>
                             </div>
                         </div>
@@ -1066,6 +1100,33 @@ export function SlidesEditor({
                             />
                         ) : null}
                     </div>
+                    {motionOpen && slide ? (
+                        <MotionPanel
+                            slideIds={deckSlides.map((one) => one.id)}
+                            slideId={slide.id}
+                            transition={motionOf(slide.id).transition}
+                            animations={motionOf(slide.id).animations}
+                            boxes={onSlide}
+                            chosen={chosenBoxes}
+                            nameOf={nameOf}
+                            editable={editable}
+                            playing={previewing}
+                            onTransition={(ids, transition) =>
+                                edits.setTransition(doc, ids, transition)
+                            }
+                            onAnimations={(list) => edits.setAnimations(doc, slide.id, list)}
+                            onChoose={(ids) => {
+                                setEditing("");
+                                setChosen(ids);
+                            }}
+                            onPlay={() => setPreviewing(true)}
+                            onStop={() => setPreviewing(false)}
+                            onClose={() => {
+                                setMotionOpen(false);
+                                setPreviewing(false);
+                            }}
+                        />
+                    ) : null}
                 </div>
                 {presenting?.presenter ? (
                     <PresenterView
@@ -1074,6 +1135,7 @@ export function SlidesEditor({
                         slides={deckSlides}
                         bySlide={bySlide}
                         notesOf={notesFor}
+                        motionOf={motionOf}
                         from={presenting.from}
                         onClose={() => setPresenting(null)}
                     />
@@ -1081,6 +1143,7 @@ export function SlidesEditor({
                     <Present
                         slides={deckSlides}
                         bySlide={bySlide}
+                        motionOf={motionOf}
                         from={presenting.from}
                         onClose={() => setPresenting(null)}
                     />
