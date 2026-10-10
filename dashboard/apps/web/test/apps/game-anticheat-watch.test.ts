@@ -74,6 +74,8 @@ interface Player {
     z: number;
     airborne?: boolean;
     riding?: boolean;
+    /** The tag a Polaris event gives whoever it has inside. */
+    tag?: string;
 }
 
 describe("watching movement", () => {
@@ -110,6 +112,14 @@ describe("watching movement", () => {
                 return players
                     .filter((one) => one.airborne)
                     .map(pos)
+                    .join("\n");
+            const tagged = /^execute as @a\[tag=(\w+)\] run data get entity @s Dimension$/.exec(
+                command
+            );
+            if (tagged)
+                return players
+                    .filter((one) => one.tag === tagged[1])
+                    .map((one) => entity(one, '"minecraft:overworld"'))
                     .join("\n");
             if (command === RIDING_COMMAND)
                 return players
@@ -200,6 +210,71 @@ describe("watching movement", () => {
         await look();
         players = [{ name: "Alex", x: 3000, y: 64, z: 0 }];
         await look();
+        // Judged at the next look, once the log has caught up.
+        expect(incidents("Alex")).toEqual([]);
+        await look();
+        expect(incidents("Alex").map((one) => one.kind)).toEqual(["teleport"]);
+    });
+
+    it("does not record a jump whose /tp the log wrote just after the look saw it", async () => {
+        await start();
+        players = [{ name: "Alex", x: 0, y: 64, z: 0 }];
+        await look();
+        await look();
+        const answer = fake.answer;
+        let moved = false;
+        fake.answer = (command) => {
+            // Between the log's length being measured and everybody's position
+            // being read: the old window ended before the line.
+            if (command === "execute as @a run data get entity @s Pos" && !moved) {
+                moved = true;
+                players = [{ name: "Alex", x: 3000, y: 64, z: 0 }];
+                const reply = answer(command);
+                log +=
+                    "[10Oct2026 20:35:56.539] [Server thread/INFO] [net.minecraft.server.MinecraftServer/]: [Rcon: Teleported Alex to 3000.500000, 64.000000, 0.500000]\n";
+                return reply;
+            }
+            return answer(command);
+        };
+        await look();
+        await look();
+        await look();
+        expect(incidents("Alex")).toEqual([]);
+    });
+
+    it("does not record a teleport that waited out a warm-up after its command", async () => {
+        await start();
+        players = [{ name: "Alex", x: 0, y: 64, z: 0 }];
+        await look();
+        await look();
+        log += "[12:00:01] [Server thread/INFO]: Alex issued server command: /home base\n";
+        await look();
+        players = [{ name: "Alex", x: 3000, y: 64, z: 0 }];
+        await look();
+        await look();
+        expect(incidents("Alex")).toEqual([]);
+    });
+
+    it("does not record a Polaris event moving the players inside it, nor sending them back", async () => {
+        // An event's own functions move its players, and the game logs nothing
+        // a function does.
+        await start();
+        players = [{ name: "Alex", x: 0, y: 64, z: 0, tag: "pe_in" }];
+        await look();
+        await look();
+        players = [{ name: "Alex", x: 3000, y: 64, z: 0, tag: "pe_in" }];
+        await look();
+        players = [{ name: "Alex", x: 3000, y: 64, z: 0, tag: "pe_arena" }];
+        await look();
+        // The event ends: the tag is gone by the look that sees them back.
+        players = [{ name: "Alex", x: 0, y: 64, z: 0 }];
+        await look();
+        await look();
+        await look();
+        expect(incidents("Alex")).toEqual([]);
+        players = [{ name: "Alex", x: 6000, y: 64, z: 0 }];
+        await look();
+        await look();
         expect(incidents("Alex").map((one) => one.kind)).toEqual(["teleport"]);
     });
 
@@ -261,6 +336,7 @@ describe("watching movement", () => {
         await look();
         players = [{ name: "Alex", x: 3000, y: 64, z: 0 }];
         await look();
+        await look();
         expect(incidents("Alex").map((one) => one.kind)).toEqual(["teleport"]);
     });
 
@@ -276,6 +352,7 @@ describe("watching movement", () => {
         await vi.advanceTimersByTimeAsync(JOIN_GRACE_MS);
         await look();
         players = [players[0]!, { name: "Alex", x: 6000, y: 64, z: 0 }];
+        await look();
         await look();
         expect(incidents("Alex").map((one) => one.kind)).toEqual(["teleport"]);
     });

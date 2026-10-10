@@ -35,6 +35,8 @@ import { javaComponent } from "./announcement";
 import { timeoutPlayer } from "./timeout-service";
 import { withServerContainer, type ServerContainer } from "./service";
 import { readContainerFile, readContainerRange } from "../container-files";
+import { IN_ARENA as IN_STAGE } from "./events/kinds/stage";
+import { IN_ARENA as IN_EVENT_ARENA } from "./events/kinds/arena";
 
 const { readInstallConfig } = host.appsInstallConfig;
 const { createNotification } = host.notificationService;
@@ -78,6 +80,11 @@ interface Loop {
     moveCounters: boolean;
     /** Who was riding at the last look: a jump is not judged if they were then or now. */
     riding: Set<string>;
+    /** Who was inside a Polaris event at the last look, the same way. */
+    inEvent: Set<string>;
+    /** Jumps seen at the last look, judged at this one against a log that has
+     *  had time to catch up: `from` is where it was read from for that look. */
+    jumps: { name: string; incident: movement.Incident; from: number | null }[];
     /** The operators, lowercased, and whether the game logs their commands -
      *  read once a minute. */
     operators: Set<string>;
@@ -85,6 +92,8 @@ interface Loop {
     lastRules: number;
     /** How long the server log was at the last look, to read only what is new. */
     logSize: number | null;
+    /** And at the look before that. */
+    logBefore: number | null;
 }
 
 const loops = new Map<string, Loop>();
@@ -154,6 +163,7 @@ async function tick(installedAppId: string, loop: Loop): Promise<void> {
     if (!watching) {
         loop.tracks.clear();
         loop.moveLooked = false;
+        loop.jumps = [];
     }
     if (!traps && !watching) {
         if (state.honeypots.length === 0 && state.cleanup.length === 0) stopLoop(installedAppId);
@@ -525,6 +535,10 @@ const LOG_FILE = "/data/logs/latest.log";
 /** The most of the log read for one look. A server that wrote more than this in
  *  a few seconds is being flooded, and the part read is the newest. */
 const LOG_READ_MAX = 256 * 1024;
+/** The tags a player carries while a Polaris event has them: inside a stage
+ *  (races, dropper, maze, parkour) or an arena (duels, sky wars, panels). Its
+ *  own functions move them there, and the game logs nothing a function does. */
+const EVENT_TAGS: readonly string[] = [IN_STAGE, IN_EVENT_ARENA];
 /** Why teleports cannot be judged, for the screen. */
 const NO_ADMIN_LOG = gameMessage("games", "lib.teleportsNoAdminLog");
 const NO_LOG = gameMessage("games", "lib.teleportsNoLog");
@@ -581,8 +595,13 @@ async function watchMovement(
     // Measured before anybody's position, so whatever moved them since the
     // last look is already in the part of the log that is read.
     const logFrom = loop.logSize;
+    const earlier = loop.logBefore;
     const size = await logLength(server);
+    loop.logBefore = logFrom;
     loop.logSize = size;
+    // Where a jump seen now is read from: before the look ahead of the last one,
+    // so a command whose teleport waited out a warm-up still counts.
+    const jumpFrom = logFrom === null || earlier === null ? logFrom : Math.min(logFrom, earlier);
 
     const positions = xray.readPositions(await server.say([xray.WHERE_EVERYBODY_IS[0]!]));
     const dimensions = xray.readDimensions(await server.say([xray.WHERE_EVERYBODY_IS[1]!]));
@@ -592,11 +611,13 @@ async function watchMovement(
             .map((one) => one.name.toLowerCase())
     );
     const riding = namesIn(await server.say([movement.RIDING_COMMAND]));
+    const inEvent = new Set<string>();
+    for (const command of movement.taggedCommands(EVENT_TAGS)) {
+        for (const name of namesIn(await server.say([command]))) inEvent.add(name);
+    }
     const died = await counted(server, movement.DEATH_OBJECTIVE);
     const glided = await counted(server, movement.GLIDE_OBJECTIVE);
 
-    // Read only if some jump needs explaining, and at most once a look.
-    let log: string | null | undefined;
     const teleportCheck =
         loop.logAdmin === false
             ? NO_ADMIN_LOG
@@ -607,7 +628,23 @@ async function watchMovement(
                 : null;
     const judgeTeleports = teleportCheck === null;
 
+    // The jumps the last look saw, against the log from two looks before them up
+    // to the start of this one: a line flushed late, a teleport made just as a
+    // look was taken, or one that waited out a warm-up after its command, is in
+    // it by now. Read only if there are some, and once.
     const found: { name: string; incident: movement.Incident }[] = [];
+    const waiting = loop.jumps;
+    loop.jumps = [];
+    const starts = waiting.flatMap((one) => (one.from === null ? [] : [one.from]));
+    if (judgeTeleports && starts.length > 0) {
+        const log = await logSince(server, Math.min(...starts), size);
+        for (const jump of waiting) {
+            if (log === null || jump.from === null) continue;
+            if (inEvent.has(jump.name.toLowerCase())) continue;
+            if (!movement.explainedByLog(log, jump.name)) found.push(jump);
+        }
+    }
+
     const present = new Set<string>();
     for (const one of positions) {
         const key = one.name.toLowerCase();
@@ -630,28 +667,29 @@ async function watchMovement(
             operator ||
             riding.has(key) ||
             loop.riding.has(key) ||
+            inEvent.has(key) ||
+            loop.inEvent.has(key) ||
             track.diedAt !== null ||
             diedAt !== null ||
             movement.joining(track, now) ||
             glided.has(key);
         if (previous && !excused && judgeTeleports && movement.isTeleport(previous, sample)) {
-            if (log === undefined) log = await logSince(server, logFrom, size);
-            if (log !== null && !movement.explainedByLog(log, one.name)) {
-                found.push({
-                    name: one.name,
-                    incident: movement.incidentAt(
-                        "teleport",
-                        sample,
-                        movement.distanceBetween(previous, sample)
-                    )
-                });
-            }
+            loop.jumps.push({
+                name: one.name,
+                incident: movement.incidentAt(
+                    "teleport",
+                    sample,
+                    movement.distanceBetween(previous, sample)
+                ),
+                from: jumpFrom
+            });
         }
         loop.tracks.set(key, { ...hover.track, last: sample, diedAt });
     }
     loop.moveLooked = true;
     for (const key of [...loop.tracks.keys()]) if (!present.has(key)) loop.tracks.delete(key);
     loop.riding = riding;
+    loop.inEvent = inEvent;
 
     if (found.length === 0 && teleportCheck === state.teleportCheck) return;
     const next = await updateXray(installedAppId, (fresh) => {
@@ -765,10 +803,13 @@ export function startXrayTraps(ownerId: string, installedAppId: string): void {
         moveLooked: false,
         moveCounters: false,
         riding: new Set(),
+        inEvent: new Set(),
+        jumps: [],
         operators: new Set(),
         logAdmin: null,
         lastRules: 0,
-        logSize: null
+        logSize: null,
+        logBefore: null
     };
     loop.timer.unref?.();
     loops.set(installedAppId, loop);

@@ -310,6 +310,36 @@ describe("teleporting", () => {
         ).toBe(true);
     });
 
+    it("is explained by the lines a NeoForge server wrote for its own operators and events", () => {
+        // Copied from a real NeoForge 1.21.4 server's log: Polaris over RCON, an
+        // event's `execute as <player> run tp @s ...`, an operator pulling a
+        // player to them, a command block and a spread.
+        const neo =
+            "[10Oct2026 20:35:56.539] [Server thread/INFO] [net.minecraft.server.MinecraftServer/]: ";
+        for (const [line, name] of [
+            [
+                `${neo}[Rcon: Teleported ErMigue04 to -5385.500000, 152.000000, -2545.500000]`,
+                "ErMigue04"
+            ],
+            [
+                `${neo}[PICHURRINA: Teleported PICHURRINA to -5188.917219, 143.528720, -2513.849984]`,
+                "PICHURRINA"
+            ],
+            [`${neo}[FJRG2007: Teleported Reckmy to FJRG2007]`, "Reckmy"],
+            [`${neo}[FJRG2007: Teleported ErMigue04 to -5644.5, 125.0, -2403.5]`, "ErMigue04"],
+            [`${neo}[@: Teleported Reckmy to 10.5, 70.0, 10.5]`, "Reckmy"],
+            [
+                `${neo}[Rcon: Spread 3 entity/entities around -5487.5, -2544.5 with an average distance of 25.11 block(s) apart]`,
+                "Reckmy"
+            ]
+        ] as const) {
+            expect(explainedByLog(line, name), line).toBe(true);
+        }
+        expect(explainedByLog(`${neo}[FJRG2007: Teleported FJRG2007 to Reckmy]`, "Reckmy")).toBe(
+            false
+        );
+    });
+
     it("reads whether the game logs operators' commands", () => {
         expect(readLogAdmin("Gamerule logAdminCommands is currently set to: true")).toBe(true);
         expect(readLogAdmin("Gamerule logAdminCommands is currently set to: false")).toBe(false);
