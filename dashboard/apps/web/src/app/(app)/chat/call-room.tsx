@@ -1082,7 +1082,13 @@ export function CallRoom({
                               : cn("flex-1", columns)
                     )}
                 >
-                    {offersInline && putAway.map((stage) => offer(stage, "size-full min-h-24"))}
+                    {offersInline &&
+                        putAway.map((stage) =>
+                            offer(
+                                stage,
+                                cn("size-full", (staged || tiles.fit.width === 0) && "min-h-24")
+                            )
+                        )}
                     <Tile
                         stream={call.localStream}
                         name={ownName}
