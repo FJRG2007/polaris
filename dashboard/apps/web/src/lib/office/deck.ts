@@ -18,6 +18,7 @@
  */
 
 import { z } from "zod";
+import { FONT_FAMILIES, type FontFamily } from "@/lib/font-families";
 
 /** What a box on a slide is. Three, deliberately: a deck made of more kinds than
  *  this is a deck nobody finishes - every outline, from a square to an arrow, is
@@ -60,6 +61,17 @@ export const VALIGNS = ["top", "middle", "bottom"] as const;
 /** A box's lines as they are, as bullets, or numbered. */
 export const LISTS = ["none", "bullet", "number"] as const;
 
+/** What a box is to its slide's layout: the title, the line under it, the
+ *  body, or nothing in particular. A title is set in the theme's heading face,
+ *  everything else in its body face, and a layout put on a slide moves the
+ *  boxes that play a part in it into place - Google Slides' placeholders. */
+export const ROLES = ["", "title", "subtitle", "body"] as const;
+
+export type BoxRole = (typeof ROLES)[number];
+
+/** The faces a box may be set in. */
+export const SLIDE_FONTS: readonly FontFamily[] = FONT_FAMILIES;
+
 export interface Box extends BoxFrame {
     readonly id: string;
     readonly kind: BoxKind;
@@ -100,6 +112,13 @@ export interface Box extends BoxFrame {
     /** Where it sits in the stack: higher is drawn over lower. Boxes written
      *  before there was a stack all read 0 and keep the order they were added. */
     readonly z: number;
+    /** Its part in the slide's layout - see `ROLES`. */
+    readonly role: BoxRole;
+    /** The face its words are set in; empty for the theme's. */
+    readonly font: string;
+    /** The group it belongs to, or empty: boxes in one group are chosen,
+     *  moved and arranged together. */
+    readonly group: string;
     /** A source, for an image: inline data, an address, or `image:<id>` - a
      *  picture kept once in the deck's own store (`IMAGE_PREFIX`). */
     readonly src: string;
@@ -196,6 +215,9 @@ export function newBox(kind: BoxKind, id: string, shape: ShapeKind = "rect"): Bo
         flip: false,
         reversed: false,
         z: 0,
+        role: "",
+        font: "",
+        group: "",
         src: "",
         version: 1
     };
@@ -240,7 +262,8 @@ export function titleBox(id: string): Box {
         h: 0.2,
         size: fractionOfPoints(54),
         align: "center",
-        valign: "middle"
+        valign: "middle",
+        role: "title"
     };
 }
 
@@ -302,6 +325,11 @@ export function readBox(raw: unknown): Box {
         flip: one.flip === true,
         reversed: one.reversed === true,
         z: finite(one.z, 0),
+        // The title every slide was given before there were layouts is a
+        // title, though it was never told so.
+        role: oneOf(ROLES, one.role, kind === "text" && one.id === "title" ? "title" : ""),
+        font: oneOf(["", ...SLIDE_FONTS], one.font, ""),
+        group: typeof one.group === "string" ? one.group.slice(0, 64) : "",
         src: typeof one.src === "string" ? one.src : "",
         version: finite(one.version, 1)
     };
@@ -387,28 +415,42 @@ export const ARRANGE = ["front", "forward", "backward", "back"] as const;
 export type Arrange = (typeof ARRANGE)[number];
 
 /**
- * The new places in the stack after box `id` is moved `how`: only the boxes
- * whose place actually changes, so a box already on top brought to the front
- * writes nothing. "Forward" and "backward" step past one neighbour, as in
- * Google Slides.
+ * The new places in the stack after the boxes `ids` - one, or every box
+ * chosen - are moved `how`: only the boxes whose place actually changes, so a
+ * box already on top brought to the front writes nothing. Several boxes keep
+ * their order among themselves. "Forward" and "backward" step each past one
+ * neighbour that is not moving with it, as in Google Slides.
  */
-export function arrange(boxes: readonly Box[], id: string, how: Arrange): Map<string, number> {
-    const order = stackOrder(boxes);
-    const from = order.findIndex((box) => box.id === id);
+export function arrange(
+    boxes: readonly Box[],
+    ids: string | readonly string[],
+    how: Arrange
+): Map<string, number> {
+    const moving = new Set(typeof ids === "string" ? [ids] : ids);
+    let order = stackOrder(boxes);
     const changes = new Map<string, number>();
-    if (from < 0) return changes;
-    const last = order.length - 1;
-    const to =
-        how === "front"
-            ? last
-            : how === "back"
-              ? 0
-              : how === "forward"
-                ? Math.min(last, from + 1)
-                : Math.max(0, from - 1);
-    if (to === from) return changes;
-    const [moving] = order.splice(from, 1);
-    order.splice(to, 0, moving!);
+    if (!order.some((box) => moving.has(box.id))) return changes;
+    if (how === "front" || how === "back") {
+        const chosen = order.filter((box) => moving.has(box.id));
+        const rest = order.filter((box) => !moving.has(box.id));
+        order = how === "front" ? [...rest, ...chosen] : [...chosen, ...rest];
+    } else if (how === "forward") {
+        for (let at = order.length - 2; at >= 0; at -= 1) {
+            if (moving.has(order[at]!.id) && !moving.has(order[at + 1]!.id)) {
+                [order[at], order[at + 1]] = [order[at + 1]!, order[at]!];
+            }
+        }
+    } else {
+        for (let at = 1; at < order.length; at += 1) {
+            if (moving.has(order[at]!.id) && !moving.has(order[at - 1]!.id)) {
+                [order[at], order[at - 1]] = [order[at - 1]!, order[at]!];
+            }
+        }
+    }
+    // Nothing moved: the stack is as it was, so nothing is written - not even
+    // the numbering of boxes that shared a place.
+    const before = stackOrder(boxes);
+    if (order.every((box, at) => box.id === before[at]!.id)) return changes;
     order.forEach((box, at) => {
         if (box.z !== at + 1) changes.set(box.id, at + 1);
     });
@@ -722,7 +764,10 @@ const pastedBox = z.object({
     stroke: pastedColor.optional(),
     strokeWidth: z.number().finite().min(0).max(0.2).optional(),
     flip: z.boolean().optional(),
-    reversed: z.boolean().optional()
+    reversed: z.boolean().optional(),
+    role: z.enum(ROLES).optional(),
+    font: z.enum(["", ...FONT_FAMILIES]).optional(),
+    group: z.string().max(64).optional()
 });
 
 const pastedBoxes = z.object({ boxes: z.array(pastedBox).min(1).max(500) });
@@ -757,7 +802,10 @@ export function writeClipboard(
             stroke: box.stroke,
             strokeWidth: box.strokeWidth,
             flip: box.flip,
-            reversed: box.reversed
+            reversed: box.reversed,
+            role: box.role,
+            font: box.font,
+            group: box.group
         }))
     });
 }
@@ -779,8 +827,625 @@ export function readClipboard(raw: string, newId: () => string): Box[] {
     }
     const read = pastedBoxes.safeParse(parsed);
     if (!read.success) return [];
+    // A pasted group is a group again, of the copies - never one with the
+    // boxes it was copied from.
+    const groups = new Map<string, string>();
+    const regroup = (group: string | undefined): string => {
+        if (!group) return "";
+        if (!groups.has(group)) groups.set(group, newId());
+        return groups.get(group)!;
+    };
     return read.data.boxes.map((one) => {
-        const box = readBox({ ...one, id: newId(), version: 1, z: 0 });
+        const box = readBox({
+            ...one,
+            id: newId(),
+            version: 1,
+            z: 0,
+            group: regroup(one.group)
+        });
         return { ...box, ...clampFrame(box, smallestFor(box)) };
     });
+}
+// ---------------------------------------------------------------------------
+// Themes and backgrounds
+// ---------------------------------------------------------------------------
+
+/** A deck's look: the colour of its slides, the colour and faces of its
+ *  words, and the colour a new shape is filled with. */
+export interface DeckTheme {
+    readonly background: string;
+    readonly text: string;
+    readonly accent: string;
+    readonly headingFont: FontFamily;
+    readonly bodyFont: FontFamily;
+}
+
+/** The themes on offer, plainest first - a handful, each a colour set and a
+ *  pair of faces, the way Google Slides' theme panel starts. */
+export const THEMES = {
+    light: {
+        background: "#ffffff",
+        text: "#1f2328",
+        accent: "#7c5cff",
+        headingFont: "Arial",
+        bodyFont: "Arial"
+    },
+    dark: {
+        background: "#1f2328",
+        text: "#f5f6f7",
+        accent: "#a78bfa",
+        headingFont: "Arial",
+        bodyFont: "Arial"
+    },
+    paper: {
+        background: "#fbf8f1",
+        text: "#2b2622",
+        accent: "#b4532a",
+        headingFont: "Georgia",
+        bodyFont: "Georgia"
+    },
+    ocean: {
+        background: "#0b3954",
+        text: "#ffffff",
+        accent: "#4cc9f0",
+        headingFont: "Trebuchet MS",
+        bodyFont: "Verdana"
+    },
+    forest: {
+        background: "#f1f7ee",
+        text: "#1e3a26",
+        accent: "#2f855a",
+        headingFont: "Georgia",
+        bodyFont: "Verdana"
+    },
+    sunset: {
+        background: "#fff4e6",
+        text: "#3d1f0f",
+        accent: "#e8590c",
+        headingFont: "Trebuchet MS",
+        bodyFont: "Arial"
+    },
+    typewriter: {
+        background: "#ffffff",
+        text: "#111111",
+        accent: "#111111",
+        headingFont: "Courier New",
+        bodyFont: "Courier New"
+    }
+} as const satisfies Record<string, DeckTheme>;
+
+export type ThemeId = keyof typeof THEMES;
+
+export const THEME_IDS = Object.keys(THEMES) as ThemeId[];
+
+/** A deck that never chose a theme: white slides and dark words, whatever the
+ *  screen around them looks like - a slide is paper, not part of the app. */
+export const DEFAULT_THEME: DeckTheme = THEMES.light;
+
+/** The fields of the theme, as the deck stores them. */
+export const THEME_FIELDS = ["background", "text", "accent", "headingFont", "bodyFont"] as const;
+
+function solid(value: unknown, fallback: string): string {
+    return typeof value === "string" && HEX.test(value) ? value : fallback;
+}
+
+/** A deck's theme as stored, each field checked and any missing one the
+ *  default's - so a deck from before themes is white. */
+export function readTheme(stored: ReadonlyMap<string, unknown>): DeckTheme {
+    return {
+        background: solid(stored.get("background"), DEFAULT_THEME.background),
+        text: solid(stored.get("text"), DEFAULT_THEME.text),
+        accent: solid(stored.get("accent"), DEFAULT_THEME.accent),
+        headingFont: oneOf(SLIDE_FONTS, stored.get("headingFont"), DEFAULT_THEME.headingFont),
+        bodyFont: oneOf(SLIDE_FONTS, stored.get("bodyFont"), DEFAULT_THEME.bodyFont)
+    };
+}
+
+/** Which offered theme a deck's colours are, if they are exactly one of them;
+ *  the faces may have been changed since. */
+export function themeIdOf(theme: DeckTheme): ThemeId | null {
+    return (
+        THEME_IDS.find((id) =>
+            (["background", "text", "accent"] as const).every(
+                (field) => THEMES[id][field] === theme[field]
+            )
+        ) ?? null
+    );
+}
+
+/** What one slide is drawn with: the theme, and its own background if it was
+ *  given one. */
+export interface SlideLook {
+    readonly background: string;
+    readonly text: string;
+    readonly headingFont: string;
+    readonly bodyFont: string;
+}
+
+export const DEFAULT_LOOK: SlideLook = {
+    background: DEFAULT_THEME.background,
+    text: DEFAULT_THEME.text,
+    headingFont: DEFAULT_THEME.headingFont,
+    bodyFont: DEFAULT_THEME.bodyFont
+};
+
+export function lookOf(
+    theme: DeckTheme,
+    backgrounds: ReadonlyMap<string, unknown>,
+    slideId: string
+): SlideLook {
+    return {
+        background: solid(backgrounds.get(slideId), theme.background),
+        text: theme.text,
+        headingFont: theme.headingFont,
+        bodyFont: theme.bodyFont
+    };
+}
+
+/** Whether a slide was given a background of its own. */
+export function hasOwnBackground(
+    backgrounds: ReadonlyMap<string, unknown>,
+    slideId: string
+): boolean {
+    return solid(backgrounds.get(slideId), "") !== "";
+}
+
+/** A colour a slide's background may be set to: a solid hex, nothing else. */
+export function readBackground(value: unknown): string | null {
+    const kept = solid(value, "");
+    return kept || null;
+}
+
+/** The face a box's words are set in: its own, or the theme's for its part. */
+export function fontOf(box: Pick<Box, "font" | "role">, look: SlideLook): string {
+    if (box.font) return box.font;
+    return box.role === "title" ? look.headingFont : look.bodyFont;
+}
+
+// ---------------------------------------------------------------------------
+// Layouts
+// ---------------------------------------------------------------------------
+
+/** Where the boxes of a new slide go - Google Slides' and PowerPoint's own
+ *  first six. */
+export const LAYOUTS = [
+    "title",
+    "titleBody",
+    "twoColumns",
+    "section",
+    "titleOnly",
+    "blank"
+] as const;
+
+export type Layout = (typeof LAYOUTS)[number];
+
+/** What a new slide is laid out as when nothing says otherwise: a title and a
+ *  body, as Ctrl+M makes one in Google Slides. */
+export const NEXT_LAYOUT: Layout = "titleBody";
+
+interface Place {
+    readonly id: string;
+    readonly role: BoxRole;
+    readonly frame: BoxFrame;
+    readonly points: number;
+    readonly align: Box["align"];
+    readonly valign: Box["valign"];
+    readonly list?: Box["list"];
+}
+
+function placeholder(place: Place): Box {
+    return {
+        ...newBox("text", place.id),
+        ...place.frame,
+        role: place.role,
+        size: fractionOfPoints(place.points),
+        align: place.align,
+        valign: place.valign,
+        list: place.list ?? "none"
+    };
+}
+
+const HEADER: BoxFrame = { x: 0.06, y: 0.06, w: 0.88, h: 0.16 };
+
+const TITLE_TOP: Place = {
+    id: "title",
+    role: "title",
+    frame: HEADER,
+    points: 40,
+    align: "left",
+    valign: "middle"
+};
+
+function body(id: string, frame: BoxFrame, points: number): Place {
+    return { id, role: "body", frame, points, align: "left", valign: "top", list: "bullet" };
+}
+
+const PLACES: Readonly<Record<Layout, readonly Place[]>> = {
+    title: [
+        {
+            id: "title",
+            role: "title",
+            frame: { x: 0.08, y: 0.28, w: 0.84, h: 0.24 },
+            points: 54,
+            align: "center",
+            valign: "bottom"
+        },
+        {
+            id: "subtitle",
+            role: "subtitle",
+            frame: { x: 0.08, y: 0.54, w: 0.84, h: 0.14 },
+            points: 24,
+            align: "center",
+            valign: "top"
+        }
+    ],
+    titleBody: [TITLE_TOP, body("body", { x: 0.06, y: 0.26, w: 0.88, h: 0.66 }, 24)],
+    twoColumns: [
+        TITLE_TOP,
+        body("body", { x: 0.06, y: 0.26, w: 0.43, h: 0.66 }, 22),
+        body("body2", { x: 0.51, y: 0.26, w: 0.43, h: 0.66 }, 22)
+    ],
+    section: [
+        {
+            id: "title",
+            role: "title",
+            frame: { x: 0.08, y: 0.36, w: 0.84, h: 0.28 },
+            points: 48,
+            align: "center",
+            valign: "middle"
+        }
+    ],
+    titleOnly: [TITLE_TOP],
+    blank: []
+};
+
+/** The boxes a slide laid out as `layout` starts with: empty, each saying what
+ *  it is for until something is typed into it. */
+export function layoutBoxes(layout: Layout): Box[] {
+    return PLACES[layout].map((place, at) => ({ ...placeholder(place), z: at + 1 }));
+}
+
+/** What putting a layout on a slide that already has boxes changes. */
+export interface LayoutChange {
+    /** Boxes to write: placeholders moved into place, and new ones. */
+    readonly set: readonly Box[];
+    /** Boxes to remove: empty placeholders the layout has no place for. */
+    readonly remove: readonly string[];
+}
+
+/**
+ * A layout put on a slide that has things on it already.
+ *
+ * As in Google Slides: a box that plays a part the layout has a place for -
+ * the title, a body - moves into that place and keeps its words; a part the
+ * slide is missing is added, empty; an empty part the layout has no place for
+ * goes; anything else on the slide - a picture, a shape, a box with words the
+ * layout has no place for - stays exactly where it is.
+ */
+export function applyLayout(
+    boxes: readonly Box[],
+    layout: Layout,
+    newId: () => string
+): LayoutChange {
+    const waiting = new Map<BoxRole, Box[]>();
+    for (const box of stackOrder(boxes)) {
+        if (!box.role) continue;
+        waiting.set(box.role, [...(waiting.get(box.role) ?? []), box]);
+    }
+    const taken = new Set(boxes.map((box) => box.id));
+    const set: Box[] = [];
+    let z = nextZ(boxes);
+    for (const place of PLACES[layout]) {
+        const existing = waiting.get(place.role)?.shift();
+        if (existing) {
+            set.push({ ...existing, ...place.frame, version: existing.version + 1 });
+            continue;
+        }
+        const id = taken.has(place.id) ? newId() : place.id;
+        taken.add(id);
+        set.push({ ...placeholder({ ...place, id }), z });
+        z += 1;
+    }
+    const remove: string[] = [];
+    for (const left of waiting.values()) {
+        for (const box of left) {
+            if (box.text.trim()) set.push({ ...box, role: "", version: box.version + 1 });
+            else remove.push(box.id);
+        }
+    }
+    return { set, remove };
+}
+
+// ---------------------------------------------------------------------------
+// Several boxes at once
+// ---------------------------------------------------------------------------
+
+/** The smallest frame round every frame given. */
+export function boundsOf(frames: readonly BoxFrame[]): BoxFrame {
+    if (frames.length === 0) return { x: 0, y: 0, w: 0, h: 0 };
+    const left = Math.min(...frames.map((one) => one.x));
+    const top = Math.min(...frames.map((one) => one.y));
+    const right = Math.max(...frames.map((one) => one.x + one.w));
+    const bottom = Math.max(...frames.map((one) => one.y + one.h));
+    return { x: left, y: top, w: right - left, h: bottom - top };
+}
+
+/** The box `id` and every box grouped with it: what one click chooses. */
+export function unitOf(boxes: readonly Box[], id: string): string[] {
+    const box = boxes.find((one) => one.id === id);
+    if (!box) return [];
+    if (!box.group) return [box.id];
+    return boxes.filter((one) => one.group === box.group).map((one) => one.id);
+}
+
+/** Chosen boxes as the things they move as: each group whole, each box on its
+ *  own otherwise - what lining up and spacing out treat as one. */
+export function unitsOf(chosen: readonly Box[]): { ids: string[]; frame: BoxFrame }[] {
+    const units = new Map<string, Box[]>();
+    for (const box of chosen) {
+        const key = box.group ? `group:${box.group}` : `box:${box.id}`;
+        units.set(key, [...(units.get(key) ?? []), box]);
+    }
+    return [...units.values()].map((members) => ({
+        ids: members.map((box) => box.id),
+        frame: boundsOf(members)
+    }));
+}
+
+/** Whether the chosen boxes can be grouped: two things or more, which are not
+ *  already one group. */
+export function canGroup(chosen: readonly Box[]): boolean {
+    return unitsOf(chosen).length >= 2;
+}
+
+export function canUngroup(chosen: readonly Box[]): boolean {
+    return chosen.some((box) => box.group !== "");
+}
+
+/** The six ways boxes line up, as the Arrange menu names them. */
+export const ALIGN_BOXES = ["left", "center", "right", "top", "middle", "bottom"] as const;
+
+export type AlignBoxes = (typeof ALIGN_BOXES)[number];
+
+function shifted(frame: BoxFrame, dx: number, dy: number): BoxFrame {
+    return { x: frame.x + dx, y: frame.y + dy, w: frame.w, h: frame.h };
+}
+
+/**
+ * Where chosen boxes go when they are lined up `how`.
+ *
+ * Several things line up with each other - with the edge or the middle of the
+ * frame round them all; one thing on its own lines up with the slide, as in
+ * Google Slides and PowerPoint. A group is one thing and moves whole. Only the
+ * boxes that actually move are in the answer.
+ */
+export function alignBoxes(chosen: readonly Box[], how: AlignBoxes): Map<string, BoxFrame> {
+    const units = unitsOf(chosen);
+    const to = units.length === 1 ? { x: 0, y: 0, w: 1, h: 1 } : boundsOf(chosen);
+    const out = new Map<string, BoxFrame>();
+    for (const unit of units) {
+        const { frame } = unit;
+        const dx =
+            how === "left"
+                ? to.x - frame.x
+                : how === "center"
+                  ? to.x + to.w / 2 - (frame.x + frame.w / 2)
+                  : how === "right"
+                    ? to.x + to.w - (frame.x + frame.w)
+                    : 0;
+        const dy =
+            how === "top"
+                ? to.y - frame.y
+                : how === "middle"
+                  ? to.y + to.h / 2 - (frame.y + frame.h / 2)
+                  : how === "bottom"
+                    ? to.y + to.h - (frame.y + frame.h)
+                    : 0;
+        if (Math.abs(dx) < 1e-9 && Math.abs(dy) < 1e-9) continue;
+        for (const box of chosen) {
+            if (unit.ids.includes(box.id)) out.set(box.id, shifted(box, dx, dy));
+        }
+    }
+    return out;
+}
+
+/** Whether the chosen boxes can be spaced out: three things or more. */
+export function canDistribute(chosen: readonly Box[]): boolean {
+    return unitsOf(chosen).length >= 3;
+}
+
+/**
+ * Where chosen boxes go when they are spaced evenly across (`x`) or down
+ * (`y`): the first and the last stay, and every gap between neighbours
+ * becomes the same.
+ */
+export function distributeBoxes(chosen: readonly Box[], axis: "x" | "y"): Map<string, BoxFrame> {
+    const out = new Map<string, BoxFrame>();
+    const units = unitsOf(chosen);
+    if (units.length < 3) return out;
+    const start = (frame: BoxFrame): number => (axis === "x" ? frame.x : frame.y);
+    const length = (frame: BoxFrame): number => (axis === "x" ? frame.w : frame.h);
+    units.sort((left, right) => start(left.frame) - start(right.frame));
+    const first = units[0]!.frame;
+    const last = units[units.length - 1]!.frame;
+    const span = start(last) + length(last) - start(first);
+    const filled = units.reduce((sum, unit) => sum + length(unit.frame), 0);
+    const gap = (span - filled) / (units.length - 1);
+    let at = start(first);
+    for (const unit of units) {
+        const move = at - start(unit.frame);
+        at += length(unit.frame) + gap;
+        if (Math.abs(move) < 1e-9) continue;
+        for (const box of chosen) {
+            if (!unit.ids.includes(box.id)) continue;
+            out.set(box.id, axis === "x" ? shifted(box, move, 0) : shifted(box, 0, move));
+        }
+    }
+    return out;
+}
+
+/** A frame inside `from`, put in the same place inside `to` - each chosen box
+ *  when the frame round them all is resized. */
+export function scaleInto(frame: BoxFrame, from: BoxFrame, to: BoxFrame): BoxFrame {
+    const sx = from.w > 0 ? to.w / from.w : 1;
+    const sy = from.h > 0 ? to.h / from.h : 1;
+    return {
+        x: to.x + (frame.x - from.x) * sx,
+        y: to.y + (frame.y - from.y) * sy,
+        w: frame.w * sx,
+        h: frame.h * sy
+    };
+}
+
+/** Whether a frame lies wholly inside another. */
+export function within(frame: BoxFrame, area: BoxFrame): boolean {
+    const slack = 1e-9;
+    return (
+        frame.x >= area.x - slack &&
+        frame.y >= area.y - slack &&
+        frame.x + frame.w <= area.x + area.w + slack &&
+        frame.y + frame.h <= area.y + area.h + slack
+    );
+}
+
+/** The boxes a selection rectangle drawn over `area` picks up: those wholly
+ *  inside it, as in Google Slides, and a group only when all of it is. */
+export function inArea(boxes: readonly Box[], area: BoxFrame): string[] {
+    const inside = new Set(boxes.filter((box) => within(box, area)).map((box) => box.id));
+    return boxes
+        .filter(
+            (box) =>
+                inside.has(box.id) &&
+                (!box.group ||
+                    boxes.every((other) => other.group !== box.group || inside.has(other.id)))
+        )
+        .map((box) => box.id);
+}
+
+// ---------------------------------------------------------------------------
+// Snapping
+// ---------------------------------------------------------------------------
+
+/** How close, in pixels, an edge or a middle must come to another before it
+ *  snaps to it - Excalidraw's distance, and about Google Slides'. */
+export const SNAP_PX = 8;
+
+/** A line a box snapped to: across (`x`, an upright line at that x) or down
+ *  (`y`, a level line at that y). */
+export interface Guide {
+    readonly axis: "x" | "y";
+    readonly at: number;
+}
+
+/** What a moving box may snap to. */
+export interface SnapTargets {
+    readonly xs: readonly number[];
+    readonly ys: readonly number[];
+}
+
+/** The slide's edges and middle, and the edges and middles of every other box
+ *  on it. */
+export function snapTargets(others: readonly BoxFrame[]): SnapTargets {
+    const xs = [0, 0.5, 1];
+    const ys = [0, 0.5, 1];
+    for (const one of others) {
+        xs.push(one.x, one.x + one.w / 2, one.x + one.w);
+        ys.push(one.y, one.y + one.h / 2, one.y + one.h);
+    }
+    return { xs, ys };
+}
+
+/** How far to move so the nearest of `points` lands on a target within
+ *  `tolerance`, or null when none is that close. */
+function nearest(
+    points: readonly number[],
+    targets: readonly number[],
+    tolerance: number
+): number | null {
+    let best: number | null = null;
+    for (const point of points) {
+        for (const target of targets) {
+            const move = target - point;
+            if (Math.abs(move) <= tolerance && (best === null || Math.abs(move) < Math.abs(best)))
+                best = move;
+        }
+    }
+    return best;
+}
+
+/** The guides to draw once a frame has snapped: every target one of its edges
+ *  or its middle now sits exactly on. */
+function guidesFor(frame: BoxFrame, targets: SnapTargets, across: boolean, down: boolean): Guide[] {
+    const on = (value: number, list: readonly number[]): boolean =>
+        list.some((target) => Math.abs(target - value) < 1e-6);
+    const guides: Guide[] = [];
+    if (across) {
+        for (const x of [frame.x, frame.x + frame.w / 2, frame.x + frame.w])
+            if (on(x, targets.xs)) guides.push({ axis: "x", at: x });
+    }
+    if (down) {
+        for (const y of [frame.y, frame.y + frame.h / 2, frame.y + frame.h])
+            if (on(y, targets.ys)) guides.push({ axis: "y", at: y });
+    }
+    return guides;
+}
+
+/**
+ * A frame being dragged, pulled onto the nearest target within `tolerance`
+ * (fractions of the slide, across and down) - its left edge, middle or right
+ * edge onto one across, its top, middle or bottom onto one down - and the
+ * guides that show what it snapped to.
+ */
+export function snapMove(
+    frame: BoxFrame,
+    targets: SnapTargets,
+    tolerance: { x: number; y: number }
+): { frame: BoxFrame; guides: Guide[] } {
+    const dx = nearest(
+        [frame.x, frame.x + frame.w / 2, frame.x + frame.w],
+        targets.xs,
+        tolerance.x
+    );
+    const dy = nearest(
+        [frame.y, frame.y + frame.h / 2, frame.y + frame.h],
+        targets.ys,
+        tolerance.y
+    );
+    const snapped = shifted(frame, dx ?? 0, dy ?? 0);
+    return { frame: snapped, guides: guidesFor(snapped, targets, dx !== null, dy !== null) };
+}
+
+/** A frame being resized by `handle`, its moving edges pulled onto the nearest
+ *  target within `tolerance`; the edges that are not moving stay put. */
+export function snapResize(
+    frame: BoxFrame,
+    handle: Handle,
+    targets: SnapTargets,
+    tolerance: { x: number; y: number }
+): { frame: BoxFrame; guides: Guide[] } {
+    let { x, y, w, h } = frame;
+    let across = false;
+    let down = false;
+    if (handle.endsWith("e") || handle.endsWith("w")) {
+        const east = handle.endsWith("e");
+        const move = nearest([east ? x + w : x], targets.xs, tolerance.x);
+        const next = move === null ? w : east ? w + move : w - move;
+        if (move !== null && next >= SMALLEST) {
+            if (!east) x += move;
+            w = next;
+            across = true;
+        }
+    }
+    if (handle.startsWith("n") || handle.startsWith("s")) {
+        const south = handle.startsWith("s");
+        const move = nearest([south ? y + h : y], targets.ys, tolerance.y);
+        const next = move === null ? h : south ? h + move : h - move;
+        if (move !== null && next >= SMALLEST) {
+            if (!south) y += move;
+            h = next;
+            down = true;
+        }
+    }
+    const snapped = { x, y, w, h };
+    return { frame: snapped, guides: guidesFor(snapped, targets, across, down) };
 }

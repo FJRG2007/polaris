@@ -207,7 +207,10 @@
                 "bringForward": "Traer adelante",
                 "sendBackward": "Enviar atrás",
                 "bringToFront": "Traer al frente",
-                "sendToBack": "Enviar al fondo"
+                "sendToBack": "Enviar al fondo",
+                "selectAll": "Elegir todo lo de la diapositiva",
+                "group": "Agrupar los elegidos",
+                "ungroup": "Desagrupar los elegidos"
             },
             "slideList": {
                 "previous": "Ir a la diapositiva anterior",

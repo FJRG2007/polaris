@@ -207,7 +207,10 @@
                 "bringForward": "Bring forward",
                 "sendBackward": "Send backward",
                 "bringToFront": "Bring to front",
-                "sendToBack": "Send to back"
+                "sendToBack": "Send to back",
+                "selectAll": "Select everything on the slide",
+                "group": "Group the chosen boxes",
+                "ungroup": "Ungroup the chosen boxes"
             },
             "slideList": {
                 "previous": "Go to the previous slide",

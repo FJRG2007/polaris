@@ -39,6 +39,16 @@ export function imagesOf(doc: Y.Doc): Y.Map<string> {
     return doc.getMap<string>(OFFICE_FIELDS.slides.images);
 }
 
+/** The deck's theme, a field at a time - see `deck.readTheme`. */
+export function themeOf(doc: Y.Doc): Y.Map<string> {
+    return doc.getMap<string>(OFFICE_FIELDS.slides.theme);
+}
+
+/** Each slide's own background, keyed by its id. */
+export function backgroundsOf(doc: Y.Doc): Y.Map<string> {
+    return doc.getMap<string>(OFFICE_FIELDS.slides.backgrounds);
+}
+
 /** What an image box shows: the picture itself, out of the deck's store when it
  *  is kept there. */
 export function imageSource(doc: Y.Doc, src: string): string {
@@ -70,15 +80,31 @@ function change(doc: Y.Doc, edit: () => void): void {
     doc.transact(edit, LOCAL);
 }
 
-export function addSlide(doc: Y.Doc, at: number): string {
+/** A new slide at `at`, laid out as `layout` - or, with none given, with the
+ *  one title every slide had before there were layouts. */
+export function addSlide(doc: Y.Doc, at: number, layout?: deck.Layout): string {
     const id = crypto.randomUUID();
     change(doc, () => {
         slidesOf(doc).insert(at, [{ id, notes: "" }]);
-        // Never a blank rectangle: a slide with nothing on it and no obvious
-        // way in is where a deck stops being made.
-        boxesOf(doc).set(deck.boxKey(id, "title"), deck.titleBox("title"));
+        // Never a blank rectangle, unless one was asked for: a slide with
+        // nothing on it and no obvious way in is where a deck stops being made.
+        const boxes = layout ? deck.layoutBoxes(layout) : [deck.titleBox("title")];
+        for (const box of boxes) boxesOf(doc).set(deck.boxKey(id, box.id), box);
     });
     return id;
+}
+
+/** A layout put on a slide that already has boxes - see `deck.applyLayout`. */
+export function applyLayout(doc: Y.Doc, slideId: string, layout: deck.Layout): void {
+    const { set, remove } = deck.applyLayout(onSlide(doc, slideId), layout, () =>
+        crypto.randomUUID()
+    );
+    if (set.length === 0 && remove.length === 0) return;
+    change(doc, () => {
+        const map = boxesOf(doc);
+        for (const box of set) map.set(deck.boxKey(slideId, box.id), box);
+        for (const id of remove) map.delete(deck.boxKey(slideId, id));
+    });
 }
 
 export function duplicateSlide(doc: Y.Doc, slideId: string, index: number): string {
@@ -96,6 +122,8 @@ export function duplicateSlide(doc: Y.Doc, slideId: string, index: number): stri
         // usually the same point made again.
         const notes = original ? deck.notesOf(original, new Map(notesOf(doc).entries())) : "";
         if (notes) notesOf(doc).set(id, notes);
+        const background = deck.readBackground(backgroundsOf(doc).get(slideId));
+        if (background) backgroundsOf(doc).set(id, background);
     });
     return id;
 }
@@ -112,6 +140,7 @@ export function removeSlide(doc: Y.Doc, slideId: string): void {
             if (deck.readBoxKey(key)?.slideId === slideId) boxes.delete(key);
         }
         notesOf(doc).delete(slideId);
+        backgroundsOf(doc).delete(slideId);
         dropUnusedImages(doc);
     });
 }
@@ -145,7 +174,19 @@ export function addBox(
     kind: deck.BoxKind,
     shape?: deck.ShapeKind
 ): string {
-    const box = deck.newBox(kind, crypto.randomUUID(), shape);
+    const made = deck.newBox(kind, crypto.randomUUID(), shape);
+    // In the theme's colours, as Google Slides fills a new shape with the
+    // theme's accent: violet on a white deck, the theme's own on any other.
+    const theme = deck.readTheme(new Map(themeOf(doc).entries()));
+    const box =
+        made.kind !== "shape"
+            ? made
+            : deck.isLine(made)
+              ? {
+                    ...made,
+                    stroke: theme.text === deck.DEFAULT_THEME.text ? made.stroke : theme.text
+                }
+              : { ...made, fill: theme.accent };
     placeBoxes(doc, slideId, [box]);
     return box.id;
 }
@@ -200,9 +241,14 @@ export function pasteBoxes(doc: Y.Doc, slideId: string, boxes: readonly deck.Box
     });
 }
 
-/** A box moved through the stack - one step, however many boxes it passes. */
-export function arrangeBox(doc: Y.Doc, slideId: string, boxId: string, how: deck.Arrange): void {
-    const changes = deck.arrange(onSlide(doc, slideId), boxId, how);
+/** Boxes moved through the stack - one step, however many boxes they pass. */
+export function arrangeBox(
+    doc: Y.Doc,
+    slideId: string,
+    boxIds: string | readonly string[],
+    how: deck.Arrange
+): void {
+    const changes = deck.arrange(onSlide(doc, slideId), boxIds, how);
     if (changes.size === 0) return;
     change(doc, () => {
         const map = boxesOf(doc);
@@ -211,6 +257,100 @@ export function arrangeBox(doc: Y.Doc, slideId: string, boxId: string, how: deck
             const box = map.get(key);
             if (box) map.set(key, { ...box, z, version: deck.readBox(box).version + 1 });
         }
+    });
+}
+
+/** Several boxes changed at once - lined up, spaced out, resized together -
+ *  as one step, each kept on the slide. */
+export function setFrames(
+    doc: Y.Doc,
+    slideId: string,
+    frames: ReadonlyMap<string, deck.BoxFrame & { flip?: boolean; reversed?: boolean }>
+): void {
+    if (frames.size === 0) return;
+    change(doc, () => {
+        for (const [id, frame] of frames) setFrame(doc, slideId, id, frame);
+    });
+}
+
+/** The same change to several boxes, as one step - each given only the fields
+ *  that mean something on it (`fits`). */
+export function updateBoxes(
+    doc: Y.Doc,
+    slideId: string,
+    boxIds: readonly string[],
+    patch: Partial<Omit<deck.Box, "id" | "version" | "kind">>,
+    fits: (box: deck.Box, field: keyof deck.Box) => boolean = () => true
+): void {
+    const map = boxesOf(doc);
+    change(doc, () => {
+        for (const id of boxIds) {
+            const stored = map.get(deck.boxKey(slideId, id));
+            if (!stored) continue;
+            const box = deck.readBox(stored);
+            const kept = Object.fromEntries(
+                Object.entries(patch).filter(([field]) => fits(box, field as keyof deck.Box))
+            ) as typeof patch;
+            if (Object.keys(kept).length > 0) updateBox(doc, slideId, id, kept);
+        }
+    });
+}
+
+/** Boxes made one group - chosen, moved and arranged together from now on -
+ *  and the group's id. A box already in a group joins the new one, so groups
+ *  grouped again are one group. */
+export function groupBoxes(doc: Y.Doc, slideId: string, boxIds: readonly string[]): string {
+    const group = crypto.randomUUID();
+    updateBoxes(doc, slideId, boxIds, { group });
+    return group;
+}
+
+export function ungroupBoxes(doc: Y.Doc, slideId: string, boxIds: readonly string[]): void {
+    updateBoxes(doc, slideId, boxIds, { group: "" });
+}
+
+/** The deck's theme set to one of those offered, or one field of it changed. */
+export function setTheme(doc: Y.Doc, theme: Partial<deck.DeckTheme>): void {
+    const map = themeOf(doc);
+    const current = deck.readTheme(new Map(map.entries()));
+    const fields = deck.THEME_FIELDS.filter(
+        (field) => theme[field] !== undefined && theme[field] !== current[field]
+    );
+    // Written whole the first time, so a deck that has a theme names every
+    // part of it rather than leaning on today's defaults.
+    const missing = deck.THEME_FIELDS.filter((field) => !map.has(field));
+    if (fields.length === 0 && missing.length === 0) return;
+    change(doc, () => {
+        for (const field of missing) map.set(field, current[field]);
+        for (const field of fields) map.set(field, theme[field]!);
+    });
+}
+
+/** The background of some slides set to a colour, or back to the theme's
+ *  with `null`. */
+export function setBackground(doc: Y.Doc, slideIds: readonly string[], color: string | null): void {
+    const map = backgroundsOf(doc);
+    const kept = color === null ? null : deck.readBackground(color);
+    if (color !== null && !kept) return;
+    const changing = slideIds.filter((id) => (map.get(id) ?? null) !== kept);
+    if (changing.length === 0) return;
+    change(doc, () => {
+        for (const id of changing) {
+            if (kept) map.set(id, kept);
+            else map.delete(id);
+        }
+    });
+}
+
+/** A colour made the theme's background, and every slide's own background
+ *  let go - so every slide has it, and a slide added later too. One step. */
+export function backgroundEverywhere(doc: Y.Doc, color: string): void {
+    const kept = deck.readBackground(color);
+    if (!kept) return;
+    change(doc, () => {
+        setTheme(doc, { background: kept });
+        const map = backgroundsOf(doc);
+        for (const id of [...map.keys()]) map.delete(id);
     });
 }
 
@@ -298,7 +438,15 @@ export function useDocumentVersion(doc: Y.Doc): number {
 
 /** The history of this tab's own changes to a deck - see `useDeckHistory`. */
 export function deckUndoManager(doc: Y.Doc): Y.UndoManager {
-    return new Y.UndoManager([slidesOf(doc), boxesOf(doc), notesOf(doc), imagesOf(doc)], {
+    const scope = [
+        slidesOf(doc),
+        boxesOf(doc),
+        notesOf(doc),
+        imagesOf(doc),
+        themeOf(doc),
+        backgroundsOf(doc)
+    ];
+    return new Y.UndoManager(scope, {
         trackedOrigins: new Set([LOCAL]),
         captureTimeout: 0
     });

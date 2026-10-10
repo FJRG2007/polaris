@@ -304,7 +304,22 @@
                 "forward": "Bring forward",
                 "backward": "Send backward",
                 "back": "Send to back"
-            }
+            },
+            "font": "Font",
+            "themeFont": "Theme font",
+            "alignBoxes": "Align objects",
+            "alignBoxesTo": {
+                "left": "Align left",
+                "center": "Align center",
+                "right": "Align right",
+                "top": "Align top",
+                "middle": "Align middle",
+                "bottom": "Align bottom"
+            },
+            "distributeAcross": "Distribute horizontally",
+            "distributeDown": "Distribute vertically",
+            "group": "Group",
+            "ungroup": "Ungroup"
         },
         "notes": {
             "title": "Speaker notes",
@@ -326,6 +341,35 @@
         },
         "audience": {
             "title": "Audience view"
+        },
+        "clickToAddTitle": "Click to add title",
+        "clickToAddSubtitle": "Click to add subtitle",
+        "design": {
+            "background": "Background",
+            "themeBackground": "Theme background",
+            "everySlide": "Use on every slide",
+            "layout": "Layout",
+            "newSlideLayout": "Choose a layout",
+            "theme": "Theme",
+            "headingFont": "Heading font",
+            "bodyFont": "Body font"
+        },
+        "layouts": {
+            "title": "Title slide",
+            "titleBody": "Title and body",
+            "twoColumns": "Two columns",
+            "section": "Section header",
+            "titleOnly": "Title only",
+            "blank": "Blank"
+        },
+        "themes": {
+            "light": "Simple light",
+            "dark": "Simple dark",
+            "paper": "Paper",
+            "ocean": "Ocean",
+            "forest": "Forest",
+            "sunset": "Sunset",
+            "typewriter": "Typewriter"
         }
     },
     "positioning": {

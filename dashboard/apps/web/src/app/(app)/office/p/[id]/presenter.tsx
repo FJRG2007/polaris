@@ -309,7 +309,7 @@ export function PresenterView({
                                 type="button"
                                 onClick={() => go("next")}
                                 aria-label={t("slides.next")}
-                                className="relative aspect-video overflow-hidden rounded-lg border border-border bg-background shadow-sm"
+                                className="relative aspect-video overflow-hidden rounded-lg border border-border bg-white shadow-sm"
                                 style={{ width: "min(100cqw, calc(100cqh * 16 / 9))" }}
                             >
                                 {ended || !slide ? (
@@ -317,7 +317,10 @@ export function PresenterView({
                                         {t("slides.endOfShow")}
                                     </span>
                                 ) : (
-                                    <SlideDrawing boxes={bySlide.get(slide.id) ?? []} />
+                                    <SlideDrawing
+                                        boxes={bySlide.get(slide.id) ?? []}
+                                        slideId={slide.id}
+                                    />
                                 )}
                             </button>
                         </div>
@@ -344,9 +347,12 @@ export function PresenterView({
                         <h2 className="text-[12px] font-medium text-muted-foreground">
                             {t("slides.presenter.nextUp")}
                         </h2>
-                        <div className="relative aspect-video w-full overflow-hidden rounded-md border border-border bg-background max-sm:w-1/2">
+                        <div className="relative aspect-video w-full overflow-hidden rounded-md border border-border bg-white max-sm:w-1/2">
                             {following ? (
-                                <SlideDrawing boxes={bySlide.get(following.id) ?? []} />
+                                <SlideDrawing
+                                    boxes={bySlide.get(following.id) ?? []}
+                                    slideId={following.id}
+                                />
                             ) : (
                                 <span className="absolute inset-0 flex items-center justify-center bg-black px-2 text-center text-[12px] text-white">
                                     {t("slides.endOfShow")}

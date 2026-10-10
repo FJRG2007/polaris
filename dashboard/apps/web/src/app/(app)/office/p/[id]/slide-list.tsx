@@ -235,13 +235,13 @@ export function SlideList({
                         }}
                         onKeyDown={(event) => onKey(event, index)}
                         className={cn(
-                            "relative aspect-video shrink-0 overflow-hidden rounded-md border bg-background text-left outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring max-sm:h-full sm:w-full",
+                            "relative aspect-video shrink-0 overflow-hidden rounded-md border bg-white text-left outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring max-sm:h-full sm:w-full",
                             index === at
                                 ? "border-primary ring-1 ring-primary"
                                 : "border-border hover:border-border-strong"
                         )}
                     >
-                        <SlideDrawing boxes={bySlide.get(one.id) ?? []} />
+                        <SlideDrawing boxes={bySlide.get(one.id) ?? []} slideId={one.id} />
                         <span className="absolute bottom-1 left-1 rounded bg-background/80 px-1 text-[10px] text-muted-foreground">
                             {index + 1}
                         </span>

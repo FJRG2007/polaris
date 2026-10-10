@@ -304,7 +304,22 @@
                 "forward": "Traer adelante",
                 "backward": "Enviar atrás",
                 "back": "Enviar al fondo"
-            }
+            },
+            "font": "Fuente",
+            "themeFont": "Del tema",
+            "alignBoxes": "Alinear objetos",
+            "alignBoxesTo": {
+                "left": "Izquierda",
+                "center": "Centro",
+                "right": "Derecha",
+                "top": "Arriba",
+                "middle": "En medio",
+                "bottom": "Abajo"
+            },
+            "distributeAcross": "Distribuir en horizontal",
+            "distributeDown": "Distribuir en vertical",
+            "group": "Agrupar",
+            "ungroup": "Desagrupar"
         },
         "notes": {
             "title": "Notas del orador",
@@ -326,6 +341,35 @@
         },
         "audience": {
             "title": "Vista del público"
+        },
+        "clickToAddTitle": "Clic para añadir título",
+        "clickToAddSubtitle": "Clic para añadir subtítulo",
+        "design": {
+            "background": "Fondo",
+            "themeBackground": "Fondo del tema",
+            "everySlide": "Aplicar a todas",
+            "layout": "Diseño",
+            "newSlideLayout": "Elegir diseño",
+            "theme": "Tema",
+            "headingFont": "Fuente títulos",
+            "bodyFont": "Fuente texto"
+        },
+        "layouts": {
+            "title": "Portada",
+            "titleBody": "Título y cuerpo",
+            "twoColumns": "Dos columnas",
+            "section": "Título de sección",
+            "titleOnly": "Solo título",
+            "blank": "Vacía"
+        },
+        "themes": {
+            "light": "Claro",
+            "dark": "Oscuro",
+            "paper": "Papel",
+            "ocean": "Océano",
+            "forest": "Bosque",
+            "sunset": "Atardecer",
+            "typewriter": "Mecanografía"
         }
     },
     "positioning": {

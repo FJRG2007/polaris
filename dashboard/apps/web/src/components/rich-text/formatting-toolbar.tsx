@@ -25,6 +25,7 @@ import { useState, type ReactNode } from "react";
 import { MAX_INDENT, indentLevel } from "./document-schema";
 import type { NamespaceKey } from "@/lib/i18n/types";
 import { useTranslations } from "@/components/i18n/i18n-provider";
+import { FONT_FAMILIES } from "@/lib/font-families";
 import {
     AlignCenter,
     AlignJustify,
@@ -70,17 +71,9 @@ import {
     Select
 } from "@polaris/ui";
 
-/** The faces offered. Ones every operating system has, so a document set in one
- *  reads the same on the machine it is opened on. Proper names, never
- *  translated. */
-export const FONT_FAMILIES = [
-    "Arial",
-    "Georgia",
-    "Times New Roman",
-    "Verdana",
-    "Trebuchet MS",
-    "Courier New"
-] as const;
+/** The faces offered - kept with the rest of the app so a slide offers the
+ *  same ones. */
+export { FONT_FAMILIES };
 
 /** Sizes in points, the unit every word processor counts in. */
 export const FONT_SIZES = [8, 9, 10, 11, 12, 14, 16, 18, 20, 24, 28, 32, 36, 48, 72] as const;
