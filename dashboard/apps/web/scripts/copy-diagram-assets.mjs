@@ -12,10 +12,6 @@
  * the canvas asks for `<base>/editor/fonts/...` - the same relative layout, so
  * the whole tree is copied as it is. Copied at build time rather than committed,
  * like the pdf.js and office font assets: they must match the built package.
- *
- * The package's LICENSE travels with them. The faces are OFL 1.1 and MIT, and
- * both licences ask for the notice to accompany a redistributed copy - which a
- * file any browser can fetch from this origin is.
  */
 
 import { dirname, join } from "node:path";
@@ -37,7 +33,7 @@ export const packageRoot = dirname(
 );
 
 /**
- * Fill `into` with the built fonts and the licence, and throw when there are
+ * Fill `into` with the built fonts, and throw when there are
  * none: staging nothing is not a visible failure anywhere downstream - the
  * canvas falls back to a system face and every diagram is laid out wrong.
  */
@@ -48,7 +44,6 @@ export function stageDiagramAssets(into = target) {
     rmSync(into, { recursive: true, force: true });
     mkdirSync(into, { recursive: true });
     cpSync(fonts, join(into, "editor", "fonts"), { recursive: true });
-    cpSync(join(packageRoot, "LICENSE"), join(into, "LICENSE.txt"));
     return into;
 }
 

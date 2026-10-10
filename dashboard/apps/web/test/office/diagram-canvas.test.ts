@@ -220,7 +220,7 @@ describe("the diagram canvas's assets", () => {
         expect(code).toContain(`"${base}/"`);
     });
 
-    it("are built: fonts under dist/editor/fonts, and the licence beside them", () => {
+    it("are built: fonts under dist/editor/fonts", () => {
         const fonts = readdirSync(join(dist, "editor", "fonts"));
         expect(fonts).toEqual(
             expect.arrayContaining([
@@ -233,7 +233,6 @@ describe("the diagram canvas's assets", () => {
                 "Cascadia"
             ])
         );
-        expect(readFileSync(join(packageRoot, "LICENSE"), "utf8")).toMatch(/MIT License/);
     });
 
     it("name no host the canvas would fetch from", () => {
