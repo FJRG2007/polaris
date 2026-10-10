@@ -19,7 +19,10 @@ preloads them and exposes each as a CSS variable that `globals.css` folds into
 
 The Office diagram canvas draws its text with the same faces - Plex Sans, Plex
 Mono and the Playpen Sans below - so `packages/diagrams/src/editor/fonts`
-carries its own copies of those three files, under the same licence.
+carries its own copies of those three files, under the same licence. Its
+Playpen Sans also carries the `latin-ext`, `vietnamese`, `cyrillic`,
+`cyrillic-ext` and `greek` subsets from Google Fonts, so hand-drawn text in
+those scripts stays in one face.
 
 ## Display name faces
 

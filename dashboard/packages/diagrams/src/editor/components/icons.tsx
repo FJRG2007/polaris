@@ -88,22 +88,16 @@ export const PlusPromoIcon = createIcon(
   tablerIconProps,
 );
 
-// tabler-icons: book
 export const LibraryIcon = <Lucide.Library {...lucideProps} />;
 
-// tabler-icons: plus
 export const PlusIcon = <Lucide.Plus {...lucideProps} />;
 
-// tabler-icons: dots-vertical
 export const DotsIcon = <Lucide.Ellipsis {...lucideProps} />;
 
-// tabler-icons: pinned
 export const PinIcon = <Lucide.Pin {...lucideProps} />;
 
-// tabler-icons: lock-open (via Figma)
 export const UnlockedIcon = <Lucide.LockOpen {...lucideProps} />;
 
-// tabler-icons: lock (via Figma)
 export const LockedIcon = <Lucide.Lock {...lucideProps} />;
 
 // custom
@@ -181,37 +175,26 @@ export const WelcomeScreenTopToolbarArrow = createIcon(
   { width: 38, height: 78, fill: "none" },
 );
 
-// custom
-// custom
 export const SelectionIcon = <Lucide.MousePointer2 {...lucideProps} />;
 
-// tabler-icons: square
 export const RectangleIcon = <Lucide.Square {...lucideProps} />;
 
-// tabler-icons: square-rotated
 export const DiamondIcon = <Lucide.Diamond {...lucideProps} />;
 
-// tabler-icons: circle
 export const EllipseIcon = <Lucide.Circle {...lucideProps} />;
 
-// tabler-icons: arrow-narrow-right
 export const ArrowIcon = <Lucide.MoveRight {...lucideProps} />;
 
-// custom?
 export const LineIcon = <Lucide.Minus {...lucideProps} />;
 
 export const PenModeIcon = <Lucide.PenLine {...lucideProps} />;
 
-// modified tabler-icons: pencil
 export const FreedrawIcon = <Lucide.Pencil {...lucideProps} />;
 
-// tabler-icons: typography
 export const TextIcon = <Lucide.Type {...lucideProps} />;
 
-// modified tabler-icons: photo
 export const ImageIcon = <Lucide.Image {...lucideProps} />;
 
-// tabler-icons: eraser
 export const EraserIcon = <Lucide.Eraser {...lucideProps} />;
 
 export const ZoomInIcon = <Lucide.ZoomIn {...lucideProps} />;
@@ -259,7 +242,6 @@ export const saveAs = createIcon(
   { width: 448, height: 512 },
 );
 
-// tabler-icon: folder
 export const LoadIcon = <Lucide.FolderOpen {...lucideProps} />;
 
 export const clipboard = <Lucide.Clipboard {...lucideProps} />;
@@ -392,13 +374,10 @@ export const CloseIcon = <Lucide.X {...lucideProps} />;
 
 export const clone = <Lucide.Copy {...lucideProps} className="rtl-mirror" />;
 
-// modified https://feathericons.com/?query=shield
 export const shield = <Lucide.Shield {...lucideProps} />;
 
 export const file = <Lucide.File {...lucideProps} />;
 
-// TODO barnabasmolnar/editor-redesign
-// couldn't find a new icon for this
 export const GroupIcon = React.memo((_props: { theme: Theme }) => <Lucide.Group {...lucideProps} className="rtl-mirror" />);
 
 export const UngroupIcon = React.memo((_props: { theme: Theme }) => <Lucide.Ungroup {...lucideProps} className="rtl-mirror" />);
@@ -919,13 +898,10 @@ export const TextAlignCenterIcon = <Lucide.AlignCenter {...lucideProps} />;
 
 export const TextAlignRightIcon = <Lucide.AlignRight {...lucideProps} />;
 
-// tabler-icons: layout-align-top
 export const TextAlignTopIcon = React.memo((_props: { theme: Theme }) => <Lucide.AlignVerticalJustifyStart {...lucideProps} />);
 
-// tabler-icons: layout-align-bottom
 export const TextAlignBottomIcon = React.memo((_props: { theme: Theme }) => <Lucide.AlignVerticalJustifyEnd {...lucideProps} />);
 
-// tabler-icons: layout-align-middle
 export const TextAlignMiddleIcon = React.memo((_props: { theme: Theme }) => <Lucide.AlignVerticalJustifyCenter {...lucideProps} />);
 
 export const angleIcon = createIcon(
