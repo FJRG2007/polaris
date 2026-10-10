@@ -9,6 +9,7 @@ import polaris.anticheat.api.storage.verbose.VerboseBuf;
 import polaris.anticheat.api.storage.verbose.VerboseRenderContext;
 import polaris.anticheat.internal.storage.verbose.VerboseRegistry;
 import polaris.anticheat.player.PolarisPlayer;
+import polaris.anticheat.utils.anticheat.ModdedContent;
 import lombok.Getter;
 import lombok.Setter;
 import org.checkerframework.checker.nullness.qual.MonotonicNonNull;
@@ -83,7 +84,13 @@ public class Check extends PolarisProcessor implements AbstractCheck {
     }
 
     public boolean shouldModifyPackets() {
+        // A modded server: the simulation knows its blocks, tools and items only
+        // through vanilla stand-ins, so a check acting on them cancelled honest
+        // players' digging and placing (cobblestone took "ten seconds" to break and
+        // never did). There the checks flag and leave the packets alone, as the
+        // setbacks do (SetbackTeleportUtil).
         return isEnabled
+                && !ModdedContent.isModdedServer()
                 && !player.disablePolaris
                 && !player.noModifyPacketPermission
                 && !noModifyPacketPermission
