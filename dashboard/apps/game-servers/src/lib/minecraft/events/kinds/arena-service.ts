@@ -164,6 +164,7 @@ export async function arenaTick(ctx: KindContext, lines: string[]): Promise<stri
         }
         return null;
     }
+    await keepRespawns(ctx, lines);
     const game = gameOf(ctx.run.preset.kind);
     if (game) return game.tick(ctx, lines);
     if (ctx.run.preset.kind === "team-duel") await duelTick(ctx, lines);
@@ -443,11 +444,6 @@ async function bringIn(ctx: KindContext): Promise<void> {
         const worlds = commands.readDimensions(await say(commands.DIMENSIONS));
         const modes = arena.readGamemodes(await say(arena.READ_GAMEMODES));
         const uuids = arena.readUuids(await say(arena.READ_UUIDS));
-        // Where each would respawn, read before the event moves it into the
-        // arena (`linesIn`) and put back at the end (`arena.spawnBack`).
-        const spawns = respawning(run)
-            ? arena.readSpawns(await Promise.all(arena.READ_SPAWNS.map(say)))
-            : null;
         const fresh: stored.Entrant[] = [];
         for (const name of waiting) {
             const at = where.get(lower(name));
@@ -470,8 +466,7 @@ async function bringIn(ctx: KindContext): Promise<void> {
                 side: game ? game.side(run, index) : duelling ? index % 2 : index,
                 away: true,
                 tagged: true,
-                stash: null,
-                ...(spawns ? { spawn: spawns.get(at.name) ?? null } : {})
+                stash: null
             });
         }
         const needed = catalog.joinersNeeded(run.preset);
@@ -496,17 +491,17 @@ async function bringIn(ctx: KindContext): Promise<void> {
                 build.themeFor(options as catalog.EventOptions<"build-battle">, run.id, ctx.home)
         };
     const overGround = hillside ? await ctx.atLeast([1, 19, 4]) : false;
-    const angled = respawning(run) ? await ctx.atLeast([1, 16, 2]) : false;
+    const respawns = await respawnKeyOf(ctx);
     const linesIn = (one: stored.Entrant): string[] => {
         if (hillside)
             return hillService.enterLines(ctx.run, one.name, one.side, overGround, language);
         // In, and nothing more: the kit, the side's colors and the theme are
-        // handed out at "Go!", to everybody at once (`goLines`). Only their
-        // spawn point goes with them now: a death from here on comes back in.
-        const back = one.spawn !== undefined ? respawnSpot(ctx.run, one) : null;
+        // handed out at "Go!", to everybody at once (`goLines`). Only where a
+        // death brings them back goes with them now, where the server can say
+        // so as they respawn (`respawnLines`).
         return [
             ...arena.enter(one.name, spotsOf(ctx.run).get(lower(one.name))!),
-            ...(back ? [arena.spawnAt(one.name, back, angled)] : []),
+            ...(respawns ? respawnLines(ctx.run, respawns, [one]) : []),
             ...(duelling ? [duel.joinTeam(one.name, one.side)] : []),
             ...(game?.enterLines?.(ctx.run, one) ?? []),
             arena.protect(one.name)
@@ -540,8 +535,61 @@ async function bringIn(ctx: KindContext): Promise<void> {
 }
 
 /** Whether a death in it is played on past, where the dead come back in. */
-function respawning(run: stored.EventRun): boolean {
-    return run.preset.kind === "team-duel" || gameOf(run.preset.kind)?.respawn !== undefined;
+function respawning(kind: catalog.EventKind): boolean {
+    return kind === "team-duel" || gameOf(kind)?.respawn !== undefined;
+}
+
+/**
+ * The key a run's respawn spots are kept under on the server, or null where
+ * they are not: a kind nobody comes back in, or a server with neither the
+ * Polaris plugin nor the mod (`in-server` `respawn`). There the tick alone
+ * brings the dead back, from wherever the game respawned them.
+ *
+ * Never the game's own `spawnpoint`: that overwrites the bed or anchor a
+ * player set, and nothing can give it back as it was.
+ */
+async function respawnKeyOf(ctx: KindContext): Promise<string | null> {
+    if (!respawning(ctx.run.preset.kind)) return null;
+    if (!(await inServer.capabilities(ctx.server)).has("respawn")) return null;
+    return inServer.respawnKey(ctx.run.id);
+}
+
+/** Each one's respawns sent to where a death brings them back. */
+function respawnLines(
+    run: stored.EventRun,
+    key: string,
+    entrants: readonly stored.Entrant[]
+): string[] {
+    return entrants.flatMap((one) => {
+        const spot = respawnSpot(run, one);
+        const line = spot ? inServer.respawnSet(key, one.name, spot) : null;
+        return line ? [line] : [];
+    });
+}
+
+/**
+ * Every look in play: a spot set again for whoever has none on the server -
+ * they logged out and back, or the server restarted, and the plugin or mod
+ * forgot it. One question a look; nothing at all where neither is there.
+ */
+async function keepRespawns(ctx: KindContext, lines: string[]): Promise<void> {
+    const key = await respawnKeyOf(ctx);
+    if (!key) return;
+    const held = inServer.parseRespawnList(
+        await ctx.server.say([inServer.respawnList(key)]).catch(() => "")
+    );
+    if (!held) {
+        // Answered as anything but the plugin or mod: asked again next time.
+        inServer.forgetCapabilities(ctx.server.installedAppId);
+        return;
+    }
+    lines.push(
+        ...respawnLines(
+            ctx.run,
+            key,
+            ctx.run.entrants.filter((one) => !held.has(lower(one.name)))
+        )
+    );
 }
 
 /** Where an entrant who dies comes back: a duel's side, the kind's own spot. */
@@ -880,9 +928,9 @@ async function duelTick(ctx: KindContext, lines: string[]): Promise<void> {
             scored = true;
         }
         const at = here.get(lower(one.name));
-        // Back from a death - on their side already, where their spawn point
-        // is (`arena.spawnAt`) - or out of it any other way: back to their
-        // side, healed and shielded for a moment.
+        // Back from a death - on their side already, where the server put
+        // them (`respawnLines`), or wherever the game did - or out of it any
+        // other way: back to their side, healed and shielded for a moment.
         if (hearts > 0 && (memory.fallen.has(lower(one.name)) || !at || !arena.contains(box, at))) {
             lines.push(...duel.sendBack(one.name, spot));
             memory.fallen.delete(lower(one.name));
@@ -1298,6 +1346,10 @@ export async function closeArena(
     // Anybody else is still owed everything, should this stop half way.
     const handled = new Set<number>();
     try {
+        // Nobody's respawns go to the arena any more. The tag coming off below
+        // ends them too; this only lets the server forget them now.
+        if (respawning(left.kind) && (await inServer.capabilities(server)).has("respawn"))
+            await server.say([inServer.respawnClear(inServer.respawnKey(left.id))]).catch(() => "");
         const box = left.arena?.box ?? null;
         if (box && left.marker) await server.sayAll([arena.killMarkedDrops(box, left.marker)]);
         const closing = box ? (gameOf(left.kind)?.closeLines?.(box) ?? []) : [];
@@ -1346,8 +1398,9 @@ export async function closeArena(
         const there = going.filter(({ at }) => home.has(at));
         const settled = there.flatMap(({ one }) => {
             const thrown = box ? arena.sendThrown(box, one) : null;
-            // Their own spawn point back before the tag comes off: whoever is
-            // found untagged at a later go has had it.
+            // A spawn point an earlier version moved into the arena put back
+            // before the tag comes off: whoever is found untagged at a later
+            // go has had it. Nothing for anybody brought in since.
             return [
                 arena.homeMode(one),
                 ...arena.spawnBack(one),

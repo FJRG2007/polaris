@@ -505,19 +505,21 @@ left out.
   and `kinds/<kind>-service.ts`, looked up in `kinds/arena-games.ts`. The
   team duel, build battle and king of the ring keep their older branches in
   `arena-service.ts`.
-- **A death in an arena respawns inside it.** The team duel, capture the
-  flag (at the player's base) and SkyWars (in the gallery) move each
-  entrant's spawn point onto their spot as they are brought in
-  (`arena.spawnAt`), so nobody comes back at the world's spawn and waits a
-  tick to be sent back. The spawn they had is read first (`READ_SPAWNS`, both
-  spellings) and put back in `closeArena` before the arena tag comes off
-  (`arena.spawnBack`). Whoever had none, or none that could be read, gets the
-  world's spawn: there is no command that removes a player's spawn point, and
-  `spawnpoint <name> ~ ~ ~` from the console lands on the world spawn. A
-  spawn put back by command is forced: a bed works as before while it
-  stands, and sleeping in it again makes it the game's own. The tick still
-  heals and shields whoever it saw die (`fallen`), even though they are
-  already on their side.
+- **A death in an arena comes back inside it, and nobody's spawn point is
+  touched.** In the team duel, capture the flag (at the player's base) and
+  SkyWars (in the gallery), where the server has the Polaris plugin or mod
+  (`polaris caps` lists `respawn`), each entrant's spot is handed to it as
+  they are brought in (`in-server.respawnSet`) and it puts them there as they
+  respawn - `PlayerRespawnEvent` on Paper, `PlayerRespawnPositionEvent` on
+  NeoForge - without writing their spawn point, so their bed or anchor is
+  theirs throughout. Every look asks who it holds (`polaris respawn list`)
+  and sets it again for whoever it forgot (logged out and back, a server
+  restart); the end clears the run (`polaris respawn clear`), and a spot is
+  never used on anybody without the arena tag. Everywhere else the game
+  respawns them where it would, and the next look sends them back. The tick
+  heals and shields whoever it saw die (`fallen`), wherever they came back.
+  Entrants brought in by #521, which did move spawn points, carry the one
+  read before (`spawn`) and get it back at the end (`arena.spawnBack`).
 - **Capture the flag** is two teams set up exactly as a duel's (kit,
   a death, with keepInventory on, sending them back and shielded once they
   respawn, kill credit, natural regeneration off),
@@ -882,17 +884,17 @@ which stays fully supported and tested.
 
 **Which servers get which path**
 
-| Server                                                                              | Path                                                                                  |
-| ----------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
-| NeoForge 1.21.4 with the Polaris mod (every one Polaris manages, after one restart) | In-server: `polaris stash`, `polaris batch`, hiding by line of sight                  |
-| NeoForge 1.21.4 not yet restarted onto the new jar                                  | Plain commands until it restarts                                                      |
-| NeoForge on another release, Forge, Fabric, Quilt                                   | Plain commands - no Polaris mod build                                                 |
-| Paper, Purpur, Spigot, Folia                                                        | Plain commands - the Polaris plugins there (anti-cheat, login) have no event commands |
-| Vanilla, Bedrock                                                                    | Plain commands                                                                        |
+| Server                                                                              | Path                                                                                    |
+| ----------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| NeoForge 1.21.4 with the Polaris mod (every one Polaris manages, after one restart) | In-server: `polaris stash`, `polaris batch`, `polaris respawn`, hiding by line of sight |
+| NeoForge 1.21.4 not yet restarted onto the new jar                                  | Plain commands until it restarts                                                        |
+| NeoForge on another release, Forge, Fabric, Quilt                                   | Plain commands - no Polaris mod build                                                   |
+| Paper, Purpur, Spigot, Folia                                                        | Plain commands, and `polaris respawn` where the Polaris plugin (login, sounds) is on    |
+| Vanilla, Bedrock                                                                    | Plain commands                                                                          |
 
 **The fallback rule.** Never decide from the loader. `in-server.capabilities`
 asks `polaris caps` and uses a command only when the mod lists it (`stash`,
-`batch`, `seek`); any other answer - an unknown command, an old jar, a Paper
+`batch`, `seek`, `respawn` - the Paper plugin lists `respawn` alone); any other answer - an unknown command, an old jar, a Paper
 plugin - is "no", remembered for a minute. A mod command answered as anything
 but the mod's JSON forgets the answer and runs the plain lines instead.
 
@@ -1148,6 +1150,15 @@ A new kind follows all of them. A change to an old kind must not undo one.
   to break the line of sight, dim corners, and time to reach them
   (`hideSeconds` scales with the map). Nametags are hidden from the other
   side and no effect shows particles, so a hider is found by looking.
+- **Never write a player's spawn point.** #521 moved each arena entrant's
+  onto their spot with `spawnpoint` and put back the one it read at the end,
+  and players still came out respawning at the event or the world's spawn:
+  a spawn that could not be read became the world's, a bed came back as a
+  forced spawn, and until the end reached a player, a death anywhere still
+  brought them back to the arena. The game
+  has no way to put a spawn point back as it was. Choose where a death comes
+  back as it happens instead (the Polaris plugin or mod), or bring them back
+  after it (the tick).
 - **Each player reads their own language** (`speech.ts`): the account's
   language when the player is linked, otherwise the server's. Lines nobody in
   particular reads (the boss bar, the boss's name) are in the server's

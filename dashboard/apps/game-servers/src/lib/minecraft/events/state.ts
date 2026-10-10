@@ -105,10 +105,11 @@ export const entrantSchema = z.object({
     /** What they carried, kept until it is given back (`kinds/stash`). */
     stash: stashSchema.nullable().default(null),
     /**
-     * Where they respawned before the event moved their spawn point into the
-     * arena (`arena.spawnBack`): null for the world's spawn - none of their
-     * own, or none that could be read - and absent where the event never
-     * moved it.
+     * Only on an entrant brought in by the version that moved their spawn
+     * point into the arena (#521): where they respawned before, put back at
+     * the end (`arena.spawnBack`), null for the world's spawn - none of their
+     * own, or none that could be read. Never written now: an event no longer
+     * touches a spawn point, so it is absent on everybody brought in since.
      */
     spawn: z
         .object({

@@ -1,17 +1,22 @@
 package polaris.minecraft;
 
 import com.google.gson.JsonObject;
+import com.mojang.brigadier.arguments.DoubleArgumentType;
+import com.mojang.brigadier.arguments.FloatArgumentType;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.context.CommandContext;
 import java.util.function.Function;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
+import net.minecraft.commands.arguments.ResourceLocationArgument;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.MinecraftServer;
+import net.neoforged.bus.api.EventPriority;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.neoforge.event.RegisterCommandsEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerEvent;
+import net.neoforged.neoforge.event.entity.player.PlayerRespawnPositionEvent;
 import net.neoforged.neoforge.event.tick.ServerTickEvent;
 
 /**
@@ -24,13 +29,15 @@ import net.neoforged.neoforge.event.tick.ServerTickEvent;
  * - {@code polaris batch run <key> [blocksPerTick]}, {@code status},
  *   {@code cancel} ({@link EventBatch}).
  *
+ * - {@code polaris respawn set <key> <player> <dimension> <x> <y> <z> <yaw>},
+ *   {@code list <key>}, {@code clear <key>} ({@link EventRespawn}).
  * - {@code polaris sounds status|refresh} ({@link SoundPack}).
  *
  * Hide and seek ({@link EventSeek}) needs no command: it follows the tags.
  */
 final class EventCommands {
     /** What `polaris caps` lists; the dashboard checks each by name. */
-    static final String[] CAPS = {"stash", "batch", "seek"};
+    static final String[] CAPS = {"stash", "batch", "seek", "respawn"};
 
     private final String version;
 
@@ -50,6 +57,26 @@ final class EventCommands {
                 .then(Commands.literal("stash")
                         .then(Commands.literal("save").then(playerAndKey(EventStash::save)))
                         .then(Commands.literal("restore").then(playerAndKey(EventStash::restore))))
+                .then(Commands.literal("respawn")
+                        .then(Commands.literal("set").then(Commands.argument("key", StringArgumentType.word())
+                                .then(Commands.argument("player", StringArgumentType.word())
+                                        .then(Commands.argument("dimension", ResourceLocationArgument.id())
+                                                .then(Commands.argument("x", DoubleArgumentType.doubleArg(-3.0E7, 3.0E7))
+                                                        .then(Commands.argument("y", DoubleArgumentType.doubleArg(-2048, 2048))
+                                                                .then(Commands.argument("z", DoubleArgumentType.doubleArg(-3.0E7, 3.0E7))
+                                                                        .then(Commands.argument("yaw", FloatArgumentType.floatArg(-360, 360))
+                                                                                .executes(context -> answer(context, server -> EventRespawn.set(
+                                                                                        server, key(context),
+                                                                                        StringArgumentType.getString(context, "player"),
+                                                                                        ResourceLocationArgument.getId(context, "dimension"),
+                                                                                        DoubleArgumentType.getDouble(context, "x"),
+                                                                                        DoubleArgumentType.getDouble(context, "y"),
+                                                                                        DoubleArgumentType.getDouble(context, "z"),
+                                                                                        FloatArgumentType.getFloat(context, "yaw")))))))))))
+                        .then(Commands.literal("list").then(Commands.argument("key", StringArgumentType.word())
+                                .executes(context -> answer(context, server -> EventRespawn.list(key(context))))))
+                        .then(Commands.literal("clear").then(Commands.argument("key", StringArgumentType.word())
+                                .executes(context -> answer(context, server -> EventRespawn.clear(key(context)))))))
                 .then(Commands.literal("batch")
                         .then(Commands.literal("run").then(Commands.argument("key", StringArgumentType.word())
                                 .executes(context -> answer(context, server -> EventBatch.run(
@@ -151,6 +178,21 @@ final class EventCommands {
                 // Nothing more to do: the tick goes on.
             }
         }
+    }
+
+    /** Last, so the event's spot is the one the player respawns at. */
+    @SubscribeEvent(priority = EventPriority.LOWEST)
+    public void onRespawnPosition(PlayerRespawnPositionEvent event) {
+        try {
+            EventRespawn.respawning(event);
+        } catch (RuntimeException failed) {
+            PolarisMod.LOG.error("A Polaris event respawn failed; the player respawns where the game chose", failed);
+        }
+    }
+
+    @SubscribeEvent
+    public void onLeave(PlayerEvent.PlayerLoggedOutEvent event) {
+        EventRespawn.left(event.getEntity().getUUID());
     }
 
     @SubscribeEvent

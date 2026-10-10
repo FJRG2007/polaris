@@ -206,10 +206,10 @@ async function tick(ctx: KindContext, lines: string[]): Promise<string | null> {
             memory.fallen.add(lower(one.name));
         }
         const at = here.get(lower(one.name));
-        // Back from a death - at their base already, where their spawn point
-        // is (`respawn`) - or out of it any other way: back to their side,
-        // healed and shielded for a moment - and whatever flag they carried
-        // back on its stand.
+        // Back from a death - at their base already, where the server put
+        // them (`respawn`), or wherever the game did - or out of it any other
+        // way: back to their side, healed and shielded for a moment - and
+        // whatever flag they carried back on its stand.
         const fell = memory.fallen.has(lower(one.name));
         if (hearts > 0 && (fell || !at || !arena.contains(box, at))) {
             memory.fallen.delete(lower(one.name));
