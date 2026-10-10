@@ -59,7 +59,7 @@ beforeEach(() => {
     gain = 0.6;
     FakeContext.allowed = true;
     FakeContext.resumed = 0;
-    vi.stubGlobal("window", { AudioContext: FakeContext });
+    vi.stubGlobal("window", { AudioContext: FakeContext, addEventListener: () => undefined });
 });
 
 afterEach(() => {

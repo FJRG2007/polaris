@@ -39,7 +39,8 @@ import { boostHeld, liftFor, liftGapFor, useLoudness } from "./call-loudness";
 import { useVoiceSettings } from "./voice-settings";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { boostStream, resumeBoost, type Boost } from "./call-boost";
-import { playThroughChosenSpeaker, SPEAKER_CHANGED } from "./speaker-device";
+import { playThroughChosenSpeaker } from "./speaker-device";
+import { SPEAKER_CHANGED } from "@/lib/speaker-choice";
 import {
     closePopOut,
     poppedStream,
