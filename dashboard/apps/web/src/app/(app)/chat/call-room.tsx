@@ -686,9 +686,7 @@ export function CallRoom({
                 {canRecord && (
                     <button
                         type="button"
-                        onClick={() =>
-                            call.recording ? held?.recording.stop() : setAsking(true)
-                        }
+                        onClick={() => (call.recording ? held?.recording.stop() : setAsking(true))}
                         aria-pressed={call.recording}
                         aria-label={
                             call.recording
@@ -733,9 +731,7 @@ export function CallRoom({
                         aria-label={
                             mayInvite ? t("callRoom.addPeople") : t("callRoom.shareALinkToThis")
                         }
-                        title={
-                            mayInvite ? t("callRoom.addPeople") : t("callRoom.shareALinkToThis")
-                        }
+                        title={mayInvite ? t("callRoom.addPeople") : t("callRoom.shareALinkToThis")}
                         className="rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                     >
                         <UserPlus className="size-4" />

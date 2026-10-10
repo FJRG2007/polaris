@@ -94,7 +94,9 @@ describe("the top row of a call", () => {
     it("holds the raised hand, outside the control bar", () => {
         room({ viewerId: "alan" });
         const hand = screen.getByRole("button", { name: /raiseYourHand/ });
-        expect(hand.parentElement).toBe(screen.getByRole("button", { name: /addPeople/ }).parentElement);
+        expect(hand.parentElement).toBe(
+            screen.getByRole("button", { name: /addPeople/ }).parentElement
+        );
     });
 
     it("offers the hand to a guest, who has no account", () => {
