@@ -879,91 +879,104 @@ export const LOOT_IDS: readonly string[] = [
     "minecraft:golden_apple",
     "minecraft:bread",
     "minecraft:cooked_beef",
-    "minecraft:cooked_porkchop"
+    "minecraft:cooked_porkchop",
+    "minecraft:fishing_rod",
+    "minecraft:shield"
+];
+
+/** What a chest can hold beside its weapon and armor, the same on every
+ *  island: snowballs knock a player back, a rod pulls one in, a shield blocks
+ *  a rush. Never eggs (a chick hatches and stays) nor potions (their item is
+ *  written differently by every version). */
+const UTILITIES: readonly Stack[] = [
+    { id: "minecraft:snowball", count: 16 },
+    { id: "minecraft:fishing_rod", count: 1 },
+    { id: "minecraft:shield", count: 1 }
 ];
 
 /**
- * What one chest holds, drawn from the run's id: an island's first chest its
- * weapon, food and most of its bridging blocks, its second armor, the rest of
- * the blocks and maybe a bow; the middle's better on both counts. `rich` puts
- * iron and diamond where `normal` has wood and leather.
+ * The kit every island's two chests share out, drawn once from the run's id -
+ * the same for every island, so no start is better than another: the first
+ * chest the weapon, food, a utility and most of the bridging blocks, the
+ * second a whole set of armor, a bow with arrows, a golden apple and the rest
+ * of the blocks. `rich` puts iron and diamond where `normal` has stone,
+ * leather and chainmail; one piece of the armor (the same on every island) a
+ * tier up.
+ */
+function islandKit(seed: string, chest: number, loot: Loot, bridge: string): Stack[] {
+    const random = seeded(`${seed}-loot-kit`);
+    const rich = loot === "rich";
+    const better = ARMOR[Math.floor(random() * ARMOR.length)]!;
+    const utility = UTILITIES[Math.floor(random() * UTILITIES.length)]!;
+    const food = random() < 0.5 ? "minecraft:bread" : "minecraft:cooked_porkchop";
+    if (chest === 0)
+        return [
+            { id: bridge, count: rich ? 48 : 32, bridge: true },
+            { id: rich ? "minecraft:iron_sword" : "minecraft:stone_sword", count: 1 },
+            { id: rich ? "minecraft:cooked_beef" : food, count: rich ? 6 : 5 },
+            utility
+        ];
+    const tier = (piece: (typeof ARMOR)[number]) =>
+        rich ? (piece === better ? "diamond" : "iron") : piece === better ? "chainmail" : "leather";
+    return [
+        { id: bridge, count: rich ? 32 : 16, bridge: true },
+        ...ARMOR.map((piece) => ({ id: `minecraft:${tier(piece)}_${piece}`, count: 1 })),
+        { id: "minecraft:bow", count: 1 },
+        { id: "minecraft:arrow", count: rich ? 16 : 10 },
+        { id: "minecraft:golden_apple", count: 1 }
+    ];
+}
+
+/**
+ * The middle's four chests, each a different half of something worth the
+ * crossing, so a player has to open more than one: the best sword, the best
+ * chest and legs, the best helmet and boots with pearls, a bow with more
+ * arrows. Which chest holds which is drawn from the run's id.
+ */
+function middleKit(seed: string, chest: number, loot: Loot, bridge: string): Stack[] {
+    const rich = loot === "rich";
+    const best = rich ? "diamond" : "iron";
+    const sets: Stack[][] = [
+        [
+            { id: `minecraft:${best}_sword`, count: 1 },
+            { id: "minecraft:golden_apple", count: rich ? 3 : 2 },
+            { id: "minecraft:cooked_beef", count: 4 }
+        ],
+        [
+            { id: `minecraft:${best}_chestplate`, count: 1 },
+            { id: `minecraft:${best}_leggings`, count: 1 },
+            { id: "minecraft:golden_apple", count: 1 }
+        ],
+        [
+            { id: `minecraft:${best}_helmet`, count: 1 },
+            { id: `minecraft:${best}_boots`, count: 1 },
+            { id: "minecraft:ender_pearl", count: rich ? 3 : 2 }
+        ],
+        [
+            { id: "minecraft:bow", count: 1 },
+            { id: "minecraft:arrow", count: rich ? 32 : 24 },
+            { id: "minecraft:ender_pearl", count: 1 },
+            { id: "minecraft:snowball", count: 16 }
+        ]
+    ];
+    const order = shuffled([0, 1, 2, 3], seeded(`${seed}-loot-middle`));
+    return [...sets[order[chest % sets.length]!]!, { id: bridge, count: 16, bridge: true }];
+}
+
+/**
+ * What one chest holds, drawn from the run's id: an island's two share the
+ * same kit as every other island's (`islandKit`), the middle's four are each a
+ * part of a better one (`middleKit`).
  */
 export function lootFor(
     seed: string,
-    island: number,
+    _island: number,
     chest: number,
     middle: boolean,
     loot: Loot,
     bridge: string
 ): Stack[] {
-    const random = seeded(`${seed}-loot-${island}-${chest}`);
-    const rich = loot === "rich";
-    const chance = (odds: number) => random() < odds;
-    const pick = <T>(list: readonly T[]): T => list[Math.floor(random() * list.length)]!;
-    const armor = (tiers: readonly string[], pieces: number): Stack[] =>
-        shuffled(ARMOR, random)
-            .slice(0, pieces)
-            .map((piece) => ({ id: `minecraft:${pick(tiers)}_${piece}`, count: 1 }));
-    const out: Stack[] = [];
-    if (middle) {
-        out.push(
-            {
-                id: rich
-                    ? "minecraft:diamond_sword"
-                    : pick(["minecraft:iron_sword", "minecraft:stone_sword"]),
-                count: 1
-            },
-            ...armor(
-                rich ? ["diamond", "iron"] : ["iron", "chainmail"],
-                rich ? 2 : 1 + Math.floor(random() * 2)
-            ),
-            { id: bridge, count: 16, bridge: true }
-        );
-        if (chance(rich ? 0.8 : 0.5))
-            out.push(
-                { id: "minecraft:bow", count: 1 },
-                { id: "minecraft:arrow", count: rich ? 16 : 10 }
-            );
-        if (chance(rich ? 0.9 : 0.5))
-            out.push({ id: "minecraft:ender_pearl", count: rich ? 2 : 1 });
-        out.push({ id: "minecraft:golden_apple", count: rich ? 3 : 1 + Math.floor(random() * 2) });
-        out.push({ id: "minecraft:cooked_beef", count: 4 });
-        return out;
-    }
-    if (chest === 0) {
-        out.push(
-            { id: bridge, count: rich ? 48 : 32, bridge: true },
-            {
-                id: rich
-                    ? chance(0.3)
-                        ? "minecraft:diamond_sword"
-                        : "minecraft:iron_sword"
-                    : pick([
-                          "minecraft:wooden_sword",
-                          "minecraft:stone_sword",
-                          "minecraft:stone_sword"
-                      ]),
-                count: 1
-            },
-            chance(0.5)
-                ? { id: "minecraft:bread", count: 3 + Math.floor(random() * 3) }
-                : { id: rich ? "minecraft:cooked_beef" : "minecraft:cooked_porkchop", count: 3 }
-        );
-        if (rich && chance(0.4)) out.push({ id: "minecraft:ender_pearl", count: 1 });
-        return out;
-    }
-    out.push(
-        { id: bridge, count: rich ? 32 : 16, bridge: true },
-        ...armor(rich ? ["iron", "iron", "diamond"] : ["leather", "chainmail", "golden"], 2)
-    );
-    if (chance(rich ? 0.6 : 0.35))
-        out.push(
-            { id: "minecraft:bow", count: 1 },
-            { id: "minecraft:arrow", count: rich ? 12 : 8 }
-        );
-    if (chance(0.4)) out.push({ id: "minecraft:snowball", count: 8 });
-    if (chance(rich ? 0.6 : 0.15)) out.push({ id: "minecraft:golden_apple", count: 1 });
-    return out;
+    return middle ? middleKit(seed, chest, loot, bridge) : islandKit(seed, chest, loot, bridge);
 }
 
 /** A chest's stacks, each in a slot drawn from the run's id, marked as the

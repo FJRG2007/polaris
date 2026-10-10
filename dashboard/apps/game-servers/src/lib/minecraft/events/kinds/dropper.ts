@@ -22,6 +22,12 @@
  *   lands on the next floor, so every floor has to be steered through.
  * - **Harder means smaller holes and further to go** between two of them
  *   (`STEPS`).
+ * - **From design 2, blocks hang in the air between floors** (`obstaclesFor`),
+ *   more the harder it is, each well clear of every way from one hole to the
+ *   next - landing on one sends a racer back like a floor does - and each
+ *   shaft has a look of its own: its walls' stone and the order of its floors'
+ *   colors drawn from the run's id. A shaft built by design 1 keeps its plain
+ *   look and empty air.
  *
  * The physics, from the Minecraft Wiki ("Entity", motion of entities; "Slow
  * Falling") and the Minecraft Parkour Wiki ("Horizontal Movement Formulas"),
@@ -60,7 +66,7 @@ import { seeded, shuffled } from "../trivia-bank";
 export type Difficulty = EventOptions<"dropper">["difficulty"];
 
 /** How shafts are laid out now, written onto the stage when one is built. */
-export const DESIGN = 1;
+export const DESIGN = 2;
 
 /** Blocks from the middle of the shaft to its inside wall: the inside is 11 by 11. */
 export const HALF = 5;
@@ -373,6 +379,133 @@ export function planProblems(shaft: Plan): string[] {
     });
     return problems;
 }
+// ------------------------------------------------------------------ obstacles
+
+/** A block hanging between two floors: its column inside the shaft (0 to 10
+ *  each way), on the way down to floor `level` (never the first), and how
+ *  far under the floor above it is. */
+export interface Obstacle {
+    readonly level: number;
+    readonly x: number;
+    readonly z: number;
+    readonly under: number;
+}
+
+/** Blocks hung between each two floors, by difficulty. */
+export const OBSTACLES: Readonly<Record<Difficulty, number>> = { easy: 1, medium: 2, hard: 3 };
+
+/** How near the middle of a block hung in the air may come to any way from one
+ *  hole to the next: half its diagonal, half a player and half a block more. */
+export const CLEAR_OF_PATH = 1.5;
+
+/** The corners of a hole, looked at from above, in blocks inside the shaft. */
+function cornersOf(hole: Hole): Point[] {
+    return [
+        { x: hole.x, z: hole.z },
+        { x: hole.x + hole.size, z: hole.z },
+        { x: hole.x, z: hole.z + hole.size },
+        { x: hole.x + hole.size, z: hole.z + hole.size }
+    ];
+}
+
+/** The convex hull of some points, counterclockwise (monotone chain). */
+function hullOf(points: readonly Point[]): Point[] {
+    const sorted = [...points].sort((a, b) => a.x - b.x || a.z - b.z);
+    const cross = (o: Point, a: Point, b: Point) =>
+        (a.x - o.x) * (b.z - o.z) - (a.z - o.z) * (b.x - o.x);
+    const half = (list: readonly Point[]) => {
+        const out: Point[] = [];
+        for (const point of list) {
+            while (out.length >= 2 && cross(out.at(-2)!, out.at(-1)!, point) <= 0) out.pop();
+            out.push(point);
+        }
+        out.pop();
+        return out;
+    };
+    return [...half(sorted), ...half([...sorted].reverse())];
+}
+
+/** How far a point is from a convex polygon: 0 inside it. */
+function distanceToHull(point: Point, hull: readonly Point[]): number {
+    let inside = true;
+    let nearest = Number.POSITIVE_INFINITY;
+    hull.forEach((a, index) => {
+        const b = hull[(index + 1) % hull.length]!;
+        const ex = b.x - a.x;
+        const ez = b.z - a.z;
+        if (ex * (point.z - a.z) - ez * (point.x - a.x) < 0) inside = false;
+        const length = ex * ex + ez * ez;
+        const t =
+            length === 0
+                ? 0
+                : Math.max(0, Math.min(1, ((point.x - a.x) * ex + (point.z - a.z) * ez) / length));
+        nearest = Math.min(nearest, Math.hypot(point.x - (a.x + t * ex), point.z - (a.z + t * ez)));
+    });
+    return inside ? 0 : nearest;
+}
+
+/** How far the middle of a block column is from every way between two holes:
+ *  any straight line from a point of one to a point of the other. */
+export function clearance(cell: Point, from: Hole, to: Hole): number {
+    return distanceToHull(
+        { x: cell.x + 0.5, z: cell.z + 0.5 },
+        hullOf([...cornersOf(from), ...cornersOf(to)])
+    );
+}
+
+/**
+ * The blocks hung between the floors of a plan, drawn from the run's id: on
+ * the way down to every floor but the first, `OBSTACLES` of them half way
+ * down the gap, never two touching, each `CLEAR_OF_PATH` from any straight way
+ * between the hole above and the hole below - so they catch only a racer who
+ * strays, and a racer steering for the next hole never meets one.
+ */
+export function obstaclesFor(laid: Plan, seed: string): Obstacle[] {
+    const random = seeded(`dropper-${seed}-obstacles`);
+    const out: Obstacle[] = [];
+    laid.levels.forEach((level, index) => {
+        if (index === 0) return;
+        const from = laid.levels[index - 1]!.hole;
+        const cells: Point[] = [];
+        for (let x = 0; x < INNER; x += 1)
+            for (let z = 0; z < INNER; z += 1)
+                if (clearance({ x, z }, from, level.hole) >= CLEAR_OF_PATH) cells.push({ x, z });
+        const chosen: Point[] = [];
+        for (const cell of shuffled(cells, random)) {
+            if (chosen.length >= OBSTACLES[laid.difficulty]) break;
+            if (
+                chosen.some((one) => Math.abs(one.x - cell.x) <= 1 && Math.abs(one.z - cell.z) <= 1)
+            )
+                continue;
+            chosen.push(cell);
+        }
+        for (const cell of chosen)
+            out.push({ level: index, x: cell.x, z: cell.z, under: Math.floor(level.drop / 2) });
+    });
+    return out;
+}
+
+/** What is wrong with a shaft's obstacles, as sentences. */
+export function obstacleProblems(laid: Plan, obstacles: readonly Obstacle[]): string[] {
+    const problems: string[] = [];
+    for (const one of obstacles) {
+        const where = `an obstacle over floor ${one.level + 1}`;
+        const level = laid.levels[one.level];
+        const above = laid.levels[one.level - 1];
+        if (!level || !above) {
+            problems.push(`${where}: no floor above it`);
+            continue;
+        }
+        if (one.x < 0 || one.z < 0 || one.x >= INNER || one.z >= INNER)
+            problems.push(`${where}: outside the shaft`);
+        if (clearance(one, above.hole, level.hole) < CLEAR_OF_PATH - 1e-9)
+            problems.push(`${where}: in the way down`);
+        if (one.under < 2 || level.drop - one.under < 3)
+            problems.push(`${where}: too near a floor`);
+    }
+    return problems;
+}
+
 // ------------------------------------------------------------------ the shaft
 
 /** The floors' colors, top first, one after another down the shaft: the band each
@@ -391,6 +524,15 @@ const COLORS: readonly Box["block"][] = [
     "minecraft:pink_concrete"
 ];
 const WALL: Box["block"] = "minecraft:white_concrete";
+/** The walls a shaft can be built of, from design 2: light, so each floor's
+ *  band of color shows on them. */
+const WALLS: readonly Box["block"][] = [
+    WALL,
+    "minecraft:quartz_block",
+    "minecraft:smooth_quartz",
+    "minecraft:polished_diorite",
+    "minecraft:snow_block"
+];
 const LID: Box["block"] = "minecraft:glass";
 /** A ring of light round every hole: it lights the floor, and shows the way down. */
 const RING: Box["block"] = "minecraft:sea_lantern";
@@ -412,6 +554,8 @@ export interface Shaft {
     readonly holes: readonly { x1: number; z1: number; x2: number; z2: number }[];
     /** The lid's box, taken out at "Go!". */
     readonly lid: Box;
+    /** Blocks hung between floors (design 2 on), as world blocks. */
+    readonly obstacles: readonly { x: number; y: number; z: number }[];
     /** What is built, in order: what holds something up before it. */
     readonly boxes: readonly Box[];
     readonly volume: Volume;
@@ -457,10 +601,15 @@ export function shaft(
     options: Pick<EventOptions<"dropper">, "levels" | "difficulty">,
     seed: string,
     site: { x: number; z: number },
-    y: number
+    y: number,
+    design = DESIGN
 ): Shaft {
     const laid = plannedOnce(options, seed);
     const { x, z } = site;
+    // Its look: design 1's white and rainbow, or one drawn from the run's id.
+    const look = seeded(`dropper-${seed}-look`);
+    const wall = design >= 2 ? WALLS[Math.floor(look() * WALLS.length)]! : WALL;
+    const colors = design >= 2 ? shuffled(COLORS, look) : COLORS;
     const outer = HALF + 1;
     const top = y + laid.depth;
     const floors: number[] = [];
@@ -481,23 +630,44 @@ export function shaft(
     const boxes: Box[] = [{ ...whole, y1: y, y2: y, block: POOL_FLOOR }];
     // The wall from the pool up to the lowest floor, then between each two.
     const heights = [...floors].reverse();
-    boxes.push(...walls(x, z, y + 1, heights[0]! - 1, WALL));
+    boxes.push(...walls(x, z, y + 1, heights[0]! - 1, wall));
     heights.forEach((floor, index) => {
         const level = floors.length - 1 - index;
         const hole = holes[level]!;
         const ring = { x1: hole.x1 - 1, z1: hole.z1 - 1, x2: hole.x2 + 1, z2: hole.z2 + 1 };
         boxes.push(
-            ...around(whole, ring, floor, COLORS[level % COLORS.length]!),
+            ...around(whole, ring, floor, colors[level % colors.length]!),
             ...around(ring, hole, floor, RING),
-            ...walls(x, z, floor + 1, (heights[index + 1] ?? top) - 1, WALL)
+            ...walls(x, z, floor + 1, (heights[index + 1] ?? top) - 1, wall)
         );
     });
+    // Hung in the air, in the color of the floor they hang over.
+    const obstacles =
+        design >= 2
+            ? obstaclesFor(laid, seed).map((one) => ({
+                  x: x - HALF + one.x,
+                  y: floors[one.level - 1]! - one.under,
+                  z: z - HALF + one.z,
+                  block: colors[one.level % colors.length]!
+              }))
+            : [];
+    boxes.push(
+        ...obstacles.map((one) => ({
+            x1: one.x,
+            y1: one.y,
+            z1: one.z,
+            x2: one.x,
+            y2: one.y,
+            z2: one.z,
+            block: one.block
+        }))
+    );
     // The lid reaches under the wall too; the rail stands on it.
     const lid: Box = { ...inside, y1: top, y2: top, block: LID };
     boxes.push(
-        ...around(whole, { ...inside }, top, WALL),
+        ...around(whole, { ...inside }, top, wall),
         lid,
-        ...walls(x, z, top + 1, top + RAIL, WALL),
+        ...walls(x, z, top + 1, top + RAIL, wall),
         ...[
             [x - outer, z - outer],
             [x + outer, z - outer],
@@ -523,6 +693,7 @@ export function shaft(
         bottom: y,
         holes,
         lid,
+        obstacles: obstacles.map(({ x: ox, y: oy, z: oz }) => ({ x: ox, y: oy, z: oz })),
         boxes,
         volume: { ...whole, y1: y, y2: top + RAIL + 2 },
         reach: Math.ceil(Math.SQRT2 * outer)

@@ -227,7 +227,16 @@ left out.
   is the winner rather than nobody.
 - **Dropper** is a shaft 11 blocks across, walled all round, `levels` floors
   (5-20) each with one hole, a pool at the bottom, laid out from the run's id
-  (`dropper.plan`). Everybody waits on a glass lid; at "Go!" all of them are
+  (`dropper.plan`). From design 2 each shaft also looks its own - its walls'
+  stone (white concrete, quartz, smooth quartz, polished diorite or snow) and
+  the order of its floors' colors drawn from the run's id - and blocks hang
+  in the air half way down every gap but the first, one to three by
+  difficulty, in the color of the floor below (`dropper.obstaclesFor`): never
+  two touching, each 1.5 blocks or more from any straight way between the
+  hole above and the hole below (`obstacleProblems`), so they catch a racer
+  who strays and never one steering for the next hole. Landing on one sends
+  a racer back like a floor does. A shaft built by design 1 keeps its white
+  walls, its rainbow and empty air. Everybody waits on a glass lid; at "Go!" all of them are
   put over the middle, the lid goes, and they fall. The events data pack
   catches a landing the tick it happens - anybody racing who is on the ground
   anywhere over the floors, the rim of a hole included, goes back to the top,
@@ -564,13 +573,22 @@ left out.
       a death, whose player comes back as a new one, by the kill the game
       counted. Before 1.19.4, the rival who struck last. The team duel
       credits the same way.
-- **Hot potato** is a striped platform walled in glass three high (11 by 11
-  up to six players, 13 by 13 past), with a gallery behind its north wall a
-  step up, roofed, that whoever is out watches from. Nobody is hurt:
-  Resistance IV, Regeneration and Saturation on everybody, every tick. Each
-  round's holder is drawn from the run's id and the round among who is left
-  (`hot-potato.holderFor`) and wears a marked TNT on their head (only onto an
-  empty one), glowing. Everybody else is under Weakness 101, so they cannot
+- **Hot potato** is a platform walled in glass three high (13 by 13 up to
+  six players, 17 by 17 up to twelve, 21 by 21 up to twenty-four), its floor
+  in stripes or in rings round the middle and cover on it - hay bales and lit
+  posts - drawn from the run's id (`hot-potato.coverFor`): a few cells turned
+  four ways round the middle so no side is better, none touching, all well
+  inside the ring players start on, so none is a start or a step out over the
+  wall. A gallery behind its north wall a step up, roofed, is where whoever is
+  out watches from. Nobody is hurt: Resistance IV, Regeneration and Saturation
+  on everybody, every tick. Each round is played with one potato up to ten
+  left and one more for every ten past (`potatoesFor`: two from eleven, three
+  from twenty-one), never one each. Its holders are drawn from the run's id
+  and the round among who is left (`hot-potato.holdersFor`, the first as
+  `holderFor` draws it, so a run saved with one holder keeps it), each a
+  different player, and wear a marked TNT on their head (only onto an empty
+  one), glowing. A holder is never handed a second potato: a hit on one is
+  not a pass. Everybody else is under Weakness 101, so they cannot
   strike. A punch - the left button; the right one hurts nobody and passes
   nothing - is read off the events data pack (see "Hits" below): the holder
   struck a player and somebody was hurt by one, by the holder where the game
@@ -578,9 +596,9 @@ left out.
   them. Where the pack cannot be put on, the hit is read off `damage_dealt`
   and `damage_taken` as before. Whoever was just handed it stays weak until
   the next tick, so it cannot bounce straight back. A hit is seen on the
-  next tick, up to two seconds after it lands. When the fuse runs out the holder is
-  out - particles and a sound where they stand, never a block or an entity -
-  and goes to the gallery; three seconds later the next round starts. Somebody
+  next tick, up to two seconds after it lands. When the fuse runs out every
+  holder is out at once, ranked together - particles and a sound where each
+  stands, never a block or an entity - and goes to the gallery; three seconds later the next round starts. Somebody
   off the server two ticks running is out too. The round, the holder and the
   fuse's end are clock times in the run, so a restart picks the fuse up where
   it was. The last one left wins; everybody else is ranked by when they went
@@ -618,11 +636,17 @@ left out.
   their barrier, only in their own boxes. The chests are filled once the
   islands stand (`ArenaGame.decorate`), each stack marked as the kit, in
   slots drawn from the run's id, `item replace block` from 1.17
-  (`replaceitem` before): an island's first chest its bridging blocks, a
-  sword and food, its second more blocks, two pieces of armor and maybe a
-  bow and arrows, snowballs or a golden apple; the middle's four better -
-  iron, pearls, golden apples. `loot: rich` puts iron and diamond where
-  `normal` has wood and leather. Bridging blocks can be placed only against
+  (`replaceitem` before). Every island gets the same kit, drawn once a run
+  (`sky-wars.islandKit`), so no start is better than another: its first
+  chest bridging blocks, a sword, food and one utility (snowballs, a fishing
+  rod or a shield); its second more blocks, a whole set of armor - one piece
+  of it, the same on every island, a tier up - a bow with arrows and a golden
+  apple. The middle's four chests each hold a different part of a better kit
+  (`middleKit`): the best sword with golden apples, the best chestplate and
+  leggings, the best helmet and boots with pearls, a bow with more arrows -
+  so a player has to open more than one. `loot: rich` puts iron and diamond
+  where `normal` has stone, leather and chainmail. No eggs (a chick hatches
+  and stays) and no potions (each version writes their item differently). Bridging blocks can be placed only against
   the islands' own blocks and other bridges (`can_place_on`), and nothing
   can be broken. PvP is on, keepInventory held, natural regeneration left
   on: food is in the chests. A player is out when they die (keepInventory
@@ -761,7 +785,10 @@ new map:
   passed by a cautious player - walking, never sprinting, setting off still
   only once their head is clear of the floor above, and stopping over the hole
     - with a quarter of a block to spare (`dropper.planProblems`), and no hole
-      lines up with the next, so a straight drop always lands on a floor. The
+      lines up with the next, so a straight drop always lands on a floor. A
+      block hung between two floors is as far from that way down as
+      `CLEAR_OF_PATH`, and the simulated player is checked against those
+      blocks too. The
       physics is the game's own, in blocks and ticks (Minecraft Wiki, "Entity" and
       "Slow Falling"; Minecraft Parkour Wiki, "Horizontal Movement Formulas"): move,
       then gravity (0.08, or 0.01 with Slow Falling) and drag (0.98 down, 0.91
@@ -874,7 +901,7 @@ Everything below is part of the arena's own boxes: built into air with
 | ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Spleef           | each floor walled in its own color, a sea lantern on every corner post                                                                                                                                                          |
 | TNT run          | TNT floors, a rim in its own color at each one, glass walls, corner lanterns                                                                                                                                                    |
-| Dropper          | white walls banded by each floor's color, a ring of light round every hole                                                                                                                                                      |
+| Dropper          | light walls (one of five stones a run) banded by each floor's color in an order of its own, a ring of light round every hole, blocks of color hanging between floors                                                            |
 | Ice boat race    | packed ice, white walls with a glass rail and lights, an arch over each gate                                                                                                                                                    |
 | Nether maze      | netherrack walls and roof, glowstone over every other room, a nether-brick starting room, and a gold floor under a sea-lantern ceiling at the goal                                                                              |
 | Acid rain        | mossy stone floor with a sea lantern in each corner, glass walls, an invisible roof, cobblestone huts                                                                                                                           |
@@ -884,7 +911,7 @@ Everything below is part of the arena's own boxes: built into air with
 | King of the ring | polished stone edge, sea lanterns at the corners, the circle drawn in yellow                                                                                                                                                    |
 | Build battle     | a stone curb between plots and glowstone where the lines meet, at floor level                                                                                                                                                   |
 | Team duel        | a stone rim round the floor and a post of light at each corner                                                                                                                                                                  |
-| Hot potato       | a floor in orange and white stripes, glass walls on a stone rim, sea lanterns up the corners, a spruce gallery                                                                                                                  |
+| Hot potato       | a floor in orange and white stripes or rings, hay bales and lit spruce posts, glass walls on a stone rim, sea lanterns up the corners, a spruce gallery                                                                         |
 | Hide and seek    | a stone brick house under a dark oak roof, spruce walls between nine rooms, oak closets, spruce hatches, birch lofts on log posts, bookcases in spruce alcoves, barrel steps up oak wardrobes, birch crow's nests, spruce beams |
 | SkyWars          | grass, dirt and flecked stone islands with oaks, boulders and flowers, invisible cages and gallery over the middle, barrier walls                                                                                               |
 | Capture the flag | the duel's rim and posts, bases in red and blue, banners on sea lanterns, cover of stone brick, spruce and chiseled stone                                                                                                       |

@@ -288,7 +288,8 @@ function layoutAt(run: EventRun, site: { x: number; z: number }, y: number): Lay
             run.preset.options as catalog.EventOptions<"dropper">,
             run.id,
             site,
-            y
+            y,
+            run.stage?.origin ? run.stage.design : dropper.DESIGN
         );
         return {
             kind: "dropper",

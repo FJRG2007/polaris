@@ -7416,7 +7416,8 @@ describe("a dropper", () => {
             );
         const water = removed("minecraft:water");
         expect(water).toBeGreaterThan(-1);
-        expect(water).toBeLessThan(removed("minecraft:white_concrete"));
+        // The walls' stone is the run's own (design 2): the one under the lowest floor.
+        expect(water).toBeLessThan(removed(shaft.boxes[1]!.block));
         expect(water).toBeLessThan(removed("minecraft:light_blue_concrete"));
         for (const box of shaft.boxes)
             expect(world.sent).toContain(
@@ -11338,7 +11339,8 @@ describe("hot potato", () => {
     };
     const kind = () =>
         import("@polaris-app/game-servers/src/lib/minecraft/events/kinds/hot-potato");
-    const holderNow = async () => (await kind()).stateOf(state().run!.game)?.holder ?? null;
+    const holderNow = async () =>
+        (await kind()).stateOf(state().run!.game)?.holders[0]?.name ?? null;
 
     /** A punch as the events data pack sees it: the striker and the one hit
      *  tagged by its advancements, and the game remembering who hurt whom. */
@@ -11448,6 +11450,52 @@ describe("hot potato", () => {
         expect(world.sent).toContain("scoreboard objectives remove pe_hpt");
         expect(done.arenaLeftovers).toEqual([]);
         onlyOurBlocks();
+    });
+
+    it("plays two potatoes past ten players, never hands a holder a second, and blows both", async () => {
+        const potato = await kind();
+        const crowd = Array.from({ length: 12 }, (_, index) => `Player${index + 1}`);
+        world.online = crowd;
+        setUp([potatoOf(40)]);
+        await joinAndStart("potato", crowd);
+        await play(2_100);
+        const run = state().run!;
+        const held = potato.stateOf(run.game)!.holders.map((one) => one.name);
+        expect(held).toHaveLength(2);
+        expect(held).toEqual(
+            potato.holdersFor(
+                run.id,
+                1,
+                run.entrants.map((one) => one.name),
+                2
+            )
+        );
+        for (const name of held)
+            expect(world.sent).toContain(
+                `execute unless data entity ${name} Inventory[{Slot:103b}] run item replace entity ${name} armor.head with minecraft:tnt[minecraft:custom_data={polaris_event:1b}] 1`
+            );
+        expect(saidToAll(`${held[0]} and ${held[1]}`)).toBe(true);
+
+        // One holder strikes the other: nothing changes hands.
+        const [one, two] = held as [string, string];
+        world.at[two] = [world.at[one]![0] + 1, world.at[one]![1], world.at[one]![2]];
+        punch(one, two);
+        await play(2_100);
+        expect(potato.stateOf(state().run!.game)!.holders.map((h) => h.name)).toEqual(held);
+
+        // Then somebody without one: theirs now, the other holder's kept.
+        const free = crowd.find((name) => !held.includes(name))!;
+        world.at[free] = [world.at[one]![0], world.at[one]![1], world.at[one]![2] + 1];
+        punch(one, free);
+        await play(2_100);
+        const now = potato.stateOf(state().run!.game)!.holders.map((h) => h.name);
+        expect(now).toEqual([free, two]);
+
+        // The fuse: both out at once, ranked together.
+        await play(potato.stateOf(state().run!.game)!.fuseEndsAt! - Date.now() + 2_100);
+        const after = potato.stateOf(state().run!.game)!;
+        expect(after.out.map((o) => o.name).sort()).toEqual([free, two].sort());
+        expect(after.out[0]!.at).toBe(after.out[1]!.at);
     });
 
     it("passes it within the second of the hit, not on the next two-second look", async () => {
@@ -11569,14 +11617,14 @@ describe("hot potato", () => {
         world.at = at;
         await play(2_100);
         const after = potato.stateOf(state().run!.game)!;
-        expect(after.holder).toBe(before.holder);
+        expect(after.holders).toEqual(before.holders);
         expect(after.round).toBe(1);
         expect(after.fuseEndsAt).toBe(before.fuseEndsAt);
         // The fuse goes off when it was going to, not a fresh one later.
         await play(before.fuseEndsAt! - Date.now() + 2_100);
-        expect(potato.stateOf(state().run!.game)!.out.map((one) => one.name)).toEqual([
-            before.holder
-        ]);
+        expect(potato.stateOf(state().run!.game)!.out.map((one) => one.name)).toEqual(
+            before.holders.map((one) => one.name)
+        );
     });
 
     it("puts out somebody who left the server, rather than wait for them", async () => {
@@ -12468,7 +12516,8 @@ describe("the pace of an event", () => {
         const builds = tripsWith(trips, / fill .* keep$/).filter(
             (trip) => !trip.lines.some((line) => line.includes("structure_void"))
         );
-        expect(builds.length).toBeLessThanOrEqual(4);
+        // Five with the blocks hung between its floors (design 2).
+        expect(builds.length).toBeLessThanOrEqual(5);
         expect(world.inv.Ana!.get(0)).toEqual({ id: "minecraft:bread", count: 5 });
         onlyOurBlocks();
     });

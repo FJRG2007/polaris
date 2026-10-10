@@ -1730,7 +1730,7 @@
             },
             "dropper": {
                 "label": "Dropper",
-                "summary": "A deep shaft is built in the air with floors that have holes in them and a pool of water at the bottom. Players fall from the top through the holes; landing on a floor sends you back to the top, and the fastest into the water wins. Nobody takes fall damage.",
+                "summary": "A deep shaft is built in the air with floors that have holes in them and a pool of water at the bottom. Players fall from the top through the holes, past blocks hanging in the way; landing on a floor or a block sends you back to the top, and the fastest into the water wins. Nobody takes fall damage.",
                 "unit": "floors"
             },
             "capture-the-flag": {
@@ -1745,12 +1745,12 @@
             },
             "hot-potato": {
                 "label": "Hot potato",
-                "summary": "Players who join stand on a small platform in the sky, and one is handed the potato: TNT on their head, glowing. Hit somebody to pass it on. When the fuse runs out whoever holds it is out and the next round starts; the last one left wins. Nobody is hurt.",
+                "summary": "Players who join stand on a platform in the sky with cover to dodge round, and one is handed the potato (one more for every ten players past ten): TNT on their head, glowing. Hit somebody to pass it on. When the fuse runs out whoever holds one is out and the next round starts; the last one left wins. Nobody is hurt.",
                 "unit": "points"
             },
             "sky-wars": {
                 "label": "SkyWars",
-                "summary": "Each player who joins starts alone on an island of their own floating in the sky, with chests of gear and blocks; a bigger island in the middle holds better loot. Bridge across, fight, and be the last one left. Falling or dying only puts you out - everybody's own things are kept and given back.",
+                "summary": "Each player who joins starts alone on an island of their own floating in the sky, with chests of gear and blocks, the same on every island; a bigger island in the middle holds better loot. Bridge across, fight, and be the last one left. Falling or dying only puts you out - everybody's own things are kept and given back.",
                 "unit": "points"
             },
             "village-defense": {

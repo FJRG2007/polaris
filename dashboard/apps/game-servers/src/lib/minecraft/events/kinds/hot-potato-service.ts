@@ -6,11 +6,11 @@
  * potato while the hand is still on the button - reads where everybody is and
  * the hits since the last one - the events data pack's (`hits.ts`), or the
  * damage dealt and taken where the pack is not on. In that order it then: puts
- * out whoever has been gone from the server for `MISSING_MS`; passes the potato when its holder struck and
- * somebody was hurt - by the holder, where the game says who hurt them, and
- * the nearest of them; sets off a fuse that has run out -
- * its holder out, to the gallery - and after a breath draws the next round's
- * holder. The rounds are written into the run before a tick ends, their times
+ * out whoever has been gone from the server for `MISSING_MS`; passes a potato when its holder struck and
+ * somebody without one was hurt - by that holder, where the game says who
+ * hurt them, and the nearest of them; sets off a fuse that has run out -
+ * every holder out, to the gallery - and after a breath draws the next round's
+ * holders (`potato.potatoesFor`). The rounds are written into the run before a tick ends, their times
  * as clock times, so a restart picks the fuse up where it was.
  */
 
@@ -60,19 +60,36 @@ function memoryOf(runId: string): Memory {
  *  late - is not leaving. */
 const MISSING_MS = 4_000;
 
-/** The first round, as "Go!" left it: its holder drawn, its fuse lit then. */
+/** A round's holders, drawn among who is left, each handed theirs at `at`. */
+function drawHolders(
+    run: stored.EventRun,
+    round: number,
+    left: readonly string[],
+    at: number
+): potato.Holder[] {
+    return potato
+        .holdersFor(run.id, round, left, potato.potatoesFor(left.length))
+        .map((name) => ({ name, passedAt: at }));
+}
+
+/** The first round, as "Go!" left it: its holders drawn, its fuse lit then. */
 function firstRound(run: stored.EventRun, now: number): potato.PotatoState {
     const start = run.readyAt ?? now;
     return potato.stateSchema.parse({
         round: 1,
-        holder: potato.holderFor(
-            run.id,
+        holders: drawHolders(
+            run,
             1,
-            run.entrants.map((one) => one.name)
+            run.entrants.map((one) => one.name),
+            start
         ),
-        fuseEndsAt: start + optionsOf(run).fuseSeconds * 1000,
-        passedAt: start
+        fuseEndsAt: start + optionsOf(run).fuseSeconds * 1000
     });
+}
+
+/** The holders' names, for what everybody reads. */
+function namesOf(state: potato.PotatoState): string[] {
+    return state.holders.map((one) => one.name);
 }
 
 /** Handed the potato: on their head, glowing, told so - and still weak, until
@@ -122,11 +139,13 @@ async function goLines(ctx: KindContext, syntax: ItemSyntax): Promise<string[]> 
                 potatoMessages.goSubtitle(ctx.language)
             )
         );
-    if (first.holder) {
+    if (first.holders.length > 0) {
+        for (const one of first.holders)
+            out.push(...handedLines(one.name, syntax.marker, syntax.itemCommand, ctx.language));
         out.push(
-            ...handedLines(first.holder, syntax.marker, syntax.itemCommand, ctx.language),
             commands.say(
-                messages.tag(ctx.language) + potatoMessages.roundLine(1, first.holder, ctx.language)
+                messages.tag(ctx.language) +
+                    potatoMessages.roundLine(1, namesOf(first), ctx.language)
             )
         );
     }
@@ -161,12 +180,14 @@ async function tick(ctx: KindContext, lines: string[]): Promise<string | null> {
     const state = structuredClone(before ?? firstRound(run, now));
     const isOut = (name: string) => state.out.some((one) => lower(one.name) === lower(name));
     const alive = () => run.entrants.filter((one) => !isOut(one.name));
-    /** Out now: off the potato if they held it, the round over if they did. */
+    /** Out now: off the potato if they held one, the round over once no
+     *  potato is left in it. */
     const putOut = (name: string) => {
         state.out.push({ name, round: state.round, at: now });
-        if (state.holder && lower(state.holder) === lower(name)) {
-            lines.push(...takenLines(name, marker));
-            state.holder = null;
+        if (!potato.holderNamed(state, name)) return;
+        lines.push(...takenLines(name, marker));
+        state.holders = state.holders.filter((one) => lower(one.name) !== lower(name));
+        if (state.holders.length === 0) {
             state.fuseEndsAt = null;
             state.pauseUntil = now + potato.ROUND_PAUSE_MS;
         }
@@ -188,26 +209,27 @@ async function tick(ctx: KindContext, lines: string[]): Promise<string | null> {
         );
     }
 
-    // Passed: the holder struck and somebody was hurt - by the holder, where
-    // the game says who hurt them - the nearest of them.
-    const holder = state.holder;
-    if (
-        holder &&
-        state.pauseUntil === null &&
-        potato.canPass(state, now) &&
-        struck.has(lower(holder))
-    ) {
+    // Passed: a holder struck and somebody without a potato was hurt - by
+    // that holder, where the game says who hurt them - the nearest of them.
+    // Each holder in turn, so one just handed a potato is never handed a
+    // second the same look.
+    const passing =
+        state.pauseUntil === null
+            ? state.holders.filter(
+                  (one) => potato.canPass(state, one.name, now) && struck.has(lower(one.name))
+              )
+            : [];
+    const hurtNow = alive().filter((one) => hurt.has(lower(one.name)) && here.has(lower(one.name)));
+    const by =
+        passing.length > 0
+            ? await hitsService.attackers(
+                  ctx,
+                  hurtNow.map((one) => one.name)
+              )
+            : new Map<string, string | null>();
+    for (const { name: holder } of passing) {
         const from = here.get(lower(holder));
-        const victims = alive().filter(
-            (one) =>
-                lower(one.name) !== lower(holder) &&
-                hurt.has(lower(one.name)) &&
-                here.has(lower(one.name))
-        );
-        const by = await hitsService.attackers(
-            ctx,
-            victims.map((one) => one.name)
-        );
+        const victims = hurtNow.filter((one) => !potato.holderNamed(state, one.name));
         const hit = from
             ? potato.hitBy(
                   from,
@@ -216,34 +238,39 @@ async function tick(ctx: KindContext, lines: string[]): Promise<string | null> {
                       .map((one) => ({ ...here.get(lower(one.name))!, name: one.name }))
               )
             : null;
-        if (hit) {
-            lines.push(
-                ...takenLines(holder, marker),
-                ...handedLines(hit, marker, itemCommand, language),
-                commands.say(messages.tag(language) + potatoMessages.passed(holder, hit, language))
-            );
-            state.holder = hit;
-            state.passedAt = now;
-        }
+        if (!hit) continue;
+        lines.push(
+            ...takenLines(holder, marker),
+            ...handedLines(hit, marker, itemCommand, language),
+            commands.say(messages.tag(language) + potatoMessages.passed(holder, hit, language))
+        );
+        state.holders = state.holders.map((one) =>
+            lower(one.name) === lower(holder) ? { name: hit, passedAt: now } : one
+        );
     }
 
-    // The fuse out: whoever holds it is out, with a bang and nothing broken.
-    if (state.holder && state.fuseEndsAt !== null && now >= state.fuseEndsAt) {
-        const name = state.holder;
-        const at = here.get(lower(name));
-        if (at) lines.push(...potato.boomLines(at));
-        putOut(name);
-        lines.push(
-            arena.moveTo(name, potato.gallerySpot(box, state.out.length - 1)),
-            ...arena.titleTo(
-                name,
-                potatoMessages.outTitle(language),
-                potatoMessages.outSubtitle(language)
-            ),
-            commands.say(
-                messages.tag(language) + potatoMessages.exploded(name, alive().length, language)
-            )
-        );
+    // The fuse out: whoever holds one is out, with a bang and nothing broken.
+    if (state.holders.length > 0 && state.fuseEndsAt !== null && now >= state.fuseEndsAt) {
+        const blown = namesOf(state);
+        for (const name of blown) {
+            const at = here.get(lower(name));
+            if (at) lines.push(...potato.boomLines(at));
+            putOut(name);
+            lines.push(
+                arena.moveTo(name, potato.gallerySpot(box, state.out.length - 1)),
+                ...arena.titleTo(
+                    name,
+                    potatoMessages.outTitle(language),
+                    potatoMessages.outSubtitle(language)
+                )
+            );
+        }
+        for (const name of blown)
+            lines.push(
+                commands.say(
+                    messages.tag(language) + potatoMessages.exploded(name, alive().length, language)
+                )
+            );
     }
 
     let decided: string | null = null;
@@ -257,26 +284,28 @@ async function tick(ctx: KindContext, lines: string[]): Promise<string | null> {
                 commands.sound(commands.SOUNDS.win)
             );
         decided = said.LAST_ONE;
-    } else if (state.holder === null && (state.pauseUntil ?? 0) <= now) {
-        // The next round, after the breath: a new holder, a new fuse.
+    } else if (state.holders.length === 0 && (state.pauseUntil ?? 0) <= now) {
+        // The next round, after the breath: new holders, a new fuse.
         state.round += state.pauseUntil === null ? 0 : 1;
-        state.holder = potato.holderFor(
-            run.id,
+        state.holders = drawHolders(
+            run,
             state.round,
-            left.map((one) => one.name)
+            left.map((one) => one.name),
+            now
         );
         state.fuseEndsAt = now + options.fuseSeconds * 1000;
-        state.passedAt = now;
         state.pauseUntil = null;
-        if (state.holder)
+        if (state.holders.length > 0) {
+            for (const one of state.holders)
+                lines.push(...handedLines(one.name, marker, itemCommand, language));
             lines.push(
-                ...handedLines(state.holder, marker, itemCommand, language),
                 commands.say(
                     messages.tag(language) +
-                        potatoMessages.roundLine(state.round, state.holder, language)
+                        potatoMessages.roundLine(state.round, namesOf(state), language)
                 ),
                 commands.sound(commands.SOUNDS.start)
             );
+        }
     }
 
     // Nobody hurt; everybody but a holder free to pass it unable to hurt; the
@@ -301,8 +330,8 @@ async function tick(ctx: KindContext, lines: string[]): Promise<string | null> {
             continue;
         }
         if (!potato.onPlatform(box, at)) lines.push(arena.moveTo(one.name, spotOf(run, one)));
-        const holding = state.holder !== null && lower(state.holder) === lower(one.name);
-        if (holding && potato.canPass(state, now)) lines.push(...potato.holderLines(one.name));
+        const holding = potato.holderNamed(state, one.name) !== null;
+        if (potato.canPass(state, one.name, now)) lines.push(...potato.holderLines(one.name));
         else lines.push(potato.weakLine(one.name));
         if (holding) {
             const tick = potato.fuseLine(one.name, fuseLeft);
@@ -311,17 +340,17 @@ async function tick(ctx: KindContext, lines: string[]): Promise<string | null> {
         lines.push(
             arena.actionbarTo(
                 one.name,
-                state.holder === null
+                state.holders.length === 0
                     ? potatoMessages.nextRoundBar(language)
                     : holding
                       ? potatoMessages.holdingBar(fuseLeft, language)
-                      : potatoMessages.awayBar(state.holder, fuseLeft, language)
+                      : potatoMessages.awayBar(namesOf(state), fuseLeft, language)
             )
         );
     }
     lines.push(
         `bossbar set ${commands.BAR} name ${commands.text(
-            potatoMessages.bar(state.round, state.holder, Math.max(0, fuseLeft), language)
+            potatoMessages.bar(state.round, namesOf(state), Math.max(0, fuseLeft), language)
         )}`,
         ...arena.keepThrown(box)
     );
@@ -340,7 +369,7 @@ export const hotPotato: ArenaGame = {
     most: () => potato.MOST,
     reach: (run) => potato.reachOf(run.joined.length),
     box: (run, place) => potato.platformBox(place, place.y + arena.ALTITUDE, run.joined.length),
-    fills: (_run, box) => potato.platformFills(box),
+    fills: (run, box) => potato.platformFills(box, run.id),
     blocks: () => [...potato.PLATFORM_BLOCKS],
     kit: () => [potato.POTATO],
     hits: true,

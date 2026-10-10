@@ -27,9 +27,15 @@ const within = (
     outer.z <= box.z2;
 
 describe("hot potato's platform", () => {
-    for (const players of [2, 6, 7, 12]) {
+    for (const [players, seed] of [
+        [2, undefined],
+        [6, "run-1"],
+        [7, "run-2"],
+        [12, "run-3"],
+        [24, "run-4"]
+    ] as const) {
         const box = potato.platformBox({ x: 100, z: -40 }, 100, players);
-        const fills = potato.platformFills(box);
+        const fills = potato.platformFills(box, seed);
         const floor = potato.floorOf(box);
         const gallery = potato.galleryOf(box);
 
@@ -44,7 +50,15 @@ describe("hot potato's platform", () => {
                 block: "minecraft:orange_terracotta",
                 box: { x1: floor.x1, z1: floor.z1, y1: floor.y1 }
             });
-            expect(floor.x2 - floor.x1 + 1).toBe(players <= 6 ? 11 : 13);
+            expect(floor.x2 - floor.x1 + 1).toBe(players <= 6 ? 13 : players <= 12 ? 17 : 21);
+            // The whole floor is laid, whichever way.
+            const laid = new Set<string>();
+            for (const one of fills.filter(
+                (fill) => fill.box.y1 === floor.y1 && /terracotta/.test(fill.block)
+            ))
+                for (let x = one.box.x1; x <= one.box.x2; x += 1)
+                    for (let z = one.box.z1; z <= one.box.z2; z += 1) laid.add(`${x},${z}`);
+            expect(laid.size).toBe((floor.x2 - floor.x1 + 1) ** 2);
             expect(potato.reachOf(players) * 2).toBeGreaterThanOrEqual(box.z2 - box.z1);
         });
 
@@ -118,11 +132,58 @@ describe("hot potato's rounds", () => {
         expect(potato.hitBy({ x: 0, z: 0 }, [])).toBeNull();
     });
 
-    it("cannot be passed straight back", () => {
+    it("cannot be passed straight back, and reads a run saved with one holder", () => {
+        // Written before a round could have more than one potato.
         const state = potato.stateSchema.parse({ holder: "Ana", passedAt: 10_000 });
-        expect(potato.canPass(state, 10_000 + potato.PASS_COOLDOWN_MS - 1)).toBe(false);
-        expect(potato.canPass(state, 10_000 + potato.PASS_COOLDOWN_MS)).toBe(true);
-        expect(potato.canPass({ ...state, holder: null }, 99_999)).toBe(false);
+        expect(state.holders).toEqual([{ name: "Ana", passedAt: 10_000 }]);
+        expect(potato.canPass(state, "Ana", 10_000 + potato.PASS_COOLDOWN_MS - 1)).toBe(false);
+        expect(potato.canPass(state, "ana", 10_000 + potato.PASS_COOLDOWN_MS)).toBe(true);
+        expect(potato.canPass(state, "Ben", 99_999)).toBe(false);
+        expect(potato.stateSchema.parse({ holder: null }).holders).toEqual([]);
+    });
+
+    it("plays one potato up to ten left, one more for every ten past, never one each", () => {
+        expect([2, 3, 10, 11, 20, 21, 24].map(potato.potatoesFor)).toEqual([1, 1, 1, 2, 2, 3, 3]);
+        expect(potato.potatoesFor(1)).toBe(1);
+        const many = Array.from({ length: 24 }, (_, index) => `P${index}`);
+        for (let run = 0; run < 50; run += 1) {
+            const drawn = potato.holdersFor(`run-${run}`, 2, many, 3);
+            expect(drawn).toHaveLength(3);
+            expect(new Set(drawn).size).toBe(3);
+            // The first is the one a single potato would go to, so a run saved
+            // before keeps its holder; the draw does not hang on the order.
+            expect(drawn[0]).toBe(potato.holderFor(`run-${run}`, 2, many));
+            expect(potato.holdersFor(`run-${run}`, 2, [...many].reverse(), 3)).toEqual(drawn);
+        }
+        expect(potato.holdersFor("run-1", 1, [], 2)).toEqual([]);
+    });
+
+    it("puts cover inside the start ring, turned four ways, nothing touching", () => {
+        for (const players of [2, 8, 24])
+            for (let run = 0; run < 200; run += 1) {
+                const box = potato.platformBox({ x: 0, z: 0 }, 100, players);
+                const floor = potato.floorOf(box);
+                const half = (floor.x2 - floor.x1) / 2;
+                const cover = potato.coverFor(`run-${run}`, half);
+                expect(cover.length).toBeGreaterThanOrEqual(4);
+                expect(cover.length % 4).toBe(0);
+                const cells = new Set(cover.map((one) => `${one.dx},${one.dz}`));
+                expect(cells.size).toBe(cover.length);
+                for (const one of cover) {
+                    expect(cells.has(`${-one.dz},${one.dx}`)).toBe(true);
+                    expect(Math.hypot(one.dx, one.dz)).toBeLessThan(half - 2.5);
+                    for (const other of cover)
+                        if (other !== one)
+                            expect(
+                                Math.max(Math.abs(one.dx - other.dx), Math.abs(one.dz - other.dz))
+                            ).toBeGreaterThan(1);
+                }
+                const center = { x: (floor.x1 + floor.x2) / 2, z: (floor.z1 + floor.z2) / 2 };
+                for (let index = 0; index < players; index += 1) {
+                    const spot = potato.startSpot(box, index, players);
+                    expect(cells.has(`${spot.x - center.x},${spot.z - center.z}`)).toBe(false);
+                }
+            }
     });
 
     it("ranks by the order players went out, the one left above all, the same moment the same", () => {
@@ -172,15 +233,16 @@ describe("what hot potato says", () => {
     for (const language of ["en", "es"] as const) {
         it(`fits one command in ${language}`, () => {
             const lines = [
-                said.roundLine(99, LONG, language),
+                said.roundLine(99, [LONG], language),
+                said.roundLine(99, [LONG, LONG, LONG], language),
                 said.passed(LONG, LONG, language),
                 said.exploded(LONG, 11, language),
                 said.leftGame(LONG, language),
                 said.winner(LONG, language),
                 said.holdingBar(40, language),
-                said.awayBar(LONG, 40, language),
+                said.awayBar([LONG, LONG, LONG], 40, language),
                 said.galleryBar(language),
-                said.bar(99, LONG, 40, language)
+                said.bar(99, [LONG, LONG, LONG], 40, language)
             ].map((line) => commands.say(messages.tag(language) + line));
             for (const line of lines)
                 expect(commandBytes(line)).toBeLessThanOrEqual(COMMAND_BYTES_MAX);
