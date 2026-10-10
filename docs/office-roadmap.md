@@ -80,7 +80,7 @@ candidacy.
 | Sheets | **Univer** core + GenOffice's domain and gateway | Apache-2.0 both | The engine GenOffice itself chose, and the only serious web spreadsheet with a formula engine and canvas rendering. Its missing half is exactly what GenOffice supplies. |
 | Docs | **TipTap/ProseMirror**, already in Polaris, plus `docx-engine` for import and export | MIT / Apache-2.0 | Polaris has one rich-text surface already ([[rich-text-editor]]); a second would be two editors to keep in step. Page-faithful pagination is a later chapter, not a reason to start again. |
 | Slides | Polaris' own canvas over `pptx-engine`'s model | Apache-2.0 | No web presentation editor is both complete and permissively licensed. PPTist is MIT but Vue, and Polaris is React. |
-| Diagrams | Polaris' own canvas | - | Written in Polaris with its icons, type and spacing, and no third-party editor or dependency behind it. |
+| Diagrams | `@polaris/diagrams`, kept in this repository | MIT | An MIT-licensed editor kept in-house at a fixed release (notices in its `LICENSE`), drawn with Polaris's icons, type and spacing and calling no outside service. |
 
 **tldraw is refused.** Its SDK licence changed in September 2025: production use
 now needs a paid commercial licence (reported around $6,000/year) or a free tier
