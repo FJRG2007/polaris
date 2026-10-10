@@ -222,7 +222,7 @@ describe("the diagram canvas's assets", () => {
 
     it("are built: fonts under dist/editor/fonts, and the licence beside them", () => {
         const fonts = readdirSync(join(dist, "editor", "fonts"));
-        expect(fonts).toEqual(expect.arrayContaining(["Handwritten", "Virgil", "Cascadia"]));
+        expect(fonts).toEqual(expect.arrayContaining(["Handwritten", "Sans", "Mono", "Nunito", "ComicShanns", "Virgil", "Cascadia"]));
         expect(readFileSync(join(packageRoot, "LICENSE"), "utf8")).toMatch(/MIT License/);
     });
 

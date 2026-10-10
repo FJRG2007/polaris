@@ -38,11 +38,20 @@ export const FONT_METADATA: Record<number, FontMetadata> = {
   [FONT_FAMILY.Handwritten]: {
     metrics: {
       unitsPerEm: 1000,
-      ascender: 886,
-      descender: -374,
+      ascender: 1170,
+      descender: -340,
       lineHeight: 1.25,
     },
     icon: FreedrawIcon,
+  },
+  [FONT_FAMILY["Polaris Sans"]]: {
+    metrics: {
+      unitsPerEm: 1000,
+      ascender: 1025,
+      descender: -275,
+      lineHeight: 1.3,
+    },
+    icon: FontFamilyNormalIcon,
   },
   [FONT_FAMILY.Nunito]: {
     metrics: {
@@ -52,6 +61,17 @@ export const FONT_METADATA: Record<number, FontMetadata> = {
       lineHeight: 1.35,
     },
     icon: FontFamilyNormalIcon,
+    deprecated: true,
+  },
+  [FONT_FAMILY["Comic Shanns"]]: {
+    metrics: {
+      unitsPerEm: 1000,
+      ascender: 750,
+      descender: -250,
+      lineHeight: 1.25,
+    },
+    icon: FontFamilyCodeIcon,
+    deprecated: true,
   },
   [FONT_FAMILY["Lilita One"]]: {
     metrics: {
@@ -62,12 +82,12 @@ export const FONT_METADATA: Record<number, FontMetadata> = {
     },
     icon: FontFamilyHeadingIcon,
   },
-  [FONT_FAMILY["Comic Shanns"]]: {
+  [FONT_FAMILY["Polaris Mono"]]: {
     metrics: {
       unitsPerEm: 1000,
-      ascender: 750,
-      descender: -250,
-      lineHeight: 1.25,
+      ascender: 1025,
+      descender: -275,
+      lineHeight: 1.3,
     },
     icon: FontFamilyCodeIcon,
   },
