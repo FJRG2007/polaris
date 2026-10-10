@@ -31,21 +31,43 @@ const CONTROLS_FOR_MS = 2500;
 /** How far a finger has to travel sideways for a swipe to turn the slide. */
 const SWIPE_PX = 50;
 
+/** Where a show goes next, as the presenter view and the audience window
+ *  tell each other. */
+export type ShowStep = "next" | "previous" | "first" | "last";
+
 export function Present({
     slides,
     bySlide,
     from,
-    onClose
+    onClose,
+    driven
 }: {
     slides: readonly deck.Slide[];
     bySlide: ReadonlyMap<string, readonly deck.Box[]>;
     from: number;
     onClose: () => void;
+    /** A show whose slide is decided elsewhere - the audience window, which
+     *  the presenter view turns. `at` is where it is, and every press here is
+     *  asked of `go` instead of turning the slide itself. */
+    driven?: { at: number; go: (step: ShowStep) => void };
 }) {
     const t = useTranslations("office");
     const surface = useRef<HTMLDivElement | null>(null);
     // One past the last slide is the end screen.
-    const [at, setAt] = useState(Math.max(0, Math.min(from, slides.length - 1)));
+    const [own, setOwn] = useState(Math.max(0, Math.min(from, slides.length - 1)));
+    const at = driven ? Math.min(driven.at, slides.length) : own;
+    const drive = useRef(driven);
+    drive.current = driven;
+    const step = useCallback(
+        (to: ShowStep): void => {
+            if (drive.current) return drive.current.go(to);
+            if (to === "first") setOwn(0);
+            else if (to === "last") setOwn(slides.length - 1);
+            else if (to === "previous") setOwn((one) => Math.max(0, one - 1));
+            else setOwn((one) => one + 1);
+        },
+        [slides.length]
+    );
     const [controls, setControls] = useState(true);
     const [full, setFull] = useState(false);
     /** Whether this browser lets a page go full screen at all - an iPhone does
@@ -61,10 +83,10 @@ export function Present({
     const slide = slides[at];
 
     const next = useCallback(() => {
-        if (at >= slides.length) close.current();
-        else setAt(at + 1);
-    }, [at, slides.length]);
-    const previous = useCallback(() => setAt((one) => Math.max(0, one - 1)), []);
+        if (at >= slides.length && !drive.current) close.current();
+        else step("next");
+    }, [at, slides.length, step]);
+    const previous = useCallback(() => step("previous"), [step]);
 
     const wake = useCallback(() => {
         setControls(true);
@@ -150,7 +172,8 @@ export function Present({
                 // PowerPoint.
                 if (ended && (action === null || action === "viewer.nextSlide")) {
                     event.preventDefault();
-                    onClose();
+                    if (driven) next();
+                    else onClose();
                     return;
                 }
                 switch (action) {
@@ -161,10 +184,10 @@ export function Present({
                         previous();
                         break;
                     case "viewer.firstSlide":
-                        setAt(0);
+                        step("first");
                         break;
                     case "viewer.lastSlide":
-                        setAt(slides.length - 1);
+                        step("last");
                         break;
                     default:
                         return;

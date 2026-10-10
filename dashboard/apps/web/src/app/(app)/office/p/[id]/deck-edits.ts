@@ -29,6 +29,43 @@ export function boxesOf(doc: Y.Doc): Y.Map<deck.Box> {
     return doc.getMap<deck.Box>(OFFICE_FIELDS.slides.boxes);
 }
 
+/** Each slide's speaker notes, keyed by its id - see `deck.notesOf`. */
+export function notesOf(doc: Y.Doc): Y.Map<string> {
+    return doc.getMap<string>(OFFICE_FIELDS.slides.notes);
+}
+
+/** Every picture in the deck, kept once, keyed by the id its boxes name. */
+export function imagesOf(doc: Y.Doc): Y.Map<string> {
+    return doc.getMap<string>(OFFICE_FIELDS.slides.images);
+}
+
+/** What an image box shows: the picture itself, out of the deck's store when it
+ *  is kept there. */
+export function imageSource(doc: Y.Doc, src: string): string {
+    if (!src.startsWith(deck.IMAGE_PREFIX)) return src;
+    return imagesOf(doc).get(src.slice(deck.IMAGE_PREFIX.length)) ?? "";
+}
+
+/** Every picture no box shows any more, out of the store - in the same
+ *  transaction as the removal, so one undo brings the box and its picture back. */
+function dropUnusedImages(doc: Y.Doc): void {
+    const images = imagesOf(doc);
+    if (images.size === 0) return;
+    const used = new Set<string>();
+    for (const box of boxesOf(doc).values()) {
+        const { src } = deck.readBox(box);
+        if (src.startsWith(deck.IMAGE_PREFIX)) used.add(src.slice(deck.IMAGE_PREFIX.length));
+    }
+    for (const key of [...images.keys()]) if (!used.has(key)) images.delete(key);
+}
+
+/** The key a picture is already kept under, so a copy pasted into the same
+ *  deck names it rather than storing it again. */
+function keptImage(doc: Y.Doc, data: string): string | undefined {
+    for (const [key, stored] of imagesOf(doc).entries()) if (stored === data) return key;
+    return undefined;
+}
+
 function change(doc: Y.Doc, edit: () => void): void {
     doc.transact(edit, LOCAL);
 }
@@ -48,11 +85,17 @@ export function duplicateSlide(doc: Y.Doc, slideId: string, index: number): stri
     const id = crypto.randomUUID();
     change(doc, () => {
         const boxes = boxesOf(doc);
-        slidesOf(doc).insert(index + 1, [{ id, notes: "" }]);
+        const slides = slidesOf(doc);
+        const original = slides.get(index);
+        slides.insert(index + 1, [{ id, notes: "" }]);
         for (const box of deck.boxesOn(slideId, new Map(boxes.entries()))) {
             const copy = crypto.randomUUID();
             boxes.set(deck.boxKey(id, copy), { ...box, id: copy, version: 1 });
         }
+        // The notes go with it, as in every deck editor: a copied slide is
+        // usually the same point made again.
+        const notes = original ? deck.notesOf(original, new Map(notesOf(doc).entries())) : "";
+        if (notes) notesOf(doc).set(id, notes);
     });
     return id;
 }
@@ -68,6 +111,8 @@ export function removeSlide(doc: Y.Doc, slideId: string): void {
         for (const key of [...boxes.keys()]) {
             if (deck.readBoxKey(key)?.slideId === slideId) boxes.delete(key);
         }
+        notesOf(doc).delete(slideId);
+        dropUnusedImages(doc);
     });
 }
 
@@ -88,20 +133,93 @@ export function moveSlide(doc: Y.Doc, from: number, to: number): void {
     });
 }
 
-/** A new box on a slide; its id, so the screen can choose it. */
-export function addBox(doc: Y.Doc, slideId: string, kind: deck.BoxKind): string {
-    const id = crypto.randomUUID();
-    change(doc, () => boxesOf(doc).set(deck.boxKey(slideId, id), deck.newBox(kind, id)));
-    return id;
+function onSlide(doc: Y.Doc, slideId: string): deck.Box[] {
+    return deck.boxesOn(slideId, new Map(boxesOf(doc).entries()));
 }
 
-/** Boxes placed on a slide as they are - pasted or duplicated. */
+/** A new box on a slide, on top of everything on it; its id, so the screen can
+ *  choose it. */
+export function addBox(
+    doc: Y.Doc,
+    slideId: string,
+    kind: deck.BoxKind,
+    shape?: deck.ShapeKind
+): string {
+    const box = deck.newBox(kind, crypto.randomUUID(), shape);
+    placeBoxes(doc, slideId, [box]);
+    return box.id;
+}
+
+/** Boxes placed on a slide as they are - pasted or duplicated - on top of what
+ *  is already there, in the order given. */
 export function placeBoxes(doc: Y.Doc, slideId: string, boxes: readonly deck.Box[]): void {
     if (boxes.length === 0) return;
     change(doc, () => {
         const map = boxesOf(doc);
-        for (const box of boxes) map.set(deck.boxKey(slideId, box.id), box);
+        let z = deck.nextZ(onSlide(doc, slideId));
+        for (const box of boxes) {
+            map.set(deck.boxKey(slideId, box.id), { ...box, z });
+            z += 1;
+        }
     });
+}
+
+/**
+ * A picture kept in the deck's store and shown on a slide as one box.
+ *
+ * The picture is written once; the box names it. So moving or resizing it is a
+ * change of a few numbers, rather than the whole picture sent to everybody
+ * again on every drag.
+ */
+export function addImage(doc: Y.Doc, slideId: string, data: string, frame: deck.BoxFrame): string {
+    const key = crypto.randomUUID();
+    const box: deck.Box = {
+        ...deck.newBox("image", crypto.randomUUID()),
+        ...frame,
+        src: `${deck.IMAGE_PREFIX}${key}`
+    };
+    change(doc, () => {
+        imagesOf(doc).set(key, data);
+        placeBoxes(doc, slideId, [box]);
+    });
+    return box.id;
+}
+
+/** Boxes placed as pasted, with every picture that came inline moved into the
+ *  deck's store - one step, so one undo takes the whole paste back. */
+export function pasteBoxes(doc: Y.Doc, slideId: string, boxes: readonly deck.Box[]): void {
+    if (boxes.length === 0) return;
+    change(doc, () => {
+        const kept = boxes.map((box) => {
+            if (box.kind !== "image" || !box.src.startsWith("data:image/")) return box;
+            const key = keptImage(doc, box.src) ?? crypto.randomUUID();
+            if (!imagesOf(doc).has(key)) imagesOf(doc).set(key, box.src);
+            return { ...box, src: `${deck.IMAGE_PREFIX}${key}` };
+        });
+        placeBoxes(doc, slideId, kept);
+    });
+}
+
+/** A box moved through the stack - one step, however many boxes it passes. */
+export function arrangeBox(doc: Y.Doc, slideId: string, boxId: string, how: deck.Arrange): void {
+    const changes = deck.arrange(onSlide(doc, slideId), boxId, how);
+    if (changes.size === 0) return;
+    change(doc, () => {
+        const map = boxesOf(doc);
+        for (const [id, z] of changes) {
+            const key = deck.boxKey(slideId, id);
+            const box = map.get(key);
+            if (box) map.set(key, { ...box, z, version: deck.readBox(box).version + 1 });
+        }
+    });
+}
+
+/** A slide's speaker notes, unless they already say that. */
+export function setNotes(doc: Y.Doc, slide: deck.Slide, text: string): void {
+    const notes = notesOf(doc);
+    const next = text.slice(0, deck.NOTES_MAX);
+    if (deck.notesOf(slide, new Map(notes.entries())) === next) return;
+    change(doc, () => notes.set(slide.id, next));
 }
 
 export function removeBoxes(doc: Y.Doc, slideId: string, ids: readonly string[]): void {
@@ -109,6 +227,7 @@ export function removeBoxes(doc: Y.Doc, slideId: string, ids: readonly string[])
     change(doc, () => {
         const map = boxesOf(doc);
         for (const id of ids) map.delete(deck.boxKey(slideId, id));
+        dropUnusedImages(doc);
     });
 }
 
@@ -122,18 +241,34 @@ export function updateBox(
 ): void {
     const map = boxesOf(doc);
     const key = deck.boxKey(slideId, boxId);
-    const box = map.get(key);
-    if (!box) return;
+    const stored = map.get(key);
+    if (!stored) return;
+    // Compared with the box as it is drawn, so a field an older editor never
+    // wrote reads as its default rather than as a change.
+    const box = deck.readBox(stored);
     const same = (Object.keys(patch) as (keyof typeof patch)[]).every(
         (field) => patch[field] === box[field]
     );
     if (same) return;
-    change(doc, () => map.set(key, { ...box, ...patch, version: box.version + 1 }));
+    change(doc, () => map.set(key, { ...stored, ...patch, version: box.version + 1 }));
 }
 
-/** A box moved or resized, kept on the slide. */
-export function setFrame(doc: Y.Doc, slideId: string, boxId: string, frame: deck.BoxFrame): void {
-    updateBox(doc, slideId, boxId, deck.clampFrame(frame));
+/** A box moved or resized, kept on the slide. A line also says which way it
+ *  runs, since its frame alone does not. */
+export function setFrame(
+    doc: Y.Doc,
+    slideId: string,
+    boxId: string,
+    frame: deck.BoxFrame & { flip?: boolean; reversed?: boolean }
+): void {
+    const stored = boxesOf(doc).get(deck.boxKey(slideId, boxId));
+    if (!stored) return;
+    const kept = deck.clampFrame(frame, deck.smallestFor(deck.readBox(stored)));
+    const turned = {
+        ...(frame.flip === undefined ? {} : { flip: frame.flip }),
+        ...(frame.reversed === undefined ? {} : { reversed: frame.reversed })
+    };
+    updateBox(doc, slideId, boxId, { ...kept, ...turned });
 }
 
 /**
@@ -163,7 +298,7 @@ export function useDocumentVersion(doc: Y.Doc): number {
 
 /** The history of this tab's own changes to a deck - see `useDeckHistory`. */
 export function deckUndoManager(doc: Y.Doc): Y.UndoManager {
-    return new Y.UndoManager([slidesOf(doc), boxesOf(doc)], {
+    return new Y.UndoManager([slidesOf(doc), boxesOf(doc), notesOf(doc), imagesOf(doc)], {
         trackedOrigins: new Set([LOCAL]),
         captureTimeout: 0
     });

@@ -86,7 +86,7 @@ export const FONT_FAMILIES = [
 export const FONT_SIZES = [8, 9, 10, 11, 12, 14, 16, 18, 20, 24, 28, 32, 36, 48, 72] as const;
 
 /** A colour on offer, and the name it is read out under. */
-interface ColorChoice {
+export interface ColorChoice {
     value: string;
     label: NamespaceKey<"components">;
 }
@@ -669,7 +669,7 @@ function Picked({
 }
 
 /** A colour, from a short palette or none at all. */
-function SwatchMenu({
+export function SwatchMenu({
     label,
     noneLabel,
     icon,

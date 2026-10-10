@@ -38,8 +38,9 @@ export const OFFICE_FIELDS = {
     doc: { body: OFFICE_FIELD },
     /** A workbook: the cells, and the shape of the sheets around them. */
     sheet: { cells: "cells", shape: "shape" },
-    /** A deck: the slides in order, and every box keyed by slide and box. */
-    slides: { slides: "slides", boxes: "boxes" },
+    /** A deck: the slides in order, every box keyed by slide and box, each
+     *  slide's speaker notes keyed by slide, and each picture kept once. */
+    slides: { slides: "slides", boxes: "boxes", notes: "notes", images: "images" },
     /** A drawing: the elements, and the canvas state around them. */
     diagram: { shapes: "shapes", scene: "scene" },
     /** A comparison: what is being compared, against what, and every answer. */
@@ -77,11 +78,7 @@ export function excerptOf(doc: Y.Doc): string {
         collect(shared, words);
         if (words.join(" ").length >= MAX_EXCERPT) break;
     }
-    return words
-        .join(" ")
-        .replace(/\s+/g, " ")
-        .trim()
-        .slice(0, MAX_EXCERPT);
+    return words.join(" ").replace(/\s+/g, " ").trim().slice(0, MAX_EXCERPT);
 }
 
 /** The text under one shared type, however deeply it nests. */

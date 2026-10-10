@@ -248,7 +248,85 @@
         "exitFullScreen": "Salir de pantalla completa",
         "fullScreen": "Pantalla completa",
         "endOfShow": "Fin de la presentación",
-        "endHint": "Haz clic o pulsa una tecla para salir."
+        "endHint": "Haz clic o pulsa una tecla para salir.",
+        "lineEnd": "Arrastra este extremo",
+        "shapes": {
+            "rect": "Rectángulo",
+            "rounded": "Rectángulo redondeado",
+            "ellipse": "Óvalo",
+            "triangle": "Triángulo",
+            "diamond": "Rombo",
+            "arrowRight": "Flecha derecha",
+            "line": "Línea",
+            "arrow": "Flecha"
+        },
+        "image": {
+            "insert": "Imagen",
+            "name": "Imagen",
+            "notAPicture": "Ese archivo no es una imagen.",
+            "tooLarge": "Esa imagen es demasiado grande para una diapositiva.",
+            "unreadable": "No se ha podido leer esa imagen."
+        },
+        "format": {
+            "fontSize": "Tamaño",
+            "smaller": "Reducir la fuente",
+            "bigger": "Aumentar la fuente",
+            "bold": "Negrita",
+            "italic": "Cursiva",
+            "underline": "Subrayado",
+            "textColor": "Color",
+            "automatic": "Automático",
+            "align": "Alinear",
+            "aligns": {
+                "left": "Izquierda",
+                "center": "Centro",
+                "right": "Derecha"
+            },
+            "valign": "Alinear vertical",
+            "valigns": {
+                "top": "Arriba",
+                "middle": "En medio",
+                "bottom": "Abajo"
+            },
+            "bulletList": "Lista con viñetas",
+            "numberedList": "Lista numerada",
+            "fill": "Relleno",
+            "noFill": "Transparente",
+            "border": "Color del borde",
+            "noBorder": "Sin borde",
+            "borderWeight": "Grosor del borde",
+            "lineColor": "Color de línea",
+            "lineWeight": "Grosor de línea",
+            "points": "{points} pt",
+            "arrange": "Organizar",
+            "arranges": {
+                "front": "Traer al frente",
+                "forward": "Traer adelante",
+                "backward": "Enviar atrás",
+                "back": "Enviar al fondo"
+            }
+        },
+        "notes": {
+            "title": "Notas del orador",
+            "placeholder": "Haz clic para añadir notas"
+        },
+        "presenter": {
+            "title": "Vista de orador",
+            "elapsed": "Tiempo desde el inicio",
+            "pause": "Pausar el reloj",
+            "resume": "Reanudar el reloj",
+            "reset": "Reiniciar el reloj",
+            "openAudience": "Abrir ventana del público",
+            "showAudience": "Ver ventana del público",
+            "current": "En pantalla",
+            "nextUp": "Después",
+            "smallerNotes": "Reducir notas",
+            "largerNotes": "Ampliar notas",
+            "noNotes": "Esta diapositiva no tiene notas del orador."
+        },
+        "audience": {
+            "title": "Vista del público"
+        }
     },
     "positioning": {
         "twoThingsToMeasure": "Dos cosas que medir",
