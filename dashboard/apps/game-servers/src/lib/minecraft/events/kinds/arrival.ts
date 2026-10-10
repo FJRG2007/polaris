@@ -121,7 +121,7 @@ export async function countdown(
             `title ${target} times 0 25 5`,
             `title ${target} subtitle ${commands.text(messages.getReady(language))}`,
             `title ${target} title ${commands.text(messages.countdownNumber(left))}`,
-            `execute as ${target} at @s run playsound ${commands.SOUNDS.tick} master @s ~ ~ ~ 1 1`
+            `execute as ${target} at @s run playsound ${commands.SOUNDS.tick} master @s ~ ~ ~ 1 1 0`
         ]);
         await pause(1_000);
     }

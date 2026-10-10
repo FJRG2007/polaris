@@ -25,6 +25,7 @@ import { GameConsole } from "./game-console";
 import { CardBoundary } from "../../components/card-boundary";
 import { MinecraftAnnounce } from "./minecraft-announce";
 import { MinecraftChatLink } from "./minecraft-chat-link";
+import { MinecraftSounds } from "./minecraft-sounds";
 import { MinecraftSidebar } from "./minecraft-sidebar";
 import { MinecraftXray } from "./minecraft-xray";
 import { MinecraftEvents } from "./minecraft-events";
@@ -594,6 +595,18 @@ export function MinecraftPanel({
                 )}
                 {tab === "panel" && (
                     <MinecraftSidebar installedAppId={installedAppId} canManage={canManage} />
+                )}
+                {tab === "sounds" && (
+                    <CardBoundary name="Sounds">
+                        <MinecraftSounds
+                            installedAppId={installedAppId}
+                            canManage={canManage}
+                            canPlay={held.includes("games.console")}
+                            running={isRunning}
+                            players={status?.players.players ?? []}
+                            edition={(game?.edition ?? status?.edition ?? "java") === "bedrock" ? "bedrock" : "java"}
+                        />
+                    </CardBoundary>
                 )}
                 {tab === "chat" && <MinecraftChatLink installedAppId={installedAppId} />}
                 {tab === "events" && (

@@ -1,0 +1,129 @@
+package polaris.minecraft;
+
+import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
+import java.util.HashMap;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Optional;
+import java.util.UUID;
+import java.util.regex.Pattern;
+
+/**
+ * What Polaris tells the server about its own sounds
+ * ({@code GET /api/minecraft/sounds/<id>}): the resource pack to hand players,
+ * and the sounds this jar plays on its own when somebody arrives.
+ *
+ * Read strictly, in the mod and the plugin alike. A sound becomes part of a
+ * command, so only a namespaced id of the shape Polaris writes is kept, and
+ * volume and pitch are clamped to what the game accepts; anything else in the
+ * reply is dropped rather than trusted.
+ */
+record SoundConfig(Pack pack, Sound join, Sound welcome, Map<String, Sound> players) {
+    /** The scoreboard tag a player carries once their game has loaded the pack:
+     *  the dashboard plays the server's sounds to these players only. */
+    static final String LOADED_TAG = "polaris_sounds";
+    /** Kept in the player's file: they have been here before. */
+    static final String SEEN_TAG = "polaris_seen";
+
+    static final SoundConfig NONE = new SoundConfig(null, null, null, Map.of());
+
+    private static final Pattern SOUND = Pattern.compile("^polaris:[a-z0-9_]{1,40}$");
+    private static final Pattern SHA1 = Pattern.compile("^[0-9a-f]{40}$");
+    private static final Pattern PLAYER = Pattern.compile("^[a-z0-9_]{1,16}$");
+    private static final int MAX_PROMPT = 160;
+    private static final int MAX_URL = 1024;
+    private static final int MAX_PLAYERS = 200;
+
+    record Pack(UUID id, String url, String sha1, boolean required, Optional<String> prompt) {}
+
+    record Sound(String id, double volume, double pitch) {
+        /** The command that plays it to everybody the selector names, where they stand. */
+        String command(String selector) {
+            return "execute as " + selector + " at @s run playsound " + id + " master @s ~ ~ ~ "
+                    + number(volume) + " " + number(pitch);
+        }
+
+        private static String number(double value) {
+            return String.format(Locale.ROOT, "%.3f", value).replaceAll("\\.?0+$", "");
+        }
+    }
+
+    /** The sound a player arrives to: their own, or everybody's. */
+    Sound arrival(String player) {
+        Sound own = players.get(player.toLowerCase(Locale.ROOT));
+        return own != null ? own : join;
+    }
+
+    static SoundConfig parse(JsonObject body) {
+        if (!flag(body, "ok")) return null;
+        Map<String, Sound> players = new HashMap<>();
+        JsonElement list = body.get("players");
+        if (list != null && list.isJsonArray()) {
+            JsonArray array = list.getAsJsonArray();
+            for (int at = 0; at < array.size() && players.size() < MAX_PLAYERS; at++) {
+                if (!array.get(at).isJsonObject()) continue;
+                JsonObject one = array.get(at).getAsJsonObject();
+                String name = text(one, "player").toLowerCase(Locale.ROOT);
+                Sound sound = sound(one);
+                if (PLAYER.matcher(name).matches() && sound != null) players.put(name, sound);
+            }
+        }
+        return new SoundConfig(pack(body.get("pack")), soundAt(body, "join"), soundAt(body, "welcome"), Map.copyOf(players));
+    }
+
+    private static Pack pack(JsonElement element) {
+        if (element == null || !element.isJsonObject()) return null;
+        JsonObject pack = element.getAsJsonObject();
+        String url = text(pack, "url");
+        String sha1 = text(pack, "sha1");
+        if (url.length() > MAX_URL || !(url.startsWith("https://") || url.startsWith("http://"))) return null;
+        if (!SHA1.matcher(sha1).matches()) return null;
+        UUID id;
+        try {
+            id = UUID.fromString(text(pack, "id"));
+        } catch (IllegalArgumentException invalid) {
+            return null;
+        }
+        String prompt = text(pack, "prompt").strip();
+        if (prompt.length() > MAX_PROMPT) prompt = prompt.substring(0, MAX_PROMPT);
+        return new Pack(id, url, sha1, flag(pack, "required"), prompt.isEmpty() ? Optional.empty() : Optional.of(prompt));
+    }
+
+    private static Sound soundAt(JsonObject body, String field) {
+        JsonElement element = body.get(field);
+        return element != null && element.isJsonObject() ? sound(element.getAsJsonObject()) : null;
+    }
+
+    private static Sound sound(JsonObject one) {
+        String id = text(one, "sound");
+        if (!SOUND.matcher(id).matches()) return null;
+        return new Sound(id, clamp(number(one, "volume", 1), 0, 1), clamp(number(one, "pitch", 1), 0.5, 2));
+    }
+
+    private static double clamp(double value, double low, double high) {
+        return Double.isFinite(value) ? Math.max(low, Math.min(high, value)) : 1;
+    }
+
+    private static String text(JsonObject body, String field) {
+        JsonElement value = body.get(field);
+        return value != null && value.isJsonPrimitive() ? value.getAsString() : "";
+    }
+
+    private static boolean flag(JsonObject body, String field) {
+        JsonElement value = body.get(field);
+        return value != null && value.isJsonPrimitive() && value.getAsJsonPrimitive().isBoolean() && value.getAsBoolean();
+    }
+
+    private static double number(JsonObject body, String field, double fallback) {
+        JsonElement value = body.get(field);
+        return value != null && value.isJsonPrimitive() && value.getAsJsonPrimitive().isNumber() ? value.getAsDouble() : fallback;
+    }
+
+    /** Whether the server's environment leaves its sounds on: they are unless
+     *  {@code POLARIS_SOUNDS=off}. */
+    static boolean wanted(Map<String, String> env) {
+        return !env.getOrDefault("POLARIS_SOUNDS", "").trim().equalsIgnoreCase("off");
+    }
+}

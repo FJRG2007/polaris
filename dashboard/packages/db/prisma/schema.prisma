@@ -4212,6 +4212,54 @@ model MinecraftAnticheatFlag {
     @@index([installedAppId, player, at])
 }
 
+// A sound an operator uploaded for one Minecraft server, as the game plays it:
+// an Ogg Vorbis file (the browser converts anything else before it is sent, and
+// the server checks it is one). Kept in the database rather than on a disk the
+// server's machine may not share: a sound is at most a few megabytes, a server
+// has at most a hundred, and the pack built from them is served from here.
+model MinecraftSound {
+    id             String   @id @default(uuid(7)) @db.Uuid
+    installedAppId String   @db.Uuid
+    // What `playsound polaris:<key>` names: lowercase letters, digits and
+    // underscores, unique on the server. Changes when the sound is renamed.
+    key            String
+    // As the operator typed it.
+    name           String
+    data           Bytes
+    // Of `data`, for the pack's file list and for telling a replaced file apart.
+    sha1           String
+    size           Int
+    channels       Int
+    sampleRate     Int
+    // Hundredths of a second are enough to show and to decide streaming.
+    seconds        Float
+    // Shown to players with subtitles on; empty for none.
+    subtitle       String   @default("")
+    // Streamed from disk rather than held in memory: music.
+    stream         Boolean  @default(false)
+    // One of the game's own sounds this one plays instead of ("minecraft:..."),
+    // or empty.
+    replaces       String   @default("")
+    createdAt      DateTime @default(now())
+    updatedAt      DateTime @updatedAt
+
+    @@unique([installedAppId, key])
+    @@index([installedAppId])
+}
+
+// What one Minecraft server does with its sounds: whether the pack is required,
+// the line the game shows when it asks, and the sounds put on event moments and
+// on players' arrivals - the shape is `soundSettingsSchema` in the game-servers
+// app, kept as JSON because it is only ever read whole. `revision` moves on every
+// change to the library, so the pack is rebuilt once per change and never per
+// download.
+model MinecraftSoundPack {
+    installedAppId String   @id @db.Uuid
+    revision       Int      @default(0)
+    settings       String   @default("{}")
+    updatedAt      DateTime @updatedAt
+}
+
 // A chat line Polaris's mod or plugin stopped on a Minecraft server, and why:
 // what the Moderation tab lists, and what a player's timeout is counted from.
 // Kept two weeks, trimmed as new ones arrive.

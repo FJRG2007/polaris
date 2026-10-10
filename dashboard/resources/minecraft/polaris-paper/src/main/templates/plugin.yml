@@ -2,7 +2,7 @@ name: Polaris
 version: "${version}"
 main: polaris.minecraft.PolarisPlugin
 api-version: "${api_version}"
-description: Asks every player for a password kept by Polaris before they can play.
+description: Polaris on this server - the login it keeps players' passwords for, and the server's own sounds.
 commands:
   register:
     description: Choose a password for this server.
@@ -13,3 +13,11 @@ commands:
   changepassword:
     description: Change your password.
     usage: /changepassword <current> <new>
+  polaris:
+    description: For Polaris itself, from the console. Answers one line of JSON.
+    usage: /polaris sounds <status|refresh>
+    permission: polaris.console
+permissions:
+  polaris.console:
+    description: Run Polaris's own console commands.
+    default: op

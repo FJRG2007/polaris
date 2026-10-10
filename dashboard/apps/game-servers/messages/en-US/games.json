@@ -1071,6 +1071,7 @@
     },
     "tabs": {
         "overview": "Overview",
+        "sounds": "Sounds",
         "console": "Console",
         "announce": "Announce",
         "panel": "Side panel",

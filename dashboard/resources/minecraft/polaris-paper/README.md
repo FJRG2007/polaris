@@ -35,11 +35,39 @@ Welcome back, Javier!"); nobody else, and nobody registering for the first
 time, gets more than the plugin's own "Logged in. Welcome back!" or "Password
 set. Welcome!".
 
+## Custom sounds
+
+Wherever Polaris has written its address, id and token, the plugin hands the
+server's own sounds (uploaded on its Sounds tab) to its players without a
+restart. It asks `GET /api/minecraft/sounds/<id>` when the server starts and
+again on `polaris sounds refresh`, which the dashboard runs after every change,
+and pushes the resource pack Polaris built to everybody on and everybody who
+joins. The pack goes under an id of its own, derived from the server's, so it
+stacks on the server's own resource pack instead of replacing it, and a newer
+one replaces the last.
+
+A player whose game has loaded it carries the `polaris_sounds` tag; the
+dashboard plays the server's sounds on event moments to those players and the
+game's own sounds to everybody else. The plugin also plays the arrival sound
+(the server's, or a player's own) to everybody with the pack, and the welcome
+sound to a player on their first visit (`polaris_seen`) once their pack has
+loaded. A player who turns down a pack the server requires is disconnected.
+
+`polaris sounds status` answers one line of JSON: the pack's checksum and each
+online player's state (`loaded`, `pending`, `declined`, `failed`).
+`POLARIS_SOUNDS=off` switches it all off.
+
+`polaris` is a console command (and so RCON); a player who runs it is refused.
+
 ## Configuration
 
 The same four variables as the mod, written by Polaris when the server's
 join-password card switches it on. The plugin does nothing unless
 `POLARIS_LOGIN` is `on`. With `online-mode=true` it asks for nothing.
+
+The custom sounds need only the address, id and token, so Polaris installs the
+plugin for them alone too, with `POLARIS_SOUNDS=on` to keep it on the server's
+list while the login is off.
 
 ## Building
 

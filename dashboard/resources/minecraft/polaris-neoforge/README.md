@@ -74,6 +74,28 @@ Messages the server or other mods send to players are not filtered: there is no
 event for them, and a filter on the outgoing packet would have to judge command
 output, death messages and every mod's feedback too.
 
+## Custom sounds
+
+Wherever Polaris has written its address, id and token, the mod hands the
+server's own sounds (uploaded on its Sounds tab) to its players without a
+restart. It asks `GET /api/minecraft/sounds/<id>` when the server starts and
+again on `polaris sounds refresh`, which the dashboard runs after every change,
+and pushes the resource pack Polaris built to everybody on and everybody who
+joins. The pack goes under an id of its own, derived from the server's, so it
+stacks on the server's own resource pack instead of replacing it, and a newer
+one replaces the last.
+
+A player whose game has loaded it carries the `polaris_sounds` tag; the
+dashboard plays the server's sounds on event moments to those players and the
+game's own sounds to everybody else. The mod also plays the arrival sound
+(the server's, or a player's own) to everybody with the pack, and the welcome
+sound to a player on their first visit (`polaris_seen`) once their pack has
+loaded. A player who turns down a pack the server requires is disconnected.
+
+`polaris sounds status` answers one line of JSON: the pack's checksum and each
+online player's state (`loaded`, `pending`, `declined`, `failed`).
+`POLARIS_SOUNDS=off` switches it all off.
+
 ## Event commands
 
 Always registered, idle until the dashboard runs one. Console and operators only
@@ -111,6 +133,7 @@ The login does nothing unless `POLARIS_LOGIN` is `on`.
 | `POLARIS_SERVER_TOKEN` | What the server proves it is with |
 | `POLARIS_ANTIXRAY`     | `off` to stop hiding buried ore   |
 | `POLARIS_ANTICHEAT`    | `off` to stop the anti-cheat      |
+| `POLARIS_SOUNDS`       | `off` to stop the custom sounds   |
 
 With `online-mode=true` the mod asks for nothing: Mojang already checks who
 players are.

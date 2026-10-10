@@ -12,7 +12,8 @@
         "assets": {
             "mcicons": ".assets/mcicons",
             "arkicons": ".assets/arkicons",
-            "minecraft-mods": ".assets/minecraft-mods"
+            "minecraft-mods": ".assets/minecraft-mods",
+            "ogg-encoder": ".assets/ogg-encoder"
         }
     },
     "dependencies": {
@@ -26,6 +27,7 @@
         "@polaris/storage": "0.1.0",
         "@polaris/ui": "0.1.0",
         "lucide-react": "0.469.0",
+        "wasm-media-encoders": "0.7.0",
         "zod": "3.24.1"
     },
     "peerDependencies": {

@@ -54,6 +54,9 @@ export const GAME_TABS: readonly GameTab[] = [
     // The box on the right of every player's screen. Its own screen rather than
     // the bottom of Announce, where nobody looking for it thought to scroll.
     { slug: "panel", label: "Side panel", permission: "games.console", games: ["minecraft"] }, // i18n-ignore
+    // The server's own sounds, as a resource pack handed to players: uploading
+    // and wiring them is the manager's; the screen checks again per action.
+    { slug: "sounds", label: "Sounds", permission: "games.manage", games: ["minecraft"] }, // i18n-ignore
     // The chat group or space the server talks through: whose call `{call.*}`
     // reads, where members ask it `/online`, where announcements are repeated.
     // A setting of the server, so the manager's.
