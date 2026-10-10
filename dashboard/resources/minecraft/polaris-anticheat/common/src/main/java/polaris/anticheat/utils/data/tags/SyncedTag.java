@@ -41,7 +41,10 @@ public final class SyncedTag<T> {
         // Server is sending tag replacement, clear default values.
         values.clear();
         for (int id : tag.getValues()) {
-            values.add(remapper.apply(id));
+            // Null is an id the engine cannot name (a modded block): skipped,
+            // so the rest of the tag still arrives.
+            final T value = remapper.apply(id);
+            if (value != null) values.add(value);
         }
     }
 
