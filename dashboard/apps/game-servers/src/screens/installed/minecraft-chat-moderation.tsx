@@ -65,10 +65,13 @@ function draftOf(rules: ChatModeration): Draft {
 export function ChatModerationSection({
     installedAppId,
     canManage,
+    playersOnline = 0,
     running
 }: {
     installedAppId: string;
     canManage: boolean;
+    /** Who a restart now would disconnect. */
+    playersOnline?: number;
     running: boolean;
 }) {
     const t = useGameText("minecraft");
@@ -373,6 +376,7 @@ export function ChatModerationSection({
                 <RestartPlanner
                     installedAppId={installedAppId}
                     running={running}
+                    playersOnline={playersOnline}
                     changed
                     reason={t("moderation.chat.restartReason")}
                     title={t("moderation.chat.restartTitle")}

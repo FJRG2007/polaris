@@ -25,6 +25,7 @@ import { reachedReady } from "../crash-loop";
 import { gameOfServer } from "@polaris/core";
 import { editionOf, withServerContainer } from "./service";
 import { readContainerBytes } from "../container-files";
+import { fetchLoaderVersions } from "./loader-versions";
 
 const { listEnvVars, setEnvVars } = host.envVarService;
 const { patchInstallConfig, readInstallConfig } = host.appsInstallConfig;
@@ -251,6 +252,73 @@ export async function releaseLoaderOnce(
         }
     });
     return { from: state.version };
+}
+
+/** The loader versions a server can be moved to, for the card's picker. */
+export interface LoaderVersions {
+    readonly loader: string;
+    readonly minecraft: string;
+    /** Newest first. Empty when the repository could not be read. */
+    readonly versions: readonly string[];
+}
+
+/** What this server's loader can be set to, or null when there is no choice to
+ *  make (see `loaderChoiceOf`). */
+export async function loaderVersionsFor(
+    ownerId: string,
+    installedAppId: string
+): Promise<LoaderVersions | null> {
+    const install = await installOf(ownerId, installedAppId);
+    if (!install) return null;
+    const choice = pin.loaderChoiceOf(await envOf(install.applicationId, ownerId));
+    if (!choice) return null;
+    return {
+        loader: choice.loader,
+        minecraft: choice.minecraft,
+        versions: await fetchLoaderVersions(choice.type, choice.minecraft)
+    };
+}
+
+export type LoaderChoice =
+    | { readonly state: "chosen"; readonly loader: string; readonly from: string | null }
+    /** Nothing to choose on this server, or not a version its repository lists
+     *  for the release. */
+    | { readonly state: "refused"; readonly reason: "none" | "unknown" };
+
+/**
+ * Hold the server at a loader version somebody picked. The caller restarts it.
+ *
+ * Only a version the loader's own repository lists for the server's release is
+ * written: anything else is a server that asks for a build that does not exist
+ * and never starts. An update that was waiting is called off - this is the
+ * newer decision.
+ */
+export async function chooseLoaderVersion(
+    ownerId: string,
+    installedAppId: string,
+    version: string
+): Promise<LoaderChoice> {
+    const install = await installOf(ownerId, installedAppId);
+    if (!install) return { state: "refused", reason: "none" };
+    const env = await envOf(install.applicationId, ownerId);
+    const choice = pin.loaderChoiceOf(env);
+    if (!choice) return { state: "refused", reason: "none" };
+    const listed = await fetchLoaderVersions(choice.type, choice.minecraft);
+    const vars = listed.includes(version.trim()) ? pin.chosenLoaderVars(env, version) : null;
+    if (!vars) return { state: "refused", reason: "unknown" };
+    const state = pin.loaderPinState(env);
+    await setEnvVars(
+        "application",
+        install.applicationId,
+        ownerId,
+        Object.entries(vars).map(([key, value]) => ({ key, value, isSecret: false }))
+    );
+    await patchInstallConfig(install.id, { [LOADER_PIN_KEY]: null }).catch(() => undefined);
+    return {
+        state: "chosen",
+        loader: choice.loader,
+        from: state.state === "held" ? state.version : null
+    };
 }
 
 /**

@@ -531,7 +531,24 @@ export function MinecraftPanel({
                         reason={t("panel.loginUpdateReason")}
                         title={t("panel.polarisLoginHasAnUpdate")}
                         detail={t("panel.loginUpdateDetail")}
+                        playersOnline={status?.players.online ?? 0}
                         onRestarted={() => void login.reload()}
+                    />
+                )}
+
+                {/* A mod put on or taken off the list without a restart - Symbiote,
+                    a plugin list, a pack - is installed when the server boots. The
+                    same card as the login update, so it reads as the same act. */}
+                {canManage && isRunning && game?.modsAwaitRestart && (
+                    <RestartPlanner
+                        installedAppId={installedAppId}
+                        running={isRunning}
+                        changed
+                        reason={t("panel.modsChangedReason")}
+                        title={t("panel.modsWaitForARestart")}
+                        detail={t("panel.modsChangedDetail")}
+                        playersOnline={status?.players.online ?? 0}
+                        onRestarted={reloadSettings}
                     />
                 )}
 
@@ -647,6 +664,7 @@ export function MinecraftPanel({
                             installedAppId={installedAppId}
                             canManage={canManage}
                             running={isRunning}
+                            playersOnline={status?.players.online ?? 0}
                         />
                     </CardBoundary>
                 )}
@@ -723,6 +741,7 @@ export function MinecraftPanel({
                                         installedAppId={installedAppId}
                                         canManage={canManage}
                                         onInstalled={setSymbioteInstalled}
+                                        onChanged={reloadSettings}
                                     />
                                 ) : null
                             }
@@ -852,6 +871,7 @@ export function MinecraftPanel({
                                 playersOnline={status?.players.online ?? 0}
                                 running={isRunning}
                                 withMemory
+                                javaRelease={edition === "java"}
                                 onSaved={reloadSettings}
                             />
                         </CardBoundary>

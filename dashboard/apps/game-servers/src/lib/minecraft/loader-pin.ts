@@ -308,6 +308,38 @@ export function loaderReleasedBy(current: EnvReader, next: EnvReader): string[] 
     return unpinVars(next);
 }
 
+/**
+ * Where a server is choosing its loader version from: the loader and the exact
+ * release it runs. Null when there is nothing to choose - not a loader this
+ * holds, one of somebody's own, or a release that is itself "newest", for which
+ * no list of loader versions means anything.
+ */
+export function loaderChoiceOf(
+    env: EnvReader
+): { readonly type: PinnableType; readonly loader: string; readonly minecraft: string } | null {
+    const state = loaderPinState(env);
+    if (state.state !== "held" && state.state !== "following") return null;
+    if (!isExactRelease(env("VERSION"))) return null;
+    const spec = loaderSpecOf(env("TYPE"));
+    return spec ? { type: spec.type, loader: spec.name, minecraft: env("VERSION").trim() } : null;
+}
+
+/**
+ * The variables that hold the server at a version somebody chose.
+ *
+ * Written into the main spelling, and the older spellings emptied, so the image
+ * cannot read a stale one first. Null for a value that is not a version - the
+ * caller has already checked it against the repository's own list.
+ */
+export function chosenLoaderVars(env: EnvReader, version: string): Record<string, string> | null {
+    const spec = loaderSpecOf(env("TYPE"));
+    const value = version.trim();
+    if (!spec || !VERSION_SHAPE.test(value) || isMoving(value, spec.moving)) return null;
+    const vars: Record<string, string> = { [spec.key]: value };
+    for (const key of spec.legacyKeys) if (env(key).trim().length > 0) vars[key] = "";
+    return vars;
+}
+
 /** An env reader over a plain record. */
 export function envReader(env: Readonly<Record<string, string | undefined>>): EnvReader {
     return (key) => env[key] ?? "";

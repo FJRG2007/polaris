@@ -400,6 +400,7 @@ export function ArkPanel({
                     installedAppId={installedAppId}
                     canManage={held.includes("games.manage")}
                     running={isRunning}
+                    playersOnline={status?.players.length ?? 0}
                 />
             )}
             {tab === "rules" && (
@@ -407,6 +408,7 @@ export function ArkPanel({
                     installedAppId={installedAppId}
                     canManage={held.includes("games.manage")}
                     running={isRunning}
+                    playersOnline={status?.players.length ?? 0}
                 />
             )}
             {tab === "usage" &&

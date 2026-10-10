@@ -26,8 +26,8 @@ import type { GameKey } from "../../messages";
 import { useGameText, useSchemaText } from "../screens/game-text";
 import { hostUi } from "@polaris/app-host/client";
 import * as world from "../lib/minecraft/world";
-import { useEffect, useMemo, useState } from "react";
-import { Input, Select, Skeleton, cn } from "@polaris/ui";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { Input, SearchableSelect, Select, Skeleton, cn } from "@polaris/ui";
 import {
     findSoftware,
     isModpackReference,
@@ -36,6 +36,7 @@ import {
     SOFTWARE_GROUPS,
     type MinecraftSoftware
 } from "@polaris/core";
+import { SoftwareLogo } from "./software-logo";
 import { blueprintsFor } from "../lib/minecraft/blueprints";
 import { mapsFor, pinnedRelease } from "../lib/minecraft/maps";
 import { blueprintVersionsAction, type BlueprintVersions } from "../screens/actions";
@@ -389,7 +390,9 @@ export function BlueprintFields({
                                 ) : offered === null ? (
                                     <Skeleton className="h-9 w-full" />
                                 ) : (
-                                    <Select
+                                    <SearchableSelect
+                                        searchPlaceholder={t("blueprint.searchVersions")}
+                                        emptyText={t("blueprint.noVersionMatches")}
                                         value={
                                             isLatest
                                                 ? LATEST
@@ -588,7 +591,10 @@ function SoftwarePicker({
             </div>
 
             <div className="rounded-md border border-border p-3">
-                <p className="text-sm font-medium">{chosen?.name ?? value}</p>
+                <p className="flex min-w-0 items-center gap-2 text-sm font-medium">
+                    <SoftwareLogo type={value} />
+                    <span className="truncate">{chosen?.name ?? value}</span>
+                </p>
                 <p className="text-xs text-muted-foreground">
                     {pinnedBy
                         ? t("blueprint.pinnedBy", { name: pinnedBy })
@@ -661,6 +667,7 @@ function SoftwarePicker({
                                                 setOpen(false);
                                             }}
                                             title={schemaText(entry.name) ?? ""}
+                                            icon={<SoftwareLogo type={entry.id} />}
                                             detail={schemaText(entry.summary) ?? ""}
                                             {...(entry.caveat ? { note: entry.caveat } : {})}
                                         />
@@ -689,13 +696,16 @@ export function Choice({
     detail,
     /** Who made it and what it takes, for a choice that is somebody's work
      *  rather than a setting. */
-    note
+    note,
+    /** The thing's own mark, beside its name. */
+    icon
 }: {
     selected: boolean;
     onSelect: () => void;
     title: string;
     detail: string;
     note?: string;
+    icon?: ReactNode;
 }) {
     return (
         <button
@@ -706,7 +716,14 @@ export function Choice({
                 selected ? "border-primary bg-primary/5" : "border-border hover:border-primary/40"
             )}
         >
-            <p className="text-sm font-medium">{title}</p>
+            {icon ? (
+                <p className="flex min-w-0 items-center gap-2 text-sm font-medium">
+                    {icon}
+                    <span className="truncate">{title}</span>
+                </p>
+            ) : (
+                <p className="text-sm font-medium">{title}</p>
+            )}
             <p className="text-xs text-muted-foreground">{detail}</p>
             {note && <p className="mt-1 text-xs text-muted-foreground/70">{note}</p>}
         </button>

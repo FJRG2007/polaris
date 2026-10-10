@@ -515,6 +515,9 @@ export function MinecraftClientMods({
                             </div>
                         ))}
                         <p className="text-xs text-muted-foreground">
+                            {t("clientMods.ownProfile")}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
                             {t("clientMods.aLauncherThatKeepsIts")}
                         </p>
                     </div>

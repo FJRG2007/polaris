@@ -12,9 +12,9 @@
  * did not run is skipped rather than quietly passing.
  */
 
-import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { createHash } from "node:crypto";
+import { join, resolve } from "node:path";
 import { createServer, type Server } from "node:http";
 import { execFileSync, spawn } from "node:child_process";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -23,7 +23,9 @@ import {
     PACK_RECORD,
     SET_ASIDE,
     asideTable,
+    packProfile,
     packTable,
+    type PackProfile,
     powershellInstaller,
     scriptName,
     scriptUrl,
@@ -52,6 +54,12 @@ function has(command: string, args: string[]): boolean {
     } catch {
         return false;
     }
+}
+
+/** The environment without a folder override this machine may happen to set. */
+function withoutFolders(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
+    const { POLARIS_MC_DIR: _dir, POLARIS_MC_ROOT: _root, ...rest } = env;
+    return rest;
 }
 
 const HAS_SH = has("sh", ["-c", "command -v curl"]);
@@ -103,9 +111,14 @@ describe("what a script may carry of somebody else's text", () => {
             // makes, with a longer comment on it.
             expect(script.split("\n")).toHaveLength(build(url, "ExampleSMP").split("\n").length);
             expect(script).not.toContain('rm -rf "$HOME');
-            expect(script.split("\n").filter((line) => line.includes("ExampleSMP"))).toEqual([
-                script.split("\n")[build === shellInstaller ? 1 : 0]
-            ]);
+            // It appears in the header comment and in the launcher profile's
+            // name, a quoted string the cleaned name has no way out of.
+            const named = script.split("\n").filter((line) => line.includes("ExampleSMP"));
+            expect(named).toHaveLength(2);
+            expect(named[0]).toBe(script.split("\n")[build === shellInstaller ? 1 : 0]);
+            expect(named[1]?.trim()).toMatch(
+                /^\$?name ?= ?"ExampleSMP rm -rf HOME \.minecraft \(Polaris\)"$/
+            );
             const header = script.split("\n").slice(0, build === shellInstaller ? 3 : 2);
             expect(header.every((line) => line.startsWith("#"))).toBe(true);
         }
@@ -194,7 +207,8 @@ describe.runIf(HAS_SH || POWERSHELL)("the installers", () => {
      */
     async function run(
         kind: "sh" | "ps1",
-        dir: string
+        dir: string,
+        profile?: { root: string; profile: PackProfile }
     ): Promise<{ code: number | null; output: string }> {
         const manifest = `${origin}/pack.tsv`;
         const script = join(
@@ -204,10 +218,15 @@ describe.runIf(HAS_SH || POWERSHELL)("the installers", () => {
         writeFileSync(
             script,
             kind === "sh"
-                ? shellInstaller(manifest, HOSTILE)
-                : powershellInstaller(manifest, HOSTILE),
+                ? shellInstaller(manifest, HOSTILE, profile?.profile)
+                : powershellInstaller(manifest, HOSTILE, profile?.profile),
             "utf8"
         );
+        // A profile run is told where Minecraft lives and nothing else, the way
+        // a player's machine runs it; the others keep to a folder of their own.
+        const where: Record<string, string> = profile
+            ? { POLARIS_MC_ROOT: profile.root }
+            : { POLARIS_MC_DIR: dir };
         const [command, args] =
             kind === "sh"
                 ? ["sh", [script]]
@@ -217,7 +236,7 @@ describe.runIf(HAS_SH || POWERSHELL)("the installers", () => {
                   ];
         return await new Promise((resolve) => {
             const child = spawn(command as string, args as string[], {
-                env: { ...process.env, POLARIS_MC_DIR: dir }
+                env: { ...withoutFolders(process.env), ...where }
             });
             let output = "";
             child.stdout.on("data", (chunk: Buffer) => (output += chunk.toString()));
@@ -352,7 +371,77 @@ describe.runIf(HAS_SH || POWERSHELL)("the installers", () => {
     }
 
     /**
-     * These six are not unit tests and cannot be timed like them.
+     * A player with Minecraft in its usual place, an earlier pack in the shared
+     * mods folder and a jar of their own beside it. The pack goes into a folder of
+     * this server's own, the earlier pack's jars are moved aside once, theirs
+     * stays, and the launcher gets a profile that plays from the new folder -
+     * once the loader it needs is installed, and keeping the profiles already
+     * there.
+     */
+    async function ownProfile(kind: "sh" | "ps1"): Promise<void> {
+        const root = mkdtempSync(join(tmpdir(), "polaris-minecraft-"));
+        const key = "11111111-1111-4111-8111-111111111111";
+        const profile = { root, profile: packProfile(key, "FABRIC", "1.21.4") };
+        const game = join(root, "polaris", key);
+        const shared = join(root, "mods");
+        const launcher = join(root, "launcher_profiles.json");
+        const before = { profiles: { theirs: { name: "Theirs", type: "custom" } }, version: 3 };
+        mkdirSync(shared);
+        writeFileSync(join(shared, PACK_RECORD), "beta-2.0.jar\n", "utf8");
+        writeFileSync(join(shared, "beta-2.0.jar"), JARS["beta-2.0.jar"] ?? "", "utf8");
+        writeFileSync(join(shared, "their-own-minimap.jar"), "not ours", "utf8");
+        writeFileSync(launcher, JSON.stringify(before), "utf8");
+        missing = [];
+        list = ["alpha-1.0.jar"];
+        try {
+            // No Fabric for that release yet: the mods are in place and the
+            // player is told what to install, and the launcher is not touched.
+            const first = await run(kind, "", profile);
+            expect(first.code, first.output).toBe(0);
+            expect(first.output).toContain("install Fabric for Minecraft 1.21.4 first");
+            expect(readdirSync(join(game, "mods")).sort()).toEqual(
+                [PACK_RECORD, "alpha-1.0.jar"].sort()
+            );
+            expect(readdirSync(shared)).toEqual(["their-own-minimap.jar"]);
+            expect(readFileSync(join(root, SET_ASIDE, "beta-2.0.jar"), "utf8")).toBe(
+                JARS["beta-2.0.jar"]
+            );
+            expect(JSON.parse(readFileSync(launcher, "utf8"))).toEqual(before);
+
+            // Fabric installed: the next run of the same line adds the profile.
+            const version = "fabric-loader-0.16.10-1.21.4";
+            mkdirSync(join(root, "versions", "fabric-loader-0.16.9-1.21.3"), { recursive: true });
+            mkdirSync(join(root, "versions", version));
+            const second = await run(kind, "", profile);
+            expect(second.code, second.output).toBe(0);
+            expect(second.output).toContain("restart the Minecraft Launcher");
+            const written = JSON.parse(readFileSync(launcher, "utf8")) as {
+                profiles: Record<string, Record<string, string>>;
+                version: number;
+            };
+            expect(written.version).toBe(3);
+            expect(written.profiles.theirs).toEqual(before.profiles.theirs);
+            const entry = written.profiles[key];
+            expect(entry?.name).toBe("ExampleSMP rm -rf HOME .minecraft (Polaris)");
+            expect(entry?.type).toBe("custom");
+            expect(entry?.lastVersionId).toBe(version);
+            expect(resolve(entry?.gameDir ?? "")).toBe(resolve(game));
+
+            // Once more: the same profile, not a second one, and nothing left to
+            // move out of the shared folder.
+            const third = await run(kind, "", profile);
+            expect(third.code, third.output).toBe(0);
+            expect(third.output).not.toContain("an earlier run put in");
+            const again = JSON.parse(readFileSync(launcher, "utf8")) as typeof written;
+            expect(Object.keys(again.profiles).sort()).toEqual([key, "theirs"].sort());
+            expect(again.profiles[key]?.created).toBe(entry?.created);
+        } finally {
+            rmSync(root, { recursive: true, force: true });
+        }
+    }
+
+    /**
+     * These eight are not unit tests and cannot be timed like them.
      *
      * Each one writes a real installer to a temporary folder and runs it several
      * times through a real shell, which is the whole point - what is being
@@ -366,6 +455,22 @@ describe.runIf(HAS_SH || POWERSHELL)("the installers", () => {
      * fails on evidence.
      */
     const SHELL_RUN_MS = 240_000;
+
+    it.runIf(HAS_SH)(
+        "install into the server's own profile, from a shell",
+        async () => {
+            await ownProfile("sh");
+        },
+        SHELL_RUN_MS
+    );
+
+    it.runIf(POWERSHELL)(
+        "install into the server's own profile, from PowerShell",
+        async () => {
+            await ownProfile("ps1");
+        },
+        SHELL_RUN_MS
+    );
 
     it.runIf(HAS_SH)(
         "move aside a hand-installed copy of a pack mod, from a shell",

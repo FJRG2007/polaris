@@ -276,7 +276,9 @@
         "couldNotPinTheLoader": "Could not hold the loader at the installed version",
         "loaderNotHeld": "This server's loader is not held at a version",
         "couldNotUpdateTheLoader": "Could not update the loader",
-        "couldNotReadTheLoader": "Could not read the loader"
+        "couldNotReadTheLoader": "Could not read the loader",
+        "loaderVersionUnknown": "That version is not one the loader lists for this release",
+        "noLoaderToChoose": "This server has no loader version to choose"
     },
     "world": {
         "world": "World",
@@ -1043,6 +1045,9 @@
         "readFailed": "Could not read the server",
         "loginUpdateReason": "Polaris login update",
         "loginUpdateDetail": "This server runs an older build. It installs the new one when it restarts; passwords are kept.",
+        "modsWaitForARestart": "Mod changes wait for a restart",
+        "modsChangedReason": "Mod changes",
+        "modsChangedDetail": "Mods added or removed since the server started are installed or taken off when it restarts.",
         "settingsMoved": "The old settings were moved beside the world and the server is starting.",
         "nothingToMove": "There was nothing left to move. The server is starting.",
         "worldSaved": "World saved",
@@ -1172,6 +1177,7 @@
         "removeNamed": "Remove {name}",
         "oneLine": "One line installs the mods for this server into their game, and running it again is how they update: it replaces what changed and takes away what came off the lists. A mod of theirs that is another copy of one here, or that one here cannot run beside, is moved to a mods-polaris-removed folder; anything else of theirs is left alone. The link needs no account here.",
         "oneLineCount": "One line installs the {count} mods for this server into their game, and running it again is how they update: it replaces what changed and takes away what came off the lists. A mod of theirs that is another copy of one here, or that one here cannot run beside, is moved to a mods-polaris-removed folder; anything else of theirs is left alone. The link needs no account here.",
+        "ownProfile": "The mods go into a launcher profile of this server's own, so somebody who plays on several servers never mixes their mods - a mix is what gets a player turned away as an incompatible client. Players install the server's mod loader first; the line says so if it is missing.",
         "commandFor": "the {system} command"
     },
     "appearance": {
@@ -2602,7 +2608,18 @@
         "updateAndRestart": "Update and restart",
         "updateOnly": "Update loader",
         "updateQueued": "The newest {loader} installs the next time the server starts.",
-        "updateStarted": "The server is restarting with the newest {loader}."
+        "updateStarted": "The server is restarting with the newest {loader}.",
+        "chooseVersion": "Version",
+        "searchVersions": "Search versions",
+        "noVersionMatches": "No version matches that.",
+        "newest": "Newest",
+        "versionsUnavailable": "Could not reach the {loader} repository, so there is no list of versions right now.",
+        "chooseTitle": "Switch to {loader} {version}?",
+        "chooseBody": "The server downloads {loader} {version} from its repository on its next start. Mods built for another version may not load on it.",
+        "switchAndRestart": "Switch and restart",
+        "switchOnly": "Switch version",
+        "chosenStarted": "The server is restarting with {loader} {version}.",
+        "chosenQueued": "{loader} {version} installs the next time the server starts."
     },
     "disconnect": {
         "refused": "Turned away",

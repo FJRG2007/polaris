@@ -16,11 +16,16 @@ import { prisma } from "@polaris/db";
 import { revalidatePath } from "next/cache";
 import { clearCrashLoop } from "../../lib/games-health";
 import { loaderReleasedBy } from "../../lib/minecraft/loader-pin";
+import { isModListKey } from "../../lib/minecraft/mods-restart";
+import { markModsChanged } from "../../lib/minecraft/mods-restart-service";
 import {
     pinInstalledLoader,
     readLoaderPin,
     releaseLoaderOnce,
-    type LoaderPinView
+    chooseLoaderVersion,
+    loaderVersionsFor,
+    type LoaderPinView,
+    type LoaderVersions
 } from "../../lib/minecraft/loader-pin-service";
 import { GAME_MODES } from "../../lib/minecraft/players";
 import { MODERATION_VERBS, moderatePlayer } from "../../lib/minecraft/player-moderation";
@@ -1787,6 +1792,7 @@ export async function setModpackAction(
         });
         if (parsed.data.restart)
             await deployApplication(install.applicationId, access.ownerId, user.id);
+        else await markModsChanged(parsed.data.installedAppId).catch(() => undefined);
         return {};
     } catch (caught) {
         return {
@@ -1858,6 +1864,7 @@ export async function saveSpigotPluginsAction(
         await setEnvVars("application", install.applicationId, access.ownerId, [
             { key: SPIGET_KEY, value: formatSpigetList(parsed.data.ids), isSecret: false }
         ]);
+        await markModsChanged(parsed.data.installedAppId).catch(() => undefined);
         await recordAudit({
             actorId: user.id,
             action: "games.plugins.spigot",
@@ -2158,6 +2165,90 @@ export async function updateLoaderAction(
             metadata: { from: released.from, restarted: restart }
         });
         revalidatePath(`/apps/installed/${parsed.data}`);
+        return { restarted: restart };
+    } catch (caught) {
+        return {
+            error:
+                caught instanceof Error
+                    ? await messageText(caught.message)
+                    : words("errors.couldNotUpdateTheLoader")
+        };
+    }
+}
+
+/** The loader versions this server can be moved to, newest first. */
+export async function loaderVersionsAction(
+    installedAppId: string
+): Promise<{ versions?: LoaderVersions | null; error?: string }> {
+    const words = await gameWords("minecraft");
+    const parsed = z.string().uuid().safeParse(installedAppId);
+    if (!parsed.success) return { error: words("errors.thatServerDoesNotExist") };
+    try {
+        const { access } = await requireGameServer("games.read", parsed.data);
+        return { versions: await loaderVersionsFor(access.ownerId, parsed.data) };
+    } catch (caught) {
+        return {
+            error:
+                caught instanceof Error
+                    ? await messageText(caught.message)
+                    : words("errors.couldNotReadTheLoader")
+        };
+    }
+}
+
+const loaderChoiceSchema = z.object({
+    installedAppId: z.string().uuid(),
+    version: z
+        .string()
+        .trim()
+        .regex(/^[A-Za-z0-9][A-Za-z0-9.+_-]{0,63}$/)
+});
+
+/**
+ * Hold the server at a loader version somebody picked from the repository's
+ * list, and restart now when the server is up.
+ */
+export async function chooseLoaderVersionAction(input: {
+    installedAppId: string;
+    version: string;
+}): Promise<{ restarted?: boolean; error?: string }> {
+    const words = await gameWords("minecraft");
+    const parsed = loaderChoiceSchema.safeParse(input);
+    if (!parsed.success) return { error: words("errors.loaderVersionUnknown") };
+    try {
+        const { user, access } = await requireGameServer(
+            "games.manage",
+            parsed.data.installedAppId
+        );
+        const applicationId = access.install.applicationId;
+        if (!applicationId) throw new Error(words("errors.thisServerHasNotBeen"));
+        const chosen = await chooseLoaderVersion(
+            access.ownerId,
+            parsed.data.installedAppId,
+            parsed.data.version
+        );
+        if (chosen.state === "refused") {
+            return {
+                error:
+                    chosen.reason === "unknown"
+                        ? words("errors.loaderVersionUnknown")
+                        : words("errors.noLoaderToChoose")
+            };
+        }
+        const app = await prisma.application.findFirst({
+            where: { id: applicationId },
+            select: { desiredState: true }
+        });
+        const restart = app?.desiredState === "running";
+        if (restart) await deployApplication(applicationId, access.ownerId, user.id);
+        await recordAudit({
+            actorId: user.id,
+            action: "games.loader-choose",
+            targetType: "installedApp",
+            targetId: parsed.data.installedAppId,
+            metadata: { from: chosen.from, to: parsed.data.version, restarted: restart }
+        });
+        revalidatePath(`/apps/installed/${parsed.data.installedAppId}`);
         return { restarted: restart };
     } catch (caught) {
         return {
@@ -2603,6 +2694,10 @@ export async function updateServerSettingsAction(
         );
 
         if (restart) await deployApplication(install.applicationId, access.ownerId, user.id);
+        // A mod list saved and not applied is the restart card's to offer.
+        else if (vars.some((entry) => isModListKey(entry.key))) {
+            await markModsChanged(parsed.data.installedAppId).catch(() => undefined);
+        }
         // The same value the Rules screen shows. Both screens write the difficulty
         // and they disagreed in whichever direction you were not looking - but only
         // once the container has actually been rebuilt onto it. Saved without a

@@ -45,10 +45,13 @@ const STATUS_TONE: Readonly<Record<AnnouncerStatus, "success" | "warning" | "neu
 export function MinecraftModeration({
     installedAppId,
     canManage,
+    playersOnline = 0,
     running
 }: {
     installedAppId: string;
     canManage: boolean;
+    /** Who a restart now would disconnect. */
+    playersOnline?: number;
     running: boolean;
 }) {
     return (
@@ -57,6 +60,7 @@ export function MinecraftModeration({
                 installedAppId={installedAppId}
                 canManage={canManage}
                 running={running}
+                playersOnline={playersOnline}
             />
             <ModAnnouncementsCard
                 installedAppId={installedAppId}
@@ -229,6 +233,7 @@ function ModAnnouncementsCard({
                 <RestartPlanner
                     installedAppId={installedAppId}
                     running={running}
+                    playersOnline={playersOnline}
                     changed
                     reason={t("moderation.announcements.restartReason")}
                     title={t("moderation.announcements.restartTitle")}

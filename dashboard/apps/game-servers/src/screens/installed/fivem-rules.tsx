@@ -43,6 +43,7 @@ const KEPT_RULES_MS = 24 * 3_600_000;
 export function FivemRules({
     installedAppId,
     canManage,
+    playersOnline = 0,
     running
 }: {
     installedAppId: string;
@@ -50,6 +51,8 @@ export function FivemRules({
     canManage: boolean;
     /** Whether the server is up. The config is a file inside its container, so a
      *  stopped server can be neither read nor changed. */
+    /** Who a restart now would disconnect. */
+    playersOnline?: number;
     running: boolean;
 }) {
     const t = useGameText("fivem");
@@ -170,6 +173,7 @@ export function FivemRules({
                 <RestartPlanner
                     installedAppId={installedAppId}
                     running={running}
+                    playersOnline={playersOnline}
                     changed={changed}
                     reason={t("rules.restartReason")}
                     onRestarted={() => {

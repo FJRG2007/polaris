@@ -59,13 +59,14 @@ export async function symbioteState(
 }
 
 /** Put it on the server's list, or take it off. Taking it off always works, so
- *  a server that moved never keeps a jar it cannot boot with. */
+ *  a server that moved never keeps a jar it cannot boot with. True when the list
+ *  changed, which is when the server has something to pick up. */
 export async function setSymbiote(
     applicationId: string,
     ownerId: string,
     installedAppId: string,
     on: boolean
-): Promise<void> {
+): Promise<boolean> {
     const env = await readEnv(applicationId, ownerId);
     const mods = env.get(MODS_KEY) ?? "";
     let next: string;
@@ -83,10 +84,11 @@ export async function setSymbiote(
     } else {
         next = symbiote.withoutSymbiote(mods);
     }
-    if (next === mods) return;
+    if (next === mods) return false;
     await setEnvVars("application", applicationId, ownerId, [
         { key: MODS_KEY, value: next, isSecret: false }
     ]);
+    return true;
 }
 
 /**

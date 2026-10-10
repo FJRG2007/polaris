@@ -38,6 +38,7 @@ const RESTARTING_FOR_MS = 10 * 60_000;
 const WATCH_BOOKED_MS = 15_000;
 
 const { RelativeTime } = hostUi.relativeTime;
+const { useConfirm } = hostUi.confirmDialog;
 
 export function RestartPlanner({
     installedAppId,
@@ -46,6 +47,7 @@ export function RestartPlanner({
     reason,
     title,
     detail,
+    playersOnline = 0,
     onRestarted
 }: {
     installedAppId: string;
@@ -61,6 +63,9 @@ export function RestartPlanner({
     /** What is waiting, for a change that is not a saved setting. */
     title?: string;
     detail?: string;
+    /** Who would be disconnected. Restarting now with anybody on is asked about
+     *  first; with nobody on there is nobody to ask for. */
+    playersOnline?: number;
     onRestarted?: () => void;
 }) {
     const t = useGameText("games");
@@ -78,6 +83,7 @@ export function RestartPlanner({
     const [error, setError] = useState<string | null>(null);
     /** The time somebody is typing, while they are typing it. */
     const [at, setAt] = useState<string | null>(null);
+    const [confirm, confirmElement] = useConfirm();
 
     const load = useCallback(async () => {
         const answer = await actions.readGameRestartAction(installedAppId);
@@ -144,6 +150,16 @@ export function RestartPlanner({
     }
 
     async function now(): Promise<void> {
+        if (
+            playersOnline > 0 &&
+            !(await confirm({
+                title: t("restartPlanner.confirmTitle"),
+                description: t("restartPlanner.confirmBody", { count: playersOnline }),
+                confirmLabel: t("restartPlanner.restartNow")
+            }))
+        ) {
+            return;
+        }
         setBusy("now");
         setError(null);
         const answer = await actions.restartGameNowAction(installedAppId);
@@ -305,6 +321,7 @@ export function RestartPlanner({
                     </p>
                 )}
             </CardBody>
+            {confirmElement}
         </Card>
     );
 }

@@ -37,6 +37,7 @@ import {
 } from "../../../../../../../lib/minecraft/client-pack";
 import {
     asideTable,
+    packProfile,
     packTable,
     powershellInstaller,
     shellInstaller
@@ -122,15 +123,26 @@ export async function GET(request: Request, { params }: Params): Promise<Respons
     });
     if (!install?.applicationId) return new Response("Not found", { status: 404 });
 
-    // The two scripts carry the server's name and the address of the list, and
-    // nothing out of the list itself - so neither is worth resolving a pack for,
-    // and a player fetching one does not spend a walk of Modrinth requests.
+    // The two scripts carry the server's name, the address of the list and the
+    // profile its mods go into, and nothing out of the list itself - so neither
+    // is worth resolving a pack for, and a player fetching one does not spend a
+    // walk of Modrinth requests.
     if (file === "install.sh" || file === "install.ps1") {
         const manifest = packUrl(await packBase(request), id, "pack.tsv");
+        const env = await prisma.envVar.findMany({
+            where: {
+                scopeType: "application",
+                scopeId: install.applicationId,
+                key: { in: [SOFTWARE_KEY, VERSION_KEY] }
+            },
+            select: { key: true, value: true }
+        });
+        const value = (key: string): string => env.find((row) => row.key === key)?.value ?? "";
+        const profile = packProfile(install.id, value(SOFTWARE_KEY), value(VERSION_KEY));
         const script =
             file === "install.ps1"
-                ? powershellInstaller(manifest, install.name)
-                : shellInstaller(manifest, install.name);
+                ? powershellInstaller(manifest, install.name, profile)
+                : shellInstaller(manifest, install.name, profile);
         return text(script, "text/plain; charset=utf-8");
     }
 
