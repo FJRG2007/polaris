@@ -37,7 +37,8 @@ export interface AnticheatState {
     readonly on: boolean;
     /** Whether the engine runs on this server's software at all. */
     readonly supported: boolean;
-    /** What carries it here: the full plugin, or the Polaris mod's anti-xray. */
+    /** What carries it here: the plugin, or the Polaris mod, with the engine nested
+     *  in it and its own anti-xray. */
     readonly kind: "plugin" | "mod" | null;
     /** Whether this Polaris has an address the server can download it from. */
     readonly reachable: boolean;
@@ -237,8 +238,8 @@ export async function adoptPolarisComponent(): Promise<{ adopted: number }> {
 
 /**
  * The server a report is from, when it carries that server's token and still has
- * the engine switched on - or Polaris login, whose NeoForge mod carries the
- * anti-xray on servers the engine does not run on. An unknown server and a wrong
+ * the engine switched on - or Polaris login, whose NeoForge mod reports what its
+ * anti-xray catches whatever the engine's switch says. An unknown server and a wrong
  * token are the same answer.
  */
 export async function authorizeReporter(

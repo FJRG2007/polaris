@@ -715,7 +715,7 @@
         "jarTimeout": "Out of time reading the jar",
         "pickSoonerTime": "Pick a time in the next few weeks",
         "anticheatNeedsAddress": "Polaris anti-cheat needs this Polaris to have a public address: the server downloads the plugin from it when it starts.",
-        "anticheatUnsupported": "Polaris anti-cheat runs on Paper, Purpur, Pufferfish, Leaf, Folia and Spigot, and its anti-xray on NeoForge 1.21.4. This server's software cannot load it.",
+        "anticheatUnsupported": "Polaris anti-cheat runs on Paper, Purpur, Pufferfish, Leaf, Folia, Spigot and NeoForge 1.21.4. This server's software cannot load it.",
         "loginNeedsAddress": "Polaris login needs this Polaris to have a public address: the server downloads the mod from it and asks it on every join.",
         "serverNotFound": "Server not found",
         "startToRead": "Start the server to read what these are set to.",

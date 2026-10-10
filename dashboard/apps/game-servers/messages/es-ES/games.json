@@ -715,7 +715,7 @@
         "jarTimeout": "Se acabó el tiempo leyendo el jar",
         "pickSoonerTime": "Elige una hora dentro de las próximas semanas",
         "anticheatNeedsAddress": "El anti-trampas de Polaris necesita que este Polaris tenga una dirección pública: el servidor descarga el plugin de ella al arrancar.",
-        "anticheatUnsupported": "El anti-trampas de Polaris funciona en Paper, Purpur, Pufferfish, Leaf, Folia y Spigot, y su anti-xray en NeoForge 1.21.4. El software de este servidor no puede cargarlo.",
+        "anticheatUnsupported": "El anti-trampas de Polaris funciona en Paper, Purpur, Pufferfish, Leaf, Folia, Spigot y NeoForge 1.21.4. El software de este servidor no puede cargarlo.",
         "loginNeedsAddress": "Polaris login necesita que este Polaris tenga una dirección pública: el servidor descarga el mod de ella y la consulta en cada entrada.",
         "serverNotFound": "Servidor no hallado",
         "startToRead": "Arranca el servidor para leer a qué están puestos.",

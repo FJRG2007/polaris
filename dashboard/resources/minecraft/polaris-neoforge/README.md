@@ -49,6 +49,14 @@ whether or not the login is on; honeypots and reports need the login's address,
 id and token. If this NeoForge build or another mod leaves out any of the code it
 hooks into, the anti-xray stays off and the server starts as usual.
 
+## Anti-cheat
+
+The image nests Polaris's anti-cheat engine inside this jar as a mod of its own
+(`polarisac`, from `../polaris-anticheat`, GPL-3.0; NeoForge loads it from
+`META-INF/jarjar`). It simulates every player's movement and checks what they
+send, and reports to Polaris through the same address, id and token. It runs
+unless `POLARIS_ANTICHEAT` is `off`. See `../polaris-anticheat/README.md`.
+
 ## Chat moderation
 
 Wherever Polaris has written its address, id and token (for the login or for the
@@ -98,6 +106,7 @@ The login does nothing unless `POLARIS_LOGIN` is `on`.
 | `POLARIS_SERVER_ID`    | This server's id in Polaris       |
 | `POLARIS_SERVER_TOKEN` | What the server proves it is with |
 | `POLARIS_ANTIXRAY`     | `off` to stop hiding buried ore   |
+| `POLARIS_ANTICHEAT`    | `off` to stop the anti-cheat      |
 
 With `online-mode=true` the mod asks for nothing: Mojang already checks who
 players are.
@@ -110,6 +119,13 @@ Gradle wrapper; with Gradle 9 and JDK 21 installed:
 
 ```sh
 gradle build
+```
+
+That is the login mod alone. With the anti-cheat nested, build its NeoForge jar
+first (`gradle :neoforge:shadowJar` in `../polaris-anticheat`) and pass it:
+
+```sh
+gradle build -Panticheat_jar=../polaris-anticheat/neoforge/build/libs/polaris-anticheat-neoforge-1.21.4.jar
 ```
 
 The HTTP client and the environment reader live in `../polaris-common`, shared
