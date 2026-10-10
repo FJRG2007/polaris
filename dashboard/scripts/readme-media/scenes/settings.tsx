@@ -87,7 +87,13 @@ export const accountSecurity = defineScene({
                     questions={[]}
                     passkeys={[]}
                     twoFactorMethods={[
-                        { method: "totp", enabled: true, available: true, target: null, blocker: null },
+                        {
+                            method: "totp",
+                            enabled: true,
+                            available: true,
+                            target: null,
+                            blocker: null
+                        },
                         {
                             method: "email",
                             enabled: true,

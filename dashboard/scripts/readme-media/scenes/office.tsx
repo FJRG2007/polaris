@@ -42,7 +42,11 @@ export const officeDoc = defineScene({
                 role="editor"
                 owned
             >
-                <DocEditor documentId={OPEN_DOCUMENT_ID} content={launchPlanContent(ctx)} editable />
+                <DocEditor
+                    documentId={OPEN_DOCUMENT_ID}
+                    content={launchPlanContent(ctx)}
+                    editable
+                />
             </DocumentChrome>
         </Chrome>
     )

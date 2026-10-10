@@ -103,18 +103,16 @@ interface Draft {
 const WEEKDAYS = [16, 17, 18, 19, 20];
 
 const DRAFTS: readonly Draft[] = [
-    ...WEEKDAYS.map(
-        (day): Draft => ({
-            title: ["Standup", "Daily"],
-            day,
-            from: "09:30",
-            to: "09:45",
-            calendar: WORK,
-            people: 6,
-            recurring: true,
-            conference: true
-        })
-    ),
+    ...WEEKDAYS.map((day): Draft => ({
+        title: ["Standup", "Daily"],
+        day,
+        from: "09:30",
+        to: "09:45",
+        calendar: WORK,
+        people: 6,
+        recurring: true,
+        conference: true
+    })),
     {
         title: ["Sprint planning", "Planificación del sprint"],
         day: 16,

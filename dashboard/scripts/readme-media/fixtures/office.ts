@@ -179,14 +179,22 @@ export function launchPlanContent(ctx: SceneContext): number[] {
                     task(true, say("Freeze the release branch", "Congelar la rama de la versión")),
                     task(true, say("Load test checkout", "Prueba de carga del pago")),
                     task(false, say("Update the status page", "Actualizar la página de estado")),
-                    task(false, say("Brief support on the new flow", "Explicar el nuevo flujo a soporte"))
+                    task(
+                        false,
+                        say("Brief support on the new flow", "Explicar el nuevo flujo a soporte")
+                    )
                 ]
             },
             heading(2, say("Who does what", "Quién hace qué")),
             {
                 type: "table",
                 content: [
-                    row("tableHeader", say("Part", "Parte"), say("Owner", "Responsable"), say("When", "Cuándo")),
+                    row(
+                        "tableHeader",
+                        say("Part", "Parte"),
+                        say("Owner", "Responsable"),
+                        say("When", "Cuándo")
+                    ),
                     row("tableCell", say("Storefront", "Tienda"), TEAM.kenji.name, "10:00"),
                     row("tableCell", say("Payments", "Pagos"), TEAM.sam.name, "10:30"),
                     row("tableCell", say("Announcement", "Anuncio"), TEAM.priya.name, "11:00")
@@ -195,6 +203,10 @@ export function launchPlanContent(ctx: SceneContext): number[] {
         ]
     };
     const doc = new Y.Doc();
-    prosemirrorJSONToYXmlFragment(getSchema(documentExtensions("")), json, doc.getXmlFragment(OFFICE_FIELD));
+    prosemirrorJSONToYXmlFragment(
+        getSchema(documentExtensions("")),
+        json,
+        doc.getXmlFragment(OFFICE_FIELD)
+    );
     return Array.from(Y.encodeStateAsUpdate(doc));
 }

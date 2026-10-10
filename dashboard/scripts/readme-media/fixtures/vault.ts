@@ -199,13 +199,6 @@ async function sends(ctx: SceneContext) {
     return Promise.all([
         send(1, ctx.say("Wi-Fi for the visitors", "Wi-Fi para las visitas"), 3, null, 6, false),
         send(2, ctx.say("Staging database login", "Acceso a la base de staging"), 1, 1, 1, true),
-        send(
-            3,
-            ctx.say("Contractor VPN config", "Configuración VPN del proveedor"),
-            2,
-            5,
-            27,
-            true
-        )
+        send(3, ctx.say("Contractor VPN config", "Configuración VPN del proveedor"), 2, 5, 27, true)
     ]);
 }

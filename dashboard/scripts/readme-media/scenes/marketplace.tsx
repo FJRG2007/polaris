@@ -55,7 +55,11 @@ export const marketplaceInstall = defineScene({
     path: "/apps/marketplace",
     actions: (ctx) => ({
         listInstallTargetsAction: () => [
-            { id: "local", name: label(ctx.locale, "marketplace.wizard.thisServer"), kind: "local" },
+            {
+                id: "local",
+                name: label(ctx.locale, "marketplace.wizard.thisServer"),
+                kind: "local"
+            },
             { id: id("host", 1), name: "office-server", kind: "host" },
             { id: id("host", 2), name: "edge-01", kind: "host" }
         ],

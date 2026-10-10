@@ -12,7 +12,11 @@ import { listHosts } from "@/lib/host-service";
 import { listConnections } from "@/lib/storage-service";
 import { recordAudit } from "@/lib/audit-service";
 import { installApp, listInstalledApps, type InstalledAppView } from "@/lib/apps/install-service";
-import { appInstallInputSchema, NAS_CONNECTION_REQUIRED, type AppInstallInput } from "@/lib/apps/install-schema";
+import {
+    appInstallInputSchema,
+    NAS_CONNECTION_REQUIRED,
+    type AppInstallInput
+} from "@/lib/apps/install-schema";
 import { getTranslations } from "@/lib/i18n/request";
 import { validationMessage } from "@/components/i18n/validation-message";
 
@@ -54,7 +58,9 @@ export async function listInstalledAppsAction(): Promise<InstalledAppView[]> {
 }
 
 /** Install a catalog app onto the chosen server with the chosen storage. */
-export async function installAppAction(input: AppInstallInput): Promise<{ error?: string; installedAppId?: string }> {
+export async function installAppAction(
+    input: AppInstallInput
+): Promise<{ error?: string; installedAppId?: string }> {
     const user = await requirePermission("deploy.manage");
     const parsed = appInstallInputSchema.safeParse(input);
     if (!parsed.success) {
@@ -79,6 +85,11 @@ export async function installAppAction(input: AppInstallInput): Promise<{ error?
         revalidatePath(MARKETPLACE_PATH);
         return { installedAppId: result.installedAppId };
     } catch (caught) {
-        return { error: caught instanceof Error ? caught.message : (await getTranslations("marketplace"))("errors.install") };
+        return {
+            error:
+                caught instanceof Error
+                    ? caught.message
+                    : (await getTranslations("marketplace"))("errors.install")
+        };
     }
 }
