@@ -428,7 +428,7 @@ function HostPanel({
     return (
         // Held short on a phone, where it shares the screen with the call and the
         // chat; the people in it scroll inside.
-        <section className="max-h-[25dvh] shrink-0 overflow-y-auto border-t border-border px-4 py-3 lg:max-h-none">
+        <section className="max-h-[25dvh] shrink-0 overflow-y-auto overscroll-contain border-t border-border px-4 py-3 lg:max-h-none">
             <h2 className="text-xs font-medium text-muted-foreground">
                 {t("meetingRoom.hosting")}
             </h2>
