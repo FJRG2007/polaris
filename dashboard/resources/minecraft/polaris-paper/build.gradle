@@ -24,6 +24,18 @@ sourceSets.main.java.srcDir '../polaris-common/src/main/java'
 repositories {
     mavenCentral()
     maven { url = 'https://hub.spigotmc.org/nexus/content/repositories/snapshots/' }
+    maven { url = 'https://repo.papermc.io/repository/maven-public/' }
+}
+
+// What only Paper has: handing the sound pack out while a player is still
+// joining (SoundPackConfigure). Compiled on its own against the Paper release
+// that added it, and loaded by name only where the server has it, so the rest of
+// the jar stays on the Spigot API above and keeps running everywhere it did.
+sourceSets {
+    paper {
+        java.srcDir 'src/paper/java'
+        compileClasspath += sourceSets.main.output
+    }
 }
 
 dependencies {
@@ -35,6 +47,11 @@ dependencies {
     // Named by an annotation on Log4j's own classes, which it does not ship
     // either; without it the compiler warns reading them, and -Werror fails.
     compileOnly "com.github.spotbugs:spotbugs-annotations:${spotbugs_annotations_version}"
+    paperCompileOnly "io.papermc.paper:paper-api:${paper_api_version}"
+}
+
+tasks.named('jar', Jar) {
+    from sourceSets.paper.output
 }
 
 tasks.withType(JavaCompile).configureEach {

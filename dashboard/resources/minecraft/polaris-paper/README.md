@@ -46,6 +46,14 @@ joins. The pack goes under an id of its own, derived from the server's, so it
 stacks on the server's own resource pack instead of replacing it, and a newer
 one replaces the last.
 
+On Paper 1.21.7 and later (and the forks built on it), a joining player gets it
+while their game is still connecting, next to the server's own pack, so the
+resource reload happens behind the joining screen rather than on a second one
+after they spawn. On Spigot and older Paper, or for a player who joined before
+Polaris answered, it goes out on arrival as before. A pack that has not changed
+is never sent again. A change does reach everybody already on, and reloads
+their game once.
+
 A player whose game has loaded it carries the `polaris_sounds` tag; the
 dashboard plays the server's sounds on event moments to those players and the
 game's own sounds to everybody else. The plugin also plays the arrival sound

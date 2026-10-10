@@ -55,7 +55,10 @@ public final class PolarisMod {
         // The server's own sounds, handed to its players live, wherever Polaris
         // has said where it is (POLARIS_SOUNDS=off switches them off).
         SoundPack sounds = SoundPack.start(version);
-        if (sounds != null) NeoForge.EVENT_BUS.register(sounds);
+        if (sounds != null) {
+            NeoForge.EVENT_BUS.register(sounds);
+            modBus.addListener(sounds::onConfigure);
+        }
         switch (config.state()) {
             case OFF -> {
                 LOG.info("Polaris login is installed but switched off for this server.");
