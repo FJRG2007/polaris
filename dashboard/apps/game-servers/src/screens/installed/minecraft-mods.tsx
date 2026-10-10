@@ -23,7 +23,7 @@
 import { updateServerSettingsAction } from "./minecraft-actions";
 import { useGameText, useSchemaText } from "../game-text";
 import { memoryChangeSentence } from "../../lib/minecraft/memory-plan";
-import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
+import { useCallback, useEffect, useMemo, useState, useTransition, type ReactNode } from "react";
 import { PROJECTS_KEY, SOFTWARE_KEY, VERSION_KEY } from "../../lib/minecraft/join-guard";
 import type { RefusedPlugin } from "../../lib/minecraft/plugin-load";
 import { Badge, Button, Card, CardBody, cn, Input, ScrollRow, Select, Skeleton } from "@polaris/ui";
@@ -67,6 +67,7 @@ export function MinecraftMods({
     playersOnline,
     clientMods = [],
     packCommands = null,
+    polarisMods = null,
     onSaved
 }: {
     installedAppId: string;
@@ -87,6 +88,9 @@ export function MinecraftMods({
     clientMods?: readonly string[];
     /** The line a player runs to install both lists at once, per system. */
     packCommands?: Readonly<Record<"windows" | "mac" | "linux", string>> | null;
+    /** Rows for the mods Polaris carries itself, shown first in the list. They
+     *  install on their own rather than through the save below. */
+    polarisMods?: ReactNode;
     onSaved: () => void;
 }) {
     const schemaText = useSchemaText();
@@ -356,6 +360,7 @@ export function MinecraftMods({
                 applicationId={applicationId}
                 entries={projects}
                 projects={onList}
+                polarisMods={polarisMods}
                 conflicts={conflicts}
                 requires={requires}
                 refused={refused}
@@ -656,12 +661,14 @@ function InstalledList({
     dependencies,
     dependencyOptions,
     onDependencies,
-    onRemove
+    onRemove,
+    polarisMods
 }: {
     installedAppId: string;
     applicationId: string | null;
     entries: readonly string[];
     projects: InstalledRow[] | null;
+    polarisMods: ReactNode;
     conflicts: readonly modrinth.ModrinthConflict[];
     /** What the things on the list cannot run without - see `readRequirements`. */
     requires: readonly modrinth.ModrinthRequirement[];
@@ -750,6 +757,8 @@ function InstalledList({
                         </p>
                     </div>
                 )}
+
+                {polarisMods && <ul className="flex flex-col gap-2 empty:hidden">{polarisMods}</ul>}
 
                 {entries.length === 0 ? (
                     <p className="py-2 text-sm text-muted-foreground">

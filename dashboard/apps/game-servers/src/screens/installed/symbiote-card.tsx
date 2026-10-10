@@ -1,24 +1,22 @@
 "use client";
 
 /**
- * Symbiote on the Mods tab: installed on the server in one click, and the same
- * jar handed to players for their own game.
+ * Symbiote as a row of the server's mod list, installed in one click.
  *
- * It runs on both sides, so a server with it and a player without it cannot
- * meet - which is why the download sits beside the install rather than in
- * another tab. Nothing restarts: the server downloads it on its next start, and
- * the card says so.
+ * It is not a Modrinth project, so it has no icon or author of its own there:
+ * it shows Polaris's mark and is credited to Polaris. Players do not download it
+ * from here - the jar is not public. They get it with the mod pack's line, which
+ * carries it whenever the server does. Nothing restarts: the server downloads it
+ * on its next start, and the row says so.
  */
 
 import { useGameText } from "../game-text";
 import { hostUi } from "@polaris/app-host/client";
 import { useEffect, useState, useTransition } from "react";
-import { MOD_PATH } from "../../lib/minecraft/polaris-login";
-import { SYMBIOTE_FILE } from "../../lib/minecraft/symbiote";
-import { Download, Loader2, Plus, Trash2 } from "lucide-react";
+import { Loader2, Plus, Trash2 } from "lucide-react";
+import { Badge, Button, Skeleton } from "@polaris/ui";
 import type { SymbioteState } from "../../lib/minecraft/symbiote-service";
 import { setSymbioteAction, symbioteStateAction } from "./symbiote-actions";
-import { Badge, Button, Card, CardBody, CopyButton, Skeleton } from "@polaris/ui";
 
 const { useConfirm } = hostUi.confirmDialog;
 const { writeSnapshot } = hostUi.snapshotCache;
@@ -28,10 +26,23 @@ const { mergeUnchanged } = hostUi.structuralMerge;
 /** How old the kept state may be and still paint first on a revisit. */
 const KEPT_STATE_MS = 24 * 3_600_000;
 
-/** Where the jar is served, on this dashboard's own address. */
-const DOWNLOAD_PATH = `${MOD_PATH}/${SYMBIOTE_FILE}`;
+/** Polaris's mark, the icon a mod Polaris carries is shown with. */
+function PolarisIcon() {
+    return (
+        <div className="grid size-10 shrink-0 place-items-center rounded-md border border-border bg-surface">
+            <svg
+                viewBox="0 0 24 24"
+                className="size-5 text-primary"
+                fill="currentColor"
+                aria-hidden
+            >
+                <path d="M12 2l1.9 6.6L20 10l-6.1 1.4L12 18l-1.9-6.6L4 10l6.1-1.4L12 2z" />
+            </svg>
+        </div>
+    );
+}
 
-export function SymbioteCard({
+export function SymbioteRow({
     installedAppId,
     canManage
 }: {
@@ -48,11 +59,8 @@ export function SymbioteCard({
     const [heard, setHeard] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [note, setNote] = useState<string | null>(null);
-    const [link, setLink] = useState<string | null>(null);
     const [pending, startTransition] = useTransition();
     const [confirm, confirmElement] = useConfirm();
-
-    useEffect(() => setLink(`${window.location.origin}${DOWNLOAD_PATH}`), []);
 
     useEffect(() => {
         if (heard && state) writeSnapshot(stateKey, state);
@@ -112,84 +120,74 @@ export function SymbioteCard({
                 : null;
     const canInstall = canManage && heard && !pending && fits && blocker === null;
 
+    // On another loader it is nothing this list could ever carry.
+    if (state?.fit === "loader") return null;
+
     return (
-        <Card>
-            <CardBody className="flex flex-col gap-3">
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                    <div className="min-w-0">
-                        <div className="flex items-center gap-2">
-                            <p className="text-sm font-medium">{t("symbiote.title")}</p>
-                            {state?.installed && (
-                                <Badge variant="success">{t("symbiote.installed")}</Badge>
-                            )}
-                        </div>
-                        <p className="text-xs text-muted-foreground">{t("symbiote.about")}</p>
+        <li className="flex flex-col gap-2 rounded-md border border-border p-2">
+            <div className="flex items-start gap-3">
+                <PolarisIcon />
+                <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                        <p className="truncate text-sm font-medium">{t("symbiote.title")}</p>
+                        {state?.installed && (
+                            <Badge variant="success">{t("symbiote.installed")}</Badge>
+                        )}
                     </div>
-                    {!heard && !state ? (
-                        <Skeleton className="h-8 w-40" />
-                    ) : (
-                        <div className="flex shrink-0 flex-wrap items-center gap-2">
-                            {state?.installed ? (
-                                <Button
-                                    size="sm"
-                                    variant="ghost"
-                                    disabled={!canManage || !heard || pending}
-                                    onClick={() => void change(false)}
-                                >
-                                    {pending ? (
-                                        <Loader2 className="size-4 animate-spin" />
-                                    ) : (
-                                        <Trash2 className="size-4" />
-                                    )}
-                                    {t("symbiote.remove")}
-                                </Button>
-                            ) : (
-                                <Button
-                                    size="sm"
-                                    variant="secondary"
-                                    disabled={!canInstall}
-                                    onClick={() => void change(true)}
-                                >
-                                    {pending ? (
-                                        <Loader2 className="size-4 animate-spin" />
-                                    ) : (
-                                        <Plus className="size-4" />
-                                    )}
-                                    {t("symbiote.install")}
-                                </Button>
-                            )}
-                            {fits && state?.bundled && (
-                                <>
-                                    <Button size="sm" variant="secondary" asChild>
-                                        <a href={DOWNLOAD_PATH} download={SYMBIOTE_FILE}>
-                                            <Download className="size-4" />
-                                            {t("symbiote.download")}
-                                        </a>
-                                    </Button>
-                                    {link && (
-                                        <CopyButton value={link} label={t("symbiote.copyLink")} />
-                                    )}
-                                </>
-                            )}
-                        </div>
-                    )}
-                </div>
-                {blocker ? (
-                    <p className="text-xs text-muted-foreground">{blocker}</p>
-                ) : fits ? (
-                    <p className="text-xs text-muted-foreground">{t("symbiote.playersNeedIt")}</p>
-                ) : null}
-                {fits && !canManage && (
-                    <p className="text-xs text-muted-foreground">{t("symbiote.onlyManagers")}</p>
-                )}
-                {note && <p className="text-xs text-muted-foreground">{note}</p>}
-                {error && (
-                    <p role="alert" className="text-xs text-danger">
-                        {error}
+                    <p className="line-clamp-2 text-xs text-muted-foreground">
+                        {t("symbiote.about")}
                     </p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                        {t("mods.byAuthor", { name: "Polaris" })}
+                    </p>
+                </div>
+                {!heard && !state ? (
+                    <Skeleton className="h-8 w-32" />
+                ) : state?.installed ? (
+                    <Button
+                        size="sm"
+                        variant="ghost"
+                        disabled={!canManage || !heard || pending}
+                        onClick={() => void change(false)}
+                    >
+                        {pending ? (
+                            <Loader2 className="size-4 animate-spin" />
+                        ) : (
+                            <Trash2 className="size-4" />
+                        )}
+                        {t("symbiote.remove")}
+                    </Button>
+                ) : (
+                    <Button
+                        size="sm"
+                        variant="secondary"
+                        disabled={!canInstall}
+                        onClick={() => void change(true)}
+                    >
+                        {pending ? (
+                            <Loader2 className="size-4 animate-spin" />
+                        ) : (
+                            <Plus className="size-4" />
+                        )}
+                        {t("symbiote.install")}
+                    </Button>
                 )}
-            </CardBody>
+            </div>
+            {blocker ? (
+                <p className="text-xs text-muted-foreground">{blocker}</p>
+            ) : fits ? (
+                <p className="text-xs text-muted-foreground">{t("symbiote.playersNeedIt")}</p>
+            ) : null}
+            {fits && !canManage && (
+                <p className="text-xs text-muted-foreground">{t("symbiote.onlyManagers")}</p>
+            )}
+            {note && <p className="text-xs text-muted-foreground">{note}</p>}
+            {error && (
+                <p role="alert" className="text-xs text-danger">
+                    {error}
+                </p>
+            )}
             {confirmElement}
-        </Card>
+        </li>
     );
 }

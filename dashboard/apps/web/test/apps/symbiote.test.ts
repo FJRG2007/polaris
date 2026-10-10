@@ -5,8 +5,10 @@
  * half of the server that rules it out; installing puts one entry on `MODS`
  * beside everything there and removing takes only that one off, writing the list
  * even when that empties it; a server that moves off 1.21.4 drops it, since the
- * loader ends that boot over it; the login mod's own edits leave it alone; and
- * the image builds the file the dashboard serves, which the route then serves.
+ * loader ends that boot over it; the login mod's own edits leave it alone; an
+ * entry from before the jar moved behind the pack link is told apart from the
+ * current one; and the image builds the file the dashboard serves, which the
+ * public mod route refuses - it goes out through the pack link alone.
  */
 
 import { join } from "node:path";
@@ -27,7 +29,10 @@ const { guardForSave } = await import("@polaris-app/game-servers/src/lib/minecra
 const route = await import("@polaris-app/game-servers/src/routes/api/minecraft/mod/[file]/route");
 
 const BASE = "https://polaris.example";
-const JAR = `${BASE}/api/minecraft/mod/${FILE}`;
+/** The server's pack link for the jar, which is where `MODS` points now. */
+const JAR = `${BASE}/api/minecraft/pack/01a0a00b-35c5-7932-861e-1b2161a9b298/token/${FILE}`;
+/** Where it was listed before it moved behind the pack link. */
+const PUBLIC = `${BASE}/api/minecraft/mod/${FILE}`;
 const LOGIN = `${BASE}/api/minecraft/mod/polaris-neoforge-1.21.4.jar`;
 const OTHER = "https://example.com/some-mod.jar";
 
@@ -53,14 +58,21 @@ describe("where it is offered", () => {
 describe("installing and removing it", () => {
     it("adds one entry beside what the list holds", () => {
         const mods = `${LOGIN},${OTHER}`;
-        expect(symbiote.withSymbiote(mods, BASE)).toBe(`${LOGIN},${OTHER},${JAR}`);
-        expect(symbiote.withSymbiote("", `${BASE}/`)).toBe(JAR);
+        expect(symbiote.withSymbiote(mods, JAR)).toBe(`${LOGIN},${OTHER},${JAR}`);
+        expect(symbiote.withSymbiote("", JAR)).toBe(JAR);
     });
 
     it("is never listed twice, and an old address is replaced", () => {
         const old = `http://old.example/api/minecraft/mod/${FILE}`;
-        expect(symbiote.withSymbiote(`${old},${OTHER}`, BASE)).toBe(`${OTHER},${JAR}`);
-        expect(symbiote.withSymbiote(JAR, BASE)).toBe(JAR);
+        expect(symbiote.withSymbiote(`${old},${OTHER}`, JAR)).toBe(`${OTHER},${JAR}`);
+        expect(symbiote.withSymbiote(JAR, JAR)).toBe(JAR);
+    });
+
+    it("tells an entry from the public route apart from the pack link", () => {
+        expect(symbiote.symbioteElsewhere(`${LOGIN},${PUBLIC}`, JAR)).toBe(true);
+        expect(symbiote.symbioteElsewhere(`${LOGIN},${JAR}`, JAR)).toBe(false);
+        expect(symbiote.symbioteElsewhere(LOGIN, JAR)).toBe(false);
+        expect(symbiote.withSymbiote(`${LOGIN},${PUBLIC}`, JAR)).toBe(`${LOGIN},${JAR}`);
     });
 
     it("takes only its own entry off, whichever address it was written with", () => {
@@ -166,12 +178,11 @@ describe("the file", () => {
         ).toContain("gradle-9.2.1");
     });
 
-    it("is served by the route, and nothing that only looks like it", async () => {
+    it("is not served by the public mod route, to anybody", async () => {
         const params = (file: string) => ({ params: Promise.resolve({ file }) });
-        const request = new Request(`${BASE}/api/minecraft/mod/${FILE}`);
-        const response = await route.GET(request, params(FILE));
-        expect(response.status).toBe(200);
-        expect(await response.text()).toBe("symbiote-bytes");
+        const request = new Request(PUBLIC);
+        expect((await route.GET(request, params(FILE))).status).toBe(404);
+        expect((await route.HEAD(request, params(FILE))).status).toBe(404);
         for (const file of ["symbiote-neoforge-1.21.1.jar", "symbiote.jar", `../${FILE}`]) {
             expect((await route.GET(request, params(file))).status, file).toBe(404);
         }

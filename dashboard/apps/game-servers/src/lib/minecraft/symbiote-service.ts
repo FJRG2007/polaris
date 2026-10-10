@@ -12,6 +12,7 @@ import { host } from "@polaris/app-host";
 import { MODS_KEY } from "./polaris-login";
 import { SOFTWARE_KEY } from "./join-guard";
 import { gameMessage } from "../game-message";
+import { packUrl } from "./client-pack";
 import { jarBundled } from "./polaris-mod-files";
 
 const { publicAppUrl } = host.domainService;
@@ -32,17 +33,35 @@ async function readEnv(applicationId: string, ownerId: string): Promise<Map<stri
     return new Map(vars.map((entry) => [entry.key, entry.value ?? ""]));
 }
 
+/** The address a server downloads it from: its own pack link. */
+function jarUrl(baseUrl: string, installedAppId: string): string {
+    return packUrl(baseUrl, installedAppId, symbiote.SYMBIOTE_FILE);
+}
+
 export async function symbioteState(
     applicationId: string,
-    ownerId: string
+    ownerId: string,
+    installedAppId: string
 ): Promise<SymbioteState> {
     const [env, publicUrl, bundled] = await Promise.all([
         readEnv(applicationId, ownerId),
         publicAppUrl().catch(() => null),
         jarBundled(symbiote.SYMBIOTE_FILE)
     ]);
+    const mods = env.get(MODS_KEY) ?? "";
+    // Installed while the jar was still on the public route: moved onto the pack
+    // link, which is the only address that serves it now.
+    if (publicUrl !== null && symbiote.symbioteElsewhere(mods, jarUrl(publicUrl, installedAppId))) {
+        await setEnvVars("application", applicationId, ownerId, [
+            {
+                key: MODS_KEY,
+                value: symbiote.withSymbiote(mods, jarUrl(publicUrl, installedAppId)),
+                isSecret: false
+            }
+        ]);
+    }
     return {
-        installed: symbiote.hasSymbiote(env.get(MODS_KEY) ?? ""),
+        installed: symbiote.hasSymbiote(mods),
         fit: symbiote.symbioteFit(env.get(SOFTWARE_KEY) ?? "", env.get("VERSION") ?? ""),
         reachable: publicUrl !== null,
         bundled
@@ -54,6 +73,7 @@ export async function symbioteState(
 export async function setSymbiote(
     applicationId: string,
     ownerId: string,
+    installedAppId: string,
     on: boolean
 ): Promise<void> {
     const env = await readEnv(applicationId, ownerId);
@@ -69,7 +89,7 @@ export async function setSymbiote(
         if (!(await jarBundled(symbiote.SYMBIOTE_FILE))) {
             throw new Error(gameMessage("games", "lib.noSymbiote"));
         }
-        next = symbiote.withSymbiote(mods, baseUrl);
+        next = symbiote.withSymbiote(mods, jarUrl(baseUrl, installedAppId));
     } else {
         next = symbiote.withoutSymbiote(mods);
     }

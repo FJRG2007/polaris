@@ -1,12 +1,14 @@
 // @vitest-environment jsdom
 
 /**
- * Symbiote on the Mods tab.
+ * Symbiote as a row of the Mods tab's list.
  *
- * Pinned: on NeoForge 1.21.4 a manager installs it in one click and players get
- * the same jar from the download button; elsewhere nothing is offered and the
- * reason is said; a viewer sees the download but not the install; and removing
- * it asks first, since its blocks leave the world with it.
+ * Pinned: it shows Polaris's mark and is credited to Polaris; on NeoForge 1.21.4
+ * a manager installs it in one click; players are pointed at the pack's line and
+ * never handed a download link, since the jar is not public; on another release
+ * the reason is said, and on another loader the row is not there at all; a
+ * viewer cannot install it; and removing it asks first, since its blocks leave
+ * the world with it.
  */
 
 import "@/components/app-host/client";
@@ -15,7 +17,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, render, screen } from "@testing-library/react";
 import * as actions from "@polaris-app/game-servers/src/screens/installed/symbiote-actions";
-import { SymbioteCard } from "@polaris-app/game-servers/src/screens/installed/symbiote-card";
+import { SymbioteRow } from "@polaris-app/game-servers/src/screens/installed/symbiote-card";
 import type { SymbioteState } from "@polaris-app/game-servers/src/lib/minecraft/symbiote-service";
 
 vi.mock("@polaris-app/game-servers/src/screens/installed/symbiote-actions", () => ({
@@ -28,9 +30,12 @@ const READY: SymbioteState = { installed: false, fit: "fits", reachable: true, b
 
 function show(state: SymbioteState, canManage = true) {
     vi.mocked(actions.symbioteStateAction).mockResolvedValue({ state });
-    render(<SymbioteCard installedAppId={SERVER} canManage={canManage} />, {
-        wrapper: MessagesWrapper
-    });
+    return render(
+        <ul>
+            <SymbioteRow installedAppId={SERVER} canManage={canManage} />
+        </ul>,
+        { wrapper: MessagesWrapper }
+    );
 }
 
 afterEach(() => {
@@ -51,11 +56,12 @@ describe("Symbiote on the Mods tab", () => {
         expect(screen.getByText("Installed")).toBeTruthy();
     });
 
-    it("hands players the jar the server downloads", async () => {
+    it("is credited to Polaris, and points players at the pack's line instead of a download", async () => {
         show(READY, false);
-        const link = await screen.findByRole("link", { name: /download for your game/i });
-        expect(link.getAttribute("href")).toBe("/api/minecraft/mod/symbiote-neoforge-1.21.4.jar");
-        // A viewer can download it but not install it.
+        expect(await screen.findByText("by Polaris")).toBeTruthy();
+        expect(screen.getByText(/send this to the players/i)).toBeTruthy();
+        expect(screen.queryByRole("link")).toBeNull();
+        // A viewer cannot install it.
         expect(
             (screen.getByRole("button", { name: /install on server/i }) as HTMLButtonElement)
                 .disabled
@@ -63,17 +69,17 @@ describe("Symbiote on the Mods tab", () => {
         expect(screen.getByText(/only somebody who manages this server/i)).toBeTruthy();
     });
 
-    it("offers nothing on another release or software, and says why", async () => {
+    it("says why on another release, and is not listed on other software", async () => {
         show({ ...READY, fit: "release" });
         expect(await screen.findByText(/set the server's version to 1\.21\.4/i)).toBeTruthy();
         expect(
             (screen.getByRole("button", { name: /install on server/i }) as HTMLButtonElement)
                 .disabled
         ).toBe(true);
-        expect(screen.queryByRole("link", { name: /download for your game/i })).toBeNull();
         cleanup();
-        show({ ...READY, fit: "loader" });
-        expect(await screen.findByText(/runs on neoforge 1\.21\.4 only/i)).toBeTruthy();
+        const { container } = show({ ...READY, fit: "loader" });
+        await vi.waitFor(() => expect(actions.symbioteStateAction).toHaveBeenCalled());
+        await vi.waitFor(() => expect(container.querySelector("li")).toBeNull());
     });
 
     it("asks before removing it, and leaves it on Cancel", async () => {

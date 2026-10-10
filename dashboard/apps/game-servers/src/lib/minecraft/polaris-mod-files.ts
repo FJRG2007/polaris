@@ -35,6 +35,17 @@ export function modPath(file: string): string | null {
     return SERVED.includes(file) ? path.join(modDir(), file) : null;
 }
 
+/** The jars anybody may download without a credential: the login's builds and
+ *  the anti-cheat's, which a server fetches before it can present one. A mod
+ *  Polaris carries for the operator is not one of them - it is handed out through
+ *  the server's own pack link (`client-pack`). */
+const PUBLIC: readonly string[] = [...MOD_FILES, ...ANTICHEAT_FILES];
+
+/** Where a publicly served build lives, or null when it is not public. */
+export function publicModPath(file: string): string | null {
+    return PUBLIC.includes(file) ? path.join(modDir(), file) : null;
+}
+
 /** The version a build reports, or null when the image has no record of it. The
  *  files never change under a running dashboard, so each is read once. */
 const versions = new Map<string, Promise<string | null>>();
