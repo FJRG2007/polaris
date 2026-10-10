@@ -17,7 +17,7 @@
  */
 
 import { loaderForType } from "./modrinth";
-import { MODS_KEY, carriesFile, modUrl } from "./polaris-login";
+import { MODS_KEY, carriesFile, modEntries, modUrl } from "./polaris-login";
 
 /** The file the dashboard serves it as. */
 export const SYMBIOTE_FILE = "symbiote-neoforge-1.21.4.jar";
@@ -36,14 +36,6 @@ export function symbioteFit(software: string, version: string): SymbioteFit {
     return version.trim() === SYMBIOTE_RELEASE ? "fits" : "release";
 }
 
-/** The image splits `MODS` on commas and newlines. */
-function entries(mods: string): string[] {
-    return mods
-        .split(/[,\n]/)
-        .map((entry) => entry.trim())
-        .filter((entry) => entry.length > 0);
-}
-
 /** Whether the list carries it, whichever address it was written with. */
 export function hasSymbiote(mods: string): boolean {
     return carriesFile(mods, SYMBIOTE_FILE);
@@ -52,14 +44,14 @@ export function hasSymbiote(mods: string): boolean {
 /** The list without it. Empty is a real value: the image only removes what the
  *  list dropped when the list is set. */
 export function withoutSymbiote(mods: string): string {
-    return entries(mods)
+    return modEntries(mods)
         .filter((entry) => !carriesFile(entry, SYMBIOTE_FILE))
         .join(",");
 }
 
 /** The list with it, once, at this dashboard's address. */
 export function withSymbiote(mods: string, baseUrl: string): string {
-    return [...entries(withoutSymbiote(mods)), modUrl(baseUrl, SYMBIOTE_FILE)].join(",");
+    return [...modEntries(withoutSymbiote(mods)), modUrl(baseUrl, SYMBIOTE_FILE)].join(",");
 }
 
 /**
