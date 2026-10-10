@@ -191,7 +191,10 @@ export function ServerRail() {
 
             <span className="h-px w-6 shrink-0 bg-border" />
 
-            <div className="flex min-h-0 flex-1 flex-col items-center gap-1.5 overflow-y-auto overscroll-contain no-scrollbar">
+            {/* The whole width of the rail, and a little room above and below:
+                a scrolling box clips on both axes, and sized to its pills it
+                cut off the unread count that hangs past each one's corner. */}
+            <div className="flex min-h-0 w-full flex-1 flex-col items-center gap-1.5 overflow-y-auto overscroll-contain py-0.5 no-scrollbar">
                 {spaces.map((space) => (
                     <SpaceMenu
                         key={space.id}

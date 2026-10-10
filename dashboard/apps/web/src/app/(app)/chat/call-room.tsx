@@ -56,6 +56,7 @@ import { QuietMicNotice } from "./quiet-mic-notice";
 import { SlowConnectionNotice } from "@/components/connection-banner";
 import { playCallSound } from "@/lib/call-sounds";
 import { useEffect, useRef, useState } from "react";
+import { FACE_MAX, useFaceSize, useTileFit } from "./call-grid";
 import type { FilteredMic, MicFilter } from "./mic-filter";
 import {
     REACTIONS,
@@ -514,6 +515,14 @@ export function CallRoom({
     /** Offered shares sit among the people, first, rather than in a row above
      *  them. Only where the people are drawn in the main area. */
     const offersInline = place === "direct" && peopleShown;
+    /** Every tile in the people grid: your own, everybody else's, and the
+     *  shares offered among them. */
+    const tileCount =
+        1 +
+        (admitted ?? []).filter((person) => person.id !== call.participantId).length +
+        (offersInline ? putAway.length : 0);
+    /** Gap between tiles, in pixels: `gap-2`. */
+    const tiles = useTileFit<HTMLDivElement>(tileCount, 8);
     /** In the band, a stream being watched is all there is: pressing it again
      *  lets go of it and brings the people back, rather than enlarging a picture
      *  that already has the whole band. */
@@ -1036,6 +1045,15 @@ export function CallRoom({
 
             {peopleShown && !bareFaces && (
                 <div
+                    ref={staged ? undefined : tiles.ref}
+                    style={
+                        !staged && tiles.fit.width > 0
+                            ? ({
+                                  "--tile-w": `${tiles.fit.width}px`,
+                                  "--tile-h": `${tiles.fit.height}px`
+                              } as React.CSSProperties)
+                            : undefined
+                    }
                     className={cn(
                         // Room inside the edges for the speaking ring, which is
                         // drawn outside a tile (ring-2): the strip scrolls
@@ -1055,7 +1073,13 @@ export function CallRoom({
                         // cannot be scrolled to.
                         staged
                             ? "h-[6.25rem] w-max max-w-full shrink-0 self-center auto-cols-[9rem] grid-flow-col overflow-x-auto"
-                            : cn("flex-1", columns)
+                            : tiles.fit.width > 0
+                              ? // Wide tiles, as big as the panel allows, with a
+                                // short last row centred under the others - the
+                                // shape every voice channel has. Until the panel
+                                // has been measured, the even grid stands in.
+                                "flex flex-1 flex-wrap content-center justify-center [&>*]:h-[var(--tile-h)] [&>*]:w-[var(--tile-w)] [&>*]:flex-none"
+                              : cn("flex-1", columns)
                     )}
                 >
                     {offersInline && putAway.map((stage) => offer(stage, "size-full min-h-24"))}
@@ -1852,10 +1876,6 @@ function clock(seconds: number): string {
     return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
 }
 
-/** How big the face in an empty tile is. One size for every tile: a grid where
- *  the faces are different sizes reads as a mistake. */
-const AVATAR_SIZE = 72;
-
 /** What a stream's menu needs, less the thing it wraps. */
 type StreamMenuFor = Omit<React.ComponentProps<typeof StreamMenu>, "children">;
 
@@ -1977,7 +1997,7 @@ function Face({
         <li className="flex w-20 shrink-0 flex-col items-center gap-1">
             <span className="relative">
                 <Avatar
-                    size={AVATAR_SIZE}
+                    size={FACE_MAX}
                     person={{ id: personId, name }}
                     callBadge={deafened ? "deafened" : muted ? "muted" : null}
                     className={cn(
@@ -2170,6 +2190,9 @@ function Tile({
     const t = useTranslations("chat");
     const video = useRef<HTMLVideoElement>(null);
     const frame = useRef<HTMLDivElement | null>(null);
+    /** The face in an empty tile, sized to the tile: a fixed one spilled over
+     *  the name of every tile in a phone's grid. */
+    const face = useFaceSize(frame);
     /** Pushing into the picture. Held for every tile and used by the ones that
      *  say so - a face in a grid of eight is not a thing anybody zooms. */
     const look = useZoomPan();
@@ -2362,7 +2385,7 @@ function Tile({
                 // grid of eight far faster than eight names are.
                 <span className="absolute inset-0 flex items-center justify-center">
                     <Avatar
-                        size={AVATAR_SIZE}
+                        size={face}
                         person={{ id: personId ?? null, name }}
                         callBadge={deafened ? "deafened" : muted ? "muted" : null}
                         className={cn(
