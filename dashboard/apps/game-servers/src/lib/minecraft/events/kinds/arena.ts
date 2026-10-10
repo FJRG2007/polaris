@@ -180,11 +180,24 @@ export function withDecayed(blocks: readonly string[]): string[] {
 export function teardown(arena: Arena): string[] {
     const pieces = slices(arena.box);
     const kinds = withDecayed(arena.blocks.filter((block) => ITEM_ID.test(block)));
-    return kinds.flatMap((block) =>
-        pieces.map(
-            (piece) => `${IN_OVERWORLD} fill ${region(piece)} minecraft:air replace ${block}`
-        )
-    );
+    return [
+        ...kinds.flatMap((block) =>
+            pieces.map(
+                (piece) => `${IN_OVERWORLD} fill ${region(piece)} minecraft:air replace ${block}`
+            )
+        ),
+        ...(arena.biome ? biomeLines(arena.biome.box, arena.biome.was, arena.biome.now) : [])
+    ];
+}
+
+/**
+ * A box's cells of one biome given another (`fillbiome`, 1.19.3): only those,
+ * so taking it back - the two the other way round - gives back exactly what
+ * was there. Ids only, as `ITEM_ID` reads them.
+ */
+export function biomeLines(box: Box, biome: string, replacing: string): string[] {
+    if (!ITEM_ID.test(biome) || !ITEM_ID.test(replacing)) return [];
+    return [`${IN_OVERWORLD} fillbiome ${region(box)} ${biome} replace ${replacing}`];
 }
 
 /**

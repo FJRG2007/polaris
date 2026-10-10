@@ -75,3 +75,9 @@ export function leads(name: string, language: Language): string {
         ? `&b&l${name}&e lleva la corona: va primero`
         : `&b&l${name}&e wears the crown: in the lead`;
 }
+
+/** After the action bar's line, once somebody has taken blows: how much
+ *  further the next one throws them than the first did. */
+export function knockback(percent: number, language: Language): string {
+    return language === "es" ? ` &8| &c+${percent}% de empuje` : ` &8| &c+${percent}% knockback`;
+}
