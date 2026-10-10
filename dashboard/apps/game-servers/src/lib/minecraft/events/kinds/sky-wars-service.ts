@@ -3,11 +3,11 @@
  * this is its part of them.
  *
  * Built, the islands' chests are filled (`decorate`), each item marked as the
- * kit. At "Go!" the cages come down. Each tick reads health, damage dealt and
+ * kit. At "Go!" the cages come down. Each tick reads damage dealt and
  * taken, bows drawn, deaths, where everybody is, and whom the quick look found
  * past the play area; it credits each hit to whoever the game says hurt them
  * (from 1.19.4; nobody for a fall), or before that to whoever struck nearest,
- * or else whoever drew a bow; then puts out whoever is down to `OUT_HEALTH`, died, fell
+ * or else whoever drew a bow; then puts out whoever died, fell
  * under the islands or left the play area, or has been off the server two
  * looks running - their kit taken, up to the gallery, the last to hit them in
  * the last ten seconds credited. The last one left wins.
@@ -127,7 +127,6 @@ async function tick(ctx: KindContext, lines: string[]): Promise<string | null> {
     const memory = memoryOf(run.id);
     const marker = run.marker;
     const say = (line: string) => ctx.server.say([line]);
-    const health = commands.readScores(await say(duel.READ_HP));
     const died = commands.readScores(await say(duel.READ_DIED));
     const dealt = commands.readScores(await say(duel.READ_DEALT));
     const taken = commands.readScores(await say(sw.READ_TAKEN));
@@ -182,7 +181,7 @@ async function tick(ctx: KindContext, lines: string[]): Promise<string | null> {
         if (by) memory.hitBy.set(lower(one.name), { by, at: now });
     }
 
-    // Out: brought low, dead, fallen, past the play area, or gone.
+    // Out: dead, fallen, past the play area, or gone.
     for (const one of alive()) {
         const name = one.name;
         const where = here.get(lower(name));
@@ -193,9 +192,7 @@ async function tick(ctx: KindContext, lines: string[]): Promise<string | null> {
             if (missed >= MISSED_LOOKS) why = "gone";
         } else {
             memory.missing.delete(lower(name));
-            const hp = health.get(name);
             if ((died.get(name) ?? 0) > 0) why = "died";
-            else if (hp !== undefined && hp > 0 && hp <= sw.OUT_HEALTH) why = "low";
             else if (gone.has(lower(name)) || !sw.inPlay(play, where))
                 why = where.y < play.y1 || gone.has(lower(name)) ? "fell" : "left";
         }

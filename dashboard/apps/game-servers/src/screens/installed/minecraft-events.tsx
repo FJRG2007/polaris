@@ -621,8 +621,7 @@ function EventExplained({
         facts.push(
             t("events.facts.duelJoin"),
             t("events.facts.duelKit", {
-                kit: t(`events.kits.${options.kit}` as GameKey<"minecraft">),
-                hearts: options.downHearts
+                kit: t(`events.kits.${options.kit}` as GameKey<"minecraft">)
             }),
             t("events.facts.duelKeepInventory"),
             t("events.facts.duelNeeds")

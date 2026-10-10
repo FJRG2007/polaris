@@ -1333,10 +1333,10 @@ export function duelEnterTitle(side: number, language: Language): string {
         : `&l${teamName(side, language)} team`;
 }
 
-export function duelEnterSubtitle(hearts: number, language: Language): string {
+export function duelEnterSubtitle(language: Language): string {
     return language === "es"
-        ? `&fA ${hearts} corazones vuelves a tu lado`
-        : `&fAt ${hearts} hearts you are sent back`;
+        ? "&fSi mueres, vuelves a tu lado con todo"
+        : "&fDie and you are back on your side, kit and all";
 }
 
 /** `Red 3 - 2 Blue - 4:10`, for the boss bar. */

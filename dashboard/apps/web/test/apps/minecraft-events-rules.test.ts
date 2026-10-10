@@ -1134,3 +1134,26 @@ describe("who an event still holds", () => {
         expect([...stored.heldNames(state)].sort()).toEqual(["ana", "ben"]);
     });
 });
+
+describe("a duel or a capture the flag saved when players were sent back at a few hearts", () => {
+    it("still reads, the hearts dropped: a player is out by dying", () => {
+        const read = catalog.readEventsConfig({
+            [catalog.EVENTS_KEY]: {
+                presets: [
+                    {
+                        ...catalog.newPreset("team-duel", "duel"),
+                        options: { kit: "iron", downHearts: 2 }
+                    },
+                    {
+                        ...catalog.newPreset("capture-the-flag", "flag"),
+                        options: { captures: 2, downHearts: 4 }
+                    }
+                ]
+            }
+        });
+        expect(read.presets.slice(0, 2).map((one) => one.id)).toEqual(["duel", "flag"]);
+        expect(read.presets[0]!.options).toMatchObject({ kit: "iron" });
+        for (const preset of read.presets.slice(0, 2))
+            expect(preset.options).not.toHaveProperty("downHearts");
+    });
+});

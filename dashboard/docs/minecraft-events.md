@@ -506,7 +506,8 @@ left out.
   team duel, build battle and king of the ring keep their older branches in
   `arena-service.ts`.
 - **Capture the flag** is two teams set up exactly as a duel's (kit,
-  `downHearts` send-back and shield, kill credit, natural regeneration off),
+  a death, with keepInventory on, sending them back and shielded once they
+  respawn, kill credit, natural regeneration off),
   in an arena 21 by 47 with a base at each end: the floor in the team's
   color, the banner on a sea lantern. A player touching the other team's
   banner while it stands at home takes it - the quick look marks a touch in
@@ -594,10 +595,9 @@ left out.
   `normal` has wood and leather. Bridging blocks can be placed only against
   the islands' own blocks and other bridges (`can_place_on`), and nothing
   can be broken. PvP is on, keepInventory held, natural regeneration left
-  on: food is in the chests. A player is out - never dead - when the duel's
-  shield catches them at two hearts (`OUT_HEALTH`), when they die anyway,
-  fall under the islands, cross the play area's edge, or are off the server
-  two ticks running; their kit is taken and they watch from an invisible
+  on: food is in the chests. A player is out when they die (keepInventory
+  on, so nothing drops), fall under the islands, cross the play area's
+  edge, or are off the server two ticks running; their kit is taken and they watch from an invisible
   gallery over the middle. The quick look takes whoever crosses the play area's edge
   up to the gallery at once, and kills any arrow stuck in a block before it
   can be picked up as nobody's. Each hit is credited to whoever the game says

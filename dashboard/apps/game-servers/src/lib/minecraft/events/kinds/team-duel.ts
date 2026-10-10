@@ -1,17 +1,18 @@
 /**
  * A team duel's commands: the arena, the two teams, what is counted, and how a
- * player brought low is taken out of the fight before the next blow kills them.
+ * player who dies is brought back.
  *
  * The arena is a closed box in the air: a floor of barrier under a layer of
  * glass - red at one end, blue at the other - barrier walls and a barrier roof.
  * Mobs cannot spawn on glass or barrier, nobody outside can break into it, and
  * nobody inside can break or place anything, playing in adventure mode.
  *
- * Nobody loses anything to it. Each tick reads everybody's health, and a player
- * at `downHearts` or below is out: sent back to their side, healed, and shielded
- * for a few seconds. A blow big enough to kill in between two looks is still
- * possible, so `keepInventory` is on for exactly as long as it lasts, and put
- * back to what the server had after: a death keeps everything, items and levels.
+ * Nobody loses anything to it. A player is out by dying, as anywhere else in the
+ * game, and `keepInventory` is on for exactly as long as it lasts, put back to
+ * what the server had after: a death keeps everything, items and levels. Back
+ * from it, they are sent to their side, healed, and shielded for a few seconds.
+ * (Sending a player back at a few hearts left, before the next blow, counted
+ * blows that would never have killed: a player out who was not.)
  *
  * Nobody heals on their own in it either. Everybody is kept fed so they can
  * sprint, and a full belly mends half a heart every half second - a fight
@@ -58,16 +59,6 @@ export function healthOf(
 export const READ_DEALT = `execute as @a run scoreboard players get @s ${DEALT}`;
 export const READ_DIED = `execute as @a run scoreboard players get @s ${DIED}`;
 export const READ_KILLS = `execute as @a run scoreboard players get @s ${KILLS}`;
-
-/**
- * Whoever is brought low between two looks, shielded at once: sent far oftener
- * than the tick (`events-service` quick look), so somebody already down to their
- * last hearts is not killed by the next blow while the tick has yet to see it.
- * The tick then sends them back to their side as it always has.
- */
-export function shieldLow(downHearts: number): string {
-    return `effect give @a[tag=pe_arena,scores={${HP}=..${downHearts * 2}}] minecraft:resistance 2 4 true`;
-}
 
 /** The game rule that keeps inventories through a death, under each name it has had. */
 export const KEEP_INVENTORY = ["keepInventory", "keep_inventory"] as const;

@@ -45,22 +45,6 @@ export function TeamDuelFields({
                     aria-label={t("editor.kit")}
                 />
             </Field>
-            <Field
-                label={t("editor.outAtHearts")}
-                hint={t("editor.outAtHint")}
-                problem={problemAt(issues, "options", "downHearts")}
-            >
-                <Input
-                    type="number"
-                    min={1}
-                    max={6}
-                    className="w-32"
-                    value={Number.isFinite(value.downHearts) ? value.downHearts : ""}
-                    onChange={(event) =>
-                        onChange({ ...value, downHearts: numberOf(event.target.value) })
-                    }
-                />
-            </Field>
             <PlaceField
                 value={value.place}
                 onChange={(place) => onChange({ ...value, place })}

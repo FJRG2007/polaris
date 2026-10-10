@@ -18,8 +18,8 @@
  * a diagonal) - to get anywhere, a player bridges. And none is so far that the
  * blocks in its own chests cannot bridge it to the middle.
  *
- * Out is out, never dead: brought low (the duel's shield first), fallen under
- * the islands or gone past the play area, a player is taken up to an invisible
+ * Out is out: dead (kept whole by `keepInventory`), fallen under the islands
+ * or gone past the play area, a player is taken up to an invisible
  * gallery over the middle to watch, their kit taken. The box the arena takes
  * reaches `MARGIN` past the play area on every side but the top's gallery, and
  * a player is put out the moment they cross it (the quick look): blocks are
@@ -1050,9 +1050,6 @@ export function tiebreakOf(state: WarState, names: readonly string[]): Record<st
     return Object.fromEntries(names.map((name) => [name, -(state.kills[name] ?? 0)]));
 }
 
-/** Health at which a player is out, before the next blow can kill them: two hearts. */
-export const OUT_HEALTH = 4;
-
 /** Who is out carries this, so the quick look leaves them be. */
 export const OUT_TAG = "pe_sw_out";
 /** Who the quick look found past the play area, for the tick to put out. */
@@ -1094,8 +1091,7 @@ export const TEARDOWN = [
 ];
 
 /**
- * Between ticks, nothing read: whoever is down to `OUT_HEALTH` shielded until
- * the tick puts them out; whoever crossed the play area's edge - under the
+ * Between ticks, nothing read: whoever crossed the play area's edge - under the
  * islands, past a side, over the top - taken up to the gallery at once and
  * marked for the tick, before they could place anything outside the box; an
  * arrow stuck in a block gone before anybody picks it up as their own; and,
@@ -1130,7 +1126,6 @@ export function quickLines(
     const seat = gallerySpot(layout, at, 0);
     const box2 = volume(box.x1, box.y1, box.z1, box.x2, box.y2, box.z2);
     return [
-        `effect give @a[${who},scores={pe_hp=..${OUT_HEALTH}}] minecraft:resistance 2 4 true`,
         ...outside.map(
             (one) => `execute in minecraft:overworld run tag @a[${who},${one}] add ${GONE_TAG}`
         ),
