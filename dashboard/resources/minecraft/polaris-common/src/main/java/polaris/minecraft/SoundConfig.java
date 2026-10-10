@@ -52,6 +52,28 @@ record SoundConfig(Pack pack, Sound join, Sound welcome, Map<String, Sound> play
         }
     }
 
+    /**
+     * Whether a player holding {@code before} has to be sent {@code after}. Every
+     * pack the game is handed reloads its resources, so one it already has is
+     * never sent again.
+     */
+    static boolean differs(Pack before, Pack after) {
+        if (before == null || after == null) return before != after;
+        return !before.sha1().equals(after.sha1()) || before.required() != after.required()
+                || !before.prompt().equals(after.prompt());
+    }
+
+    /** A player's answer to a pack, as {@code polaris sounds status} reports it,
+     *  from the game's own name for it (the same in every API that passes it on). */
+    static String state(String answer) {
+        return switch (answer) {
+            case "SUCCESSFULLY_LOADED" -> "loaded";
+            case "DECLINED" -> "declined";
+            case "FAILED_DOWNLOAD", "INVALID_URL", "FAILED_RELOAD", "DISCARDED" -> "failed";
+            default -> "pending";
+        };
+    }
+
     /** The sound a player arrives to: their own, or everybody's. */
     Sound arrival(String player) {
         Sound own = players.get(player.toLowerCase(Locale.ROOT));

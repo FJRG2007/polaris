@@ -16,9 +16,12 @@ import net.minecraft.network.protocol.common.ClientboundResourcePackPushPacket;
 import net.minecraft.network.protocol.common.ServerboundResourcePackPacket;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.server.network.ServerConfigurationPacketListenerImpl;
+import net.minecraft.server.network.config.ServerResourcePackConfigurationTask;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerEvent;
 import net.neoforged.neoforge.event.server.ServerStartedEvent;
+import net.neoforged.neoforge.network.event.RegisterConfigurationTasksEvent;
 import net.neoforged.neoforge.server.ServerLifecycleHooks;
 
 /**
@@ -29,6 +32,11 @@ import net.neoforged.neoforge.server.ServerLifecycleHooks;
  * it changed ({@code polaris sounds refresh}), and pushes it to everybody on and
  * everybody who joins - under an id of its own, so it stacks on top of the
  * server's own pack instead of replacing it, and a new one replaces the last.
+ *
+ * A joining player is handed it while their game is still connecting (the
+ * configuration phase, as the server's own pack is), so the reload it costs
+ * happens behind the joining screen instead of on a second screen once they are
+ * in the world. One who joined before Polaris answered gets it on arrival.
  *
  * A player whose game has loaded it carries the {@link SoundConfig#LOADED_TAG}
  * tag, which is what the dashboard's commands play the server's sounds to; the
@@ -47,6 +55,13 @@ final class SoundPack {
     private final Map<UUID, String> states = new ConcurrentHashMap<>();
     /** Players on their first visit, owed the welcome once their pack loads. */
     private final Set<UUID> welcomeOwed = ConcurrentHashMap.newKeySet();
+    /** The pack each player still joining was handed, and their answer to it. */
+    private final Map<UUID, Handed> handed = new ConcurrentHashMap<>();
+
+    /** Kept until the player arrives; one who never does is forgotten after this. */
+    private static final long HANDED_FOR_MILLIS = TimeUnit.MINUTES.toMillis(10);
+
+    private record Handed(SoundConfig.Pack pack, String state, long at) {}
 
     private SoundPack(PolarisConfig link, String version) {
         this.client = new PolarisClient(link, version);
@@ -96,9 +111,7 @@ final class SoundPack {
         SoundConfig.Pack before = config.pack();
         config = fresh;
         SoundConfig.Pack after = fresh.pack();
-        boolean changed = before == null ? after != null : after == null || !before.sha1().equals(after.sha1())
-                || before.required() != after.required() || !before.prompt().equals(after.prompt());
-        if (!changed) return;
+        if (!SoundConfig.differs(before, after)) return;
         for (ServerPlayer player : server.getPlayerList().getPlayers()) {
             if (after == null) {
                 if (before != null) player.connection.send(new ClientboundResourcePackPopPacket(Optional.of(before.id())));
@@ -121,16 +134,61 @@ final class SoundPack {
                 pack.id(), pack.url(), pack.sha1(), pack.required(), pack.prompt().map(Component::literal)));
     }
 
+    /**
+     * A player's game connecting (on the mod bus): the pack goes into the same
+     * queue as the server's own, so the game loads it before the player is
+     * placed in the world. The answer comes back through {@link
+     * #onJoiningResponse}; vanilla's own listener moves on to the next task.
+     */
+    void onConfigure(RegisterConfigurationTasksEvent event) {
+        // An answer kept from an earlier attempt to join no longer counts.
+        UUID player = event.getListener() instanceof ServerConfigurationPacketListenerImpl joining
+                ? joining.getOwner().getId() : null;
+        if (player != null) handed.remove(player);
+        SoundConfig.Pack pack = config.pack();
+        if (pack == null) return;
+        if (player != null) hand(player, pack, "pending");
+        event.register(new ServerResourcePackConfigurationTask(new MinecraftServer.ServerResourcePackInfo(
+                pack.id(), pack.url(), pack.sha1(), pack.required(), pack.prompt().map(Component::literal).orElse(null))));
+    }
+
+    /** A joining player's answer to the pack, on the game thread; see {@link #onResponse}. */
+    boolean onJoiningResponse(ServerConfigurationPacketListenerImpl listener, UUID packId,
+            ServerboundResourcePackPacket.Action action) {
+        Handed offered = handed.get(listener.getOwner().getId());
+        if (offered == null || !offered.pack().id().equals(packId)) return false;
+        SoundConfig.Pack pack = offered.pack();
+        hand(listener.getOwner().getId(), pack, SoundConfig.state(action.name()));
+        if (action == ServerboundResourcePackPacket.Action.DECLINED && pack.required())
+            listener.disconnect(Component.translatable("multiplayer.requiredTexturePrompt.disconnect"));
+        return true;
+    }
+
+    private void hand(UUID player, SoundConfig.Pack pack, String state) {
+        long now = System.currentTimeMillis();
+        handed.values().removeIf(one -> now - one.at() > HANDED_FOR_MILLIS);
+        handed.put(player, new Handed(pack, state, now));
+    }
+
     @SubscribeEvent
     public void onJoin(PlayerEvent.PlayerLoggedInEvent event) {
         if (!(event.getEntity() instanceof ServerPlayer player)) return;
         player.removeTag(SoundConfig.LOADED_TAG);
         if (player.addTag(SoundConfig.SEEN_TAG)) welcomeOwed.add(player.getUUID());
         SoundConfig current = config;
-        if (current.pack() != null) push(player, current.pack());
-        // Everybody who has the sounds hears this one arrive.
+        // Everybody who has the sounds hears this one arrive (before the
+        // player's own answer counts, so not they themselves).
         SoundConfig.Sound arrival = current.arrival(player.getGameProfile().getName());
         if (arrival != null) run(player.getServer(), arrival.command("@a[tag=" + SoundConfig.LOADED_TAG + "]"));
+        Handed early = handed.remove(player.getUUID());
+        if (current.pack() != null) {
+            // Handed while joining, and still the one: not sent again, since
+            // that would reload the player's game a second time.
+            if (early != null && !SoundConfig.differs(early.pack(), current.pack())) settle(player, early.state());
+            else push(player, current.pack());
+        } else if (early != null) {
+            player.connection.send(new ClientboundResourcePackPopPacket(Optional.of(early.pack().id())));
+        }
     }
 
     @SubscribeEvent
@@ -150,13 +208,7 @@ final class SoundPack {
         SoundConfig.Pack pack = config.pack();
         if (pack == null || !pack.id().equals(packId)) return false;
         switch (action) {
-            case SUCCESSFULLY_LOADED -> {
-                states.put(player.getUUID(), "loaded");
-                player.addTag(SoundConfig.LOADED_TAG);
-                SoundConfig.Sound welcome = config.welcome();
-                if (welcomeOwed.remove(player.getUUID()) && welcome != null)
-                    run(player.getServer(), welcome.command(player.getStringUUID()));
-            }
+            case SUCCESSFULLY_LOADED -> settle(player, "loaded");
             case DECLINED -> {
                 states.put(player.getUUID(), "declined");
                 if (pack.required())
@@ -166,6 +218,17 @@ final class SoundPack {
             default -> states.putIfAbsent(player.getUUID(), "pending");
         }
         return true;
+    }
+
+    /** Where a player's answer leaves them: one whose game loaded the pack hears
+     *  the server's sounds from now on, and the welcome if it is their first visit. */
+    private void settle(ServerPlayer player, String state) {
+        states.put(player.getUUID(), state);
+        if (!state.equals("loaded")) return;
+        player.addTag(SoundConfig.LOADED_TAG);
+        SoundConfig.Sound welcome = config.welcome();
+        if (welcomeOwed.remove(player.getUUID()) && welcome != null)
+            run(player.getServer(), welcome.command(player.getStringUUID()));
     }
 
     /** {@code polaris sounds status}: the pack and who has it. */

@@ -7,6 +7,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
 import org.bukkit.Bukkit;
 import org.bukkit.SoundCategory;
 import org.bukkit.command.Command;
@@ -30,6 +31,12 @@ import org.bukkit.scheduler.BukkitTask;
  * it changed ({@code polaris sounds refresh}), and pushes it to everybody on and
  * everybody who joins - under an id of its own, so it stacks on top of the
  * server's own pack instead of replacing it, and a new one replaces the last.
+ *
+ * On Paper 1.21.7 and later a joining player is handed it while their game is
+ * still connecting (the configuration phase, as the server's own pack is; see
+ * {@code SoundPackConfigure}), so the reload it costs happens behind the joining
+ * screen instead of on a second screen once they are in the world. Elsewhere,
+ * and for anybody who joined before Polaris answered, it goes out on arrival.
  *
  * A player whose game has loaded it carries the {@link SoundConfig#LOADED_TAG}
  * scoreboard tag, which is what the dashboard's commands play the server's
@@ -55,7 +62,17 @@ final class SoundPack implements Listener, CommandExecutor {
     private volatile SoundConfig config = SoundConfig.NONE;
     private final Map<UUID, String> states = new ConcurrentHashMap<>();
     private final Set<UUID> welcomeOwed = ConcurrentHashMap.newKeySet();
+    /** The pack each player still joining was handed, and their answer to it. */
+    private final Map<UUID, Handed> handed = new ConcurrentHashMap<>();
     private BukkitTask retry;
+
+    /** Kept until the player arrives; one who never does is forgotten after this. */
+    private static final long HANDED_FOR_MILLIS = TimeUnit.MINUTES.toMillis(10);
+    /** Where the configuration phase can be joined in on (Paper 1.21.7 and later). */
+    private static final String CONFIGURE_EVENT =
+            "io.papermc.paper.event.connection.configuration.AsyncPlayerConnectionConfigureEvent";
+
+    private record Handed(SoundConfig.Pack pack, String state, long at) {}
 
     private SoundPack(JavaPlugin plugin, PolarisConfig link, String version) {
         this.plugin = plugin;
@@ -73,8 +90,52 @@ final class SoundPack implements Listener, CommandExecutor {
         if (link.state() != PolarisConfig.State.ON) return null;
         SoundPack pack = new SoundPack(plugin, link, version);
         Bukkit.getPluginManager().registerEvents(pack, plugin);
+        pack.handOutWhileJoining();
         pack.refresh();
         return pack;
+    }
+
+    /**
+     * Joins the configuration phase where the server has one. The listener is
+     * compiled against Paper's API and loaded by name, so a server without it
+     * (Spigot, or Paper before 1.21.7) never reads it and keeps the push on arrival.
+     */
+    private void handOutWhileJoining() {
+        try {
+            Class.forName(CONFIGURE_EVENT, false, SoundPack.class.getClassLoader());
+        } catch (ClassNotFoundException absent) {
+            return;
+        }
+        try {
+            Listener listener = (Listener) Class.forName("polaris.minecraft.SoundPackConfigure")
+                    .getDeclaredConstructor(SoundPack.class).newInstance(this);
+            Bukkit.getPluginManager().registerEvents(listener, plugin);
+        } catch (ReflectiveOperationException | LinkageError | ClassCastException failed) {
+            plugin.getLogger().warning("Polaris sounds: the pack goes out once players are in the world ("
+                    + failed + ").");
+        }
+    }
+
+    /** The pack to hand a player now, or null. */
+    SoundConfig.Pack current() {
+        return config.pack();
+    }
+
+    /** Whether the game has to be told the pack is required: see the class notes. */
+    static boolean requiredOf(SoundConfig.Pack pack) {
+        return pack.required() || Bukkit.getServer().isResourcePackRequired();
+    }
+
+    /** A player starting to join: an answer kept from an earlier attempt no longer counts. */
+    void joining(UUID player) {
+        handed.remove(player);
+    }
+
+    /** A joining player's final answer to {@code pack}, from any thread. */
+    void answeredWhileJoining(UUID player, SoundConfig.Pack pack, String state) {
+        long now = System.currentTimeMillis();
+        handed.values().removeIf(one -> now - one.at() > HANDED_FOR_MILLIS);
+        handed.put(player, new Handed(pack, state, now));
     }
 
     void stop() {
@@ -109,9 +170,7 @@ final class SoundPack implements Listener, CommandExecutor {
         SoundConfig.Pack before = config.pack();
         config = fresh;
         SoundConfig.Pack after = fresh.pack();
-        boolean changed = before == null ? after != null : after == null || !before.sha1().equals(after.sha1())
-                || before.required() != after.required() || !before.prompt().equals(after.prompt());
-        if (!changed) return;
+        if (!SoundConfig.differs(before, after)) return;
         for (Player player : Bukkit.getOnlinePlayers()) {
             if (after == null) {
                 if (before != null) player.removeResourcePack(before.id());
@@ -131,7 +190,7 @@ final class SoundPack implements Listener, CommandExecutor {
         player.removeScoreboardTag(SoundConfig.LOADED_TAG);
         states.put(player.getUniqueId(), "pending");
         player.addResourcePack(pack.id(), pack.url(), HexFormat.of().parseHex(pack.sha1()),
-                pack.prompt().orElse(null), pack.required() || Bukkit.getServer().isResourcePackRequired());
+                pack.prompt().orElse(null), requiredOf(pack));
     }
 
     @EventHandler(priority = EventPriority.MONITOR)
@@ -140,13 +199,22 @@ final class SoundPack implements Listener, CommandExecutor {
         player.removeScoreboardTag(SoundConfig.LOADED_TAG);
         if (player.addScoreboardTag(SoundConfig.SEEN_TAG)) welcomeOwed.add(player.getUniqueId());
         SoundConfig current = config;
-        if (current.pack() != null) push(player, current.pack());
-        // Everybody who has the sounds hears this one arrive.
+        // Everybody who has the sounds hears this one arrive (before the
+        // player's own answer counts, so not they themselves).
         SoundConfig.Sound arrival = current.arrival(player.getName());
         if (arrival != null) {
             for (Player other : Bukkit.getOnlinePlayers()) {
                 if (other.getScoreboardTags().contains(SoundConfig.LOADED_TAG)) play(other, arrival);
             }
+        }
+        Handed early = handed.remove(player.getUniqueId());
+        if (current.pack() != null) {
+            // Handed while joining, and still the one: not sent again, since
+            // that would reload the player's game a second time.
+            if (early != null && !SoundConfig.differs(early.pack(), current.pack())) settle(player, early.state());
+            else push(player, current.pack());
+        } else if (early != null) {
+            player.removeResourcePack(early.pack().id());
         }
     }
 
@@ -163,12 +231,7 @@ final class SoundPack implements Listener, CommandExecutor {
         if (pack == null || !pack.id().equals(event.getID())) return;
         Player player = event.getPlayer();
         switch (event.getStatus()) {
-            case SUCCESSFULLY_LOADED -> {
-                states.put(player.getUniqueId(), "loaded");
-                player.addScoreboardTag(SoundConfig.LOADED_TAG);
-                SoundConfig.Sound welcome = config.welcome();
-                if (welcomeOwed.remove(player.getUniqueId()) && welcome != null) play(player, welcome);
-            }
+            case SUCCESSFULLY_LOADED -> settle(player, "loaded");
             case DECLINED -> {
                 states.put(player.getUniqueId(), "declined");
                 if (pack.required()) player.kickPlayer(pack.kick());
@@ -176,6 +239,16 @@ final class SoundPack implements Listener, CommandExecutor {
             case FAILED_DOWNLOAD, INVALID_URL, FAILED_RELOAD, DISCARDED -> states.put(player.getUniqueId(), "failed");
             default -> states.putIfAbsent(player.getUniqueId(), "pending");
         }
+    }
+
+    /** Where a player's answer leaves them: one whose game loaded the pack hears
+     *  the server's sounds from now on, and the welcome if it is their first visit. */
+    private void settle(Player player, String state) {
+        states.put(player.getUniqueId(), state);
+        if (!state.equals("loaded")) return;
+        player.addScoreboardTag(SoundConfig.LOADED_TAG);
+        SoundConfig.Sound welcome = config.welcome();
+        if (welcomeOwed.remove(player.getUniqueId()) && welcome != null) play(player, welcome);
     }
 
     private static void play(Player player, SoundConfig.Sound sound) {
