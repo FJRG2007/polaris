@@ -20,41 +20,11 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useTranslations } from "@/components/i18n/i18n-provider";
-
-const KEY = "polaris.call.speaker";
-
-/** Same-tab announcement, since the storage event only reaches other tabs. It is
- *  exported because every element already playing has to follow a change, not
- *  only the next one to start. */
-export const SPEAKER_CHANGED = "polaris:call-speaker";
-const CHANGED = SPEAKER_CHANGED;
+import { SPEAKER_CHANGED as CHANGED, setSpeakerDevice, speakerDevice } from "@/lib/speaker-choice";
 
 /** Whether this browser can be told where to play. */
 export function canChooseSpeaker(): boolean {
     return typeof window !== "undefined" && "setSinkId" in HTMLMediaElement.prototype;
-}
-
-/** The one this browser has been told to use, or null for the system's own
- *  choice - which is what "Default" means and what most people want. */
-export function speakerDevice(): string | null {
-    if (typeof window === "undefined") return null;
-    try {
-        return window.localStorage.getItem(KEY) || null;
-    } catch {
-        return null;
-    }
-}
-
-export function setSpeakerDevice(deviceId: string | null): void {
-    if (typeof window === "undefined") return;
-    try {
-        if (deviceId) window.localStorage.setItem(KEY, deviceId);
-        else window.localStorage.removeItem(KEY);
-    } catch {
-        // It still applies to what is playing now; it just will not be
-        // remembered.
-    }
-    window.dispatchEvent(new Event(CHANGED));
 }
 
 /**

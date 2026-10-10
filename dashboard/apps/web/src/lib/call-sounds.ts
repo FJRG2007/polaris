@@ -37,6 +37,7 @@
 
 import type { Season } from "@polaris/core";
 import { soundGain } from "@/lib/notification-sound";
+import { SPEAKER_CHANGED, speakerDevice } from "@/lib/speaker-choice";
 import { soundSeason } from "@/lib/sound-season";
 
 /** One note: where it starts, where it ends, and how long it takes. */
@@ -435,6 +436,29 @@ const TWELFTH_SHARE = 0.12;
 
 let context: AudioContext | null = null;
 
+/** An audio context that can be told where to play - Chromium 110 and later. */
+type Routable = AudioContext & { sinkId?: unknown; setSinkId?: (id: string) => Promise<void> };
+
+/**
+ * Play these tones through the output the call was set to, not the system's.
+ *
+ * The call's voices go wherever its speaker picker says (`speaker-device`), and
+ * these did not: somebody on a headset heard the call in it and everything else
+ * - an incoming ring above all - out of the speakers the system prefers, which
+ * on a desk is often a monitor turned down or a pair switched off. So a second
+ * call ringing in the middle of the first one rang, card and all, somewhere
+ * nobody could hear it. An empty id is the system's own choice, which is what
+ * "Default" means. Failures are swallowed for the same reasons the picker
+ * swallows them: a browser that cannot do it, a device since unplugged - the
+ * tone then plays where it always did.
+ */
+function followSpeaker(ctx: Routable): void {
+    if (typeof ctx.setSinkId !== "function") return;
+    const chosen = speakerDevice() ?? "";
+    if (ctx.sinkId === chosen) return;
+    void ctx.setSinkId(chosen).catch(() => undefined);
+}
+
 /** The one audio context, made the first time something is played. */
 function audio(): AudioContext | null {
     if (typeof window === "undefined") return null;
@@ -442,7 +466,16 @@ function audio(): AudioContext | null {
         window.AudioContext ??
         (window as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
     if (!Ctor) return null;
-    context ??= new Ctor();
+    if (!context) {
+        const made: Routable = new Ctor();
+        context = made;
+        followSpeaker(made);
+        // Changed in this tab, or in another one: a ring already sounding moves
+        // with it, the way the call's own voices do.
+        const follow = () => followSpeaker(made);
+        window.addEventListener(SPEAKER_CHANGED, follow);
+        window.addEventListener("storage", follow);
+    }
     // Suspended is the ordinary state for a context made before the reader
     // pressed anything. Resuming is refused rather than throwing, and the next
     // sound tries again.
