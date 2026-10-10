@@ -39,7 +39,10 @@ class FakeContext {
             connect: (next: unknown) => next,
             start: () => undefined,
             stop: () => undefined,
-            frequency: { setValueAtTime: () => undefined, exponentialRampToValueAtTime: () => undefined }
+            frequency: {
+                setValueAtTime: () => undefined,
+                exponentialRampToValueAtTime: () => undefined
+            }
         };
     }
     createGain(): unknown {

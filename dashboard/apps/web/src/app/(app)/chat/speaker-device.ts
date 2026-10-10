@@ -80,7 +80,9 @@ export function useSpeakers(): {
                     // this is the fallback when it is empty.
                     label:
                         device.label ||
-                        (device.deviceId === "default" ? t("devices.systemDefault") : t("devices.outputN", { n: index + 1 }))
+                        (device.deviceId === "default"
+                            ? t("devices.systemDefault")
+                            : t("devices.outputN", { n: index + 1 }))
                 }))
         );
     }, []);
