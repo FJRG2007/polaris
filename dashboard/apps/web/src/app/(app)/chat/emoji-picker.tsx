@@ -481,13 +481,11 @@ export function EmojiPicker({
     );
     const customGrid = useMemo(
         () =>
-            (customEntries ?? []).map(
-                (entry): PickerEntry => ({
-                    char: core.customEmojiToken(entry),
-                    words: entry.name,
-                    entry
-                })
-            ),
+            (customEntries ?? []).map((entry): PickerEntry => ({
+                char: core.customEmojiToken(entry),
+                words: entry.name,
+                entry
+            })),
         [customEntries]
     );
 
