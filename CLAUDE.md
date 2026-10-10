@@ -164,6 +164,15 @@ cutting each other, version gates, both gamerule names, the stash order,
 fall deaths at an arena's end, restarts in the middle of a run. A new kind
 that skips them brings those bugs back.
 
+## Minecraft servers
+
+Anything that runs inside or acts on a player's Minecraft server - the
+anti-cheat engine, the Polaris mod and plugin, sounds, login, scores - follows
+the `minecraft-servers` skill (`.claude/skills/minecraft-servers/`). Servers
+here are vanilla, plugin and modded, with mods that conflict and blocks nothing
+in our tables knows: an unknown id is skipped, never fatal, and a guess about
+modded content never sets back, kicks or freezes a player.
+
 ## This machine
 
 Docker is not available on the development machine and must never be started
