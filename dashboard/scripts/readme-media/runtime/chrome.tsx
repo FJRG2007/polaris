@@ -5,7 +5,8 @@
  * The app chrome itself is a server component - it reads the session and the
  * settings before it draws - so it cannot run in this page. What it renders is
  * client components fed with values, and those are what this file composes,
- * with the values a signed-in administrator of a small team would have. When the
+ * with the values a signed-in administrator of a small team would have - one who
+ * belongs to an organization and has its shelf open, so the shelf switch shows. When the
  * chrome gains a provider a screen depends on, add it here in the same place.
  */
 
@@ -43,7 +44,8 @@ import {
     ShortcutsProvider,
     ToastProvider
 } from "@polaris/ui";
-import { VIEWER } from "../fixtures/people";
+import { shelfKey } from "@/lib/shelf";
+import { ORG, VIEWER } from "../fixtures/people";
 
 /** Every app a full install shows its administrator. */
 export const APP_IDS = [
@@ -95,7 +97,7 @@ export function Chrome({
     return (
         <CapabilityProvider capabilities={CAPABILITIES as never}>
             <AppUrlProvider baseUrl="https://polaris.example.com">
-                <ShelfScopeProvider shelf="personal">
+                <ShelfScopeProvider shelf={shelfKey(ORG.id)}>
                     <DisplayFormatProvider
                         preferences={resolveDisplayPreferences(null, null, locale)}
                     >
@@ -171,8 +173,8 @@ function Frame({ children }: { children: ReactNode }) {
                         <AppNav appIds={APP_IDS} marketplace />
                         <ScopeSwitcher
                             personalName={VIEWER.name}
-                            organizations={[]}
-                            current={null}
+                            organizations={[ORG]}
+                            current={ORG}
                         />
                     </>
                 }

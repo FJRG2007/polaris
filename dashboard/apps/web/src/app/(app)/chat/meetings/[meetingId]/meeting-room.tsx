@@ -19,6 +19,7 @@
  * this only decides what is worth drawing.
  */
 
+import Link from "next/link";
 import { runAction } from "@/lib/run-action";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { useAppUrl } from "@/components/app-url";
@@ -37,7 +38,17 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { MeetingDetailsDialog } from "../meeting-details-dialog";
 import { useLobbyAdmission } from "@/app/(app)/chat/use-lobby-admission";
 import { PeoplePicker, type PickedPerson } from "@/components/people-picker";
-import { Crown, Link2, LogOut, Loader2, Pencil, UserMinus, UserPlus, Video } from "lucide-react";
+import {
+    ArrowLeft,
+    Crown,
+    Link2,
+    LogOut,
+    Loader2,
+    Pencil,
+    UserMinus,
+    UserPlus,
+    Video
+} from "lucide-react";
 import {
     Button,
     ConfirmDeleteDialog,
@@ -183,6 +194,15 @@ export function MeetingRoom({ meetingId, viewerId }: { meetingId: string; viewer
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden lg:flex-row">
             <div className="flex min-h-0 min-w-0 flex-1 flex-col">
                 <header className="flex h-header shrink-0 flex-wrap items-center gap-2 border-b border-border px-4">
+                    {/* On a phone this page has the whole screen, so it carries the
+                        way back to the list, as a conversation's header does. */}
+                    <Link
+                        href="/chat"
+                        aria-label={t("channelHeader.backToConversations")}
+                        className="-ml-1.5 rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground md:hidden"
+                    >
+                        <ArrowLeft className="size-4" />
+                    </Link>
                     <Video className="size-4 shrink-0 text-muted-foreground" />
                     <span className="min-w-0 flex-1 truncate text-sm">
                         {/* The room's own copy first: it is re-read whenever the
@@ -194,7 +214,9 @@ export function MeetingRoom({ meetingId, viewerId }: { meetingId: string; viewer
                         {about && (
                             <span className="text-muted-foreground">
                                 {" - "}
-                                {about.mine ? t("meetingRoom.youAreHosting") : t("meetingRoom.hostedBy", { name: about.hostName })}
+                                {about.mine
+                                    ? t("meetingRoom.youAreHosting")
+                                    : t("meetingRoom.hostedBy", { name: about.hostName })}
                                 {about.scheduledAt ? `, ${format.dateTime(about.scheduledAt)}` : ""}
                             </span>
                         )}
@@ -310,7 +332,9 @@ export function MeetingRoom({ meetingId, viewerId }: { meetingId: string; viewer
                     bounds={CALL_CHAT_PANE}
                     beside="lg"
                     label={t("meetingRoom.meetingChatWidth")}
-                    className="border-t border-border lg:border-l lg:border-t-0"
+                    // Under the room on a phone, held to a third of the screen
+                    // so the call keeps the rest; it scrolls inside that.
+                    className="max-h-[33dvh] border-t border-border lg:max-h-none lg:border-l lg:border-t-0"
                 >
                     <MeetingChat meetingId={meetingId} call={call} className="flex-1" />
                 </SidePane>
@@ -402,8 +426,12 @@ function HostPanel({
     };
 
     return (
-        <section className="shrink-0 border-t border-border px-4 py-3">
-            <h2 className="text-xs font-medium text-muted-foreground">{t("meetingRoom.hosting")}</h2>
+        // Held short on a phone, where it shares the screen with the call and the
+        // chat; the people in it scroll inside.
+        <section className="max-h-[25dvh] shrink-0 overflow-y-auto overscroll-contain border-t border-border px-4 py-3 lg:max-h-none">
+            <h2 className="text-xs font-medium text-muted-foreground">
+                {t("meetingRoom.hosting")}
+            </h2>
 
             <div className="mt-2 flex flex-col gap-2">
                 <label className="flex items-center justify-between gap-4">
@@ -441,7 +469,9 @@ function HostPanel({
                             <span className="min-w-0 flex-1 truncate text-xs">
                                 {person.name}
                                 {person.guest && (
-                                    <span className="text-muted-foreground">{t("meetingRoom.guestSuffix")}</span>
+                                    <span className="text-muted-foreground">
+                                        {t("meetingRoom.guestSuffix")}
+                                    </span>
                                 )}
                             </span>
                             {!person.self && (
@@ -458,7 +488,9 @@ function HostPanel({
                                                 ? t("meetingRoom.onlySomebodyWithAPolaris")
                                                 : t("meetingRoom.makeHost", { name: person.name })
                                         }
-                                        aria-label={t("meetingRoom.makeHost", { name: person.name })}
+                                        aria-label={t("meetingRoom.makeHost", {
+                                            name: person.name
+                                        })}
                                         disabled={person.guest}
                                         onClick={async () => {
                                             const result = await runAction(
@@ -474,7 +506,9 @@ function HostPanel({
                                         size="icon-xs"
                                         variant="ghost"
                                         title={t("meetingRoom.removeNamed", { name: person.name })}
-                                        aria-label={t("meetingRoom.removeNamed", { name: person.name })}
+                                        aria-label={t("meetingRoom.removeNamed", {
+                                            name: person.name
+                                        })}
                                         onClick={() =>
                                             setRemoving({ id: person.id, name: person.name })
                                         }
@@ -494,7 +528,11 @@ function HostPanel({
                 name={removing?.name ?? ""}
                 kind="person"
                 requireTyping={false}
-                title={removing ? t("meetingRoom.removeQuestion", { name: removing.name }) : t("meetingRoom.removeThem")}
+                title={
+                    removing
+                        ? t("meetingRoom.removeQuestion", { name: removing.name })
+                        : t("meetingRoom.removeThem")
+                }
                 question={t.rich("meetingRoom.removeConfirm", {
                     name: removing?.name ?? "",
                     strong: (chunks) => (

@@ -2216,7 +2216,15 @@ export function ChannelView({
                 voiceRoom && "flex-col lg:flex-row"
             )}
         >
-            <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+            {/* A thread or a search takes the whole of a phone's screen, as a
+                conversation does, and closing it brings this back. Side by
+                side, the two composers were drawn over each other. */}
+            <div
+                className={cn(
+                    "flex min-h-0 min-w-0 flex-1 flex-col",
+                    (thread || searching) && "hidden md:flex"
+                )}
+            >
                 <ChannelHeader
                     channel={channel}
                     viewerId={viewerId}
@@ -2404,7 +2412,10 @@ export function ChannelView({
                     bounds={CALL_CHAT_PANE}
                     beside="lg"
                     label={t("channelView.voiceChannelChatWidth")}
-                    className="border-t border-border lg:border-l lg:border-t-0"
+                    className={cn(
+                        "border-t border-border lg:border-l lg:border-t-0",
+                        (thread || searching) && "hidden md:flex"
+                    )}
                 >
                     {shownConversation}
                 </SidePane>
@@ -2446,7 +2457,11 @@ export function ChannelView({
                         // this conversation is already on screen behind the
                         // panel, and scrolling to it is what a reader expects.
                         if (hit.channelId !== channelId) router.push(`/chat/c/${hit.channelId}`);
-                        else void jumpTo(hit.message.id);
+                        else {
+                            if (!window.matchMedia?.("(min-width: 768px)").matches)
+                                setSearching(false);
+                            void jumpTo(hit.message.id);
+                        }
                     }}
                 />
             )}

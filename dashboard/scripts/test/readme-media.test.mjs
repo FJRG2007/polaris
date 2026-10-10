@@ -102,8 +102,17 @@ test("covers every screen the README promises", () => {
     const ids = new Set(SCENES.map((scene) => scene.id));
     for (const id of [
         "chat",
+        "chat-thread",
+        "chat-media",
+        "chat-poll",
+        "chat-direct",
+        "chat-channel-settings",
+        "chat-rules",
+        "chat-privacy",
         "call",
         "in-call",
+        "call-meeting",
+        "call-group",
         "tasks",
         "task-panel",
         "deploy",
@@ -224,22 +233,58 @@ test("every picture the scenes promise is committed, and nothing else is", () =>
     for (const file of present) assert.ok(expected.has(file), `${file} belongs to no scene`);
 });
 
-test("both READMEs show every scene, from files that exist", () => {
-    for (const [readme, language] of [
-        ["README.md", "en"],
-        ["README.es.md", "es"]
-    ]) {
-        const text = readFileSync(join(repo, readme), "utf8");
-        const linked = [...text.matchAll(new RegExp(`${MEDIA_DIR}/([\\w-]+\\.webp)`, "g"))].map(
-            (match) => match[1]
-        );
-        for (const file of linked)
-            assert.ok(existsSync(join(repo, MEDIA_DIR, file)), `${readme} links ${file}`);
+/** The pages written in one language: its README and its feature pages. */
+function pagesIn(language) {
+    const features = join(repo, "docs", "features");
+    const pages = existsSync(features)
+        ? readdirSync(features)
+              .filter((file) => file.endsWith(".md"))
+              .filter((file) => file.endsWith(".es.md") === (language === "es"))
+              .map((file) => join(features, file))
+        : [];
+    return [join(repo, language === "es" ? "README.es.md" : "README.md"), ...pages];
+}
+
+/** Every local file a page links or shows, resolved from where the page is. */
+function localLinks(page) {
+    const text = readFileSync(page, "utf8");
+    const targets = [
+        ...text.matchAll(/(?:src|srcset|href)="([^"]+)"/g),
+        ...text.matchAll(/\]\(([^)\s]+)\)/g)
+    ].map((match) => match[1].split("#")[0]);
+    return targets
+        .filter((target) => target && !/^[a-z]+:/i.test(target))
+        .map((target) => resolve(dirname(page), target));
+}
+
+test("each language's README and feature pages show every scene, from files that exist", () => {
+    const media = join(repo, MEDIA_DIR);
+    for (const language of ["en", "es"]) {
+        const shown = new Set();
+        for (const page of pagesIn(language)) {
+            const name = page.slice(repo.length + 1);
+            for (const target of localLinks(page)) {
+                assert.ok(existsSync(target), `${name} links ${target.slice(repo.length + 1)}`);
+                if (dirname(target) === media) shown.add(target.slice(media.length + 1));
+            }
+        }
         for (const scene of SCENES) {
             assert.ok(
-                linked.includes(mediaName(scene.id, "dark", language, "desktop")),
-                `${readme} does not show ${scene.id}`
+                shown.has(mediaName(scene.id, "dark", language, "desktop")),
+                `no ${language} page shows ${scene.id}`
             );
         }
+    }
+});
+
+test("every feature page is reachable from its README", () => {
+    for (const language of ["en", "es"]) {
+        const [readme, ...pages] = pagesIn(language);
+        const linked = new Set(localLinks(readme));
+        for (const page of pages)
+            assert.ok(
+                linked.has(page),
+                `${readme.slice(repo.length + 1)} never links ${page.slice(repo.length + 1)}`
+            );
     }
 });

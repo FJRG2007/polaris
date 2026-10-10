@@ -95,6 +95,8 @@ export function SearchPanel({
         <SidePane
             pane="search"
             bounds={SEARCH_PANE}
+            // The whole screen on a phone, where the conversation steps aside.
+            beside="md"
             label={t("search.searchWidth")}
             className="min-w-0 border-l border-border"
         >

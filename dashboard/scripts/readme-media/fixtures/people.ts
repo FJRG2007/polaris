@@ -26,6 +26,23 @@ export const TEAM = {
     priya: person(6, "Priya Nair", "priya")
 } as const;
 
+/** The rest of the Northwind space: in its voice rooms and its channels, but
+ *  not in every scene's member list. */
+export const CREW = {
+    mateo: person(7, "Mateo Silva", "mateo"),
+    grace: person(8, "Grace Lin", "grace"),
+    omar: person(9, "Omar Haddad", "omar"),
+    yuki: person(10, "Yuki Tanaka", "yuki")
+} as const;
+
+/** The organization the viewer belongs to, which is what puts the shelf switch
+ *  in the header of every picture. */
+export const ORG = {
+    id: "00000000-0000-4000-8000-0000000000a1",
+    slug: "northwind",
+    name: "Northwind"
+};
+
 /** A fixture id that reads as one: `id("channel", 3)`. */
 export function id(kind: string, n: number): string {
     const tag = [...kind].reduce((sum, char) => sum + char.charCodeAt(0), 0) % 0xffff;
