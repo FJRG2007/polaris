@@ -35,12 +35,18 @@ const faces = join(here, "faces");
 /** Files the fixtures send - pictures, a clip's still, a space's emoji - by the
  *  fixture id the message names them by; see media/LICENSE.md. */
 const media = join(here, "media");
-/** The routes that serve such a file, with the id where the route puts it. */
+/** The routes that serve such a file, with the id where the route puts it. An
+ *  organization's or a space's picture is its mark, in the same folder. */
 const MEDIA_ROUTES = [
     /^\/api\/chat\/attachments\/([\w-]+)$/,
     /^\/api\/chat\/emoji\/([\w-]+)$/,
-    /^\/api\/chat\/links\/([\w-]+)\/image$/
+    /^\/api\/chat\/links\/([\w-]+)\/image$/,
+    /^\/api\/avatar\/org\/([\w-]+)$/,
+    /^\/api\/avatar\/chat\/space\/([\w-]+)$/
 ];
+/** Where a fixture camera (`fixtures/call.ts`) fetches the person it films. Not
+ *  a route of the app: only the harness's own canvas asks for it. */
+const CAMERA = /^\/readme-media\/camera\/([\w-]+)$/;
 const output = resolve(root, "..", MEDIA_DIR);
 const require = createRequire(join(root, "package.json"));
 const { chromium } = require("playwright");
@@ -80,17 +86,10 @@ const FACELESS = "/api/mail/face/";
 function serve() {
     const server = createServer((req, res) => {
         const path = decodeURIComponent((req.url ?? "/").split("?")[0]);
-        // A fixture person with a face gets it. Anybody else gets a transparent
-        // pixel, as the real route answers for somebody with no picture, and the
-        // initials the component drew show through.
-        if (path.startsWith("/api/avatar/") || path.startsWith("/api/banner/")) {
-            const face = /^\/api\/avatar\/([\w-]+)$/.exec(path)?.[1];
-            const file = face ? join(faces, `${face}.webp`) : null;
-            if (file && existsSync(file)) {
-                res.writeHead(200, { "content-type": "image/webp" }).end(readFileSync(file));
-            } else {
-                res.writeHead(200, { "content-type": "image/png" }).end(PIXEL);
-            }
+        const filmed = CAMERA.exec(path)?.[1];
+        const film = filmed ? join(faces, `${filmed}.camera.webp`) : null;
+        if (film && existsSync(film)) {
+            res.writeHead(200, { "content-type": "image/webp" }).end(readFileSync(film));
             return;
         }
         const sent = MEDIA_ROUTES.map((route) => route.exec(path)?.[1]).find(Boolean);
@@ -104,6 +103,19 @@ function serve() {
                 );
                 return;
             }
+        }
+        // A fixture person with a face gets it. Anybody else gets a transparent
+        // pixel, as the real route answers for somebody with no picture, and the
+        // initials the component drew show through.
+        if (path.startsWith("/api/avatar/") || path.startsWith("/api/banner/")) {
+            const face = /^\/api\/avatar\/([\w-]+)$/.exec(path)?.[1];
+            const file = face ? join(faces, `${face}.webp`) : null;
+            if (file && existsSync(file)) {
+                res.writeHead(200, { "content-type": "image/webp" }).end(readFileSync(file));
+            } else {
+                res.writeHead(200, { "content-type": "image/png" }).end(PIXEL);
+            }
+            return;
         }
         // A sender with no picture is a 404 from the real route, and the list
         // draws their initials. Same here; see FACELESS below.
@@ -260,7 +272,9 @@ async function run() {
                                     );
                                     await page.waitForTimeout(120);
                                     shots.push(
-                                        await (await picture(page, scene, viewport))
+                                        await (
+                                            await picture(page, scene, viewport)
+                                        )
                                             .resize(VIEWPORTS[viewport].width)
                                             .png()
                                             .toBuffer()

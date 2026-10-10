@@ -15,6 +15,7 @@ import type { VoicePresence } from "@/lib/chat/meetings";
 import type { SpaceEmojiList } from "@/lib/chat/custom-emoji";
 import type { ScheduledMessageView } from "@/lib/chat/scheduled";
 import type { ChatAttachmentView, ChatMessageView } from "@/lib/chat/messages";
+import type { CallSoundboard } from "@/lib/chat/soundboard-service";
 import type { ChatChannelView, ChatSpaceView, ChatCategoryView } from "@/lib/chat/chat-service";
 
 export const SPACE_ID = id("space", 1);
@@ -146,21 +147,68 @@ export function chatChannels(ctx: SceneContext): ChatChannelView[] {
     ];
 }
 
+/** The spaces in the rail, the team's own first. Each one's picture is its mark,
+ *  `media/<id>.svg`; the other two are communities the viewer is a member of. */
 export function chatSpaces(ctx: SceneContext): ChatSpaceView[] {
+    const space = (
+        n: number,
+        name: string,
+        color: string,
+        extra: Partial<ChatSpaceView> = {}
+    ): ChatSpaceView => ({
+        id: id("space", n),
+        name,
+        description: "",
+        color,
+        visibility: "private",
+        orgId: null,
+        orgName: null,
+        archived: false,
+        access: "member",
+        notifyLevel: "all",
+        ...extra
+    });
     return [
-        {
-            id: SPACE_ID,
-            name: ctx.say("Northwind team", "Equipo Northwind"),
-            description: "",
-            color: "#6366f1",
-            visibility: "private",
-            orgId: null,
-            orgName: null,
-            archived: false,
-            access: "owner",
-            notifyLevel: "all"
-        }
+        space(1, ctx.say("Northwind team", "Equipo Northwind"), "#6366f1", { access: "owner" }),
+        space(2, "Harbor Lights", "#14b8a6", { visibility: "internal" }),
+        space(3, "Copperleaf Studio", "#f59e0b")
     ];
+}
+
+/** The soundboard a call offers: Polaris's own sounds and the team space's.
+ *  Every call screen asks for it when the call opens. */
+export function callSoundboard(ctx: SceneContext): CallSoundboard {
+    const sound = (n: number, en: string, es: string, emoji: string, minutes: number) => ({
+        id: id("sound", n),
+        spaceId: SPACE_ID,
+        name: ctx.say(en, es),
+        emoji,
+        volume: 1,
+        durationMs: 2_400,
+        uploaderName: TEAM.ana.name,
+        createdAt: ago(ctx.now, minutes)
+    });
+    return {
+        refusal: null,
+        external: true,
+        groups: [
+            {
+                spaceId: SPACE_ID,
+                spaceName: chatSpaces(ctx)[0]!.name,
+                here: true,
+                sounds: [
+                    sound(1, "Ship it", "A producción", "\u{1F680}", 900),
+                    sound(2, "Standup bell", "Campana daily", "\u{1F514}", 800),
+                    sound(3, "Coffee break", "Hora del café", "☕", 700),
+                    sound(4, "Nice catch", "Bien visto", "\u{1F3AF}", 600),
+                    sound(5, "Drumroll", "Redoble", "\u{1F941}", 500)
+                ]
+            }
+        ],
+        favorites: ["default:applause", id("sound", 1)],
+        manageSpaceId: SPACE_ID,
+        cooldownMs: 3_000
+    };
 }
 
 export function chatCategories(ctx: SceneContext): ChatCategoryView[] {

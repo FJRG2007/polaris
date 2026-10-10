@@ -13,6 +13,7 @@ import {
     membersOf,
     THREAD_ROOT_ID,
     arriving,
+    callSoundboard,
     chatCategories,
     chatChannels,
     chatSpaces,
@@ -65,6 +66,7 @@ export function chatActions(ctx: SceneContext, channelId: string) {
         listChannelsAction: () => ({ channels }),
         chatRulesAction: () => ({ rules: {} }),
         callsUnavailableAction: () => null,
+        callSoundboardAction: () => ({ board: callSoundboard(ctx) }),
         voicePresenceAction: () => ({ inRoom: voicePresence() }),
         readChannelAction: () => ({
             page: { messages: conversation(ctx, channelId), olderThan: null },

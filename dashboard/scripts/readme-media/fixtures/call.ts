@@ -6,11 +6,10 @@
  * draws all three kinds of call: the stand-up voice room (no cameras, the way a
  * voice room is used), a meeting with cameras on, and a call in a group chat.
  *
- * A camera here is a canvas with the person's fixture face on it, sent as a real
- * video track: the room plays it through the same tile it plays a webcam in.
+ * A camera here is a canvas with the person's fixture photo on it, sent as a
+ * real video track: the room plays it through the same tile it plays a webcam in.
  */
 
-import { avatarUrl } from "@/lib/avatar-url";
 import { CREW, TEAM, VIEWER, ago, id } from "./people";
 import type { SceneContext } from "../runtime/scene";
 import type { CallHold } from "@/app/(app)/chat/call-hold";
@@ -34,13 +33,12 @@ type Person = { readonly id: string; readonly name: string };
 
 const nothing = (): void => undefined;
 
-/** Background tints behind each face on a fixture camera. */
-const TINTS = ["#1e293b", "#3b2f4a", "#1f3b36", "#3d2f24", "#24324a", "#3a2433"];
-
 const cameras = new Map<string, MediaStream | null>();
 
-/** A fixture camera for somebody: their face on a tinted canvas, as a video
- *  track. Made once per person, so a re-render does not restart the picture. */
+/** A fixture camera for somebody: their photo filling a canvas, sent as a video
+ *  track. The picture drifts and breathes a little, as a face in front of a
+ *  webcam does; `index` sets each person apart so the tiles do not move in step.
+ *  Made once per person, so a re-render does not restart the picture. */
 function camera(person: Person, index: number): MediaStream | null {
     const known = cameras.get(person.id);
     if (known !== undefined) return known;
@@ -51,19 +49,26 @@ function camera(person: Person, index: number): MediaStream | null {
     canvas.width = 640;
     canvas.height = 360;
     const pen = canvas.getContext("2d")!;
-    const face = new Image();
-    face.src = avatarUrl(person.id);
+    const photo = new Image();
+    // The webcam framing of the same photo the avatar is cut from (faces/).
+    photo.src = `/readme-media/camera/${person.id}`;
+    const phase = index * 1.7;
     const draw = () => {
-        const tint = TINTS[index % TINTS.length]!;
-        const fill = pen.createLinearGradient(0, 0, 640, 360);
-        fill.addColorStop(0, tint);
-        fill.addColorStop(1, "#0b0f19");
-        pen.fillStyle = fill;
+        pen.fillStyle = "#0b0f19";
         pen.fillRect(0, 0, 640, 360);
-        if (face.complete && face.naturalWidth > 0) pen.drawImage(face, 200, 40, 240, 240);
+        if (!photo.complete || photo.naturalWidth === 0) return;
+        const t = performance.now() / 1000 + phase;
+        // Covers the frame at its smallest, then a slow lean in and out.
+        const cover = Math.max(640 / photo.naturalWidth, 360 / photo.naturalHeight);
+        const scale = cover * (1.06 + 0.015 * Math.sin(t * 0.7));
+        const width = photo.naturalWidth * scale;
+        const height = photo.naturalHeight * scale;
+        const x = (640 - width) / 2 + 9 * Math.sin(t * 0.37);
+        const y = (360 - height) / 2 + 5 * Math.sin(t * 0.53 + 1);
+        pen.drawImage(photo, x, y, width, height);
     };
     draw();
-    face.onload = draw;
+    photo.onload = draw;
     // A canvas track only sends a frame when it is drawn on, so it is drawn on.
     setInterval(draw, 100);
     const stream = canvas.captureStream(10);
