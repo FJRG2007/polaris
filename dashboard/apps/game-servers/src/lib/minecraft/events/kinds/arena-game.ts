@@ -123,7 +123,8 @@ export interface ArenaGame {
     /** Where an entrant stands at "Go!" and is put back to while waiting. */
     spot(run: stored.EventRun, entrant: stored.Entrant): Spot;
     /** Where an entrant who dies comes back, for a kind played on past a
-     *  death: their spawn point there for as long as they are in. */
+     *  death: chosen as they respawn where the server has the Polaris plugin
+     *  or mod (`in-server.respawnSet`), never by moving their spawn point. */
     respawn?(run: stored.EventRun, entrant: stored.Entrant): Spot;
     /** Said once as the event begins, before anybody is brought in (teams,
      *  counts), in the server's own language. */

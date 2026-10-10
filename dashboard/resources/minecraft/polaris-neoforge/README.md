@@ -115,8 +115,9 @@ Always registered, idle until the dashboard runs one. Console and operators only
 (permission level 4); each answers one line of JSON.
 
 - `polaris caps` (or `polaris capabilities`): the mod's version and what this
-  server can do (`stash`, `batch`, `seek`). The dashboard uses a command only when
-  it is listed here, and keeps its plain-command path otherwise.
+  server can do (`stash`, `batch`, `seek`, `respawn`). The dashboard uses a
+  command only when it is listed here, and keeps its plain-command path
+  otherwise.
 - `polaris stash save|restore <player> <key>`: a player's 41 slots (never the
   ender chest or the event kit), experience, health, hunger and effects, to
   `world/polaris/stash/<key>.dat` and back, each in one tick. Idempotent per key;
@@ -125,6 +126,13 @@ Always registered, idle until the dashboard runs one. Console and operators only
   the commands appended to `storage polaris:batch <key>` over as many ticks as
   it takes, under a block cap (8192 by default) and a 15 ms slice of each tick.
   The commands run at permission level 2, the level that can write that storage.
+- `polaris respawn set <key> <player> <dimension> <x> <y> <z> <yaw>`, `list <key>`,
+  `clear <key>`: where a player in an arena event comes back after a death,
+  put into the respawn itself (`PlayerRespawnPositionEvent`, lowest priority),
+  never into their spawn point, so their bed or anchor is untouched, and a
+  charged anchor is not spent on a respawn that goes to the spot
+  (`RespawnChargeMixin`). Used only while they carry `pe_arena`; forgotten as
+  they log out or the event clears it (`EventRespawn`).
 - Hide and seek: while players carry `pe_hider` and `pe_seeker` (or sit in the
   `pe_hs_hide` and `pe_hs_seek` teams), a hider is not
   sent to a seeker farther than 2 blocks without a line of sight (`EventSeek`).

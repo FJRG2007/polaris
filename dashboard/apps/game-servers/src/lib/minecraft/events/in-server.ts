@@ -12,6 +12,9 @@
  *
  * Hide and seek needs nothing from here: the mod hides a hider from seekers who
  * cannot see them on its own, by the event's teams.
+ *
+ * Where an arena's players come back after a death (`polaris respawn`) is the
+ * one thing the Polaris Paper plugin answers too: it lists `respawn` alone.
  */
 
 import { z } from "zod";
@@ -20,7 +23,7 @@ import { stripFormatting } from "../parse";
 import type { ServerContainer } from "../service";
 import { COMMAND_BYTES_MAX, commandBytes } from "../command-size";
 
-export type Capability = "stash" | "batch" | "seek";
+export type Capability = "stash" | "batch" | "seek" | "respawn";
 
 const capsSchema = z.object({
     ok: z.literal(true),
@@ -51,7 +54,7 @@ export function parseCaps(reply: string): ReadonlySet<Capability> {
     if (!parsed.success) return new Set();
     return new Set(
         parsed.data.caps.filter((cap): cap is Capability =>
-            ["stash", "batch", "seek"].includes(cap)
+            ["stash", "batch", "seek", "respawn"].includes(cap)
         )
     );
 }
@@ -123,6 +126,52 @@ export type StashReply = z.infer<typeof stashReplySchema>;
 export function parseStashReply(reply: string): StashReply | null {
     const parsed = stashReplySchema.safeParse(replyObject(reply));
     return parsed.success ? parsed.data : null;
+}
+
+// ------------------------------------------------------------------ respawn
+
+/** Where a player respawns, as the plugin or mod takes it. */
+export interface RespawnSpot {
+    readonly x: number;
+    readonly y: number;
+    readonly z: number;
+    readonly yaw: number;
+}
+
+/**
+ * The key a run's respawn spots are kept under: the same for the same run, so
+ * setting one again replaces it and clearing the run clears them all.
+ */
+export function respawnKey(runId: string): string {
+    return `pr${createHash("sha256").update(runId).digest("hex").slice(0, 24)}`;
+}
+
+/**
+ * The command that sends a player's respawns to a spot - in the Overworld,
+ * on the block's middle, facing its way - for as long as the run lasts, or
+ * null for a name the command cannot take. It never moves their spawn point.
+ */
+export function respawnSet(key: string, name: string, spot: RespawnSpot): string | null {
+    if (!WORD.test(name)) return null;
+    return `polaris respawn set ${key} ${name} minecraft:overworld ${spot.x + 0.5} ${spot.y} ${spot.z + 0.5} ${spot.yaw}`;
+}
+
+/** Who has a spot under `key` now. */
+export function respawnList(key: string): string {
+    return `polaris respawn list ${key}`;
+}
+
+/** Every spot under `key` forgotten: the run is over. */
+export function respawnClear(key: string): string {
+    return `polaris respawn clear ${key}`;
+}
+
+const respawnListSchema = z.object({ ok: z.literal(true), players: z.array(z.string()) });
+
+/** The names `respawnList` answered, in lower case; null when it did not answer as the plugin or mod. */
+export function parseRespawnList(reply: string): ReadonlySet<string> | null {
+    const parsed = respawnListSchema.safeParse(replyObject(reply));
+    return parsed.success ? new Set(parsed.data.players.map((name) => name.toLowerCase())) : null;
 }
 
 // ------------------------------------------------------------------ batch

@@ -211,6 +211,10 @@ interface World {
     kinds: WorldKinds;
     /** Any other count, by objective and player: what an arena kind reads of its own. */
     board: Record<string, Record<string, number>>;
+    /** The Polaris plugin or mod is on the server and answers `polaris respawn`. */
+    respawnMod: boolean;
+    /** The respawn spot each player has on it, by name: the run's key and the spot. */
+    respawnSpots: Map<string, { key: string; at: string }>;
 }
 
 const world: World = {
@@ -317,7 +321,9 @@ const world: World = {
     fighterGap: 2,
     bossBoxed: false,
     kinds: freshKinds(),
-    board: {}
+    board: {},
+    respawnMod: false,
+    respawnSpots: new Map()
 };
 let config: Record<string, unknown> = {};
 /** The kept-bag copies written to the database, by id. */
@@ -799,6 +805,8 @@ function answer(sent: string): string {
     world.onLine?.(sent);
     world.sent.push(sent);
     let line = sent;
+    const respawnAnswer = respawnModAnswer(line);
+    if (respawnAnswer !== null) return respawnAnswer;
     // A data pack is found once the folder is looked at again, and on once enabled.
     if (line === "datapack list available") {
         for (const path of world.files.keys()) {
@@ -1648,6 +1656,34 @@ function answer(sent: string): string {
 }
 
 /** What small wild plant grows at a spot, if any. */
+/** The Polaris plugin's or mod's `polaris caps` and `polaris respawn`, where it is on. */
+function respawnModAnswer(line: string): string | null {
+    if (!line.startsWith("polaris ")) return null;
+    if (!world.respawnMod) return "Unknown or incomplete command, see below for error";
+    if (line === "polaris caps") return '{"ok":true,"polaris":"0.4.0","caps":["respawn"]}';
+    const set = /^polaris respawn set (\S+) (\S+) minecraft:overworld (.+)$/.exec(line);
+    if (set) {
+        if (!world.online.includes(set[2]!)) return '{"ok":false,"why":"offline"}';
+        world.respawnSpots.set(set[2]!, { key: set[1]!, at: set[3]! });
+        return '{"ok":true}';
+    }
+    const listed = /^polaris respawn list (\S+)$/.exec(line);
+    if (listed)
+        return JSON.stringify({
+            ok: true,
+            players: [...world.respawnSpots]
+                .filter(([, spot]) => spot.key === listed[1])
+                .map(([name]) => name)
+        });
+    const cleared = /^polaris respawn clear (\S+)$/.exec(line);
+    if (cleared) {
+        for (const [name, spot] of world.respawnSpots)
+            if (spot.key === cleared[1]) world.respawnSpots.delete(name);
+        return '{"ok":true}';
+    }
+    return '{"ok":false,"why":"usage"}';
+}
+
 function plantAt(at: string): string | undefined {
     if (world.plants.has(at)) return world.plants.get(at);
     return world.grass && !world.chests.includes(at) && !world.blocks.has(at)
@@ -1915,6 +1951,7 @@ const hillService = await import(
 const playing = await import("@polaris-app/game-servers/src/lib/minecraft/activity");
 const arrival = await import("@polaris-app/game-servers/src/lib/minecraft/events/kinds/arrival");
 const arenaKind = await import("@polaris-app/game-servers/src/lib/minecraft/events/kinds/arena");
+const inServer = await import("@polaris-app/game-servers/src/lib/minecraft/events/in-server");
 const bingo = await import("@polaris-app/game-servers/src/lib/minecraft/events/kinds/bingo");
 
 /** What a player reads of a command's text: the words of its JSON, without the
@@ -2080,6 +2117,9 @@ beforeEach(() => {
     world.bossBoxed = false;
     world.kinds = freshKinds();
     world.board = {};
+    world.respawnMod = false;
+    world.respawnSpots = new Map();
+    inServer.forgetCapabilities("s");
     speechService.forget(SERVER);
     world.stormTicks = 0;
     events.forgetPlayers();
@@ -8675,7 +8715,11 @@ describe("a king of the hill", () => {
 describe("a team duel", () => {
     const duelOf = (minutes = 3) => ({ ...newPreset("team-duel", "duel"), minutes });
 
-    it("respawns a fallen duellist on their own side, and gives everybody their spawn back", async () => {
+    /** No line that writes anybody's spawn point, for the whole run. */
+    const noSpawnpoint = () =>
+        expect(world.sent.filter((line) => /(^| run )spawnpoint /.test(line))).toEqual([]);
+
+    it("brings a fallen duellist back to their side without touching anybody's spawn point", async () => {
         const duel = await import(
             "@polaris-app/game-servers/src/lib/minecraft/events/kinds/team-duel"
         );
@@ -8686,25 +8730,63 @@ describe("a team duel", () => {
         await joinAndStart("duel");
         const run = state().run!;
         expect(run.readyAt).not.toBeNull();
-        expect(run.entrants.map((one) => [one.name, one.spawn])).toEqual([
-            ["Ana", { dimension: "minecraft:overworld", x: 120, y: 64, z: -40 }],
-            ["Ben", null]
-        ]);
+        // Nothing kept of their spawn point, which nothing moves.
+        expect(run.entrants.map((one) => one.spawn)).toEqual([undefined, undefined]);
         const box = run.arena!.box;
         const red = duel.sideSpot(box, 0, 0);
         const blue = duel.sideSpot(box, 1, 0);
-        // Their spawn read first, then moved onto their side as they go in.
-        const setAna = world.sent.indexOf(
-            `execute in minecraft:overworld run spawnpoint Ana ${red.x} ${red.y} ${red.z} 0`
-        );
-        expect(setAna).toBeGreaterThan(
-            world.sent.indexOf("execute as @a run data get entity @s SpawnY")
-        );
-        expect(world.sent).toContain(
-            `execute in minecraft:overworld run spawnpoint Ben ${blue.x} ${blue.y} ${blue.z} 180`
-        );
+        world.at = {
+            Ana: [red.x + 0.5, red.y, red.z + 0.5],
+            Ben: [blue.x + 0.5, blue.y, blue.z + 0.5]
+        };
+        await play(6_100);
+        const shielded = () =>
+            world.sent.filter((line) => line.startsWith("effect give Ben minecraft:resistance 5 4"))
+                .length;
+        const before = shielded();
+        // Ben dies, and the game respawns him at the world's spawn, far out:
+        // the next look sends him back to his side, shielded.
+        world.died = { Ben: 1 };
+        world.at = { ...world.at, Ben: [0.5, 64, 0.5] };
+        const sentBefore = world.sent.length;
+        await play(2_100);
+        world.died = {};
+        expect(world.sent.slice(sentBefore)).toContain(duel.sendBack("Ben", blue)[0]);
+        expect(shielded()).toBe(before + 1);
 
-        // Ben dies and is back at once, on his side, inside: still shielded.
+        await play(3 * 60_000);
+        expect(state().run).toBeNull();
+        expect(state().arenaLeftovers).toEqual([]);
+        // No plugin or mod here: nothing asked of one beyond what it can do.
+        expect(world.sent.some((line) => line.startsWith("polaris respawn"))).toBe(false);
+        noSpawnpoint();
+    });
+
+    it("has the Polaris plugin or mod respawn a fallen duellist on their side, the spot set again when forgotten", async () => {
+        const duel = await import(
+            "@polaris-app/game-servers/src/lib/minecraft/events/kinds/team-duel"
+        );
+        world.online = ["Ana", "Ben"];
+        world.homes = { Ana: [120, -40] };
+        world.respawnMod = true;
+        setUp([duelOf()]);
+        await joinAndStart("duel");
+        const run = state().run!;
+        expect(run.readyAt).not.toBeNull();
+        const key = inServer.respawnKey(run.id);
+        const box = run.arena!.box;
+        const red = duel.sideSpot(box, 0, 0);
+        const blue = duel.sideSpot(box, 1, 0);
+        const setAna = `polaris respawn set ${key} Ana minecraft:overworld ${red.x + 0.5} ${red.y} ${red.z + 0.5} ${red.yaw}`;
+        const setBen = `polaris respawn set ${key} Ben minecraft:overworld ${blue.x + 0.5} ${blue.y} ${blue.z + 0.5} ${blue.yaw}`;
+        // Set as they are brought in, after the arena tag.
+        expect(world.sent.indexOf(setAna)).toBeGreaterThan(
+            world.sent.indexOf("tag Ana add pe_arena")
+        );
+        expect(world.sent).toContain(setBen);
+        expect([...world.respawnSpots.keys()].sort()).toEqual(["Ana", "Ben"]);
+
+        // Ben dies and the server respawns him on his side: still healed and shielded.
         world.at = {
             Ana: [red.x + 0.5, red.y, red.z + 0.5],
             Ben: [blue.x + 0.5, blue.y, blue.z + 0.5]
@@ -8718,21 +8800,38 @@ describe("a team duel", () => {
         await play(2_100);
         world.died = {};
         expect(shielded()).toBe(before + 1);
+
+        // Ben logs out and back (or the server restarts): the spot is set again.
+        world.respawnSpots.delete("Ben");
+        const setsBefore = world.sent.filter((line) => line === setBen).length;
         await play(2_100);
-        expect(shielded()).toBe(before + 1);
+        expect(world.sent.filter((line) => line === setBen).length).toBe(setsBefore + 1);
+        expect(world.respawnSpots.has("Ben")).toBe(true);
+        // While held, it is not sent again.
+        await play(2_100);
+        expect(world.sent.filter((line) => line === setBen).length).toBe(setsBefore + 1);
+        // Offline, he is refused once and left a while, not asked every look.
+        world.online = ["Ana"];
+        world.respawnSpots.delete("Ben");
+        await play(2_100);
+        expect(world.sent.filter((line) => line === setBen).length).toBe(setsBefore + 2);
+        await play(10_000);
+        expect(world.sent.filter((line) => line === setBen).length).toBe(setsBefore + 2);
+        // Back on, he has it again once the wait is over.
+        world.online = ["Ana", "Ben"];
+        await play(25_000);
+        expect(world.sent.filter((line) => line === setBen).length).toBe(setsBefore + 3);
+        expect(world.respawnSpots.has("Ben")).toBe(true);
 
         await play(3 * 60_000);
         expect(state().run).toBeNull();
-        // Their own spawn back - the world's, for Ben - before the tag comes off.
-        const backAna = world.sent.indexOf(
-            "execute in minecraft:overworld run spawnpoint Ana 120 64 -40"
-        );
-        const backBen = world.sent.indexOf("spawnpoint Ben ~ ~ ~");
-        expect(backAna).toBeGreaterThan(setAna);
-        expect(backBen).toBeGreaterThan(setAna);
-        expect(world.sent.indexOf("tag Ana remove pe_arena", backAna)).toBeGreaterThan(backAna);
-        expect(world.sent.indexOf("tag Ben remove pe_arena", backBen)).toBeGreaterThan(backBen);
+        // Cleared at the end, before anybody is sent home.
+        const clear = world.sent.indexOf(`polaris respawn clear ${key}`);
+        expect(clear).toBeGreaterThan(-1);
+        expect(world.sent.indexOf("tag Ana remove pe_arena", clear)).toBeGreaterThan(clear);
+        expect(world.respawnSpots.size).toBe(0);
         expect(state().arenaLeftovers).toEqual([]);
+        noSpawnpoint();
     });
 
     it("finds its place over the open sea round an island, where it is built in the air", async () => {
@@ -10750,7 +10849,7 @@ describe("capture the flag", () => {
         onlyOurBlocks();
     });
 
-    it("respawns a fallen player at their own base, and gives their spawn back at the end", async () => {
+    it("brings a fallen player back to their base without touching their spawn point", async () => {
         const flag = await ctf();
         world.homes = { Ben: [-300, 12] };
         world.homeWorlds = { Ben: "minecraft:the_nether" };
@@ -10759,11 +10858,48 @@ describe("capture the flag", () => {
         const box = state().run!.arena!.box;
         const red = flag.startSpot(box, 0, 0);
         const blue = flag.startSpot(box, 1, 0);
+        expect(state().run!.entrants.map((one) => one.spawn)).toEqual([undefined, undefined]);
+        world.at = {
+            Ana: [red.x + 0.5, red.y, red.z + 0.5],
+            Ben: [blue.x + 0.5, blue.y, blue.z + 0.5]
+        };
+        await play(2_100);
+        const shielded = () =>
+            world.sent.filter((line) => line.startsWith("effect give Ana minecraft:resistance 5 4"))
+                .length;
+        const before = shielded();
+        // Ana dies and the game respawns her far out: sent back to her base.
+        world.died = { Ana: 1 };
+        world.at = { ...world.at, Ana: [0.5, 64, 0.5] };
+        const sentBefore = world.sent.length;
+        await play(2_100);
+        world.died = {};
+        expect(world.sent.slice(sentBefore)).toContain(
+            `execute in minecraft:overworld run tp Ana ${red.x + 0.5} ${red.y} ${red.z + 0.5} ${red.yaw} 0`
+        );
+        expect(shielded()).toBe(before + 1);
+
+        await play(10 * 60_000);
+        expect(state().run).toBeNull();
+        expect(world.sent.filter((line) => /(^| run )spawnpoint /.test(line))).toEqual([]);
+        expect(world.sent.some((line) => line.startsWith("polaris respawn"))).toBe(false);
+    });
+
+    it("has the Polaris plugin or mod respawn a fallen player at their base", async () => {
+        const flag = await ctf();
+        world.respawnMod = true;
+        setUp([ctfOf(3)]);
+        await joinAndStart("ctf");
+        const run = state().run!;
+        const key = inServer.respawnKey(run.id);
+        const box = run.arena!.box;
+        const red = flag.startSpot(box, 0, 0);
+        const blue = flag.startSpot(box, 1, 0);
         expect(world.sent).toContain(
-            `execute in minecraft:overworld run spawnpoint Ana ${red.x} ${red.y} ${red.z} ${red.yaw}`
+            `polaris respawn set ${key} Ana minecraft:overworld ${red.x + 0.5} ${red.y} ${red.z + 0.5} ${red.yaw}`
         );
         expect(world.sent).toContain(
-            `execute in minecraft:overworld run spawnpoint Ben ${blue.x} ${blue.y} ${blue.z} ${blue.yaw}`
+            `polaris respawn set ${key} Ben minecraft:overworld ${blue.x + 0.5} ${blue.y} ${blue.z + 0.5} ${blue.yaw}`
         );
         // Ana dies and is back at once at her base, inside: still shielded.
         world.at = {
@@ -10782,11 +10918,9 @@ describe("capture the flag", () => {
 
         await play(10 * 60_000);
         expect(state().run).toBeNull();
-        // Ana never slept anywhere: the world's spawn. Ben's anchor in the Nether.
-        expect(world.sent).toContain("spawnpoint Ana ~ ~ ~");
-        expect(world.sent).toContain(
-            "execute in minecraft:the_nether run spawnpoint Ben -300 64 12"
-        );
+        expect(world.sent).toContain(`polaris respawn clear ${key}`);
+        expect(world.respawnSpots.size).toBe(0);
+        expect(world.sent.filter((line) => /(^| run )spawnpoint /.test(line))).toEqual([]);
     });
 
     it("drops the flag when its carrier dies, back on its stand, the elimination credited", async () => {
@@ -11760,6 +11894,26 @@ describe("SkyWars", () => {
         };
     };
 
+    it("has the Polaris plugin or mod respawn the dead in the gallery, never by their spawn point", async () => {
+        const sw = await kind();
+        world.online = [...names];
+        world.board = { pe_swt: { Ana: 0, Ben: 0, Cy: 0 }, pe_swb: { Ana: 0, Ben: 0, Cy: 0 } };
+        world.dealt = { Ana: 0, Ben: 0, Cy: 0 };
+        world.respawnMod = true;
+        setUp([warOf()]);
+        await joinAndStart("war", names);
+        const run = state().run!;
+        expect(run.readyAt).not.toBeNull();
+        const { layout, at } = await placedOf(run);
+        const seat = sw.gallerySpot(layout, at, 0);
+        const key = inServer.respawnKey(run.id);
+        for (const name of names)
+            expect(world.sent).toContain(
+                `polaris respawn set ${key} ${name} minecraft:overworld ${seat.x + 0.5} ${seat.y} ${seat.z + 0.5} ${seat.yaw}`
+            );
+        expect(world.sent.filter((line) => /(^| run )spawnpoint /.test(line))).toEqual([]);
+    });
+
     it("builds the islands, fills the chests, opens the cages at Go, and the last one left wins", async () => {
         const sw = await kind();
         world.online = [...names];
@@ -11771,12 +11925,10 @@ describe("SkyWars", () => {
         expect(run.readyAt).not.toBeNull();
         const { layout, at } = await placedOf(run);
         expect(run.arena!.box).toEqual(sw.arenaBox(layout, at));
-        // A death respawns straight into the gallery, where the out are kept.
-        const seat = sw.gallerySpot(layout, at, 0);
-        for (const name of names)
-            expect(world.sent).toContain(
-                `execute in minecraft:overworld run spawnpoint ${name} ${seat.x} ${seat.y} ${seat.z} ${seat.yaw}`
-            );
+        // Nobody's spawn point touched: with no plugin or mod, the tick takes
+        // the dead up to the gallery from wherever the game respawns them.
+        expect(world.sent.filter((line) => /(^| run )spawnpoint /.test(line))).toEqual([]);
+        expect(world.sent.some((line) => line.startsWith("polaris respawn"))).toBe(false);
         // Built only into air; every chest filled with marked loot, bridging
         // blocks placeable against the islands; nothing handed out.
         expect(

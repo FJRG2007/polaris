@@ -76,6 +76,13 @@ clock once a second since the game has no event for it.
 online player's state (`loaded`, `pending`, `declined`, `failed`).
 `POLARIS_SOUNDS=off` switches it all off.
 
+`polaris caps` answers `respawn`, and `polaris respawn set <key> <player>
+<dimension> <x> <y> <z> <yaw>`, `list <key>` and `clear <key>` choose where a
+player in an arena event comes back after a death: given to the respawn itself
+(`PlayerRespawnEvent`, highest priority), never to their spawn point, so their
+bed or anchor is untouched. Used only while they carry `pe_arena`; forgotten as
+they leave the server or the event clears it (`EventRespawn`).
+
 `polaris` is a console command (and so RCON); a player who runs it is refused.
 
 ## Configuration
