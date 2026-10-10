@@ -199,10 +199,44 @@ describe("formatting, the stack, notes and pictures", () => {
         expect(edits.imagesOf(doc).size).toBe(0);
     });
 
+    it("lets a picture go with the last box that shows it, and undo brings it back", () => {
+        const { doc, slide } = oneSlide();
+        const frame = { x: 0.2, y: 0.2, w: 0.3, h: 0.3 };
+        const id = edits.addImage(doc, slide, "data:image/webp;base64,AAAA", frame);
+        const copy = edits.duplicateSlide(doc, slide, 0);
+        const history = edits.deckUndoManager(doc);
+        edits.removeBoxes(doc, slide, [id]);
+        expect(edits.imagesOf(doc).size).toBe(1);
+        edits.removeSlide(doc, copy);
+        expect(edits.imagesOf(doc).size).toBe(0);
+        history.undo();
+        expect(edits.imagesOf(doc).size).toBe(1);
+        history.undo();
+        expect(edits.imageSource(doc, read(doc, slide, id).src)).toBe(
+            "data:image/webp;base64,AAAA"
+        );
+    });
+
+    it("names a picture the deck already keeps when a copy of it is pasted", () => {
+        const { doc, slide } = oneSlide();
+        const data = "data:image/png;base64,BBBB";
+        const id = edits.addImage(doc, slide, data, { x: 0.2, y: 0.2, w: 0.3, h: 0.3 });
+        edits.pasteBoxes(doc, slide, [{ ...deck.newBox("image", "p"), src: data }]);
+        expect(edits.imagesOf(doc).size).toBe(1);
+        expect(read(doc, slide, "p").src).toBe(read(doc, slide, id).src);
+    });
+
     it("keeps a flat line flat when it is moved", () => {
         const { doc, slide } = oneSlide();
         const id = edits.addBox(doc, slide, "shape", "line");
-        edits.setFrame(doc, slide, id, { x: 0.1, y: 0.5, w: 0.4, h: 0, flip: false, reversed: true });
+        edits.setFrame(doc, slide, id, {
+            x: 0.1,
+            y: 0.5,
+            w: 0.4,
+            h: 0,
+            flip: false,
+            reversed: true
+        });
         const line = read(doc, slide, id);
         expect(line.h).toBe(0);
         expect(line.reversed).toBe(true);

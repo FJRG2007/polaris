@@ -168,7 +168,7 @@ export const STROKE_POINTS = [1, 2, 3, 4, 6, 8, 12] as const;
 export const SHAPE_FILL = "#7c5cff";
 const SHAPE_TEXT = "#ffffff";
 /** What a new line is drawn in. */
-const LINE_STROKE = "#4d5561";
+export const LINE_STROKE = "#4d5561";
 
 /** A box as it starts. Placed a little in from the edge and a third of the way
  *  down, which is where somebody who just pressed "add" is looking. */

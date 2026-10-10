@@ -24,6 +24,7 @@ export default async function OfficeSlidesPage({ params }: { params: Promise<{ i
                 documentId={id}
                 content={found.content ? Array.from(found.content) : null}
                 editable={core.officeRoleAtLeast(found.access.role, "editor")}
+                audienceWindow
             />
         </DocumentChrome>
     );

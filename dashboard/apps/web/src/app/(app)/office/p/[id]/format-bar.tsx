@@ -306,7 +306,7 @@ export function FormatBar({
                             swatches={FILL_COLORS}
                             current={box.stroke}
                             disabled={false}
-                            onPick={(color) => onPatch({ stroke: color ?? "#4d5561" })}
+                            onPick={(color) => onPatch({ stroke: color ?? deck.LINE_STROKE })}
                         />
                     ) : (
                         <SwatchMenu
@@ -330,7 +330,7 @@ export function FormatBar({
                                         strokeWidth: deck.fractionOfPoints(one),
                                         // A weight for an outline nobody can see
                                         // is a weight that also shows it.
-                                        ...(box.stroke || line ? {} : { stroke: "#4d5561" })
+                                        ...(box.stroke || line ? {} : { stroke: deck.LINE_STROKE })
                                     })
                                 }
                             >

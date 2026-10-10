@@ -106,6 +106,7 @@ export function PresenterView({
     bySlide,
     notesOf,
     from,
+    audienceWindow,
     onClose
 }: {
     documentId: string;
@@ -113,6 +114,7 @@ export function PresenterView({
     bySlide: ReadonlyMap<string, readonly deck.Box[]>;
     notesOf: (slide: deck.Slide) => string;
     from: number;
+    audienceWindow: boolean;
     onClose: () => void;
 }) {
     const t = useTranslations("office");
@@ -162,7 +164,7 @@ export function PresenterView({
     useEffect(() => {
         surface.current?.focus();
         setNoteSize(readNoteSize());
-        setCanAudience(canOpenAudienceWindow());
+        setCanAudience(audienceWindow && canOpenAudienceWindow());
         const opened = openShowChannel(documentId, (one) => {
             if (one.kind === "hello") {
                 setAudienceOpen(true);
@@ -175,7 +177,7 @@ export function PresenterView({
             opened?.close();
             channel.current = null;
         };
-    }, [documentId]);
+    }, [documentId, audienceWindow]);
 
     // Wherever the slide changes from, the audience window follows.
     useEffect(() => {

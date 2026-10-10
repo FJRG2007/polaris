@@ -46,6 +46,26 @@ export function imageSource(doc: Y.Doc, src: string): string {
     return imagesOf(doc).get(src.slice(deck.IMAGE_PREFIX.length)) ?? "";
 }
 
+/** Every picture no box shows any more, out of the store - in the same
+ *  transaction as the removal, so one undo brings the box and its picture back. */
+function dropUnusedImages(doc: Y.Doc): void {
+    const images = imagesOf(doc);
+    if (images.size === 0) return;
+    const used = new Set<string>();
+    for (const box of boxesOf(doc).values()) {
+        const { src } = deck.readBox(box);
+        if (src.startsWith(deck.IMAGE_PREFIX)) used.add(src.slice(deck.IMAGE_PREFIX.length));
+    }
+    for (const key of [...images.keys()]) if (!used.has(key)) images.delete(key);
+}
+
+/** The key a picture is already kept under, so a copy pasted into the same
+ *  deck names it rather than storing it again. */
+function keptImage(doc: Y.Doc, data: string): string | undefined {
+    for (const [key, stored] of imagesOf(doc).entries()) if (stored === data) return key;
+    return undefined;
+}
+
 function change(doc: Y.Doc, edit: () => void): void {
     doc.transact(edit, LOCAL);
 }
@@ -92,6 +112,7 @@ export function removeSlide(doc: Y.Doc, slideId: string): void {
             if (deck.readBoxKey(key)?.slideId === slideId) boxes.delete(key);
         }
         notesOf(doc).delete(slideId);
+        dropUnusedImages(doc);
     });
 }
 
@@ -171,8 +192,8 @@ export function pasteBoxes(doc: Y.Doc, slideId: string, boxes: readonly deck.Box
     change(doc, () => {
         const kept = boxes.map((box) => {
             if (box.kind !== "image" || !box.src.startsWith("data:image/")) return box;
-            const key = crypto.randomUUID();
-            imagesOf(doc).set(key, box.src);
+            const key = keptImage(doc, box.src) ?? crypto.randomUUID();
+            if (!imagesOf(doc).has(key)) imagesOf(doc).set(key, box.src);
             return { ...box, src: `${deck.IMAGE_PREFIX}${key}` };
         });
         placeBoxes(doc, slideId, kept);
@@ -206,6 +227,7 @@ export function removeBoxes(doc: Y.Doc, slideId: string, ids: readonly string[])
     change(doc, () => {
         const map = boxesOf(doc);
         for (const id of ids) map.delete(deck.boxKey(slideId, id));
+        dropUnusedImages(doc);
     });
 }
 

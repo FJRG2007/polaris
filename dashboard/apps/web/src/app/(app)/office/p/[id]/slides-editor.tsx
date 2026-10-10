@@ -157,11 +157,15 @@ function onControl(target: EventTarget | null): boolean {
 export function SlidesEditor({
     documentId,
     content,
-    editable
+    editable,
+    audienceWindow = false
 }: {
     documentId: string;
     content: number[] | null;
     editable: boolean;
+    /** Whether the presenter view may open the audience window, which needs the
+     *  signed-in access a deck opened through a share link does not have. */
+    audienceWindow?: boolean;
 }) {
     const t = useTranslations("office");
     const { doc } = useOfficeDocument({ documentId, content, editable });
@@ -806,6 +810,7 @@ export function SlidesEditor({
             {presenting?.presenter ? (
                 <PresenterView
                     documentId={documentId}
+                    audienceWindow={audienceWindow}
                     slides={deckSlides}
                     bySlide={bySlide}
                     notesOf={notesFor}
