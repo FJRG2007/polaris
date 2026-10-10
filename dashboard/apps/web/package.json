@@ -86,7 +86,7 @@
         "marked": "12.0.2",
         "mongodb": "6.12.0",
         "mysql2": "3.24.5",
-        "next": "15.5.27",
+        "next": "16.4.0",
         "node-stream-zip": "1.15.0",
         "node-unrar-js": "2.0.2",
         "nodemailer": "10.0.15",
