@@ -34,6 +34,7 @@ import {
 import {
     MINING_WEIGHT_MAX,
     buildSuspects,
+    engineScore,
     levelOf,
     movementScore,
     xrayScore
@@ -558,6 +559,20 @@ describe("the players list", () => {
         expect(plain.suspects[0]?.engine.level).toBe("confirmed");
         expect(modded.suspects[0]?.engine.level).toBe("possible");
         expect(modded.suspects[0]?.engine.reasons.at(-1)).toMatch(/^Modded server/);
+    });
+
+    it("lists first the checks that set the level on a modded server", () => {
+        const checks = [
+            { check: "Simulation", alerts: 30 },
+            { check: "NoFall", alerts: 20 },
+            { check: "Timer", alerts: 10 },
+            { check: "Reach", alerts: 3 }
+        ];
+        const score = engineScore(checks, true);
+        expect(score.value).toBe(engineScore([{ check: "Reach", alerts: 3 }]).value);
+        expect(score.reasons[0]).toMatch(/Reach/);
+        expect(score.reasons.at(-1)).toMatch(/^Modded server/);
+        expect(engineScore(checks).reasons[0]).toMatch(/Simulation/);
     });
 
     it("lists whoever is online, even before the game has written their counts", () => {

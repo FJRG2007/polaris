@@ -292,12 +292,14 @@ export function engineScore(
     if (failing.length === 0) return scored(0, []);
     const approximate = modded ? failing.filter((one) => approximateOnMods(one.check)) : [];
     const exact = modded ? failing.filter((one) => !approximateOnMods(one.check)) : failing;
-    const value = Math.max(
-        alertsValue(exact),
-        Math.min(MODDED_APPROXIMATE_MAX, alertsValue(approximate))
-    );
-    const why = [...failing]
-        .sort((left, right) => right.alerts - left.alerts)
+    const exactValue = alertsValue(exact);
+    const approximateValue = Math.min(MODDED_APPROXIMATE_MAX, alertsValue(approximate));
+    const value = Math.max(exactValue, approximateValue);
+    const byAlerts = (left: { alerts: number }, right: { alerts: number }) =>
+        right.alerts - left.alerts;
+    const [leading, trailing] =
+        exactValue >= approximateValue ? [exact, approximate] : [approximate, exact];
+    const why = [...[...leading].sort(byAlerts), ...[...trailing].sort(byAlerts)]
         .slice(0, 3)
         .map((one): ScoreReason => ({ kind: "engine", check: one.check, alerts: one.alerts }));
     if (approximate.length > 0) why.push({ kind: "modded" });
