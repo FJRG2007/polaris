@@ -21,6 +21,8 @@ import java.util.Set;
  */
 public final class ModdedContent {
 
+    private static final double MAX_SWEPT_MOVE = 4.0;
+
     private static volatile BitSet moddedBlocks = new BitSet();
     private static volatile BitSet unmodelledBlocks = new BitSet();
     private static volatile Set<ItemType> moddedItems = Collections.emptySet();
@@ -56,13 +58,23 @@ public final class ModdedContent {
         BitSet unmodelled = unmodelledBlocks;
         if (unmodelled.isEmpty()) return false;
 
+        if (Math.abs(player.x - player.lastX) <= MAX_SWEPT_MOVE
+                && Math.abs(player.y - player.lastY) <= MAX_SWEPT_MOVE
+                && Math.abs(player.z - player.lastZ) <= MAX_SWEPT_MOVE) {
+            return scan(player, unmodelled, player.lastX, player.lastY, player.lastZ, player.x, player.y, player.z);
+        }
+        return scan(player, unmodelled, player.lastX, player.lastY, player.lastZ, player.lastX, player.lastY, player.lastZ)
+                || scan(player, unmodelled, player.x, player.y, player.z, player.x, player.y, player.z);
+    }
+
+    private static boolean scan(PolarisPlayer player, BitSet unmodelled, double fromX, double fromY, double fromZ, double toX, double toY, double toZ) {
         double halfWidth = player.pose.width / 2.0 + 1.0;
-        int minX = (int) Math.floor(Math.min(player.lastX, player.x) - halfWidth);
-        int maxX = (int) Math.floor(Math.max(player.lastX, player.x) + halfWidth);
-        int minZ = (int) Math.floor(Math.min(player.lastZ, player.z) - halfWidth);
-        int maxZ = (int) Math.floor(Math.max(player.lastZ, player.z) + halfWidth);
-        int minY = (int) Math.floor(Math.min(player.lastY, player.y) - 1.0);
-        int maxY = (int) Math.floor(Math.max(player.lastY, player.y) + player.pose.height + 0.5);
+        int minX = (int) Math.floor(Math.min(fromX, toX) - halfWidth);
+        int maxX = (int) Math.floor(Math.max(fromX, toX) + halfWidth);
+        int minZ = (int) Math.floor(Math.min(fromZ, toZ) - halfWidth);
+        int maxZ = (int) Math.floor(Math.max(fromZ, toZ) + halfWidth);
+        int minY = (int) Math.floor(Math.min(fromY, toY) - 1.0);
+        int maxY = (int) Math.floor(Math.max(fromY, toY) + player.pose.height + 0.5);
 
         for (int x = minX; x <= maxX; x++) {
             for (int z = minZ; z <= maxZ; z++) {

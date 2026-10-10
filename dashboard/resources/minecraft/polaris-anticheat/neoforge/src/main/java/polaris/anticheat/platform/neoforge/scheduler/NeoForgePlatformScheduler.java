@@ -13,11 +13,9 @@ import polaris.anticheat.platform.api.world.PlatformWorld;
 import polaris.anticheat.utils.anticheat.LogUtil;
 import polaris.anticheat.utils.math.Location;
 
-import java.util.ArrayList;
 import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.Queue;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.function.IntSupplier;
 
 /**
@@ -27,7 +25,7 @@ import java.util.function.IntSupplier;
 public final class NeoForgePlatformScheduler implements PlatformScheduler {
 
     private final NeoForgeAsyncScheduler asyncScheduler = new NeoForgeAsyncScheduler();
-    private final Map<ScheduledTask, Runnable> taskMap = new ConcurrentHashMap<>();
+    private final Queue<ScheduledTask> tasks = new ConcurrentLinkedQueue<>();
     private final IntSupplier tickCount;
     private final GlobalRegionScheduler global = new Global();
     private final RegionScheduler region = new Region();
@@ -39,7 +37,7 @@ public final class NeoForgePlatformScheduler implements PlatformScheduler {
 
     /** Called by the mod at the end of every server tick. */
     public void tick() {
-        Iterator<ScheduledTask> iterator = taskMap.keySet().iterator();
+        Iterator<ScheduledTask> iterator = tasks.iterator();
         int now = tickCount.getAsInt();
         while (iterator.hasNext()) {
             ScheduledTask task = iterator.next();
@@ -59,24 +57,17 @@ public final class NeoForgePlatformScheduler implements PlatformScheduler {
 
     private TaskHandle schedule(PolarisPlugin plugin, Runnable task, long delay, long period, boolean periodic) {
         ScheduledTask scheduled = new ScheduledTask(task, tickCount.getAsInt() + delay, period, periodic, plugin);
-        Runnable cancel = () -> taskMap.remove(scheduled);
-        taskMap.put(scheduled, cancel);
-        return new NeoForgeTaskHandle(cancel, true);
+        tasks.add(scheduled);
+        return new NeoForgeTaskHandle(() -> tasks.remove(scheduled), true);
     }
 
     private void cancel(PolarisPlugin plugin) {
-        List<Runnable> cancellations = new ArrayList<>();
-        taskMap.entrySet().removeIf(entry -> {
-            if (!entry.getKey().plugin.equals(plugin)) return false;
-            cancellations.add(entry.getValue());
-            return true;
-        });
-        cancellations.forEach(Runnable::run);
+        tasks.removeIf(task -> task.plugin.equals(plugin));
     }
 
     public void shutdown() {
         asyncScheduler.cancelAll();
-        taskMap.clear();
+        tasks.clear();
     }
 
     @Override

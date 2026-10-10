@@ -49,10 +49,15 @@ final class PacketEncoder extends ChannelOutboundHandlerAdapter {
         }
         if (!in.isReadable()) {
             in.release();
+            promise.trySuccess();
             return;
         }
         PacketSendEvent event = PacketEventsImplHelper.handleClientBoundPacket(ctx.channel(), this.user, this.player, in, false);
-        if (!in.isReadable()) return;
+        if (!in.isReadable()) {
+            in.release();
+            promise.trySuccess();
+            return;
+        }
         if (event != null && event.hasTasksAfterSend()) {
             // The Fabric platform drops these; the engine starts tracking a player from
             // one (after LOGIN_SUCCESS is sent), so they run once the write goes out, as
