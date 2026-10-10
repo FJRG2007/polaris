@@ -219,7 +219,7 @@ export function FormatBar({
     onGroup: () => void;
     onUngroup: () => void;
     /** The cell of a table being typed in, which rows and columns go beside. */
-    cell: tables.CellAt | null;
+    cell: { box: string; at: tables.CellAt } | null;
     /** A chosen table changed. */
     onTable: (id: string, edit: (table: tables.SlideTable) => tables.SlideTable) => void;
     /** A chosen chart changed. */
@@ -323,7 +323,7 @@ export function FormatBar({
             {tableBox ? (
                 <TableControls
                     box={tableBox}
-                    cell={cell ?? { row: 0, col: 0 }}
+                    cell={cell?.box === tableBox.id ? cell.at : { row: 0, col: 0 }}
                     onTable={(edit) => onTable(tableBox.id, edit)}
                     onPatch={(patch) => onPatch(patch, "tables")}
                 />

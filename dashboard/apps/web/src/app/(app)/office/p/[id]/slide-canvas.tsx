@@ -481,8 +481,9 @@ export function SlideStage({
         text: string,
         then: "exit" | "stay" | "next" | "back"
     ) => void;
-    /** A table's columns resized. */
-    onTable: (id: string, table: tables.SlideTable) => void;
+    /** A table's columns resized, worked out from the table as it is when
+     *  the edit lands. */
+    onTable: (id: string, edit: (table: tables.SlideTable) => tables.SlideTable) => void;
 }) {
     const look = useContext(SlideLooks)(slideId);
     const layer = useRef<HTMLDivElement | null>(null);
@@ -792,8 +793,10 @@ export function SlideStage({
         const across = layer.current.getBoundingClientRect().width * box.w;
         const fromX = event.clientX;
         let last = start;
+        let by = 0;
         const move = (at: PointerEvent): void => {
-            last = tables.resizeCol(start, border, (at.clientX - fromX) / Math.max(1, across));
+            by = (at.clientX - fromX) / Math.max(1, across);
+            last = tables.resizeCol(start, border, by);
             setColumns({ id: box.id, table: last });
         };
         const finish = (commit: boolean): void => {
@@ -803,7 +806,8 @@ export function SlideStage({
             window.removeEventListener("keydown", escape, true);
             gestureEnd.current = null;
             setColumns(null);
-            if (commit && last !== start) onTable(box.id, last);
+            if (commit && last !== start)
+                onTable(box.id, (one) => tables.resizeCol(one, border, by));
         };
         const up = (): void => finish(true);
         const cancel = (): void => finish(false);

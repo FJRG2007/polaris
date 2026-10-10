@@ -417,6 +417,7 @@
             "notANumber": "Escribe un número, como 12 o 4,5.",
             "fixTheNumbers": "Hay valores que aún no son números. Corrígelos para ver el gráfico.",
             "pieFirstSeries": "Un gráfico circular solo muestra la primera serie.",
+            "other": "Otros",
             "cancel": "Cancelar",
             "save": "Guardar"
         }

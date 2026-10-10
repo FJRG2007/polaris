@@ -212,7 +212,7 @@ export function SlidesEditor({
     const [chosen, setChosen] = useState<string[]>([]);
     const [editing, setEditing] = useState("");
     /** The cell being typed into, when a table is. */
-    const [editingCell, setEditingCell] = useState<tables.CellAt | null>(null);
+    const [editingCell, setEditingCell] = useState<{ box: string; at: tables.CellAt } | null>(null);
     /** The chart whose data is open for editing. */
     const [chartData, setChartData] = useState("");
     /** The slide the show started from, and how it is shown, while it runs. */
@@ -303,7 +303,7 @@ export function SlidesEditor({
         const id = edits.addTable(doc, slide.id, rows, cols);
         setChosen([id]);
         // Straight into its first cell, as in Google Slides.
-        setEditingCell({ row: 0, col: 0 });
+        setEditingCell({ box: id, at: { row: 0, col: 0 } });
         setEditing(id);
     };
 
@@ -349,10 +349,10 @@ export function SlidesEditor({
             edits.updateTable(doc, slide.id, boxId, (one) =>
                 tables.insertRow(one, tables.rowCount(one))
             );
-            setEditingCell({ row: tables.rowCount(table), col: 0 });
+            setEditingCell({ box: boxId, at: { row: tables.rowCount(table), col: 0 } });
             return;
         }
-        setEditingCell(next);
+        setEditingCell({ box: boxId, at: next });
     };
 
     const addBox = (kind: deck.BoxKind, shape?: deck.ShapeKind): void => {
@@ -577,7 +577,7 @@ export function SlidesEditor({
                     return true;
                 case "office.slides.edit":
                     if (!single || !deck.typable(single)) return false;
-                    setEditingCell({ row: 0, col: 0 });
+                    setEditingCell({ box: single.id, at: { row: 0, col: 0 } });
                     setEditing(single.id);
                     return true;
                 case "office.slides.group":
@@ -1020,7 +1020,9 @@ export function SlidesEditor({
                                             boxes={onSlide}
                                             chosen={chosenIds}
                                             editing={editing}
-                                            editingCell={editingCell}
+                                            editingCell={
+                                                editingCell?.box === editing ? editingCell.at : null
+                                            }
                                             placeholderOf={placeholderOf}
                                             nameOf={nameOf}
                                             resizeLabel={t("slides.resize")}
@@ -1029,12 +1031,12 @@ export function SlidesEditor({
                                             onChoose={setChosen}
                                             onEdit={(id, cell) => {
                                                 setEditing(id);
-                                                if (cell) setEditingCell(cell);
+                                                if (cell) setEditingCell({ box: id, at: cell });
                                                 else if (!id) setEditingCell(null);
                                             }}
                                             onCell={onCell}
-                                            onTable={(id, table) =>
-                                                edits.updateTable(doc, slide.id, id, () => table)
+                                            onTable={(id, edit) =>
+                                                edits.updateTable(doc, slide.id, id, edit)
                                             }
                                             onFrames={(frames) =>
                                                 edits.setFrames(doc, slide.id, frames)

@@ -320,10 +320,7 @@ function deckSlides(doc: Y.Doc): { notes: string; lines: string[] }[] {
     const notes = new Map<string, unknown>(doc.getMap<unknown>(OFFICE_FIELDS.slides.notes));
     return slides.map((slide) => ({
         notes: deck.notesOf(slide, notes),
-        lines: deck
-            .boxesOn(slide.id, boxes)
-            .map((box) => box.text.trim())
-            .filter(Boolean)
+        lines: deck.boxesOn(slide.id, boxes).map(deck.boxWords).filter(Boolean)
     }));
 }
 

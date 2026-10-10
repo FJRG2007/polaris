@@ -9,11 +9,13 @@
  */
 
 import * as Y from "yjs";
+import JSZip from "jszip";
 import * as deck from "@/lib/office/deck";
 import { describe, expect, it } from "vitest";
 import * as tables from "@/lib/office/slide-table";
 import * as charts from "@/lib/office/slide-chart";
 import * as edits from "@/app/(app)/office/p/[id]/deck-edits";
+import { exportDocument } from "@/lib/office/export";
 
 const sum = (values: readonly number[]): number => values.reduce((all, one) => all + one, 0);
 
@@ -116,6 +118,20 @@ describe("a table in the deck", () => {
         const table = deck.readBox(edits.boxesOf(doc).get(key)).table!;
         expect(table.rows[0]?.[0]).toBe("mine");
         expect(table.rows[1]?.[1]).toBe("theirs");
+    });
+
+    it("leaves in a PowerPoint export with its cells' words", async () => {
+        const doc = new Y.Doc();
+        edits.addSlide(doc, 0);
+        const slideId = edits.slidesOf(doc).get(0).id;
+        const id = edits.addTable(doc, slideId, 1, 2);
+        edits.setCell(doc, slideId, id, { row: 0, col: 0 }, "Revenue");
+        edits.setCell(doc, slideId, id, { row: 0, col: 1 }, "Margin");
+        const out = await exportDocument("slides", "Deck", Y.encodeStateAsUpdate(doc), "pptx");
+        const zip = await JSZip.loadAsync(out?.bytes ?? new Uint8Array());
+        const slide = (await zip.file("ppt/slides/slide1.xml")?.async("string")) ?? "";
+        expect(slide).toContain("Revenue");
+        expect(slide).toContain("Margin");
     });
 
     it("writes nothing when a cell already says that", () => {
@@ -241,6 +257,23 @@ describe("a chart", () => {
         expect(layout.valueLabels.map((label) => label.text)).toEqual(["29%", "17%", "24%", "30%"]);
         // A pie's key names its categories.
         expect(layout.legend.map((item) => item.label)).toEqual(["C1", "C2", "C3", "C4"]);
+    });
+
+    it("folds a pie's categories past its colours into one last slice", () => {
+        const categories = Array.from({ length: 12 }, (_, at) => `C${at + 1}`);
+        const chart = charts.readChart({
+            kind: "pie",
+            categories,
+            series: [{ name: "s", values: categories.map(() => 1) }]
+        });
+        const layout = charts.chartLayout(chart, 600, 400, 20, undefined, "Other");
+        expect(layout.slices).toHaveLength(charts.SERIES_MAX);
+        expect(new Set(layout.slices.map((slice) => slice.category)).size).toBe(charts.SERIES_MAX);
+        expect(layout.slices.at(-1)?.value).toBe(5);
+        expect(layout.legend.map((item) => item.label)).toEqual([
+            ...categories.slice(0, charts.SERIES_MAX - 1),
+            "Other"
+        ]);
     });
 
     it("shows no key for a single series", () => {

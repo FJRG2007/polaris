@@ -12,7 +12,8 @@
  *
  * The series colours are a fixed, validated categorical order, assigned by
  * the series' place and never cycled: there are as many series as colours and
- * no more. Two orders, one stepped for light slides and one for dark, because a
+ * no more, and a pie with more categories than that folds the rest into one
+ * last slice (`pieSlices`). Two orders, one stepped for light slides and one for dark, because a
  * colour that reads on white is not the one that reads on navy.
  */
 
@@ -148,6 +149,24 @@ export function showsLegend(chart: SlideChart): boolean {
     );
 }
 
+/**
+ * A pie's slices, named and valued: one per category while there are colours
+ * enough, and past that the first `SERIES_MAX - 1` with everything after them
+ * summed into one more, called `other`. Negative values count as nothing.
+ */
+export function pieSlices(
+    chart: SlideChart,
+    other: string
+): { readonly names: readonly string[]; readonly values: readonly number[] } {
+    const values = chart.categories.map((_, at) => Math.max(0, chart.series[0]?.values[at] ?? 0));
+    if (chart.categories.length <= SERIES_MAX) return { names: chart.categories, values };
+    const kept = SERIES_MAX - 1;
+    return {
+        names: [...chart.categories.slice(0, kept), other],
+        values: [...values.slice(0, kept), values.slice(kept).reduce((sum, one) => sum + one, 0)]
+    };
+}
+
 // ---------------------------------------------------------------------------
 // Axis
 // ---------------------------------------------------------------------------
@@ -268,19 +287,21 @@ export function formatValue(value: number, locale?: string): string {
 
 /**
  * Where everything in a chart goes, in a box `width` by `height` with words of
- * size `font` - all in the same units.
+ * size `font` - all in the same units. `other` names a pie's folded last
+ * slice (`pieSlices`).
  */
 export function chartLayout(
     chart: SlideChart,
     width: number,
     height: number,
     font: number,
-    format: (value: number) => string = (value) => formatValue(value)
+    format: (value: number) => string = (value) => formatValue(value),
+    other = ""
 ): ChartLayout {
     const pad = font * 0.6;
     const legendShown = showsLegend(chart);
-    const legendNames =
-        chart.kind === "pie" ? chart.categories : chart.series.map((one) => one.name);
+    const pie = chart.kind === "pie" ? pieSlices(chart, other) : null;
+    const legendNames = pie ? pie.names : chart.series.map((one) => one.name);
     const swatch = font * 0.7;
     const legendRow = legendShown ? font * 1.8 : 0;
     const legend: LegendItem[] = [];
@@ -312,8 +333,8 @@ export function chartLayout(
         h: Math.max(1, height - 2 * pad - legendRow)
     };
 
-    if (chart.kind === "pie") {
-        const values = (chart.series[0]?.values ?? []).map((one) => Math.max(0, one));
+    if (pie) {
+        const values = pie.values;
         const total = values.reduce((sum, one) => sum + one, 0);
         const radius = Math.max(1, Math.min(inner.w, inner.h) / 2);
         const cx = inner.x + inner.w / 2;

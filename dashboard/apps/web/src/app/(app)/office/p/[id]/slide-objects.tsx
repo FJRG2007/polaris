@@ -12,6 +12,7 @@
 import * as deck from "@/lib/office/deck";
 import * as tables from "@/lib/office/slide-table";
 import * as charts from "@/lib/office/slide-chart";
+import { useTranslations } from "@/components/i18n/i18n-provider";
 import {
     useEffect,
     useLayoutEffect,
@@ -304,9 +305,11 @@ export function ChartArt({ box, look }: { box: deck.Box; look: deck.SlideLook })
     const width = Math.max(1, box.w * UNITS_W);
     const height = Math.max(1, box.h * UNITS_H);
     const font = box.size * UNITS_H;
+    const t = useTranslations("office");
+    const other = t("slides.chart.other");
     const layout = useMemo(
-        () => (chart ? charts.chartLayout(chart, width, height, font) : null),
-        [chart, width, height, font]
+        () => (chart ? charts.chartLayout(chart, width, height, font, undefined, other) : null),
+        [chart, width, height, font, other]
     );
     if (!chart || !layout) return null;
     const ink = box.color || look.text;
