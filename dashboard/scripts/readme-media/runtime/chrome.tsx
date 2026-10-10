@@ -31,7 +31,8 @@ import { SessionScopeProvider } from "@/components/session-scope";
 import { FavoriteAppsProvider } from "@/components/favorite-apps";
 import { DisplayFormatProvider } from "@/components/display-format";
 import { ProfileStyleProvider } from "@/components/profile-style-store";
-import { DISPLAY_DEFAULTS, NO_SHORTCUT_OVERRIDES } from "@polaris/core";
+import { useLocale } from "@/components/i18n/i18n-provider";
+import { NO_SHORTCUT_OVERRIDES, resolveDisplayPreferences } from "@polaris/core";
 import { AdminWaitingProvider, NO_ADMIN_WAITING } from "@/components/admin-waiting";
 import { NotificationsProvider } from "@/components/notifications/notifications-provider";
 import {
@@ -88,11 +89,16 @@ export function Chrome({
     children: ReactNode;
     unread?: { chat?: number; mail?: number };
 }) {
+    // As the app chrome resolves them: the reader's language decides how a date
+    // and "3 days ago" are written, not only which catalog the labels come from.
+    const locale = useLocale();
     return (
         <CapabilityProvider capabilities={CAPABILITIES as never}>
             <AppUrlProvider baseUrl="https://polaris.example.com">
                 <ShelfScopeProvider shelf="personal">
-                    <DisplayFormatProvider preferences={DISPLAY_DEFAULTS}>
+                    <DisplayFormatProvider
+                        preferences={resolveDisplayPreferences(null, null, locale)}
+                    >
                         <SessionScopeProvider userId={VIEWER.id}>
                             <ChatUnreadProvider
                                 initial={{

@@ -197,6 +197,14 @@ async function run() {
                         } catch (caught) {
                             problems.push(`never settled: ${caught.message}`);
                         }
+                        // A Spanish picture with "3d ago" in it is a phrase formatted
+                        // for the wrong reader, the way a misconfigured page would.
+                        if (short === "es") {
+                            const english = await page.evaluate(
+                                () => document.body.innerText.match(/\b\d+\s?[smhdw] ago\b/)?.[0]
+                            );
+                            if (english) problems.push(`English time in Spanish: "${english}"`);
+                        }
                         const missing = await page.evaluate(() => globalThis.__MISSING__ ?? []);
                         for (const what of new Set(missing)) problems.push(`not answered: ${what}`);
                         if (problems.length > 0) {
