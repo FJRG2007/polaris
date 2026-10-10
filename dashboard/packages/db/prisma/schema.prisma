@@ -8406,7 +8406,8 @@ model ChatSoundboardDenial {
     // user | role
     kind        String
     // A user id for `user`. For `role`: `member` or `admin` (the space's own
-    // two roles), or `org:<slug>` for a role of the organization that owns it.
+    // two roles - `member` leaves administrators out), or `org:<slug>` for a
+    // role of the organization that owns it.
     subject     String
     createdById String?  @db.Uuid
     createdAt   DateTime @default(now())

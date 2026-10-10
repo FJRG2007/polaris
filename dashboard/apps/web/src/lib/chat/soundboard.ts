@@ -243,17 +243,18 @@ export interface SoundboardSubject {
  * Whether any denial names this person, directly or through a role they hold.
  *
  * Deny beats allow and there is no allow to beat: the soundboard is on for
- * everybody until a denial says otherwise. An administrator holds the `member`
- * role too - a denial of every member is a denial of everybody below the owner,
- * which is what somebody turning it off "for members" means.
+ * everybody until a denial says otherwise. A denial of `member` does not reach
+ * an administrator, as Discord's Administrator passes over role overwrites:
+ * the people who run the space can deny it to every member, and only the owner
+ * denies an administrator - through `admin`, by name, or through an
+ * organization role they hold.
  */
 export function soundboardDenied(
     denials: readonly SoundDenial[],
     subject: SoundboardSubject
 ): boolean {
     if (subject.spaceRole === "owner") return false;
-    const roles = new Set<string>(["member"]);
-    if (subject.spaceRole === "admin") roles.add("admin");
+    const roles = new Set<string>([subject.spaceRole]);
     if (subject.orgRole) roles.add(`${ORG_ROLE_PREFIX}${subject.orgRole}`);
     return denials.some((denial) =>
         denial.kind === "user" ? denial.subject === subject.userId : roles.has(denial.subject)
@@ -263,9 +264,11 @@ export function soundboardDenied(
 /**
  * Whether somebody who runs the space may add or lift this denial.
  *
- * The owner may change any of them. An administrator may not change one that
- * reaches themselves - or "deny beats allow" would mean nothing to the people
- * who manage it - nor one naming another administrator by name, so the
+ * The owner may change any of them. An administrator may change a denial of
+ * `member`, of a person who does not run the space and of an organization role
+ * they do not hold. They may not change one that reaches themselves - `admin`,
+ * their own name, a role of theirs - or "deny beats allow" would mean nothing to
+ * the people who manage it, nor one naming another administrator, so the
  * administrators cannot silence each other: both are the owner's to decide.
  */
 export function mayChangeDenial(

@@ -4,7 +4,8 @@
  * The soundboard is on for everybody until a switch or a denial says
  * otherwise. A denial of a person, of the space's role they hold or of their
  * organization role beats everything - except for the space's owner, who
- * decides the denials. The reasons come out in the order a reader would want
+ * decides the denials. A denial of every member leaves the administrators,
+ * whom only the owner denies. The reasons come out in the order a reader would want
  * them: what nobody here can change first, their own controls last.
  */
 
@@ -40,9 +41,10 @@ describe("a denial", () => {
         expect(rules.soundboardDenied(denials, { ...member, userId: BEN })).toBe(false);
     });
 
-    it("of `member` reaches administrators too, since they are members", () => {
+    it("of `member` leaves administrators alone, as Discord's Administrator passes over role overwrites", () => {
         const denials: rules.SoundDenial[] = [{ kind: "role", subject: "member" }];
-        expect(rules.soundboardDenied(denials, { ...member, spaceRole: "admin" })).toBe(true);
+        expect(rules.soundboardDenied(denials, member)).toBe(true);
+        expect(rules.soundboardDenied(denials, { ...member, spaceRole: "admin" })).toBe(false);
     });
 
     it("of `admin` leaves plain members alone", () => {
@@ -81,6 +83,30 @@ describe("a denial", () => {
         expect(parse({ kind: "role", subject: "org:Bad Slug" })).toBe(false);
         expect(parse({ kind: "user", subject: "not-a-uuid" })).toBe(false);
         expect(parse({ kind: "everyone", subject: ADA })).toBe(false);
+    });
+});
+
+describe("who may change a denial", () => {
+    const owner = { userId: ADA, spaceRole: "owner" as const, orgRole: null };
+    const admin = { userId: ADA, spaceRole: "admin" as const, orgRole: "sales" };
+
+    it("is the owner, for every one of them", () => {
+        expect(rules.mayChangeDenial({ kind: "role", subject: "admin" }, owner)).toBe(true);
+        expect(rules.mayChangeDenial({ kind: "user", subject: BEN }, owner, { spaceRole: "admin" })).toBe(true);
+    });
+
+    it("is an administrator, for every member, a member by name and a role they do not hold", () => {
+        expect(rules.mayChangeDenial({ kind: "role", subject: "member" }, admin)).toBe(true);
+        expect(rules.mayChangeDenial({ kind: "user", subject: BEN }, admin, { spaceRole: "member" })).toBe(true);
+        expect(rules.mayChangeDenial({ kind: "role", subject: "org:support" }, admin)).toBe(true);
+    });
+
+    it("is not an administrator, for anything that reaches an administrator", () => {
+        expect(rules.mayChangeDenial({ kind: "role", subject: "admin" }, admin)).toBe(false);
+        expect(rules.mayChangeDenial({ kind: "role", subject: "org:sales" }, admin)).toBe(false);
+        expect(rules.mayChangeDenial({ kind: "user", subject: ADA }, admin, { spaceRole: "admin" })).toBe(false);
+        expect(rules.mayChangeDenial({ kind: "user", subject: BEN }, admin, { spaceRole: "admin" })).toBe(false);
+        expect(rules.mayChangeDenial({ kind: "user", subject: BEN }, admin, { spaceRole: "owner" })).toBe(false);
     });
 });
 

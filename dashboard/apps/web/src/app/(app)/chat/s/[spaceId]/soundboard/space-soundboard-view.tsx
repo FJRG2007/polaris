@@ -117,6 +117,7 @@ export function SpaceSoundboardView({ spaceId }: { spaceId: string }) {
     const spaceName = board?.spaceName ?? space?.name ?? "";
     const full = (board?.sounds.length ?? 0) >= rules.SOUNDBOARD_SLOTS;
     const deniedSubjects = new Set(board?.denials.map((denial) => denial.subject) ?? []);
+    const deniableRoles = board?.roles.filter((role) => !deniedSubjects.has(role.subject)) ?? [];
     const roleName = (subject: string, name: string | null) =>
         subject === "member"
             ? t("soundboardSettings.roleMember")
@@ -372,36 +373,42 @@ export function SpaceSoundboardView({ spaceId }: { spaceId: string }) {
                                     <span className="text-xs text-muted-foreground">
                                         {t("soundboardSettings.denyRole")}
                                     </span>
-                                    <Select
-                                        value=""
-                                        placeholder={t("soundboardSettings.pickRole")}
-                                        aria-label={t("soundboardSettings.denyRole")}
-                                        options={board.roles
-                                            .filter((role) => !deniedSubjects.has(role.subject))
-                                            .map((role) => ({
+                                    {deniableRoles.length === 0 ? (
+                                        <p className="text-xs text-muted-foreground">
+                                            {board.owner
+                                                ? t("soundboardSettings.rolesAllDenied")
+                                                : t("soundboardSettings.rolesOwnerOnly")}
+                                        </p>
+                                    ) : (
+                                        <Select
+                                            value=""
+                                            placeholder={t("soundboardSettings.pickRole")}
+                                            aria-label={t("soundboardSettings.denyRole")}
+                                            options={deniableRoles.map((role) => ({
                                                 value: role.subject,
                                                 label: roleName(role.subject, role.name)
                                             }))}
-                                        onValueChange={(subject) => {
-                                            const role = board.roles.find((one) => one.subject === subject);
-                                            if (!role) return;
-                                            void optimistic(
-                                                (current) => ({
-                                                    ...current,
-                                                    denials: [
-                                                        ...current.denials,
-                                                        { kind: "role", subject, name: role.name, mayChange: true } as SpaceSoundboard["denials"][number]
-                                                    ]
-                                                }),
-                                                () =>
-                                                    actions.setSoundDenialAction({
-                                                        spaceId,
-                                                        denial: { kind: "role", subject },
-                                                        denied: true
-                                                    })
-                                            );
-                                        }}
-                                    />
+                                            onValueChange={(subject) => {
+                                                const role = board.roles.find((one) => one.subject === subject);
+                                                if (!role) return;
+                                                void optimistic(
+                                                    (current) => ({
+                                                        ...current,
+                                                        denials: [
+                                                            ...current.denials,
+                                                            { kind: "role", subject, name: role.name, mayChange: true } as SpaceSoundboard["denials"][number]
+                                                        ]
+                                                    }),
+                                                    () =>
+                                                        actions.setSoundDenialAction({
+                                                            spaceId,
+                                                            denial: { kind: "role", subject },
+                                                            denied: true
+                                                        })
+                                                );
+                                            }}
+                                        />
+                                    )}
                                 </div>
                                 <div className="flex min-w-0 flex-1 flex-col gap-1">
                                     <span className="text-xs text-muted-foreground">
@@ -409,9 +416,12 @@ export function SpaceSoundboardView({ spaceId }: { spaceId: string }) {
                                     </span>
                                     <PeoplePicker
                                         picked={[]}
-                                        exclude={board.denials
-                                            .filter((denial) => denial.kind === "user")
-                                            .map((denial) => denial.subject)}
+                                        exclude={[
+                                            ...board.ownerOnlyPeople,
+                                            ...board.denials
+                                                .filter((denial) => denial.kind === "user")
+                                                .map((denial) => denial.subject)
+                                        ]}
                                         search={searchPeopleAction}
                                         label={t("soundboardSettings.denyPerson")}
                                         onChange={(picked) => {

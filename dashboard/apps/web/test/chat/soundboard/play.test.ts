@@ -50,6 +50,8 @@ interface State {
     access: Record<string, "owner" | "admin" | "member" | null>;
     /** Somebody else's standing in SPACE, by account. */
     people: Record<string, "admin" | "member">;
+    /** Somebody else's standing in SPACE handed to them through a grant. */
+    granted: Record<string, "admin" | "member">;
     orgRole: string | null;
     channels: { id: string; private: boolean; members: string[] }[];
     allowed: boolean;
@@ -83,6 +85,7 @@ function reset(): void {
         denials: [],
         access: { [SPACE]: "member", [OTHER_SPACE]: "member" },
         people: { [BEN]: "member" },
+        granted: {},
         orgRole: "sales",
         channels: [
             { id: PUBLIC_CHANNEL, private: false, members: [] },
@@ -128,7 +131,10 @@ vi.mock("@/lib/chat/access", async (importActual) => {
         ...actual,
         spaceAccess: async (actor: { id: string }, spaceId: string) => {
             if (actor.id === OWNER) return "owner";
-            if (actor.id !== ADA) return spaceId === SPACE ? (state.people[actor.id] ?? null) : null;
+            if (actor.id !== ADA) {
+                if (spaceId !== SPACE) return null;
+                return state.people[actor.id] ?? state.granted[actor.id] ?? null;
+            }
             return state.access[spaceId] ?? null;
         },
         channelAccess: async (actor: { id: string }, channelId: string) => {
@@ -177,9 +183,9 @@ vi.mock("@polaris/db", () => ({
             })
         },
         chatSpaceMember: {
-            findMany: async ({ where }: { where: { userId: { in: string[] } } }) =>
+            findMany: async ({ where }: { where: { role?: string } }) =>
                 Object.entries(state.people)
-                    .filter(([userId]) => where.userId.in.includes(userId))
+                    .filter(([, role]) => !where.role || role === where.role)
                     .map(([userId, role]) => ({ userId, role }))
         },
         chatChannel: {
@@ -441,7 +447,6 @@ describe("denying the soundboard", () => {
     it.each([
         ["themselves", { kind: "user" as const, subject: ADA }],
         ["the administrators' role", { kind: "role" as const, subject: "admin" }],
-        ["every member, them included", { kind: "role" as const, subject: "member" }],
         ["an organization role they hold", { kind: "role" as const, subject: "org:sales" }],
         ["another administrator", { kind: "user" as const, subject: BEN }]
     ])("is the owner's alone when an administrator would change it for %s", async (_who, denial) => {
@@ -453,6 +458,21 @@ describe("denying the soundboard", () => {
             ).rejects.toMatchObject({ text: { key: "errors.soundboardDenialOwnerOnly" } });
         }
         expect(denialWrites).toHaveLength(0);
+    });
+
+    it("lets an administrator deny every member, which leaves the administrators", async () => {
+        state.access[SPACE] = "admin";
+        await setSoundDenial({ id: ADA }, {
+            spaceId: SPACE,
+            denial: { kind: "role", subject: "member" },
+            denied: true
+        });
+        await setSoundDenial({ id: ADA }, {
+            spaceId: SPACE,
+            denial: { kind: "user", subject: BEN },
+            denied: true
+        });
+        expect(denialWrites).toHaveLength(2);
     });
 
     it("lets the owner change any of them", async () => {
@@ -485,8 +505,28 @@ describe("the settings page", () => {
             { kind: "role", subject: "org:other" }
         ];
         const board = await spaceSoundboard({ id: ADA }, SPACE);
-        expect(board.roles.map((role) => role.subject)).toEqual([]);
+        expect(board.owner).toBe(false);
+        expect(board.roles.map((role) => role.subject)).toEqual(["member"]);
         expect(board.denials.map((one) => one.mayChange)).toEqual([false, true]);
+    });
+
+    it("reads a denied person's standing as the server does, grants included", async () => {
+        state.access[SPACE] = "admin";
+        state.people = {};
+        state.granted[BEN] = "admin";
+        state.denials = [{ kind: "user", subject: BEN }];
+        const board = await spaceSoundboard({ id: ADA }, SPACE);
+        expect(board.denials.map((one) => one.mayChange)).toEqual([false]);
+        await expect(
+            setSoundDenial({ id: ADA }, { spaceId: SPACE, denial: { kind: "user", subject: BEN }, denied: false })
+        ).rejects.toMatchObject({ text: { key: "errors.soundboardDenialOwnerOnly" } });
+    });
+
+    it("keeps the reader, the owner and the administrators out of an administrator's picker", async () => {
+        state.access[SPACE] = "admin";
+        state.people = { [BEN]: "admin" };
+        const board = await spaceSoundboard({ id: ADA }, SPACE);
+        expect([...board.ownerOnlyPeople].sort()).toEqual([ADA, OWNER, BEN].sort());
     });
 
     it("refuses the switch of a private conversation the administrator is not in", async () => {

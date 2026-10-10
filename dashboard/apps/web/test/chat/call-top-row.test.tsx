@@ -18,6 +18,11 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 const recording = { supported: true, seconds: 0, start: () => undefined, stop: () => undefined };
 vi.mock("@/app/(app)/chat/call-session", () => ({ useHeldCall: () => ({ recording }) }));
 vi.mock("@/app/(app)/chat/meeting-actions", () => ({}));
+vi.mock("@/app/(app)/chat/soundboard-actions", () => ({
+    callSoundboardAction: async () => ({}),
+    favoriteSoundAction: async () => ({}),
+    playSoundAction: async () => ({})
+}));
 // The panels around the room, which are not what this is about.
 vi.mock("@/app/(app)/chat/call-diagnosis-panel", () => ({ CallDiagnosisPanel: () => null }));
 vi.mock("@/app/(app)/chat/no-audio-notice", () => ({ NoAudioNotice: () => null }));
