@@ -35,7 +35,9 @@ export async function decodeSound(
         const bytes = await file.arrayBuffer();
         // An offline context decodes without asking for the speakers, so
         // nothing needs a click first and nothing is heard.
-        const buffer = await new OfflineAudioContext(1, 1, SOUND_SAMPLE_RATE).decodeAudioData(bytes);
+        const buffer = await new OfflineAudioContext(1, 1, SOUND_SAMPLE_RATE).decodeAudioData(
+            bytes
+        );
         if (buffer.duration <= 0) return { failure: "unreadable" };
         return { sound: { buffer, durationMs: Math.round(buffer.duration * 1000) } };
     } catch {
@@ -71,6 +73,9 @@ export async function cutSound(sound: DecodedSound, startMs: number): Promise<Ui
 
 /** A name to start from: the file's own, without its extension, cut to fit. */
 export function nameFromFile(file: File, max: number): string {
-    const bare = file.name.replace(/\.[^.]+$/, "").replace(/[_-]+/g, " ").trim();
+    const bare = file.name
+        .replace(/\.[^.]+$/, "")
+        .replace(/[_-]+/g, " ")
+        .trim();
     return [...bare].slice(0, max).join("").trim();
 }

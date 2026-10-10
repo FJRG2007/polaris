@@ -16,7 +16,8 @@ const { encodeWav, readWav, SOUND_SAMPLE_RATE } = await import("@/lib/chat/sound
 const { readSoundTicket, soundTicket, soundUrl } = await import("@/lib/chat/soundboard-ticket");
 const { soundPlayedSchema } = await import("@/lib/chat/soundboard");
 
-const seconds = (value: number) => new Float32Array(Math.round(SOUND_SAMPLE_RATE * value)).fill(0.25);
+const seconds = (value: number) =>
+    new Float32Array(Math.round(SOUND_SAMPLE_RATE * value)).fill(0.25);
 
 describe("a sound's file", () => {
     it("is read back with its length", () => {
@@ -44,7 +45,9 @@ describe("a sound's file", () => {
     it("loses whatever an editor put around the samples", () => {
         const plain = encodeWav(seconds(0.1));
         // A `LIST` chunk between the format and the samples.
-        const extra = new Uint8Array([..."LIST"].map((c) => c.charCodeAt(0)).concat([4, 0, 0, 0, 1, 2, 3, 4]));
+        const extra = new Uint8Array(
+            [..."LIST"].map((c) => c.charCodeAt(0)).concat([4, 0, 0, 0, 1, 2, 3, 4])
+        );
         const tagged = new Uint8Array(plain.length + extra.length);
         tagged.set(plain.subarray(0, 36));
         tagged.set(extra, 36);
@@ -69,8 +72,12 @@ describe("a play's pass", () => {
 
     it("opens nothing in another call, or another sound", () => {
         const pass = soundTicket(sound, call, now);
-        expect(readSoundTicket(pass, sound, "0193b0f0-0000-7000-8000-0000000000e2", now)).toBe(false);
-        expect(readSoundTicket(pass, "0193b0f0-0000-7000-8000-0000000000c2", call, now)).toBe(false);
+        expect(readSoundTicket(pass, sound, "0193b0f0-0000-7000-8000-0000000000e2", now)).toBe(
+            false
+        );
+        expect(readSoundTicket(pass, "0193b0f0-0000-7000-8000-0000000000c2", call, now)).toBe(
+            false
+        );
     });
 
     it("runs out", () => {
@@ -81,7 +88,9 @@ describe("a play's pass", () => {
 
     it("is refused when tampered with", () => {
         const [expires, signature] = soundTicket(sound, call, now).split(".");
-        expect(readSoundTicket(`${Number(expires) + 1}.${signature}`, sound, call, now)).toBe(false);
+        expect(readSoundTicket(`${Number(expires) + 1}.${signature}`, sound, call, now)).toBe(
+            false
+        );
         expect(readSoundTicket("garbage", sound, call, now)).toBe(false);
     });
 

@@ -244,10 +244,24 @@ const MAKE: Record<DefaultSoundId, (ctx: Ctx, noise: AudioBuffer) => void> = {
     fanfare: (ctx) => {
         const rise = [523.25, 659.25, 783.99];
         rise.forEach((pitch, index) => {
-            held(ctx, { at: index * 0.13, seconds: 0.14, from: pitch, wave: "square", gain: 0.1, cutoff: 3_000 });
+            held(ctx, {
+                at: index * 0.13,
+                seconds: 0.14,
+                from: pitch,
+                wave: "square",
+                gain: 0.1,
+                cutoff: 3_000
+            });
         });
         for (const pitch of [523.25, 659.25, 783.99, 1_046.5]) {
-            held(ctx, { at: 0.42, seconds: 1.3, from: pitch, wave: "square", gain: 0.07, cutoff: 2_600 });
+            held(ctx, {
+                at: 0.42,
+                seconds: 1.3,
+                from: pitch,
+                wave: "square",
+                gain: 0.07,
+                cutoff: 2_600
+            });
         }
     },
     // A spring: a tone that drops and comes back up, wobbling as it settles.
@@ -309,7 +323,11 @@ export function defaultSoundFile(id: DefaultSoundId): Promise<Uint8Array> {
     if (cached) return cached;
     const made = (async () => {
         const seconds = LENGTH[id];
-        const ctx = new OfflineAudioContext(1, Math.ceil(seconds * SOUND_SAMPLE_RATE), SOUND_SAMPLE_RATE);
+        const ctx = new OfflineAudioContext(
+            1,
+            Math.ceil(seconds * SOUND_SAMPLE_RATE),
+            SOUND_SAMPLE_RATE
+        );
         MAKE[id](ctx, noiseBuffer(ctx, Math.min(3, seconds + 0.5)));
         const buffer = await ctx.startRendering();
         const samples = buffer.getChannelData(0);

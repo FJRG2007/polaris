@@ -84,7 +84,12 @@ const EDGE_GAP = 8;
 
 /** Where the panel goes: above the button where there is room, never off the
  *  side of the window. */
-function place(button: DOMRect): { left: number; bottom?: number; top?: number; maxHeight: number } {
+function place(button: DOMRect): {
+    left: number;
+    bottom?: number;
+    top?: number;
+    maxHeight: number;
+} {
     const width = Math.min(PANEL_WIDTH, window.innerWidth - EDGE_GAP * 2);
     const left = Math.max(
         EDGE_GAP,
@@ -374,7 +379,10 @@ export function SoundboardPanel({
         if (cooling || busy) return;
         setBusy(tile.ref);
         setError(null);
-        const answer = await runAction(() => playSoundAction({ meetingId, sound: tile.ref }), setError);
+        const answer = await runAction(
+            () => playSoundAction({ meetingId, sound: tile.ref }),
+            setError
+        );
         setBusy(null);
         if (!answer) return;
         if (answer.error) {
@@ -392,7 +400,10 @@ export function SoundboardPanel({
         const on = !favorites.has(ref);
         const before = [...favorites];
         onFavorites(on ? [...before, ref] : before.filter((entry) => entry !== ref));
-        const answer = await runAction(() => favoriteSoundAction({ sound: ref, favorite: on }), setError);
+        const answer = await runAction(
+            () => favoriteSoundAction({ sound: ref, favorite: on }),
+            setError
+        );
         if (!answer || answer.error) {
             onFavorites(before);
             if (answer?.error) setError(answer.error);
@@ -460,7 +471,10 @@ export function SoundboardPanel({
                                     const name = nameOf(tile.ref, tile.name);
                                     const starred = favorites.has(tile.ref);
                                     return (
-                                        <div key={`${section.id}:${tile.ref}`} className="group relative min-w-0">
+                                        <div
+                                            key={`${section.id}:${tile.ref}`}
+                                            className="group relative min-w-0"
+                                        >
                                             <button
                                                 type="button"
                                                 disabled={cooling || busy !== null}
@@ -476,7 +490,9 @@ export function SoundboardPanel({
                                                         tile.emoji || SOUND_GLYPH
                                                     )}
                                                 </span>
-                                                <span className="min-w-0 truncate" title={name}>{name}</span>
+                                                <span className="min-w-0 truncate" title={name}>
+                                                    {name}
+                                                </span>
                                             </button>
                                             {/* On hover and on focus, so a keyboard reaches them
                                                 too. Outside the play button, since a button
@@ -484,7 +500,9 @@ export function SoundboardPanel({
                                             <span className="absolute inset-y-0 right-1 flex items-center gap-0.5 opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100">
                                                 <button
                                                     type="button"
-                                                    onClick={() => void previewSound(tile.ref, volume)}
+                                                    onClick={() =>
+                                                        void previewSound(tile.ref, volume)
+                                                    }
                                                     aria-label={t("soundboard.preview", { name })}
                                                     title={t("soundboard.preview", { name })}
                                                     className="flex size-5 items-center justify-center rounded text-muted-foreground hover:text-foreground"
@@ -507,10 +525,17 @@ export function SoundboardPanel({
                                                     }
                                                     className={cn(
                                                         "flex size-5 items-center justify-center rounded hover:text-foreground",
-                                                        starred ? "text-warning" : "text-muted-foreground"
+                                                        starred
+                                                            ? "text-warning"
+                                                            : "text-muted-foreground"
                                                     )}
                                                 >
-                                                    <Star className={cn("size-3.5", starred && "fill-current")} />
+                                                    <Star
+                                                        className={cn(
+                                                            "size-3.5",
+                                                            starred && "fill-current"
+                                                        )}
+                                                    />
                                                 </button>
                                             </span>
                                         </div>
@@ -531,7 +556,10 @@ export function SoundboardPanel({
                 />
             )}
             {error && (
-                <p role="alert" className="shrink-0 border-t border-border px-3 py-1.5 text-xs text-danger">
+                <p
+                    role="alert"
+                    className="shrink-0 border-t border-border px-3 py-1.5 text-xs text-danger"
+                >
                     {error}
                 </p>
             )}

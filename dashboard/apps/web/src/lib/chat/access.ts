@@ -223,7 +223,8 @@ export async function spaceStandings(
     // The grants last, as `spaceAccess` asks them: one query for the space's,
     // and the teams and roles of the unanswered only when there are any.
     const granted = await grantedCapabilities(unanswered, "chat.space", spaceId, memberships);
-    for (const id of unanswered) standings.set(id, standingIn(space, id, facts(id, granted.get(id))));
+    for (const id of unanswered)
+        standings.set(id, standingIn(space, id, facts(id, granted.get(id))));
     return standings;
 }
 

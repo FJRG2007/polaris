@@ -22,9 +22,18 @@ import { loadEnv } from "@polaris/config";
 import { isPolarisPart } from "@/lib/polaris-parts";
 import { ensureCallKey } from "@/lib/chat/call-keys";
 import { localDockerDriver } from "@/lib/docker-service";
-import { AccessToken, DataPacket_Kind, RoomServiceClient, type TrackSource } from "livekit-server-sdk";
+import {
+    AccessToken,
+    DataPacket_Kind,
+    RoomServiceClient,
+    type TrackSource
+} from "livekit-server-sdk";
 import { mediaPermissions, MEDIA_SOURCE, type SeatRestriction } from "./voice-moderation";
-import { getIntegrationSecret, getIntegrationState, upsertIntegration } from "@/lib/integration-service";
+import {
+    getIntegrationSecret,
+    getIntegrationState,
+    upsertIntegration
+} from "@/lib/integration-service";
 
 /** Where the pairing is kept. One per instance: a call server is infrastructure,
  *  not something a conversation chooses. */
@@ -39,7 +48,8 @@ const TOKEN_TTL = "10m";
  *  worked around: with no server there is no call, and a button that opens a
  *  microphone for a connection that cannot be made is the failure people report
  *  and nobody can act on. */
-export const NO_CALL_SERVER = "The call server is not answering, so a call would reach nobody. An administrator can check it under Chat settings.";
+export const NO_CALL_SERVER =
+    "The call server is not answering, so a call would reach nobody. An administrator can check it under Chat settings.";
 
 /** What is stored beside the secret: everything that is not the secret. */
 interface CallServerConfig {
@@ -148,7 +158,9 @@ function websocket(address: string): string {
  */
 async function shippedServer(): Promise<CallServerEndpoint | null> {
     const key = await ensureCallKey();
-    return key ? { url: CALL_PATH, apiKey: key.apiKey, apiSecret: key.apiSecret, shipped: true } : null;
+    return key
+        ? { url: CALL_PATH, apiKey: key.apiKey, apiSecret: key.apiSecret, shipped: true }
+        : null;
 }
 
 /** Where the shipped server is served from: the address the browser is handed,
@@ -384,7 +396,11 @@ function notConnected(caught: unknown): boolean {
  * True when the media server took it. False when none could be asked, which
  * the caller says out loud rather than pretending.
  */
-export async function sendToRoom(meetingId: string, payload: unknown, topic: string): Promise<boolean> {
+export async function sendToRoom(
+    meetingId: string,
+    payload: unknown,
+    topic: string
+): Promise<boolean> {
     const endpoint = await callServer();
     if (!endpoint) return false;
     const hosts = endpoint.shipped
@@ -540,7 +556,11 @@ export function forgetAnswer(): void {
  * starting is a fact to report rather than a reason to hold the page.
  */
 export async function answering(endpoint: CallServerEndpoint): Promise<boolean> {
-    if (lastAnswer && lastAnswer.url === endpoint.url && Date.now() - lastAnswer.at < ANSWER_TTL_MS) {
+    if (
+        lastAnswer &&
+        lastAnswer.url === endpoint.url &&
+        Date.now() - lastAnswer.at < ANSWER_TTL_MS
+    ) {
         return lastAnswer.answering;
     }
     // A path names the edge in front of this app, which this process cannot

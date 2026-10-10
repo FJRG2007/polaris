@@ -233,7 +233,9 @@ export async function principalsOfMany(
 ): Promise<GrantPrincipals[]> {
     if (userIds.length === 0) return [];
     const ids = [...new Set(userIds)];
-    const pairs = [...new Map(memberships.map((held) => [`${held.orgId}:${held.role}`, held])).values()];
+    const pairs = [
+        ...new Map(memberships.map((held) => [`${held.orgId}:${held.role}`, held])).values()
+    ];
     const [teams, roles] = await Promise.all([
         prisma.teamMember.findMany({
             where: { userId: { in: ids } },

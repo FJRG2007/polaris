@@ -136,9 +136,14 @@ export function SpaceSoundboardView({ spaceId }: { spaceId: string }) {
                     <ArrowLeft className="size-4" />
                 </Link>
                 <Music2 className="size-4 shrink-0 text-primary" />
-                <span className="shrink-0 text-sm font-semibold">{t("soundboardSettings.title")}</span>
+                <span className="shrink-0 text-sm font-semibold">
+                    {t("soundboardSettings.title")}
+                </span>
                 {spaceName && (
-                    <span className="min-w-0 truncate text-sm text-muted-foreground" title={spaceName}>
+                    <span
+                        className="min-w-0 truncate text-sm text-muted-foreground"
+                        title={spaceName}
+                    >
                         {spaceName}
                     </span>
                 )}
@@ -149,7 +154,10 @@ export function SpaceSoundboardView({ spaceId }: { spaceId: string }) {
                     <p className="text-sm text-muted-foreground">{t("soundboardSettings.intro")}</p>
 
                     {failed ? (
-                        <p className="rounded-lg border border-border bg-card p-3 text-sm text-muted-foreground" role="alert">
+                        <p
+                            className="rounded-lg border border-border bg-card p-3 text-sm text-muted-foreground"
+                            role="alert"
+                        >
                             {failed}
                         </p>
                     ) : null}
@@ -173,7 +181,11 @@ export function SpaceSoundboardView({ spaceId }: { spaceId: string }) {
                                     onChange={(enabled) =>
                                         void optimistic(
                                             (current) => ({ ...current, enabled }),
-                                            () => actions.setSpaceSoundboardAction({ spaceId, enabled })
+                                            () =>
+                                                actions.setSpaceSoundboardAction({
+                                                    spaceId,
+                                                    enabled
+                                                })
                                         )
                                     }
                                 />
@@ -185,7 +197,11 @@ export function SpaceSoundboardView({ spaceId }: { spaceId: string }) {
                                     onChange={(external) =>
                                         void optimistic(
                                             (current) => ({ ...current, external }),
-                                            () => actions.setSpaceSoundboardAction({ spaceId, external })
+                                            () =>
+                                                actions.setSpaceSoundboardAction({
+                                                    spaceId,
+                                                    external
+                                                })
                                         )
                                     }
                                 />
@@ -202,13 +218,23 @@ export function SpaceSoundboardView({ spaceId }: { spaceId: string }) {
                                     total: rules.SOUNDBOARD_SLOTS
                                 })}
                             </h2>
-                            <Button size="sm" disabled={!board || full} onClick={() => setEditing("new")}>
+                            <Button
+                                size="sm"
+                                disabled={!board || full}
+                                onClick={() => setEditing("new")}
+                            >
                                 <Upload className="size-3.5" />
                                 {t("soundboardSettings.upload")}
                             </Button>
                         </div>
-                        <p className="text-xs text-muted-foreground">{t("soundboardSettings.rules")}</p>
-                        {full && <p className="text-xs text-muted-foreground">{t("soundboardSettings.full")}</p>}
+                        <p className="text-xs text-muted-foreground">
+                            {t("soundboardSettings.rules")}
+                        </p>
+                        {full && (
+                            <p className="text-xs text-muted-foreground">
+                                {t("soundboardSettings.full")}
+                            </p>
+                        )}
                         {board === null && !failed ? (
                             <Skeleton className="h-32 w-full" />
                         ) : board && board.sounds.length === 0 ? (
@@ -218,8 +244,14 @@ export function SpaceSoundboardView({ spaceId }: { spaceId: string }) {
                         ) : board ? (
                             <ul className="flex flex-col divide-y divide-border rounded-lg border border-border bg-card">
                                 {board.sounds.map((sound) => (
-                                    <li key={sound.id} className="flex min-w-0 items-center gap-3 px-3 py-2">
-                                        <span aria-hidden className="w-6 shrink-0 text-center text-lg">
+                                    <li
+                                        key={sound.id}
+                                        className="flex min-w-0 items-center gap-3 px-3 py-2"
+                                    >
+                                        <span
+                                            aria-hidden
+                                            className="w-6 shrink-0 text-center text-lg"
+                                        >
                                             {sound.emoji || SOUND_GLYPH}
                                         </span>
                                         <div className="flex min-w-0 flex-1 flex-col">
@@ -238,18 +270,24 @@ export function SpaceSoundboardView({ spaceId }: { spaceId: string }) {
                                         </div>
                                         <IconButton
                                             label={t("soundboard.preview", { name: sound.name })}
-                                            onClick={() => void previewSound(sound.id, sound.volume)}
+                                            onClick={() =>
+                                                void previewSound(sound.id, sound.volume)
+                                            }
                                         >
                                             <Volume2 className="size-4" />
                                         </IconButton>
                                         <IconButton
-                                            label={t("soundboardSettings.edit", { name: sound.name })}
+                                            label={t("soundboardSettings.edit", {
+                                                name: sound.name
+                                            })}
                                             onClick={() => setEditing(sound)}
                                         >
                                             <Pencil className="size-4" />
                                         </IconButton>
                                         <IconButton
-                                            label={t("soundboardSettings.delete", { name: sound.name })}
+                                            label={t("soundboardSettings.delete", {
+                                                name: sound.name
+                                            })}
                                             onClick={() => {
                                                 setDeleteError(null);
                                                 setDeleting(sound);
@@ -266,13 +304,18 @@ export function SpaceSoundboardView({ spaceId }: { spaceId: string }) {
                     {/* Each conversation, on or off. */}
                     {board && board.channels.length > 0 && (
                         <section className="flex flex-col gap-2">
-                            <h2 className="text-sm font-medium">{t("soundboardSettings.channels")}</h2>
+                            <h2 className="text-sm font-medium">
+                                {t("soundboardSettings.channels")}
+                            </h2>
                             <p className="text-xs text-muted-foreground">
                                 {t("soundboardSettings.channelsHint")}
                             </p>
                             <ul className="flex flex-col divide-y divide-border rounded-lg border border-border bg-card">
                                 {board.channels.map((channel) => (
-                                    <li key={channel.id} className="flex min-w-0 items-center gap-2 px-3 py-2">
+                                    <li
+                                        key={channel.id}
+                                        className="flex min-w-0 items-center gap-2 px-3 py-2"
+                                    >
                                         {channel.kind === "voice" ? (
                                             <Volume2 className="size-4 shrink-0 text-muted-foreground" />
                                         ) : (
@@ -288,13 +331,17 @@ export function SpaceSoundboardView({ spaceId }: { spaceId: string }) {
                                         <Switch
                                             checked={channel.enabled && board.enabled}
                                             disabled={!board.enabled}
-                                            aria-label={t("soundboardSettings.inChannel", { name: channel.name })}
+                                            aria-label={t("soundboardSettings.inChannel", {
+                                                name: channel.name
+                                            })}
                                             onChange={(enabled) =>
                                                 void optimistic(
                                                     (current) => ({
                                                         ...current,
                                                         channels: current.channels.map((one) =>
-                                                            one.id === channel.id ? { ...one, enabled } : one
+                                                            one.id === channel.id
+                                                                ? { ...one, enabled }
+                                                                : one
                                                         )
                                                     }),
                                                     () =>
@@ -314,15 +361,20 @@ export function SpaceSoundboardView({ spaceId }: { spaceId: string }) {
                     {/* Who may not. */}
                     {board && (
                         <section className="flex flex-col gap-2">
-                            <h2 className="text-sm font-medium">{t("soundboardSettings.denied")}</h2>
-                            <p className="text-xs text-muted-foreground">{t("soundboardSettings.deniedHint")}</p>
+                            <h2 className="text-sm font-medium">
+                                {t("soundboardSettings.denied")}
+                            </h2>
+                            <p className="text-xs text-muted-foreground">
+                                {t("soundboardSettings.deniedHint")}
+                            </p>
                             {board.denials.length > 0 && (
                                 <ul className="flex flex-col divide-y divide-border rounded-lg border border-border bg-card">
                                     {board.denials.map((denial) => {
                                         const name =
                                             denial.kind === "role"
                                                 ? roleName(denial.subject, denial.name)
-                                                : (denial.name ?? t("soundboardSettings.unknownPerson"));
+                                                : (denial.name ??
+                                                  t("soundboardSettings.unknownPerson"));
                                         return (
                                             <li
                                                 key={`${denial.kind}:${denial.subject}`}
@@ -333,13 +385,18 @@ export function SpaceSoundboardView({ spaceId }: { spaceId: string }) {
                                                         ? t("soundboardSettings.role")
                                                         : t("soundboardSettings.person")}
                                                 </span>
-                                                <span className="min-w-0 flex-1 truncate text-sm" title={name}>
+                                                <span
+                                                    className="min-w-0 flex-1 truncate text-sm"
+                                                    title={name}
+                                                >
                                                     {name}
                                                 </span>
                                                 <IconButton
                                                     label={
                                                         denial.mayChange
-                                                            ? t("soundboardSettings.allow", { name })
+                                                            ? t("soundboardSettings.allow", {
+                                                                  name
+                                                              })
                                                             : t("errors.soundboardDenialOwnerOnly")
                                                     }
                                                     disabled={!denial.mayChange}
@@ -349,13 +406,21 @@ export function SpaceSoundboardView({ spaceId }: { spaceId: string }) {
                                                                 ...current,
                                                                 denials: current.denials.filter(
                                                                     (one) =>
-                                                                        !(one.kind === denial.kind && one.subject === denial.subject)
+                                                                        !(
+                                                                            one.kind ===
+                                                                                denial.kind &&
+                                                                            one.subject ===
+                                                                                denial.subject
+                                                                        )
                                                                 )
                                                             }),
                                                             () =>
                                                                 actions.setSoundDenialAction({
                                                                     spaceId,
-                                                                    denial: { kind: denial.kind, subject: denial.subject },
+                                                                    denial: {
+                                                                        kind: denial.kind,
+                                                                        subject: denial.subject
+                                                                    },
                                                                     denied: false
                                                                 })
                                                         )
@@ -389,14 +454,21 @@ export function SpaceSoundboardView({ spaceId }: { spaceId: string }) {
                                                 label: roleName(role.subject, role.name)
                                             }))}
                                             onValueChange={(subject) => {
-                                                const role = board.roles.find((one) => one.subject === subject);
+                                                const role = board.roles.find(
+                                                    (one) => one.subject === subject
+                                                );
                                                 if (!role) return;
                                                 void optimistic(
                                                     (current) => ({
                                                         ...current,
                                                         denials: [
                                                             ...current.denials,
-                                                            { kind: "role", subject, name: role.name, mayChange: true } as SpaceSoundboard["denials"][number]
+                                                            {
+                                                                kind: "role",
+                                                                subject,
+                                                                name: role.name,
+                                                                mayChange: true
+                                                            } as SpaceSoundboard["denials"][number]
                                                         ]
                                                     }),
                                                     () =>
@@ -443,7 +515,10 @@ export function SpaceSoundboardView({ spaceId }: { spaceId: string }) {
                                                 () =>
                                                     actions.setSoundDenialAction({
                                                         spaceId,
-                                                        denial: { kind: "user", subject: person.id },
+                                                        denial: {
+                                                            kind: "user",
+                                                            subject: person.id
+                                                        },
                                                         denied: true
                                                     })
                                             );
@@ -621,7 +696,9 @@ function SoundDialog({
         if (!decoded) return;
         const bytes = await cutSound(decoded, startMs);
         preview.current?.pause();
-        const element = new Audio(URL.createObjectURL(new Blob([bytes as BlobPart], { type: "audio/wav" })));
+        const element = new Audio(
+            URL.createObjectURL(new Blob([bytes as BlobPart], { type: "audio/wav" }))
+        );
         element.volume = volume;
         preview.current = element;
         void element.play().catch(() => undefined);
@@ -676,7 +753,9 @@ function SoundDialog({
             <DialogContent>
                 <DialogHeader>
                     <DialogTitle>
-                        {isNew ? t("soundboardSettings.uploadTitle") : t("soundboardSettings.editTitle")}
+                        {isNew
+                            ? t("soundboardSettings.uploadTitle")
+                            : t("soundboardSettings.editTitle")}
                     </DialogTitle>
                     <DialogDescription>{t("soundboardSettings.uploadBody")}</DialogDescription>
                 </DialogHeader>
@@ -696,10 +775,15 @@ function SoundDialog({
                                     ) : (
                                         <Upload className="size-3.5" />
                                     )}
-                                    {file ? t("soundboardSettings.otherFile") : t("soundboardSettings.chooseFile")}
+                                    {file
+                                        ? t("soundboardSettings.otherFile")
+                                        : t("soundboardSettings.chooseFile")}
                                 </Button>
                                 {file && (
-                                    <span className="min-w-0 truncate text-xs text-muted-foreground" title={file.name}>
+                                    <span
+                                        className="min-w-0 truncate text-xs text-muted-foreground"
+                                        title={file.name}
+                                    >
                                         {file.name}
                                     </span>
                                 )}
@@ -723,7 +807,9 @@ function SoundDialog({
                                               seconds: seconds(decoded.durationMs),
                                               max: seconds(rules.SOUND_MAX_MS)
                                           })
-                                        : t("soundboardSettings.length", { seconds: seconds(decoded.durationMs) })}
+                                        : t("soundboardSettings.length", {
+                                              seconds: seconds(decoded.durationMs)
+                                          })}
                                 </p>
                             )}
                             {decoded && longer && (
@@ -733,7 +819,12 @@ function SoundDialog({
                                         <span className="tabular-nums text-muted-foreground">
                                             {t("soundboardSettings.window", {
                                                 from: seconds(startMs),
-                                                to: seconds(Math.min(decoded.durationMs, startMs + rules.SOUND_MAX_MS))
+                                                to: seconds(
+                                                    Math.min(
+                                                        decoded.durationMs,
+                                                        startMs + rules.SOUND_MAX_MS
+                                                    )
+                                                )
                                             })}
                                         </span>
                                     </span>
@@ -749,7 +840,12 @@ function SoundDialog({
                                 </label>
                             )}
                             {decoded && (
-                                <Button size="sm" variant="ghost" className="self-start" onClick={() => void listen()}>
+                                <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    className="self-start"
+                                    onClick={() => void listen()}
+                                >
                                     <Volume2 className="size-3.5" />
                                     {t("soundboardSettings.listen")}
                                 </Button>
@@ -780,13 +876,18 @@ function SoundDialog({
                     <div className="flex flex-col gap-1 text-sm">
                         <span>{t("soundboardSettings.emoji")}</span>
                         <div className="flex items-center gap-2">
-                            <span aria-hidden className="flex size-9 items-center justify-center rounded-md border border-border text-lg">
+                            <span
+                                aria-hidden
+                                className="flex size-9 items-center justify-center rounded-md border border-border text-lg"
+                            >
                                 {emoji || SOUND_GLYPH}
                             </span>
                             <EmojiPicker
                                 disabled={false}
                                 label={t("soundboardSettings.pickEmoji")}
-                                onEmoji={(chosen) => setEmoji(rules.isOneEmoji(chosen) ? chosen : "")}
+                                onEmoji={(chosen) =>
+                                    setEmoji(rules.isOneEmoji(chosen) ? chosen : "")
+                                }
                             />
                             {emoji && (
                                 <Button size="sm" variant="ghost" onClick={() => setEmoji("")}>
@@ -799,7 +900,9 @@ function SoundDialog({
                     <label className="flex flex-col gap-1 text-sm">
                         <span className="flex items-center justify-between">
                             {t("soundboardSettings.volume")}
-                            <span className="tabular-nums text-muted-foreground">{Math.round(volume * 100)}%</span>
+                            <span className="tabular-nums text-muted-foreground">
+                                {Math.round(volume * 100)}%
+                            </span>
                         </span>
                         <input
                             type="range"
@@ -810,7 +913,9 @@ function SoundDialog({
                             onChange={(event) => setVolume(Number(event.target.value) / 100)}
                             className="h-1.5 w-full cursor-pointer appearance-none rounded-full bg-muted accent-primary"
                         />
-                        <span className="text-xs text-muted-foreground">{t("soundboardSettings.volumeHint")}</span>
+                        <span className="text-xs text-muted-foreground">
+                            {t("soundboardSettings.volumeHint")}
+                        </span>
                     </label>
 
                     {error && (

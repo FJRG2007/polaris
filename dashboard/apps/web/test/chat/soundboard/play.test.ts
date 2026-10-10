@@ -107,7 +107,10 @@ function reset(): void {
 }
 
 vi.mock("@polaris/config", () => ({
-    loadEnv: () => ({ POLARIS_DB_PROVIDER: "postgresql", POLARIS_AUTH_SECRET: "test-secret-not-real" })
+    loadEnv: () => ({
+        POLARIS_DB_PROVIDER: "postgresql",
+        POLARIS_AUTH_SECRET: "test-secret-not-real"
+    })
 }));
 
 vi.mock("@/lib/chat/call-server", () => ({
@@ -144,7 +147,8 @@ vi.mock("@/lib/chat/access", async (importActual) => {
     const actual = await importActual<typeof import("@/lib/chat/access")>();
     return {
         ...actual,
-        spaceAccess: async (actor: { id: string }, spaceId: string) => standingOf(actor.id, spaceId),
+        spaceAccess: async (actor: { id: string }, spaceId: string) =>
+            standingOf(actor.id, spaceId),
         spaceStandings: async (spaceId: string, userIds: readonly string[]) => {
             standingBatches += 1;
             return new Map(userIds.map((id) => [id, standingOf(id, spaceId)]));
@@ -229,7 +233,13 @@ vi.mock("@polaris/db", () => ({
                 if (where.id === SOUND)
                     return { id: SOUND, spaceId: SPACE, name: "Drum", emoji: "", volume: 0.4 };
                 if (where.id === FOREIGN_SOUND)
-                    return { id: FOREIGN_SOUND, spaceId: OTHER_SPACE, name: "Far", emoji: "", volume: 1 };
+                    return {
+                        id: FOREIGN_SOUND,
+                        spaceId: OTHER_SPACE,
+                        name: "Far",
+                        emoji: "",
+                        volume: 1
+                    };
                 return null;
             },
             findMany: async () => []
@@ -436,11 +446,14 @@ describe("a play of the call's own space's sound", () => {
 describe("denying the soundboard", () => {
     it("is refused to somebody who does not run the space", async () => {
         await expect(
-            setSoundDenial({ id: ADA }, {
-                spaceId: SPACE,
-                denial: { kind: "role", subject: "member" },
-                denied: true
-            })
+            setSoundDenial(
+                { id: ADA },
+                {
+                    spaceId: SPACE,
+                    denial: { kind: "role", subject: "member" },
+                    denied: true
+                }
+            )
         ).rejects.toMatchObject({ text: { key: "errors.spaceAdminOnly" } });
         expect(denialWrites).toHaveLength(0);
     });
@@ -448,11 +461,14 @@ describe("denying the soundboard", () => {
     it("is refused for the owner, on whom it would do nothing", async () => {
         state.access[SPACE] = "admin";
         await expect(
-            setSoundDenial({ id: ADA }, {
-                spaceId: SPACE,
-                denial: { kind: "user", subject: OWNER },
-                denied: true
-            })
+            setSoundDenial(
+                { id: ADA },
+                {
+                    spaceId: SPACE,
+                    denial: { kind: "user", subject: OWNER },
+                    denied: true
+                }
+            )
         ).rejects.toMatchObject({ text: { key: "errors.soundboardOwner" } });
         expect(denialWrites).toHaveLength(0);
     });
@@ -470,29 +486,38 @@ describe("denying the soundboard", () => {
         ["the administrators' role", { kind: "role" as const, subject: "admin" }],
         ["an organization role they hold", { kind: "role" as const, subject: "org:sales" }],
         ["another administrator", { kind: "user" as const, subject: BEN }]
-    ])("is the owner's alone when an administrator would change it for %s", async (_who, denial) => {
-        state.access[SPACE] = "admin";
-        state.people[BEN] = "admin";
-        for (const denied of [true, false]) {
-            await expect(
-                setSoundDenial({ id: ADA }, { spaceId: SPACE, denial, denied })
-            ).rejects.toMatchObject({ text: { key: "errors.soundboardDenialOwnerOnly" } });
+    ])(
+        "is the owner's alone when an administrator would change it for %s",
+        async (_who, denial) => {
+            state.access[SPACE] = "admin";
+            state.people[BEN] = "admin";
+            for (const denied of [true, false]) {
+                await expect(
+                    setSoundDenial({ id: ADA }, { spaceId: SPACE, denial, denied })
+                ).rejects.toMatchObject({ text: { key: "errors.soundboardDenialOwnerOnly" } });
+            }
+            expect(denialWrites).toHaveLength(0);
         }
-        expect(denialWrites).toHaveLength(0);
-    });
+    );
 
     it("lets an administrator deny every member, which leaves the administrators", async () => {
         state.access[SPACE] = "admin";
-        await setSoundDenial({ id: ADA }, {
-            spaceId: SPACE,
-            denial: { kind: "role", subject: "member" },
-            denied: true
-        });
-        await setSoundDenial({ id: ADA }, {
-            spaceId: SPACE,
-            denial: { kind: "user", subject: BEN },
-            denied: true
-        });
+        await setSoundDenial(
+            { id: ADA },
+            {
+                spaceId: SPACE,
+                denial: { kind: "role", subject: "member" },
+                denied: true
+            }
+        );
+        await setSoundDenial(
+            { id: ADA },
+            {
+                spaceId: SPACE,
+                denial: { kind: "user", subject: BEN },
+                denied: true
+            }
+        );
         expect(denialWrites).toHaveLength(2);
     });
 
@@ -514,11 +539,14 @@ describe("denying the soundboard", () => {
         state.access[SPACE] = "admin";
         state.people[BEN] = "admin";
         state.heldRoles[BEN] = "support";
-        await setSoundDenial({ id: ADA }, {
-            spaceId: SPACE,
-            denial: { kind: "role", subject: "org:design" },
-            denied: true
-        });
+        await setSoundDenial(
+            { id: ADA },
+            {
+                spaceId: SPACE,
+                denial: { kind: "role", subject: "org:design" },
+                denied: true
+            }
+        );
         expect(denialWrites).toHaveLength(1);
     });
 
@@ -528,26 +556,35 @@ describe("denying the soundboard", () => {
         state.granted[BEN] = "admin";
         state.heldRoles[BEN] = "support";
         await expect(
-            setSoundDenial({ id: ADA }, {
-                spaceId: SPACE,
-                denial: { kind: "role", subject: "org:support" },
-                denied: true
-            })
+            setSoundDenial(
+                { id: ADA },
+                {
+                    spaceId: SPACE,
+                    denial: { kind: "role", subject: "org:support" },
+                    denied: true
+                }
+            )
         ).rejects.toMatchObject({ text: { key: "errors.soundboardDenialOwnerOnly" } });
     });
 
     it("lets the owner change any of them", async () => {
         state.people[BEN] = "admin";
-        await setSoundDenial({ id: OWNER }, {
-            spaceId: SPACE,
-            denial: { kind: "user", subject: BEN },
-            denied: true
-        });
-        await setSoundDenial({ id: OWNER }, {
-            spaceId: SPACE,
-            denial: { kind: "role", subject: "admin" },
-            denied: false
-        });
+        await setSoundDenial(
+            { id: OWNER },
+            {
+                spaceId: SPACE,
+                denial: { kind: "user", subject: BEN },
+                denied: true
+            }
+        );
+        await setSoundDenial(
+            { id: OWNER },
+            {
+                spaceId: SPACE,
+                denial: { kind: "role", subject: "admin" },
+                denied: false
+            }
+        );
         expect(denialWrites).toHaveLength(2);
     });
 });
@@ -579,7 +616,10 @@ describe("the settings page", () => {
         const board = await spaceSoundboard({ id: ADA }, SPACE);
         expect(board.denials.map((one) => one.mayChange)).toEqual([false]);
         await expect(
-            setSoundDenial({ id: ADA }, { spaceId: SPACE, denial: { kind: "user", subject: BEN }, denied: false })
+            setSoundDenial(
+                { id: ADA },
+                { spaceId: SPACE, denial: { kind: "user", subject: BEN }, denied: false }
+            )
         ).rejects.toMatchObject({ text: { key: "errors.soundboardDenialOwnerOnly" } });
     });
 

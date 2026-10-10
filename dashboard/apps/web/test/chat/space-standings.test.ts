@@ -54,7 +54,9 @@ function handedTo(principalType: string, principalId: string, capability: string
 vi.mock("@/lib/orgs/org-service", () => ({
     memberOrgIds: async (userId: string) => [
         ...(world.orgOwnerId === userId ? [ORG] : []),
-        ...world.orgMembers.filter((row) => row.userId === userId && !row.restricted).map((row) => row.orgId)
+        ...world.orgMembers
+            .filter((row) => row.userId === userId && !row.restricted)
+            .map((row) => row.orgId)
     ],
     teamIdsFor: async (userId: string) =>
         world.teams.filter((row) => row.userId === userId).map((row) => row.teamId)
@@ -66,14 +68,21 @@ vi.mock("@polaris/db", () => ({
             findUnique: async ({ where }: { where: { id: string } }) => {
                 read("chatSpace");
                 return where.id === world.space.id
-                    ? { ...world.space, org: world.space.orgId ? { ownerId: world.orgOwnerId } : null }
+                    ? {
+                          ...world.space,
+                          org: world.space.orgId ? { ownerId: world.orgOwnerId } : null
+                      }
                     : null;
             }
         },
         chatSpaceMember: {
             findUnique: async ({ where }: { where: { spaceId_userId: { userId: string } } }) =>
                 world.members.find((row) => row.userId === where.spaceId_userId.userId) ?? null,
-            findMany: async ({ where }: { where: { userId?: { in: string[] }; role?: string } }) => {
+            findMany: async ({
+                where
+            }: {
+                where: { userId?: { in: string[] }; role?: string };
+            }) => {
                 read("chatSpaceMember");
                 return world.members.filter(
                     (row) =>
@@ -86,18 +95,28 @@ vi.mock("@polaris/db", () => ({
             findMany: async ({
                 where
             }: {
-                where: { userId?: string | { in: string[] }; OR?: { orgId: string; role: string }[] };
+                where: {
+                    userId?: string | { in: string[] };
+                    OR?: { orgId: string; role: string }[];
+                };
             }) => {
                 read("organizationMember");
                 return world.orgMembers.filter((row) => {
-                    if (where.OR) return where.OR.some((one) => one.orgId === row.orgId && one.role === row.role);
+                    if (where.OR)
+                        return where.OR.some(
+                            (one) => one.orgId === row.orgId && one.role === row.role
+                        );
                     if (typeof where.userId === "string") return row.userId === where.userId;
                     return where.userId!.in.includes(row.userId);
                 });
             }
         },
         teamMember: {
-            findMany: async ({ where }: { where: { userId?: { in: string[] }; teamId?: { in: string[] } } }) => {
+            findMany: async ({
+                where
+            }: {
+                where: { userId?: { in: string[] }; teamId?: { in: string[] } };
+            }) => {
                 read("teamMember");
                 return world.teams.filter(
                     (row) =>
@@ -116,7 +135,9 @@ vi.mock("@polaris/db", () => ({
                 return world.roles.filter((role) =>
                     where.id
                         ? where.id.in.includes(role.id)
-                        : where.OR!.some((one) => one.orgId === role.orgId && one.slug === role.slug)
+                        : where.OR!.some(
+                              (one) => one.orgId === role.orgId && one.slug === role.slug
+                          )
                 );
             }
         },
@@ -131,7 +152,17 @@ vi.mock("@polaris/db", () => ({
 
 const access = await import("@/lib/chat/access");
 
-const PEOPLE = ["owner", "listed-admin", "listed-member", "roster", "restricted", "by-name", "by-team", "by-role", "stranger"];
+const PEOPLE = [
+    "owner",
+    "listed-admin",
+    "listed-member",
+    "roster",
+    "restricted",
+    "by-name",
+    "by-team",
+    "by-role",
+    "stranger"
+];
 
 beforeEach(() => {
     reads = {};
@@ -159,21 +190,25 @@ beforeEach(() => {
 
 async function oneByOne(): Promise<Map<string, string | null>> {
     const found = new Map<string, string | null>();
-    for (const id of [...PEOPLE, "org-owner"]) found.set(id, await access.spaceAccess({ id }, SPACE));
+    for (const id of [...PEOPLE, "org-owner"])
+        found.set(id, await access.spaceAccess({ id }, SPACE));
     return found;
 }
 
 describe("standings in a batch", () => {
-    it.each(["internal", "private"])("match one-by-one access in a %s space", async (visibility) => {
-        world.space.visibility = visibility;
-        const alone = await oneByOne();
-        const batch = await access.spaceStandings(SPACE, [...PEOPLE, "org-owner"]);
-        expect(Object.fromEntries(batch)).toEqual(Object.fromEntries(alone));
-        expect(batch.get("by-name")).toBe("admin");
-        expect(batch.get("by-role")).toBe("admin");
-        expect(batch.get("by-team")).toBe("member");
-        expect(batch.get("stranger")).toBeNull();
-    });
+    it.each(["internal", "private"])(
+        "match one-by-one access in a %s space",
+        async (visibility) => {
+            world.space.visibility = visibility;
+            const alone = await oneByOne();
+            const batch = await access.spaceStandings(SPACE, [...PEOPLE, "org-owner"]);
+            expect(Object.fromEntries(batch)).toEqual(Object.fromEntries(alone));
+            expect(batch.get("by-name")).toBe("admin");
+            expect(batch.get("by-role")).toBe("admin");
+            expect(batch.get("by-team")).toBe("member");
+            expect(batch.get("stranger")).toBeNull();
+        }
+    );
 
     it("read each table once however many people are asked about", async () => {
         const many = [...PEOPLE, ...Array.from({ length: 200 }, (_, index) => `extra-${index}`)];
@@ -194,7 +229,11 @@ describe("standings in a batch", () => {
 
 describe("the administrators", () => {
     it("are the listed ones and whoever a grant makes one, never the owner", async () => {
-        expect((await access.spaceAdminIds(SPACE)).sort()).toEqual(["by-name", "by-role", "listed-admin"]);
+        expect((await access.spaceAdminIds(SPACE)).sort()).toEqual([
+            "by-name",
+            "by-role",
+            "listed-admin"
+        ]);
     });
 
     it("leave out somebody a grant names but the space no longer reaches at that level", async () => {

@@ -12,7 +12,15 @@ import { useTranslations } from "@/components/i18n/i18n-provider";
 import { ModerationItems, type SeatModeration } from "./call-moderation-menu";
 import { DEFAULT_VOLUME, MAX_VOLUME, useCallVolume } from "./call-volumes";
 import { gapFor, gapWords, useLoudness } from "./call-loudness";
-import { Check, Headphones, Music2, PictureInPicture2, Users, Volume2, VolumeX } from "lucide-react";
+import {
+    Check,
+    Headphones,
+    Music2,
+    PictureInPicture2,
+    Users,
+    Volume2,
+    VolumeX
+} from "lucide-react";
 import { setSoundboardMuted, useSoundboardPrefs } from "./soundboard-prefs";
 import {
     canPopOut,
@@ -161,7 +169,11 @@ export function PersonMenu({
                     aria-checked={soundsMuted}
                     role="menuitemcheckbox"
                 >
-                    {soundsMuted ? <Music2 className="size-3.5" /> : <VolumeX className="size-3.5" />}
+                    {soundsMuted ? (
+                        <Music2 className="size-3.5" />
+                    ) : (
+                        <VolumeX className="size-3.5" />
+                    )}
                     {soundsMuted ? t("soundboard.unmuteUser") : t("soundboard.muteUser")}
                 </ContextMenuItem>
 

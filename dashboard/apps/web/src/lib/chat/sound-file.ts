@@ -54,7 +54,11 @@ function ascii(bytes: Uint8Array, at: number, length: number): string {
 export function readWav(bytes: Uint8Array): WavInfo {
     if (bytes.length === 0) return { ok: false, problem: "empty" };
     if (bytes.length > SOUND_MAX_BYTES) return { ok: false, problem: "size" };
-    if (bytes.length < HEADER_BYTES || ascii(bytes, 0, 4) !== "RIFF" || ascii(bytes, 8, 4) !== "WAVE")
+    if (
+        bytes.length < HEADER_BYTES ||
+        ascii(bytes, 0, 4) !== "RIFF" ||
+        ascii(bytes, 8, 4) !== "WAVE"
+    )
         return { ok: false, problem: "type" };
 
     const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
@@ -92,7 +96,8 @@ export function readWav(bytes: Uint8Array): WavInfo {
     if (!format || !data) return { ok: false, problem: "type" };
     if (!format.pcm || format.bits !== 16) return { ok: false, problem: "type" };
     if (format.channels < 1 || format.channels > 2) return { ok: false, problem: "type" };
-    if (format.sampleRate < 8_000 || format.sampleRate > 48_000) return { ok: false, problem: "type" };
+    if (format.sampleRate < 8_000 || format.sampleRate > 48_000)
+        return { ok: false, problem: "type" };
 
     const frame = format.channels * 2;
     const frames = Math.floor(data.length / frame);
@@ -115,7 +120,8 @@ function wavBytes(samples: Uint8Array, channels: number, sampleRate: number): Ui
     const out = new Uint8Array(HEADER_BYTES + samples.length);
     const view = new DataView(out.buffer);
     const write = (at: number, text: string) => {
-        for (let index = 0; index < text.length; index += 1) out[at + index] = text.charCodeAt(index);
+        for (let index = 0; index < text.length; index += 1)
+            out[at + index] = text.charCodeAt(index);
     };
     write(0, "RIFF");
     view.setUint32(4, 36 + samples.length, true);
@@ -140,7 +146,10 @@ function wavBytes(samples: Uint8Array, channels: number, sampleRate: number): Ui
  * Clipped rather than wrapped: a sample past full scale that wrapped would be a
  * click at the loudest moment of somebody's sound.
  */
-export function encodeWav(samples: Float32Array, sampleRate: number = SOUND_SAMPLE_RATE): Uint8Array {
+export function encodeWav(
+    samples: Float32Array,
+    sampleRate: number = SOUND_SAMPLE_RATE
+): Uint8Array {
     const pcm = new Uint8Array(samples.length * 2);
     const view = new DataView(pcm.buffer);
     for (let index = 0; index < samples.length; index += 1) {

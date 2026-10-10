@@ -92,27 +92,41 @@ describe("who may change a denial", () => {
 
     it("is the owner, for every one of them", () => {
         expect(rules.mayChangeDenial({ kind: "role", subject: "admin" }, owner)).toBe(true);
-        expect(rules.mayChangeDenial({ kind: "user", subject: BEN }, owner, { spaceRole: "admin" })).toBe(true);
+        expect(
+            rules.mayChangeDenial({ kind: "user", subject: BEN }, owner, { spaceRole: "admin" })
+        ).toBe(true);
     });
 
     it("is an administrator, for every member, a member by name and a role no administrator holds", () => {
         expect(rules.mayChangeDenial({ kind: "role", subject: "member" }, admin)).toBe(true);
-        expect(rules.mayChangeDenial({ kind: "user", subject: BEN }, admin, { spaceRole: "member" })).toBe(true);
+        expect(
+            rules.mayChangeDenial({ kind: "user", subject: BEN }, admin, { spaceRole: "member" })
+        ).toBe(true);
         expect(rules.mayChangeDenial({ kind: "role", subject: "org:support" }, admin)).toBe(true);
     });
 
     it("is the owner alone, for an organization role another administrator holds", () => {
         const named = { spaceRole: null, heldByAdmin: true };
-        expect(rules.mayChangeDenial({ kind: "role", subject: "org:support" }, admin, named)).toBe(false);
-        expect(rules.mayChangeDenial({ kind: "role", subject: "org:support" }, owner, named)).toBe(true);
+        expect(rules.mayChangeDenial({ kind: "role", subject: "org:support" }, admin, named)).toBe(
+            false
+        );
+        expect(rules.mayChangeDenial({ kind: "role", subject: "org:support" }, owner, named)).toBe(
+            true
+        );
     });
 
     it("is not an administrator, for anything that reaches an administrator", () => {
         expect(rules.mayChangeDenial({ kind: "role", subject: "admin" }, admin)).toBe(false);
         expect(rules.mayChangeDenial({ kind: "role", subject: "org:sales" }, admin)).toBe(false);
-        expect(rules.mayChangeDenial({ kind: "user", subject: ADA }, admin, { spaceRole: "admin" })).toBe(false);
-        expect(rules.mayChangeDenial({ kind: "user", subject: BEN }, admin, { spaceRole: "admin" })).toBe(false);
-        expect(rules.mayChangeDenial({ kind: "user", subject: BEN }, admin, { spaceRole: "owner" })).toBe(false);
+        expect(
+            rules.mayChangeDenial({ kind: "user", subject: ADA }, admin, { spaceRole: "admin" })
+        ).toBe(false);
+        expect(
+            rules.mayChangeDenial({ kind: "user", subject: BEN }, admin, { spaceRole: "admin" })
+        ).toBe(false);
+        expect(
+            rules.mayChangeDenial({ kind: "user", subject: BEN }, admin, { spaceRole: "owner" })
+        ).toBe(false);
     });
 });
 
@@ -156,7 +170,9 @@ describe("whether one sound may be played here", () => {
     });
 
     it("lets anybody in the call play its own space's sounds, reaching the space or not", () => {
-        expect(rules.soundRefusal(facts(), { kind: "space", here: true, reachable: false })).toBeNull();
+        expect(
+            rules.soundRefusal(facts(), { kind: "space", here: true, reachable: false })
+        ).toBeNull();
     });
 
     it("is gone for a sound of a space the player does not reach", () => {
@@ -175,14 +191,21 @@ describe("whether one sound may be played here", () => {
 
     it("lets a member bring their spaces' sounds into a direct message call", () => {
         expect(
-            rules.soundRefusal(facts({ space: null }), { kind: "space", here: false, reachable: true })
+            rules.soundRefusal(facts({ space: null }), {
+                kind: "space",
+                here: false,
+                reachable: true
+            })
         ).toBeNull();
     });
 });
 
 describe("a sound reference", () => {
     it("is a known default or a space sound's id, and nothing else", () => {
-        expect(rules.parseSoundRef("default:applause")).toEqual({ kind: "default", id: "applause" });
+        expect(rules.parseSoundRef("default:applause")).toEqual({
+            kind: "default",
+            id: "applause"
+        });
         expect(rules.parseSoundRef(ADA.toUpperCase())).toEqual({ kind: "space", id: ADA });
         expect(rules.parseSoundRef("default:nope")).toBeNull();
         expect(rules.parseSoundRef("../etc/passwd")).toBeNull();

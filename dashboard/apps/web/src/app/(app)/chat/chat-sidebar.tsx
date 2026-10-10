@@ -364,7 +364,9 @@ export function ChatSidebar() {
                                         {t("sidebar.emoji")}
                                     </DropdownMenuItem>
                                     <DropdownMenuItem
-                                        onSelect={() => router.push(`/chat/s/${space.id}/soundboard`)}
+                                        onSelect={() =>
+                                            router.push(`/chat/s/${space.id}/soundboard`)
+                                        }
                                     >
                                         <Music2 className="size-3.5" />
                                         {t("sidebar.soundboard")}

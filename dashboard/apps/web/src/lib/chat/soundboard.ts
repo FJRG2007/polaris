@@ -99,7 +99,9 @@ export function parseSoundRef(
             ? { kind: "default", id: id as DefaultSoundId }
             : null;
     }
-    return z.string().uuid().safeParse(ref).success ? { kind: "space", id: ref.toLowerCase() } : null;
+    return z.string().uuid().safeParse(ref).success
+        ? { kind: "space", id: ref.toLowerCase() }
+        : null;
 }
 
 export const soundRefSchema = z
@@ -212,12 +214,7 @@ export const soundDenialSchema = z.discriminatedUnion("kind", [
     z.object({ kind: z.literal("user"), subject: z.string().uuid() }),
     z.object({
         kind: z.literal("role"),
-        subject: z.union([
-            z.enum(SPACE_ROLES),
-            z
-                .string()
-                .regex(/^org:[a-z0-9][a-z0-9_-]{0,62}$/)
-        ])
+        subject: z.union([z.enum(SPACE_ROLES), z.string().regex(/^org:[a-z0-9][a-z0-9_-]{0,62}$/)])
     })
 ]);
 
@@ -284,7 +281,8 @@ export function mayChangeDenial(
 ): boolean {
     if (actor.spaceRole === "owner") return true;
     if (soundboardDenied([denial], actor)) return false;
-    if (denial.kind === "role") return !(denial.subject.startsWith(ORG_ROLE_PREFIX) && named.heldByAdmin);
+    if (denial.kind === "role")
+        return !(denial.subject.startsWith(ORG_ROLE_PREFIX) && named.heldByAdmin);
     return named.spaceRole !== "admin" && named.spaceRole !== "owner";
 }
 

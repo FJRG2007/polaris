@@ -138,7 +138,10 @@ async function orgRoleOf(orgId: string | null, userId: string): Promise<string |
 
 /** The organization roles any of these people hold - `orgRoleOf` for many, in
  *  one read of the roster. */
-async function orgRolesHeld(orgId: string | null, userIds: readonly string[]): Promise<Set<string>> {
+async function orgRolesHeld(
+    orgId: string | null,
+    userIds: readonly string[]
+): Promise<Set<string>> {
     if (!orgId || userIds.length === 0) return new Set();
     const [org, members] = await Promise.all([
         prisma.organization.findUnique({ where: { id: orgId }, select: { ownerId: true } }),
@@ -156,9 +159,10 @@ async function orgRolesHeld(orgId: string | null, userIds: readonly string[]): P
 
 /** Who runs the space besides its owner, and the organization roles they hold,
  *  as `rules.mayChangeDenial` needs them. The page and the server both ask here. */
-async function spaceAdmins(
-    space: { readonly id: string; readonly orgId: string | null }
-): Promise<{ readonly ids: readonly string[]; readonly orgRoles: ReadonlySet<string> }> {
+async function spaceAdmins(space: {
+    readonly id: string;
+    readonly orgId: string | null;
+}): Promise<{ readonly ids: readonly string[]; readonly orgRoles: ReadonlySet<string> }> {
     const ids = await spaceAdminIds(space.id);
     return { ids, orgRoles: await orgRolesHeld(space.orgId, ids) };
 }
@@ -169,7 +173,8 @@ function namedBy(
     standings: ReadonlyMap<string, ChatSpaceAccess | null>,
     adminOrgRoles: ReadonlySet<string>
 ): { readonly spaceRole: ChatSpaceAccess | null; readonly heldByAdmin: boolean } {
-    if (denial.kind === "user") return { spaceRole: standings.get(denial.subject) ?? null, heldByAdmin: false };
+    if (denial.kind === "user")
+        return { spaceRole: standings.get(denial.subject) ?? null, heldByAdmin: false };
     return {
         spaceRole: null,
         heldByAdmin:
@@ -427,7 +432,11 @@ export async function playSound(seat: MeetingSeat, ref: string): Promise<void> {
 
 /** Star a sound, or take the star off. Kept on the account, so it follows the
  *  person to every device - Discord's favourites do. */
-export async function setFavorite(actor: ChatActor, sound: string, favorite: boolean): Promise<void> {
+export async function setFavorite(
+    actor: ChatActor,
+    sound: string,
+    favorite: boolean
+): Promise<void> {
     if (!rules.parseSoundRef(sound)) throw new ChatRuleError({ key: "errors.soundGone" });
     if (!favorite) {
         await prisma.chatSoundFavorite.deleteMany({ where: { userId: actor.id, sound } });
@@ -544,7 +553,11 @@ export async function spaceSoundboard(actor: ChatActor, spaceId: string): Promis
             ? Promise.resolve(new Map<string, ChatSpaceAccess | null>())
             : spaceStandings(spaceId, deniedPeople)
     ]);
-    const self: rules.SoundboardSubject = { userId: actor.id, spaceRole: access, orgRole: actorOrgRole };
+    const self: rules.SoundboardSubject = {
+        userId: actor.id,
+        spaceRole: access,
+        orgRole: actorOrgRole
+    };
     const mayChange = (denial: rules.SoundDenial) =>
         rules.mayChangeDenial(denial, self, namedBy(denial, standings, admins.orgRoles));
     const personName = new Map(people.map((person) => [person.id, person.name]));
@@ -570,12 +583,13 @@ export async function spaceSoundboard(actor: ChatActor, spaceId: string): Promis
         roles: [
             { subject: "member", name: null },
             { subject: "admin", name: null },
-            ...orgRoles.map((role) => ({ subject: `${rules.ORG_ROLE_PREFIX}${role.slug}`, name: role.name }))
+            ...orgRoles.map((role) => ({
+                subject: `${rules.ORG_ROLE_PREFIX}${role.slug}`,
+                name: role.name
+            }))
         ].filter((role) => mayChange({ kind: "role", subject: role.subject } as rules.SoundDenial)),
         ownerOnlyPeople:
-            access === "owner"
-                ? []
-                : [...new Set([actor.id, space.ownerId, ...admins.ids])],
+            access === "owner" ? [] : [...new Set([actor.id, space.ownerId, ...admins.ids])],
         channels: channels.map((channel) => ({
             id: channel.id,
             name: channel.name,
@@ -617,7 +631,11 @@ export async function setChannelSoundboard(
 /** Deny the soundboard to a person or a role, or lift the denial. */
 export async function setSoundDenial(
     actor: ChatActor,
-    input: { readonly spaceId: string; readonly denial: rules.SoundDenial; readonly denied: boolean }
+    input: {
+        readonly spaceId: string;
+        readonly denial: rules.SoundDenial;
+        readonly denied: boolean;
+    }
 ): Promise<void> {
     const access = await requireSpace(actor, input.spaceId, "admin");
     const key = { spaceId: input.spaceId, kind: input.denial.kind, subject: input.denial.subject };
@@ -625,7 +643,11 @@ export async function setSoundDenial(
         input.denial.kind === "user"
             ? await spaceStandings(input.spaceId, [input.denial.subject])
             : new Map<string, ChatSpaceAccess | null>();
-    if (input.denied && input.denial.kind === "user" && standings.get(input.denial.subject) === "owner") {
+    if (
+        input.denied &&
+        input.denial.kind === "user" &&
+        standings.get(input.denial.subject) === "owner"
+    ) {
         // The owner is never denied - the rule `rules.soundboardDenied` keeps too -
         // so the page cannot list a denial that does nothing.
         throw new ChatRuleError({ key: "errors.soundboardOwner" });
@@ -644,7 +666,9 @@ export async function setSoundDenial(
         access !== "owner" && orgId && input.denial.subject.startsWith(rules.ORG_ROLE_PREFIX)
             ? (await spaceAdmins({ id: input.spaceId, orgId })).orgRoles
             : new Set<string>();
-    if (!rules.mayChangeDenial(input.denial, self, namedBy(input.denial, standings, adminOrgRoles))) {
+    if (
+        !rules.mayChangeDenial(input.denial, self, namedBy(input.denial, standings, adminOrgRoles))
+    ) {
         throw new ChatRuleError({ key: "errors.soundboardDenialOwnerOnly" });
     }
     if (!input.denied) {
@@ -710,7 +734,10 @@ export async function uploadSound(
 }
 
 /** The space one sound belongs to, for whoever runs it, or a refusal. */
-async function managed(actor: ChatActor, soundId: string): Promise<{ id: string; spaceId: string }> {
+async function managed(
+    actor: ChatActor,
+    soundId: string
+): Promise<{ id: string; spaceId: string }> {
     const row = await prisma.chatSpaceSound.findUnique({
         where: { id: soundId },
         select: { id: true, spaceId: true }
@@ -721,7 +748,10 @@ async function managed(actor: ChatActor, soundId: string): Promise<{ id: string;
 }
 
 /** Rename one, give it another emoji, or change how loud it plays. */
-export async function updateSound(actor: ChatActor, input: rules.SoundUpdateInput): Promise<SoundView> {
+export async function updateSound(
+    actor: ChatActor,
+    input: rules.SoundUpdateInput
+): Promise<SoundView> {
     const row = await managed(actor, input.soundId);
     const updated = await prisma.chatSpaceSound.update({
         where: { id: row.id },
