@@ -26,7 +26,6 @@ import * as written from "./messages";
 import * as waves from "./kinds/waves";
 import * as commands from "./commands";
 import * as stage from "./kinds/stage";
-import * as entry from "./kinds/beam-entry";
 import * as playing from "../activity";
 import * as delivery from "../delivery";
 import * as trivia from "./trivia-bank";
@@ -2058,90 +2057,6 @@ async function footprintTop(
     }
 }
 
-/**
- * Where the beam up to something in the sky stands (`beam-entry.ts`), looked
- * for ring by ring outward from where the players are: every column of a ring
- * read at once (`entryColumnsRead`) - the same reading a place's ground is
- * judged by (`judgeAtOnce`). The best spots of a ring are read again block by
- * block across the entry, and checked for a walk there from the players,
- * before the next ring is read.
- *
- * Nothing is loaded for it: the players' own chunks are, and with nobody in
- * the Overworld the arena's column is held. A column not loaded is not known,
- * and nothing is put next to it.
- */
-async function findEntry(
-    loop: Loop,
-    server: ServerContainer,
-    near: { x: number; z: number }
-): Promise<stored.Point | "none" | "unknown"> {
-    // Too old for the heightmap the markers come down by (before 1.19.4).
-    if (!(await serverAtLeast(server, [1, 19, 4]))) return "none";
-    const players = commands.readWhere(await server.say([commands.IN_OVERWORLD]));
-    const center = hunt.centerOf(players) ?? near;
-    let read = false;
-    for (const ring of entry.ENTRY_RINGS) {
-        const judged = await entryColumnsRead(loop, server, entry.entryColumns(center, ring));
-        if (judged === "unread") continue;
-        read = true;
-        // Builds cannot be told from the world's ground here: nowhere is safe.
-        if (judged === "unknowable") return "none";
-        const ranked = entry.rankEntries(center, judged, ring.step);
-        for (const spot of ranked.slice(0, entry.WALK_CHECKS)) {
-            const close = await entryColumnsRead(loop, server, entry.entryBox(spot.point));
-            if (typeof close === "string" || !entry.entryHolds(spot.point, close)) continue;
-            if (await canWalk(server, center, spot.point)) return spot.point;
-        }
-    }
-    return read ? "none" : "unknown";
-}
-
-/**
- * Columns read at once for the beam (`beam-entry.EntryColumn`): a marker on
- * the ground of each, then which of them stand on something somebody built,
- * on water or lava, or on a tree. `unread` when no marker came down at all,
- * `unknowable` when the server would not say what is built.
- */
-async function entryColumnsRead(
-    loop: Loop,
-    server: ServerContainer,
-    columns: readonly { x: number; z: number }[]
-): Promise<entry.EntryColumn[] | "unread" | "unknowable"> {
-    const key = (one: { x: number; z: number }) => `${one.x},${one.z}`;
-    try {
-        await server.sayAll(commands.sampleLines(columns));
-        const down = commands.samplesIn(await server.say([commands.READ_SAMPLES]));
-        if (down.length === 0) return "unread";
-        const built = await builtAtOnce(loop, server);
-        if (built === null) return "unknowable";
-        const of = async (lines: readonly string[]) => {
-            const found = new Set<string>();
-            for (const line of lines)
-                for (const one of commands.samplesIn(await server.say([line]))) found.add(key(one));
-            return found;
-        };
-        const wet =
-            built.size > 0
-                ? await of([commands.SAMPLES_ON_WATER, commands.SAMPLES_ON_LAVA])
-                : new Set<string>();
-        const trees = built.size > 0 ? await of(commands.SAMPLES_ON_TREES) : new Set<string>();
-        const at = new Map(down.map((one) => [key(one), one]));
-        return columns.map((column): entry.EntryColumn => {
-            const id = key(column);
-            const kind = !built.has(id)
-                ? "ground"
-                : wet.has(id)
-                  ? "wet"
-                  : trees.has(id)
-                    ? "tree"
-                    : "built";
-            return { x: column.x, z: column.z, y: at.get(id)?.y ?? null, kind };
-        });
-    } finally {
-        await server.sayAll([commands.CLEAR_SAMPLES]);
-    }
-}
-
 /** Whether a place can be walked to from a point (`commands.walkable`), judged
  *  by markers along the way, all summoned and read at once. */
 async function canWalk(
@@ -2532,7 +2447,6 @@ function kindContext(
                 }
             );
         },
-        findEntry: (near) => findEntry(loop, server, near),
         giveUpPlace: (point, why) =>
             retryPlace(installedAppId, loop, server, point, nearHomeLast, why),
         chat: () => chatSince(loop, server),

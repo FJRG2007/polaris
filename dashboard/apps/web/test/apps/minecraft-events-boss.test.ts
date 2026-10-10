@@ -506,6 +506,16 @@ describe("the sky arena", () => {
         ).toBe(true);
     });
 
+    it("lets go of whoever is far from both the lair and the boss on the land, or in another world", () => {
+        const lair = { x: 100, y: 70, z: -40 };
+        const at = (dx: number) => ({ x: lair.x + dx, y: lair.y, z: lair.z });
+        expect(boss.leftLand(lair, null, at(20), "minecraft:overworld")).toBe(false);
+        expect(boss.leftLand(lair, null, at(300), "minecraft:overworld")).toBe(true);
+        expect(boss.leftLand(lair, at(250), at(300), "minecraft:overworld")).toBe(false);
+        expect(boss.leftLand(lair, at(-250), at(300), undefined)).toBe(true);
+        expect(boss.leftLand(lair, null, at(1), "minecraft:the_nether")).toBe(true);
+    });
+
     it("takes players up tagged first, then moves them, then into adventure mode", () => {
         const lines = boss.admitLines("Ana", { x: 1.5, y: 95, z: 2.5, yaw: 90 });
         expect(lines[0]).toBe("tag Ana add pe_in");
@@ -513,6 +523,23 @@ describe("the sky arena", () => {
         expect(boss.inLift({ x: 10, y: 64, z: 20 })).toContain(
             "tag=!pe_in,gamemode=!creative,gamemode=!spectator"
         );
+    });
+
+    it("brings players to the boss on the land round its lair, in their own game mode", () => {
+        const lair = { x: 100, y: 70, z: -40 };
+        for (let index = 0; index < 8; index++) {
+            const spot = boss.landSpot(lair, index);
+            expect(spot.y).toBe(lair.y);
+            const away = Math.hypot(spot.x - (lair.x + 0.5), spot.z - (lair.z + 0.5));
+            expect(away).toBeGreaterThan(1);
+            expect(away).toBeLessThanOrEqual(3 * Math.SQRT2);
+        }
+        const lines = boss.landAdmitLines("Ana", boss.landSpot(lair, 0));
+        expect(lines.indexOf("tag Ana add pe_in")).toBeLessThan(
+            lines.findIndex((line) => line.includes(" tp Ana "))
+        );
+        expect(lines.some((line) => line.startsWith("gamemode"))).toBe(false);
+        expect(lines.some((line) => line.includes("slow_falling"))).toBe(false);
     });
 
     it("lets somebody who left go in their own game mode, without moving them", () => {

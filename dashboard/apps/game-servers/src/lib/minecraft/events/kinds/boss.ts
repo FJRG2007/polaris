@@ -18,9 +18,11 @@
  * - **The sky arena** (`arenaBoxes`) is a closed box of glass built only into
  *   air proved empty, 30 blocks over open ground, and taken down block kind by
  *   block kind - the same stage parkour and spleef stand on (`stage.ts`).
- *   Players go up through a beam of light and play in adventure mode, so they
- *   can neither break nor place anything there; each is put back at the beam
- *   at the end, after a restart, or when they next log in.
+ *   Players are taken up, like every other event's, and play in adventure
+ *   mode, so they can neither break nor place anything there; each is put back
+ *   where they were at the end, after a restart, or when they next log in. On
+ *   the land they are brought round its lair in their own game mode instead,
+ *   and put back the same way.
  * - **Nothing of anybody's is lost.** `keepInventory` is on for the fight, put
  *   back after even a restart; every creature near the boss that is not a
  *   player or one of the fight's own mobs - a dog, a horse, a villager - takes
@@ -370,8 +372,8 @@ export const bossStateSchema = z.object({
     /** Where the beam up to the arena stands, on the ground of its own column
      *  (`beam-entry.ts`). */
     lift: pointSchema.nullable().default(null),
-    /** No open ground for a beam was found near the players: everybody in the
-     *  Overworld is taken up once instead, and put back at the end. */
+    /** Everybody in the Overworld is brought to the fight once - up to the
+     *  arena, or beside the boss on the land - and put back at the end. */
     direct: z.boolean().default(false),
     /** Who has been taken up that way, in lower case: never pulled up again
      *  after they left. */
@@ -458,6 +460,17 @@ export function arenaSpot(origin: Point, index: number): stage.Spot {
     return { x, y: origin.y + 1, z, yaw };
 }
 
+/** Where a player is put beside the boss on the land: round its lair, on the
+ *  ground the lair was judged by, facing it. */
+export function landSpot(lair: Point, index: number): stage.Spot {
+    const angle = (index * 2 * Math.PI) / 8 + Math.PI / 8;
+    const radius = 3;
+    const x = lair.x + 0.5 + Math.round(Math.sin(angle) * radius);
+    const z = lair.z + 0.5 - Math.round(Math.cos(angle) * radius);
+    const yaw = (Math.atan2(-(lair.x + 0.5 - x), lair.z + 0.5 - z) * 180) / Math.PI;
+    return { x, y: lair.y, z, yaw };
+}
+
 /** Where the boss stands in the arena: the middle of the floor. */
 export function arenaCenter(origin: Point): Point {
     return { x: origin.x + 0.5, y: origin.y + 1, z: origin.z + 0.5 };
@@ -484,6 +497,27 @@ export function leftArena(origin: Point, at: Point, dimension: string | undefine
         at.y > origin.y + ARENA_ROOM + 16 ||
         at.y < origin.y - CATCH_DEPTH
     );
+}
+
+/** How far from both its lair and the boss somebody brought to it on the land
+ *  may go before they count as gone. */
+const LAND_REACH = 96;
+
+/**
+ * Whether somebody brought to the boss on the land has gone: another world,
+ * or far from both its lair and where the boss was last seen - back at their
+ * bed after a death, or a `/home`.
+ */
+export function leftLand(
+    lair: Point,
+    seen: Point | null,
+    at: Point,
+    dimension: string | undefined
+): boolean {
+    if (dimension !== undefined && dimension !== "minecraft:overworld") return true;
+    const far = (from: Point) =>
+        Math.max(Math.abs(at.x - (from.x + 0.5)), Math.abs(at.z - (from.z + 0.5))) > LAND_REACH;
+    return far(lair) && (seen === null || far(seen));
 }
 
 /** Whether the boss is still inside the arena. */
@@ -525,6 +559,12 @@ export function admitLines(name: string, spot: stage.Spot): string[] {
         stage.moveLine(name, spot),
         `gamemode adventure ${name}`
     ];
+}
+
+/** Brought to the boss on the land: protected for a moment, tagged as taken
+ *  (so the end sends them back), then moved - their game mode left alone. */
+export function landAdmitLines(name: string, spot: stage.Spot): string[] {
+    return [stage.protect(name), `tag ${name} add ${stage.IN_ARENA}`, stage.moveLine(name, spot)];
 }
 
 /** Caught under the arena and put back on its floor, floating. */

@@ -116,6 +116,11 @@ export function leftArenaForGood(language: Language): string {
     return language === "es" ? "&7Has salido de la arena." : "&7You left the arena.";
 }
 
+/** The same on the land, where there is no arena to leave. */
+export function leftFight(language: Language): string {
+    return language === "es" ? "&7Has dejado el combate." : "&7You left the fight.";
+}
+
 export function phaseTitle(phase: 2 | 3, language: Language): string {
     if (phase === 2) return language === "es" ? "&5&lFase 2" : "&5&lPhase 2";
     return language === "es" ? "&4&l¡Furia!" : "&4&lRage!";
