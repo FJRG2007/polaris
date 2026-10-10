@@ -305,6 +305,9 @@ interface Loop {
     quickBusy: boolean;
     busy: boolean;
     run: stored.EventRun;
+    /** Brought in from the Events screen since the last look at the chat: read
+     *  there as having typed `join` (`forceJoin`). */
+    forcing: string[];
     link: { server: ServerContainer; close: () => Promise<void> } | null;
     ticks: number;
     lastSample: number;
@@ -460,6 +463,14 @@ export interface EventsView {
         readonly cancelling: boolean;
         /** The scoreboard as it stands, best first. */
         readonly standings: readonly { name: string; score: number }[];
+        /** Whether players can be brought in from here now (`forceJoin`). */
+        readonly takesForced: boolean;
+        /** Who is in it already, for an event players join. */
+        readonly inEvent: readonly string[];
+        /** Who was brought in from here, by whom and when. */
+        readonly forced: readonly { name: string; byName: string; at: number }[];
+        /** Who is on the server, as the last look saw them: who can be brought in. */
+        readonly online: readonly string[];
     } | null;
     readonly history: readonly stored.EventHistoryEntry[];
     readonly pending: readonly stored.PendingReward[];
@@ -609,7 +620,16 @@ export async function eventsView(installedAppId: string): Promise<EventsView> {
                   endsAt: run.endsAt,
                   trigger: run.trigger,
                   cancelling: run.cancelled,
-                  standings
+                  standings,
+                  takesForced: takesForced(run),
+                  inEvent: catalog.takesJoiners(run.preset) ? inEvent(run) : [],
+                  // The record is the screen's own, written to the state alone.
+                  forced: (state.run?.id === run.id ? state.run.forced : run.forced).map((one) => ({
+                      name: one.name,
+                      byName: one.byName,
+                      at: one.at
+                  })),
+                  online: seen ? [...seen.values()].map((one) => one.name) : []
               }
             : null,
         history: state.history,
@@ -855,6 +875,7 @@ export async function startEvent(input: {
         timeBefore: null,
         offMode: [],
         keptOut: [],
+        forced: [],
         chests: [],
         held: [],
         hidden: false,
@@ -894,11 +915,41 @@ export async function startEvent(input: {
 
     const written = await updateEventState(input.installedAppId, (state) => {
         if (state.run) throw new Error(refused("anotherOn"));
-        return { ...state, run, waiting: null };
+        // Started from the screen or a schedule: the draw waits a whole gap
+        // after this one is due to end, as it does after one it drew itself.
+        const nextRandomAt =
+            input.trigger === "random"
+                ? state.nextRandomAt
+                : plan.rearmed(
+                      config.settings,
+                      state.nextRandomAt,
+                      run.endsAt,
+                      plan.nextGap(config.settings, Math.random)
+                  );
+        return { ...state, run, waiting: null, nextRandomAt };
     });
     if (!written) throw new Error(refused("noServer"));
     startLoop(row.ownerId, input.installedAppId, run, config.settings);
     return run;
+}
+
+/** The draw's settings as saved now, to re-arm it by when an event ends; null
+ *  when they cannot be read, and the draw is then left as it was. */
+async function drawSettings(installedAppId: string): Promise<catalog.EventSettings | null> {
+    const row = await readRow(installedAppId).catch(() => null);
+    return row ? settingsOf(row.config).settings : null;
+}
+
+/** At least the shortest gap between an event's end and the next drawn one,
+ *  whatever started it and however long it really took (`plan.rearmed`). */
+function afterAnEnd(
+    draw: catalog.EventSettings | null,
+    nextRandomAt: number | null,
+    endedAt: number
+): number | null {
+    return draw
+        ? plan.rearmed(draw, nextRandomAt, endedAt, draw.random.minGap * 60_000)
+        : nextRandomAt;
 }
 
 /** Call off the event on now. The loop takes it down on its next tick. */
@@ -942,6 +993,100 @@ export async function startNow(ownerId: string, installedAppId: string): Promise
         const row = await readRow(installedAppId);
         if (row) startLoop(ownerId, installedAppId, state.run, settingsOf(row.config).settings);
     }
+}
+
+/** Who is in an event players join, or on their way in: who typed `join`, and
+ *  on a stage, who is racing and has not left. */
+function inEvent(run: stored.EventRun): string[] {
+    if (!catalog.playsOnStage(run.preset)) return run.joined;
+    const stage = run.stage;
+    if (!stage) return [];
+    return [
+        ...stage.joined,
+        ...stage.racers.filter((one) => one.outAt === null).map((one) => one.name)
+    ];
+}
+
+/** Whether players can be brought into the event on now from the screen: one
+ *  players join, through its countdown - or, a race that lets latecomers in,
+ *  while it is on. */
+export function takesForced(run: stored.EventRun): boolean {
+    if (run.cancelled || run.finishing || !catalog.takesJoiners(run.preset)) return false;
+    return run.phase === "countdown" || catalog.joinsWhileOn(run.preset);
+}
+
+/**
+ * Bring players into the event on now as if each had typed `join` - everybody
+ * on the server not in it yet, or the ones named - read on the loop's next look
+ * at the chat, so the event treats them exactly as it treats a typed join (the
+ * countdown's list, a late racer let in, somebody still owed a trip back left
+ * out). Who brought whom is kept on the run. Answers who was brought, and which
+ * of the named are not on the server.
+ */
+export async function forceJoin(input: {
+    ownerId: string;
+    installedAppId: string;
+    everybody: boolean;
+    players: readonly string[];
+    by: string;
+    byName: string;
+}): Promise<{ brought: string[]; offline: string[] }> {
+    const row = await readRow(input.installedAppId);
+    if (!row) throw new Error(refused("noServer"));
+    const state = stored.readEventState(row.config);
+    const run = loops.get(input.installedAppId)?.run ?? state.run;
+    if (!run || !state.run || run.cancelled) throw new Error(refused("noneOn"));
+    if (!catalog.takesJoiners(run.preset)) throw new Error(refused("notJoinable"));
+    if (!takesForced(run)) throw new Error(refused("joinClosed"));
+    const seen = await playersNow(input.ownerId, input.installedAppId);
+    if (seen === null) throw new Error(refused("notRunning"));
+    const online = new Map([...seen.values()].map((one) => [one.name.toLowerCase(), one.name]));
+    const already = new Set(inEvent(run).map((name) => name.toLowerCase()));
+    const asked = input.everybody ? [...online.values()] : input.players;
+    const brought: string[] = [];
+    const offline: string[] = [];
+    for (const name of asked) {
+        const spelled = online.get(name.toLowerCase());
+        if (!spelled) offline.push(name);
+        else if (!already.has(spelled.toLowerCase()) && catalog.PLAYER_NAME.test(spelled)) {
+            already.add(spelled.toLowerCase());
+            brought.push(spelled);
+        }
+    }
+    if (brought.length === 0)
+        throw new Error(refused(offline.length > 0 ? "notOnServer" : "allIn"));
+    const at = Date.now();
+    const written = await updateEventState(input.installedAppId, (current) =>
+        current.run?.id === run.id
+            ? {
+                  ...current,
+                  run: {
+                      ...current.run,
+                      forced: [
+                          ...current.run.forced,
+                          ...brought.map((name) => ({
+                              name,
+                              by: input.by,
+                              byName: input.byName,
+                              at
+                          }))
+                      ]
+                  }
+              }
+            : current
+    );
+    if (written?.run?.id !== run.id) throw new Error(refused("noneOn"));
+    // Read by the loop's next look at the chat: started here if Polaris has
+    // not picked the run up again since a restart.
+    if (!loops.has(input.installedAppId))
+        startLoop(
+            input.ownerId,
+            input.installedAppId,
+            written.run,
+            settingsOf(row.config).settings
+        );
+    loops.get(input.installedAppId)?.forcing.push(...brought);
+    return { brought, offline };
 }
 
 /** Stop waiting to hand somebody a prize. */
@@ -1080,6 +1225,7 @@ function startLoop(
         quickBusy: false,
         busy: false,
         run,
+        forcing: [],
         link: null,
         ticks: 0,
         lastSample: 0,
@@ -1163,6 +1309,8 @@ async function writeRun(installedAppId: string, loop: Loop): Promise<void> {
                   ...state,
                   run: {
                       ...run,
+                      // Written by the screen alone (`forceJoin`), never by the loop.
+                      forced: state.run.forced,
                       cancelled: state.run.cancelled || run.cancelled,
                       finishing: state.run.finishing || run.finishing
                   }
@@ -4139,10 +4287,14 @@ function stageTools(
 async function newChat(server: ServerContainer, loop: Loop): Promise<string | null> {
     const said = await newLog(server, loop);
     if (!catalog.takesJoiners(loop.run.preset)) return said;
-    // A [Join] or [Leave] pressed in the chat reads as having typed it.
-    const pressed = [...(await readPresses(server)).entries()]
-        .map(([name, value]) => commands.pressedLine(name, value))
-        .filter((line): line is string => line !== null);
+    // A [Join] or [Leave] pressed in the chat reads as having typed it, and so
+    // does being brought in from the Events screen.
+    const pressed = [
+        ...[...(await readPresses(server)).entries()].map(([name, value]) =>
+            commands.pressedLine(name, value)
+        ),
+        ...loop.forcing.splice(0).map((name) => commands.pressedLine(name, commands.JOIN_VALUE))
+    ].filter((line): line is string => line !== null);
     if (pressed.length === 0) return said;
     return `${said ?? ""}${said && !said.endsWith("\n") ? "\n" : ""}${pressed.join("\n")}\n`;
 }
@@ -4600,12 +4752,14 @@ async function finish(
                 : null,
         keptOut: run.keptOut ?? []
     };
+    const draw = await drawSettings(installedAppId);
     await updateEventState(installedAppId, (state) => ({
         ...stored.withHistory(
             { ...state, run: state.run?.id === run.id ? null : state.run },
             entry
         ),
         lastKind: preset.kind,
+        nextRandomAt: afterAnEnd(draw, state.nextRandomAt, entry.endedAt),
         pending: stored.livePending([...state.pending, ...pending], Date.now()),
         owedLines: stored.withOwedLines(state.owedLines, owedLines, Date.now()),
         stageLeftovers: stage.withLeftover(state.stageLeftovers, stageLeftover),
@@ -4799,11 +4953,13 @@ async function abandon(
     const arenaLeftover = catalog.playsInArena(run.preset)
         ? arenaService.leftoverOf(run, run.gamerules)
         : null;
+    const draw = await drawSettings(installedAppId);
     await updateEventState(installedAppId, (state) =>
         state.run?.id === run.id
             ? {
                   ...stored.withHistory({ ...state, run: null }, entry),
                   lastKind: run.preset.kind,
+                  nextRandomAt: afterAnEnd(draw, state.nextRandomAt, now),
                   // Its stage or arena, if it had one, is undone by the sweep from here.
                   stageLeftovers: stage.withLeftover(
                       state.stageLeftovers,

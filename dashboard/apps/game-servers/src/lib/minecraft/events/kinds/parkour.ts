@@ -590,22 +590,42 @@ export const CHECKPOINT_SCORE = "pe_cp";
 /** The game tick a racer stepped onto the finish, for their time to the tick. */
 export const FINISH_TICK = "pe_done";
 
+/**
+ * The racers' own team, so nobody can knock another off a jump: no pushing by
+ * walking into them (`collisionRule never`) and no punching (`friendlyFire
+ * false`) - what hide-and-seek's sides do for their own. Made with the scores
+ * and gone with them; taking the team away takes everybody off it.
+ */
+export const NO_PUSH_TEAM = "pe_parkour";
+
 export const SCORES_ADDED = [
     `scoreboard objectives add ${CHECKPOINT_SCORE} dummy`,
-    `scoreboard objectives add ${FINISH_TICK} dummy`
+    `scoreboard objectives add ${FINISH_TICK} dummy`,
+    `team add ${NO_PUSH_TEAM}`,
+    `team modify ${NO_PUSH_TEAM} collisionRule never`,
+    `team modify ${NO_PUSH_TEAM} friendlyFire false`
 ];
 
 export const SCORES_REMOVED = [
     `scoreboard objectives remove ${CHECKPOINT_SCORE}`,
-    `scoreboard objectives remove ${FINISH_TICK}`
+    `scoreboard objectives remove ${FINISH_TICK}`,
+    `team remove ${NO_PUSH_TEAM}`
 ];
 
-/** A racer coming in: at their checkpoint, and not finished. */
+/** A racer coming in: at their checkpoint, not finished, and on the racers'
+ *  team - only if they are on none of the server's own, whose colour and
+ *  prefix are theirs to keep. */
 export function racerScores(name: string, checkpoint: number): string[] {
     return [
         `scoreboard players set ${name} ${CHECKPOINT_SCORE} ${checkpoint}`,
-        `scoreboard players reset ${name} ${FINISH_TICK}`
+        `scoreboard players reset ${name} ${FINISH_TICK}`,
+        `execute if entity @a[name=${name},team=] run team join ${NO_PUSH_TEAM} ${name}`
     ];
+}
+
+/** Off the racers' team, for one going home while the race goes on. */
+export function leaveTeam(name: string): string {
+    return `execute if entity @a[name=${name},team=${NO_PUSH_TEAM}] run team leave ${name}`;
 }
 
 /** Every racer's checkpoint, as the game has it. */

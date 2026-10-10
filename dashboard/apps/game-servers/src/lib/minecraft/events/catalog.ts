@@ -2077,6 +2077,20 @@ export function takesJoiners(preset: EventPreset): boolean {
     return playsOnStage(preset) || playsInArena(preset);
 }
 
+/** A race that lets a player in after its "Go!" as well as through the
+ *  countdown (`stage-service.admit`): a spleef, a TNT run, an acid rain and an
+ *  arena's sides are made once, when it starts. */
+export function joinsWhileOn(preset: EventPreset): boolean {
+    return (
+        preset.kind === "parkour" ||
+        preset.kind === "dropper" ||
+        preset.kind === "boat-race" ||
+        preset.kind === "downhill-race" ||
+        preset.kind === "nether-maze" ||
+        preset.kind === "elytra-race"
+    );
+}
+
 /** Played on a stage built in the sky for each to play alone - a parkour
  *  course, a spleef or TNT run floor, an ice track, a dropper's shaft
  *  (`kinds/stage-service.ts`). */

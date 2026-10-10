@@ -489,6 +489,19 @@ describe("the random draw", () => {
         random: always(0)
     };
 
+    it("starts its wait again after an event it did not draw", () => {
+        const gap = 60 * 60_000;
+        // Due in ten minutes; an event pressed on now ends in thirty: a whole
+        // gap after that end, not ten minutes from now.
+        expect(plan.rearmed(on, at("19:10"), at("19:30"), gap)).toBe(at("20:30"));
+        // Already further off than that: left where it was.
+        expect(plan.rearmed(on, at("21:00"), at("19:30"), gap)).toBe(at("21:00"));
+        // Not armed yet, or switched off: the draw arms itself on its next look.
+        expect(plan.rearmed(on, null, at("19:30"), gap)).toBeNull();
+        const off = settings({ random: { ...on.random, enabled: false } });
+        expect(plan.rearmed(off, at("19:10"), at("19:30"), gap)).toBe(at("19:10"));
+    });
+
     it("arms itself a gap away rather than starting on the spot", () => {
         const decided = plan.decideRandom({ ...base, nextRandomAt: null, now: at("19:00") });
         expect(decided.start).toBeNull();

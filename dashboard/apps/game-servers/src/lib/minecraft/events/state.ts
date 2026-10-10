@@ -79,6 +79,17 @@ export const keptOutSchema = z.object({
 
 export type KeptOut = z.infer<typeof keptOutSchema>;
 
+/** Somebody brought into an event from the Events screen rather than by typing
+ *  `join`: who, by whom - their user id, and their name as it read then - and when. */
+export const forcedSchema = z.object({
+    name: z.string(),
+    by: z.string(),
+    byName: z.string(),
+    at: z.number()
+});
+
+export type Forced = z.infer<typeof forcedSchema>;
+
 /**
  * A player an event took somewhere, and everything needed to put them back:
  * where they stood, which way they faced, in which world, and the game mode
@@ -213,6 +224,8 @@ export const runSchema = z.object({
     /** Everybody kept out because what they carried could not all be put away
      *  safely, and why (`stash-service`). */
     keptOut: z.array(keptOutSchema).default([]),
+    /** Who was brought in from the Events screen (`forceJoin`). */
+    forced: z.array(forcedSchema).default([]),
     /** Its results are being handed out; never played again from here. */
     finishing: z.boolean().default(false),
     /** Treasure hunt: every chest it put down, and who opened each. Kept so the

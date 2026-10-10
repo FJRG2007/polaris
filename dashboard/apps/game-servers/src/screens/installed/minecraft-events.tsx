@@ -13,6 +13,7 @@
 import * as ui from "@polaris/ui";
 import * as actions from "./events-actions";
 import { EventEditor } from "./event-editor";
+import { type ForceChoice, ForceJoinDialog } from "./force-join-dialog";
 import type { GameKey } from "../../../messages";
 import { hostUi } from "@polaris/app-host/client";
 import { CATCH_LABELS } from "./event-options-rare-catch";
@@ -40,7 +41,8 @@ import {
     Plus,
     RotateCcw,
     Square,
-    Trash2
+    Trash2,
+    UserPlus
 } from "lucide-react";
 
 const { useConfirm } = hostUi.confirmDialog;
@@ -747,6 +749,9 @@ export function MinecraftEvents({
     );
     const [pending, startTransition] = useTransition();
     const [confirm, confirmElement] = useConfirm();
+    /** The "Bring players in" dialog: open, and what the server refused it with. */
+    const [forcing, setForcing] = useState(false);
+    const [forceError, setForceError] = useState<string | null>(null);
     const [now, setNow] = useState(() => Date.now());
 
     const accept = useCallback(
@@ -905,6 +910,31 @@ export function MinecraftEvents({
             const answer = await actions.cancelEventAction(installedAppId);
             if (answer.view) accept(answer.view, false);
             else setError(answer.error ?? t("events.errors.cancel"));
+        });
+    }
+
+    function bringIn(choice: ForceChoice): void {
+        setForceError(null);
+        setNote(null);
+        startTransition(async () => {
+            const answer = await actions.forceJoinAction({ installedAppId, ...choice });
+            if (!answer.view) {
+                setForceError(answer.error ?? t("events.errors.forceJoin"));
+                return;
+            }
+            accept(answer.view, false);
+            setForcing(false);
+            const offline = answer.offline ?? [];
+            setNote(
+                [
+                    t("events.broughtIn", { count: answer.brought ?? 0 }),
+                    offline.length > 0
+                        ? t("events.broughtSkipped", { names: offline.join(", ") })
+                        : null
+                ]
+                    .filter(Boolean)
+                    .join(" ")
+            );
         });
     }
 
@@ -1087,6 +1117,21 @@ export function MinecraftEvents({
                                         {t("events.startNow")}
                                     </ui.Button>
                                 )}
+                                {/* A snapshot kept from before these fields were sent has none. */}
+                                {view.run.takesForced === true && (
+                                    <ui.Button
+                                        variant="secondary"
+                                        size="sm"
+                                        disabled={pending}
+                                        onClick={() => {
+                                            setForceError(null);
+                                            setForcing(true);
+                                        }}
+                                    >
+                                        <UserPlus className="size-4" />
+                                        {t("events.bringIn")}
+                                    </ui.Button>
+                                )}
                                 <ui.Button
                                     variant="secondary"
                                     size="sm"
@@ -1118,6 +1163,32 @@ export function MinecraftEvents({
                                 </li>
                             ))}
                         </ol>
+                    )}
+                    {view?.run && (view.run.forced?.length ?? 0) > 0 && (
+                        <div className="flex flex-col gap-1 text-xs text-muted-foreground">
+                            <p className="font-medium text-foreground">{t("events.broughtList")}</p>
+                            <ul className="flex flex-wrap gap-x-3 gap-y-0.5">
+                                {view.run.forced.map((one) => (
+                                    <li
+                                        key={`${one.name}-${one.at}`}
+                                        className="min-w-0 max-w-full truncate"
+                                        title={display.dateTime(one.at)}
+                                    >
+                                        {t("events.broughtBy", { name: one.name, by: one.byName })}
+                                    </li>
+                                ))}
+                            </ul>
+                        </div>
+                    )}
+                    {forcing && view?.run && (
+                        <ForceJoinDialog
+                            online={view.run.online ?? []}
+                            inEvent={view.run.inEvent ?? []}
+                            pending={pending}
+                            error={forceError}
+                            onClose={() => setForcing(false)}
+                            onConfirm={bringIn}
+                        />
                     )}
                     {view && settings?.random.enabled && (
                         <DrawStatus

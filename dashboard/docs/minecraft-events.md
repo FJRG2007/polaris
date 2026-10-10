@@ -162,6 +162,12 @@ Rare catch, Bingo rush, Boss fishing) leave the world alone.
 6. Otherwise one is drawn by weight, never the same kind twice in a row when
    there is another; the next is a gap after it ends.
 
+An event it did not draw pushes it back too (`plan.rearmed`): one started from
+the screen or a schedule moves the next draw to a whole gap after that event is
+due to end, and any event's end - drawn or not, finished or called off - leaves
+at least `minGap` before the next one. Pressing Run never has a drawn event land
+right behind it.
+
 "Run a random event" on the screen draws one now among those whose conditions
 hold, ignoring the hours, the gap and fights, and lists why the others were
 left out.
@@ -492,6 +498,12 @@ left out.
   again, and orange platforms that vanish for two seconds in every six
   (`parkour.blinkLines`). Never two in a row, never a checkpoint; a fall is only
   ever back to the last checkpoint.
+- **Parkour** racers cannot push each other off a jump: they are on a team of
+  their own (`parkour.NO_PUSH_TEAM`) with `collisionRule never` and
+  `friendlyFire false`, as hide-and-seek keeps its sides from hurting their
+  own. Only a player on none of the server's own teams is put on it, so a
+  server's ranks keep their prefix; the team is made with the course's scores
+  and removed with them, and somebody leaving early is taken off it.
 - **Parkour** also has climbs - three up a ladder or a vine on a column, the
   climb hung after the column and taken down before it - and moving platforms
   that swap between two places a step apart every three seconds. Each course
@@ -1367,6 +1379,15 @@ A new kind follows all of them. A change to an old kind must not undo one.
   number.** A race's finish (`catalog.finishedIn`) is kept above any
   progress so it always ranks first; shown back raw it read as a count of
   seconds in the thousands instead of the time it took (`1715ffef0`).
+- **Players can be brought into an event players join from the screen**
+  ("Bring players in"): everybody on the server not in it yet, or the ones
+  ticked from who is on. Each is read on the loop's next look at the chat as
+  having typed `join` (`events-service.forceJoin`), so the event treats them
+  exactly as a typed join - greeted, listed, kept out if still owed a trip
+  back. Offered through the countdown, and while a race that lets latecomers
+  in is on (`catalog.joinsWhileOn`); an arena's sides, a spleef's and an acid
+  rain's are made once at the start. Who brought whom is kept on the run
+  (`run.forced`), shown under it, and audited (`games.events.force-join`).
 - **Done on a new event saves it as it opens.** The same guard that holds
   Done disabled until a saved event is changed also held it disabled for
   one just added, where nothing has to change first - its defaults are a

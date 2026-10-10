@@ -2530,6 +2530,43 @@ describe("the minute sweep", () => {
         expect(state().run?.trigger).toBe("random");
     });
 
+    it("waits a whole gap after an event pressed on from the screen, not the gap it had left", async () => {
+        const fish = { ...newPreset("fishing", "fish"), minutes: 5 };
+        setUp([fish], {
+            minActive: 1,
+            random: {
+                enabled: true,
+                days: [],
+                from: "00:00",
+                to: "23:59",
+                minGap: 15,
+                maxGap: 15,
+                pool: [{ presetId: "fish", weight: 1 }]
+            }
+        });
+        await events.sweepEvents();
+        const armed = state().nextRandomAt!;
+        // Ten minutes on, five before the draw was due, one is started by hand.
+        await play(10 * 60_000);
+        await events.startEvent({
+            ownerId: "owner",
+            installedAppId: SERVER,
+            presetId: "fish",
+            trigger: "manual",
+            startedBy: null
+        });
+        const run = state().run!;
+        expect(state().nextRandomAt).toBe(run.endsAt + 15 * 60_000);
+        expect(state().nextRandomAt).toBeGreaterThan(armed);
+        // Called off a minute in: still a whole gap after it ended, at the least.
+        await play(60_000);
+        await events.cancelEvent("owner", SERVER);
+        await play(4_100);
+        expect(state().run).toBeNull();
+        const ended = state().history[0]!.endedAt;
+        expect(state().nextRandomAt).toBeGreaterThanOrEqual(ended + 15 * 60_000);
+    });
+
     it("does not open an event players join with fewer on the server than must join it", async () => {
         world.online = ["Ana", "Ben"];
         setUp([{ ...newPreset("build-battle", "build"), minutes: 10 }]);
@@ -5910,6 +5947,24 @@ describe("a parkour race", () => {
             difficulty: "medium" as const,
             height: 30
         }
+    });
+
+    it("keeps its racers from pushing each other, and lets them go after", async () => {
+        world.online = ["Ana", "Ben"];
+        setUp([race()]);
+        await startArena("race");
+        await play(2_100);
+        chat(["Ana", "join"], ["Ben", "join"]);
+        await play(42_100);
+        expect(world.sent).toContain("team modify pe_parkour collisionRule never");
+        expect(world.sent).toContain("team modify pe_parkour friendlyFire false");
+        // Onto it only from no team of the server's own.
+        expect(world.sent).toContain(
+            "execute if entity @a[name=Ana,team=] run team join pe_parkour Ana"
+        );
+        await events.cancelEvent("owner", SERVER);
+        await play(10_100);
+        expect(world.sent).toContain("team remove pe_parkour");
     });
 
     it("counts a checkpoint only from the one before it, and sends back whoever got past the next", async () => {
@@ -10014,6 +10069,72 @@ describe("the clock", () => {
         expect(
             world.sent.some((line) => line.startsWith("tellraw @a") && line.includes("starts in"))
         ).toBe(true);
+    });
+});
+
+describe("players brought in from the Events screen", () => {
+    const race = () => ({
+        ...newPreset("parkour", "race"),
+        minutes: 5,
+        options: {
+            place: { mode: "players" as const },
+            jumps: 12,
+            difficulty: "medium" as const,
+            height: 30
+        }
+    });
+    const force = (everybody: boolean, players: string[] = []) =>
+        events.forceJoin({
+            ownerId: "owner",
+            installedAppId: SERVER,
+            everybody,
+            players,
+            by: "user-1",
+            byName: "Op"
+        });
+
+    it("joins the chosen ones as if they had typed it, and keeps who brought them", async () => {
+        world.online = ["Ana", "Ben", "Cy"];
+        setUp([race()]);
+        await startArena("race");
+        await play(2_100);
+        chat(["Ana", "join"]);
+        await play(2_100);
+        const outcome = await force(false, ["ben", "Zed"]);
+        // As the game spells them, and who of the chosen is not on.
+        expect(outcome).toEqual({ brought: ["Ben"], offline: ["Zed"] });
+        await play(2_100);
+        expect(state().run!.stage!.joined).toEqual(["Ana", "Ben"]);
+        expect(state().run!.forced).toEqual([
+            { name: "Ben", by: "user-1", byName: "Op", at: expect.any(Number) }
+        ]);
+        expect(world.sent.some((line) => line.includes("Ben") && line.includes("You are in"))).toBe(
+            true
+        );
+        // Everybody: only who is not in yet. Then nobody is left to bring.
+        expect((await force(true)).brought).toEqual(["Cy"]);
+        await play(2_100);
+        expect(state().run!.stage!.joined).toEqual(["Ana", "Ben", "Cy"]);
+        expect(await refusal(force(true))).toBe("They are all in it already");
+        const view = await events.eventsView(SERVER);
+        expect(view.run).toMatchObject({ takesForced: true, inEvent: ["Ana", "Ben", "Cy"] });
+        expect(view.run!.forced.map((one) => one.name)).toEqual(["Ben", "Cy"]);
+        // An arena's sides are made at its start: in through its countdown only.
+        const arena = { ...state().run!, preset: newPreset("hot-potato", "potato") };
+        expect(events.takesForced({ ...arena, phase: "countdown" })).toBe(true);
+        expect(events.takesForced({ ...arena, phase: "running" })).toBe(false);
+        expect(events.takesForced({ ...state().run!, phase: "running" })).toBe(true);
+    });
+
+    it("is refused for an event nobody joins, and with none on", async () => {
+        world.online = ["Ana", "Ben"];
+        setUp([{ ...newPreset("mob-hunt", "hunt"), minutes: 10 }]);
+        await startArena("hunt");
+        expect(await refusal(force(true))).toBe("This event is not one players join");
+        expect(await refusal(force(false, ["Ana"]))).toBe("This event is not one players join");
+        await events.cancelEvent("owner", SERVER);
+        await play(4_100);
+        expect(await refusal(force(true))).toBe("No event is on");
     });
 });
 

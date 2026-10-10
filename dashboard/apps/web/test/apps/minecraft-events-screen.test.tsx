@@ -95,8 +95,33 @@ vi.mock("@polaris-app/game-servers/src/screens/installed/events-actions", () => 
         retriedArenas.push(input.id);
         return { view: { ...view, arenaRemains: [] }, outcome: "cleared" };
     },
-    dismissArenaAction: async () => ({ view: { ...view, arenaRemains: [] } })
+    dismissArenaAction: async () => ({ view: { ...view, arenaRemains: [] } }),
+    forceJoinAction: async (input: { who: string; players?: string[] }) => {
+        forcedAsks.push(input);
+        return {
+            view: { ...view, run: { ...joinable, forced: [{ name: "Ben", byName: "Op", at: 0 }] } },
+            brought: 1,
+            offline: []
+        };
+    }
 }));
+
+const forcedAsks: { who: string; players?: string[] }[] = [];
+const joinable = {
+    presetId: "pk",
+    name: "Parkour race",
+    kind: "parkour",
+    phase: "countdown",
+    startsAt: Date.now() + 60_000,
+    endsAt: Date.now() + 360_000,
+    trigger: "manual",
+    cancelling: false,
+    standings: [],
+    takesForced: true,
+    inEvent: ["Ana"],
+    forced: [],
+    online: ["Ana", "Ben", "Cy"]
+};
 
 const retried: string[] = [];
 const retriedArenas: string[] = [];
@@ -323,6 +348,31 @@ describe("the Events tab", () => {
         expect(row.parentElement?.className).toContain("min-w-0");
         fireEvent.click(screen.getByLabelText("What Mining rush is"));
         expect(screen.getByText("Prizes - everybody: 8 experience bottle.")).toBeTruthy();
+    });
+
+    it("brings the chosen players into the event on now, offering only who is not in", async () => {
+        render(<MinecraftEvents installedAppId="00000000-0000-4000-8000-000000000001" canManage />);
+        answerRead({ view: { ...view, run: joinable } });
+        fireEvent.click(await screen.findByRole("button", { name: "Bring players in" }));
+        // Ana is in already: not offered.
+        expect(screen.queryByText("Ana")).toBeNull();
+        expect(screen.getByText("Everybody on the server (2)")).toBeTruthy();
+        // Nobody chosen yet: nothing to confirm.
+        expect(
+            screen.getByRole("button", { name: "Bring players in" }).hasAttribute("disabled")
+        ).toBe(true);
+        fireEvent.click(screen.getByLabelText("Ben"));
+        fireEvent.click(screen.getByRole("button", { name: "Bring 1 player in" }));
+        await waitFor(() =>
+            expect(forcedAsks).toEqual([
+                {
+                    installedAppId: "00000000-0000-4000-8000-000000000001",
+                    who: "chosen",
+                    players: ["Ben"]
+                }
+            ])
+        );
+        expect(await screen.findByText("Ben, by Op")).toBeTruthy();
     });
 
     it("draws its sections before the server answers", () => {
