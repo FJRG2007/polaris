@@ -72,7 +72,7 @@ final class EventCommands {
                                                                                         DoubleArgumentType.getDouble(context, "x"),
                                                                                         DoubleArgumentType.getDouble(context, "y"),
                                                                                         DoubleArgumentType.getDouble(context, "z"),
-                                                                                        FloatArgumentType.getFloat(context, "yaw")))))))))))
+                                                                                        FloatArgumentType.getFloat(context, "yaw"))))))))))))
                         .then(Commands.literal("list").then(Commands.argument("key", StringArgumentType.word())
                                 .executes(context -> answer(context, server -> EventRespawn.list(key(context))))))
                         .then(Commands.literal("clear").then(Commands.argument("key", StringArgumentType.word())
