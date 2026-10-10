@@ -75,7 +75,7 @@ final class EventRespawn implements Listener {
         Player player = Bukkit.getPlayerExact(name);
         if (player == null) return SoundPack.refused("offline");
         NamespacedKey world = NamespacedKey.fromString(dimension);
-        if (world == null || Bukkit.getWorld(world) == null) return SoundPack.refused("badWorld");
+        if (world == null || worldOf(world) == null) return SoundPack.refused("badWorld");
         spots.put(player.getUniqueId(), new Spot(key, player.getName(), world, x, y, z, yaw));
         JsonObject reply = new JsonObject();
         reply.addProperty("ok", true);
@@ -110,9 +110,16 @@ final class EventRespawn implements Listener {
             spots.remove(player.getUniqueId());
             return;
         }
-        World world = Bukkit.getWorld(spot.world());
+        World world = worldOf(spot.world());
         if (world == null) return;
         event.setRespawnLocation(new Location(world, spot.x(), spot.y(), spot.z(), spot.yaw(), 0.0F));
+    }
+
+    /** A loaded world by its key: the Spigot API this compiles against has no
+     *  getWorld(NamespacedKey), only Paper's newer one does. */
+    private static World worldOf(NamespacedKey key) {
+        for (World world : Bukkit.getWorlds()) if (world.getKey().equals(key)) return world;
+        return null;
     }
 
     @EventHandler
