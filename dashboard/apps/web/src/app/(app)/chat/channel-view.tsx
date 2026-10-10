@@ -2458,7 +2458,8 @@ export function ChannelView({
                         // panel, and scrolling to it is what a reader expects.
                         if (hit.channelId !== channelId) router.push(`/chat/c/${hit.channelId}`);
                         else {
-                            if (!window.matchMedia?.("(min-width: 768px)").matches) setSearching(false);
+                            if (!window.matchMedia?.("(min-width: 768px)").matches)
+                                setSearching(false);
                             void jumpTo(hit.message.id);
                         }
                     }}

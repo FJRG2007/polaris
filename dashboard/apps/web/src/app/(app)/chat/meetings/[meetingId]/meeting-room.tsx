@@ -38,7 +38,17 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { MeetingDetailsDialog } from "../meeting-details-dialog";
 import { useLobbyAdmission } from "@/app/(app)/chat/use-lobby-admission";
 import { PeoplePicker, type PickedPerson } from "@/components/people-picker";
-import { ArrowLeft, Crown, Link2, LogOut, Loader2, Pencil, UserMinus, UserPlus, Video } from "lucide-react";
+import {
+    ArrowLeft,
+    Crown,
+    Link2,
+    LogOut,
+    Loader2,
+    Pencil,
+    UserMinus,
+    UserPlus,
+    Video
+} from "lucide-react";
 import {
     Button,
     ConfirmDeleteDialog,
@@ -204,7 +214,9 @@ export function MeetingRoom({ meetingId, viewerId }: { meetingId: string; viewer
                         {about && (
                             <span className="text-muted-foreground">
                                 {" - "}
-                                {about.mine ? t("meetingRoom.youAreHosting") : t("meetingRoom.hostedBy", { name: about.hostName })}
+                                {about.mine
+                                    ? t("meetingRoom.youAreHosting")
+                                    : t("meetingRoom.hostedBy", { name: about.hostName })}
                                 {about.scheduledAt ? `, ${format.dateTime(about.scheduledAt)}` : ""}
                             </span>
                         )}
@@ -417,7 +429,9 @@ function HostPanel({
         // Held short on a phone, where it shares the screen with the call and the
         // chat; the people in it scroll inside.
         <section className="max-h-[25dvh] shrink-0 overflow-y-auto border-t border-border px-4 py-3 lg:max-h-none">
-            <h2 className="text-xs font-medium text-muted-foreground">{t("meetingRoom.hosting")}</h2>
+            <h2 className="text-xs font-medium text-muted-foreground">
+                {t("meetingRoom.hosting")}
+            </h2>
 
             <div className="mt-2 flex flex-col gap-2">
                 <label className="flex items-center justify-between gap-4">
@@ -455,7 +469,9 @@ function HostPanel({
                             <span className="min-w-0 flex-1 truncate text-xs">
                                 {person.name}
                                 {person.guest && (
-                                    <span className="text-muted-foreground">{t("meetingRoom.guestSuffix")}</span>
+                                    <span className="text-muted-foreground">
+                                        {t("meetingRoom.guestSuffix")}
+                                    </span>
                                 )}
                             </span>
                             {!person.self && (
@@ -472,7 +488,9 @@ function HostPanel({
                                                 ? t("meetingRoom.onlySomebodyWithAPolaris")
                                                 : t("meetingRoom.makeHost", { name: person.name })
                                         }
-                                        aria-label={t("meetingRoom.makeHost", { name: person.name })}
+                                        aria-label={t("meetingRoom.makeHost", {
+                                            name: person.name
+                                        })}
                                         disabled={person.guest}
                                         onClick={async () => {
                                             const result = await runAction(
@@ -488,7 +506,9 @@ function HostPanel({
                                         size="icon-xs"
                                         variant="ghost"
                                         title={t("meetingRoom.removeNamed", { name: person.name })}
-                                        aria-label={t("meetingRoom.removeNamed", { name: person.name })}
+                                        aria-label={t("meetingRoom.removeNamed", {
+                                            name: person.name
+                                        })}
                                         onClick={() =>
                                             setRemoving({ id: person.id, name: person.name })
                                         }
@@ -508,7 +528,11 @@ function HostPanel({
                 name={removing?.name ?? ""}
                 kind="person"
                 requireTyping={false}
-                title={removing ? t("meetingRoom.removeQuestion", { name: removing.name }) : t("meetingRoom.removeThem")}
+                title={
+                    removing
+                        ? t("meetingRoom.removeQuestion", { name: removing.name })
+                        : t("meetingRoom.removeThem")
+                }
                 question={t.rich("meetingRoom.removeConfirm", {
                     name: removing?.name ?? "",
                     strong: (chunks) => (

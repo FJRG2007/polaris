@@ -79,7 +79,9 @@ export function MeetingsView() {
                     <ArrowLeft className="size-4" />
                 </Link>
                 <Video className="size-4 shrink-0 text-muted-foreground" />
-                <h1 className="min-w-0 flex-1 truncate text-sm font-medium">{t("meetings.meetings")}</h1>
+                <h1 className="min-w-0 flex-1 truncate text-sm font-medium">
+                    {t("meetings.meetings")}
+                </h1>
                 {may.meetings && (
                     <Button size="sm" onClick={() => setCreating(true)}>
                         <Plus className="size-4" />
@@ -89,9 +91,7 @@ export function MeetingsView() {
             </header>
 
             <div className="flex flex-col gap-3 p-4">
-                <p className="text-xs text-muted-foreground">
-                    {t("meetings.aRoomWithALink")}
-                </p>
+                <p className="text-xs text-muted-foreground">{t("meetings.aRoomWithALink")}</p>
 
                 {error && (
                     <p role="alert" className="text-sm text-danger">
@@ -131,13 +131,17 @@ export function MeetingsView() {
                                                 <span>
                                                     {meeting.mine
                                                         ? t("meetings.youAreHosting")
-                                                        : t("meetingRoom.hostedBy", { name: meeting.hostName })}
+                                                        : t("meetingRoom.hostedBy", {
+                                                              name: meeting.hostName
+                                                          })}
                                                 </span>
                                                 <span>{whenIs(meeting, format.dateTime)}</span>
                                                 {meeting.present > 0 && (
                                                     <span className="flex items-center gap-1 text-success">
                                                         <Users className="size-3.5 shrink-0" />
-                                                        {t("meetings.present", { count: meeting.present })}
+                                                        {t("meetings.present", {
+                                                            count: meeting.present
+                                                        })}
                                                     </span>
                                                 )}
                                                 {meeting.requireAccount && (
@@ -165,7 +169,9 @@ export function MeetingsView() {
                                                 }}
                                             >
                                                 <Link2 className="size-3.5" />
-                                                {copied === meeting.id ? t("meetings.copied") : t("meetings.copyLink")}
+                                                {copied === meeting.id
+                                                    ? t("meetings.copied")
+                                                    : t("meetings.copyLink")}
                                             </Button>
                                         )}
                                         {meeting.mine && (
@@ -173,7 +179,9 @@ export function MeetingsView() {
                                                 size="icon-xs"
                                                 variant="secondary"
                                                 title={t("meetings.renameOrReschedule")}
-                                                aria-label={t("meetings.renameNamed", { name: meeting.title })}
+                                                aria-label={t("meetings.renameNamed", {
+                                                    name: meeting.title
+                                                })}
                                                 onClick={() => setEditing(meeting)}
                                             >
                                                 <Pencil className="size-3.5" />
@@ -284,7 +292,8 @@ function NewMeetingDialog({
                 <div className="flex flex-col gap-4">
                     <label className="flex flex-col gap-1.5">
                         <span className="text-xs font-medium">
-                            {t("meetings.name")}<span className="text-danger"> *</span>
+                            {t("meetings.name")}
+                            <span className="text-danger"> *</span>
                         </span>
                         <Input
                             autoFocus
