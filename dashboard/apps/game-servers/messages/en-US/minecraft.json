@@ -2007,6 +2007,8 @@
         "arenaUncounted": "could not be counted",
         "clearArenaNow": "Take it down again",
         "arenaCleared": "That space is empty now.",
+        "arenaRetrying": "Taking it down again. It is checked again within a minute.",
+        "arenaBeingCleared": "being taken down again",
         "arenaStillThere": "Some blocks are still there. Break them by hand in the game, then dismiss.",
         "copyArenaBox": "Copy the corners",
         "dismissArena": "Dismiss",

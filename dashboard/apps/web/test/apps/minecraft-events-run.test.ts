@@ -2665,8 +2665,47 @@ describe("the minute sweep", () => {
         expect(await events.retryArena(SERVER, "old")).toBe("left");
         const [held] = state().arenaLeftovers;
         expect(held).toMatchObject({ id: "old", checks: 3, remains: 2 });
+        // Left for the operator again: its chunks let go.
+        expect(world.sent).toContain(
+            "execute in minecraft:overworld run forceload remove 0 0 10 10"
+        );
         world.solidCount = 0;
         expect(await events.retryArena(SERVER, "old")).toBe("cleared");
+        expect(state().arenaLeftovers).toEqual([]);
+    });
+
+    it("leaves a retried arena to the sweep, still shown, while its chunks are loading", async () => {
+        setUp([newPreset("fishing", "fish")]);
+        const box = { x1: 0, y1: 100, z1: 0, x2: 10, y2: 110, z2: 10 };
+        config[catalog.EVENT_STATE_KEY] = {
+            arenaLeftovers: [
+                {
+                    id: "old",
+                    kind: "sky-wars",
+                    arena: { box, blocks: ["minecraft:stone"] },
+                    marker: null,
+                    kit: [],
+                    entrants: [],
+                    checks: 3,
+                    remains: 5,
+                    createdAt: Date.now()
+                }
+            ]
+        };
+        world.unloadedBlock = "minecraft:stone";
+        expect(await events.retryArena(SERVER, "old")).toBe("later");
+        // Held loaded for the sweep, not left for the operator with its chunks held.
+        const [held] = state().arenaLeftovers;
+        expect(held).toMatchObject({ id: "old", checks: 2, remains: 5 });
+        expect(world.sent).not.toContain(
+            "execute in minecraft:overworld run forceload remove 0 0 10 10"
+        );
+        expect((await events.eventsView(SERVER)).arenaRemains).toEqual([
+            { id: "old", kind: "sky-wars", box, count: 5, retrying: true }
+        ]);
+        world.unloadedBlock = null;
+        world.solidCount = 0;
+        await events.sweepEvents();
         expect(state().arenaLeftovers).toEqual([]);
     });
 

@@ -2007,6 +2007,8 @@
         "arenaUncounted": "no se pudieron contar",
         "clearArenaNow": "Volver a desmontarla",
         "arenaCleared": "Ese espacio ya está vacío.",
+        "arenaRetrying": "Desmontándola de nuevo. Se vuelve a comprobar en menos de un minuto.",
+        "arenaBeingCleared": "desmontándose de nuevo",
         "arenaStillThere": "Aún quedan bloques. Rómpelos a mano en el juego y luego descártalo.",
         "copyArenaBox": "Copiar las esquinas",
         "dismissArena": "Descartar",
