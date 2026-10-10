@@ -213,6 +213,8 @@ final class SoundPack implements Listener, CommandExecutor {
             // that would reload the player's game a second time.
             if (early != null && !SoundConfig.differs(early.pack(), current.pack())) settle(player, early.state());
             else push(player, current.pack());
+        } else if (early != null) {
+            player.removeResourcePack(early.pack().id());
         }
     }
 

@@ -142,10 +142,12 @@ final class SoundPack {
      */
     void onConfigure(RegisterConfigurationTasksEvent event) {
         // An answer kept from an earlier attempt to join no longer counts.
-        if (event.getListener() instanceof ServerConfigurationPacketListenerImpl joining)
-            handed.remove(joining.getOwner().getId());
+        UUID player = event.getListener() instanceof ServerConfigurationPacketListenerImpl joining
+                ? joining.getOwner().getId() : null;
+        if (player != null) handed.remove(player);
         SoundConfig.Pack pack = config.pack();
         if (pack == null) return;
+        if (player != null) hand(player, pack, "pending");
         event.register(new ServerResourcePackConfigurationTask(new MinecraftServer.ServerResourcePackInfo(
                 pack.id(), pack.url(), pack.sha1(), pack.required(), pack.prompt().map(Component::literal).orElse(null))));
     }
@@ -153,14 +155,19 @@ final class SoundPack {
     /** A joining player's answer to the pack, on the game thread; see {@link #onResponse}. */
     boolean onJoiningResponse(ServerConfigurationPacketListenerImpl listener, UUID packId,
             ServerboundResourcePackPacket.Action action) {
-        SoundConfig.Pack pack = config.pack();
-        if (pack == null || !pack.id().equals(packId)) return false;
-        long now = System.currentTimeMillis();
-        handed.values().removeIf(one -> now - one.at() > HANDED_FOR_MILLIS);
-        handed.put(listener.getOwner().getId(), new Handed(pack, SoundConfig.state(action.name()), now));
+        Handed offered = handed.get(listener.getOwner().getId());
+        if (offered == null || !offered.pack().id().equals(packId)) return false;
+        SoundConfig.Pack pack = offered.pack();
+        hand(listener.getOwner().getId(), pack, SoundConfig.state(action.name()));
         if (action == ServerboundResourcePackPacket.Action.DECLINED && pack.required())
             listener.disconnect(Component.translatable("multiplayer.requiredTexturePrompt.disconnect"));
         return true;
+    }
+
+    private void hand(UUID player, SoundConfig.Pack pack, String state) {
+        long now = System.currentTimeMillis();
+        handed.values().removeIf(one -> now - one.at() > HANDED_FOR_MILLIS);
+        handed.put(player, new Handed(pack, state, now));
     }
 
     @SubscribeEvent
@@ -179,6 +186,8 @@ final class SoundPack {
             // that would reload the player's game a second time.
             if (early != null && !SoundConfig.differs(early.pack(), current.pack())) settle(player, early.state());
             else push(player, current.pack());
+        } else if (early != null) {
+            player.connection.send(new ClientboundResourcePackPopPacket(Optional.of(early.pack().id())));
         }
     }
 
