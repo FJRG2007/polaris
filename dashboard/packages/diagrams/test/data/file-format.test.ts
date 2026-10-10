@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 
 /**
- * Files written before the editor was vendored carry the upstream format
- * identifiers. They still open; new files are written with Polaris's own.
+ * Diagram files, libraries, clipboard payloads and SVG exports are recognized
+ * by Polaris's own format identifiers, and by nothing else.
  */
 
 import { describe, expect, it } from "vitest";
@@ -22,27 +22,21 @@ function svgWith(payloadType: string, scene: object): string {
     return `<svg><metadata><!-- payload-type:${payloadType} --><!-- payload-version:2 --><!-- payload-start -->${base64}<!-- payload-end --></metadata></svg>`;
 }
 
-describe("legacy diagram files", () => {
-    it("accepts a scene saved under the upstream type", () => {
-        expect(isValidDiagramData({ type: "excalidraw", elements: [] })).toBe(true);
+describe("diagram file format", () => {
+    it("accepts a scene saved under the diagram type only", () => {
         expect(isValidDiagramData({ type: EXPORT_DATA_TYPES.diagram, elements: [] })).toBe(true);
         expect(isValidDiagramData({ type: "something-else", elements: [] })).toBe(false);
         expect(isValidDiagramData(undefined)).toBe(false);
     });
 
-    it("accepts a library saved under the upstream type", () => {
-        expect(isValidLibrary({ type: "excalidrawlib", version: 2, libraryItems: [] })).toBe(true);
+    it("accepts a library saved under the library type only", () => {
+        expect(isValidLibrary({ type: EXPORT_DATA_TYPES.diagramLibrary, version: 2, libraryItems: [] })).toBe(true);
         expect(isValidLibrary({ type: "other", version: 2, libraryItems: [] })).toBe(false);
         expect(JSON.parse(serializeLibraryAsJSON([])).type).toBe(EXPORT_DATA_TYPES.diagramLibrary);
     });
 
-    it("reads the scene from an SVG exported under the upstream MIME type", () => {
-        const scene = { type: "excalidraw", elements: [] };
-        expect(
-            JSON.parse(
-                decodeSvgBase64Payload({ svg: svgWith("application/vnd.excalidraw+json", scene) })
-            )
-        ).toEqual(scene);
+    it("reads the scene from an SVG exported under the diagram MIME type only", () => {
+        const scene = { type: EXPORT_DATA_TYPES.diagram, elements: [] };
         expect(
             JSON.parse(decodeSvgBase64Payload({ svg: svgWith(MIME_TYPES.diagram, scene) }))
         ).toEqual(scene);
@@ -51,12 +45,13 @@ describe("legacy diagram files", () => {
         ).toThrow("INVALID");
     });
 
-    it("recognizes the upstream file extensions", async () => {
-        expect(getMimeType("old.excalidraw")).toBe(MIME_TYPES.json);
+    it("recognizes the diagram file extensions", async () => {
         expect(getMimeType("saved.diagram")).toBe(MIME_TYPES.json);
-        const lib = await normalizeFile(new File(["{}"], "shapes.excalidrawlib"));
+        expect(getMimeType("saved.polaris-diagram")).toBe(MIME_TYPES.json);
+        expect(getMimeType("notes.txt")).toBe("");
+        const lib = await normalizeFile(new File(["{}"], "shapes.diagramlib"));
         expect(lib.type).toBe(MIME_TYPES.diagramlib);
-        const scene = await normalizeFile(new File(["{}"], "old.excalidraw"));
+        const scene = await normalizeFile(new File(["{}"], "saved.polaris-diagram"));
         expect(scene.type).toBe(MIME_TYPES.diagram);
     });
 });

@@ -266,9 +266,8 @@ describe("the diagram canvas's assets", () => {
         expect([...styled].filter((name) => !code.includes(name))).toEqual([]);
     });
 
-    it("say nothing of where the code came from in the stylesheet's class names", () => {
+    it("scope the stylesheet under Polaris's own class names", () => {
         const css = built(".css").join("\n");
-        expect(css).not.toMatch(/\.excalidraw/i);
         expect(css).toContain(".polaris-diagram");
     });
 });

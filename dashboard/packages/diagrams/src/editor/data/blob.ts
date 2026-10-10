@@ -76,7 +76,7 @@ export const getMimeType = (blob: Blob | string): string => {
     }
     name = blob.name || "";
   }
-  if (/\.(diagram|polaris-diagram|excalidraw|json)$/.test(name)) {
+  if (/\.(diagram|polaris-diagram|json)$/.test(name)) {
     return MIME_TYPES.json;
   } else if (/\.png$/.test(name)) {
     return MIME_TYPES.png;
@@ -95,7 +95,7 @@ export const getFileHandleType = (handle: FileSystemHandle | null) => {
 
   return (
     handle.name.match(
-      /\.(json|diagram|polaris-diagram|excalidraw|png|svg)$/,
+      /\.(json|diagram|polaris-diagram|png|svg)$/,
     )?.[1] || null
   );
 };
@@ -450,14 +450,14 @@ export const createFile = (
  * Note: doesn't handle missing .polaris-diagram/.diagramlib extension  */
 export const normalizeFile = async (file: File) => {
   if (!file.type) {
-    if (/\.(diagramlib|excalidrawlib)$/.test(file?.name ?? "")) {
+    if (/\.diagramlib$/.test(file?.name ?? "")) {
       file = createFile(
         await blobToArrayBuffer(file),
         MIME_TYPES.diagramlib,
         file.name,
       );
     } else if (
-      /\.(diagram|polaris-diagram|excalidraw)$/.test(file?.name ?? "")
+      /\.(diagram|polaris-diagram)$/.test(file?.name ?? "")
     ) {
       file = createFile(
         await blobToArrayBuffer(file),

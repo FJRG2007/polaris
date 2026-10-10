@@ -1399,7 +1399,7 @@ export function inArea(boxes: readonly Box[], area: BoxFrame): string[] {
 // ---------------------------------------------------------------------------
 
 /** How close, in pixels, an edge or a middle must come to another before it
- *  snaps to it - Excalidraw's distance, and about Google Slides'. */
+ *  snaps to it - about what whiteboards and Google Slides use. */
 export const SNAP_PX = 8;
 
 /** A line a box snapped to: across (`x`, an upright line at that x) or down
