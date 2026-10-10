@@ -72,9 +72,13 @@ public class MorphTuneScreen extends Screen {
       }
    }
 
+   /** A live tuning panel: the player model behind it has to stay sharp, so no menu blur and no dim, only the panel. */
+   public void renderBackground(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
+      g.fill(4, 4, 194, 48 + this.params.length * 20 + 30, -1072693224);
+   }
+
    public void render(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
-      int h = 48 + this.params.length * 20 + 30;
-      g.fill(4, 4, 194, h, -1072693224);
+      super.render(g, mouseX, mouseY, partialTick);
       g.drawString(this.font, "MORPH TUNING (dev)", 8, 10, -2576129, true);
       int y = 48;
 
@@ -84,8 +88,6 @@ public class MorphTuneScreen extends Screen {
          g.drawString(this.font, val, 52, y + 5, -1516304, false);
          y += 20;
       }
-
-      super.render(g, mouseX, mouseY, partialTick);
    }
 
    public void onClose() {

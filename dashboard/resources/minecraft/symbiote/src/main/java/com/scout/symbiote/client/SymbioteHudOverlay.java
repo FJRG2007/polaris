@@ -60,6 +60,7 @@ public final class SymbioteHudOverlay {
    private static final int SUB_W = 160;
    private static final int SUB_H = 28;
    private static final LayeredDraw.Layer HUNGER_AND_FX;
+   private static final LayeredDraw.Layer SCREEN_FX;
    private static final int ARM_SLOT_BOX = -871235562;
    private static final int ARM_SLOT_BORDER = -12972470;
    private static final int ARM_SLOT_BORDER_OFF = -11197918;
@@ -91,14 +92,37 @@ public final class SymbioteHudOverlay {
       g.blit(RenderType::guiTextured, tex, x, y, 0.0F, 0.0F, dw, dh, texW, texH, texW, texH, tint(r, gr, b, alpha));
    }
 
+   /**
+    * Each layer is anchored to the one before it, so the order is explicit rather than the reverse of the call order that
+    * repeated registerAbove on the same anchor produces. Full-screen tints sit just above the camera overlays, under the
+    * crosshair, hotbar and every status bar; the stamina bar and the symbiote's hunger row render after vanilla health,
+    * armor, food, vehicle health and air, so gui.leftHeight / gui.rightHeight already name the next free row.
+    */
    public static void register(RegisterGuiLayersEvent event) {
-      event.registerAbove(VanillaGuiLayers.HOTBAR, ResourceLocation.fromNamespaceAndPath("symbiote", "symbiote_mood_bleed"), MOOD_BLEED);
-      event.registerAbove(VanillaGuiLayers.HOTBAR, ResourceLocation.fromNamespaceAndPath("symbiote", "symbiote_control_pulse"), CONTROL_PULSE);
-      event.registerAbove(VanillaGuiLayers.HOTBAR, ResourceLocation.fromNamespaceAndPath("symbiote", "symbiote_arm_slots"), ARM_SLOTS);
-      event.registerAbove(VanillaGuiLayers.AIR_LEVEL, ResourceLocation.fromNamespaceAndPath("symbiote", "symbiote_command_mode"), COMMAND_MODE);
-      event.registerAbove(VanillaGuiLayers.AIR_LEVEL, ResourceLocation.fromNamespaceAndPath("symbiote", "symbiote_hud"), HUNGER_AND_FX);
-      event.registerAbove(VanillaGuiLayers.HOTBAR, ResourceLocation.fromNamespaceAndPath("symbiote", "symbiote_subtitle"), SUBTITLE);
-      event.registerAbove(VanillaGuiLayers.HOTBAR, ResourceLocation.fromNamespaceAndPath("symbiote", "symbiote_bond_pulse"), BOND_PULSE);
+      ResourceLocation controlPulse = id("symbiote_control_pulse");
+      ResourceLocation moodBleed = id("symbiote_mood_bleed");
+      ResourceLocation screenFx = id("symbiote_screen_fx");
+      ResourceLocation armSlots = id("symbiote_arm_slots");
+      ResourceLocation subtitle = id("symbiote_subtitle");
+      ResourceLocation hud = id("symbiote_hud");
+      event.registerAbove(VanillaGuiLayers.CAMERA_OVERLAYS, controlPulse, CONTROL_PULSE);
+      event.registerAbove(controlPulse, moodBleed, MOOD_BLEED);
+      event.registerAbove(moodBleed, screenFx, SCREEN_FX);
+      event.registerAbove(VanillaGuiLayers.HOTBAR, armSlots, ARM_SLOTS);
+      event.registerAbove(armSlots, subtitle, SUBTITLE);
+      event.registerAbove(subtitle, id("symbiote_bond_pulse"), BOND_PULSE);
+      event.registerAbove(VanillaGuiLayers.AIR_LEVEL, hud, HUNGER_AND_FX);
+      event.registerAbove(hud, id("symbiote_command_mode"), COMMAND_MODE);
+   }
+
+   private static ResourceLocation id(String path) {
+      return ResourceLocation.fromNamespaceAndPath("symbiote", path);
+   }
+
+   /** Vanilla only draws health, armor, food and air for a player who can be hurt; creative and spectator get none. */
+   private static boolean showsStatusBars() {
+      Minecraft mc = Minecraft.getInstance();
+      return mc.gameMode != null && mc.gameMode.canHurtPlayer() && mc.getCameraEntity() instanceof net.minecraft.world.entity.player.Player;
    }
 
    private static void drawDescentPips(GuiGraphics g, BondStage stage, int x, int y, int strainIdx) {
@@ -299,7 +323,7 @@ public final class SymbioteHudOverlay {
          int sw = g.guiWidth();
          int sh = g.guiHeight();
          if (!Minecraft.getInstance().options.hideGui) {
-            if (SymbioteClientState.isBonded()) {
+            if (SymbioteClientState.isBonded() && showsStatusBars()) {
                int strainIdx = SymbioteClientState.getStrain().ordinal();
                if (strainIdx < 0 || strainIdx >= TEX_HUNGER_FILL_S.length) {
                   strainIdx = 0;
@@ -307,8 +331,10 @@ public final class SymbioteHudOverlay {
 
                int leftStatusLeft = sw / 2 - 91;
                int barX = leftStatusLeft + -1;
-               int armorComp = Minecraft.getInstance().player != null && Minecraft.getInstance().player.getArmorValue() > 0 ? 0 : 10;
-               int barY = sh - gui.leftHeight - 13 + 11 + armorComp;
+               // The next free left row starts at sh - leftHeight and is 9 tall; the 13-tall bar shares its bottom edge
+               // and grows upward, then claims its height plus the 1px gap vanilla leaves between rows.
+               int barY = sh - gui.leftHeight - 4;
+               gui.leftHeight += 14;
                int stamina = SymbioteClientState.getStamina();
                int staminaMax = Math.max(1, SymbioteClientState.getStaminaMax());
                float sfrac = Math.max(0.0F, Math.min(1.0F, (float)stamina / staminaMax));
@@ -327,6 +353,7 @@ public final class SymbioteHudOverlay {
                float hpulse = starving ? 0.55F + 0.45F * (float)Math.sin(SymbioteClientState.getClientTick() / 4.0) : 1.0F;
                int rightStatusRight = sw / 2 + 91;
                int shankRowY = sh - gui.rightHeight;
+               gui.rightHeight += 10;
                int halves = Math.round(hunger / 5.0F);
 
                for (int ix = 0; ix < 10; ix++) {
@@ -339,7 +366,14 @@ public final class SymbioteHudOverlay {
                      blitTex(g, TEX_SHANK_HALF_S[strainIdx], ixx, shankRowY, 9, 9, hpulse);
                   }
                }
-
+            }
+         }
+      };
+      SCREEN_FX = (g, deltaTracker) -> {
+         int sw = g.guiWidth();
+         int sh = g.guiHeight();
+         if (!Minecraft.getInstance().options.hideGui) {
+            if (SymbioteClientState.isBonded()) {
                renderVignette(g, "vignette_red", -65536, sw, sh);
                renderVignette(g, "vignette_black", -16777216, sw, sh);
                renderVignette(g, "fire_panic_pulse", -32768, sw, sh);
@@ -371,9 +405,11 @@ public final class SymbioteHudOverlay {
                   int boxY = sh - 22;
                   boolean rightSide = mc.player == null || mc.player.getMainArm() == HumanoidArm.RIGHT;
                   int contraband = SymbioteClientState.getContrabandSlot();
+                  // The attack indicator, when set to the hotbar, sits on the main-hand side where these slots go.
+                  int indicatorGap = mc.options.attackIndicator().get() == net.minecraft.client.AttackIndicatorStatus.HOTBAR ? 22 : 0;
 
                   for (int ix = 0; ix < slots; ix++) {
-                     int x = rightSide ? hotbarRight + 3 + ix * 22 : hotbarLeft - 23 - ix * 22;
+                     int x = rightSide ? hotbarRight + 3 + indicatorGap + ix * 22 : hotbarLeft - 23 - indicatorGap - ix * 22;
                      drawArmSlot(g, x, boxY, SymbioteClientState.getArmSlot(ix), false, ix == contraband);
                   }
                }
@@ -415,8 +451,9 @@ public final class SymbioteHudOverlay {
                   Font font = Minecraft.getInstance().font;
                   int iconSz = 11;
                   int x = sw / 2 - 91;
-                  int armorComp = Minecraft.getInstance().player != null && Minecraft.getInstance().player.getArmorValue() > 0 ? 0 : 10;
-                  int y = sh - gui.leftHeight - 13 + 11 + armorComp - 15;
+                  // The chip's plate spans y - 2 .. y + iconSz + 2; its bottom meets the next free row's bottom edge.
+                  int y = sh - gui.leftHeight + 9 - iconSz - 2;
+                  gui.leftHeight += iconSz + 5;
                   float pulse = 0.72F + 0.28F * (float)Math.sin(SymbioteClientState.getClientTick() / 8.0);
                   int labelW = font.width(label);
                   g.fill(x - 2, y - 2, x + iconSz + 3 + labelW + 3, y + iconSz + 2, -2013265920);

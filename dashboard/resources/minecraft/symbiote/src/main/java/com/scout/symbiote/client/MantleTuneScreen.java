@@ -250,9 +250,13 @@ public class MantleTuneScreen extends Screen {
       }
    }
 
+   /** A live tuning panel: the player model behind it has to stay sharp, so no menu blur and no dim, only the panel. */
+   public void renderBackground(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
+      g.fill(2, 4, 188, 22 + this.activeParams().length * 15 + 116, -1072693224);
+   }
+
    public void render(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
-      int h = 22 + this.activeParams().length * 15 + 116;
-      g.fill(2, 4, 188, h, -1072693224);
+      super.render(g, mouseX, mouseY, partialTick);
       g.drawString(this.font, "MANTLE (dev): F5", 6, 9, -2576129, true);
       int y = 22;
       String group = null;
@@ -268,8 +272,6 @@ public class MantleTuneScreen extends Screen {
          g.drawString(this.font, String.format("%.2f", p.get().get()), 70, y + 3, -1516304, false);
          y += 15;
       }
-
-      super.render(g, mouseX, mouseY, partialTick);
    }
 
    private record Param(String group, String name, Supplier<Float> get, Consumer<Float> set, float step) {

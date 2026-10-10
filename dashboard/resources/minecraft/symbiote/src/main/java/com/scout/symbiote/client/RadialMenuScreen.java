@@ -38,8 +38,13 @@ public class RadialMenuScreen extends Screen {
       return false;
    }
 
-   public void render(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
+   /** A quick-pick wheel over the live game: a light dim, never the menu blur. */
+   public void renderBackground(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
       g.fill(0, 0, this.width, this.height, 1711276032);
+   }
+
+   public void render(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
+      super.render(g, mouseX, mouseY, partialTick);
       int cx = this.width / 2;
       int cy = this.height / 2;
       float dx = mouseX - cx;
@@ -151,8 +156,6 @@ public class RadialMenuScreen extends Screen {
          String gLabel = "Graft";
          g.drawString(this.font, gLabel, graftX - this.font.width(gLabel) / 2, statusY + 18 + 2, this.graftHovered ? -1 : -5205824, true);
       }
-
-      super.render(g, mouseX, mouseY, partialTick);
    }
 
    private static boolean integrating() {
