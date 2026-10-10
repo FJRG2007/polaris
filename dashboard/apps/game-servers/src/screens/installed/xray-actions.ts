@@ -32,10 +32,12 @@ import {
     engineRecords,
     type EngineRecord
 } from "../../lib/minecraft/polaris-anticheat-service";
+import { moddedServer } from "../../lib/minecraft/polaris-anticheat";
 
 const { recordAudit } = host.auditService;
 const { requireGameServer } = host.appsInstallAccess;
 const { readInstallConfig } = host.appsInstallConfig;
+const { listEnvVars } = host.envVarService;
 
 export interface XrayPlayer {
     readonly name: string;
@@ -66,6 +68,9 @@ export interface XrayView {
     readonly refusal: string | null;
     /** What Polaris's anti-cheat engine caught, per player, in the window. */
     readonly engine: readonly EngineRecord[];
+    /** Whether the server runs mods, where the engine's movement and block
+     *  checks are approximate. Missing from a view kept before it was read. */
+    readonly modded?: boolean;
 }
 
 async function viewOf(
@@ -75,19 +80,27 @@ async function viewOf(
 ): Promise<XrayView> {
     const row = await prisma.installedApp.findUnique({
         where: { id: installedAppId },
-        select: { config: true, catalogId: true }
+        select: { config: true, catalogId: true, applicationId: true }
     });
     const state = readXray(readInstallConfig(row?.config));
     const now = Date.now();
     const bedrock = editionOf(row?.catalogId ?? "minecraft") === "bedrock";
-    // Three trips - the stats files and the player list into the container, the
-    // engine's alerts to the database - that do not wait on each other.
-    const [mining, online, engine] = await Promise.all([
+    // Four trips - the stats files and the player list into the container, the
+    // engine's alerts and the server's software to the database - that do not
+    // wait on each other.
+    const [mining, online, engine, modded] = await Promise.all([
         withMining && !bedrock ? readAllMining(ownerId, installedAppId) : [],
         onlinePlayers(ownerId, installedAppId)
             .then((answer) => answer?.players ?? [])
             .catch(() => []),
-        bedrock ? [] : engineRecords(installedAppId).catch(() => [])
+        bedrock ? [] : engineRecords(installedAppId).catch(() => []),
+        row?.applicationId
+            ? listEnvVars("application", row.applicationId, ownerId)
+                  .then((vars) =>
+                      moddedServer(new Map(vars.map((one) => [one.key, one.value ?? ""])))
+                  )
+                  .catch(() => false)
+            : false
     ]);
     return {
         settings: state.settings,
@@ -117,7 +130,8 @@ async function viewOf(
             .filter((player) => player.incidents.length > 0),
         teleportCheck: state.settings.movement ? state.teleportCheck : null,
         refusal: bedrock ? (await gameWords("games"))("errors.bedrockKeepsNoPerPlayer") : null,
-        engine
+        engine,
+        modded
     };
 }
 

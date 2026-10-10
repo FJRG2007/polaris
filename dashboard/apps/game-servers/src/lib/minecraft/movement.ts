@@ -23,16 +23,20 @@
  * A teleport is a jump between two looks further than anybody could have
  * walked, ridden, glided or thrown a pearl, in the same dimension. Ruled out: a
  * change of dimension (a portal), a respawn (from the look that saw them die
- * until they are next seen moving, since the death screen can hold a player
- * for as long as they like before the respawn moves them), the first
+ * until they are next seen moving, since the death screen can hold a player for
+ * as long as they like before the respawn moves them), the first
  * `JOIN_GRACE_MS` after joining (a server that sends whoever connects to its
- * spawn), a vehicle or an elytra at any point since the last look, the End
- * (its gateways move you a thousand blocks), operators, and anything the
- * server log explains - a `/tp` by an
- * operator or the console (the game logs those while `logAdminCommands` is on,
- * which is its default; with it off the teleport check stands down, because an
- * operator's teleport can no longer be told apart), or a teleport command
- * somebody ran through a plugin (`/home`, `/spawn`, `/tpa`...). An ender pearl
+ * spawn), a vehicle or an elytra at any point since the last look, the End (its
+ * gateways move you a thousand blocks), operators, anybody inside a Polaris
+ * event at this look or the last (its own functions move them, and the game
+ * logs nothing a function does), and anything the server log explains - a `/tp`
+ * by an operator or the console (the game logs those while `logAdminCommands`
+ * is on, which is its default; with it off the teleport check stands down,
+ * because an operator's teleport can no longer be told apart), or a teleport
+ * command somebody ran through a plugin (`/home`, `/spawn`, `/tpa`...). A jump
+ * is judged one look after it is seen, against the log from two looks before
+ * it up to then, so a line written a moment late, or a teleport that waited a
+ * few seconds after its command, still explains it. An ender pearl
  * stasis chamber is the one legitimate thing left that looks the same, and the
  * screen says so.
  *
@@ -114,6 +118,13 @@ export const AIRBORNE_COMMAND = [
     "unless entity @s[nbt={ActiveEffects:[{Id:28}]}]",
     "run data get entity @s Pos"
 ].join(" ");
+
+/** Everybody carrying one of these tags right now, one command per tag: the
+ *  ones a Polaris event gives whoever it has inside (`xray-service` names them,
+ *  since the events read this module's state through `xray.ts`). */
+export function taggedCommands(tags: readonly string[]): string[] {
+    return tags.map((tag) => `execute as @a[tag=${tag}] run data get entity @s Dimension`);
+}
 
 /** Everybody on a horse, in a boat or a minecart right now. */
 export const RIDING_COMMAND =

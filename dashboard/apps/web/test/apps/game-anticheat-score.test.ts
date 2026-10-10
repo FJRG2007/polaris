@@ -34,6 +34,7 @@ import {
 import {
     MINING_WEIGHT_MAX,
     buildSuspects,
+    engineScore,
     levelOf,
     movementScore,
     xrayScore
@@ -310,6 +311,36 @@ describe("teleporting", () => {
         ).toBe(true);
     });
 
+    it("is explained by the lines a NeoForge server wrote for its own operators and events", () => {
+        // Copied from a real NeoForge 1.21.4 server's log: Polaris over RCON, an
+        // event's `execute as <player> run tp @s ...`, an operator pulling a
+        // player to them, a command block and a spread.
+        const neo =
+            "[10Oct2026 20:35:56.539] [Server thread/INFO] [net.minecraft.server.MinecraftServer/]: ";
+        for (const [line, name] of [
+            [
+                `${neo}[Rcon: Teleported ErMigue04 to -5385.500000, 152.000000, -2545.500000]`,
+                "ErMigue04"
+            ],
+            [
+                `${neo}[PICHURRINA: Teleported PICHURRINA to -5188.917219, 143.528720, -2513.849984]`,
+                "PICHURRINA"
+            ],
+            [`${neo}[FJRG2007: Teleported Reckmy to FJRG2007]`, "Reckmy"],
+            [`${neo}[FJRG2007: Teleported ErMigue04 to -5644.5, 125.0, -2403.5]`, "ErMigue04"],
+            [`${neo}[@: Teleported Reckmy to 10.5, 70.0, 10.5]`, "Reckmy"],
+            [
+                `${neo}[Rcon: Spread 3 entity/entities around -5487.5, -2544.5 with an average distance of 25.11 block(s) apart]`,
+                "Reckmy"
+            ]
+        ] as const) {
+            expect(explainedByLog(line, name), line).toBe(true);
+        }
+        expect(explainedByLog(`${neo}[FJRG2007: Teleported FJRG2007 to Reckmy]`, "Reckmy")).toBe(
+            false
+        );
+    });
+
     it("reads whether the game logs operators' commands", () => {
         expect(readLogAdmin("Gamerule logAdminCommands is currently set to: true")).toBe(true);
         expect(readLogAdmin("Gamerule logAdminCommands is currently set to: false")).toBe(false);
@@ -508,6 +539,40 @@ describe("the players list", () => {
         expect(suspects[1]).toMatchObject({ flights: 1, mining: figures(4, 300) });
         expect(suspects[2]).toMatchObject({ hits: 0, flights: 0, teleports: 0, mining: null });
         expect(incidents.map((one) => one.kind)).toEqual(["honeypot", "flying", "honeypot"]);
+    });
+
+    it("holds the engine's movement and block checks to Possible on a modded server", () => {
+        const engine = [
+            {
+                name: "Reckmy",
+                checks: [{ check: "Simulation", alerts: 38, lastAt: NOW }]
+            }
+        ];
+        const plain = buildSuspects({ honeypots: [], movement: [], mining: [], engine });
+        const modded = buildSuspects({
+            honeypots: [],
+            movement: [],
+            mining: [],
+            engine,
+            modded: true
+        });
+        expect(plain.suspects[0]?.engine.level).toBe("confirmed");
+        expect(modded.suspects[0]?.engine.level).toBe("possible");
+        expect(modded.suspects[0]?.engine.reasons.at(-1)).toMatch(/^Modded server/);
+    });
+
+    it("lists first the checks that set the level on a modded server", () => {
+        const checks = [
+            { check: "Simulation", alerts: 30 },
+            { check: "NoFall", alerts: 20 },
+            { check: "Timer", alerts: 10 },
+            { check: "Reach", alerts: 3 }
+        ];
+        const score = engineScore(checks, true);
+        expect(score.value).toBe(engineScore([{ check: "Reach", alerts: 3 }]).value);
+        expect(score.reasons[0]).toMatch(/Reach/);
+        expect(score.reasons.at(-1)).toMatch(/^Modded server/);
+        expect(engineScore(checks).reasons[0]).toMatch(/Simulation/);
     });
 
     it("lists whoever is online, even before the game has written their counts", () => {

@@ -11,7 +11,10 @@
  * every few seconds rather than move by move. Polaris's anti-cheat engine sees
  * every packet and compensates for latency, and it only reports a check once it
  * has failed past its own alert threshold, so it is the one signal besides the
- * honeypots that can reach "Confirmed" - on repeated alerts, never on one.
+ * honeypots that can reach "Confirmed" - on repeated alerts, never on one. On a
+ * modded server its movement and block checks are the exception: they model
+ * blocks and items the server's mods replace, so on their own they stop at
+ * "Possible" (`approximateOnMods`).
  *
  * Pure: the screen and the tests read the same answer.
  */
@@ -39,7 +42,8 @@ export type ScoreReason =
     | { readonly kind: "rate"; readonly ore: "diamond" | "debris"; readonly per: number }
     | { readonly kind: "flights"; readonly count: number }
     | { readonly kind: "teleports"; readonly count: number }
-    | { readonly kind: "engine"; readonly check: string; readonly alerts: number };
+    | { readonly kind: "engine"; readonly check: string; readonly alerts: number }
+    | { readonly kind: "modded" };
 
 /** The words a score's reasons are written in. */
 export type SuspicionText = Translator<GameKey<"minecraft">>;
@@ -73,6 +77,8 @@ export function reasonLine(reason: ScoreReason, t: SuspicionText = ENGLISH): str
                 count: reason.alerts
             });
         }
+        case "modded":
+            return t("xray.reasons.modded");
     }
 }
 
@@ -213,20 +219,90 @@ function alertsWeight(alerts: number): number {
     return 92;
 }
 
-export function engineScore(
+/**
+ * The checks that predict a player from the blocks and items around them and
+ * from the server keeping time: how they move through and on them, and how long
+ * a block takes to break or where one may go. On a modded server the engine only
+ * knows the mods' blocks and items through vanilla stand-ins - a server with a
+ * few mods has thousands of block states it does not model - and a heavy modpack
+ * runs below twenty ticks a second, so these fail for honest players there, and
+ * did on a real one: "Confirmed" on Simulation for somebody walking over modded
+ * blocks, FastBreak on cobblestone mined with a modded pick.
+ */
+const APPROXIMATE_ON_MODS: ReadonlySet<EngineCheckPart> = new Set<EngineCheckPart>([
+    "Simulation",
+    "GroundSpoof",
+    "NoFall",
+    "Timer",
+    "NoSlow",
+    "Sprint",
+    "AntiKB",
+    "Knockback",
+    "Explosion",
+    "Elytra",
+    "Vehicle",
+    "Phase",
+    "FarPlace",
+    "Place",
+    "FastBreak",
+    "FarBreak",
+    "Break"
+]);
+
+/** Block checks that read only the packets, not the block: as exact with mods. */
+const PACKET_ONLY: ReadonlySet<string> = new Set([
+    "MultiBreak",
+    "NoSwingBreak",
+    "MultiPlace",
+    "DuplicateRotPlace"
+]);
+
+/** Whether a check is only approximate on a modded server. */
+export function approximateOnMods(check: string): boolean {
+    const part = engineCheckPart(check);
+    return part !== null && APPROXIMATE_ON_MODS.has(part) && !PACKET_ONLY.has(check);
+}
+
+/** The most those checks reach on their own on a modded server: "Possible". */
+export const MODDED_APPROXIMATE_MAX = 55;
+
+function alertsValue(
     checks: readonly { readonly check: string; readonly alerts: number }[]
-): Score {
+): number {
     const alerts = checks.reduce((sum, one) => sum + one.alerts, 0);
-    if (alerts === 0) return scored(0, []);
+    if (alerts === 0) return 0;
     // Different checks failing is stronger than one check failing more: a
     // glitch the engine does not model trips the same check again.
-    const distinct = new Set(checks.filter((one) => one.alerts > 0).map((one) => one.check)).size;
-    const value = Math.min(98, alertsWeight(alerts) + Math.min(6, (distinct - 1) * 2));
-    const why = [...checks]
-        .filter((one) => one.alerts > 0)
-        .sort((left, right) => right.alerts - left.alerts)
+    const distinct = new Set(checks.map((one) => one.check)).size;
+    return Math.min(98, alertsWeight(alerts) + Math.min(6, (distinct - 1) * 2));
+}
+
+/**
+ * The engine's score. On a modded server (`modded`) the checks in
+ * `APPROXIMATE_ON_MODS` are scored apart and held to `MODDED_APPROXIMATE_MAX`,
+ * so only the others - aim, reach, packets, the X-Ray probe - can make a player
+ * "Likely" or "Confirmed" there. Worked out whenever it is read, so flags kept
+ * from before count the same way.
+ */
+export function engineScore(
+    checks: readonly { readonly check: string; readonly alerts: number }[],
+    modded = false
+): Score {
+    const failing = checks.filter((one) => one.alerts > 0);
+    if (failing.length === 0) return scored(0, []);
+    const approximate = modded ? failing.filter((one) => approximateOnMods(one.check)) : [];
+    const exact = modded ? failing.filter((one) => !approximateOnMods(one.check)) : failing;
+    const exactValue = alertsValue(exact);
+    const approximateValue = Math.min(MODDED_APPROXIMATE_MAX, alertsValue(approximate));
+    const value = Math.max(exactValue, approximateValue);
+    const byAlerts = (left: { alerts: number }, right: { alerts: number }) =>
+        right.alerts - left.alerts;
+    const [leading, trailing] =
+        exactValue >= approximateValue ? [exact, approximate] : [approximate, exact];
+    const why = [...[...leading].sort(byAlerts), ...[...trailing].sort(byAlerts)]
         .slice(0, 3)
         .map((one): ScoreReason => ({ kind: "engine", check: one.check, alerts: one.alerts }));
+    if (approximate.length > 0) why.push({ kind: "modded" });
     return scored(value, why);
 }
 
@@ -306,6 +382,9 @@ export function buildSuspects(input: {
      * written to disk yet - and reading as "not here" is not the same as "clean".
      */
     readonly players?: readonly string[];
+    /** Whether the server runs mods, which the engine's movement and block
+     *  checks only approximate (`engineScore`). */
+    readonly modded?: boolean;
 }): { suspects: Suspect[]; incidents: SuspectIncident[] } {
     const rows = new Map<
         string,
@@ -379,7 +458,7 @@ export function buildSuspects(input: {
             name: held.name,
             xray: xrayScore(held.hits.length, held.mining),
             movement: movementScore(flights, teleports),
-            engine: engineScore(engineChecks),
+            engine: engineScore(engineChecks, input.modded ?? false),
             engineChecks,
             hits: held.hits.length,
             flights,

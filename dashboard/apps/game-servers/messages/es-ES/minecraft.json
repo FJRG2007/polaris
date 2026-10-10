@@ -593,7 +593,8 @@
             "rateDebris": "Mina 1 escombro ancestral cada {per} de roca del Nether - rápido, aunque explorar cuevas también lo da",
             "flights": "Flotó en el aire {count, plural, one {una vez} other {# veces}} sin permiso para volar",
             "teleports": "Se movió más lejos de lo que nadie puede {count, plural, one {una vez} other {# veces}}, sin un comando que lo explique",
-            "engine": "{label} - {check}, {count, plural, one {una vez} other {# veces}}"
+            "engine": "{label} - {check}, {count, plural, one {una vez} other {# veces}}",
+            "modded": "Servidor con mods: aquí las comprobaciones de movimiento y de bloques son aproximadas, así que por sí solas no pasan de Posible"
         },
         "checks": {
             "XRayProbe": "cavó hacia mena enterrada que no podía ver",

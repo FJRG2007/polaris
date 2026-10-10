@@ -593,7 +593,8 @@
             "rateDebris": "Mines 1 ancient debris per {per} nether rock - fast, though exploring caves does that too",
             "flights": "Hovered in the air {count, plural, one {once} other {# times}} without being allowed to fly",
             "teleports": "Moved further than anybody can {count, plural, one {once} other {# times}}, with no command explaining it",
-            "engine": "{label} - {check}, {count, plural, one {once} other {# times}}"
+            "engine": "{label} - {check}, {count, plural, one {once} other {# times}}",
+            "modded": "Modded server: the movement and block checks are approximate here, so on their own they stop at Possible"
         },
         "checks": {
             "XRayProbe": "dug at buried ore it could not see",

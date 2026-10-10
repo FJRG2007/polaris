@@ -245,7 +245,7 @@ export async function adoptPolarisComponent(): Promise<{ adopted: number }> {
 export async function authorizeReporter(
     request: Request,
     installedAppId: string
-): Promise<{ installedAppId: string; ownerId: string } | null> {
+): Promise<{ installedAppId: string; ownerId: string; modded: boolean } | null> {
     const header = request.headers.get("authorization") ?? "";
     const presented = header.startsWith("Bearer ") ? header.slice(7).trim() : "";
     if (!presented) return null;
@@ -260,7 +260,7 @@ export async function authorizeReporter(
     const token = await readInstallEnvSecret(install.applicationId, install.ownerId, TOKEN_KEY);
     const digest = (value: string) => createHash("sha256").update(value).digest();
     if (!token || !timingSafeEqual(digest(presented), digest(token))) return null;
-    return { installedAppId, ownerId: install.ownerId };
+    return { installedAppId, ownerId: install.ownerId, modded: anticheat.moddedServer(env) };
 }
 
 /**
@@ -302,7 +302,12 @@ export const REPORTS_PER_MINUTE = 60;
  * evidence in the past or the future.
  */
 export async function recordFlags(
-    server: { readonly installedAppId: string; readonly ownerId: string },
+    server: {
+        readonly installedAppId: string;
+        readonly ownerId: string;
+        /** Whether it runs mods, which changes what its alerts are worth. */
+        readonly modded?: boolean;
+    },
     flags: readonly ReportedFlag[]
 ): Promise<{ kept: number; limited: boolean }> {
     const { installedAppId } = server;
@@ -485,14 +490,18 @@ async function alertsPerPlayer(
  * or the plugin's own punishments.
  */
 async function tellOwner(
-    server: { readonly installedAppId: string; readonly ownerId: string },
+    server: {
+        readonly installedAppId: string;
+        readonly ownerId: string;
+        readonly modded?: boolean;
+    },
     players: readonly string[],
     before: Map<string, { name: string; checks: { check: string; alerts: number }[] }>,
     now: number
 ): Promise<void> {
     const after = await alertsPerPlayer(server.installedAppId, players, now);
     const serious = (checks: readonly { check: string; alerts: number }[] | undefined) => {
-        const level = engineScore(checks ?? []).level;
+        const level = engineScore(checks ?? [], server.modded ?? false).level;
         return level === "likely" || level === "confirmed";
     };
     const crossed = players.filter(
@@ -505,7 +514,7 @@ async function tellOwner(
     });
     for (const key of crossed) {
         const record = after.get(key)!;
-        const score = engineScore(record.checks);
+        const score = engineScore(record.checks, server.modded ?? false);
         const locale = await ownerLocale(server.ownerId);
         const t = gameCatalogs.translator(locale, "games");
         const said = gameCatalogs.translator(locale, "minecraft");

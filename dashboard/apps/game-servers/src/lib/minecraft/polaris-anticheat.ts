@@ -30,6 +30,7 @@
  * Pure: nothing here reads or writes a server.
  */
 
+import { findSoftware } from "@polaris/core";
 import { formatProjectList, loaderForType, parseProjectList, projectSlug } from "./modrinth";
 import {
     MOD_PATH,
@@ -77,6 +78,12 @@ export function wantsDefaultAnticheat(env: ReadonlyMap<string, string>): boolean
         decided === "" &&
         anticheatBuildFor(env.get("TYPE") ?? "", env.get("VERSION") ?? "") !== null
     );
+}
+
+/** Whether the server runs mods: the engine's movement and block checks only
+ *  approximate their blocks and items there (`approximateOnMods`). */
+export function moddedServer(env: ReadonlyMap<string, string>): boolean {
+    return findSoftware(env.get("TYPE"))?.weight === "mods";
 }
 
 /** The file the dashboard serves the plugin as. */
