@@ -45,6 +45,7 @@ import {
 import { useMicrophones } from "@/app/(app)/chat/mic-device";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useHeldCall } from "@/app/(app)/chat/call-hold";
+import { useSoundboardVolume } from "@/app/(app)/chat/soundboard-prefs";
 import { MicLevelMeter } from "@/app/(app)/chat/mic-level-meter";
 import { Button, Card, CardBody, Select, Switch, cn } from "@polaris/ui";
 import { useMicGain, GAIN_MAX, GAIN_MIN } from "@/app/(app)/chat/mic-gain";
@@ -93,6 +94,7 @@ export function DevicesView() {
             />
             <CameraCard />
             <InputModeCard voice={voice} setVoice={setVoice} />
+            <SoundboardCard />
             <AdvancedCard voice={voice} setVoice={setVoice} />
         </div>
     );
@@ -843,6 +845,44 @@ function InputModeCard({ voice, setVoice }: { voice: VoiceSettings; setVoice: Ch
                         </span>
                     </div>
                 ) : null}
+            </CardBody>
+        </Card>
+    );
+}
+
+/**
+ * How loud other people's soundboard sounds are here. The same setting as the
+ * slider at the foot of the picker in a call; zero is silence, and the emoji
+ * still appears over whoever played one.
+ */
+function SoundboardCard() {
+    const t = useTranslations("account");
+    const [volume, setVolume] = useSoundboardVolume();
+    return (
+        <Card>
+            <CardBody className="flex flex-col gap-3">
+                <div className="flex flex-col gap-1">
+                    <h2 className="text-sm font-medium">{t("devices.soundboard.title")}</h2>
+                    <p className="text-xs text-muted-foreground">{t("devices.soundboard.intro")}</p>
+                </div>
+                <div className="flex flex-col gap-1">
+                    <span className="flex items-center justify-between gap-2 text-sm">
+                        {t("devices.soundboard.volume")}
+                        <span className="tabular-nums text-muted-foreground">
+                            {percent(volume)}
+                        </span>
+                    </span>
+                    <input
+                        type="range"
+                        min={0}
+                        max={100}
+                        step={5}
+                        value={Math.round(volume * 100)}
+                        aria-label={t("devices.soundboard.volume")}
+                        onChange={(event) => setVolume(Number(event.target.value) / 100)}
+                        className="h-1.5 w-full cursor-pointer appearance-none rounded-full bg-muted accent-primary"
+                    />
+                </div>
             </CardBody>
         </Card>
     );

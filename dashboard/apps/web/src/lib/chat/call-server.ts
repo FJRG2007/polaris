@@ -22,7 +22,7 @@ import { loadEnv } from "@polaris/config";
 import { isPolarisPart } from "@/lib/polaris-parts";
 import { ensureCallKey } from "@/lib/chat/call-keys";
 import { localDockerDriver } from "@/lib/docker-service";
-import { AccessToken, RoomServiceClient, type TrackSource } from "livekit-server-sdk";
+import { AccessToken, DataPacket_Kind, RoomServiceClient, type TrackSource } from "livekit-server-sdk";
 import { mediaPermissions, MEDIA_SOURCE, type SeatRestriction } from "./voice-moderation";
 import { getIntegrationSecret, getIntegrationState, upsertIntegration } from "@/lib/integration-service";
 
@@ -370,6 +370,46 @@ export async function applyToSeat(
 function notConnected(caught: unknown): boolean {
     const error = caught as { status?: number; code?: string } | null;
     return error?.status === 404 || error?.code === "not_found";
+}
+
+/**
+ * Say something to everybody in a room, in the media server's own voice.
+ *
+ * What a browser receives this way arrives with no participant attached, which
+ * no browser can fake: whatever one publishes, the media server stamps with who
+ * sent it. That is what lets a browser believe a message only Polaris may send -
+ * a soundboard play, which the server decided was allowed - and drop the same
+ * shape from anybody in the call.
+ *
+ * True when the media server took it. False when none could be asked, which
+ * the caller says out loud rather than pretending.
+ */
+export async function sendToRoom(meetingId: string, payload: unknown, topic: string): Promise<boolean> {
+    const endpoint = await callServer();
+    if (!endpoint) return false;
+    const hosts = endpoint.shipped
+        ? INTERNAL_CALL_SERVER
+        : [endpoint.url.replace(/^ws:/, "http:").replace(/^wss:/, "https:")];
+    const data = new TextEncoder().encode(JSON.stringify(payload));
+
+    let failure: unknown = null;
+    for (const host of hosts) {
+        const rooms = new RoomServiceClient(host, endpoint.apiKey, endpoint.apiSecret, {
+            requestTimeout: ADMIN_TIMEOUT_S,
+            failover: false
+        });
+        try {
+            await rooms.sendData(meetingId, data, DataPacket_Kind.RELIABLE, { topic });
+            return true;
+        } catch (caught) {
+            failure = caught;
+        }
+    }
+    console.error(
+        "polaris: the call server did not take a message for a room:",
+        failure instanceof Error ? failure.message : failure
+    );
+    return false;
 }
 
 /** The compose service the media server runs as. What a screen looks for when

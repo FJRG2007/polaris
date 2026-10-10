@@ -554,6 +554,11 @@
             "stream": "Lower voices while a stream plays",
             "streamLabel": "How far voices are lowered while a stream plays",
             "streamHint": "While you watch a stream that has sound. Zero leaves voices alone."
+        },
+        "soundboard": {
+            "title": "Soundboard",
+            "intro": "How loud other people's sounds are for you. At 0% you still see the emoji.",
+            "volume": "Soundboard volume"
         }
     },
     "domains": {

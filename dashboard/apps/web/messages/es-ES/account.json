@@ -554,6 +554,11 @@
             "stream": "Bajar las voces mientras suena una emisión",
             "streamLabel": "Cuánto se bajan las voces mientras suena una emisión",
             "streamHint": "Mientras ves una emisión con sonido. Cero deja las voces como están."
+        },
+        "soundboard": {
+            "title": "Botonera",
+            "intro": "Lo fuerte que suenan para ti los sonidos de otros. Al 0% aún ves el emoji.",
+            "volume": "Volumen de sonidos"
         }
     },
     "domains": {

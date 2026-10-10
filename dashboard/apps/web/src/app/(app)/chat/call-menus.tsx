@@ -12,7 +12,8 @@ import { useTranslations } from "@/components/i18n/i18n-provider";
 import { ModerationItems, type SeatModeration } from "./call-moderation-menu";
 import { DEFAULT_VOLUME, MAX_VOLUME, useCallVolume } from "./call-volumes";
 import { gapFor, gapWords, useLoudness } from "./call-loudness";
-import { Check, Headphones, PictureInPicture2, Users, Volume2, VolumeX } from "lucide-react";
+import { Check, Headphones, Music2, PictureInPicture2, Users, Volume2, VolumeX } from "lucide-react";
+import { setSoundboardMuted, useSoundboardPrefs } from "./soundboard-prefs";
 import {
     canPopOut,
     closePopOut,
@@ -72,6 +73,7 @@ export function PersonMenu({
 }) {
     const t = useTranslations("chat");
     const [volume, setVolume] = useCallVolume(volumeKey);
+    const soundsMuted = useSoundboardPrefs().muted.includes(volumeKey);
     // How they arrive against everybody else, measured here while each talks -
     // see `call-loudness`. What turns "they are quiet" into "they are quiet for
     // everybody", which is the difference between this slider and their
@@ -150,6 +152,17 @@ export function PersonMenu({
                     {volume === 0
                         ? t("callMenus.letThemThrough")
                         : t("callMenus.silenceThemForYou")}
+                </ContextMenuItem>
+                {/* Their sounds and nothing else: their voice stays as loud as
+                    the slider above says. Remembered against their account, for
+                    every call after this one, and nobody else is told. */}
+                <ContextMenuItem
+                    onSelect={() => setSoundboardMuted(volumeKey, !soundsMuted)}
+                    aria-checked={soundsMuted}
+                    role="menuitemcheckbox"
+                >
+                    {soundsMuted ? <Music2 className="size-3.5" /> : <VolumeX className="size-3.5" />}
+                    {soundsMuted ? t("soundboard.unmuteUser") : t("soundboard.muteUser")}
                 </ContextMenuItem>
 
                 {/* The way to combine with somebody this browser did not hear -
