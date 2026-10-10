@@ -48,13 +48,6 @@ export interface KindContext {
         /** For `air`: how far over the highest thing in its footprint. */
         lift?: number
     ): Promise<stored.Point | "failed" | null>;
-    /**
-     * Where the beam up to something in the sky stands (`beam-entry.ts`): open,
-     * flat ground nearest the players - or, with nobody in the Overworld,
-     * nearest `near`. `none` when there is nowhere like that, `unknown` when
-     * the ground could not be read at all.
-     */
-    findEntry(near: { x: number; z: number }): Promise<stored.Point | "none" | "unknown">;
     /** The place given up, for the reason given, and another looked for; throws
      *  once the tries run out. */
     giveUpPlace(point: stored.Point, why?: PlaceRefusal): Promise<void>;

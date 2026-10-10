@@ -79,7 +79,6 @@ interface Memory {
     still: number;
     alone: boolean;
     waits: number;
-    /** Ticks the ground round the players has been waited for, for the beam. */
     /** When everybody not up yet was last told where the beam is. */
     remindedAt: number;
 }
@@ -234,7 +233,7 @@ export async function tick(ctx: KindContext, lines: string[]): Promise<string | 
             })
         );
         const lair = ctx.run.place;
-        if (!state.arena && state.direct && lair) await bringToLair(ctx, lair, lines);
+        if (!state.arena && state.direct && lair) await landTick(ctx, lair, memory.at, lines);
         await guide(ctx, memory, lines);
         if (at && health !== null) await fight(ctx, memory, { at, previous, health }, lines);
         return null;
@@ -880,22 +879,42 @@ function arenaWay(origin: stored.Point): Way {
 }
 
 /**
- * On the land, everybody in the Overworld not brought yet taken to the boss's
- * lair, once each: somebody who walks off is never pulled back mid-fight.
+ * The land's side of a tick: everybody in the Overworld not brought yet taken
+ * to the boss's lair, once each, and anybody who left it on their own let go
+ * where they are - somebody who walks off is never pulled back mid-fight, nor
+ * sent back to where they stood at the end.
  */
-async function bringToLair(ctx: KindContext, lair: stored.Point, lines: string[]): Promise<void> {
+async function landTick(
+    ctx: KindContext,
+    lair: stored.Point,
+    seen: stored.Point | null,
+    lines: string[]
+): Promise<void> {
+    const server = ctx.server;
     const taken = new Set(stateOf(ctx).taken);
     const fresh = commands
-        .readWhere(await ctx.server.say([boss.NOT_UP]))
+        .readWhere(await server.say([boss.NOT_UP]))
         .map((one) => one.name)
         .filter((name) => !taken.has(lower(name)));
-    if (fresh.length === 0) return;
-    await admit(
-        ctx,
-        fresh,
-        { spot: (index) => boss.landSpot(lair, index), lines: boss.landAdmitLines },
-        lines
-    );
+    if (fresh.length > 0)
+        await admit(
+            ctx,
+            fresh,
+            { spot: (index) => boss.landSpot(lair, index), lines: boss.landAdmitLines },
+            lines
+        );
+    const where = commands.readWhere(await server.say([stage.ARENA_WHERE]));
+    const dimensions = commands.readDimensions(await server.say([stage.ARENA_DIMENSIONS]));
+    const saved = stageOf(ctx).saved;
+    const gone = saved.filter((kept) => {
+        const one = where.find((each) => lower(each.name) === lower(kept.name));
+        return one !== undefined && boss.leftLand(lair, seen, one, dimensions.get(one.name));
+    });
+    if (gone.length === 0) return;
+    const note = messages.tag(ctx.language) + say.leftFight(ctx.language);
+    for (const kept of gone) lines.push(...boss.letGoLines(kept, note));
+    changeStage(ctx, { saved: saved.filter((kept) => !gone.includes(kept)) });
+    await ctx.persist();
 }
 
 /** Into the fight: where each stood written down first, then moved. */

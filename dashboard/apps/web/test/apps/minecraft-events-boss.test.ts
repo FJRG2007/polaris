@@ -506,6 +506,16 @@ describe("the sky arena", () => {
         ).toBe(true);
     });
 
+    it("lets go of whoever is far from both the lair and the boss on the land, or in another world", () => {
+        const lair = { x: 100, y: 70, z: -40 };
+        const at = (dx: number) => ({ x: lair.x + dx, y: lair.y, z: lair.z });
+        expect(boss.leftLand(lair, null, at(20), "minecraft:overworld")).toBe(false);
+        expect(boss.leftLand(lair, null, at(300), "minecraft:overworld")).toBe(true);
+        expect(boss.leftLand(lair, at(250), at(300), "minecraft:overworld")).toBe(false);
+        expect(boss.leftLand(lair, at(-250), at(300), undefined)).toBe(true);
+        expect(boss.leftLand(lair, null, at(1), "minecraft:the_nether")).toBe(true);
+    });
+
     it("takes players up tagged first, then moves them, then into adventure mode", () => {
         const lines = boss.admitLines("Ana", { x: 1.5, y: 95, z: 2.5, yaw: 90 });
         expect(lines[0]).toBe("tag Ana add pe_in");

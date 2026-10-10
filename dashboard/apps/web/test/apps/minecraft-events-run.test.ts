@@ -3143,6 +3143,38 @@ describe("a world boss", () => {
         expect(state().stageLeftovers).toEqual([]);
     });
 
+    it("lets go on the land whoever left the fight, and never sends them back at the end", async () => {
+        setUp([groundBoss("boss", 10)]);
+        await events.startEvent({
+            ownerId: "owner",
+            installedAppId: SERVER,
+            presetId: "boss",
+            trigger: "manual",
+            startedBy: null
+        });
+        world.lift = ["Ana"];
+        await play(8_100);
+        const lair = state().run!.place!;
+        expect(state().run?.stage?.saved.map((one) => one.name)).toEqual(["Ana"]);
+        world.lift = [];
+        // Back at her bed, far from the lair and the boss.
+        world.at.Ana = [lair.x + 500, 64, lair.z + 500];
+        await play(2_100);
+        expect(world.sent).toContain("tag Ana remove pe_in");
+        expect(
+            world.sent.some(
+                (line) => line.startsWith("tellraw Ana ") && line.includes("You left the fight.")
+            )
+        ).toBe(true);
+        expect(state().run?.stage?.saved).toEqual([]);
+        expect(state().run?.boss?.taken).toEqual(["ana"]);
+
+        const sent = world.sent.length;
+        await events.cancelEvent("owner", SERVER);
+        await play(6_100);
+        expect(world.sent.slice(sent).some((line) => / tp Ana /.test(line))).toBe(false);
+    });
+
     it("points whoever is out of its reach the way, with how far and which way to turn", async () => {
         const boss = groundBoss("boss", 10);
         setUp([boss]);

@@ -499,6 +499,27 @@ export function leftArena(origin: Point, at: Point, dimension: string | undefine
     );
 }
 
+/** How far from both its lair and the boss somebody brought to it on the land
+ *  may go before they count as gone. */
+const LAND_REACH = 96;
+
+/**
+ * Whether somebody brought to the boss on the land has gone: another world,
+ * or far from both its lair and where the boss was last seen - back at their
+ * bed after a death, or a `/home`.
+ */
+export function leftLand(
+    lair: Point,
+    seen: Point | null,
+    at: Point,
+    dimension: string | undefined
+): boolean {
+    if (dimension !== undefined && dimension !== "minecraft:overworld") return true;
+    const far = (from: Point) =>
+        Math.max(Math.abs(at.x - (from.x + 0.5)), Math.abs(at.z - (from.z + 0.5))) > LAND_REACH;
+    return far(lair) && (seen === null || far(seen));
+}
+
 /** Whether the boss is still inside the arena. */
 export function insideArena(origin: Point, at: Point): boolean {
     return (
