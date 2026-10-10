@@ -157,6 +157,24 @@ describe("formatting, the stack, notes and pictures", () => {
         expect(read(doc, slide, "title").bold).toBe(true);
     });
 
+    it("works out a change for each box it reaches, as one step", () => {
+        const { doc, slide } = oneSlide();
+        const plain = edits.addBox(doc, slide, "shape", "rect");
+        const red = edits.addBox(doc, slide, "shape", "rect");
+        edits.updateBox(doc, slide, red, { stroke: "#ff0000" });
+        const history = edits.deckUndoManager(doc);
+        edits.updateBoxes(doc, slide, [plain, red], (box) => ({
+            strokeWidth: 0.01,
+            ...(box.stroke ? {} : { stroke: deck.LINE_STROKE })
+        }));
+        expect(read(doc, slide, plain).stroke).toBe(deck.LINE_STROKE);
+        expect(read(doc, slide, red).stroke).toBe("#ff0000");
+        expect(read(doc, slide, red).strokeWidth).toBe(0.01);
+        history.undo();
+        expect(read(doc, slide, plain).stroke).toBe("");
+        expect(read(doc, slide, red).strokeWidth).not.toBe(0.01);
+    });
+
     it("keeps notes apart from the slide, and takes them with a copy", () => {
         const { doc, slide } = oneSlide();
         const [one] = edits.slidesOf(doc).toArray();

@@ -167,6 +167,7 @@ export function DesignBar({
                                             fontFamily: `"${one.headingFont}"`
                                         }}
                                     >
+                                        {/* i18n-ignore: a type sample, not a word */}
                                         Aa
                                         <span
                                             className="size-1.5 rounded-full"

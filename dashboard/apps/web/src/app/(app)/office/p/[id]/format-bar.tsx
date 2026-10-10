@@ -73,6 +73,9 @@ import type { ReactNode } from "react";
 
 export type BoxPatch = Partial<Omit<deck.Box, "id" | "version" | "kind">>;
 
+/** A patch, or one worked out for each chosen box from what it already has. */
+export type BoxChange = BoxPatch | ((box: deck.Box) => BoxPatch);
+
 /** Which of the chosen boxes a change is for: those with words, those that
  *  are an area (a shape or a text box, which can be filled and outlined), or
  *  the lines. */
@@ -159,7 +162,10 @@ export function MenuButton({
                     <ChevronDown className="size-3 shrink-0" aria-hidden />
                 </button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="start" className="max-h-[min(70vh,28rem)] overflow-y-auto overscroll-contain">
+            <DropdownMenuContent
+                align="start"
+                className="max-h-[min(70vh,28rem)] overflow-y-auto overscroll-contain"
+            >
                 {menu}
             </DropdownMenuContent>
         </DropdownMenu>
@@ -198,7 +204,7 @@ export function FormatBar({
 }: {
     /** The chosen boxes, at least one. */
     boxes: readonly deck.Box[];
-    onPatch: (patch: BoxPatch, to: PatchTarget) => void;
+    onPatch: (patch: BoxChange, to: PatchTarget) => void;
     onArrange: (how: deck.Arrange) => void;
     onAlign: (how: deck.AlignBoxes) => void;
     onDistribute: (axis: "x" | "y") => void;
@@ -460,7 +466,7 @@ function OutlineControls({
 }: {
     box: deck.Box;
     line: boolean;
-    onPatch: (patch: BoxPatch) => void;
+    onPatch: (patch: BoxChange) => void;
 }) {
     const t = useTranslations("office");
     const tc = useTranslations("components");
@@ -507,12 +513,12 @@ function OutlineControls({
                         key={one}
                         chosen={one === strokePoints}
                         onSelect={() =>
-                            onPatch({
+                            onPatch((each) => ({
                                 strokeWidth: deck.fractionOfPoints(one),
                                 // A weight for an outline nobody can see is a
                                 // weight that also shows it.
-                                ...(box.stroke || line ? {} : { stroke: deck.LINE_STROKE })
-                            })
+                                ...(each.stroke || line ? {} : { stroke: deck.LINE_STROKE })
+                            }))
                         }
                     >
                         <span

@@ -274,12 +274,15 @@ export function setFrames(
 }
 
 /** The same change to several boxes, as one step - each given only the fields
- *  that mean something on it (`fits`). */
+ *  that mean something on it (`fits`). A change that depends on the box is
+ *  worked out for each one. */
 export function updateBoxes(
     doc: Y.Doc,
     slideId: string,
     boxIds: readonly string[],
-    patch: Partial<Omit<deck.Box, "id" | "version" | "kind">>,
+    patch:
+        | Partial<Omit<deck.Box, "id" | "version" | "kind">>
+        | ((box: deck.Box) => Partial<Omit<deck.Box, "id" | "version" | "kind">>),
     fits: (box: deck.Box, field: keyof deck.Box) => boolean = () => true
 ): void {
     const map = boxesOf(doc);
@@ -288,9 +291,10 @@ export function updateBoxes(
             const stored = map.get(deck.boxKey(slideId, id));
             if (!stored) continue;
             const box = deck.readBox(stored);
+            const own = typeof patch === "function" ? patch(box) : patch;
             const kept = Object.fromEntries(
-                Object.entries(patch).filter(([field]) => fits(box, field as keyof deck.Box))
-            ) as typeof patch;
+                Object.entries(own).filter(([field]) => fits(box, field as keyof deck.Box))
+            ) as typeof own;
             if (Object.keys(kept).length > 0) updateBox(doc, slideId, id, kept);
         }
     });

@@ -21,7 +21,13 @@
 import * as deck from "@/lib/office/deck";
 import * as edits from "./deck-edits";
 import { Present } from "./present";
-import { FormatBar, patchFits, type BoxPatch, type PatchTarget } from "./format-bar";
+import {
+    FormatBar,
+    patchFits,
+    type BoxChange,
+    type BoxPatch,
+    type PatchTarget
+} from "./format-bar";
 import { DesignBar, LayoutItems } from "./design-bar";
 import { SlideList } from "./slide-list";
 import { NotesPanel } from "./notes-panel";
@@ -323,7 +329,7 @@ export function SlidesEditor({
     };
 
     /** A change to every chosen box it means something on. */
-    const patchChosen = (patch: BoxPatch, to: PatchTarget): void => {
+    const patchChosen = (patch: BoxChange, to: PatchTarget): void => {
         if (!slide || chosenIds.length === 0) return;
         edits.updateBoxes(doc, slide.id, chosenIds, patch, (box) => patchFits(box, to));
     };
