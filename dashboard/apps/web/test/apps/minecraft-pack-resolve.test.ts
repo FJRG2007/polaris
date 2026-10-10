@@ -67,6 +67,13 @@ vi.mock("@polaris-app/game-servers/src/lib/minecraft/modrinth", async (importOri
     };
 });
 
+/** What the image carries, by file, as its checksum. */
+const carried = new Map<string, string>();
+
+vi.mock("@polaris-app/game-servers/src/lib/minecraft/polaris-mod-files", () => ({
+    bundledSha1: vi.fn(async (file: string) => carried.get(file) ?? null)
+}));
+
 const {
     clientMods,
     isJarName,
@@ -99,6 +106,45 @@ beforeEach(() => {
 });
 
 describe("the pack a player installs", () => {
+    const SYMBIOTE = "symbiote-neoforge-1.21.4.jar";
+    const symbioteOn = {
+        name: "ExampleSMP",
+        software: "NEOFORGE",
+        version: "1.21.4",
+        projects: "securitycraft?",
+        config: {},
+        mods: `https://polaris.example/api/minecraft/mod/${SYMBIOTE}`,
+        base: "http://192.168.1.20:3000/"
+    };
+
+    it("carries Symbiote when the server does, from the address the player reached", async () => {
+        carried.set(SYMBIOTE, "a".repeat(40));
+        const pack = await resolvePack(symbioteOn);
+        expect(pack.mods.map((mod) => [mod.filename, mod.where, mod.url, mod.sha1])).toEqual([
+            ["securitycraft-1.0.0.jar", "server", "https://cdn.modrinth.com/securitycraft.jar", ""],
+            [
+                SYMBIOTE,
+                "server",
+                `http://192.168.1.20:3000/api/minecraft/mod/${SYMBIOTE}`,
+                "a".repeat(40)
+            ]
+        ]);
+        expect(pack.missing).toEqual([]);
+    });
+
+    it("leaves Symbiote out when the server does not carry it", async () => {
+        carried.set(SYMBIOTE, "a".repeat(40));
+        const pack = await resolvePack({ ...symbioteOn, mods: "" });
+        expect(pack.mods.map((mod) => mod.filename)).toEqual(["securitycraft-1.0.0.jar"]);
+    });
+
+    it("says Symbiote is missing when this Polaris was built without it", async () => {
+        carried.clear();
+        const pack = await resolvePack(symbioteOn);
+        expect(pack.mods.map((mod) => mod.filename)).toEqual(["securitycraft-1.0.0.jar"]);
+        expect(pack.missing).toEqual(["symbiote"]);
+    });
+
     it("carries the server's mods and the players' own, each marked with where it runs", async () => {
         const pack = await resolvePack({
             name: "ExampleSMP",

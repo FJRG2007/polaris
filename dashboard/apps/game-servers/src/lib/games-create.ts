@@ -34,6 +34,7 @@ import { ALLOW_LIST_KEY, withPlayer } from "./ark/access";
 import * as polarisLogin from "./minecraft/polaris-login";
 import { anticheatBundled } from "./minecraft/polaris-mod-files";
 import { soundsMovedTo } from "./minecraft/sounds-env";
+import { symbioteMovedTo } from "./minecraft/symbiote";
 import {
     anticheatBuildFor,
     anticheatEnableEnv,
@@ -380,6 +381,13 @@ function javaSoftwareEnv(
     // The plugin the server's sounds hold, the same way.
     for (const [key, value] of soundsMovedTo(
         before,
+        software,
+        env.get("VERSION") ?? "",
+        env.get(polarisLogin.MODS_KEY) ?? ""
+    ) ?? [])
+        env.set(key, value);
+    // Symbiote, off a release it does not load on.
+    for (const [key, value] of symbioteMovedTo(
         software,
         env.get("VERSION") ?? "",
         env.get(polarisLogin.MODS_KEY) ?? ""

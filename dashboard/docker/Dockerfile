@@ -184,6 +184,19 @@ RUN cd /mods/polaris-paper \
     && cp "build/libs/polaris-$version.jar" /out/polaris-paper.jar \
     && printf '%s\n' "$version" > /out/polaris-paper.jar.version
 
+# Symbiote (resources/minecraft/symbiote/README.md), a mod Polaris carries for the
+# operator: NeoForge 1.21.4, loaded by the server and by every player's game, so
+# the one file is served to both (apps/game-servers/src/lib/minecraft/symbiote.ts).
+# Its own stage, reused until its sources change.
+FROM gradle:9.2.1-jdk21 AS minecraft-symbiote
+
+WORKDIR /symbiote
+COPY resources/minecraft/symbiote/ ./
+RUN version="$(sed -n 's/^mod_version=//p' gradle.properties)" \
+    && gradle --no-daemon -q build \
+    && mkdir -p /out \
+    && cp "build/libs/symbiote-$version.jar" /out/symbiote-neoforge-1.21.4.jar
+
 # ---------------------------------------------------------------------------
 # App bundles - every installable app built into the bundle a server that
 # installs it downloads (packages/app-host/bundler), including what an app ships
@@ -201,6 +214,7 @@ FROM builder AS app-bundles-build
 COPY --from=minecraft-mods /out ./apps/game-servers/.assets/minecraft-mods
 COPY --from=minecraft-plugins /out ./apps/game-servers/.assets/minecraft-mods
 COPY --from=minecraft-anticheat /out ./apps/game-servers/.assets/minecraft-mods
+COPY --from=minecraft-symbiote /out ./apps/game-servers/.assets/minecraft-mods
 ARG POLARIS_APP_BUNDLES=embed
 RUN node packages/app-host/bundler/build.mjs /build/app-bundles \
     && mkdir -p /build/app-bundles-image \

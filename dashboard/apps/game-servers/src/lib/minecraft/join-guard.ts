@@ -31,6 +31,7 @@
 
 import * as polarisLogin from "./polaris-login";
 import { anticheatMovedTo, withoutAnticheatBuild } from "./polaris-anticheat";
+import { symbioteMovedTo } from "./symbiote";
 import { soundsHoldPlugin, soundsMovedTo } from "./sounds-env";
 import { SOUNDS_KEY } from "./sounds";
 import {
@@ -356,10 +357,24 @@ export async function guardForSave(
         version ?? current.get("VERSION") ?? "",
         listedNow ?? current.get(polarisLogin.MODS_KEY) ?? ""
     );
-    if (sounds === null) return afterAnticheat;
+    const afterSounds =
+        sounds === null
+            ? afterAnticheat
+            : [
+                  ...afterAnticheat.filter((entry) => !sounds.has(entry.key)),
+                  ...[...sounds].map(([key, value]) => ({ key, value }))
+              ];
+    // Symbiote comes off a release it does not load on, the same way.
+    const listedLast = afterSounds.find((entry) => entry.key === polarisLogin.MODS_KEY)?.value;
+    const symbiote = symbioteMovedTo(
+        software || (current.get(SOFTWARE_KEY) ?? ""),
+        version ?? current.get("VERSION") ?? "",
+        listedLast ?? current.get(polarisLogin.MODS_KEY) ?? ""
+    );
+    if (symbiote === null) return afterSounds;
     return [
-        ...afterAnticheat.filter((entry) => !sounds.has(entry.key)),
-        ...[...sounds].map(([key, value]) => ({ key, value }))
+        ...afterSounds.filter((entry) => !symbiote.has(entry.key)),
+        ...[...symbiote].map(([key, value]) => ({ key, value }))
     ];
 }
 

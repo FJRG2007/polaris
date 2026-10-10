@@ -13,3 +13,6 @@ package-lock.json
 # checkout, and reports them as style violations in between.
 apps/extension/.output
 apps/extension/.wxt
+# Symbiote's sources as its port left them: a mod's data and assets, formatted
+# the way its own tools write them, not part of the dashboard's code.
+resources/minecraft/symbiote

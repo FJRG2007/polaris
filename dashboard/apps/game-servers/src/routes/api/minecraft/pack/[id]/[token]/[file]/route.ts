@@ -9,7 +9,8 @@
  *
  * What it gives away is exactly the list of mods that server runs, which is what
  * anybody who joins learns anyway - and the files themselves come from Modrinth,
- * not from here.
+ * except the jars this dashboard serves the server itself (Symbiote), which come
+ * from the same public mod route the server downloads them from.
  *
  * Node runtime: it reads the install and asks Modrinth.
  */
@@ -36,6 +37,7 @@ import {
     shellInstaller
 } from "../../../../../../../lib/minecraft/pack-scripts";
 import { bounded } from "../../../../../../../lib/minecraft/mod-items-service";
+import { MODS_KEY } from "../../../../../../../lib/minecraft/polaris-login";
 import { host } from "@polaris/app-host";
 
 const { readInstallConfig } = host.appsInstallConfig;
@@ -72,7 +74,7 @@ export async function GET(request: Request, { params }: Params): Promise<Respons
         return text(script, "text/plain; charset=utf-8");
     }
 
-    const pack = await packOf(install as Install);
+    const pack = await packOf(install as Install, await packBase(request));
 
     if (file === "manifest.json") {
         return Response.json(pack, { headers: { "cache-control": "no-store" } });
@@ -82,13 +84,14 @@ export async function GET(request: Request, { params }: Params): Promise<Respons
 
 type Install = { name: string; config: string | null; applicationId: string };
 
-/** The pack as the server's lists stand right now. */
-async function packOf(install: Install): Promise<ClientPack> {
+/** The pack as the server's lists stand right now. `base` is where the player
+ *  reached this, which is where they download what this dashboard serves. */
+async function packOf(install: Install, base: string): Promise<ClientPack> {
     const env = await prisma.envVar.findMany({
         where: {
             scopeType: "application",
             scopeId: install.applicationId,
-            key: { in: [PROJECTS_KEY, SOFTWARE_KEY, VERSION_KEY] }
+            key: { in: [PROJECTS_KEY, SOFTWARE_KEY, VERSION_KEY, MODS_KEY] }
         },
         select: { key: true, value: true }
     });
@@ -98,7 +101,9 @@ async function packOf(install: Install): Promise<ClientPack> {
         software: value(SOFTWARE_KEY),
         version: value(VERSION_KEY),
         projects: value(PROJECTS_KEY),
-        config: readInstallConfig(install.config)
+        config: readInstallConfig(install.config),
+        mods: value(MODS_KEY),
+        base
     });
 }
 
@@ -145,7 +150,7 @@ export async function POST(request: Request, { params }: Params): Promise<Respon
     }
     if (jars.length === 0) return text("", "text/plain; charset=utf-8");
 
-    const pack = await packOf(install as Install);
+    const pack = await packOf(install as Install, await packBase(request));
     return text(asideTable(await setAside(pack.mods, jars)), "text/plain; charset=utf-8");
 }
 

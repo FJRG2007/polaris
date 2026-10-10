@@ -32,6 +32,7 @@ import { MinecraftEvents } from "./minecraft-events";
 import { MinecraftChallenges } from "./minecraft-challenges";
 import type { Permission } from "@polaris/core";
 import { MinecraftMods } from "./minecraft-mods";
+import { SymbioteCard } from "./symbiote-card";
 import { SpigotPluginsCard } from "./minecraft-spigot-plugins";
 import { ModpacksCard } from "./minecraft-modpacks";
 import { SPIGET_KEY } from "../../lib/minecraft/spiget";
@@ -717,6 +718,11 @@ export function MinecraftPanel({
                             packCommands={game?.packCommands ?? null}
                             onSaved={reloadSettings}
                         />
+                        {/* A mod Polaris carries itself. Shown on every Java server,
+                            with the reason where it cannot run. */}
+                        {edition === "java" && (
+                            <SymbioteCard installedAppId={installedAppId} canManage={canManage} />
+                        )}
                         {/* A second catalogue rather than a second source in the one
                             above: SpigotMC publishes a page and a claim about which
                             releases were tested, where Modrinth publishes builds, and

@@ -1,0 +1,7 @@
+{
+  "type": "symbiote:meteor_crash",
+  "biomes": "#symbiote:has_structure/meteor_crash",
+  "step": "surface_structures",
+  "terrain_adaptation": "none",
+  "spawn_overrides": {}
+}

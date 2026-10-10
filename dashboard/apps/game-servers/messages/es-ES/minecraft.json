@@ -2803,5 +2803,25 @@
             "noAccess": "No puedes cambiar los sonidos de este servidor.",
             "failed": "No funcionó. Inténtalo de nuevo."
         }
+    },
+    "symbiote": {
+        "title": "Symbiote",
+        "about": "A Bonding Experience, de Arnau Guardiola. Funciona en el servidor y en el juego de cada jugador.",
+        "installed": "Instalado",
+        "install": "Instalar en servidor",
+        "remove": "Quitar",
+        "download": "Descargar para tu juego",
+        "copyLink": "Copiar enlace",
+        "playersNeedIt": "Instalarlo o quitarlo surte efecto en el próximo arranque del servidor. Los jugadores necesitan el mismo jar en su juego para entrar: mándales el enlace de descarga o la línea del pack de mods, que también lo instala.",
+        "installedNote": "Añadido. El servidor lo descarga en su próximo arranque.",
+        "removedNote": "Quitado. Sale en el próximo arranque del servidor.",
+        "removeTitle": "¿Quitar Symbiote?",
+        "removeBody": "Sale en el próximo arranque del servidor, y los bloques y objetos de Symbiote del mundo se van con él.",
+        "notLoader": "Solo funciona en NeoForge 1.21.4. Cambia el software del servidor en Ajustes para usarlo.",
+        "notRelease": "Solo funciona en Minecraft 1.21.4. Pon la versión del servidor en 1.21.4 en Ajustes para usarlo.",
+        "notBundled": "Este Polaris se construyó sin Symbiote. Actualiza Polaris desde Ajustes para tenerlo.",
+        "needsAddress": "El servidor lo descarga de la dirección pública de este Polaris, y aún no tiene. Dale un dominio a Polaris en Ajustes.",
+        "onlyManagers": "Solo quien gestiona este servidor puede instalarlo o quitarlo.",
+        "readFailed": "No se pudo leer Symbiote"
     }
 }
