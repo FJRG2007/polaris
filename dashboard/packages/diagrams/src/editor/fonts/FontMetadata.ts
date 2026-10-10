@@ -38,11 +38,20 @@ export const FONT_METADATA: Record<number, FontMetadata> = {
   [FONT_FAMILY.Handwritten]: {
     metrics: {
       unitsPerEm: 1000,
-      ascender: 886,
-      descender: -374,
+      ascender: 1170,
+      descender: -340,
       lineHeight: 1.25,
     },
     icon: FreedrawIcon,
+  },
+  [FONT_FAMILY["Polaris Sans"]]: {
+    metrics: {
+      unitsPerEm: 1000,
+      ascender: 1025,
+      descender: -275,
+      lineHeight: 1.3,
+    },
+    icon: FontFamilyNormalIcon,
   },
   [FONT_FAMILY.Nunito]: {
     metrics: {
@@ -52,6 +61,17 @@ export const FONT_METADATA: Record<number, FontMetadata> = {
       lineHeight: 1.35,
     },
     icon: FontFamilyNormalIcon,
+    deprecated: true,
+  },
+  [FONT_FAMILY["Comic Shanns"]]: {
+    metrics: {
+      unitsPerEm: 1000,
+      ascender: 750,
+      descender: -250,
+      lineHeight: 1.25,
+    },
+    icon: FontFamilyCodeIcon,
+    deprecated: true,
   },
   [FONT_FAMILY["Lilita One"]]: {
     metrics: {
@@ -62,12 +82,12 @@ export const FONT_METADATA: Record<number, FontMetadata> = {
     },
     icon: FontFamilyHeadingIcon,
   },
-  [FONT_FAMILY["Comic Shanns"]]: {
+  [FONT_FAMILY["Polaris Mono"]]: {
     metrics: {
       unitsPerEm: 1000,
-      ascender: 750,
-      descender: -250,
-      lineHeight: 1.25,
+      ascender: 1025,
+      descender: -275,
+      lineHeight: 1.3,
     },
     icon: FontFamilyCodeIcon,
   },
@@ -142,6 +162,8 @@ export const GOOGLE_FONTS_RANGES = {
   CYRILIC_EXT:
     "U+0460-052F, U+1C80-1C88, U+20B4, U+2DE0-2DFF, U+A640-A69F, U+FE2E-FE2F",
   CYRILIC: "U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116",
+  GREEK:
+    "U+0370-0377, U+037A-037F, U+0384-038A, U+038C, U+038E-03A1, U+03A3-03FF",
   VIETNAMESE:
     "U+0102-0103, U+0110-0111, U+0128-0129, U+0168-0169, U+01A0-01A1, U+01AF-01B0, U+0300-0301, U+0303-0304, U+0308-0309, U+0323, U+0329, U+1EA0-1EF9, U+20AB",
 };

@@ -13,13 +13,15 @@ import { getFontString, PromisePool, promiseTry } from "../utils";
 import { DiagramFontFace } from "./DiagramFontFace";
 
 import { CascadiaFontFaces } from "./Cascadia";
-import { ComicShannsFontFaces } from "./ComicShanns";
 import { EmojiFontFaces } from "./Emoji";
 import { HandwrittenFontFaces } from "./Handwritten";
 import { HelveticaFontFaces } from "./Helvetica";
 import { LiberationFontFaces } from "./Liberation";
 import { LilitaFontFaces } from "./Lilita";
+import { ComicShannsFontFaces } from "./ComicShanns";
+import { MonoFontFaces } from "./Mono";
 import { NunitoFontFaces } from "./Nunito";
+import { SansFontFaces } from "./Sans";
 import { VirgilFontFaces } from "./Virgil";
 import { XiaolaiFontFaces } from "./Xiaolai";
 
@@ -373,14 +375,18 @@ export class Fonts {
     };
 
     init("Cascadia", ...CascadiaFontFaces);
-    init("Comic Shanns", ...ComicShannsFontFaces);
     init("Handwritten", ...HandwrittenFontFaces);
     // keeping for backwards compatibility reasons, uses system font (Helvetica on MacOS, Arial on Win)
     init("Helvetica", ...HelveticaFontFaces);
     // used for server-side pdf & png export instead of helvetica (technically does not need metrics, but kept in for consistency)
     init("Liberation Sans", ...LiberationFontFaces);
     init("Lilita One", ...LilitaFontFaces);
+    // The faces new text was set in before the Polaris ones, kept so a drawing
+    // made then still measures and draws as it did.
     init("Nunito", ...NunitoFontFaces);
+    init("Comic Shanns", ...ComicShannsFontFaces);
+    init("Polaris Sans", ...SansFontFaces);
+    init("Polaris Mono", ...MonoFontFaces);
     init("Virgil", ...VirgilFontFaces);
 
     // fallback font faces
