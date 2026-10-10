@@ -1774,7 +1774,7 @@
             },
             "acid-rain": {
                 "label": "Acid rain",
-                "summary": "An open arena is built in the air, and an acid rain falls on it alone. Standing with nothing over your head fills your acid bar; full, you are out. Shelter in the ruined huts or build your own with the cobblestone handed out, while the rain eats the block over your head - harder every minute, so no roof lasts forever. The last one left wins.",
+                "summary": "Acid rain falls in waves on a floating arena: stay under cover, patch the roofs it eats, and run for supplies in each calm. The last one left wins.",
                 "unit": "points"
             },
             "elytra-race": {
