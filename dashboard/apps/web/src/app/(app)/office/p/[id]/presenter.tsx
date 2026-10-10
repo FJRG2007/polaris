@@ -298,7 +298,7 @@ export function PresenterView({
                 </div>
             </header>
 
-            <div className="grid min-h-0 flex-1 content-start gap-3 overflow-y-auto p-3 sm:content-stretch sm:grid-cols-[minmax(0,2fr)_minmax(0,1fr)] sm:overflow-hidden">
+            <div className="grid min-h-0 flex-1 content-start gap-3 overflow-y-auto overscroll-contain p-3 sm:content-stretch sm:grid-cols-[minmax(0,2fr)_minmax(0,1fr)] sm:overflow-hidden">
                 <section className="flex min-h-0 min-w-0 flex-col gap-2">
                     <h2 className="text-[12px] font-medium text-muted-foreground">
                         {t("slides.presenter.current")}
@@ -376,7 +376,7 @@ export function PresenterView({
                         </div>
                         <div
                             className={cn(
-                                "min-h-24 flex-1 overflow-y-auto whitespace-pre-wrap break-words rounded-md bg-muted/40 p-3 leading-relaxed",
+                                "min-h-24 flex-1 overflow-y-auto overscroll-contain whitespace-pre-wrap break-words rounded-md bg-muted/40 p-3 leading-relaxed",
                                 !notes.trim() && "text-muted-foreground"
                             )}
                             style={{ fontSize: noteSize }}
