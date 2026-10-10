@@ -469,13 +469,13 @@ function audio(): AudioContext | null {
     if (!context) {
         const made: Routable = new Ctor();
         context = made;
-        followSpeaker(made);
         // Changed in this tab, or in another one: a ring already sounding moves
         // with it, the way the call's own voices do.
         const follow = () => followSpeaker(made);
         window.addEventListener(SPEAKER_CHANGED, follow);
         window.addEventListener("storage", follow);
     }
+    followSpeaker(context as Routable);
     // Suspended is the ordinary state for a context made before the reader
     // pressed anything. Resuming is refused rather than throwing, and the next
     // sound tries again.

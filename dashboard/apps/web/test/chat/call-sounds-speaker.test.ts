@@ -101,4 +101,19 @@ describe("a call's tones", () => {
         expect(FakeContext.made[0].sinkId).toBe("headset");
         stop();
     });
+
+    it("try the chosen output again on the next sound when it was not there yet", async () => {
+        stored = "headset";
+        const { playCallSound } = await import("@/lib/call-sounds");
+        const original = FakeContext.prototype.setSinkId;
+        FakeContext.prototype.setSinkId = () => Promise.reject(new Error("NotFoundError"));
+        playCallSound("ring");
+        await Promise.resolve();
+        expect(FakeContext.made[0].sinkId).toBe("");
+        FakeContext.prototype.setSinkId = original;
+        playCallSound("ring");
+        await Promise.resolve();
+        expect(FakeContext.made).toHaveLength(1);
+        expect(FakeContext.made[0].sinkId).toBe("headset");
+    });
 });
