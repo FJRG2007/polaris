@@ -177,6 +177,7 @@ import {
     FileText,
     HardDrive,
     MessageSquare,
+    MoreHorizontal,
     Paperclip,
     Pencil,
     Pin,
@@ -1200,6 +1201,33 @@ function Message({
                                         </button>
                                     </li>
                                 ))}
+                                {/* One more, beside the ones already there, as every
+                                    chat has it: adding a reaction to a message that
+                                    has some is where the eye already is, rather than
+                                    up in the toolbar. Shown while the message is
+                                    hovered or focused, so a column of reacted
+                                    messages is not a column of empty faces. */}
+                                {canPost && !message.deleted && (
+                                    <li className="hidden group-focus-within:block group-hover:block group-data-[state=open]:block has-[[aria-expanded=true]]:block">
+                                        <EmojiPicker
+                                            disabled={false}
+                                            media={false}
+                                            custom={
+                                                emoji
+                                                    ? {
+                                                          spaceName: emoji.spaceName,
+                                                          entries: emoji.entries,
+                                                          manageHref: null
+                                                      }
+                                                    : null
+                                            }
+                                            label={t("messageList.addReaction")}
+                                            icon={<SmilePlus className="size-3.5" />}
+                                            triggerClassName="flex h-full items-center rounded-full border border-border bg-muted px-1.5 py-0.5 text-muted-foreground transition-colors hover:border-border-strong hover:text-foreground"
+                                            onEmoji={(choice) => onReact(message.id, choice)}
+                                        />
+                                    </li>
+                                )}
                             </ul>
                         )}
 
@@ -1313,7 +1341,10 @@ function Message({
                                             aria-label={t("messageList.moreForThisMessage")}
                                             className="rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                                         >
-                                            <SmilePlus className="size-3.5 rotate-90" />
+                                            {/* Three dots, as "more" is drawn everywhere else. It was a
+                                                sideways smiley, which read as a second
+                                                emoji button. */}
+                                            <MoreHorizontal className="size-3.5" />
                                         </button>
                                     </DropdownMenuTrigger>
                                     <DropdownMenuContent

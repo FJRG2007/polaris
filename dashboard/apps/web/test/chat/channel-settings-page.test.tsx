@@ -179,6 +179,31 @@ describe("the draft", () => {
         expect((screen.getByLabelText("Channel topic") as HTMLTextAreaElement).value).toBe("Talk");
     });
 
+    it("says why a name with nothing left after rewriting cannot be saved", () => {
+        show();
+        fireEvent.change(screen.getByLabelText("Channel name"), { target: { value: "!!!" } });
+        expect(screen.getByText("Use at least one letter or number")).toBeTruthy();
+        expect(
+            (screen.getByRole("button", { name: "Save changes" }) as HTMLButtonElement).disabled
+        ).toBe(true);
+    });
+
+    it("says a name that rewrites to the current one is already the name, not saved", () => {
+        show();
+        fireEvent.change(screen.getByLabelText("Channel name"), { target: { value: "General" } });
+        expect(screen.getByText("That is already its name, #general")).toBeTruthy();
+        expect(screen.queryByText(/Will be saved as/)).toBeNull();
+        expect(screen.queryByRole("button", { name: "Save changes" })).toBeNull();
+    });
+
+    it("says what a rewritten new name will be kept as", () => {
+        show();
+        fireEvent.change(screen.getByLabelText("Channel name"), {
+            target: { value: "Daily Notes" }
+        });
+        expect(screen.getByText("Will be saved as #daily-notes")).toBeTruthy();
+    });
+
     it("holds the save on a topic past Discord's length", () => {
         show();
         fireEvent.change(screen.getByLabelText("Channel topic"), {
