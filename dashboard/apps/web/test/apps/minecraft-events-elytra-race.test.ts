@@ -222,6 +222,17 @@ describe("a racer who has not found their wings", () => {
         expect(elytra.GRACE_LOOKS * 0.4).toBeLessThan(4);
     });
 
+    it("makes its own counts in a race armed before they existed", () => {
+        for (const name of [elytra.GRACE_SCORE, elytra.TRIES_SCORE, "pe_eseen"]) {
+            const made = lines.indexOf(`scoreboard objectives add ${name} dummy`);
+            expect(made).toBeGreaterThanOrEqual(0);
+            const used = lines.findIndex(
+                (line) => line.includes(name) && !line.startsWith("scoreboard objectives")
+            );
+            expect(made).toBeLessThan(used);
+        }
+    });
+
     it("is told how to fly after a few tries, and then left standing where they land", () => {
         const landed = lines.find((line) => line.includes("nbt={OnGround:1b}] add pe_ereset"))!;
         expect(landed).toContain(`${elytra.TRIES_SCORE}=..${elytra.TRIES_MOST - 1}`);

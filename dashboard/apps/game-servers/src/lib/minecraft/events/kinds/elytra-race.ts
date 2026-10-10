@@ -939,7 +939,10 @@ export function quickLines(
     const trying = `tag=pe_in,scores={${counts},${TRIES_SCORE}=..${TRIES_MOST - 1}}`;
     const world = "execute in minecraft:overworld";
     const lines = [
-        // Racers from before these counts: none of them set yet.
+        // A race armed before these counts: neither they nor any racer's set yet.
+        ...[GRACE_SCORE, TRIES_SCORE, SEEN_SCORE].map(
+            (name) => `scoreboard objectives add ${name} dummy`
+        ),
         `scoreboard players add @a[tag=pe_in] ${GRACE_SCORE} 0`,
         `scoreboard players add @a[tag=pe_in] ${TRIES_SCORE} 0`,
         `scoreboard players add @a[tag=pe_in] ${SEEN_SCORE} 0`,
