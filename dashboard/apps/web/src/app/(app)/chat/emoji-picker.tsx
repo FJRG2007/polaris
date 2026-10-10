@@ -216,6 +216,7 @@ export function EmojiPicker({
     custom = null,
     label,
     icon,
+    triggerClassName,
     onEmoji,
     onMedia,
     onSaved
@@ -227,6 +228,8 @@ export function EmojiPicker({
     label?: string;
     /** What the button shows, when it is not the composer's face. */
     icon?: React.ReactNode;
+    /** The button's look, when it sits somewhere other than a toolbar. */
+    triggerClassName?: string;
     /**
      * Whether there is anything here but emoji.
      *
@@ -521,10 +524,13 @@ export function EmojiPicker({
             title={label ?? t("emojiPicker.emojiGifsAndStickers")}
             aria-expanded={open}
             onClick={() => setOpen((current) => !current)}
-            className={cn(
-                "rounded text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50",
-                icon ? "p-1" : "p-1.5"
-            )}
+            className={
+                triggerClassName ??
+                cn(
+                    "rounded text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50",
+                    icon ? "p-1" : "p-1.5"
+                )
+            }
         >
             {icon ?? <Smile className="size-4" />}
         </button>

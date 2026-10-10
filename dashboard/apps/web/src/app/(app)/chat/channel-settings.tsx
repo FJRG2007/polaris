@@ -506,9 +506,18 @@ function Overview({
                 label={t("channelSettings.channelName")}
                 htmlFor="channel-name"
                 hint={
-                    stored && stored !== draft.name
-                        ? t("channelSettings.storedAs", { name: stored })
-                        : undefined
+                    // Said whenever what is typed is not what is kept, because a
+                    // name is rewritten on the way in: a name with nothing left
+                    // after that is refused here rather than by a Save that
+                    // silently stays grey, and one that comes out as the name the
+                    // channel already has is said to be that, not to be saved.
+                    !stored ? (
+                        <span className="text-danger">{t("channelSettings.nameNeedsLetters")}</span>
+                    ) : stored === draft.name ? undefined : stored === channel.name ? (
+                        t("channelSettings.alreadyNamed", { name: stored })
+                    ) : (
+                        t("channelSettings.storedAs", { name: stored })
+                    )
                 }
             >
                 <Input
