@@ -229,3 +229,46 @@ export async function forgetPrizeAction(input: z.input<typeof forgetSchema>): Pr
         return { error: await failure(caught, t("events.errors.forgetPrize")) };
     }
 }
+
+const arenaSchema = z.object({ installedAppId: serverId, id: z.string().trim().min(1).max(128) });
+
+/** An arena that still had blocks in its box, taken down and counted again now. */
+export async function retryArenaAction(
+    input: z.input<typeof arenaSchema>
+): Promise<Answer & { outcome?: "cleared" | "left" | "offline" }> {
+    const t = await gameWords("minecraft");
+    const parsed = arenaSchema.safeParse(input);
+    if (!parsed.success) return { error: t("events.errors.noArena") };
+    try {
+        const { user } = await requireGameServer("games.console", parsed.data.installedAppId);
+        const outcome = await events.retryArena(parsed.data.installedAppId, parsed.data.id);
+        await recordAudit({
+            actorId: user.id,
+            action: "games.events.arena-retry",
+            targetType: "installedApp",
+            targetId: parsed.data.installedAppId
+        });
+        return { view: await events.eventsView(parsed.data.installedAppId), outcome };
+    } catch (caught) {
+        return { error: await failure(caught, t("events.errors.arenaRetry")) };
+    }
+}
+
+export async function dismissArenaAction(input: z.input<typeof arenaSchema>): Promise<Answer> {
+    const t = await gameWords("minecraft");
+    const parsed = arenaSchema.safeParse(input);
+    if (!parsed.success) return { error: t("events.errors.noArena") };
+    try {
+        const { user } = await requireGameServer("games.console", parsed.data.installedAppId);
+        await events.dismissArena(parsed.data.installedAppId, parsed.data.id);
+        await recordAudit({
+            actorId: user.id,
+            action: "games.events.arena-dismiss",
+            targetType: "installedApp",
+            targetId: parsed.data.installedAppId
+        });
+        return { view: await events.eventsView(parsed.data.installedAppId) };
+    } catch (caught) {
+        return { error: await failure(caught, t("events.errors.arenaDismiss")) };
+    }
+}

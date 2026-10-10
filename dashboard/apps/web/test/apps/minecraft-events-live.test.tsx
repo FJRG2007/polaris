@@ -13,6 +13,9 @@ vi.mock("@polaris/app-host/client", () => ({
     hostUi: {
         i18nProvider: { useLocale: () => "en-US" },
         confirmDialog: { useConfirm: () => [async () => true, null] },
+        copyButton: {
+            CopyButton: ({ label }: { label?: string }) => <button aria-label={label} />
+        },
         displayFormat: {
             useDisplayFormat: () => ({ dateTime: (at: number) => new Date(at).toISOString() })
         },

@@ -12,9 +12,11 @@
  *   compares it with itself, which counts every block in it that is not air -
  *   and only a count of nought is built on, with `fill ... keep` besides.
  * - No block the event did not place is removed. Taking it down is `fill ...
- *   air replace <block>` for each kind of block it used, inside its own box;
- *   and nobody can have put one of those there meanwhile, since everybody in
- *   it plays in adventure mode.
+ *   air replace <block>` for each kind of block it used - and what one of
+ *   them turns into by itself, grass gone to dirt - inside its own box; and
+ *   nobody can have put one of those there meanwhile, since everybody in it
+ *   plays in adventure mode. Once down, the box is counted again: it was all
+ *   air, so anything still in it is named on the event's screen.
  * - None of anybody's own items is taken. What the event hands out carries a
  *   marker, and only items with the marker are cleared. What somebody drops
  *   while they are there is kept theirs - only they can pick it up, it does
@@ -134,6 +136,32 @@ export function fillKeep(box: Box, block: string): string {
 }
 
 /**
+ * What a block the arena placed turns into by itself while it stands: grass,
+ * mycelium and podzol with a solid block on top go to dirt over the game's
+ * random ticks - grass under a garden's tree trunk, say - and water open to
+ * the sky freezes in a cold place. Nobody placed that dirt, so no arena lists
+ * it, and a teardown that took only what it listed left it floating in the sky.
+ */
+const DECAYS_TO: Readonly<Record<string, readonly string[]>> = {
+    "minecraft:grass_block": ["minecraft:dirt"],
+    "minecraft:mycelium": ["minecraft:dirt"],
+    "minecraft:podzol": ["minecraft:dirt"],
+    "minecraft:water": ["minecraft:ice"]
+};
+
+/** What falls on any arena in a cold place: a layer of snow on whatever is on
+ *  top. A fill does not tell what stands on a block it takes, so it would stay
+ *  in the air; it comes down first. The box was all air, so it is ours. */
+const SNOW = "minecraft:snow";
+
+/** The kinds an arena lists, each followed by what it may have turned into,
+ *  and the snow that fell on it first. Nothing for an arena that built nothing. */
+export function withDecayed(blocks: readonly string[]): string[] {
+    if (blocks.length === 0) return [];
+    return [...new Set([SNOW, ...blocks.flatMap((block) => [block, ...(DECAYS_TO[block] ?? [])])])];
+}
+
+/**
  * The arena taken down: every kind of block it used replaced with air, and
  * nothing else, inside its own box and nowhere else.
  *
@@ -145,13 +173,30 @@ export function fillKeep(box: Box, block: string): string {
  */
 export function teardown(arena: Arena): string[] {
     const pieces = slices(arena.box);
-    return arena.blocks
-        .filter((block) => ITEM_ID.test(block))
-        .flatMap((block) =>
-            pieces.map(
-                (piece) => `${IN_OVERWORLD} fill ${region(piece)} minecraft:air replace ${block}`
-            )
-        );
+    const kinds = withDecayed(arena.blocks.filter((block) => ITEM_ID.test(block)));
+    return kinds.flatMap((block) =>
+        pieces.map(
+            (piece) => `${IN_OVERWORLD} fill ${region(piece)} minecraft:air replace ${block}`
+        )
+    );
+}
+
+/**
+ * How many blocks are still in a box that was nothing but air before the arena
+ * went up: nought once it is down. Null when the game did not say - a chunk not
+ * loaded yet, a refusal - which is never taken for empty.
+ */
+export async function leftIn(
+    box: Box,
+    say: (line: string) => Promise<string>
+): Promise<number | null> {
+    let solid = 0;
+    for (const piece of slices(box)) {
+        const count = readCount(await say(solidCount(piece)));
+        if (typeof count !== "number") return null;
+        solid += count;
+    }
+    return solid;
 }
 
 /** Whether a fill could not reach its blocks, and has to be tried again. */

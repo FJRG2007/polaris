@@ -141,6 +141,37 @@ describe("batches", () => {
         expect(said).toEqual(["polaris caps"]);
     });
 
+    it("starts the batch under the key it is given, so an arena can keep it", async () => {
+        const { server, sent } = fakeServer((command) =>
+            command === "polaris caps"
+                ? CAPS
+                : '{"ok":true,"key":"pbkept","done":true,"total":1,"ran":1,"failed":0}'
+        );
+        const key = inServer.batchKey();
+        expect(key).toMatch(/^pb[0-9a-z]+$/);
+        expect(inServer.batchKey()).not.toBe(key);
+        expect(
+            await inServer.build(server, ["say done"], undefined, async () => undefined, "pbkept")
+        ).toBe(true);
+        expect(sent[0]).toBe("data remove storage polaris:batch pbkept");
+    });
+
+    it("calls a kept batch off on a server with the mod, and asks nothing elsewhere", async () => {
+        const modded = fakeServer((command) =>
+            command === "polaris caps" ? CAPS : '{"ok":false,"key":"pbold","why":"unknown"}'
+        );
+        await inServer.cancelBatch(modded.server, "pbold");
+        expect(modded.said).toEqual(["polaris caps", "polaris batch cancel pbold"]);
+
+        const plain = fakeServer(() => "Unknown or incomplete command");
+        await inServer.cancelBatch(plain.server, "pbold");
+        expect(plain.said).toEqual(["polaris caps"]);
+
+        const odd = fakeServer(() => CAPS);
+        await inServer.cancelBatch(odd.server, "pb old; op me");
+        expect(odd.said).toEqual([]);
+    });
+
     it("falls back when the batch is not answered as the mod", async () => {
         const { server, sent } = fakeServer((command) =>
             command === "polaris caps" ? CAPS : "Unknown or incomplete command"

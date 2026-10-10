@@ -1908,6 +1908,7 @@ const hillService = await import(
 );
 const playing = await import("@polaris-app/game-servers/src/lib/minecraft/activity");
 const arrival = await import("@polaris-app/game-servers/src/lib/minecraft/events/kinds/arrival");
+const arenaKind = await import("@polaris-app/game-servers/src/lib/minecraft/events/kinds/arena");
 const bingo = await import("@polaris-app/game-servers/src/lib/minecraft/events/kinds/bingo");
 
 /** What a player reads of a command's text: the words of its JSON, without the
@@ -8798,7 +8799,7 @@ describe("a team duel", () => {
             false
         );
         const removed = fills().slice(built);
-        expect(removed).toHaveLength(run.arena!.blocks.length);
+        expect(removed).toHaveLength(arenaKind.withDecayed(run.arena!.blocks).length);
         expect(removed.every((line) => line.includes("minecraft:air replace"))).toBe(true);
         for (const one of run.entrants) {
             expect(world.sent).toContain(
