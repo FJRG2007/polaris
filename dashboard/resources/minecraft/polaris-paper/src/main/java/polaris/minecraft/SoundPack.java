@@ -9,14 +9,23 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import org.bukkit.Bukkit;
+import org.bukkit.Location;
 import org.bukkit.SoundCategory;
+import org.bukkit.World;
+import org.bukkit.advancement.AdvancementDisplay;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
+import org.bukkit.entity.EnderDragon;
+import org.bukkit.entity.EntityType;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
+import org.bukkit.event.entity.EnderDragonChangePhaseEvent;
+import org.bukkit.event.entity.EntityDeathEvent;
+import org.bukkit.event.entity.PlayerDeathEvent;
+import org.bukkit.event.player.PlayerAdvancementDoneEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.event.player.PlayerResourcePackStatusEvent;
@@ -50,6 +59,11 @@ import org.bukkit.scheduler.BukkitTask;
  * out as required too: the prompt says so, rather than an optional pack
  * costing the player their place.
  *
+ * The everyday moments ({@link SoundConfig#cue}) are heard from the game's own
+ * events: a death and the kill behind it, a player leaving, an advancement that
+ * shows a toast, the Ender Dragon starting to die and the Wither's death. Night
+ * and day have no event, so the main world's clock is read once a second.
+ *
  * {@code polaris sounds status|refresh} answer one line of JSON, from the
  * console (and so RCON) only.
  */
@@ -65,6 +79,9 @@ final class SoundPack implements Listener, CommandExecutor {
     /** The pack each player still joining was handed, and their answer to it. */
     private final Map<UUID, Handed> handed = new ConcurrentHashMap<>();
     private BukkitTask retry;
+    private BukkitTask clock;
+    /** The night the main world was in at the last look; null before the first. */
+    private Boolean night;
 
     /** Kept until the player arrives; one who never does is forgotten after this. */
     private static final long HANDED_FOR_MILLIS = TimeUnit.MINUTES.toMillis(10);
@@ -91,6 +108,7 @@ final class SoundPack implements Listener, CommandExecutor {
         SoundPack pack = new SoundPack(plugin, link, version);
         Bukkit.getPluginManager().registerEvents(pack, plugin);
         pack.handOutWhileJoining();
+        pack.clock = Bukkit.getScheduler().runTaskTimer(plugin, pack::checkClock, 20, 20);
         pack.refresh();
         return pack;
     }
@@ -141,6 +159,8 @@ final class SoundPack implements Listener, CommandExecutor {
     void stop() {
         if (retry != null) retry.cancel();
         retry = null;
+        if (clock != null) clock.cancel();
+        clock = null;
     }
 
     /** Ask Polaris again; the answer is applied on the main thread. A failure
@@ -220,6 +240,7 @@ final class SoundPack implements Listener, CommandExecutor {
 
     @EventHandler(priority = EventPriority.MONITOR)
     public void onQuit(PlayerQuitEvent event) {
+        cue("leave", null, event.getPlayer().getLocation());
         UUID id = event.getPlayer().getUniqueId();
         states.remove(id);
         welcomeOwed.remove(id);
@@ -249,6 +270,81 @@ final class SoundPack implements Listener, CommandExecutor {
         player.addScoreboardTag(SoundConfig.LOADED_TAG);
         SoundConfig.Sound welcome = config.welcome();
         if (welcomeOwed.remove(player.getUniqueId()) && welcome != null) play(player, welcome);
+    }
+
+    // ------------------------------------------------------------- everyday moments
+
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    public void onDeath(PlayerDeathEvent event) {
+        Player victim = event.getEntity();
+        cue("death", victim, victim.getLocation());
+        Player killer = victim.getKiller();
+        if (killer != null && killer != victim) cue("kill", killer, victim.getLocation());
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    public void onBossDeath(EntityDeathEvent event) {
+        if (event.getEntityType() == EntityType.WITHER)
+            cue("wither", event.getEntity().getKiller(), event.getEntity().getLocation());
+    }
+
+    /** The dragon never dies the ordinary way: it falls into a death animation,
+     *  and this is the moment it does. */
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    public void onDragonDying(EnderDragonChangePhaseEvent event) {
+        if (event.getNewPhase() == EnderDragon.Phase.DYING)
+            cue("dragon", event.getEntity().getKiller(), event.getEntity().getLocation());
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR)
+    public void onAdvancement(PlayerAdvancementDoneEvent event) {
+        // Recipes and the game's bookkeeping are advancements too; only the ones
+        // the player is shown count.
+        AdvancementDisplay display = event.getAdvancement().getDisplay();
+        if (display != null && display.shouldShowToast()) cue("advancement", event.getPlayer(), event.getPlayer().getLocation());
+    }
+
+    private void checkClock() {
+        SoundConfig current = config;
+        if ((current.cue("nightfall") == null && current.cue("daybreak") == null) || Bukkit.getWorlds().isEmpty()) {
+            night = null;
+            return;
+        }
+        long time = Bukkit.getWorlds().get(0).getTime();
+        boolean now = time >= 13000 && time < 23000;
+        Boolean before = night;
+        night = now;
+        if (before != null && before != now) cue(now ? "nightfall" : "daybreak", null, null);
+    }
+
+    /**
+     * An everyday moment's sound, to whoever the owner picked: {@code subject}
+     * is the player it happened to (none for night and day), {@code where} the
+     * place it happened. Only players carrying the tag hear it; the rest hear the
+     * game's own sounds, as always.
+     */
+    private void cue(String moment, Player subject, Location where) {
+        SoundConfig.Cue cue = config.cue(moment);
+        if (cue == null) return;
+        switch (cue.audience()) {
+            case PLAYER -> {
+                if (subject != null && loaded(subject)) play(subject, cue.sound());
+            }
+            case NEAR -> {
+                World world = where == null ? null : where.getWorld();
+                if (world == null) return;
+                double reach = (double) SoundConfig.NEAR_BLOCKS * SoundConfig.NEAR_BLOCKS;
+                for (Player other : world.getPlayers())
+                    if (loaded(other) && other.getLocation().distanceSquared(where) <= reach) play(other, cue.sound());
+            }
+            case ALL -> {
+                for (Player other : Bukkit.getOnlinePlayers()) if (loaded(other)) play(other, cue.sound());
+            }
+        }
+    }
+
+    private static boolean loaded(Player player) {
+        return player.getScoreboardTags().contains(SoundConfig.LOADED_TAG);
     }
 
     private static void play(Player player, SoundConfig.Sound sound) {

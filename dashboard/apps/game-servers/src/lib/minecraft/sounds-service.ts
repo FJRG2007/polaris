@@ -474,6 +474,8 @@ export interface JarConfig {
     readonly join: JarSound | null;
     readonly welcome: JarSound | null;
     readonly players: readonly (JarSound & { readonly player: string })[];
+    /** The everyday moments with a sound, and who hears each. */
+    readonly moments: rules.JarMoments;
 }
 
 interface JarSound {
@@ -495,7 +497,8 @@ export async function jarConfig(installedAppId: string): Promise<JarConfig> {
         }),
         prisma.installedApp.findUnique({ where: { id: installedAppId }, select: { ownerId: true } })
     ]);
-    if (!pack || !install) return { ok: true, pack: null, join: null, welcome: null, players: [] };
+    if (!pack || !install)
+        return { ok: true, pack: null, join: null, welcome: null, players: [], moments: {} };
     const keys = await prisma.minecraftSound.findMany({
         where: { installedAppId },
         select: { key: true }
@@ -522,7 +525,8 @@ export async function jarConfig(installedAppId: string): Promise<JarConfig> {
             sound: rules.soundId(one.sound),
             volume: one.volume,
             pitch: one.pitch
-        }))
+        })),
+        moments: rules.jarMoments(settings.moments)
     };
 }
 

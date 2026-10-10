@@ -64,6 +64,14 @@ Where the server requires its own resource pack (`require-resource-pack`), the
 game disconnects a player who turns down any pack, so the sound pack is handed
 out as required there too.
 
+The owner can also put a sound on everyday moments, each played to the player
+it happened to, the players within 48 blocks, or everybody (always only players
+with the pack): a death (`PlayerDeathEvent`) and the kill behind it, a player
+leaving, an advancement that shows a toast (`PlayerAdvancementDoneEvent`), the
+Ender Dragon starting to die (`EnderDragonChangePhaseEvent`), the Wither's
+death, and night falling and day breaking in the main world, read from its
+clock once a second since the game has no event for it.
+
 `polaris sounds status` answers one line of JSON: the pack's checksum and each
 online player's state (`loaded`, `pending`, `declined`, `failed`).
 `POLARIS_SOUNDS=off` switches it all off.
