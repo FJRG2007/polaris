@@ -22,8 +22,25 @@ import { SoundEditDialog, SoundPlayDialog } from "./sound-dialogs";
 import { EncodeError, toGameSound } from "../../lib/minecraft/sound-encode";
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import type { LiveSounds, SoundEntry } from "../../lib/minecraft/sounds-service";
-import { Copy, MoreHorizontal, Pencil, Play, Radio, Replace, Square, Trash2, Upload, Volume2 } from "lucide-react";
-import { ACCEPTED_FILES, MAX_LIBRARY_BYTES, MAX_SOUND_BYTES, MAX_SOUNDS, soundId } from "../../lib/minecraft/sounds";
+import {
+    Copy,
+    MoreHorizontal,
+    Pencil,
+    Play,
+    Radio,
+    Replace,
+    Square,
+    Trash2,
+    Upload,
+    Volume2
+} from "lucide-react";
+import {
+    ACCEPTED_FILES,
+    MAX_LIBRARY_BYTES,
+    MAX_SOUND_BYTES,
+    MAX_SOUNDS,
+    soundId
+} from "../../lib/minecraft/sounds";
 import {
     Badge,
     Button,
@@ -51,7 +68,11 @@ type UploadAnswer = { sound?: SoundEntry; pushed?: boolean; error?: string };
 
 /** The file's name as the sound's: no extension, at most the name's length. */
 function nameFromFile(file: File): string {
-    return file.name.replace(/\.[^.]+$/, "").replace(/[_-]+/g, " ").trim().slice(0, 48);
+    return file.name
+        .replace(/\.[^.]+$/, "")
+        .replace(/[_-]+/g, " ")
+        .trim()
+        .slice(0, 48);
 }
 
 async function send(url: string, method: "POST" | "PUT", bytes: Uint8Array): Promise<UploadAnswer> {
@@ -84,7 +105,9 @@ export function MinecraftSounds({
     const t = useGameText("minecraft");
     const viewKey = `minecraft-sounds:${installedAppId}`;
     const [view, setView] = useState<SoundsView | null>(null);
-    useKeptSnapshot<SoundsView>(viewKey, KEPT_VIEW_MS, (kept) => setView((current) => current ?? kept.value));
+    useKeptSnapshot<SoundsView>(viewKey, KEPT_VIEW_MS, (kept) =>
+        setView((current) => current ?? kept.value)
+    );
     const [heard, setHeard] = useState(false);
     const [loadError, setLoadError] = useState<string | null>(null);
     const [live, setLive] = useState<LiveSounds | null>(null);
@@ -161,7 +184,9 @@ export function MinecraftSounds({
         try {
             return (await toGameSound(file)).bytes;
         } catch (caught) {
-            return caught instanceof EncodeError ? encodeWords(caught.reason) : t("sounds.encode.encoder");
+            return caught instanceof EncodeError
+                ? encodeWords(caught.reason)
+                : t("sounds.encode.encoder");
         }
     }
 
@@ -190,12 +215,22 @@ export function MinecraftSounds({
             if (answer.sound) {
                 added += 1;
                 last = answer.sound.name;
-            } else missed.push(t("sounds.library.failedFile", { name: file.name, reason: answer.error ?? t("sounds.refused.failed") }));
+            } else
+                missed.push(
+                    t("sounds.library.failedFile", {
+                        name: file.name,
+                        reason: answer.error ?? t("sounds.refused.failed")
+                    })
+                );
         }
         setBusy(null);
         setFailures(missed);
         if (added > 0) {
-            said(added === 1 ? t("sounds.library.added", { name: last }) : t("sounds.library.addedMany", { count: added }));
+            said(
+                added === 1
+                    ? t("sounds.library.added", { name: last })
+                    : t("sounds.library.addedMany", { count: added })
+            );
             await reload();
         }
     }
@@ -213,9 +248,11 @@ export function MinecraftSounds({
             return;
         }
         setBusy(t("sounds.library.uploading", { name: entry.name }));
-        const answer = await send(`/api/apps/installed/${installedAppId}/minecraft/sounds/${entry.id}`, "PUT", bytes).catch(
-            () => ({ error: t("sounds.refused.failed") }) as UploadAnswer
-        );
+        const answer = await send(
+            `/api/apps/installed/${installedAppId}/minecraft/sounds/${entry.id}`,
+            "PUT",
+            bytes
+        ).catch(() => ({ error: t("sounds.refused.failed") }) as UploadAnswer);
         setBusy(null);
         if (answer.error || !answer.sound) {
             failed(answer.error ?? t("sounds.refused.failed"));
@@ -271,7 +308,9 @@ export function MinecraftSounds({
         startTransition(async () => {
             const result = await actions.enableSoundsAction(installedAppId);
             if (result.error) return failed(result.error);
-            said(result.restarted ? t("sounds.delivery.setUpDone") : t("sounds.delivery.setUpReady"));
+            said(
+                result.restarted ? t("sounds.delivery.setUpDone") : t("sounds.delivery.setUpReady")
+            );
             await reload();
         });
     }
@@ -326,7 +365,9 @@ export function MinecraftSounds({
     if (edition === "bedrock")
         return (
             <Card>
-                <CardBody className="py-10 text-center text-sm text-muted-foreground">{t("sounds.delivery.bedrock")}</CardBody>
+                <CardBody className="py-10 text-center text-sm text-muted-foreground">
+                    {t("sounds.delivery.bedrock")}
+                </CardBody>
             </Card>
         );
 
@@ -335,7 +376,9 @@ export function MinecraftSounds({
     const working = pending || busy !== null;
     const online = live?.players.length ?? 0;
     const loaded = live?.players.filter((one) => one.state === "loaded").length ?? 0;
-    const declined = live?.players.filter((one) => one.state === "declined" || one.state === "failed").length ?? 0;
+    const declined =
+        live?.players.filter((one) => one.state === "declined" || one.state === "failed").length ??
+        0;
 
     return (
         <div className="flex flex-col gap-4">
@@ -363,26 +406,44 @@ export function MinecraftSounds({
                             <div className="flex flex-wrap items-start justify-between gap-3">
                                 <div className="min-w-0 flex-1 basis-60">
                                     <p className="flex items-center gap-2 text-sm font-medium">
-                                        <Radio className="size-4 shrink-0" /> {t("sounds.delivery.liveTitle")}
+                                        <Radio className="size-4 shrink-0" />{" "}
+                                        {t("sounds.delivery.liveTitle")}
                                     </p>
-                                    <p className="text-xs text-muted-foreground">{t("sounds.delivery.liveBody")}</p>
+                                    <p className="text-xs text-muted-foreground">
+                                        {t("sounds.delivery.liveBody")}
+                                    </p>
                                 </div>
                                 {canManage && running && live?.loaded ? (
-                                    <Button type="button" size="sm" variant="outline" disabled={working} onClick={sendAgain}>
+                                    <Button
+                                        type="button"
+                                        size="sm"
+                                        variant="outline"
+                                        disabled={working}
+                                        onClick={sendAgain}
+                                    >
                                         {t("sounds.delivery.sendAgain")}
                                     </Button>
                                 ) : null}
                             </div>
                             {!running ? (
-                                <p className="text-xs text-muted-foreground">{t("sounds.delivery.stopped")}</p>
+                                <p className="text-xs text-muted-foreground">
+                                    {t("sounds.delivery.stopped")}
+                                </p>
                             ) : live && !live.loaded ? (
                                 <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-border p-2">
                                     <div className="min-w-0 flex-1 basis-60">
                                         <p className="text-sm">{t("sounds.delivery.oldTitle")}</p>
-                                        <p className="text-xs text-muted-foreground">{t("sounds.delivery.oldBody")}</p>
+                                        <p className="text-xs text-muted-foreground">
+                                            {t("sounds.delivery.oldBody")}
+                                        </p>
                                     </div>
                                     {canManage ? (
-                                        <Button type="button" size="sm" disabled={working} onClick={() => void restart()}>
+                                        <Button
+                                            type="button"
+                                            size="sm"
+                                            disabled={working}
+                                            onClick={() => void restart()}
+                                        >
                                             {t("sounds.delivery.restart")}
                                         </Button>
                                     ) : null}
@@ -394,7 +455,13 @@ export function MinecraftSounds({
                                             ? t("sounds.delivery.nobodyOnline")
                                             : t("sounds.delivery.loadedCount", { loaded, online })}
                                     </p>
-                                    {declined > 0 ? <p>{t("sounds.delivery.declinedCount", { count: declined })}</p> : null}
+                                    {declined > 0 ? (
+                                        <p>
+                                            {t("sounds.delivery.declinedCount", {
+                                                count: declined
+                                            })}
+                                        </p>
+                                    ) : null}
                                     {online > 0 ? (
                                         <ul className="flex flex-wrap gap-1">
                                             {live.players.map((one) => (
@@ -424,9 +491,13 @@ export function MinecraftSounds({
                     ) : delivery.mode === "jar" ? (
                         <div className="flex flex-wrap items-start justify-between gap-3">
                             <div className="min-w-0 flex-1 basis-60">
-                                <p className="text-sm font-medium">{t("sounds.delivery.setupTitle")}</p>
+                                <p className="text-sm font-medium">
+                                    {t("sounds.delivery.setupTitle")}
+                                </p>
                                 <p className="text-xs text-muted-foreground">
-                                    {delivery.kind === "mod" ? t("sounds.delivery.setupMod") : t("sounds.delivery.setupPlugin")}
+                                    {delivery.kind === "mod"
+                                        ? t("sounds.delivery.setupMod")
+                                        : t("sounds.delivery.setupPlugin")}
                                 </p>
                             </div>
                             {canManage ? (
@@ -443,7 +514,9 @@ export function MinecraftSounds({
                     ) : (
                         <div className="flex flex-wrap items-start justify-between gap-3">
                             <div className="min-w-0 flex-1 basis-60">
-                                <p className="text-sm font-medium">{t("sounds.delivery.serverPackTitle")}</p>
+                                <p className="text-sm font-medium">
+                                    {t("sounds.delivery.serverPackTitle")}
+                                </p>
                                 <p className="text-xs text-muted-foreground">
                                     {delivery.serverPackOn
                                         ? t("sounds.delivery.serverPackOn")
@@ -453,7 +526,13 @@ export function MinecraftSounds({
                                 </p>
                             </div>
                             {canManage && delivery.serverPackOn ? (
-                                <Button type="button" size="sm" variant="outline" disabled={working} onClick={() => void serverPack(false)}>
+                                <Button
+                                    type="button"
+                                    size="sm"
+                                    variant="outline"
+                                    disabled={working}
+                                    onClick={() => void serverPack(false)}
+                                >
                                     {t("sounds.delivery.stopOffering")}
                                 </Button>
                             ) : canManage && delivery.serverPackFree ? (
@@ -461,7 +540,11 @@ export function MinecraftSounds({
                                     type="button"
                                     size="sm"
                                     disabled={working || sounds.length === 0}
-                                    title={sounds.length === 0 ? t("sounds.delivery.needsSounds") : undefined}
+                                    title={
+                                        sounds.length === 0
+                                            ? t("sounds.delivery.needsSounds")
+                                            : undefined
+                                    }
                                     onClick={() => void serverPack(true)}
                                 >
                                     {t("sounds.delivery.offer")}
@@ -504,7 +587,11 @@ export function MinecraftSounds({
                                         used: formatBytes(view.library.totalBytes),
                                         limit: formatBytes(MAX_LIBRARY_BYTES)
                                     })}{" "}
-                                    - {t("sounds.library.count", { count: sounds.length, limit: MAX_SOUNDS })}
+                                    -{" "}
+                                    {t("sounds.library.count", {
+                                        count: sounds.length,
+                                        limit: MAX_SOUNDS
+                                    })}
                                 </p>
                             ) : null}
                         </div>
@@ -561,7 +648,11 @@ export function MinecraftSounds({
                             ))}
                         </ul>
                     ) : null}
-                    {preview.unplayable ? <p className="text-xs text-muted-foreground">{t("sounds.library.cannotPlay")}</p> : null}
+                    {preview.unplayable ? (
+                        <p className="text-xs text-muted-foreground">
+                            {t("sounds.library.cannotPlay")}
+                        </p>
+                    ) : null}
 
                     {!view ? (
                         <div className="flex flex-col gap-2">
@@ -585,27 +676,60 @@ export function MinecraftSounds({
                                             onClick={() =>
                                                 listening
                                                     ? preview.stop()
-                                                    : preview.play(entry.id, soundUrl(installedAppId, entry.id, entry.updatedAt))
+                                                    : preview.play(
+                                                          entry.id,
+                                                          soundUrl(
+                                                              installedAppId,
+                                                              entry.id,
+                                                              entry.updatedAt
+                                                          )
+                                                      )
                                             }
-                                            aria-label={listening ? t("sounds.library.stop") : t("sounds.library.listen")}
-                                            title={listening ? t("sounds.library.stop") : t("sounds.library.listen")}
+                                            aria-label={
+                                                listening
+                                                    ? t("sounds.library.stop")
+                                                    : t("sounds.library.listen")
+                                            }
+                                            title={
+                                                listening
+                                                    ? t("sounds.library.stop")
+                                                    : t("sounds.library.listen")
+                                            }
                                         >
-                                            {listening ? <Square className="size-4" /> : <Play className="size-4" />}
+                                            {listening ? (
+                                                <Square className="size-4" />
+                                            ) : (
+                                                <Play className="size-4" />
+                                            )}
                                         </Button>
                                         <div className="min-w-0 flex-1">
                                             <p className="truncate text-sm" title={entry.name}>
                                                 {entry.name}
                                             </p>
                                             <p className="flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground">
-                                                <code className="truncate" title={soundId(entry.key)}>
+                                                <code
+                                                    className="truncate"
+                                                    title={soundId(entry.key)}
+                                                >
                                                     {soundId(entry.key)}
                                                 </code>
-                                                <span>{t("sounds.library.seconds", { seconds: entry.seconds.toFixed(1) })}</span>
+                                                <span>
+                                                    {t("sounds.library.seconds", {
+                                                        seconds: entry.seconds.toFixed(1)
+                                                    })}
+                                                </span>
                                                 <span>{formatBytes(entry.size)}</span>
-                                                {entry.stream ? <Badge>{t("sounds.library.streamed")}</Badge> : null}
+                                                {entry.stream ? (
+                                                    <Badge>{t("sounds.library.streamed")}</Badge>
+                                                ) : null}
                                                 {entry.replaces ? (
-                                                    <Badge className="max-w-56 truncate" title={entry.replaces}>
-                                                        {t("sounds.library.replacesBadge", { id: entry.replaces })}
+                                                    <Badge
+                                                        className="max-w-56 truncate"
+                                                        title={entry.replaces}
+                                                    >
+                                                        {t("sounds.library.replacesBadge", {
+                                                            id: entry.replaces
+                                                        })}
                                                     </Badge>
                                                 ) : null}
                                             </p>
@@ -635,13 +759,20 @@ export function MinecraftSounds({
                                                 </Button>
                                             </DropdownMenuTrigger>
                                             <DropdownMenuContent align="end">
-                                                <DropdownMenuItem onSelect={() => void copyId(entry)}>
-                                                    <Copy className="size-4" /> {t("sounds.library.copyId")}
+                                                <DropdownMenuItem
+                                                    onSelect={() => void copyId(entry)}
+                                                >
+                                                    <Copy className="size-4" />{" "}
+                                                    {t("sounds.library.copyId")}
                                                 </DropdownMenuItem>
                                                 {canManage ? (
                                                     <>
-                                                        <DropdownMenuItem disabled={working} onSelect={() => setEditing(entry)}>
-                                                            <Pencil className="size-4" /> {t("sounds.library.edit")}
+                                                        <DropdownMenuItem
+                                                            disabled={working}
+                                                            onSelect={() => setEditing(entry)}
+                                                        >
+                                                            <Pencil className="size-4" />{" "}
+                                                            {t("sounds.library.edit")}
                                                         </DropdownMenuItem>
                                                         <DropdownMenuItem
                                                             disabled={working}
@@ -650,7 +781,8 @@ export function MinecraftSounds({
                                                                 replaceInput.current?.click();
                                                             }}
                                                         >
-                                                            <Replace className="size-4" /> {t("sounds.library.replace")}
+                                                            <Replace className="size-4" />{" "}
+                                                            {t("sounds.library.replace")}
                                                         </DropdownMenuItem>
                                                         <DropdownMenuSeparator />
                                                         <DropdownMenuItem
@@ -658,7 +790,8 @@ export function MinecraftSounds({
                                                             className="text-danger"
                                                             onSelect={() => void remove(entry)}
                                                         >
-                                                            <Trash2 className="size-4" /> {t("sounds.library.delete")}
+                                                            <Trash2 className="size-4" />{" "}
+                                                            {t("sounds.library.delete")}
                                                         </DropdownMenuItem>
                                                     </>
                                                 ) : null}
@@ -682,7 +815,9 @@ export function MinecraftSounds({
                     preview={preview}
                     onSaved={(settings) => {
                         setView((current) =>
-                            current ? { ...current, library: { ...current.library, settings } } : current
+                            current
+                                ? { ...current, library: { ...current.library, settings } }
+                                : current
                         );
                         void reload();
                     }}
@@ -699,7 +834,12 @@ export function MinecraftSounds({
                     void reload();
                 }}
             />
-            <SoundPlayDialog installedAppId={installedAppId} sound={playing} players={players} onClose={() => setPlaying(null)} />
+            <SoundPlayDialog
+                installedAppId={installedAppId}
+                sound={playing}
+                players={players}
+                onClose={() => setPlaying(null)}
+            />
             {confirmElement}
         </div>
     );

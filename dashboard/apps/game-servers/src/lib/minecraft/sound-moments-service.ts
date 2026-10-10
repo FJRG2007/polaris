@@ -14,7 +14,10 @@ import { momentOverrides, type MomentOverrides } from "./sound-moments";
 const TTL_MS = 30_000;
 const NONE: MomentOverrides = new Map();
 
-const known = new Map<string, { readonly at: number; readonly overrides: Promise<MomentOverrides> }>();
+const known = new Map<
+    string,
+    { readonly at: number; readonly overrides: Promise<MomentOverrides> }
+>();
 
 async function read(installedAppId: string): Promise<MomentOverrides> {
     const pack = await prisma.minecraftSoundPack.findUnique({

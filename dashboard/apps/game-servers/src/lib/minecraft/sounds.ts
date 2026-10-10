@@ -193,9 +193,14 @@ export function readVorbis(bytes: Uint8Array): VorbisInfo {
             if (!(flags & 0x02)) return { ok: false, reason: "notOgg" };
             serial = pageSerial;
             if (ascii(bytes, headerEnd, 8) === "OpusHead") return { ok: false, reason: "opus" };
-            if (bytes[headerEnd] !== 1 || ascii(bytes, headerEnd + 1, 6) !== "vorbis" || bodyLength < 30)
+            if (
+                bytes[headerEnd] !== 1 ||
+                ascii(bytes, headerEnd + 1, 6) !== "vorbis" ||
+                bodyLength < 30
+            )
                 return { ok: false, reason: "notVorbis" };
-            if (view.getUint32(headerEnd + 7, true) !== 0) return { ok: false, reason: "notVorbis" };
+            if (view.getUint32(headerEnd + 7, true) !== 0)
+                return { ok: false, reason: "notVorbis" };
             channels = bytes[headerEnd + 11] as number;
             sampleRate = view.getUint32(headerEnd + 12, true);
             if (channels !== 1 && channels !== 2) return { ok: false, reason: "channels" };
@@ -284,7 +289,12 @@ export const soundSettingsSchema = z.object({
 
 export type SoundSettings = z.infer<typeof soundSettingsSchema>;
 
-export const DEFAULT_SETTINGS: SoundSettings = { required: false, prompt: "", moments: {}, players: [] };
+export const DEFAULT_SETTINGS: SoundSettings = {
+    required: false,
+    prompt: "",
+    moments: {},
+    players: []
+};
 
 /** Stored settings, whatever shape they were stored in. */
 export function readSoundSettings(json: string | null | undefined): SoundSettings {
@@ -358,7 +368,8 @@ export function soundsJson(sounds: readonly PackSound[]): string {
  *  or null when it replaces none. Two uploads for the same sound play at random,
  *  as the game does with its own variants. */
 export function replacedJson(sounds: readonly PackSound[]): string | null {
-    const events: Record<string, { replace: true; sounds: { name: string; stream: boolean }[] }> = {};
+    const events: Record<string, { replace: true; sounds: { name: string; stream: boolean }[] }> =
+        {};
     for (const sound of [...sounds].sort((a, b) => a.key.localeCompare(b.key))) {
         if (!sound.replaces) continue;
         const id = sound.replaces.slice("minecraft:".length);

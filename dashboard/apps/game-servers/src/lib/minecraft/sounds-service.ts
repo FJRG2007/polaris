@@ -94,7 +94,10 @@ export async function soundLibrary(installedAppId: string): Promise<SoundLibrary
             orderBy: { name: "asc" },
             take: rules.MAX_SOUNDS
         }),
-        prisma.minecraftSoundPack.findUnique({ where: { installedAppId }, select: { settings: true } })
+        prisma.minecraftSoundPack.findUnique({
+            where: { installedAppId },
+            select: { settings: true }
+        })
     ]);
     return {
         sounds: rows.map(entry),
@@ -123,7 +126,8 @@ function refusal(reason: rules.VorbisRefusal): string {
 
 /** The file checked as the game will read it, or a refusal. */
 function checked(bytes: Uint8Array): Extract<rules.VorbisInfo, { ok: true }> {
-    if (bytes.length === 0) throw new SoundRefusal(gameMessage("minecraft", "sounds.refused.empty"));
+    if (bytes.length === 0)
+        throw new SoundRefusal(gameMessage("minecraft", "sounds.refused.empty"));
     if (bytes.length > rules.MAX_SOUND_BYTES)
         throw new SoundRefusal(gameMessage("minecraft", "sounds.refused.tooLarge"));
     const info = rules.readVorbis(bytes);
@@ -145,7 +149,10 @@ async function bump(installedAppId: string): Promise<void> {
 /** Read the library and write to it as one step: two uploads at once (several
  *  files dropped together) take turns, so neither takes the other's key or
  *  slips past the limits with it. */
-function withLibrary<T>(installedAppId: string, work: (tx: Prisma.TransactionClient) => Promise<T>): Promise<T> {
+function withLibrary<T>(
+    installedAppId: string,
+    work: (tx: Prisma.TransactionClient) => Promise<T>
+): Promise<T> {
     return prisma.$transaction(
         async (tx) => {
             await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`polaris.minecraft.sounds:${installedAppId}`}))`;
@@ -169,11 +176,16 @@ export async function addSound(
             select: { key: true, size: true }
         });
         if (existing.length >= rules.MAX_SOUNDS)
-            throw new SoundRefusal(gameMessage("minecraft", "sounds.refused.tooMany", { count: rules.MAX_SOUNDS }));
+            throw new SoundRefusal(
+                gameMessage("minecraft", "sounds.refused.tooMany", { count: rules.MAX_SOUNDS })
+            );
         const total = existing.reduce((sum, row) => sum + row.size, 0);
         if (total + input.bytes.length > rules.MAX_LIBRARY_BYTES)
             throw new SoundRefusal(gameMessage("minecraft", "sounds.refused.libraryFull"));
-        const key = rules.freeKey(rules.soundKey(name.data), new Set(existing.map((row) => row.key)));
+        const key = rules.freeKey(
+            rules.soundKey(name.data),
+            new Set(existing.map((row) => row.key))
+        );
         return tx.minecraftSound.create({
             data: {
                 installedAppId,
@@ -223,9 +235,13 @@ export async function replaceSound(
             }
         });
     });
-    if (updated.count === 0) throw new SoundRefusal(gameMessage("minecraft", "sounds.refused.gone"));
+    if (updated.count === 0)
+        throw new SoundRefusal(gameMessage("minecraft", "sounds.refused.gone"));
     await bump(installedAppId);
-    const row = await prisma.minecraftSound.findFirstOrThrow({ where: { installedAppId, id }, select: entrySelect });
+    const row = await prisma.minecraftSound.findFirstOrThrow({
+        where: { installedAppId, id },
+        select: entrySelect
+    });
     return entry(row);
 }
 
@@ -238,31 +254,48 @@ export interface SoundChange {
     readonly replaces?: string;
 }
 
-export async function updateSound(installedAppId: string, id: string, change: SoundChange): Promise<void> {
+export async function updateSound(
+    installedAppId: string,
+    id: string,
+    change: SoundChange
+): Promise<void> {
     const data: { name?: string; subtitle?: string; stream?: boolean; replaces?: string } = {};
     if (change.name !== undefined) {
         const name = rules.soundNameSchema.safeParse(change.name);
         if (!name.success) throw new SoundRefusal(gameMessage("minecraft", "sounds.refused.name"));
         data.name = name.data;
     }
-    if (change.subtitle !== undefined) data.subtitle = rules.normalizeSoundName(change.subtitle).slice(0, rules.MAX_SUBTITLE);
+    if (change.subtitle !== undefined)
+        data.subtitle = rules.normalizeSoundName(change.subtitle).slice(0, rules.MAX_SUBTITLE);
     if (change.stream !== undefined) data.stream = change.stream;
     if (change.replaces !== undefined) {
         const replaces = rules.vanillaIdSchema.safeParse(change.replaces);
-        if (!replaces.success) throw new SoundRefusal(gameMessage("minecraft", "sounds.refused.vanilla"));
+        if (!replaces.success)
+            throw new SoundRefusal(gameMessage("minecraft", "sounds.refused.vanilla"));
         data.replaces = replaces.data;
     }
     const updated = await prisma.minecraftSound.updateMany({ where: { installedAppId, id }, data });
-    if (updated.count === 0) throw new SoundRefusal(gameMessage("minecraft", "sounds.refused.gone"));
+    if (updated.count === 0)
+        throw new SoundRefusal(gameMessage("minecraft", "sounds.refused.gone"));
     // A name is only the screen's; everything else is in the pack.
-    if (data.subtitle !== undefined || data.stream !== undefined || data.replaces !== undefined) await bump(installedAppId);
+    if (data.subtitle !== undefined || data.stream !== undefined || data.replaces !== undefined)
+        await bump(installedAppId);
 }
 
 export async function deleteSound(installedAppId: string, id: string): Promise<void> {
     await prisma.minecraftSound.deleteMany({ where: { installedAppId, id } });
-    const keys = await prisma.minecraftSound.findMany({ where: { installedAppId }, select: { key: true } });
-    const pack = await prisma.minecraftSoundPack.findUnique({ where: { installedAppId }, select: { settings: true } });
-    const settings = rules.withoutMissing(rules.readSoundSettings(pack?.settings), new Set(keys.map((row) => row.key)));
+    const keys = await prisma.minecraftSound.findMany({
+        where: { installedAppId },
+        select: { key: true }
+    });
+    const pack = await prisma.minecraftSoundPack.findUnique({
+        where: { installedAppId },
+        select: { settings: true }
+    });
+    const settings = rules.withoutMissing(
+        rules.readSoundSettings(pack?.settings),
+        new Set(keys.map((row) => row.key))
+    );
     await prisma.minecraftSoundPack.upsert({
         where: { installedAppId },
         create: { installedAppId, revision: 1, settings: JSON.stringify(settings) },
@@ -273,22 +306,32 @@ export async function deleteSound(installedAppId: string, id: string): Promise<v
 
 /** Save what the server does with its sounds. Anything pointing at a sound that
  *  is not in the library is refused rather than kept. */
-export async function saveSoundSettings(installedAppId: string, input: unknown): Promise<rules.SoundSettings> {
+export async function saveSoundSettings(
+    installedAppId: string,
+    input: unknown
+): Promise<rules.SoundSettings> {
     const parsed = rules.soundSettingsSchema.safeParse(input);
-    if (!parsed.success) throw new SoundRefusal(gameMessage("minecraft", "sounds.refused.settings"));
-    const keys = await prisma.minecraftSound.findMany({ where: { installedAppId }, select: { key: true } });
+    if (!parsed.success)
+        throw new SoundRefusal(gameMessage("minecraft", "sounds.refused.settings"));
+    const keys = await prisma.minecraftSound.findMany({
+        where: { installedAppId },
+        select: { key: true }
+    });
     const kept = rules.withoutMissing(parsed.data, new Set(keys.map((row) => row.key)));
     const seen = new Set<string>();
     const settings: rules.SoundSettings = {
         ...kept,
         prompt: rules.normalizeSoundName(kept.prompt),
         // One arrival sound per player, the last one given.
-        players: [...kept.players].reverse().filter((one) => {
-            const name = one.player.toLowerCase();
-            if (seen.has(name)) return false;
-            seen.add(name);
-            return true;
-        }).reverse()
+        players: [...kept.players]
+            .reverse()
+            .filter((one) => {
+                const name = one.player.toLowerCase();
+                if (seen.has(name)) return false;
+                seen.add(name);
+                return true;
+            })
+            .reverse()
     };
     await prisma.minecraftSoundPack.upsert({
         where: { installedAppId },
@@ -301,7 +344,10 @@ export async function saveSoundSettings(installedAppId: string, input: unknown):
 
 /** One sound's file, for the screen's player. */
 export async function soundFile(installedAppId: string, id: string): Promise<Uint8Array | null> {
-    const row = await prisma.minecraftSound.findFirst({ where: { installedAppId, id }, select: { data: true } });
+    const row = await prisma.minecraftSound.findFirst({
+        where: { installedAppId, id },
+        select: { data: true }
+    });
     return row ? new Uint8Array(row.data) : null;
 }
 
@@ -327,7 +373,10 @@ export interface BuiltPack {
 }
 
 /** The last pack built per server. Bounded: a pack can be tens of megabytes. */
-const packs = new Map<string, { readonly revision: number; readonly built: Promise<BuiltPack | null> }>();
+const packs = new Map<
+    string,
+    { readonly revision: number; readonly built: Promise<BuiltPack | null> }
+>();
 const PACKS_KEPT = 4;
 
 async function build(installedAppId: string, revision: number): Promise<BuiltPack | null> {
@@ -355,7 +404,10 @@ async function build(installedAppId: string, revision: number): Promise<BuiltPac
 /** The server's pack as its library stands, or null when it has no sounds. */
 export async function currentPack(installedAppId: string): Promise<BuiltPack | null> {
     const [pack, install] = await Promise.all([
-        prisma.minecraftSoundPack.findUnique({ where: { installedAppId }, select: { revision: true } }),
+        prisma.minecraftSoundPack.findUnique({
+            where: { installedAppId },
+            select: { revision: true }
+        }),
         prisma.installedApp.findUnique({ where: { id: installedAppId }, select: { id: true } })
     ]);
     if (!pack || !install) return null;
@@ -437,12 +489,21 @@ function jarSound(use: rules.SoundUse | undefined): JarSound | null {
 export async function jarConfig(installedAppId: string): Promise<JarConfig> {
     const [pack, settingsRow, install] = await Promise.all([
         currentPack(installedAppId),
-        prisma.minecraftSoundPack.findUnique({ where: { installedAppId }, select: { settings: true } }),
+        prisma.minecraftSoundPack.findUnique({
+            where: { installedAppId },
+            select: { settings: true }
+        }),
         prisma.installedApp.findUnique({ where: { id: installedAppId }, select: { ownerId: true } })
     ]);
     if (!pack || !install) return { ok: true, pack: null, join: null, welcome: null, players: [] };
-    const keys = await prisma.minecraftSound.findMany({ where: { installedAppId }, select: { key: true } });
-    const settings = rules.withoutMissing(rules.readSoundSettings(settingsRow?.settings), new Set(keys.map((row) => row.key)));
+    const keys = await prisma.minecraftSound.findMany({
+        where: { installedAppId },
+        select: { key: true }
+    });
+    const settings = rules.withoutMissing(
+        rules.readSoundSettings(settingsRow?.settings),
+        new Set(keys.map((row) => row.key))
+    );
     const { base } = await soundPackBase();
     return {
         ok: true,
@@ -478,7 +539,9 @@ export async function authorizeServer(request: Request, installedAppId: string):
     if (!install?.applicationId) return false;
     const token = await readInstallEnvSecret(install.applicationId, install.ownerId, TOKEN_KEY);
     const digest = (value: string) => createHash("sha256").update(value).digest();
-    return token !== null && token !== undefined && timingSafeEqual(digest(presented), digest(token));
+    return (
+        token !== null && token !== undefined && timingSafeEqual(digest(presented), digest(token))
+    );
 }
 
 // ------------------------------------------------------------------ the server
@@ -528,14 +591,19 @@ export async function soundsDelivery(
 
 /** Put the jar on the server and tell it where Polaris is. Answers whether a
  *  restart is needed for it to load. */
-export async function enableSounds(installedAppId: string, applicationId: string, ownerId: string): Promise<boolean> {
+export async function enableSounds(
+    installedAppId: string,
+    applicationId: string,
+    ownerId: string
+): Promise<boolean> {
     const env = await envOf(applicationId, ownerId);
     const build = soundsEnv.soundsBuildFor(env.get(SOFTWARE_KEY) ?? "", env.get("VERSION") ?? "");
     if (!build) throw new SoundRefusal(gameMessage("minecraft", "sounds.refused.noBuild"));
     // The server downloads the jar and asks for the pack at this address, and a
     // LAN-only name does not resolve inside a container.
     const baseUrl = await publicAppUrl().catch(() => null);
-    if (baseUrl === null) throw new SoundRefusal(gameMessage("minecraft", "sounds.refused.noAddress"));
+    if (baseUrl === null)
+        throw new SoundRefusal(gameMessage("minecraft", "sounds.refused.noAddress"));
     if (!(await anticheatBundled(build.file).catch(() => false)))
         throw new SoundRefusal(gameMessage("games", "lib.noModBuild"));
     const existing = await readInstallEnvSecret(applicationId, ownerId, TOKEN_KEY);
@@ -567,7 +635,10 @@ export async function setServerPack(
     if (on && !soundsEnv.serverPackFree(env, installedAppId))
         throw new SoundRefusal(gameMessage("minecraft", "sounds.refused.packTaken"));
     if (!on && !soundsEnv.serverPackIsOurs(env, installedAppId)) return;
-    const pack = await prisma.minecraftSoundPack.findUnique({ where: { installedAppId }, select: { settings: true } });
+    const pack = await prisma.minecraftSoundPack.findUnique({
+        where: { installedAppId },
+        select: { settings: true }
+    });
     const { base } = await soundPackBase();
     const writes = on
         ? soundsEnv.serverPackEnv(
@@ -609,7 +680,10 @@ export interface LiveSounds {
     /** The pack it is handing out, by checksum. */
     readonly sha1: string;
     /** Who has it loaded, and who turned it down or could not get it. */
-    readonly players: readonly { readonly name: string; readonly state: "loaded" | "pending" | "declined" | "failed" }[];
+    readonly players: readonly {
+        readonly name: string;
+        readonly state: "loaded" | "pending" | "declined" | "failed";
+    }[];
 }
 
 const NOT_RUNNING: LiveSounds = { running: false, loaded: false, sha1: "", players: [] };
@@ -620,7 +694,9 @@ const STATES = new Set(["loaded", "pending", "declined", "failed"]);
 export async function liveSounds(ownerId: string, installedAppId: string): Promise<LiveSounds> {
     return withServerContainer(ownerId, installedAppId, async (server) => {
         if (!server.running || server.edition !== "java") return NOT_RUNNING;
-        const reply = replyObject(await server.say(["polaris", "sounds", "status"]).catch(() => ""));
+        const reply = replyObject(
+            await server.say(["polaris", "sounds", "status"]).catch(() => "")
+        );
         if (!reply || reply.ok !== true) return { ...NOT_RUNNING, running: true };
         const players = Array.isArray(reply.players) ? reply.players : [];
         return {
@@ -644,7 +720,9 @@ export async function liveSounds(ownerId: string, installedAppId: string): Promi
 export async function refreshServer(ownerId: string, installedAppId: string): Promise<boolean> {
     return withServerContainer(ownerId, installedAppId, async (server) => {
         if (!server.running || server.edition !== "java") return false;
-        const reply = replyObject(await server.say(["polaris", "sounds", "refresh"]).catch(() => ""));
+        const reply = replyObject(
+            await server.say(["polaris", "sounds", "refresh"]).catch(() => "")
+        );
         return reply?.ok === true;
     }).catch(() => false);
 }
@@ -656,17 +734,28 @@ const PLAYER = /^[A-Za-z0-9_]{1,16}$/;
 export async function playSound(
     ownerId: string,
     installedAppId: string,
-    input: { readonly key: string; readonly player: string | null; readonly volume: number; readonly pitch: number }
+    input: {
+        readonly key: string;
+        readonly player: string | null;
+        readonly volume: number;
+        readonly pitch: number;
+    }
 ): Promise<string> {
-    const sound = await prisma.minecraftSound.findFirst({ where: { installedAppId, key: input.key }, select: { key: true } });
+    const sound = await prisma.minecraftSound.findFirst({
+        where: { installedAppId, key: input.key },
+        select: { key: true }
+    });
     if (!sound) throw new SoundRefusal(gameMessage("minecraft", "sounds.refused.gone"));
     if (input.player !== null && !PLAYER.test(input.player))
         throw new SoundRefusal(gameMessage("minecraft", "sounds.refused.player"));
     const volume = rules.commandNumber(Math.min(1, Math.max(0, input.volume)));
-    const pitch = rules.commandNumber(Math.min(rules.MAX_PITCH, Math.max(rules.MIN_PITCH, input.pitch)));
+    const pitch = rules.commandNumber(
+        Math.min(rules.MAX_PITCH, Math.max(rules.MIN_PITCH, input.pitch))
+    );
     const target = input.player ?? "@a";
     return withServerContainer(ownerId, installedAppId, async (server) => {
-        if (!server.running) throw new SoundRefusal(gameMessage("minecraft", "sounds.refused.stopped"));
+        if (!server.running)
+            throw new SoundRefusal(gameMessage("minecraft", "sounds.refused.stopped"));
         return server.say([
             `execute as ${target} at @s run playsound ${rules.soundId(sound.key)} master @s ~ ~ ~ ${volume} ${pitch}`
         ]);

@@ -130,7 +130,5 @@ export async function countdown(
 /** Said with "Go!" when it started without some of them. */
 export function startedWithoutLines(look: Look, language: speech.Speech): string[] {
     if (look.missing.length === 0) return [];
-    return [
-        commands.say(messages.tag(language) + messages.startedWithout(look.missing, language))
-    ];
+    return [commands.say(messages.tag(language) + messages.startedWithout(look.missing, language))];
 }

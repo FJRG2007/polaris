@@ -25,7 +25,9 @@ type SoundUse = rules.SoundUse;
 const PLAYER = /^[A-Za-z0-9_]{1,16}$/;
 const NONE = "";
 
-const MOMENT_WORDS: Readonly<Record<Moment, readonly [GameKey<"minecraft">, GameKey<"minecraft">]>> = {
+const MOMENT_WORDS: Readonly<
+    Record<Moment, readonly [GameKey<"minecraft">, GameKey<"minecraft">]>
+> = {
     countdown: ["sounds.moments.countdown", "sounds.moments.countdownHint"],
     start: ["sounds.moments.start", "sounds.moments.startHint"],
     win: ["sounds.moments.win", "sounds.moments.winHint"],
@@ -81,7 +83,10 @@ export function SoundSettingsEditor({
 
     const byKey = useMemo(() => new Map(sounds.map((entry) => [entry.key, entry])), [sounds]);
     const options = useMemo(
-        () => [...sounds].sort((a, b) => a.name.localeCompare(b.name)).map((entry) => ({ value: entry.key, label: entry.name })),
+        () =>
+            [...sounds]
+                .sort((a, b) => a.name.localeCompare(b.name))
+                .map((entry) => ({ value: entry.key, label: entry.name })),
         [sounds]
     );
     const dirty = !same(draft, settings);
@@ -109,7 +114,9 @@ export function SoundSettingsEditor({
         setNote(null);
         setDraft((current) => ({
             ...current,
-            players: current.players.map((one, index) => (index === at ? { ...one, ...change } : one))
+            players: current.players.map((one, index) =>
+                index === at ? { ...one, ...change } : one
+            )
         }));
     }
 
@@ -117,7 +124,13 @@ export function SoundSettingsEditor({
         const entry = byKey.get(use.sound);
         if (!entry) return;
         if (preview.playing === id) preview.stop();
-        else preview.play(id, soundUrl(installedAppId, entry.id, entry.updatedAt), use.volume, use.pitch);
+        else
+            preview.play(
+                id,
+                soundUrl(installedAppId, entry.id, entry.updatedAt),
+                use.volume,
+                use.pitch
+            );
     }
 
     function save(): void {
@@ -150,7 +163,9 @@ export function SoundSettingsEditor({
                 <div className="flex flex-wrap items-start justify-between gap-2">
                     <div className="min-w-0 flex-1 basis-48">
                         <p className="text-sm">{t(MOMENT_WORDS[moment][0])}</p>
-                        <p className="text-xs text-muted-foreground">{t(MOMENT_WORDS[moment][1])}</p>
+                        <p className="text-xs text-muted-foreground">
+                            {t(MOMENT_WORDS[moment][1])}
+                        </p>
                     </div>
                     <div className="flex min-w-0 items-center gap-2">
                         <Select
@@ -158,12 +173,23 @@ export function SoundSettingsEditor({
                             value={use?.sound ?? NONE}
                             disabled={off || sounds.length === 0}
                             onValueChange={(key) =>
-                                setMoment(moment, key === NONE ? null : { sound: key, volume: use?.volume ?? 1, pitch: use?.pitch ?? 1 })
+                                setMoment(
+                                    moment,
+                                    key === NONE
+                                        ? null
+                                        : {
+                                              sound: key,
+                                              volume: use?.volume ?? 1,
+                                              pitch: use?.pitch ?? 1
+                                          }
+                                )
                             }
                             options={[
                                 {
                                     value: NONE,
-                                    label: rules.EVENT_MOMENTS.includes(moment as (typeof rules.EVENT_MOMENTS)[number])
+                                    label: rules.EVENT_MOMENTS.includes(
+                                        moment as (typeof rules.EVENT_MOMENTS)[number]
+                                    )
                                         ? t("sounds.moments.gameSound")
                                         : t("sounds.moments.none")
                                 },
@@ -177,10 +203,22 @@ export function SoundSettingsEditor({
                             variant="ghost"
                             disabled={!use || !byKey.has(use.sound)}
                             onClick={() => use && listen(id, use)}
-                            aria-label={preview.playing === id ? t("sounds.library.stop") : t("sounds.moments.listen")}
-                            title={preview.playing === id ? t("sounds.library.stop") : t("sounds.moments.listen")}
+                            aria-label={
+                                preview.playing === id
+                                    ? t("sounds.library.stop")
+                                    : t("sounds.moments.listen")
+                            }
+                            title={
+                                preview.playing === id
+                                    ? t("sounds.library.stop")
+                                    : t("sounds.moments.listen")
+                            }
                         >
-                            {preview.playing === id ? <Square className="size-4" /> : <Play className="size-4" />}
+                            {preview.playing === id ? (
+                                <Square className="size-4" />
+                            ) : (
+                                <Play className="size-4" />
+                            )}
                         </Button>
                     </div>
                 </div>
@@ -219,7 +257,11 @@ export function SoundSettingsEditor({
                 </p>
             ) : null}
             {canManage ? (
-                <Button type="button" disabled={pending || !dirty || badPlayers || duplicate} onClick={save}>
+                <Button
+                    type="button"
+                    disabled={pending || !dirty || badPlayers || duplicate}
+                    onClick={save}
+                >
                     {t("sounds.moments.save")}
                 </Button>
             ) : null}
@@ -233,7 +275,9 @@ export function SoundSettingsEditor({
                     <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0">
                             <p className="text-sm font-medium">{t("sounds.required")}</p>
-                            <p className="text-xs text-muted-foreground">{t("sounds.requiredHint")}</p>
+                            <p className="text-xs text-muted-foreground">
+                                {t("sounds.requiredHint")}
+                            </p>
                         </div>
                         <Switch
                             checked={draft.required}
@@ -258,7 +302,9 @@ export function SoundSettingsEditor({
                                 setDraft((current) => ({ ...current, prompt }));
                             }}
                         />
-                        <span className="text-xs text-muted-foreground">{t("sounds.promptHint")}</span>
+                        <span className="text-xs text-muted-foreground">
+                            {t("sounds.promptHint")}
+                        </span>
                     </label>
                 </CardBody>
             </Card>
@@ -273,7 +319,11 @@ export function SoundSettingsEditor({
                         {rules.EVENT_MOMENTS.map((moment) => momentRow(moment, false))}
                         {rules.SERVER_MOMENTS.map((moment) => momentRow(moment, !jar))}
                     </ul>
-                    {!jar ? <p className="text-xs text-muted-foreground">{t("sounds.moments.needsJar")}</p> : null}
+                    {!jar ? (
+                        <p className="text-xs text-muted-foreground">
+                            {t("sounds.moments.needsJar")}
+                        </p>
+                    ) : null}
                 </CardBody>
             </Card>
 
@@ -289,9 +339,13 @@ export function SoundSettingsEditor({
                         <ul className="flex flex-col divide-y divide-border">
                             {draft.players.map((one, at) => {
                                 const id = `player:${at}`;
-                                const bad = one.player.trim() !== "" && !PLAYER.test(one.player.trim());
+                                const bad =
+                                    one.player.trim() !== "" && !PLAYER.test(one.player.trim());
                                 return (
-                                    <li key={at} className="flex flex-col gap-2 py-3 first:pt-0 last:pb-0">
+                                    <li
+                                        key={at}
+                                        className="flex flex-col gap-2 py-3 first:pt-0 last:pb-0"
+                                    >
                                         <div className="flex flex-wrap items-center gap-2">
                                             <Input
                                                 className="w-40 min-w-0"
@@ -302,14 +356,18 @@ export function SoundSettingsEditor({
                                                 placeholder={t("sounds.players.player")}
                                                 aria-label={t("sounds.players.player")}
                                                 aria-invalid={bad}
-                                                onChange={(event) => setPlayer(at, { player: event.target.value })}
+                                                onChange={(event) =>
+                                                    setPlayer(at, { player: event.target.value })
+                                                }
                                             />
                                             <Select
                                                 className="w-48 max-w-full"
                                                 value={byKey.has(one.sound) ? one.sound : NONE}
                                                 disabled={disabled || !jar}
                                                 placeholder={t("sounds.players.sound")}
-                                                onValueChange={(sound) => sound !== NONE && setPlayer(at, { sound })}
+                                                onValueChange={(sound) =>
+                                                    sound !== NONE && setPlayer(at, { sound })
+                                                }
                                                 options={options}
                                                 aria-label={t("sounds.players.sound")}
                                             />
@@ -319,10 +377,22 @@ export function SoundSettingsEditor({
                                                 variant="ghost"
                                                 disabled={!byKey.has(one.sound)}
                                                 onClick={() => listen(id, one)}
-                                                aria-label={preview.playing === id ? t("sounds.library.stop") : t("sounds.moments.listen")}
-                                                title={preview.playing === id ? t("sounds.library.stop") : t("sounds.moments.listen")}
+                                                aria-label={
+                                                    preview.playing === id
+                                                        ? t("sounds.library.stop")
+                                                        : t("sounds.moments.listen")
+                                                }
+                                                title={
+                                                    preview.playing === id
+                                                        ? t("sounds.library.stop")
+                                                        : t("sounds.moments.listen")
+                                                }
                                             >
-                                                {preview.playing === id ? <Square className="size-4" /> : <Play className="size-4" />}
+                                                {preview.playing === id ? (
+                                                    <Square className="size-4" />
+                                                ) : (
+                                                    <Play className="size-4" />
+                                                )}
                                             </Button>
                                             <Button
                                                 type="button"
@@ -333,7 +403,9 @@ export function SoundSettingsEditor({
                                                     setNote(null);
                                                     setDraft((current) => ({
                                                         ...current,
-                                                        players: current.players.filter((_, index) => index !== at)
+                                                        players: current.players.filter(
+                                                            (_, index) => index !== at
+                                                        )
                                                     }));
                                                 }}
                                                 aria-label={t("sounds.players.remove")}
@@ -342,7 +414,11 @@ export function SoundSettingsEditor({
                                                 <Trash2 className="size-4" />
                                             </Button>
                                         </div>
-                                        {bad ? <p className="text-xs text-danger">{t("sounds.players.badName")}</p> : null}
+                                        {bad ? (
+                                            <p className="text-xs text-danger">
+                                                {t("sounds.players.badName")}
+                                            </p>
+                                        ) : null}
                                         <div className="grid grid-cols-2 gap-3">
                                             <LevelSlider
                                                 label={t("sounds.moments.volume")}
@@ -368,25 +444,44 @@ export function SoundSettingsEditor({
                             })}
                         </ul>
                     )}
-                    {duplicate ? <p className="text-xs text-danger">{t("sounds.players.duplicate")}</p> : null}
+                    {duplicate ? (
+                        <p className="text-xs text-danger">{t("sounds.players.duplicate")}</p>
+                    ) : null}
                     <div>
                         <Button
                             type="button"
                             variant="outline"
                             size="sm"
-                            disabled={disabled || !jar || options.length === 0 || draft.players.length >= rules.MAX_PLAYER_SOUNDS}
+                            disabled={
+                                disabled ||
+                                !jar ||
+                                options.length === 0 ||
+                                draft.players.length >= rules.MAX_PLAYER_SOUNDS
+                            }
                             onClick={() => {
                                 setNote(null);
                                 setDraft((current) => ({
                                     ...current,
-                                    players: [...current.players, { player: "", sound: options[0]!.value, volume: 1, pitch: 1 }]
+                                    players: [
+                                        ...current.players,
+                                        {
+                                            player: "",
+                                            sound: options[0]!.value,
+                                            volume: 1,
+                                            pitch: 1
+                                        }
+                                    ]
                                 }));
                             }}
                         >
                             <Plus className="size-4" /> {t("sounds.players.add")}
                         </Button>
                     </div>
-                    {!jar ? <p className="text-xs text-muted-foreground">{t("sounds.moments.needsJar")}</p> : null}
+                    {!jar ? (
+                        <p className="text-xs text-muted-foreground">
+                            {t("sounds.moments.needsJar")}
+                        </p>
+                    ) : null}
                 </CardBody>
             </Card>
             {saveBar}

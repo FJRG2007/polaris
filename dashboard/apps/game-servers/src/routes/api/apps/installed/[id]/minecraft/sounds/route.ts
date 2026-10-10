@@ -53,7 +53,8 @@ export async function POST(
         const pushed = await service.refreshServer(resolved.access.ownerId, id);
         return Response.json({ sound, pushed }, { headers: { "cache-control": "no-store" } });
     } catch (caught) {
-        if (caught instanceof service.SoundRefusal) return refuse(400, await messageText(caught.message));
+        if (caught instanceof service.SoundRefusal)
+            return refuse(400, await messageText(caught.message));
         console.error("[minecraft-sounds] upload failed:", caught);
         return refuse(500, t("sounds.refused.failed"));
     }

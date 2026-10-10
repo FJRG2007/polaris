@@ -10,7 +10,11 @@ import { z } from "zod";
 import { host } from "@polaris/app-host";
 import * as service from "../../../../../../../../lib/minecraft/sounds-service";
 import { gameWords, messageText } from "../../../../../../../../screens/game-words";
-import { readUpload, refuse, sameOrigin } from "../../../../../../../../lib/minecraft/sounds-upload";
+import {
+    readUpload,
+    refuse,
+    sameOrigin
+} from "../../../../../../../../lib/minecraft/sounds-upload";
 
 const { requireGameServer } = host.appsInstallAccess;
 const { recordAudit } = host.auditService;
@@ -71,7 +75,8 @@ export async function PUT(request: Request, { params }: Params): Promise<Respons
         const pushed = await service.refreshServer(resolved.access.ownerId, parsed.data.id);
         return Response.json({ sound, pushed }, { headers: { "cache-control": "no-store" } });
     } catch (caught) {
-        if (caught instanceof service.SoundRefusal) return refuse(400, await messageText(caught.message));
+        if (caught instanceof service.SoundRefusal)
+            return refuse(400, await messageText(caught.message));
         console.error("[minecraft-sounds] replace failed:", caught);
         return refuse(500, t("sounds.refused.failed"));
     }

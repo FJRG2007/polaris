@@ -112,7 +112,9 @@ export async function encodePcm(
 }
 
 async function encode(audio: AudioBuffer, quality: number): Promise<Uint8Array> {
-    const samples = Array.from({ length: audio.numberOfChannels }, (_, at) => audio.getChannelData(at));
+    const samples = Array.from({ length: audio.numberOfChannels }, (_, at) =>
+        audio.getChannelData(at)
+    );
     return encodePcm(samples, audio.sampleRate, quality, await encoderBytes());
 }
 

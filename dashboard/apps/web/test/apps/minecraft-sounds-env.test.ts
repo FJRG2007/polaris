@@ -23,9 +23,18 @@ const enable = { baseUrl: `${BASE}/`, installedAppId: ID, token: "fixture-token"
 
 describe("which servers hand the sounds out live", () => {
     it("is the mod on NeoForge and the plugin on Paper, Purpur and Spigot", () => {
-        expect(env.soundsBuildFor("NEOFORGE", "1.21.4")).toEqual({ kind: "mod", file: "polaris-neoforge-1.21.4.jar" });
-        expect(env.soundsBuildFor("PAPER", "1.21.4")).toEqual({ kind: "plugin", file: "polaris-paper.jar" });
-        expect(env.soundsBuildFor("PURPUR", "LATEST")).toEqual({ kind: "plugin", file: "polaris-paper.jar" });
+        expect(env.soundsBuildFor("NEOFORGE", "1.21.4")).toEqual({
+            kind: "mod",
+            file: "polaris-neoforge-1.21.4.jar"
+        });
+        expect(env.soundsBuildFor("PAPER", "1.21.4")).toEqual({
+            kind: "plugin",
+            file: "polaris-paper.jar"
+        });
+        expect(env.soundsBuildFor("PURPUR", "LATEST")).toEqual({
+            kind: "plugin",
+            file: "polaris-paper.jar"
+        });
         expect(env.soundsBuildFor("FABRIC", "1.21.4")).toBeNull();
         expect(env.soundsBuildFor("VANILLA", "1.21.4")).toBeNull();
         expect(env.soundsBuildFor("PAPER", "1.20.4")).toBeNull();
@@ -61,22 +70,34 @@ describe("switching sounds on", () => {
     });
 
     it("writes nothing where Polaris has no jar", () => {
-        expect(env.soundsEnableEnv(vars({ TYPE: "FABRIC", VERSION: "1.21.4" }), enable).size).toBe(0);
+        expect(env.soundsEnableEnv(vars({ TYPE: "FABRIC", VERSION: "1.21.4" }), enable).size).toBe(
+            0
+        );
     });
 });
 
 describe("the plugin the sounds hold", () => {
-    const held = vars({ TYPE: "PAPER", VERSION: "1.21.4", MODS: `https://cdn.example/other.jar,${PAPER_JAR}`, POLARIS_SOUNDS: "on" });
+    const held = vars({
+        TYPE: "PAPER",
+        VERSION: "1.21.4",
+        MODS: `https://cdn.example/other.jar,${PAPER_JAR}`,
+        POLARIS_SOUNDS: "on"
+    });
 
     it("is held only with the switch on and the jar on the list", () => {
         expect(env.soundsHoldPlugin(held)).toBe(true);
-        expect(env.soundsHoldPlugin(vars({ ...Object.fromEntries(held), POLARIS_SOUNDS: "" }))).toBe(false);
+        expect(
+            env.soundsHoldPlugin(vars({ ...Object.fromEntries(held), POLARIS_SOUNDS: "" }))
+        ).toBe(false);
         expect(env.soundsHoldPlugin(vars({ ...Object.fromEntries(held), MODS: "" }))).toBe(false);
     });
 
     it("comes off, with the switch, when the server moves to a mod loader", () => {
         const moved = env.soundsMovedTo(held, "FABRIC", "1.21.4");
-        expect(moved && Object.fromEntries(moved)).toEqual({ MODS: "https://cdn.example/other.jar", POLARIS_SOUNDS: "" });
+        expect(moved && Object.fromEntries(moved)).toEqual({
+            MODS: "https://cdn.example/other.jar",
+            POLARIS_SOUNDS: ""
+        });
     });
 
     it("stays on a move to another Paper release or to Purpur", () => {
@@ -97,9 +118,16 @@ describe("the server's own resource pack", () => {
     it("is free when empty or already the sounds'", () => {
         expect(env.serverPackFree(vars({}), ID)).toBe(true);
         expect(env.serverPackFree(vars({ RESOURCE_PACK: ours }), ID)).toBe(true);
-        expect(env.serverPackFree(vars({ RESOURCE_PACK: "https://packs.example/mine.zip" }), ID)).toBe(false);
+        expect(
+            env.serverPackFree(vars({ RESOURCE_PACK: "https://packs.example/mine.zip" }), ID)
+        ).toBe(false);
         expect(env.serverPackIsOurs(vars({ RESOURCE_PACK: ours }), ID)).toBe(true);
-        expect(env.serverPackIsOurs(vars({ RESOURCE_PACK: ours }), "6b7a3c2e-0000-4f43-9a8b-0c2f3e1d4a5b")).toBe(false);
+        expect(
+            env.serverPackIsOurs(
+                vars({ RESOURCE_PACK: ours }),
+                "6b7a3c2e-0000-4f43-9a8b-0c2f3e1d4a5b"
+            )
+        ).toBe(false);
     });
 
     it("is offered with no checksum, so every join fetches the newest, and taken back whole", () => {

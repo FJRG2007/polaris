@@ -23,7 +23,15 @@
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { createRequire } from "node:module";
-import { copyFileSync, cpSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import {
+    copyFileSync,
+    cpSync,
+    mkdirSync,
+    readdirSync,
+    readFileSync,
+    rmSync,
+    writeFileSync
+} from "node:fs";
 
 const app = join(dirname(fileURLToPath(import.meta.url)), "..");
 const resources = join(app, "..", "..", "resources");
@@ -50,14 +58,19 @@ writeFileSync(join(stage("mcicons", mcicons), "items.json"), `${JSON.stringify(m
 // The blueprint path is left behind on purpose; `icon: false` is carried across
 // because the picker puts the items nobody has a picture of behind the ones it
 // can draw.
-const catalog = JSON.parse(readFileSync(join(app, "src", "lib", "ark", "item-catalog.json"), "utf8"));
+const catalog = JSON.parse(
+    readFileSync(join(app, "src", "lib", "ark", "item-catalog.json"), "utf8")
+);
 const ark = catalog.items.map((item) => ({
     key: item.key,
     name: item.name,
     stack: item.stack,
     ...(item.icon === false ? { icon: false } : {})
 }));
-writeFileSync(join(stage("arkicons", join(resources, "arkicons", "icons")), "items.json"), `${JSON.stringify(ark)}\n`);
+writeFileSync(
+    join(stage("arkicons", join(resources, "arkicons", "icons")), "items.json"),
+    `${JSON.stringify(ark)}\n`
+);
 
 console.log(`Staged ${minecraft.length} Minecraft and ${ark.length} ARK item icons in ${staged}`);
 

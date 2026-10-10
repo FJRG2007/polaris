@@ -543,8 +543,12 @@ function forThePlayersIn(install: MinecraftInstall, argv: readonly string[]): re
  * loaded the pack and the game's sound for everybody else. Java only, and
  * every other line as it was.
  */
-async function withServerSounds(install: MinecraftInstall, lines: readonly string[]): Promise<string[]> {
-    if (install.edition !== "java" || !lines.some((line) => line.includes(" playsound "))) return [...lines];
+async function withServerSounds(
+    install: MinecraftInstall,
+    lines: readonly string[]
+): Promise<string[]> {
+    if (install.edition !== "java" || !lines.some((line) => line.includes(" playsound ")))
+        return [...lines];
     const overrides = await soundMomentOverrides(install.installedAppId);
     return lines.flatMap((line) => withMoments(line, overrides));
 }
@@ -744,7 +748,8 @@ async function sendGameLines(
     given: readonly string[]
 ): Promise<void> {
     const sounded = await withServerSounds(install, given);
-    const lines = install.edition === "java" ? sounded.map((line) => hiddenFromPending(line)) : sounded;
+    const lines =
+        install.edition === "java" ? sounded.map((line) => hiddenFromPending(line)) : sounded;
     for (const line of lines) assertSafeCommand([line]);
     if (install.edition !== "java") {
         for (const line of lines) await sendOneCommand(ports, install, [line]);

@@ -43,7 +43,9 @@ export type SoundsBuild =
 export function soundsBuildFor(software: string, version: string): SoundsBuild | null {
     const file = modFileFor(software, version);
     if (file === null) return null;
-    return loaderForType(software) === "neoforge" ? { kind: "mod", file } : { kind: "plugin", file };
+    return loaderForType(software) === "neoforge"
+        ? { kind: "mod", file }
+        : { kind: "plugin", file };
 }
 
 function buildOf(env: ReadonlyMap<string, string>): SoundsBuild | null {
@@ -79,16 +81,23 @@ export function soundsReady(env: ReadonlyMap<string, string>, installedAppId: st
  */
 export function soundsEnableEnv(
     current: ReadonlyMap<string, string>,
-    input: { readonly baseUrl: string; readonly installedAppId: string; readonly token: string; readonly hasToken: boolean }
+    input: {
+        readonly baseUrl: string;
+        readonly installedAppId: string;
+        readonly token: string;
+        readonly hasToken: boolean;
+    }
 ): Map<string, string> {
     const build = buildOf(current);
     const writes = new Map<string, string>();
     if (build === null) return writes;
     const mods = current.get(MODS_KEY) ?? "";
-    if (!carriesFile(mods, build.file)) writes.set(MODS_KEY, withMod(mods, modUrl(input.baseUrl, build.file)));
+    if (!carriesFile(mods, build.file))
+        writes.set(MODS_KEY, withMod(mods, modUrl(input.baseUrl, build.file)));
     const base = input.baseUrl.replace(/\/+$/, "");
     if (!(current.get(URL_KEY) ?? "").trim()) writes.set(URL_KEY, base);
-    if (current.get(SERVER_ID_KEY)?.trim() !== input.installedAppId) writes.set(SERVER_ID_KEY, input.installedAppId);
+    if (current.get(SERVER_ID_KEY)?.trim() !== input.installedAppId)
+        writes.set(SERVER_ID_KEY, input.installedAppId);
     if (!input.hasToken) writes.set(TOKEN_KEY, input.token);
     if (build.kind === "plugin" && current.get(SOUNDS_KEY)?.trim().toLowerCase() !== "on")
         writes.set(SOUNDS_KEY, "on");
@@ -142,7 +151,10 @@ export function serverPackFree(env: ReadonlyMap<string, string>, installedAppId:
 }
 
 /** Whether the server's own resource pack is the sounds'. */
-export function serverPackIsOurs(env: ReadonlyMap<string, string>, installedAppId: string): boolean {
+export function serverPackIsOurs(
+    env: ReadonlyMap<string, string>,
+    installedAppId: string
+): boolean {
     return (env.get(RESOURCE_PACK_KEY) ?? "").includes(serverPackMarker(installedAppId));
 }
 

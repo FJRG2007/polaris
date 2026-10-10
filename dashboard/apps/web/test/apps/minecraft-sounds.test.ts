@@ -29,7 +29,11 @@ import {
 import { encodePcm } from "@polaris-app/game-servers/src/lib/minecraft/sound-encode";
 import { hiddenFromPending } from "@polaris-app/game-servers/src/lib/minecraft/prelogin";
 import { SOUNDS, sound } from "@polaris-app/game-servers/src/lib/minecraft/events/commands";
-import { MOMENT_SOUNDS, momentOverrides, withMoments } from "@polaris-app/game-servers/src/lib/minecraft/sound-moments";
+import {
+    MOMENT_SOUNDS,
+    momentOverrides,
+    withMoments
+} from "@polaris-app/game-servers/src/lib/minecraft/sound-moments";
 
 const require = createRequire(import.meta.url);
 const WASM = new Uint8Array(readFileSync(require.resolve("wasm-media-encoders/wasm/ogg.wasm")));
@@ -46,14 +50,27 @@ function tone(seconds: number, rate: number, channels: number): Float32Array[] {
 describe("readVorbis", () => {
     it("reads what the encoder writes: channels, rate and length", async () => {
         const mono = await encodePcm(tone(1.5, 44_100, 1), 44_100, 4, WASM);
-        expect(readVorbis(mono)).toEqual({ ok: true, channels: 1, sampleRate: 44_100, seconds: 1.5 });
+        expect(readVorbis(mono)).toEqual({
+            ok: true,
+            channels: 1,
+            sampleRate: 44_100,
+            seconds: 1.5
+        });
         const stereo = await encodePcm(tone(0.5, 48_000, 2), 48_000, -1, WASM);
-        expect(readVorbis(stereo)).toEqual({ ok: true, channels: 2, sampleRate: 48_000, seconds: 0.5 });
+        expect(readVorbis(stereo)).toEqual({
+            ok: true,
+            channels: 2,
+            sampleRate: 48_000,
+            seconds: 0.5
+        });
     });
 
     it("refuses a file cut short or with a changed byte", async () => {
         const file = await encodePcm(tone(1, 44_100, 1), 44_100, 4, WASM);
-        expect(readVorbis(file.slice(0, file.length - 10))).toEqual({ ok: false, reason: "broken" });
+        expect(readVorbis(file.slice(0, file.length - 10))).toEqual({
+            ok: false,
+            reason: "broken"
+        });
         const flipped = file.slice();
         const middle = Math.floor(file.length / 2);
         flipped[middle] = flipped[middle]! ^ 0xff;
@@ -69,7 +86,10 @@ describe("readVorbis", () => {
     });
 
     it("refuses what is not Ogg Vorbis, naming Opus", () => {
-        expect(readVorbis(new TextEncoder().encode("ID3".padEnd(100, "x")))).toEqual({ ok: false, reason: "notOgg" });
+        expect(readVorbis(new TextEncoder().encode("ID3".padEnd(100, "x")))).toEqual({
+            ok: false,
+            reason: "notOgg"
+        });
         expect(readVorbis(new Uint8Array(0))).toEqual({ ok: false, reason: "notOgg" });
         const opus = oggPage(new TextEncoder().encode("OpusHead".padEnd(19, "\0")));
         expect(readVorbis(opus)).toEqual({ ok: false, reason: "opus" });
@@ -88,7 +108,8 @@ function oggPage(body: Uint8Array): Uint8Array {
     let crc = 0;
     for (const byte of page.subarray(0, header.length + body.length)) {
         crc ^= byte << 24;
-        for (let bit = 0; bit < 8; bit++) crc = crc & 0x80000000 ? (crc << 1) ^ 0x04c11db7 : crc << 1;
+        for (let bit = 0; bit < 8; bit++)
+            crc = crc & 0x80000000 ? (crc << 1) ^ 0x04c11db7 : crc << 1;
         crc >>>= 0;
     }
     new DataView(page.buffer).setUint32(22, crc, true);
@@ -129,8 +150,15 @@ describe("settings", () => {
         const read = readSoundSettings(
             JSON.stringify({
                 required: "yes",
-                moments: { win: { sound: "fanfare", volume: 7, pitch: 1.2 }, nope: { sound: "x" }, start: { sound: "BAD KEY" } },
-                players: [{ player: "Ana", sound: "ana", volume: 0.5, pitch: 1 }, { player: "two words", sound: "x" }]
+                moments: {
+                    win: { sound: "fanfare", volume: 7, pitch: 1.2 },
+                    nope: { sound: "x" },
+                    start: { sound: "BAD KEY" }
+                },
+                players: [
+                    { player: "Ana", sound: "ana", volume: 0.5, pitch: 1 },
+                    { player: "two words", sound: "x" }
+                ]
             })
         );
         expect(read.required).toBe(false);
@@ -141,7 +169,10 @@ describe("settings", () => {
     it("drops whatever points at a deleted sound", () => {
         const settings = {
             ...DEFAULT_SETTINGS,
-            moments: { win: { sound: "gone", volume: 1, pitch: 1 }, start: { sound: "kept", volume: 1, pitch: 1 } },
+            moments: {
+                win: { sound: "gone", volume: 1, pitch: 1 },
+                start: { sound: "kept", volume: 1, pitch: 1 }
+            },
             players: [{ player: "Ana", sound: "gone", volume: 1, pitch: 1 }]
         };
         const kept = withoutMissing(settings, new Set(["kept"]));
@@ -159,11 +190,16 @@ describe("the pack", () => {
 
     it("names every sound under polaris, streaming music", () => {
         expect(JSON.parse(soundsJson(sounds))).toEqual({
-            fanfare: { sounds: [{ name: "polaris:fanfare", stream: false }], subtitle: "polaris.subtitle.fanfare" },
+            fanfare: {
+                sounds: [{ name: "polaris:fanfare", stream: false }],
+                subtitle: "polaris.subtitle.fanfare"
+            },
             theme: { sounds: [{ name: "polaris:theme", stream: true }] },
             theme_2: { sounds: [{ name: "polaris:theme_2", stream: true }] }
         });
-        expect(JSON.parse(subtitlesJson(sounds)!)).toEqual({ "polaris.subtitle.fanfare": "Fanfare plays" });
+        expect(JSON.parse(subtitlesJson(sounds)!)).toEqual({
+            "polaris.subtitle.fanfare": "Fanfare plays"
+        });
     });
 
     it("replaces a game sound with every upload put on it", () => {
@@ -191,7 +227,10 @@ describe("the pack", () => {
             const zip = new JSZip();
             const date = new Date("2000-01-01T00:00:00Z");
             zip.file("pack.mcmeta", packMeta("x"), { date, compression: "STORE" });
-            zip.file("assets/polaris/sounds.json", soundsJson(sounds), { date, compression: "STORE" });
+            zip.file("assets/polaris/sounds.json", soundsJson(sounds), {
+                date,
+                compression: "STORE"
+            });
             return zip.generateAsync({ type: "uint8array", platform: "UNIX" });
         };
         expect(Buffer.from(await make()).equals(Buffer.from(await make()))).toBe(true);
@@ -200,7 +239,10 @@ describe("the pack", () => {
 
 describe("event moments", () => {
     const overrides = momentOverrides(
-        { win: { sound: "fanfare", volume: 0.5, pitch: 1.5 }, start: { sound: "gone", volume: 1, pitch: 1 } },
+        {
+            win: { sound: "fanfare", volume: 0.5, pitch: 1.5 },
+            start: { sound: "gone", volume: 1, pitch: 1 }
+        },
         new Set(["fanfare"])
     );
 

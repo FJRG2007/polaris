@@ -10,7 +10,15 @@ import { LevelSlider } from "./sounds-parts";
 import { useEffect, useState, useTransition } from "react";
 import type { SoundEntry } from "../../lib/minecraft/sounds-service";
 import { playSoundAction, updateSoundAction } from "./sounds-actions";
-import { MAX_NAME, MAX_PITCH, MAX_SUBTITLE, MIN_PITCH, normalizeVanillaId, soundId, soundKey } from "../../lib/minecraft/sounds";
+import {
+    MAX_NAME,
+    MAX_PITCH,
+    MAX_SUBTITLE,
+    MIN_PITCH,
+    normalizeVanillaId,
+    soundId,
+    soundKey
+} from "../../lib/minecraft/sounds";
 import {
     Button,
     Dialog,
@@ -90,7 +98,8 @@ export function SoundEditDialog({
                 <DialogHeader>
                     <DialogTitle>{t("sounds.editor.title")}</DialogTitle>
                     <DialogDescription>
-                        {t("sounds.editor.id")}: <code className="break-all">{soundId(sound.key)}</code>
+                        {t("sounds.editor.id")}:{" "}
+                        <code className="break-all">{soundId(sound.key)}</code>
                     </DialogDescription>
                 </DialogHeader>
                 <form
@@ -114,8 +123,14 @@ export function SoundEditDialog({
                     </label>
                     <label className="flex flex-col gap-1 text-sm">
                         <span>{t("sounds.editor.subtitle")}</span>
-                        <Input value={subtitle} maxLength={MAX_SUBTITLE} onChange={(event) => setSubtitle(event.target.value)} />
-                        <span className="text-xs text-muted-foreground">{t("sounds.editor.subtitleHint")}</span>
+                        <Input
+                            value={subtitle}
+                            maxLength={MAX_SUBTITLE}
+                            onChange={(event) => setSubtitle(event.target.value)}
+                        />
+                        <span className="text-xs text-muted-foreground">
+                            {t("sounds.editor.subtitleHint")}
+                        </span>
                     </label>
                     <label className="flex flex-col gap-1 text-sm">
                         <span>{t("sounds.editor.replaces")}</span>
@@ -127,16 +142,28 @@ export function SoundEditDialog({
                             onChange={(event) => setReplaces(event.target.value)}
                             aria-invalid={!replacesOk}
                         />
-                        <span className={replacesOk ? "text-xs text-muted-foreground" : "text-xs text-danger"}>
-                            {replacesOk ? t("sounds.editor.replacesHint") : t("sounds.refused.vanilla")}
+                        <span
+                            className={
+                                replacesOk ? "text-xs text-muted-foreground" : "text-xs text-danger"
+                            }
+                        >
+                            {replacesOk
+                                ? t("sounds.editor.replacesHint")
+                                : t("sounds.refused.vanilla")}
                         </span>
                     </label>
                     <div className="flex items-start justify-between gap-3 text-sm">
                         <div className="min-w-0">
                             <p>{t("sounds.editor.stream")}</p>
-                            <p className="text-xs text-muted-foreground">{t("sounds.editor.streamHint")}</p>
+                            <p className="text-xs text-muted-foreground">
+                                {t("sounds.editor.streamHint")}
+                            </p>
                         </div>
-                        <Switch checked={stream} onChange={setStream} aria-label={t("sounds.editor.stream")} />
+                        <Switch
+                            checked={stream}
+                            onChange={setStream}
+                            aria-label={t("sounds.editor.stream")}
+                        />
                     </div>
                     {error ? (
                         <p role="alert" className="text-xs text-danger">
@@ -147,7 +174,10 @@ export function SoundEditDialog({
                         <Button type="button" variant="ghost" onClick={onClose}>
                             {t("sounds.editor.cancel")}
                         </Button>
-                        <Button type="submit" disabled={pending || !dirty || !nameOk || !replacesOk}>
+                        <Button
+                            type="submit"
+                            disabled={pending || !dirty || !nameOk || !replacesOk}
+                        >
                             {t("sounds.editor.save")}
                         </Button>
                     </DialogFooter>
@@ -186,7 +216,9 @@ export function SoundPlayDialog({
     if (!sound) return null;
     const options = [
         { value: EVERYBODY, label: t("sounds.play.everybody") },
-        ...[...players].sort((a, b) => a.localeCompare(b)).map((name) => ({ value: name, label: name }))
+        ...[...players]
+            .sort((a, b) => a.localeCompare(b))
+            .map((name) => ({ value: name, label: name }))
     ];
 
     function play(): void {
@@ -210,21 +242,34 @@ export function SoundPlayDialog({
         <Dialog open onOpenChange={(open) => !open && onClose()}>
             <DialogContent className="max-w-md">
                 <DialogHeader>
-                    <DialogTitle className="truncate">{t("sounds.play.title", { name: sound.name })}</DialogTitle>
+                    <DialogTitle className="truncate">
+                        {t("sounds.play.title", { name: sound.name })}
+                    </DialogTitle>
                     <DialogDescription>{t("sounds.play.note")}</DialogDescription>
                 </DialogHeader>
                 <div className="flex flex-col gap-3">
                     <label className="flex flex-col gap-1 text-sm">
                         <span>{t("sounds.play.to")}</span>
                         <Select
-                            value={players.includes(target) || target === EVERYBODY ? target : EVERYBODY}
+                            value={
+                                players.includes(target) || target === EVERYBODY
+                                    ? target
+                                    : EVERYBODY
+                            }
                             onValueChange={setTarget}
                             options={options}
                             aria-label={t("sounds.play.to")}
                         />
                     </label>
                     <div className="grid grid-cols-2 gap-3">
-                        <LevelSlider label={t("sounds.play.volume")} value={volume} min={0} max={1} step={0.05} onChange={setVolume} />
+                        <LevelSlider
+                            label={t("sounds.play.volume")}
+                            value={volume}
+                            min={0}
+                            max={1}
+                            step={0.05}
+                            onChange={setVolume}
+                        />
                         <LevelSlider
                             label={t("sounds.play.pitch")}
                             value={pitch}

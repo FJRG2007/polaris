@@ -17,7 +17,11 @@ vi.mock("@polaris/app-host/client", async () => {
     return {
         hostUi: {
             liveRead: { useKeptSnapshot: () => useLayoutEffect(() => undefined, []) },
-            snapshotCache: { readSnapshot: () => null, writeSnapshot: () => undefined, dropSnapshots: () => undefined },
+            snapshotCache: {
+                readSnapshot: () => null,
+                writeSnapshot: () => undefined,
+                dropSnapshots: () => undefined
+            },
             structuralMerge: { mergeUnchanged: <T,>(_previous: T, next: T) => next },
             confirmDialog: { useConfirm: () => [async () => true, null] },
             i18nProvider: { useLocale: () => "en-US" }
@@ -30,7 +34,12 @@ vi.mock("@polaris-app/game-servers/src/screens/installed/sounds-actions", () => 
             answerView = resolve;
         }),
     liveSoundsAction: async () => ({
-        live: { running: true, loaded: true, sha1: "a".repeat(40), players: [{ name: "Ana", state: "loaded" }] }
+        live: {
+            running: true,
+            loaded: true,
+            sha1: "a".repeat(40),
+            players: [{ name: "Ana", state: "loaded" }]
+        }
     }),
     updateSoundAction: async () => ({}),
     deleteSoundAction: async () => ({}),
@@ -44,7 +53,9 @@ vi.mock("@polaris-app/game-servers/src/screens/installed/restart-actions", () =>
     restartGameNowAction: async () => ({})
 }));
 
-const { MinecraftSounds } = await import("@polaris-app/game-servers/src/screens/installed/minecraft-sounds");
+const { MinecraftSounds } = await import(
+    "@polaris-app/game-servers/src/screens/installed/minecraft-sounds"
+);
 
 afterEach(cleanup);
 
@@ -64,7 +75,12 @@ const VIEW = {
                 updatedAt: "2026-10-10T00:00:00.000Z"
             }
         ],
-        settings: { required: false, prompt: "", moments: { win: { sound: "victory_fanfare", volume: 1, pitch: 1 } }, players: [] },
+        settings: {
+            required: false,
+            prompt: "",
+            moments: { win: { sound: "victory_fanfare", volume: 1, pitch: 1 } },
+            players: []
+        },
         totalBytes: 20_480
     },
     delivery: {
@@ -80,7 +96,14 @@ const VIEW = {
 
 function draw(): void {
     render(
-        <MinecraftSounds installedAppId={SERVER} canManage canPlay running players={["Ana"]} edition="java" />
+        <MinecraftSounds
+            installedAppId={SERVER}
+            canManage
+            canPlay
+            running
+            players={["Ana"]}
+            edition="java"
+        />
     );
 }
 
@@ -94,16 +117,31 @@ describe("the Sounds tab", () => {
     it("lists the library, the live state and the moments once it has", async () => {
         draw();
         answerView({ view: VIEW });
-        await waitFor(() => expect(screen.getAllByText("Victory fanfare").length).toBeGreaterThan(0));
+        await waitFor(() =>
+            expect(screen.getAllByText("Victory fanfare").length).toBeGreaterThan(0)
+        );
         expect(screen.getByText("polaris:victory_fanfare")).toBeTruthy();
         expect(screen.getByText("Live on this server")).toBeTruthy();
-        await waitFor(() => expect(screen.getByText("1 of 1 online have the sounds loaded.")).toBeTruthy());
+        await waitFor(() =>
+            expect(screen.getByText("1 of 1 online have the sounds loaded.")).toBeTruthy()
+        );
         expect(screen.getByText("Winner")).toBeTruthy();
         expect(screen.getByText("Players' own arrival sounds")).toBeTruthy();
     });
 
     it("says plainly that Bedrock servers cannot play them", () => {
-        render(<MinecraftSounds installedAppId={SERVER} canManage canPlay running players={[]} edition="bedrock" />);
-        expect(screen.getByText("Bedrock servers cannot play custom sounds from Polaris.")).toBeTruthy();
+        render(
+            <MinecraftSounds
+                installedAppId={SERVER}
+                canManage
+                canPlay
+                running
+                players={[]}
+                edition="bedrock"
+            />
+        );
+        expect(
+            screen.getByText("Bedrock servers cannot play custom sounds from Polaris.")
+        ).toBeTruthy();
     });
 });

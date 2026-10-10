@@ -343,7 +343,10 @@ export async function guardForSave(
     const afterAnticheat =
         off === null
             ? writes
-            : [...writes.filter((entry) => !off.has(entry.key)), ...[...off].map(([key, value]) => ({ key, value }))];
+            : [
+                  ...writes.filter((entry) => !off.has(entry.key)),
+                  ...[...off].map(([key, value]) => ({ key, value }))
+              ];
     // The plugin the server's sounds hold comes off the same way, from the list
     // as everything above leaves it.
     const listedNow = afterAnticheat.find((entry) => entry.key === polarisLogin.MODS_KEY)?.value;
@@ -408,7 +411,10 @@ export function guardAsTemplate(env: ReadonlyMap<string, string>): Map<string, s
     }
     // The plugin the sounds put on a server is that server's, like its token.
     if (soundsHoldPlugin(env) && !polarisLogin.loginOn(env)) {
-        copy.set(polarisLogin.MODS_KEY, polarisLogin.withoutMod(copy.get(polarisLogin.MODS_KEY) ?? ""));
+        copy.set(
+            polarisLogin.MODS_KEY,
+            polarisLogin.withoutMod(copy.get(polarisLogin.MODS_KEY) ?? "")
+        );
     }
     copy.delete(SOUNDS_KEY);
     if (!polarisLogin.loginOn(env)) return copy;

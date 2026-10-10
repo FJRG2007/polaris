@@ -55,7 +55,13 @@ export function withMoments(line: string, overrides: MomentOverrides): string[] 
     if (overrides.size === 0) return [line];
     const marked = MARKED.exec(line);
     if (!marked) return [line];
-    const [, context, vanilla, volume, pitch] = marked as unknown as [string, string, string, string, string];
+    const [, context, vanilla, volume, pitch] = marked as unknown as [
+        string,
+        string,
+        string,
+        string,
+        string
+    ];
     const use = overrides.get(vanilla);
     if (!use) return [line];
     const level = Math.min(1, Number(volume) * use.volume);

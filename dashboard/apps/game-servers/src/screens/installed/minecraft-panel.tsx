@@ -604,7 +604,11 @@ export function MinecraftPanel({
                             canPlay={held.includes("games.console")}
                             running={isRunning}
                             players={status?.players.players ?? []}
-                            edition={(game?.edition ?? status?.edition ?? "java") === "bedrock" ? "bedrock" : "java"}
+                            edition={
+                                (game?.edition ?? status?.edition ?? "java") === "bedrock"
+                                    ? "bedrock"
+                                    : "java"
+                            }
                         />
                     </CardBoundary>
                 )}

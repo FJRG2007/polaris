@@ -34,7 +34,9 @@ export function LevelSlider({
     return (
         <label className="flex min-w-0 flex-col gap-1 text-xs">
             <span className="flex items-center justify-between gap-2 text-muted-foreground">
-                <span className="truncate" title={label}>{label}</span>
+                <span className="truncate" title={label}>
+                    {label}
+                </span>
                 <span className="tabular-nums">{value.toFixed(2)}</span>
             </span>
             <input
@@ -86,7 +88,8 @@ export function usePreview(): {
         setPlaying(id);
         element.play().catch((caught: unknown) => {
             setPlaying((current) => (current === id ? null : current));
-            if (caught instanceof DOMException && caught.name === "NotSupportedError") setUnplayable(true);
+            if (caught instanceof DOMException && caught.name === "NotSupportedError")
+                setUnplayable(true);
         });
     }, []);
 

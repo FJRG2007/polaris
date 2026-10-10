@@ -38,16 +38,24 @@ export interface SoundsView {
     readonly delivery: service.SoundsDelivery;
 }
 
-export async function soundsAction(installedAppId: string): Promise<{ view?: SoundsView; error?: string }> {
+export async function soundsAction(
+    installedAppId: string
+): Promise<{ view?: SoundsView; error?: string }> {
     const parsed = serverId.safeParse(installedAppId);
     if (!parsed.success) return { error: (await gameWords("games"))("errors.serverNotFound") };
     try {
         const { access } = await requireGameServer("games.read", parsed.data);
         const applicationId = access.install.applicationId;
-        if (!applicationId) return { error: (await gameWords("games"))("errors.thisServerHasNotBeen") };
+        if (!applicationId)
+            return { error: (await gameWords("games"))("errors.thisServerHasNotBeen") };
         const [library, delivery] = await Promise.all([
             service.soundLibrary(parsed.data),
-            service.soundsDelivery(parsed.data, applicationId, access.ownerId, editionOf(access.install.catalogId))
+            service.soundsDelivery(
+                parsed.data,
+                applicationId,
+                access.ownerId,
+                editionOf(access.install.catalogId)
+            )
         ]);
         return { view: { library, delivery } };
     } catch (caught) {
@@ -55,7 +63,9 @@ export async function soundsAction(installedAppId: string): Promise<{ view?: Sou
     }
 }
 
-export async function liveSoundsAction(installedAppId: string): Promise<{ live?: service.LiveSounds; error?: string }> {
+export async function liveSoundsAction(
+    installedAppId: string
+): Promise<{ live?: service.LiveSounds; error?: string }> {
     const parsed = serverId.safeParse(installedAppId);
     if (!parsed.success) return { error: (await gameWords("games"))("errors.serverNotFound") };
     try {
@@ -75,14 +85,25 @@ const changeSchema = z.object({
     replaces: z.string().max(200).optional()
 });
 
-export async function updateSoundAction(input: z.input<typeof changeSchema>): Promise<{ error?: string; pushed?: boolean }> {
+export async function updateSoundAction(
+    input: z.input<typeof changeSchema>
+): Promise<{ error?: string; pushed?: boolean }> {
     const parsed = changeSchema.safeParse(input);
-    if (!parsed.success) return { error: (await gameWords("minecraft"))("sounds.refused.settings") };
+    if (!parsed.success)
+        return { error: (await gameWords("minecraft"))("sounds.refused.settings") };
     try {
-        const { user, access } = await requireGameServer("games.manage", parsed.data.installedAppId);
+        const { user, access } = await requireGameServer(
+            "games.manage",
+            parsed.data.installedAppId
+        );
         const { installedAppId, soundId, ...change } = parsed.data;
         await service.updateSound(installedAppId, soundId, change);
-        await recordAudit({ actorId: user.id, action: "minecraft.sounds.edit", targetType: "installedApp", targetId: installedAppId });
+        await recordAudit({
+            actorId: user.id,
+            action: "minecraft.sounds.edit",
+            targetType: "installedApp",
+            targetId: installedAppId
+        });
         return { pushed: await service.refreshServer(access.ownerId, installedAppId) };
     } catch (caught) {
         return { error: await failure(caught) };
@@ -91,11 +112,16 @@ export async function updateSoundAction(input: z.input<typeof changeSchema>): Pr
 
 const removeSchema = z.object({ installedAppId: serverId, soundId: z.string().uuid() });
 
-export async function deleteSoundAction(input: z.input<typeof removeSchema>): Promise<{ error?: string; pushed?: boolean }> {
+export async function deleteSoundAction(
+    input: z.input<typeof removeSchema>
+): Promise<{ error?: string; pushed?: boolean }> {
     const parsed = removeSchema.safeParse(input);
     if (!parsed.success) return { error: (await gameWords("minecraft"))("sounds.refused.gone") };
     try {
-        const { user, access } = await requireGameServer("games.manage", parsed.data.installedAppId);
+        const { user, access } = await requireGameServer(
+            "games.manage",
+            parsed.data.installedAppId
+        );
         await service.deleteSound(parsed.data.installedAppId, parsed.data.soundId);
         await recordAudit({
             actorId: user.id,
@@ -119,8 +145,18 @@ export async function saveSoundSettingsAction(input: {
         const { user, access } = await requireGameServer("games.manage", parsed.data);
         const saved = await service.saveSoundSettings(parsed.data, input.settings);
         if (access.install.applicationId)
-            await service.syncServerPackRequired(parsed.data, access.install.applicationId, access.ownerId, saved.required);
-        await recordAudit({ actorId: user.id, action: "minecraft.sounds.settings", targetType: "installedApp", targetId: parsed.data });
+            await service.syncServerPackRequired(
+                parsed.data,
+                access.install.applicationId,
+                access.ownerId,
+                saved.required
+            );
+        await recordAudit({
+            actorId: user.id,
+            action: "minecraft.sounds.settings",
+            targetType: "installedApp",
+            targetId: parsed.data
+        });
         return { pushed: await service.refreshServer(access.ownerId, parsed.data) };
     } catch (caught) {
         return { error: await failure(caught) };
@@ -130,12 +166,18 @@ export async function saveSoundSettingsAction(input: {
 const playSchema = z.object({
     installedAppId: serverId,
     key: z.string().regex(/^[a-z0-9_]{1,40}$/),
-    player: z.string().trim().regex(/^[A-Za-z0-9_]{1,16}$/).nullable(),
+    player: z
+        .string()
+        .trim()
+        .regex(/^[A-Za-z0-9_]{1,16}$/)
+        .nullable(),
     volume: z.number().finite().min(0).max(1),
     pitch: z.number().finite().min(MIN_PITCH).max(MAX_PITCH)
 });
 
-export async function playSoundAction(input: z.input<typeof playSchema>): Promise<{ error?: string }> {
+export async function playSoundAction(
+    input: z.input<typeof playSchema>
+): Promise<{ error?: string }> {
     const parsed = playSchema.safeParse(input);
     if (!parsed.success) return { error: (await gameWords("minecraft"))("sounds.refused.player") };
     try {
@@ -149,7 +191,9 @@ export async function playSoundAction(input: z.input<typeof playSchema>): Promis
 }
 
 /** Hand the pack out again to everybody on, now. */
-export async function pushSoundsAction(installedAppId: string): Promise<{ error?: string; pushed?: boolean }> {
+export async function pushSoundsAction(
+    installedAppId: string
+): Promise<{ error?: string; pushed?: boolean }> {
     const parsed = serverId.safeParse(installedAppId);
     if (!parsed.success) return { error: (await gameWords("games"))("errors.serverNotFound") };
     try {
@@ -162,16 +206,24 @@ export async function pushSoundsAction(installedAppId: string): Promise<{ error?
 
 /** Put Polaris's jar on the server so the pack reaches players live, and
  *  restart it onto the jar when it was not there. */
-export async function enableSoundsAction(installedAppId: string): Promise<{ error?: string; restarted?: boolean }> {
+export async function enableSoundsAction(
+    installedAppId: string
+): Promise<{ error?: string; restarted?: boolean }> {
     const parsed = serverId.safeParse(installedAppId);
     if (!parsed.success) return { error: (await gameWords("games"))("errors.serverNotFound") };
     try {
         const { user, access } = await requireGameServer("games.manage", parsed.data);
         const applicationId = access.install.applicationId;
-        if (!applicationId) return { error: (await gameWords("games"))("errors.thisServerHasNotBeen") };
+        if (!applicationId)
+            return { error: (await gameWords("games"))("errors.thisServerHasNotBeen") };
         const restart = await service.enableSounds(parsed.data, applicationId, access.ownerId);
         if (restart) await deployApplication(applicationId, access.ownerId, user.id);
-        await recordAudit({ actorId: user.id, action: "minecraft.sounds.enable", targetType: "installedApp", targetId: parsed.data });
+        await recordAudit({
+            actorId: user.id,
+            action: "minecraft.sounds.enable",
+            targetType: "installedApp",
+            targetId: parsed.data
+        });
         return { restarted: restart };
     } catch (caught) {
         return { error: await failure(caught) };
@@ -180,18 +232,32 @@ export async function enableSoundsAction(installedAppId: string): Promise<{ erro
 
 /** Offer the pack as the server's own resource pack (servers Polaris has no jar
  *  for), or take it back, and restart onto it. */
-export async function serverPackAction(input: { installedAppId: string; on: boolean }): Promise<{ error?: string }> {
+export async function serverPackAction(input: {
+    installedAppId: string;
+    on: boolean;
+}): Promise<{ error?: string }> {
     const parsed = z.object({ installedAppId: serverId, on: z.boolean() }).safeParse(input);
     if (!parsed.success) return { error: (await gameWords("games"))("errors.serverNotFound") };
     try {
-        const { user, access } = await requireGameServer("games.manage", parsed.data.installedAppId);
+        const { user, access } = await requireGameServer(
+            "games.manage",
+            parsed.data.installedAppId
+        );
         const applicationId = access.install.applicationId;
-        if (!applicationId) return { error: (await gameWords("games"))("errors.thisServerHasNotBeen") };
-        await service.setServerPack(parsed.data.installedAppId, applicationId, access.ownerId, parsed.data.on);
+        if (!applicationId)
+            return { error: (await gameWords("games"))("errors.thisServerHasNotBeen") };
+        await service.setServerPack(
+            parsed.data.installedAppId,
+            applicationId,
+            access.ownerId,
+            parsed.data.on
+        );
         await deployApplication(applicationId, access.ownerId, user.id);
         await recordAudit({
             actorId: user.id,
-            action: parsed.data.on ? "minecraft.sounds.serverPack.on" : "minecraft.sounds.serverPack.off",
+            action: parsed.data.on
+                ? "minecraft.sounds.serverPack.on"
+                : "minecraft.sounds.serverPack.off",
             targetType: "installedApp",
             targetId: parsed.data.installedAppId
         });

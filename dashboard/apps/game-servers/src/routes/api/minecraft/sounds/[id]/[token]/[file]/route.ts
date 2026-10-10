@@ -15,7 +15,10 @@
  */
 
 import { z } from "zod";
-import { currentPack, soundPackTokenMatches } from "../../../../../../../lib/minecraft/sounds-service";
+import {
+    currentPack,
+    soundPackTokenMatches
+} from "../../../../../../../lib/minecraft/sounds-service";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -24,7 +27,8 @@ const FILE = /^(latest|[0-9a-f]{40})\.zip$/;
 
 type Params = { params: Promise<{ id: string; token: string; file: string }> };
 
-const missing = () => new Response("Not found", { status: 404, headers: { "cache-control": "no-store" } });
+const missing = () =>
+    new Response("Not found", { status: 404, headers: { "cache-control": "no-store" } });
 
 export async function GET(_request: Request, { params }: Params): Promise<Response> {
     const { id, token, file } = await params;

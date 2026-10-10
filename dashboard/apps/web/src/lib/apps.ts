@@ -2184,7 +2184,16 @@ const GAME_RAIL: Readonly<Record<string, Omit<AppSection, "href">>> = {
         label: "Sounds", // i18n-ignore
         icon: Music,
         group: TALKING_GROUP,
-        keywords: ["custom sounds", "resource pack", "music", "upload", "ogg", "mp3", "join sound", "victory"]
+        keywords: [
+            "custom sounds",
+            "resource pack",
+            "music",
+            "upload",
+            "ogg",
+            "mp3",
+            "join sound",
+            "victory"
+        ]
     },
     chat: {
         label: "Linked chat", // i18n-ignore

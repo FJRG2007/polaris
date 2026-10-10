@@ -64,39 +64,71 @@ vi.mock("@polaris/db", () => {
             return 1;
         }),
         minecraftSound: {
-            findMany: vi.fn(async ({ where, select }: { where: { installedAppId: string }; select?: Record<string, boolean> }) => {
-                const rows = db.sounds.filter((row) => row.installedAppId === where.installedAppId).map((row) => pick(row, select));
-                // The answer is what the table held when it was read, and it takes a while to arrive.
-                await new Promise((resolve) => setTimeout(resolve, 20));
-                return rows;
-            }),
-            findFirst: vi.fn(async ({ where, select }: { where: { installedAppId: string; key?: string; id?: string }; select?: Record<string, boolean> }) => {
-                const row = db.sounds.find(
-                    (one) =>
-                        one.installedAppId === where.installedAppId &&
-                        (where.key === undefined || one.key === where.key) &&
-                        (where.id === undefined || one.id === where.id)
-                );
-                return row ? pick(row, select) : null;
-            }),
-            create: vi.fn(async ({ data, select }: { data: Omit<SoundRow, "id" | "updatedAt" | "subtitle" | "replaces">; select?: Record<string, boolean> }) => {
-                const row: SoundRow = {
-                    subtitle: "",
-                    replaces: "",
-                    ...data,
-                    id: `0190c0de-0000-7000-8000-${String(db.sounds.length + 1).padStart(12, "0")}`,
-                    updatedAt: new Date("2026-10-10T00:00:00Z")
-                };
-                db.sounds.push(row);
-                return pick(row, select);
-            })
+            findMany: vi.fn(
+                async ({
+                    where,
+                    select
+                }: {
+                    where: { installedAppId: string };
+                    select?: Record<string, boolean>;
+                }) => {
+                    const rows = db.sounds
+                        .filter((row) => row.installedAppId === where.installedAppId)
+                        .map((row) => pick(row, select));
+                    // The answer is what the table held when it was read, and it takes a while to arrive.
+                    await new Promise((resolve) => setTimeout(resolve, 20));
+                    return rows;
+                }
+            ),
+            findFirst: vi.fn(
+                async ({
+                    where,
+                    select
+                }: {
+                    where: { installedAppId: string; key?: string; id?: string };
+                    select?: Record<string, boolean>;
+                }) => {
+                    const row = db.sounds.find(
+                        (one) =>
+                            one.installedAppId === where.installedAppId &&
+                            (where.key === undefined || one.key === where.key) &&
+                            (where.id === undefined || one.id === where.id)
+                    );
+                    return row ? pick(row, select) : null;
+                }
+            ),
+            create: vi.fn(
+                async ({
+                    data,
+                    select
+                }: {
+                    data: Omit<SoundRow, "id" | "updatedAt" | "subtitle" | "replaces">;
+                    select?: Record<string, boolean>;
+                }) => {
+                    const row: SoundRow = {
+                        subtitle: "",
+                        replaces: "",
+                        ...data,
+                        id: `0190c0de-0000-7000-8000-${String(db.sounds.length + 1).padStart(12, "0")}`,
+                        updatedAt: new Date("2026-10-10T00:00:00Z")
+                    };
+                    db.sounds.push(row);
+                    return pick(row, select);
+                }
+            )
         },
         minecraftSoundPack: {
             upsert: vi.fn(async ({ where }: { where: { installedAppId: string } }) => {
-                const current = db.packs.get(where.installedAppId) ?? { revision: 0, settings: "{}" };
+                const current = db.packs.get(where.installedAppId) ?? {
+                    revision: 0,
+                    settings: "{}"
+                };
                 db.packs.set(where.installedAppId, { ...current, revision: current.revision + 1 });
             }),
-            findUnique: vi.fn(async ({ where }: { where: { installedAppId: string } }) => db.packs.get(where.installedAppId) ?? null)
+            findUnique: vi.fn(
+                async ({ where }: { where: { installedAppId: string } }) =>
+                    db.packs.get(where.installedAppId) ?? null
+            )
         },
         installedApp: {
             findUnique: vi.fn(async () => ({ id: SERVER, name: owner.name, ownerId: "owner" })),
@@ -114,7 +146,9 @@ vi.mock("@/lib/i18n/request", () => ({ getLocale: async () => "en-US" }));
 vi.mock("@/lib/i18n/locale-service", () => ({ getUserLocale: async () => owner.locale }));
 vi.mock("@/lib/audit-service", () => ({ recordAudit: vi.fn(async () => undefined) }));
 vi.mock("@/lib/apps/install-secret", () => ({
-    readInstallEnvSecret: vi.fn(async (applicationId: string) => (applicationId === "app-1" ? "server-token" : null))
+    readInstallEnvSecret: vi.fn(async (applicationId: string) =>
+        applicationId === "app-1" ? "server-token" : null
+    )
 }));
 vi.mock("@/lib/domain-service", () => ({
     publicAppUrl: async () => ORIGIN,
@@ -125,22 +159,35 @@ vi.mock("@polaris-app/game-servers/src/lib/minecraft/service", () => ({
     withServerContainer: vi.fn(async () => false)
 }));
 
-const upload = await import("@polaris-app/game-servers/src/routes/api/apps/installed/[id]/minecraft/sounds/route");
-const pack = await import("@polaris-app/game-servers/src/routes/api/minecraft/sounds/[id]/[token]/[file]/route");
+const upload = await import(
+    "@polaris-app/game-servers/src/routes/api/apps/installed/[id]/minecraft/sounds/route"
+);
+const pack = await import(
+    "@polaris-app/game-servers/src/routes/api/minecraft/sounds/[id]/[token]/[file]/route"
+);
 const jar = await import("@polaris-app/game-servers/src/routes/api/minecraft/sounds/[id]/route");
-const { soundPackToken } = await import("@polaris-app/game-servers/src/lib/minecraft/sounds-service");
+const { soundPackToken } = await import(
+    "@polaris-app/game-servers/src/lib/minecraft/sounds-service"
+);
 
 const require = createRequire(import.meta.url);
 const WASM = new Uint8Array(readFileSync(require.resolve("wasm-media-encoders/wasm/ogg.wasm")));
 
 async function vorbis(): Promise<Uint8Array> {
     const samples = new Float32Array(22_050);
-    for (let at = 0; at < samples.length; at++) samples[at] = 0.2 * Math.sin((2 * Math.PI * 440 * at) / 44_100);
+    for (let at = 0; at < samples.length; at++)
+        samples[at] = 0.2 * Math.sin((2 * Math.PI * 440 * at) / 44_100);
     return encodePcm([samples], 44_100, 4, WASM);
 }
 
-function send(body: BodyInit, options: { name?: string; origin?: string | null; length?: string } = {}) {
-    const headers: Record<string, string> = { host: "polaris.example", "content-type": "audio/ogg" };
+function send(
+    body: BodyInit,
+    options: { name?: string; origin?: string | null; length?: string } = {}
+) {
+    const headers: Record<string, string> = {
+        host: "polaris.example",
+        "content-type": "audio/ogg"
+    };
     if (options.origin !== null) headers.origin = options.origin ?? ORIGIN;
     if (options.length) headers["content-length"] = options.length;
     const request = new Request(
@@ -157,14 +204,19 @@ beforeEach(() => {
     owner.locale = "en-US";
     owner.name = "Survival";
     requireGameServer.mockReset();
-    requireGameServer.mockResolvedValue({ user: { id: "user" }, access: { ownerId: "owner", install: { applicationId: "app-1" } } });
+    requireGameServer.mockResolvedValue({
+        user: { id: "user" },
+        access: { ownerId: "owner", install: { applicationId: "app-1" } }
+    });
 });
 
 describe("uploading a sound", () => {
     it("keeps an Ogg Vorbis file under a key made from its name", async () => {
         const response = await send(await vorbis());
         expect(response.status).toBe(200);
-        const body = (await response.json()) as { sound: { key: string; channels: number; seconds: number } };
+        const body = (await response.json()) as {
+            sound: { key: string; channels: number; seconds: number };
+        };
         expect(body.sound).toMatchObject({ key: "victory_fanfare", channels: 1, seconds: 0.5 });
         expect(db.sounds).toHaveLength(1);
     });
@@ -181,7 +233,9 @@ describe("uploading a sound", () => {
     it("refuses a body past one sound's limit, whatever length it claims", async () => {
         const big = new Uint8Array(8 * 1024 * 1024 + 1);
         expect((await send(big, { length: "10" })).status).toBe(413);
-        expect((await send(new Uint8Array(10), { length: String(9 * 1024 * 1024) })).status).toBe(413);
+        expect((await send(new Uint8Array(10), { length: String(9 * 1024 * 1024) })).status).toBe(
+            413
+        );
         expect(db.sounds).toHaveLength(0);
     });
 
@@ -197,8 +251,14 @@ describe("uploading a sound", () => {
         const file = await vorbis();
         const [first, second] = await Promise.all([send(file), send(file)]);
         expect([first.status, second.status]).toEqual([200, 200]);
-        expect(db.sounds.map((row) => row.key).sort()).toEqual(["victory_fanfare", "victory_fanfare_2"]);
-        expect(locks).toEqual([[`polaris.minecraft.sounds:${SERVER}`], [`polaris.minecraft.sounds:${SERVER}`]]);
+        expect(db.sounds.map((row) => row.key).sort()).toEqual([
+            "victory_fanfare",
+            "victory_fanfare_2"
+        ]);
+        expect(locks).toEqual([
+            [`polaris.minecraft.sounds:${SERVER}`],
+            [`polaris.minecraft.sounds:${SERVER}`]
+        ]);
     });
 
     it("refuses a name with nothing usable in it", async () => {
@@ -208,26 +268,40 @@ describe("uploading a sound", () => {
 
 describe("the pack players download", () => {
     function get(file: string, token = soundPackToken(SERVER)) {
-        return pack.GET(new Request(`${ORIGIN}/x`), { params: Promise.resolve({ id: SERVER, token, file }) });
+        return pack.GET(new Request(`${ORIGIN}/x`), {
+            params: Promise.resolve({ id: SERVER, token, file })
+        });
     }
 
     it("is served under its checksum and as the latest, and the jar is told that checksum", async () => {
         await send(await vorbis());
         const config = await jar.GET(
-            new Request(`${ORIGIN}/api/minecraft/sounds/${SERVER}`, { headers: { authorization: "Bearer server-token" } }),
+            new Request(`${ORIGIN}/api/minecraft/sounds/${SERVER}`, {
+                headers: { authorization: "Bearer server-token" }
+            }),
             { params: Promise.resolve({ id: SERVER }) }
         );
         expect(config.status).toBe(200);
-        const told = (await config.json()) as { pack: { id: string; url: string; sha1: string; kick: string } };
+        const told = (await config.json()) as {
+            pack: { id: string; url: string; sha1: string; kick: string };
+        };
         expect(told.pack.kick).toBe("This server needs its sound pack. Join again and accept it.");
-        expect(told.pack.url).toBe(`${ORIGIN}/api/minecraft/sounds/${SERVER}/${soundPackToken(SERVER)}/${told.pack.sha1}.zip`);
-        expect(told.pack.id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-5[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
+        expect(told.pack.url).toBe(
+            `${ORIGIN}/api/minecraft/sounds/${SERVER}/${soundPackToken(SERVER)}/${told.pack.sha1}.zip`
+        );
+        expect(told.pack.id).toMatch(
+            /^[0-9a-f]{8}-[0-9a-f]{4}-5[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/
+        );
 
         const byChecksum = await get(`${told.pack.sha1}.zip`);
         expect(byChecksum.status).toBe(200);
         expect(byChecksum.headers.get("cache-control")).toContain("immutable");
         const { createHash } = await import("node:crypto");
-        expect(createHash("sha1").update(new Uint8Array(await byChecksum.arrayBuffer())).digest("hex")).toBe(told.pack.sha1);
+        expect(
+            createHash("sha1")
+                .update(new Uint8Array(await byChecksum.arrayBuffer()))
+                .digest("hex")
+        ).toBe(told.pack.sha1);
         const latest = await get("latest.zip");
         expect(latest.status).toBe(200);
         expect(latest.headers.get("cache-control")).toBe("no-store");
@@ -237,7 +311,9 @@ describe("the pack players download", () => {
         await send(await vorbis());
         const checksum = async () => {
             const config = await jar.GET(
-                new Request(`${ORIGIN}/api/minecraft/sounds/${SERVER}`, { headers: { authorization: "Bearer server-token" } }),
+                new Request(`${ORIGIN}/api/minecraft/sounds/${SERVER}`, {
+                    headers: { authorization: "Bearer server-token" }
+                }),
                 { params: Promise.resolve({ id: SERVER }) }
             );
             return ((await config.json()) as { pack: { sha1: string; kick: string } }).pack;
