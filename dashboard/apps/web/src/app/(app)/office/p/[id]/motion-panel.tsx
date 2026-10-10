@@ -91,16 +91,14 @@ export function MotionPanel({
         if (room <= 0 || targets.length === 0) return;
         onAnimations([
             ...animations,
-            ...targets
-                .slice(0, room)
-                .map((target, at) =>
-                    at === 0
-                        ? motion.newAnimation(crypto.randomUUID(), target)
-                        : {
-                              ...motion.newAnimation(crypto.randomUUID(), target),
-                              trigger: "withPrev" as const
-                          }
-                )
+            ...targets.slice(0, room).map((target, at) =>
+                at === 0
+                    ? motion.newAnimation(crypto.randomUUID(), target)
+                    : {
+                          ...motion.newAnimation(crypto.randomUUID(), target),
+                          trigger: "withPrev" as const
+                      }
+            )
         ]);
     };
     const patch = (id: string, change: Partial<motion.SlideAnimation>): void =>
