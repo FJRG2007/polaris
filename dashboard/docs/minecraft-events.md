@@ -1308,6 +1308,13 @@ A new kind follows all of them. A change to an old kind must not undo one.
   player who fell from a build battle died (`3dda1f25f`, `199eb82b2`).
 - **`keepInventory` is held for every event players can die in**, and put
   back only once everybody is home.
+- **A stack written back is given, wherever it goes next.** The give-back
+  read back only the slot it wrote: a stack moved off it the moment it landed
+  (a shift-click, or a mod sorting the bag), or thrown, read as never given,
+  and a second copy was dropped at the player's feet. Now the game's own
+  "Replaced a slot" answer, or the stack turning up in a slot it was not in
+  before, counts as given; only a stack never written (its slot filled first)
+  is dropped (`stash-service.giveBack`).
 - **Experience given back is checked as the game can say it back.** The game
   keeps the points into a level as a float fraction of it and answers
   `xp query ... points` rounded down, so some values read back a point under
