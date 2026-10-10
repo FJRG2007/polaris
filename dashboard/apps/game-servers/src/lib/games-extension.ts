@@ -93,6 +93,14 @@ export const gameServersExtension: AppExtension = {
     afterStart: async (installedAppId) =>
         (await import("./games-health")).clearCrashLoop(installedAppId),
 
+    // A server that took Symbiote on before it moved behind the pack link still
+    // lists the old address, which no longer answers.
+    onBoot: () => {
+        void import("./minecraft/symbiote-service")
+            .then((service) => service.moveSymbioteLinks())
+            .catch((error) => console.error("polaris: Symbiote links could not be moved:", error));
+    },
+
     // A server this app stopped for looping, found running: somebody brought it
     // back, so it is running again rather than stopped a second time.
     adoptsRunningService: async (ownerId, applicationId) =>

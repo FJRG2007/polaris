@@ -7,7 +7,7 @@
  * even when that empties it; a server that moves off 1.21.4 drops it, since the
  * loader ends that boot over it; the login mod's own edits leave it alone; an
  * entry from before the jar moved behind the pack link is told apart from the
- * current one; and the image builds the file the dashboard serves, which the
+ * current one; a template does not carry it; and the image builds the file the dashboard serves, which the
  * public mod route refuses - it goes out through the pack link alone.
  */
 
@@ -25,7 +25,9 @@ process.env.POLARIS_MINECRAFT_MODS_DIR = dir;
 const symbiote = await import("@polaris-app/game-servers/src/lib/minecraft/symbiote");
 const login = await import("@polaris-app/game-servers/src/lib/minecraft/polaris-login");
 const files = await import("@polaris-app/game-servers/src/lib/minecraft/polaris-mod-files");
-const { guardForSave } = await import("@polaris-app/game-servers/src/lib/minecraft/join-guard");
+const { guardAsTemplate, guardForSave } = await import(
+    "@polaris-app/game-servers/src/lib/minecraft/join-guard"
+);
 const route = await import("@polaris-app/game-servers/src/routes/api/minecraft/mod/[file]/route");
 
 const BASE = "https://polaris.example";
@@ -81,6 +83,16 @@ describe("installing and removing it", () => {
         expect(symbiote.hasSymbiote(`${LOGIN},${JAR}`)).toBe(true);
         expect(symbiote.hasSymbiote(LOGIN)).toBe(false);
         expect(symbiote.hasSymbiote("")).toBe(false);
+    });
+
+    it("is not carried into a template, whose servers have pack links of their own", () => {
+        const env = new Map([
+            ["TYPE", "NEOFORGE"],
+            ["VERSION", "1.21.4"],
+            [login.MODS_KEY, `${OTHER},${JAR}`]
+        ]);
+        expect(guardAsTemplate(env).get(login.MODS_KEY)).toBe(OTHER);
+        expect(guardAsTemplate(new Map([[login.MODS_KEY, OTHER]])).get(login.MODS_KEY)).toBe(OTHER);
     });
 
     it("is left alone by the login mod's own edits", () => {

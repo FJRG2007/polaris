@@ -491,6 +491,7 @@ export function MinecraftPanel({
     );
     const loginOn = login.state?.on === true;
     const canManage = held.includes("games.manage");
+    const [symbioteInstalled, setSymbioteInstalled] = useState(false);
 
     /** Settings come from the page, so applying them has to re-render it -
      *  otherwise the form keeps showing the old values as the current ones. */
@@ -721,9 +722,11 @@ export function MinecraftPanel({
                                     <SymbioteRow
                                         installedAppId={installedAppId}
                                         canManage={canManage}
+                                        onInstalled={setSymbioteInstalled}
                                     />
                                 ) : null
                             }
+                            polarisModsInstalled={edition === "java" && symbioteInstalled}
                             onSaved={reloadSettings}
                         />
                         {/* A second catalogue rather than a second source in the one

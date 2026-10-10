@@ -14,7 +14,7 @@ import { useGameText } from "../game-text";
 import { hostUi } from "@polaris/app-host/client";
 import { useEffect, useState, useTransition } from "react";
 import { Loader2, Plus, Trash2 } from "lucide-react";
-import { Badge, Button, Skeleton } from "@polaris/ui";
+import { Badge, Button, PolarisMark, Skeleton } from "@polaris/ui";
 import type { SymbioteState } from "../../lib/minecraft/symbiote-service";
 import { setSymbioteAction, symbioteStateAction } from "./symbiote-actions";
 
@@ -30,24 +30,20 @@ const KEPT_STATE_MS = 24 * 3_600_000;
 function PolarisIcon() {
     return (
         <div className="grid size-10 shrink-0 place-items-center rounded-md border border-border bg-surface">
-            <svg
-                viewBox="0 0 24 24"
-                className="size-5 text-primary"
-                fill="currentColor"
-                aria-hidden
-            >
-                <path d="M12 2l1.9 6.6L20 10l-6.1 1.4L12 18l-1.9-6.6L4 10l6.1-1.4L12 2z" />
-            </svg>
+            <PolarisMark nameClassName="hidden" />
         </div>
     );
 }
 
 export function SymbioteRow({
     installedAppId,
-    canManage
+    canManage,
+    onInstalled
 }: {
     installedAppId: string;
     canManage: boolean;
+    /** Told whether the server's list carries it, whenever that changes. */
+    onInstalled?: (installed: boolean) => void;
 }) {
     const t = useGameText("minecraft");
     const stateKey = `symbiote:${installedAppId}`;
@@ -65,6 +61,11 @@ export function SymbioteRow({
     useEffect(() => {
         if (heard && state) writeSnapshot(stateKey, state);
     }, [heard, stateKey, state]);
+
+    const installed = state?.installed ?? false;
+    useEffect(() => {
+        onInstalled?.(installed);
+    }, [installed, onInstalled]);
 
     useEffect(() => {
         void symbioteStateAction(installedAppId).then((answer) => {

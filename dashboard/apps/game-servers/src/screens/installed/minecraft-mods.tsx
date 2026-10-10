@@ -68,6 +68,7 @@ export function MinecraftMods({
     clientMods = [],
     packCommands = null,
     polarisMods = null,
+    polarisModsInstalled = false,
     onSaved
 }: {
     installedAppId: string;
@@ -91,6 +92,8 @@ export function MinecraftMods({
     /** Rows for the mods Polaris carries itself, shown first in the list. They
      *  install on their own rather than through the save below. */
     polarisMods?: ReactNode;
+    /** Whether one of those rows is installed, so the list is not empty. */
+    polarisModsInstalled?: boolean;
     onSaved: () => void;
 }) {
     const schemaText = useSchemaText();
@@ -361,6 +364,7 @@ export function MinecraftMods({
                 entries={projects}
                 projects={onList}
                 polarisMods={polarisMods}
+                polarisModsInstalled={polarisModsInstalled}
                 conflicts={conflicts}
                 requires={requires}
                 refused={refused}
@@ -662,13 +666,15 @@ function InstalledList({
     dependencyOptions,
     onDependencies,
     onRemove,
-    polarisMods
+    polarisMods,
+    polarisModsInstalled
 }: {
     installedAppId: string;
     applicationId: string | null;
     entries: readonly string[];
     projects: InstalledRow[] | null;
     polarisMods: ReactNode;
+    polarisModsInstalled: boolean;
     conflicts: readonly modrinth.ModrinthConflict[];
     /** What the things on the list cannot run without - see `readRequirements`. */
     requires: readonly modrinth.ModrinthRequirement[];
@@ -761,9 +767,11 @@ function InstalledList({
                 {polarisMods && <ul className="flex flex-col gap-2 empty:hidden">{polarisMods}</ul>}
 
                 {entries.length === 0 ? (
-                    <p className="py-2 text-sm text-muted-foreground">
-                        {t("mods.nothingInstalledYetBrowseBelow")}
-                    </p>
+                    polarisModsInstalled ? null : (
+                        <p className="py-2 text-sm text-muted-foreground">
+                            {t("mods.nothingInstalledYetBrowseBelow")}
+                        </p>
+                    )
                 ) : projects === null ? (
                     // The names are a round trip away; the rows themselves are not.
                     <ul className="flex flex-col gap-2">

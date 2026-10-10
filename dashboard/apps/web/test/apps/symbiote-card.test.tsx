@@ -7,8 +7,8 @@
  * a manager installs it in one click; players are pointed at the pack's line and
  * never handed a download link, since the jar is not public; on another release
  * the reason is said, and on another loader the row is not there at all; a
- * viewer cannot install it; and removing it asks first, since its blocks leave
- * the world with it.
+ * viewer cannot install it; the list hears whether it is installed; and
+ * removing it asks first, since its blocks leave the world with it.
  */
 
 import "@/components/app-host/client";
@@ -91,6 +91,20 @@ describe("Symbiote on the Mods tab", () => {
         await user.click(screen.getByRole("button", { name: /cancel/i }));
         expect(actions.setSymbioteAction).not.toHaveBeenCalled();
         expect(screen.getByText("Installed")).toBeTruthy();
+    });
+
+    it("tells the list whether it is installed, so the list is not called empty", async () => {
+        const onInstalled = vi.fn();
+        vi.mocked(actions.symbioteStateAction).mockResolvedValue({
+            state: { ...READY, installed: true }
+        });
+        render(
+            <ul>
+                <SymbioteRow installedAppId={SERVER} canManage onInstalled={onInstalled} />
+            </ul>,
+            { wrapper: MessagesWrapper }
+        );
+        await vi.waitFor(() => expect(onInstalled).toHaveBeenLastCalledWith(true));
     });
 
     it("puts it back when the change fails", async () => {

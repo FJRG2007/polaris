@@ -8,6 +8,7 @@
  */
 
 import * as symbiote from "./symbiote";
+import { prisma } from "@polaris/db";
 import { host } from "@polaris/app-host";
 import { MODS_KEY } from "./polaris-login";
 import { SOFTWARE_KEY } from "./join-guard";
@@ -49,17 +50,6 @@ export async function symbioteState(
         jarBundled(symbiote.SYMBIOTE_FILE)
     ]);
     const mods = env.get(MODS_KEY) ?? "";
-    // Installed while the jar was still on the public route: moved onto the pack
-    // link, which is the only address that serves it now.
-    if (publicUrl !== null && symbiote.symbioteElsewhere(mods, jarUrl(publicUrl, installedAppId))) {
-        await setEnvVars("application", applicationId, ownerId, [
-            {
-                key: MODS_KEY,
-                value: symbiote.withSymbiote(mods, jarUrl(publicUrl, installedAppId)),
-                isSecret: false
-            }
-        ]);
-    }
     return {
         installed: symbiote.hasSymbiote(mods),
         fit: symbiote.symbioteFit(env.get(SOFTWARE_KEY) ?? "", env.get("VERSION") ?? ""),
@@ -97,4 +87,38 @@ export async function setSymbiote(
     await setEnvVars("application", applicationId, ownerId, [
         { key: MODS_KEY, value: next, isSecret: false }
     ]);
+}
+
+/**
+ * Every server that took it on while the jar was still on the public route,
+ * moved onto its own pack link: the public route no longer answers it, so a
+ * server booting with the old address would not start. Run when the dashboard
+ * boots, before anybody has to open the server's Mods tab.
+ */
+export async function moveSymbioteLinks(): Promise<void> {
+    const baseUrl = await publicAppUrl().catch(() => null);
+    if (baseUrl === null) return;
+    const listed = await prisma.envVar.findMany({
+        where: {
+            scopeType: "application",
+            key: MODS_KEY,
+            value: { contains: symbiote.SYMBIOTE_FILE }
+        },
+        select: { scopeId: true, value: true }
+    });
+    for (const entry of listed) {
+        const install = await prisma.installedApp.findFirst({
+            where: { applicationId: entry.scopeId, status: { not: "removed" } },
+            select: { id: true, ownerId: true }
+        });
+        if (!install) continue;
+        const mods = entry.value ?? "";
+        const url = jarUrl(baseUrl, install.id);
+        if (!symbiote.symbioteElsewhere(mods, url)) continue;
+        await setEnvVars("application", entry.scopeId, install.ownerId, [
+            { key: MODS_KEY, value: symbiote.withSymbiote(mods, url), isSecret: false }
+        ]).catch((error) =>
+            console.error("polaris: a server's Symbiote link could not be moved:", error)
+        );
+    }
 }
