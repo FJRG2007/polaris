@@ -99,6 +99,7 @@ public class SetbackTeleportUtil extends PolarisProcessor implements PostPredict
         if (player.gamemode == GameMode.SPECTATOR || player.disablePolaris)
             return; // We don't care about spectators, they don't flag
         if (lastKnownGoodPosition == null) return; // Player hasn't spawned yet
+        if (ModdedContent.isModdedServer()) return; // See isExempt: a resync froze players the same way
         blockMovementsUntilResync(true, true);
     }
 
@@ -106,6 +107,7 @@ public class SetbackTeleportUtil extends PolarisProcessor implements PostPredict
         if (player.gamemode == GameMode.SPECTATOR || player.disablePolaris)
             return; // We don't care about spectators, they don't flag
         if (lastKnownGoodPosition == null) return; // Player hasn't spawned yet
+        if (ModdedContent.isModdedServer()) return; // See isExempt: a resync froze players the same way
         blockMovementsUntilResync(false, true);
     }
 
@@ -113,6 +115,7 @@ public class SetbackTeleportUtil extends PolarisProcessor implements PostPredict
         if (player.gamemode == GameMode.SPECTATOR || player.disablePolaris)
             return; // We don't care about spectators, they don't flag
         if (lastKnownGoodPosition == null) return; // Player hasn't spawned yet
+        if (ModdedContent.isModdedServer()) return; // See isExempt: a resync froze players the same way
         blockMovementsUntilResync(false, false);
     }
 
