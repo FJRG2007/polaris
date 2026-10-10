@@ -2396,7 +2396,9 @@ function Tile({
                     <Avatar
                         size={face}
                         person={{ id: personId ?? null, name }}
-                        callBadge={deafened ? "deafened" : muted ? "muted" : null}
+                        // In a call, so no presence dot - but no badge either:
+                        // the name plate below says it.
+                        callBadge={null}
                         className={cn(
                             "transition-shadow duration-fast",
                             speaking && "ring-2 ring-success"
@@ -2445,26 +2447,27 @@ function Tile({
                 </span>
             )}
             <span className="absolute bottom-1 left-1 flex items-center gap-1 rounded bg-background/80 px-1.5 py-0.5 text-[0.6875rem]">
-                {label ?? name}
-                {guest && <span className="text-muted-foreground">{t("callRoom.guest")}</span>}
-                {sharing && <LiveBadge />}
-                {/* Drawn because this person cannot be heard, yours included -
-                    and only while the picture is a video: with the camera off
-                    the face carries it instead (see `callBadge`). Deafened wins
-                    the space: somebody who is not listening is not reached by
-                    talking louder, and their microphone being off follows from
-                    it anyway. */}
-                {blank ? null : deafened ? (
+                {/* Drawn because this person cannot be heard, yours included,
+                    and ahead of the name the way a voice channel's tile carries
+                    it - camera on or off. It used to sit on the face when the
+                    camera was off, a badge on the circle that read as part of
+                    the picture. Deafened wins the space: somebody who is not
+                    listening is not reached by talking louder, and their
+                    microphone being off follows from it anyway. */}
+                {deafened ? (
                     <HeadphoneOff
-                        className="size-3 text-danger"
+                        className="size-3 shrink-0 text-danger"
                         aria-label={t("callRoom.notListening")}
                     />
                 ) : muted ? (
                     <MicOff
-                        className="size-3 text-danger"
+                        className="size-3 shrink-0 text-danger"
                         aria-label={t("callRoom.microphoneOff")}
                     />
                 ) : null}
+                {label ?? name}
+                {guest && <span className="text-muted-foreground">{t("callRoom.guest")}</span>}
+                {sharing && <LiveBadge />}
                 {volumeKey && volume === 0 && (
                     <VolumeX
                         className="size-3 text-danger"
