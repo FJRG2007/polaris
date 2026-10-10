@@ -146,7 +146,7 @@ export function modUrl(baseUrl: string, file: string): string {
 }
 
 /** The image splits `MODS` on commas and newlines. */
-function modEntries(mods: string): string[] {
+export function modEntries(mods: string): string[] {
     return mods
         .split(/[,\n]/)
         .map((entry) => entry.trim())

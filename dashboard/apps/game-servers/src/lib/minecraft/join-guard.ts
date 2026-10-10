@@ -334,47 +334,36 @@ export async function guardForSave(
         return writes;
     }
     const current = await once();
-    const listed = writes.find((entry) => entry.key === polarisLogin.MODS_KEY)?.value;
-    const off = anticheatMovedTo(
-        current,
-        software || (current.get(SOFTWARE_KEY) ?? ""),
-        version ?? current.get("VERSION") ?? "",
-        listed ?? current.get(polarisLogin.MODS_KEY) ?? ""
+    const nextSoftware = software || (current.get(SOFTWARE_KEY) ?? "");
+    const nextVersion = version ?? current.get("VERSION") ?? "";
+    // Each jar Polaris put on the list comes off the same way, in turn, from the
+    // list as the writes before it leave it.
+    const mods = (list: readonly { key: string; value: string }[]): string =>
+        list.find((entry) => entry.key === polarisLogin.MODS_KEY)?.value ??
+        current.get(polarisLogin.MODS_KEY) ??
+        "";
+    const afterAnticheat = overlay(
+        writes,
+        anticheatMovedTo(current, nextSoftware, nextVersion, mods(writes))
     );
-    const afterAnticheat =
-        off === null
-            ? writes
-            : [
-                  ...writes.filter((entry) => !off.has(entry.key)),
-                  ...[...off].map(([key, value]) => ({ key, value }))
-              ];
-    // The plugin the server's sounds hold comes off the same way, from the list
-    // as everything above leaves it.
-    const listedNow = afterAnticheat.find((entry) => entry.key === polarisLogin.MODS_KEY)?.value;
-    const sounds = soundsMovedTo(
-        current,
-        software || (current.get(SOFTWARE_KEY) ?? ""),
-        version ?? current.get("VERSION") ?? "",
-        listedNow ?? current.get(polarisLogin.MODS_KEY) ?? ""
+    // The plugin the server's sounds hold.
+    const afterSounds = overlay(
+        afterAnticheat,
+        soundsMovedTo(current, nextSoftware, nextVersion, mods(afterAnticheat))
     );
-    const afterSounds =
-        sounds === null
-            ? afterAnticheat
-            : [
-                  ...afterAnticheat.filter((entry) => !sounds.has(entry.key)),
-                  ...[...sounds].map(([key, value]) => ({ key, value }))
-              ];
-    // Symbiote comes off a release it does not load on, the same way.
-    const listedLast = afterSounds.find((entry) => entry.key === polarisLogin.MODS_KEY)?.value;
-    const symbiote = symbioteMovedTo(
-        software || (current.get(SOFTWARE_KEY) ?? ""),
-        version ?? current.get("VERSION") ?? "",
-        listedLast ?? current.get(polarisLogin.MODS_KEY) ?? ""
-    );
-    if (symbiote === null) return afterSounds;
+    // Symbiote, off a release it does not load on.
+    return overlay(afterSounds, symbioteMovedTo(nextSoftware, nextVersion, mods(afterSounds)));
+}
+
+/** A list of writes with these keys written over, or as it was for none. */
+function overlay(
+    writes: readonly { key: string; value: string }[],
+    over: ReadonlyMap<string, string> | null
+): { key: string; value: string }[] {
+    if (over === null) return [...writes];
     return [
-        ...afterSounds.filter((entry) => !symbiote.has(entry.key)),
-        ...[...symbiote].map(([key, value]) => ({ key, value }))
+        ...writes.filter((entry) => !over.has(entry.key)),
+        ...[...over].map(([key, value]) => ({ key, value }))
     ];
 }
 

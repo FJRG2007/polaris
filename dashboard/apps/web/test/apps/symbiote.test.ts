@@ -185,4 +185,13 @@ describe("the file", () => {
         );
         expect(await files.bundledSha1("symbiote.jar")).toBeNull();
     });
+
+    it("asks again for a checksum it could not read, rather than keeping the miss", async () => {
+        const late = "polaris-paper.jar";
+        expect(await files.bundledSha1(late)).toBeNull();
+        writeFileSync(join(dir, late), "late-bytes");
+        expect(await files.bundledSha1(late)).toBe(
+            createHash("sha1").update("late-bytes").digest("hex")
+        );
+    });
 });

@@ -72,7 +72,7 @@ export async function jarBundled(file: string): Promise<boolean> {
 }
 
 /** A served jar's sha1, as the mod pack's installers check a download against,
- *  or null when the image does not carry it. Read once, like the versions. */
+ *  or null when the image does not carry it. */
 const checksums = new Map<string, Promise<string | null>>();
 
 export function bundledSha1(file: string): Promise<string | null> {
@@ -82,7 +82,11 @@ export function bundledSha1(file: string): Promise<string | null> {
     if (!sum) {
         sum = readFile(location)
             .then((bytes) => createHash("sha1").update(bytes).digest("hex"))
-            .catch(() => null);
+            .catch(() => {
+                // Not kept: a read that failed is tried again on the next ask.
+                checksums.delete(file);
+                return null;
+            });
         checksums.set(file, sum);
     }
     return sum;
