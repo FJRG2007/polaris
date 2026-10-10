@@ -1732,7 +1732,9 @@ export function readEventsConfig(
     // back to its kind's defaults (`repairPreset`), rather than vanishing
     // from the list and the draw with nothing to say so.
     const kept = readPresets(value.presets)
-        .map(({ preset }) => replaceRetired(saved < KIND_DEFAULTS_SINCE ? toKindDefaults(preset) : preset))
+        .map(({ preset }) =>
+            replaceRetired(saved < KIND_DEFAULTS_SINCE ? toKindDefaults(preset) : preset)
+        )
         .map((preset) => (saved < HIDE_SECONDS_SINCE ? toHideSeconds(preset) : preset));
     // Every kind this server's events were saved before, once, named in the
     // language its players read.
