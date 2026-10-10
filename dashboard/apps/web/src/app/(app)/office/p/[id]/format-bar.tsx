@@ -13,6 +13,9 @@
  */
 
 import * as deck from "@/lib/office/deck";
+import type * as tables from "@/lib/office/slide-table";
+import type * as charts from "@/lib/office/slide-chart";
+import { ChartControls, TableControls } from "./object-controls";
 import { ToolbarButton } from "@/components/rich-text/toolbar";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import {
@@ -77,14 +80,15 @@ export type BoxPatch = Partial<Omit<deck.Box, "id" | "version" | "kind">>;
 export type BoxChange = BoxPatch | ((box: deck.Box) => BoxPatch);
 
 /** Which of the chosen boxes a change is for: those with words, those that
- *  are an area (a shape or a text box, which can be filled and outlined), or
- *  the lines. */
-export type PatchTarget = "words" | "areas" | "lines";
+ *  are an area (a shape or a text box, which can be filled and outlined), the
+ *  lines, or the tables. */
+export type PatchTarget = "words" | "areas" | "lines" | "tables";
 
 /** Whether a change meant for `to` applies to `box`. */
 export function patchFits(box: deck.Box, to: PatchTarget): boolean {
-    if (to === "words") return deck.holdsText(box);
+    if (to === "words") return deck.typable(box);
     if (to === "lines") return deck.isLine(box);
+    if (to === "tables") return box.kind === "table";
     return (box.kind === "shape" || box.kind === "text") && !deck.isLine(box);
 }
 
@@ -200,7 +204,11 @@ export function FormatBar({
     onAlign,
     onDistribute,
     onGroup,
-    onUngroup
+    onUngroup,
+    cell,
+    onTable,
+    onChart,
+    onEditData
 }: {
     /** The chosen boxes, at least one. */
     boxes: readonly deck.Box[];
@@ -210,6 +218,14 @@ export function FormatBar({
     onDistribute: (axis: "x" | "y") => void;
     onGroup: () => void;
     onUngroup: () => void;
+    /** The cell of a table being typed in, which rows and columns go beside. */
+    cell: { box: string; at: tables.CellAt } | null;
+    /** A chosen table changed. */
+    onTable: (id: string, edit: (table: tables.SlideTable) => tables.SlideTable) => void;
+    /** A chosen chart changed. */
+    onChart: (id: string, chart: charts.SlideChart) => void;
+    /** A chosen chart's data opened for editing. */
+    onEditData: (id: string) => void;
 }) {
     const t = useTranslations("office");
     const wordsBox = boxes.find((one) => patchFits(one, "words"));
@@ -220,6 +236,8 @@ export function FormatBar({
     const canGroup = deck.canGroup(boxes);
     const canUngroup = deck.canUngroup(boxes);
     const canDistribute = deck.canDistribute(boxes);
+    const tableBox = boxes.find((one) => one.kind === "table");
+    const chartBox = boxes.find((one) => one.kind === "chart");
 
     return (
         <>
@@ -295,8 +313,27 @@ export function FormatBar({
             >
                 <Layers className="size-4" />
             </MenuButton>
+            {chartBox ? (
+                <ChartControls
+                    box={chartBox}
+                    onChart={(chart) => onChart(chartBox.id, chart)}
+                    onEditData={() => onEditData(chartBox.id)}
+                />
+            ) : null}
+            {tableBox ? (
+                <TableControls
+                    box={tableBox}
+                    cell={cell?.box === tableBox.id ? cell.at : { row: 0, col: 0 }}
+                    onTable={(edit) => onTable(tableBox.id, edit)}
+                    onPatch={(patch) => onPatch(patch, "tables")}
+                />
+            ) : null}
             {wordsBox ? (
-                <WordControls box={wordsBox} onPatch={(patch) => onPatch(patch, "words")} />
+                <WordControls
+                    box={wordsBox}
+                    lists={wordsBox.kind !== "table"}
+                    onPatch={(patch) => onPatch(patch, "words")}
+                />
             ) : null}
             {areaBox ? (
                 <OutlineControls
@@ -312,7 +349,16 @@ export function FormatBar({
 }
 
 /** A box's words: face, size, emphasis, colour, alignment and lists. */
-function WordControls({ box, onPatch }: { box: deck.Box; onPatch: (patch: BoxPatch) => void }) {
+function WordControls({
+    box,
+    lists,
+    onPatch
+}: {
+    box: deck.Box;
+    /** Whether the list buttons are offered - not for a table's cells. */
+    lists: boolean;
+    onPatch: (patch: BoxPatch) => void;
+}) {
     const t = useTranslations("office");
     const points = deck.pointsOf(box.size);
     const AlignIcon = ALIGN_ICON[box.align];
@@ -440,20 +486,24 @@ function WordControls({ box, onPatch }: { box: deck.Box; onPatch: (patch: BoxPat
             >
                 <ValignIcon className="size-4" />
             </MenuButton>
-            <ToolbarButton
-                label={t("slides.format.bulletList")}
-                active={box.list === "bullet"}
-                onClick={() => onPatch({ list: box.list === "bullet" ? "none" : "bullet" })}
-            >
-                <List className="size-4" />
-            </ToolbarButton>
-            <ToolbarButton
-                label={t("slides.format.numberedList")}
-                active={box.list === "number"}
-                onClick={() => onPatch({ list: box.list === "number" ? "none" : "number" })}
-            >
-                <ListOrdered className="size-4" />
-            </ToolbarButton>
+            {lists ? (
+                <>
+                    <ToolbarButton
+                        label={t("slides.format.bulletList")}
+                        active={box.list === "bullet"}
+                        onClick={() => onPatch({ list: box.list === "bullet" ? "none" : "bullet" })}
+                    >
+                        <List className="size-4" />
+                    </ToolbarButton>
+                    <ToolbarButton
+                        label={t("slides.format.numberedList")}
+                        active={box.list === "number"}
+                        onClick={() => onPatch({ list: box.list === "number" ? "none" : "number" })}
+                    >
+                        <ListOrdered className="size-4" />
+                    </ToolbarButton>
+                </>
+            ) : null}
         </>
     );
 }

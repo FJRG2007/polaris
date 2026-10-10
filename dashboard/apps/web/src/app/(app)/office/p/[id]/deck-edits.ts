@@ -15,6 +15,8 @@
 
 import * as Y from "yjs";
 import * as deck from "@/lib/office/deck";
+import * as tables from "@/lib/office/slide-table";
+import type { SlideChart } from "@/lib/office/slide-chart";
 import { OFFICE_FIELDS } from "@/lib/office/content";
 import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from "react";
 
@@ -189,6 +191,62 @@ export function addBox(
               : { ...made, fill: theme.accent };
     placeBoxes(doc, slideId, [box]);
     return box.id;
+}
+
+/** A new table on a slide, `rows` by `cols`, its header in the theme's accent;
+ *  its id. */
+export function addTable(doc: Y.Doc, slideId: string, rows: number, cols: number): string {
+    const theme = deck.readTheme(new Map(themeOf(doc).entries()));
+    const box = deck.newTableBox(crypto.randomUUID(), rows, cols, theme.accent);
+    placeBoxes(doc, slideId, [box]);
+    return box.id;
+}
+
+/** A new chart on a slide; its id. */
+export function addChart(doc: Y.Doc, slideId: string, chart: SlideChart): string {
+    const box = deck.newChartBox(crypto.randomUUID(), chart);
+    placeBoxes(doc, slideId, [box]);
+    return box.id;
+}
+
+/**
+ * A table changed by `edit`, worked out from the table as it is in the deck
+ * right now rather than as this screen last drew it - so a cell somebody else
+ * typed a moment ago is kept. Nothing is written when `edit` changes nothing.
+ */
+export function updateTable(
+    doc: Y.Doc,
+    slideId: string,
+    boxId: string,
+    edit: (table: tables.SlideTable) => tables.SlideTable
+): void {
+    const stored = boxesOf(doc).get(deck.boxKey(slideId, boxId));
+    if (!stored) return;
+    const { table } = deck.readBox(stored);
+    if (!table) return;
+    const next = edit(table);
+    if (next === table) return;
+    updateBox(doc, slideId, boxId, { table: next });
+}
+
+/** One cell's words. */
+export function setCell(
+    doc: Y.Doc,
+    slideId: string,
+    boxId: string,
+    at: tables.CellAt,
+    text: string
+): void {
+    updateTable(doc, slideId, boxId, (table) => tables.setCell(table, at, text));
+}
+
+/** A chart's numbers, kind and switches, as one step - unless they are the
+ *  ones it already has, which is no step at all. */
+export function setChart(doc: Y.Doc, slideId: string, boxId: string, chart: SlideChart): void {
+    const stored = boxesOf(doc).get(deck.boxKey(slideId, boxId));
+    if (!stored) return;
+    if (JSON.stringify(deck.readBox(stored).chart) === JSON.stringify(chart)) return;
+    updateBox(doc, slideId, boxId, { chart });
 }
 
 /** Boxes placed on a slide as they are - pasted or duplicated - on top of what

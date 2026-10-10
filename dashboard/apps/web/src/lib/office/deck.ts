@@ -18,12 +18,14 @@
  */
 
 import { z } from "zod";
+import * as tables from "./slide-table";
+import * as charts from "./slide-chart";
 import { FONT_FAMILIES, type FontFamily } from "@/lib/font-families";
 
-/** What a box on a slide is. Three, deliberately: a deck made of more kinds than
- *  this is a deck nobody finishes - every outline, from a square to an arrow, is
- *  one kind of shape (`SHAPES`). */
-export const BOX_KINDS = ["text", "shape", "image"] as const;
+/** What a box on a slide is. Few, deliberately: every outline, from a square to
+ *  an arrow, is one kind of shape (`SHAPES`); a table and a chart are the two
+ *  things a slide holds that are not a picture or words in a frame. */
+export const BOX_KINDS = ["text", "shape", "image", "table", "chart"] as const;
 
 export type BoxKind = (typeof BOX_KINDS)[number];
 
@@ -122,6 +124,10 @@ export interface Box extends BoxFrame {
     /** A source, for an image: inline data, an address, or `image:<id>` - a
      *  picture kept once in the deck's own store (`IMAGE_PREFIX`). */
     readonly src: string;
+    /** A table's cells - see `slide-table.ts`. Null on anything else. */
+    readonly table: tables.SlideTable | null;
+    /** A chart's numbers - see `slide-chart.ts`. Null on anything else. */
+    readonly chart: charts.SlideChart | null;
     /** Which counts up when somebody changes it, so two people editing the same
      *  box resolve the same way a drawing does. */
     readonly version: number;
@@ -219,6 +225,8 @@ export function newBox(kind: BoxKind, id: string, shape: ShapeKind = "rect"): Bo
         font: "",
         group: "",
         src: "",
+        table: null,
+        chart: null,
         version: 1
     };
     if (kind !== "shape") return base;
@@ -250,6 +258,52 @@ export function newBox(kind: BoxKind, id: string, shape: ShapeKind = "rect"): Bo
         color: SHAPE_TEXT,
         align: "center",
         valign: "middle"
+    };
+}
+
+/** What a new table's borders are drawn in: a grey that reads on a light
+ *  slide and on a dark one. */
+export const TABLE_BORDER = "#9aa3ad";
+
+/**
+ * A new table, `rows` by `cols`, centred across most of the slide, its header
+ * filled with `accent` - as a table inserted in Google Slides takes the theme.
+ * As tall as its rows need at the size its words start at, never taller than
+ * most of the slide.
+ */
+export function newTableBox(id: string, rows: number, cols: number, accent: string): Box {
+    const table = tables.newTable(rows, cols);
+    const w = 0.8;
+    const h = Math.min(0.7, table.rows.length * 0.075);
+    return {
+        ...newBox("text", id),
+        kind: "table",
+        x: (1 - w) / 2,
+        y: Math.max(0.05, (1 - h) / 2),
+        w,
+        h,
+        size: fractionOfPoints(14),
+        fill: readColor(accent, SHAPE_FILL),
+        stroke: TABLE_BORDER,
+        strokeWidth: fractionOfPoints(1),
+        valign: "middle",
+        table
+    };
+}
+
+/** A new chart of `chart`'s numbers, centred, a little over half the slide. */
+export function newChartBox(id: string, chart: charts.SlideChart): Box {
+    const w = 0.6;
+    const h = 0.62;
+    return {
+        ...newBox("text", id),
+        kind: "chart",
+        x: (1 - w) / 2,
+        y: (1 - h) / 2,
+        w,
+        h,
+        size: fractionOfPoints(14),
+        chart
     };
 }
 
@@ -331,6 +385,8 @@ export function readBox(raw: unknown): Box {
         font: oneOf(["", ...SLIDE_FONTS], one.font, ""),
         group: typeof one.group === "string" ? one.group.slice(0, 64) : "",
         src: typeof one.src === "string" ? one.src : "",
+        table: kind === "table" ? tables.readTable(one.table) : null,
+        chart: kind === "chart" ? charts.readChart(one.chart) : null,
         version: finite(one.version, 1)
     };
 }
@@ -344,6 +400,21 @@ export function isLine(box: Pick<Box, "kind" | "shape">): boolean {
 /** Whether a box holds words: text, and every shape that is an area. */
 export function holdsText(box: Pick<Box, "kind" | "shape">): boolean {
     return box.kind === "text" || (box.kind === "shape" && !isLine(box));
+}
+
+/** Whether a box can be typed into - one that holds words, or a table's cells -
+ *  and so whether the format bar's face, size, emphasis, colour and alignment
+ *  apply to it: a table's cells are formatted whole. */
+export function typable(box: Pick<Box, "kind" | "shape">): boolean {
+    return holdsText(box) || box.kind === "table";
+}
+
+/** Everything a box says, as plain lines: its words, a table's cells, a
+ *  chart's names. */
+export function boxWords(box: Box): string {
+    if (box.table) return tables.tableText(box.table);
+    if (box.chart) return charts.chartText(box.chart);
+    return box.text.trim();
 }
 
 /**
@@ -460,12 +531,7 @@ export function arrange(
 /** What a deck reads as, for the excerpt and for a plain-text export: every
  *  slide's words, in order. */
 export function deckText(slides: readonly Slide[], boxes: ReadonlyMap<string, unknown>): string[] {
-    return slides.map((slide) =>
-        boxesOn(slide.id, boxes)
-            .map((box) => box.text.trim())
-            .filter(Boolean)
-            .join("\n")
-    );
+    return slides.map((slide) => boxesOn(slide.id, boxes).map(boxWords).filter(Boolean).join("\n"));
 }
 
 /** The boxes of every slide at once, for a screen that draws them all - the
@@ -767,7 +833,11 @@ const pastedBox = z.object({
     reversed: z.boolean().optional(),
     role: z.enum(ROLES).optional(),
     font: z.enum(["", ...FONT_FAMILIES]).optional(),
-    group: z.string().max(64).optional()
+    group: z.string().max(64).optional(),
+    // Read whole by `readTable` and `readChart`, which keep only what a table
+    // or a chart may hold; bounded here so a huge paste is refused unread.
+    table: z.unknown().optional(),
+    chart: z.unknown().optional()
 });
 
 const pastedBoxes = z.object({ boxes: z.array(pastedBox).min(1).max(500) });
@@ -805,7 +875,9 @@ export function writeClipboard(
             reversed: box.reversed,
             role: box.role,
             font: box.font,
-            group: box.group
+            group: box.group,
+            ...(box.table ? { table: box.table } : {}),
+            ...(box.chart ? { chart: box.chart } : {})
         }))
     });
 }
