@@ -94,7 +94,7 @@ vi.mock("@polaris/app-host", () => ({
 const { GET, POST } = await import(
     "@polaris-app/game-servers/src/routes/api/minecraft/anticheat/[id]/route"
 );
-const { engineCheckLabel, engineScore } = await import(
+const { MODDED_APPROXIMATE_MAX, approximateOnMods, engineCheckLabel, engineScore } = await import(
     "@polaris-app/game-servers/src/lib/minecraft/suspicion"
 );
 
@@ -191,6 +191,33 @@ describe("taking a report", () => {
     });
 });
 
+describe("a modded server", () => {
+    beforeEach(() => {
+        fake.env = new Map([
+            ["TYPE", "NEOFORGE"],
+            ["VERSION", "1.21.4"],
+            ["MODS", "https://polaris.example/api/minecraft/mod/polaris-neoforge-1.21.4.jar"],
+            ["POLARIS_ANTICHEAT", "on"]
+        ]);
+    });
+
+    it("does not tell the owner about movement and block checks alone", async () => {
+        // Seen on a real modded server: an honest player at "Confirmed" on
+        // Simulation, another "Likely" on FastBreak mining cobblestone.
+        for (let index = 0; index < 12; index += 1) {
+            expect((await report({ flags: [flag()] })).status).toBe(200);
+            await report({ flags: [flag({ player: "ErMigue04", check: "FastBreak" })] });
+        }
+        expect(fake.notified).toEqual([]);
+    });
+
+    it("still tells the owner what the other checks catch", async () => {
+        for (let index = 0; index < 4; index += 1)
+            await report({ flags: [flag({ check: "Reach" })] });
+        expect(fake.notified).toHaveLength(1);
+    });
+});
+
 describe("handing the plugin the honeypots", () => {
     const traps = (token = "the-token", id = SERVER) =>
         GET(
@@ -262,6 +289,59 @@ describe("scoring the engine's alerts", () => {
         expect(engineScore([{ check: "Reach", alerts: 2 }]).reasons).toEqual([
             "Hit from further away than anybody can - Reach, 2 times"
         ]);
+    });
+
+    it("holds the checks that model blocks and items to Possible on a modded server", () => {
+        const simulation = engineScore([{ check: "Simulation", alerts: 38 }], true);
+        expect(simulation).toMatchObject({ value: MODDED_APPROXIMATE_MAX, level: "possible" });
+        expect(simulation.why.at(-1)).toEqual({ kind: "modded" });
+        expect(engineScore([{ check: "FastBreak", alerts: 4 }], true).level).toBe("possible");
+        expect(
+            engineScore(
+                [
+                    { check: "Simulation", alerts: 38 },
+                    { check: "GroundSpoof", alerts: 5 },
+                    { check: "TickTimer", alerts: 9 }
+                ],
+                true
+            ).level
+        ).toBe("possible");
+        // The rest count as anywhere else, and the score is the stronger of the two.
+        expect(engineScore([{ check: "Reach", alerts: 10 }], true).level).toBe("confirmed");
+        expect(engineScore([{ check: "XRayProbe", alerts: 3 }], true).level).toBe("likely");
+        expect(
+            engineScore(
+                [
+                    { check: "Simulation", alerts: 38 },
+                    { check: "Reach", alerts: 1 }
+                ],
+                true
+            ).value
+        ).toBe(MODDED_APPROXIMATE_MAX);
+        expect(engineScore([{ check: "Reach", alerts: 2 }], true).why).not.toContainEqual({
+            kind: "modded"
+        });
+    });
+
+    it("tells the checks a mod can fool from the ones it cannot", () => {
+        for (const check of [
+            "Simulation",
+            "PositionBreakA",
+            "WrongBreak",
+            "AirLiquidPlace",
+            "NegativeTimer",
+            "ElytraC"
+        ])
+            expect(approximateOnMods(check), check).toBe(true);
+        for (const check of [
+            "Reach",
+            "XRayProbe",
+            "MultiBreak",
+            "NoSwingBreak",
+            "AimModulo360",
+            "BadPacketsA"
+        ])
+            expect(approximateOnMods(check), check).toBe(false);
     });
 
     it("has words for every check the engine has", () => {

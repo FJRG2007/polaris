@@ -235,7 +235,8 @@ export function MinecraftXray({
                       movement: view.movement,
                       mining: view.mining,
                       engine: view.engine,
-                      players: view.online
+                      players: view.online,
+                      modded: view.modded ?? false
                   })
                 : { suspects: [], incidents: [] },
         [view]
@@ -518,6 +519,11 @@ export function MinecraftXray({
                         <p className="text-xs text-muted-foreground">
                             {t("xray.fromWhatWasFoundIn")}
                         </p>
+                        {view?.modded && (
+                            <p className="text-xs text-muted-foreground">
+                                {t("xray.reasons.modded")}.
+                            </p>
+                        )}
                     </div>
                     <PlayersTable
                         columns={[

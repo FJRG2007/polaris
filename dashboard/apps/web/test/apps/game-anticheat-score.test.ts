@@ -510,6 +510,26 @@ describe("the players list", () => {
         expect(incidents.map((one) => one.kind)).toEqual(["honeypot", "flying", "honeypot"]);
     });
 
+    it("holds the engine's movement and block checks to Possible on a modded server", () => {
+        const engine = [
+            {
+                name: "Reckmy",
+                checks: [{ check: "Simulation", alerts: 38, lastAt: NOW }]
+            }
+        ];
+        const plain = buildSuspects({ honeypots: [], movement: [], mining: [], engine });
+        const modded = buildSuspects({
+            honeypots: [],
+            movement: [],
+            mining: [],
+            engine,
+            modded: true
+        });
+        expect(plain.suspects[0]?.engine.level).toBe("confirmed");
+        expect(modded.suspects[0]?.engine.level).toBe("possible");
+        expect(modded.suspects[0]?.engine.reasons.at(-1)).toMatch(/^Modded server/);
+    });
+
     it("lists whoever is online, even before the game has written their counts", () => {
         // Grumm was mining and not in the table: nothing found yet, and the
         // server had not saved the stats that would have put him there.
