@@ -19,22 +19,38 @@ public class GraftStatusScreen extends Screen {
       return false;
    }
 
-   public void render(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
+   /** An overlay on the live game: its own dim and panel, drawn first and never blurred, so the text stays crisp. */
+   public void renderBackground(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
       g.fill(0, 0, this.width, this.height, -2013265920);
+      if (SymbioteClientState.isGrafted()) {
+         int accent = accent();
+         int left = (this.width - 240) / 2;
+         int top = this.panelTop();
+         g.fill(left - 2, top - 2, left + 240 + 2, top + 92 + 2, -535557608);
+         g.fill(left - 2, top - 2, left + 240 + 2, top - 1, accent);
+         g.fill(left - 2, top + 92 + 1, left + 240 + 2, top + 92 + 2, accent);
+      }
+   }
+
+   private int panelTop() {
+      return Math.max(4, (this.height - 92) / 2);
+   }
+
+   private static int accent() {
+      return STRAIN_COLORS[Math.min(SymbioteClientState.getGraftStrain().ordinal(), STRAIN_COLORS.length - 1)];
+   }
+
+   public void render(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
+      super.render(g, mouseX, mouseY, partialTick);
       if (!SymbioteClientState.isGrafted()) {
          String none = "Nothing is riding along.";
          g.drawString(this.font, none, (this.width - this.font.width(none)) / 2, this.height / 2, -6516568, true);
-         super.render(g, mouseX, mouseY, partialTick);
       } else {
          SymbioteStrain strain = SymbioteClientState.getGraftStrain();
-         int accent = STRAIN_COLORS[Math.min(strain.ordinal(), STRAIN_COLORS.length - 1)];
+         int accent = accent();
          int tension = SymbioteClientState.getGraftTension();
-         int panelH = 92;
          int left = (this.width - 240) / 2;
-         int top = (this.height - panelH) / 2;
-         g.fill(left - 2, top - 2, left + 240 + 2, top + panelH + 2, -535557608);
-         g.fill(left - 2, top - 2, left + 240 + 2, top - 1, accent);
-         g.fill(left - 2, top + panelH + 1, left + 240 + 2, top + panelH + 2, accent);
+         int top = this.panelTop();
          int y = top + 8;
          String title = "The Graft  ·  " + pretty(strain.name());
          g.drawString(this.font, title, left + 10, y, accent, true);
@@ -48,8 +64,6 @@ public class GraftStatusScreen extends Screen {
             ? "They are about to settle this."
             : (tension >= 60 ? "Your symbiote is done being patient." : (tension >= 30 ? "They tolerate each other. Barely." : "An uneasy quiet."));
          g.drawString(this.font, verdict, left + 10, y, -3628840, false);
-         y += 14;
-         super.render(g, mouseX, mouseY, partialTick);
       }
    }
 

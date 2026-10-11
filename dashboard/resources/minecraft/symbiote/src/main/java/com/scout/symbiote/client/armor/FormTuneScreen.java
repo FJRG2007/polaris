@@ -64,9 +64,13 @@ public class FormTuneScreen extends Screen {
       }
    }
 
+   /** A live tuning panel: the player model behind it has to stay sharp, so no menu blur and no dim, only the panel. */
+   public void renderBackground(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
+      g.fill(4, 4, 194, 24 + this.params.length * 19 + 30, -1072693224);
+   }
+
    public void render(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
-      int h = 24 + this.params.length * 19 + 30;
-      g.fill(4, 4, 194, h, -1072693224);
+      super.render(g, mouseX, mouseY, partialTick);
       g.drawString(this.font, "HORROR FORM (dev): F5", 8, 10, -2576129, true);
       int y = 24;
 
@@ -77,8 +81,6 @@ public class FormTuneScreen extends Screen {
          g.drawString(this.font, String.format("%.2f", v), 56, y + 5, col, false);
          y += 19;
       }
-
-      super.render(g, mouseX, mouseY, partialTick);
    }
 
    private record Param(String name, Supplier<Float> get, Consumer<Float> set, float fine, float coarse) {

@@ -80,9 +80,13 @@ public class BloomTuneScreen extends Screen {
       }
    }
 
+   /** A live tuning panel: the player model behind it has to stay sharp, so no menu blur and no dim, only the panel. */
+   public void renderBackground(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
+      g.fill(4, 4, 210, 24 + this.params.length * 20 + 30, -1072693224);
+   }
+
    public void render(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
-      int h = 24 + this.params.length * 20 + 30;
-      g.fill(4, 4, 210, h, -1072693224);
+      super.render(g, mouseX, mouseY, partialTick);
       g.drawString(this.font, "BLOOM TUNING (dev): F5", 8, 10, -2576129, true);
       int y = 24;
 
@@ -91,8 +95,6 @@ public class BloomTuneScreen extends Screen {
          g.drawString(this.font, String.format(p.fmt(), p.get().get()), 70, y + 5, -1516304, false);
          y += 20;
       }
-
-      super.render(g, mouseX, mouseY, partialTick);
    }
 
    private record Param(String name, Supplier<Float> get, Consumer<Float> set, float fine, float coarse, String fmt) {

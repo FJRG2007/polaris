@@ -29,7 +29,7 @@ public class SymbioteStatusScreen extends Screen {
       super.init();
       if (SymbioteClientState.getStage().isAtLeast(BondStage.INTEGRATED) || SymbioteClientState.isLivingArmorActive()) {
          int left = (this.width - 240) / 2;
-         int top = (this.height - this.panelHeight()) / 2;
+         int top = this.panelTop(this.panelHeight());
          this.addRenderableWidget(new ArmorSkinButton(left + 240 - 26, top + 6));
       }
    }
@@ -45,8 +45,29 @@ public class SymbioteStatusScreen extends Screen {
       return h;
    }
 
-   public void render(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
+   /** Kept on screen when the panel is taller than the window (large GUI scale), instead of clipping its title. */
+   private int panelTop(int panelH) {
+      return Math.max(4, (this.height - panelH) / 2);
+   }
+
+   private static int accent() {
+      return STRAIN_COLORS[Math.min(SymbioteClientState.getStrain().ordinal(), STRAIN_COLORS.length - 1)];
+   }
+
+   /** An overlay on the live game: its own dim and panel, drawn first and never blurred, so text and widgets stay crisp. */
+   public void renderBackground(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
       g.fill(0, 0, this.width, this.height, -2013265920);
+      int accent = accent();
+      int panelH = this.panelHeight();
+      int left = (this.width - 240) / 2;
+      int top = this.panelTop(panelH);
+      g.fill(left - 2, top - 2, left + 240 + 2, top + panelH + 2, -535557608);
+      g.fill(left - 2, top - 2, left + 240 + 2, top - 1, accent);
+      g.fill(left - 2, top + panelH + 1, left + 240 + 2, top + panelH + 2, accent);
+   }
+
+   public void render(GuiGraphics g, int mouseX, int mouseY, float partialTick) {
+      super.render(g, mouseX, mouseY, partialTick);
       SymbioteStrain strain = SymbioteClientState.getStrain();
       BondStage stage = SymbioteClientState.getStage();
       int si = Math.min(strain.ordinal(), STRAIN_COLORS.length - 1);
@@ -54,10 +75,7 @@ public class SymbioteStatusScreen extends Screen {
       List<FormattedCharSequence> blurb = this.font.split(Component.translatable("symbiote.status.blurb." + strain.name().toLowerCase()), 220);
       int panelH = this.panelHeight();
       int left = (this.width - 240) / 2;
-      int top = (this.height - panelH) / 2;
-      g.fill(left - 2, top - 2, left + 240 + 2, top + panelH + 2, -535557608);
-      g.fill(left - 2, top - 2, left + 240 + 2, top - 1, accent);
-      g.fill(left - 2, top + panelH + 1, left + 240 + 2, top + panelH + 2, accent);
+      int top = this.panelTop(panelH);
       int y = top + 8;
       String title = Component.translatable("screen.symbiote.status").getString() + ": " + pretty(strain.name());
       g.drawString(this.font, title, left + 10, y, accent, true);
@@ -158,8 +176,6 @@ public class SymbioteStatusScreen extends Screen {
          g.drawString(this.font, line, left + 10, y, -6516568, false);
          y += 10;
       }
-
-      super.render(g, mouseX, mouseY, partialTick);
    }
 
    private int meter(GuiGraphics g, int left, int y, String key, int value, int max, int color) {
