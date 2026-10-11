@@ -1541,7 +1541,13 @@ function LogStream({ deploymentId, onDone }: { deploymentId: string; onDone: () 
                 <DeployStepper steps={deploySteps(status, log)} />
             </div>
             {live && <LivePill />}
-            <LogViewer log={log} name={deploymentId} searchable className="h-[26rem]" />
+            <LogViewer
+                log={log}
+                name={deploymentId}
+                storageKey="deployment"
+                searchable
+                className="h-[26rem]"
+            />
         </div>
     );
 }

@@ -2258,6 +2258,7 @@ export function DeploymentLogs({
         <LogViewer
             log={log}
             name={deploymentId}
+            storageKey="deployment"
             header={<StatusPill tone={dbTone(status)} label={t("view.status", { status })} />}
         />
     );
