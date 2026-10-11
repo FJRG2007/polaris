@@ -60,7 +60,10 @@ export function ControlHint({
         const button = anchor.current?.getBoundingClientRect();
         const own = box.current?.getBoundingClientRect();
         if (!button || !own) return;
-        const next = placeHint(button, own, { width: window.innerWidth, height: window.innerHeight });
+        const next = placeHint(button, own, {
+            width: window.innerWidth,
+            height: window.innerHeight
+        });
         setAt((current) =>
             current && next && current.left === next.left && current.top === next.top
                 ? current
