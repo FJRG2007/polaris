@@ -680,11 +680,8 @@ async function arrivalTick(ctx: KindContext, lines: string[]): Promise<void> {
     await ctx.server.sayAll(lines.splice(0, lines.length));
     await arrival.countdown((out) => ctx.server.sayAll(out), everybody, language);
     const now = Date.now();
-    const seconds =
-        run.preset.minutes * 60 +
-        (run.preset.kind === "build-battle"
-            ? (run.preset.options as catalog.EventOptions<"build-battle">).voteSeconds
-            : 0);
+    // Hide and seek's by the house its players were given.
+    const seconds = catalog.playSeconds(run.preset, run.joined.length);
     const started = { readyAt: now, startsAt: now, endsAt: now + seconds * 1000 };
     // Everybody whole before anything is counted (`arena.HEAL_INSIDE`).
     await ctx.server.sayAll([arena.HEAL_INSIDE]);

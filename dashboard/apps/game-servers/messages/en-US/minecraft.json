@@ -1746,7 +1746,7 @@
             },
             "hide-and-seek": {
                 "label": "Hide and seek",
-                "summary": "A manor is built in the sky, bigger the more who play, its rooms drawn anew each time: a library, a forge, a garden with a waterfall, a pond, mazes and more. Its walls hide rooms behind paintings and panels that open from across the room, with a button, a rug or a stare; there are cellars under the floor, a hollow tree and lava only hiders can cross. The seekers wait, blinded, while the others hide; a seeker's hit finds a hider, who then seeks too. Hiders score for every second hidden and seekers for every hider found; names are hidden from the other side.",
+                "summary": "A map is built in the sky, bigger the more who play, its rooms drawn anew each time: a library, a forge, a garden with a waterfall, a pond, mazes and more. Its walls hide rooms behind paintings and panels that open from across the room, with a button, a rug or a stare; there are cellars under the floor, a hollow tree and lava only hiders can cross. The seekers wait, blinded, while the others hide; a seeker's hit finds a hider, who then seeks too. The hider who stays hidden longest wins; names are hidden from the other side.",
                 "unit": "points"
             },
             "hot-potato": {
@@ -2047,7 +2047,6 @@
             "writeTheme": "Write at least one theme",
             "giveName": "Give it a name",
             "timeFormat": "Write the time as HH:MM",
-            "hideHalfEvent": "At most {count} seconds, half the event",
             "gapOrder": "The longest wait cannot be shorter than the shortest",
             "eventsAtMost": "At most {count} events",
             "schedulesAtMost": "At most {count} scheduled events",
@@ -2349,6 +2348,10 @@
                 "jungle": "Jungle (vines)",
                 "nether": "Nether"
             },
+            "seekTime": {
+                "auto": "Automatic, by the size of the arena",
+                "manual": "Set the minutes"
+            },
             "house": {
                 "auto": "By player count",
                 "small": "Small: 3 by 3 rooms",
@@ -2472,7 +2475,10 @@
         "fuseSeconds": "Fuse (seconds)",
         "fuseSecondsHint": "10 to 40 before the potato goes off.",
         "chestLoot": "What the chests hold",
-        "house": "Size of the house",
+        "house": "Size of the arena",
+        "seekTime": "Seeking time after hiding",
+        "seekTimeHint": "How long the seekers have once the hiding time ends.",
+        "seekMinutes": "Minutes to seek",
         "powerUpMinutes": "Power-ups (minutes)",
         "powerUpMinutesHint": "0 to 10. Each hider gets a short boost this often; 0 for none.",
         "bingoGoal": "What wins",

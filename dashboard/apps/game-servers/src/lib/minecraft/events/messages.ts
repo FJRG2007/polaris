@@ -1339,11 +1339,15 @@ export function takenBack(language: Language): string {
  * it was.
  */
 export function keptOut(
-    why: "unread" | "untakeable" | "unsaved" | "unsettled",
+    why: "unread" | "untakeable" | "unsaved" | "unsettled" | "trash",
     items: readonly string[],
     language: Language
 ): string {
     const list = items.slice(0, 3).map(itemName).join(", ");
+    if (why === "trash")
+        return language === "es"
+            ? `${WARN}Vacía la papelera de tu inventario${list ? ` (${list})` : ""}: lo que hay en ella no se puede guardar a salvo, así que no entras en este.`
+            : `${WARN}Empty the trash slot in your inventory${list ? ` (${list})` : ""}: what's in it can't be put away safely, so you're not in this one.`;
     if (why === "untakeable" && list)
         return language === "es"
             ? `${WARN}Tu ${list} no se puede guardar a salvo: no entras en este. Guárdalo y únete al siguiente.`

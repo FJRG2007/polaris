@@ -308,11 +308,32 @@ function legacySpleef(value: unknown): unknown {
     return { ...rest, variants: one ? [one] : [...SPLEEF_VARIANTS] };
 }
 
+/** The king of the hill's circle, and what every one was given before it. */
+export const RING_RADIUS = 10;
+const OLD_RING_RADIUS = 6;
+
 /** Hide and seek's time to hide, and the most it may be. */
-export const HIDE_SECONDS = 75;
+export const HIDE_SECONDS = 90;
 export const MOST_HIDE_SECONDS = 180;
-/** What every hide and seek was given before `HIDE_SECONDS`: nobody's choice. */
+/** What every hide and seek was given before `HIDE_SECONDS`: nobody's choice.
+ *  45 first, then 75 - still too short to cross the house and settle. */
 const OLD_HIDE_SECONDS = 45;
+const LATER_HIDE_SECONDS = 75;
+
+/** Rooms along a side of the hide and seek house: by the size asked for, or by
+ *  how many play. */
+export function houseRooms(players: number, size: (typeof HOUSE_SIZES)[number] = "auto"): number {
+    if (size === "small") return 3;
+    if (size === "medium") return 4;
+    if (size === "large") return 5;
+    return players <= 8 ? 3 : players <= 16 ? 4 : 5;
+}
+
+/** Hide and seek's seeking time, once the hiding is over, when it follows the
+ *  arena's size: minutes by rooms along a side. */
+export const SEEK_MINUTES_BY_ROOMS: Readonly<Record<number, number>> = { 3: 5, 4: 7, 5: 9 };
+/** The seeking time an operator may set by hand. */
+export const SEEK_MINUTES = { min: 1, max: 60 } as const;
 
 /** What each kind can be set to. Every field has a default, so an event made on
  *  an older version of this screen reads as a whole one. */
@@ -391,7 +412,8 @@ export const optionsSchemas = {
         }),
     "king-of-the-hill": z.object({
         place: placeSchema.default({ mode: "players" }),
-        radius: z.number().int().min(3).max(20).default(6),
+        /** Ten since the ring was found too small to fight in (`OLD_RING_RADIUS`). */
+        radius: z.number().int().min(3).max(20).default(RING_RADIUS),
         /** Played by who joins, brought to it with nothing in their hands - their
          *  things kept and given back after - where nobody can die, and pushing
          *  is how the circle is won (`kinds/hill`). */
@@ -681,6 +703,20 @@ export const optionsSchemas = {
             .max(3, problem("atMost", { count: 3 }))
             .default(1),
         house: z.enum(HOUSE_SIZES).default("auto"),
+        /** The time to seek once the hiding is over: "auto" follows the
+         *  arena's size (`SEEK_MINUTES_BY_ROOMS`), a number is minutes. The
+         *  preset's own `minutes` is not used: the run lasts the time to hide
+         *  and then this (`playSeconds`). */
+        seekMinutes: z
+            .union([
+                z.literal("auto"),
+                z
+                    .number()
+                    .int()
+                    .min(SEEK_MINUTES.min, problem("atLeast", { count: SEEK_MINUTES.min }))
+                    .max(SEEK_MINUTES.max, problem("atMost", { count: SEEK_MINUTES.max }))
+            ])
+            .default("auto"),
         /** Minutes between the hiders' power-ups; 0 for none. */
         powerUpMinutes: z
             .number()
@@ -940,17 +976,6 @@ export const presetSchema = z
             options: optionsSchemas["downhill-race"]
         })
     ])
-    .superRefine((value, context) => {
-        if (value.kind !== "hide-and-seek") return;
-        const most = Math.floor((value.minutes * 60) / 2);
-        if (value.options.hideSeconds > most) {
-            context.addIssue({
-                code: z.ZodIssueCode.custom,
-                path: ["options", "hideSeconds"],
-                message: problem("hideHalfEvent", { count: most })
-            });
-        }
-    })
     .transform((value) => value as EventPreset);
 
 const TIME = /^([01]\d|2[0-3]):([0-5]\d)$/;
@@ -1019,7 +1044,7 @@ export type RandomEvents = z.infer<typeof randomSchema>;
  * value an operator chooses later, even one that happens to be an old default,
  * is theirs.
  */
-export const DEFAULTS_VERSION = 9;
+export const DEFAULTS_VERSION = 10;
 
 /** Events saved before this were brought up to their kind's defaults once
  *  (`toKindDefaults`). */
@@ -1028,6 +1053,12 @@ const KIND_DEFAULTS_SINCE = 2;
 /** Hide and seek saved before this was given `OLD_HIDE_SECONDS` to hide, and is
  *  brought up to `HIDE_SECONDS` once (`toHideSeconds`). */
 const HIDE_SECONDS_SINCE = 8;
+/** Hide and seek saved before this was given `LATER_HIDE_SECONDS`, and is
+ *  brought up to `HIDE_SECONDS` once, and its whole length becomes a time to
+ *  seek (`toSeekMinutes`); a king of the ring saved before it was
+ *  given `OLD_RING_RADIUS`, and is brought up to `RING_RADIUS` once
+ *  (`toRingRadius`). */
+const LATER_HIDE_SECONDS_SINCE = 10;
 
 /** A meteor shower saved before this was paid the steady-work prizes
  *  (`STANDARD`), and is brought up to its own once (`toMeteorPrizes`). */
@@ -1608,13 +1639,39 @@ function readPresets(list: unknown): { preset: EventPreset; reset: string[] }[] 
     });
 }
 
-/** A hide and seek still on the time to hide every one was given before
- *  `HIDE_SECONDS`, given that instead. */
-function toHideSeconds(preset: EventPreset): EventPreset {
+/** A hide and seek still on a time to hide every one was given before
+ *  `HIDE_SECONDS` (`from`), given that instead. */
+function toHideSeconds(preset: EventPreset, from: number): EventPreset {
     if (preset.kind !== "hide-and-seek") return preset;
     const options = preset.options as EventOptions<"hide-and-seek">;
-    if (options.hideSeconds !== OLD_HIDE_SECONDS) return preset;
+    if (options.hideSeconds !== from) return preset;
     return { ...preset, options: { ...options, hideSeconds: HIDE_SECONDS } } as EventPreset;
+}
+
+/** A hide and seek saved when its `minutes` were the whole run, the hiding
+ *  included: on the default length it seeks for as long as its arena's size
+ *  calls for; on a length somebody chose, it keeps that whole length - the
+ *  hiding it had taken off it is the time to seek. Run before the time to hide
+ *  moves, so the length is the one it was played for. */
+function toSeekMinutes(preset: EventPreset): EventPreset {
+    if (preset.kind !== "hide-and-seek") return preset;
+    const options = preset.options as EventOptions<"hide-and-seek">;
+    if (preset.minutes === DEFAULT_MINUTES["hide-and-seek"])
+        return { ...preset, options: { ...options, seekMinutes: "auto" } } as EventPreset;
+    const seekMinutes = Math.min(
+        SEEK_MINUTES.max,
+        Math.max(SEEK_MINUTES.min, Math.round((preset.minutes * 60 - options.hideSeconds) / 60))
+    );
+    return { ...preset, options: { ...options, seekMinutes } } as EventPreset;
+}
+
+/** A king of the ring (fists only) still on the circle every one was given
+ *  before `RING_RADIUS`, given that instead. One walked to keeps its own. */
+function toRingRadius(preset: EventPreset): EventPreset {
+    if (preset.kind !== "king-of-the-hill") return preset;
+    const options = preset.options as EventOptions<"king-of-the-hill">;
+    if (!options.fistsOnly || options.radius !== OLD_RING_RADIUS) return preset;
+    return { ...preset, options: { ...options, radius: RING_RADIUS } } as EventPreset;
 }
 
 /** A meteor shower still on exactly the steady-work prizes it used to have,
@@ -1755,7 +1812,15 @@ export function readEventsConfig(
         .map(({ preset }) =>
             replaceRetired(saved < KIND_DEFAULTS_SINCE ? toKindDefaults(preset) : preset)
         )
-        .map((preset) => (saved < HIDE_SECONDS_SINCE ? toHideSeconds(preset) : preset))
+        .map((preset) => (saved < LATER_HIDE_SECONDS_SINCE ? toSeekMinutes(preset) : preset))
+        .map((preset) =>
+            saved < HIDE_SECONDS_SINCE ? toHideSeconds(preset, OLD_HIDE_SECONDS) : preset
+        )
+        .map((preset) =>
+            saved < LATER_HIDE_SECONDS_SINCE
+                ? toRingRadius(toHideSeconds(preset, LATER_HIDE_SECONDS))
+                : preset
+        )
         .map((preset) => (saved < METEOR_PRIZES_SINCE ? toMeteorPrizes(preset) : preset));
     // Every kind this server's events were saved before, once, named in the
     // language its players read.
@@ -2039,6 +2104,28 @@ export function readyToPlay(run: {
     }
 }
 
+/**
+ * How long a run is played once it starts, in seconds, for `players` who
+ * joined (0 before anybody has: the smallest house). Hide and seek is the time
+ * to hide and then the time to seek; build battle the build and the vote;
+ * everything else its minutes.
+ */
+export function playSeconds(preset: EventPreset, players = 0): number {
+    if (preset.kind === "hide-and-seek") {
+        const options = preset.options as EventOptions<"hide-and-seek">;
+        const seek =
+            options.seekMinutes === "auto"
+                ? SEEK_MINUTES_BY_ROOMS[houseRooms(players, options.house)]!
+                : options.seekMinutes;
+        return options.hideSeconds + seek * 60;
+    }
+    if (preset.kind === "build-battle") {
+        const options = preset.options as EventOptions<"build-battle">;
+        return preset.minutes * 60 + options.voteSeconds;
+    }
+    return preset.minutes * 60;
+}
+
 export function runMinutes(preset: EventPreset): number {
     if (preset.kind === "trivia") {
         const options = preset.options as EventOptions<"trivia">;
@@ -2062,6 +2149,8 @@ export function runMinutes(preset: EventPreset): number {
         const options = preset.options as EventOptions<"gathering">;
         return options.rounds * options.roundMinutes;
     }
+    if (preset.kind === "hide-and-seek")
+        return Math.ceil(playSeconds(preset, Number.POSITIVE_INFINITY) / 60);
     return preset.minutes;
 }
 

@@ -123,12 +123,14 @@ async function buildPlatform(ctx: KindContext, at: stored.Point, radius: number)
     // Ours, written down before a block goes in.
     const batch = inServer.batchKey();
     // With fists only, the floor and the layers over it a bolt of the storm
-    // can set alight (`hill.strikeLine`).
+    // can set alight (`hill.strikeLine`) - and, where the server has the
+    // blocks, the ring's own look (`hill.DEATH`).
     const stormy = optionsOf(run).fistsOnly;
+    const look = stormy && (await ctx.atLeast(hill.DEATH_SINCE)) ? hill.DEATH : hill.PLAIN;
     const built: stored.Arena = stormy
         ? {
               box: { ...floor, y2: floor.y2 + hill.OVER_FLOOR },
-              blocks: [...hill.PLATFORM_BLOCKS, hill.FIRE],
+              blocks: [...hill.lookBlocks(look), hill.FIRE],
               batch
           }
         : { box: floor, blocks: [...hill.PLATFORM_BLOCKS], batch };
@@ -138,14 +140,16 @@ async function buildPlatform(ctx: KindContext, at: stored.Point, radius: number)
     const raised = await inServer.build(
         ctx.server,
         [
-            ...hill.platformDecor(at, radius).map((one) => arena.fillKeep(one.box, one.block)),
-            arena.fillKeep(floor, hill.PLATFORM_BLOCK)
+            ...hill
+                .platformDecor(at, radius, look)
+                .map((one) => arena.fillKeep(one.box, one.block)),
+            arena.fillKeep(floor, look.floor)
         ],
         undefined,
         undefined,
         batch
     );
-    const probe = `execute in minecraft:overworld if block ${at.x} ${at.y} ${at.z} ${hill.PLATFORM_BLOCK}`;
+    const probe = `execute in minecraft:overworld if block ${at.x} ${at.y} ${at.z} ${look.floor}`;
     if (!raised || commands.readTest(await ctx.server.say([probe])) !== "passed") {
         // A protected area refuses blocks without a word.
         await ctx.server.sayAll(arena.teardown(built));
@@ -443,10 +447,21 @@ export async function fightTick(ctx: KindContext, seconds: number, lines: string
         lines.push(hill.strikeLine(platform, radius, center, ring.radius));
     if (!ring.pause)
         lines.push(...hill.scoreLines(center, ring.radius, seconds * (ring.sprint ? 2 : 1)));
+    const look = hill.lookOf(run.arena?.blocks ?? []);
     if (ring.radius !== was.radius || ring.dx !== was.dx || ring.dz !== was.dz) {
         const floor = { ...platform, y: platform.y - 1 };
-        lines.push(...hill.redrawLines(floor, radius, { ...center, y: floor.y }, ring.radius));
+        lines.push(
+            ...hill.redrawLines(floor, radius, { ...center, y: floor.y }, ring.radius, look)
+        );
     }
+    if (look === hill.DEATH)
+        lines.push(
+            ...hill.ambientLines(
+                { ...platform, y: platform.y - 1 },
+                radius,
+                ring.sprint && !ring.pause
+            )
+        );
     const everybody = `@a[tag=${arena.IN_ARENA}]`;
     if (ring.round > was.round) {
         // A new round: everybody back on their own spot, the ring whole again.

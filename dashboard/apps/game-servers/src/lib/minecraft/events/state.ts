@@ -77,7 +77,7 @@ export const GAMEMODES = ["survival", "creative", "adventure", "spectator"] as c
  *  own things: why, and the items that could not be put away, by id. */
 export const keptOutSchema = z.object({
     name: z.string(),
-    why: z.enum(["unread", "untakeable", "unsaved", "unsettled"]),
+    why: z.enum(["unread", "untakeable", "unsaved", "unsettled", "trash"]),
     items: z.array(z.string()).default([])
 });
 
@@ -314,6 +314,9 @@ export const runSchema = z.object({
     /** A trivia game: the bank's questions the server asked lately, as it
      *  started - asked after the others (`trivia-bank.ordered`). */
     triviaSkip: z.array(z.string()).default([]),
+    /** Hide and seek: who sought first in the last one, as it started - drawn
+     *  again only when there are not enough others (`hide-and-seek.seekersFor`). */
+    seekersBefore: z.array(z.string()).max(16).default([]),
     /** A build battle: the building is over and the vote is on. */
     voting: z.boolean().default(false),
     /** A build battle: the [Done] button has been offered to the builders. */
@@ -469,6 +472,8 @@ export const eventStateSchema = z.object({
     scheduleRuns: z.record(z.number()).default({}),
     /** The bank's trivia questions asked lately, oldest first. */
     triviaSeen: z.array(z.string()).default([]),
+    /** Who sought first in the last hide and seek that got going. */
+    lastSeekers: z.array(z.string()).max(16).default([]),
     /** Events won, by lowercased player name - kept apart from the history,
      *  which forgets. Null on a server that has not finished one since this was
      *  kept, where the history is counted instead. */
@@ -520,6 +525,7 @@ export const EMPTY_EVENT_STATE: EventState = {
     lastKind: null,
     scheduleRuns: {},
     triviaSeen: [],
+    lastSeekers: [],
     wins: null,
     stageLeftovers: [],
     arenaLeftovers: []

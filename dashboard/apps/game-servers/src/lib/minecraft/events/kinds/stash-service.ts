@@ -80,6 +80,16 @@ async function experienceOf(
     return levels === null || points === null ? null : { levels, points };
 }
 
+/** What a trash slot mod holds for them, by its item's id; null for nothing. */
+async function trashOf(server: ServerContainer, name: string): Promise<string | null> {
+    const said = await Promise.all(stash.readTrash(name).map((line) => server.say([line])));
+    for (const output of said) {
+        const id = stash.trashedIn(output);
+        if (id) return id;
+    }
+    return null;
+}
+
 /** Their health and hunger now, and the absorption over the health; null when
  *  they are not on to ask. Asked in one trip where the server can. */
 async function vitalsOf(
@@ -113,7 +123,9 @@ export type StashRefusal =
     /** The copy could not be written to the database. */
     | "unsaved"
     /** What they carry kept changing while it was being put away. */
-    | "unsettled";
+    | "unsettled"
+    /** A trash slot mod holds a stack of theirs no command can take: named. */
+    | "trash";
 
 export interface StashResult {
     /** What is kept for them now; null for nothing. */
@@ -189,6 +201,8 @@ export async function stashIn(
     ]);
     let reading = first;
     if (!reading.answered || reading.unreadable > 0) return refuse("unread");
+    const trashed = await trashOf(server, name);
+    if (trashed) return { stash: current, refused: { why: "trash", items: [trashed] } };
     let theirs = reading.items.filter((item) => !stash.isKit(item));
     const untakeable = theirs.filter((item) => !stash.takeable(item));
     if (untakeable.length > 0) return refuse("untakeable", untakeable);

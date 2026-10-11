@@ -65,6 +65,7 @@ import * as villageMessages from "./kinds/village-defense-messages";
 import * as bingo from "./kinds/bingo";
 import * as bingoMessages from "./kinds/bingo-messages";
 import * as fishing from "./kinds/boss-fishing";
+import * as seek from "./kinds/hide-and-seek";
 import * as fishingMessages from "./kinds/boss-fishing-messages";
 import { editionOf, type ServerContainer } from "../service";
 import { gameMessage, gameMessageIn } from "../../game-message";
@@ -859,6 +860,8 @@ export async function startEvent(input: {
         endsAt: now + countdown + catalog.runMinutes(preset) * 60_000,
         participants: [...seen.values()].map((one) => one.name),
         triviaSkip: preset.kind === "trivia" ? stored.readEventState(row.config).triviaSeen : [],
+        seekersBefore:
+            preset.kind === "hide-and-seek" ? stored.readEventState(row.config).lastSeekers : [],
         place: null,
         target: null,
         placeTries: 0,
@@ -4865,6 +4868,12 @@ async function finish(
             entry
         ),
         lastKind: preset.kind,
+        // Who sought first, the latest game's in front of the earlier ones, so
+        // the next hide and seek draws whoever sought longest ago.
+        lastSeekers:
+            preset.kind === "hide-and-seek"
+                ? seek.rememberSeekers(seek.stateOf(run.game)?.seekers ?? [], state.lastSeekers)
+                : state.lastSeekers,
         nextRandomAt: afterAnEnd(draw, state.nextRandomAt, entry.endedAt),
         pending: stored.livePending([...state.pending, ...pending], Date.now()),
         owedLines: stored.withOwedLines(state.owedLines, owedLines, Date.now()),

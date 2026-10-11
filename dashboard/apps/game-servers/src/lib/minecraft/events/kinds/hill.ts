@@ -27,52 +27,150 @@ export const CORNER_BLOCK = "minecraft:sea_lantern";
 export const RING_BLOCK = "minecraft:yellow_concrete";
 /** Every block the platform is built of, for taking it down. */
 export const PLATFORM_BLOCKS = [PLATFORM_BLOCK, EDGE_BLOCK, CORNER_BLOCK, RING_BLOCK] as const;
+
+/**
+ * What a platform is built of: its floor, its edge, its corners, the ring
+ * drawn on it, and what stands over the floor - on the corners, and in the
+ * middle of each side. The ring is only ever drawn onto the floor's block and
+ * rubbed out back to it (`redrawLines`), so the floor inside the edge is one
+ * block whatever the look.
+ */
+export interface Look {
+    readonly floor: string;
+    readonly edge: string;
+    readonly corner: string;
+    readonly ring: string;
+    /** Over each corner; null for nothing. */
+    readonly top: string | null;
+    /** Over the middle of each side, turned to look in; null for nothing. */
+    readonly middle: string | null;
+}
+
+/** The plain platform: a king of the hill walked to, or a server before 1.19. */
+export const PLAIN: Look = {
+    floor: PLATFORM_BLOCK,
+    edge: EDGE_BLOCK,
+    corner: CORNER_BLOCK,
+    ring: RING_BLOCK,
+    top: null,
+    middle: null
+};
+
+/**
+ * The king of the ring's own (fists only, from 1.19): a floor of deepslate
+ * tiles edged in sculk, a block of the deep's own stone at each corner with a
+ * soul campfire burning on it, a wither skeleton's skull in the middle of each
+ * side looking in, and the ring a line of froglight - under the soul sand
+ * valley's sky (`DEATH_BIOME`), with souls and ash drifting over it
+ * (`ambientLines`). The edge is a block past where the ring can ever drift,
+ * so the sculk is never painted over.
+ */
+export const DEATH_SINCE = [1, 19] as const;
+export const DEATH: Look = {
+    floor: "minecraft:deepslate_tiles",
+    edge: "minecraft:sculk",
+    corner: "minecraft:reinforced_deepslate",
+    ring: "minecraft:ochre_froglight",
+    top: "minecraft:soul_campfire",
+    middle: "minecraft:wither_skeleton_skull"
+};
+
+/** The look a platform was built in, from the blocks its arena lists - the
+ *  same after a restart, and plain for one built before there were looks. */
+export function lookOf(blocks: readonly string[]): Look {
+    return blocks.includes(DEATH.floor) ? DEATH : PLAIN;
+}
+
+/** Every block of a look, for its arena's list and so for taking it down. */
+export function lookBlocks(look: Look): string[] {
+    return [look.floor, look.edge, look.corner, look.ring, look.top, look.middle].filter(
+        (one): one is string => one !== null
+    );
+}
 /** What a bolt of the storm (`strikeLine`) can leave on the platform. */
 export const FIRE = "minecraft:fire";
 /** The layers over the floor the platform's box takes in, for that fire. */
 export const OVER_FLOOR = 2;
 
 /**
- * The platform's look, put in before its plain floor fills round it: its
- * edge in polished stone with a light at each corner, and the circle drawn
- * in yellow, a block wide, where it ends. Only on the floor's own layer.
+ * The platform's look, put in before its floor fills round it: its edge with
+ * something at each corner, and the circle drawn a block wide where it ends,
+ * on the floor's own layer - and what the look stands over its corners and
+ * the middle of its sides, on the layer over it.
  */
-export function platformDecor(place: Point, radius: number): { box: Box; block: string }[] {
+export function platformDecor(
+    place: Point,
+    radius: number,
+    look: Look = PLAIN
+): { box: Box; block: string }[] {
     const half = radius + MARGIN;
     const { x, y, z } = place;
-    const one = (bx: number, bz: number, block: string) => ({
-        box: { x1: bx, y1: y, z1: bz, x2: bx, y2: y, z2: bz },
+    const one = (bx: number, bz: number, block: string, by = y) => ({
+        box: { x1: bx, y1: by, z1: bz, x2: bx, y2: by, z2: bz },
         block
     });
+    const corners = [
+        [x - half, z - half],
+        [x + half, z - half],
+        [x - half, z + half],
+        [x + half, z + half]
+    ] as const;
     const out: { box: Box; block: string }[] = [
-        one(x - half, z - half, CORNER_BLOCK),
-        one(x + half, z - half, CORNER_BLOCK),
-        one(x - half, z + half, CORNER_BLOCK),
-        one(x + half, z + half, CORNER_BLOCK),
+        ...corners.map(([cx, cz]) => one(cx, cz, look.corner)),
         {
             box: { x1: x - half + 1, y1: y, z1: z - half, x2: x + half - 1, y2: y, z2: z - half },
-            block: EDGE_BLOCK
+            block: look.edge
         },
         {
             box: { x1: x - half + 1, y1: y, z1: z + half, x2: x + half - 1, y2: y, z2: z + half },
-            block: EDGE_BLOCK
+            block: look.edge
         },
         {
             box: { x1: x - half, y1: y, z1: z - half + 1, x2: x - half, y2: y, z2: z + half - 1 },
-            block: EDGE_BLOCK
+            block: look.edge
         },
         {
             box: { x1: x + half, y1: y, z1: z - half + 1, x2: x + half, y2: y, z2: z + half - 1 },
-            block: EDGE_BLOCK
+            block: look.edge
         }
     ];
+    if (look.top) for (const [cx, cz] of corners) out.push(one(cx, cz, look.top, y + 1));
+    // Looking in: 0 south, 4 west, 8 north, 12 east.
+    if (look.middle)
+        out.push(
+            one(x, z - half, `${look.middle}[rotation=0]`, y + 1),
+            one(x, z + half, `${look.middle}[rotation=8]`, y + 1),
+            one(x - half, z, `${look.middle}[rotation=12]`, y + 1),
+            one(x + half, z, `${look.middle}[rotation=4]`, y + 1)
+        );
     // The ring: every block whose middle is within half a block of the circle.
     for (let dx = -radius; dx <= radius; dx += 1)
         for (let dz = -radius; dz <= radius; dz += 1) {
             const away = Math.hypot(dx, dz);
-            if (Math.abs(away - radius) <= 0.5) out.push(one(x + dx, z + dz, RING_BLOCK));
+            if (Math.abs(away - radius) <= 0.5) out.push(one(x + dx, z + dz, look.ring));
         }
     return out;
+}
+
+/**
+ * What hangs in the air over a platform in the king of the ring's own look,
+ * each look: souls rising off the floor and ash drifting down - and, through
+ * the end of a round that counts double, a heartbeat everybody on it hears.
+ * `place` is the platform's floor.
+ */
+export function ambientLines(place: Point, radius: number, sprint: boolean): string[] {
+    const half = radius + MARGIN;
+    const at = `${place.x + 0.5} ${place.y + 1.5} ${place.z + 0.5}`;
+    const run = "execute in minecraft:overworld run";
+    const lines = [
+        `${run} particle minecraft:sculk_soul ${at} ${half / 2} 0.4 ${half / 2} 0.03 10 normal`,
+        `${run} particle minecraft:ash ${place.x + 0.5} ${place.y + 5} ${place.z + 0.5} ${half} 2 ${half} 0 60 normal`
+    ];
+    if (sprint)
+        lines.push(
+            `${run} playsound minecraft:entity.warden.heartbeat ambient @a[tag=${IN_ARENA}] ${at} 2 1`
+        );
+    return lines;
 }
 
 /** Floor beyond the circle's edge, all round: room to be pushed out onto. */
@@ -480,15 +578,16 @@ export function redrawLines(
     floor: Point,
     radius: number,
     center: Point,
-    ringRadius: number
+    ringRadius: number,
+    look: Look = PLAIN
 ): string[] {
     const box = platformBox(floor, radius);
     const area = `${box.x1} ${box.y1} ${box.z1} ${box.x2} ${box.y2} ${box.z2}`;
     return [
-        `execute in minecraft:overworld run fill ${area} ${PLATFORM_BLOCK} replace ${RING_BLOCK}`,
+        `execute in minecraft:overworld run fill ${area} ${look.floor} replace ${look.ring}`,
         ...ringBlocks(center, ringRadius).map(
             (one) =>
-                `execute in minecraft:overworld run fill ${one.x} ${floor.y} ${one.z} ${one.x} ${floor.y} ${one.z} ${RING_BLOCK} replace ${PLATFORM_BLOCK}`
+                `execute in minecraft:overworld run fill ${one.x} ${floor.y} ${one.z} ${one.x} ${floor.y} ${one.z} ${look.ring} replace ${look.floor}`
         )
     ];
 }

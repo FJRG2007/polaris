@@ -4,7 +4,7 @@
  */
 
 import type { Language } from "../catalog";
-import { PALETTE, mark } from "../messages";
+import { PALETTE, clock, mark } from "../messages";
 
 const { bad: BAD, good: GOOD, warn: WARN, info: INFO } = PALETTE;
 
@@ -51,16 +51,92 @@ export function foundSubtitle(language: Language): string {
     return language === "es" ? "&fAhora buscas tú también" : "&fNow you seek too";
 }
 
-export function hiddenBar(seconds: number, left: number, language: Language): string {
-    return language === "es"
-        ? `${GOOD}Escondido ${Math.floor(seconds)} s ${INFO}- quedan ${left}`
-        : `${GOOD}Hidden ${Math.floor(seconds)}s ${INFO}- ${left} left`;
+/**
+ * A length of time as minutes and seconds in words ("1m 05s"), so a count up
+ * is never read as the countdown on the boss bar ("1:05").
+ */
+function spell(seconds: number, language: Language): string {
+    const total = Math.max(0, Math.floor(seconds));
+    const minutes = Math.floor(total / 60);
+    const rest = total % 60;
+    if (minutes === 0) return language === "es" ? `${rest} s` : `${rest}s`;
+    const padded = String(rest).padStart(2, "0");
+    return language === "es" ? `${minutes} min ${padded} s` : `${minutes}m ${padded}s`;
 }
 
+/** A hider's action bar once the seekers are out: their score, named as one. */
+export function hiddenBar(seconds: number, left: number, language: Language): string {
+    return language === "es"
+        ? `${GOOD}Tiempo escondido: ${spell(seconds, language)} ${INFO}- quedan ${left}`
+        : `${GOOD}Time hidden: ${spell(seconds, language)} ${INFO}- ${left} still hidden`;
+}
+
+/** A hider's action bar while the seekers wait: the time left to hide, and
+ *  how many hiders are ready (`ready` of `hiders`). */
+export function hideBar(
+    seconds: number,
+    ready: number,
+    hiders: number,
+    language: Language
+): string {
+    return language === "es"
+        ? `${GOOD}Tiempo para esconderte: ${INFO}${clock(seconds)} &7- ${WARN}Listos ${ready}/${hiders}`
+        : `${GOOD}Time left to hide: ${INFO}${clock(seconds)} &7- ${WARN}Ready ${ready}/${hiders}`;
+}
+
+/** Offered to each hider as the hiding starts: once every hider is ready,
+ *  the seekers come out at once. */
+export function readyOffer(language: Language): {
+    lead: string;
+    ready: { label: string; hover: string };
+} {
+    return language === "es"
+        ? {
+              lead: `${WARN}¿Ya estás escondido?`,
+              // i18n-ignore: in-game button, both languages here (speech picks one)
+              ready: { label: "[Listo]", hover: "Cuando todos estén listos, salen los buscadores" }
+          }
+        : {
+              lead: `${WARN}Hidden already?`,
+              // i18n-ignore: in-game button, both languages here (speech picks one)
+              ready: { label: "[Ready]", hover: "When every hider is ready, the seekers come out" }
+          };
+}
+
+/** Said to a hider who pressed [Ready], with the way to take it back. */
+export function readyMarked(language: Language): {
+    lead: string;
+    undo: { label: string; hover: string };
+} {
+    return language === "es"
+        ? {
+              lead: `${GOOD}Marcado como listo.`,
+              // i18n-ignore: in-game button, both languages here (speech picks one)
+              undo: { label: "[Aún no]", hover: "Quitar el listo y seguir escondiéndote" }
+          }
+        : {
+              lead: `${GOOD}Marked as ready.`,
+              // i18n-ignore: in-game button, both languages here (speech picks one)
+              undo: { label: "[Not yet]", hover: "Take it back and keep hiding" }
+          };
+}
+
+export function readyUndone(language: Language): string {
+    return language === "es" ? `${INFO}Sigues escondiéndote.` : `${INFO}Back to hiding.`;
+}
+
+/** Every hider ready: the rest of the time to hide is skipped. */
+export function allReady(language: Language): string {
+    return language === "es"
+        ? `${GOOD}Todos están escondidos: salen los buscadores.`
+        : `${GOOD}Every hider is ready: the seekers are coming out.`;
+}
+
+/** A seeker's action bar while they wait: when they can start. */
 export function waitBar(seconds: number, language: Language): string {
     return language === "es"
-        ? `${BAD}Sales en ${Math.ceil(seconds)} s`
-        : `${BAD}You are let out in ${Math.ceil(seconds)}s`;
+        ? `${BAD}Empiezas a buscar en ${INFO}${clock(seconds)}`
+        : `${BAD}You can start seeking in ${INFO}${clock(seconds)}`;
 }
 
 export function seekBar(left: number, language: Language): string {
@@ -69,11 +145,18 @@ export function seekBar(left: number, language: Language): string {
         : `${BAD}Find them ${INFO}- ${left} still hidden`;
 }
 
-/** The boss bar: who is still hidden, and the time. */
-export function bar(left: number, clock: string, language: Language): string {
+/** The boss bar while the hiders hide: the same countdown for everybody. */
+export function hidingBar(clockText: string, language: Language): string {
     return language === "es"
-        ? `&aEscondidos: ${left} &7- &f${clock}`
-        : `&aStill hidden: ${left} &7- &f${clock}`;
+        ? `&aTiempo para esconderse: &f${clockText}`
+        : `&aTime left to hide: &f${clockText}`;
+}
+
+/** The boss bar once the seekers are out: the time left in the game, and who is still hidden. */
+export function bar(left: number, clockText: string, language: Language): string {
+    return language === "es"
+        ? `&aTiempo restante: &f${clockText} &7- &aEscondidos: ${left}`
+        : `&aTime left: &f${clockText} &7- &aStill hidden: ${left}`;
 }
 
 /** Told to each player at "Go!", with the code that turns minimap radars off. */

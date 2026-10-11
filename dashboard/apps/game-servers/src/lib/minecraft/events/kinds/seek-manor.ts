@@ -46,7 +46,7 @@
  */
 
 import type { Box } from "../state";
-import type { HOUSE_SIZES } from "../catalog";
+import * as catalog from "../catalog";
 import type { Spot } from "./arena";
 import * as rooms from "./seek-rooms";
 import type { Fill } from "./arena-game";
@@ -75,14 +75,11 @@ const HOLD_MAX = 600;
 const INSIDE_HOLD = 60;
 
 /** The house sizes the event's options offer (`catalog.HOUSE_SIZES`). */
-export type HouseSize = (typeof HOUSE_SIZES)[number];
+export type HouseSize = (typeof catalog.HOUSE_SIZES)[number];
 
 /** Rooms along a side: by the size asked for, or by how many play. */
 export function roomsFor(players: number, size: HouseSize = "auto"): number {
-    if (size === "small") return 3;
-    if (size === "medium") return 4;
-    if (size === "large") return 5;
-    return players <= 8 ? 3 : players <= 16 ? 4 : 5;
+    return catalog.houseRooms(players, size);
 }
 
 /** A house's width, walls included: 58, 76 or 94. */

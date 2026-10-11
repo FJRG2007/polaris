@@ -1746,7 +1746,7 @@
             },
             "hide-and-seek": {
                 "label": "Escondite",
-                "summary": "Se construye en el cielo una mansión, más grande cuantos más jueguen, con salas distintas cada vez: biblioteca, forja, jardín con cascada, estanque, laberintos y más. Sus muros esconden salas tras cuadros y paneles que se abren desde el otro lado de la sala, con un botón, una alfombra o una mirada; hay sótanos bajo el suelo, un árbol hueco y lava que solo cruzan los escondidos. Los buscadores esperan cegados mientras los demás se esconden; si un buscador golpea a alguien lo encuentra, y este pasa a buscar. Los escondidos puntúan por cada segundo oculto y los buscadores por cada uno encontrado; los nombres no se ven entre bandos.",
+                "summary": "Se construye en el cielo un mapa, más grande cuantos más jueguen, con salas distintas cada vez: biblioteca, forja, jardín con cascada, estanque, laberintos y más. Sus muros esconden salas tras cuadros y paneles que se abren desde el otro lado de la sala, con un botón, una alfombra o una mirada; hay sótanos bajo el suelo, un árbol hueco y lava que solo cruzan los escondidos. Los buscadores esperan cegados mientras los demás se esconden; si un buscador golpea a alguien lo encuentra, y este pasa a buscar. Gana quien más tiempo siga escondido; los nombres no se ven entre bandos.",
                 "unit": "puntos"
             },
             "hot-potato": {
@@ -2047,7 +2047,6 @@
             "writeTheme": "Escribe al menos un tema",
             "giveName": "Ponle un nombre",
             "timeFormat": "Escribe la hora como HH:MM",
-            "hideHalfEvent": "Como mucho {count} segundos, la mitad del evento",
             "gapOrder": "La espera más larga no puede ser menor que la más corta",
             "eventsAtMost": "Como máximo {count} eventos",
             "schedulesAtMost": "Como máximo {count} eventos programados",
@@ -2349,6 +2348,10 @@
                 "jungle": "Selva (lianas)",
                 "nether": "Nether"
             },
+            "seekTime": {
+                "auto": "Automático, según el tamaño de la arena",
+                "manual": "Fijar los minutos"
+            },
             "house": {
                 "auto": "Según los jugadores",
                 "small": "Pequeña: 3 por 3 salas",
@@ -2472,7 +2475,10 @@
         "fuseSeconds": "Mecha (segundos)",
         "fuseSecondsHint": "De 10 a 40 hasta que explota la patata.",
         "chestLoot": "Qué hay en los cofres",
-        "house": "Tamaño de la casa",
+        "house": "Tamaño de la arena",
+        "seekTime": "Tiempo de búsqueda",
+        "seekTimeHint": "Lo que tienen los buscadores cuando acaba el tiempo para esconderse.",
+        "seekMinutes": "Minutos para buscar",
         "powerUpMinutes": "Mejoras (minutos)",
         "powerUpMinutesHint": "De 0 a 10. Cada escondido recibe una mejora corta así de a menudo; 0, ninguna.",
         "bingoGoal": "Qué gana",

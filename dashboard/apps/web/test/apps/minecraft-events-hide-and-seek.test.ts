@@ -548,6 +548,49 @@ describe("hide and seek's rules", () => {
         expect(hs.seekersFor("run-1", ["Ana", "Ben"], 3)).toHaveLength(1);
     });
 
+    it("draws everybody about as often, and never last game's seeker while there are others", () => {
+        const counts = new Map<string, number>();
+        for (let run = 0; run < 4_000; run += 1) {
+            const [one] = hs.seekersFor(`r${run.toString(36)}-x${run * 7919}`, names, 1);
+            counts.set(one!, (counts.get(one!) ?? 0) + 1);
+        }
+        for (const name of names) expect(counts.get(name)).toBeGreaterThan(850);
+        for (let run = 0; run < 200; run += 1) {
+            const seed = `again-${run}`;
+            const [last] = hs.seekersFor(seed, names, 1);
+            expect(hs.seekersFor(seed, names, 1, [last!.toUpperCase()])).not.toContain(last);
+            // Two wanted, three of four sought last time: one new, one again.
+            const pair = hs.seekersFor(seed, names, 2, ["Ana", "Ben", "Cy"]);
+            expect(pair).toContain("Dee");
+            expect(pair).toHaveLength(2);
+        }
+        // Only two playing: the one who sought before has to hide this time.
+        expect(hs.seekersFor("two", ["Ana", "Ben"], 1, ["Ana"])).toEqual(["Ben"]);
+        expect(hs.seekersFor("two", ["Ana", "Ben"], 1, ["Ben"])).toEqual(["Ana"]);
+    });
+
+    it("rotates the seeker through the whole group before anybody seeks again", () => {
+        const group = ["Ana", "Ben", "Cy", "Dee", "Eve"];
+        for (let start = 0; start < 50; start += 1) {
+            let before: string[] = [];
+            const order: string[] = [];
+            for (let game = 0; game < group.length * 3; game += 1) {
+                const [one] = hs.seekersFor(`rot-${start}-${game}`, group, 1, before);
+                order.push(one!);
+                before = hs.rememberSeekers([one!], before);
+            }
+            // Every block of five games is the whole group, once each.
+            for (let block = 0; block < 3; block += 1)
+                expect(new Set(order.slice(block * 5, block * 5 + 5)).size).toBe(5);
+        }
+        // A newcomer is drawn before anybody who already sought.
+        expect(hs.seekersFor("new", ["Ana", "Ben", "Zed"], 1, ["Ben", "Ana"])).toEqual(["Zed"]);
+        // Remembered once each, the latest first, never more than the cap.
+        expect(hs.rememberSeekers(["ana"], ["Ben", "Ana", "Cy"])).toEqual(["ana", "Ben", "Cy"]);
+        const many = Array.from({ length: 40 }, (_, i) => `P${i}`);
+        expect(hs.rememberSeekers(many.slice(0, 3), many)).toHaveLength(hs.REMEMBERED);
+    });
+
     it("finds a hider only beside a seeker who struck", () => {
         const at = { x: 0, y: 100, z: 0 };
         expect(hs.foundBy(at, [{ name: "Ben", x: 2, y: 100, z: 0 }])).toBe("Ben");
@@ -560,7 +603,7 @@ describe("hide and seek's rules", () => {
         ).toBe("Cy");
     });
 
-    it("scores a point a second hidden and a fixed number a find", () => {
+    it("ranks by time hidden alone, the last found first, finds only breaking a tie", () => {
         const state = hs.stateSchema.parse({
             seekers: ["Ben"],
             finds: [
@@ -569,12 +612,16 @@ describe("hide and seek's rules", () => {
             ],
             hidden: { Ana: 61_500, Cy: 120_000, Dee: 300_000 }
         });
+        // A point for taking part, and one a second hidden.
         expect(Object.fromEntries(hs.scoresOf(state, names))).toEqual({
-            Ana: 61 + hs.FIND_POINTS,
-            Ben: hs.FIND_POINTS,
-            Cy: 120,
-            Dee: 300
+            Ana: 62,
+            Ben: 1,
+            Cy: 121,
+            Dee: 301
         });
+        // Ana found Cy after she was found herself, and still stands under the
+        // two who stayed hidden longer: Dee, never found, wins, then Cy.
+        expect(hs.tiebreakOf(state, names)).toEqual({ Ana: -1, Ben: -1, Cy: -0, Dee: -0 });
         expect(hs.seeks(state, "cy")).toBe(true);
         expect(hs.seeks(state, "Dee")).toBe(false);
         expect(hs.stateOf({ design: 1 })).toBeNull();
@@ -583,24 +630,62 @@ describe("hide and seek's rules", () => {
     it("hides each side's names from the other, and keeps the seekers blind and still while they wait", () => {
         const lines = hs.setupLines(["Seekers", "Hiders"]);
         expect(lines).toContain("team modify pe_hs_seek nametagVisibility hideForOtherTeams");
+        // A hider's name shown to nobody, and nobody in anybody's way.
+        expect(lines).toContain("team modify pe_hs_hide nametagVisibility never");
+        expect(lines).toContain("team modify pe_hs_seek collisionRule never");
+        expect(lines).toContain("team modify pe_hs_hide collisionRule never");
         expect(lines).toContain("team modify pe_hs_hide friendlyFire false");
         expect(hs.waitingLines("Ben")).toContain("effect give Ben minecraft:blindness 3 0 true");
         expect(hs.hiderLine("Ana")).toBe("effect give Ana minecraft:weakness 3 100 true");
         expect(hs.joinSide("Ana", true)).toContain(
             "execute if entity @a[name=Ana,team=pe_hs_hide] run team join pe_hs_seek Ana"
         );
+        // Tagged whatever their team, so the Polaris mod knows the sides even
+        // for somebody on one of the server's own teams.
+        expect(hs.joinSide("Ana", false)).toContain("tag Ana add pe_hider");
+        expect(hs.joinSide("Ana", true)).toEqual(
+            expect.arrayContaining(["tag Ana remove pe_hider", "tag Ana add pe_seeker"])
+        );
+        expect(hs.TEARDOWN).toEqual(
+            expect.arrayContaining([
+                "tag @a[tag=pe_seeker] remove pe_seeker",
+                "tag @a[tag=pe_hider] remove pe_hider"
+            ])
+        );
+        expect(hs.sideTagsOff("Ana")).toEqual([
+            "tag Ana remove pe_seeker",
+            "tag Ana remove pe_hider"
+        ]);
     });
 });
 
 describe("what hide and seek says", () => {
     const LONG = "Maximilian_1234";
     for (const language of ["en", "es"] as const) {
+        it(`labels the score as time hidden and counts down in mm:ss in ${language}`, () => {
+            // The score reads as a duration in words, never as a clock, so it
+            // is not mistaken for the countdown on the boss bar.
+            expect(said.hiddenBar(83, 4, language)).not.toMatch(/\d:\d\d/);
+            expect(said.hiddenBar(83, 4, language)).toMatch(
+                language === "es" ? /1 min 23 s/ : /1m 23s/
+            );
+            expect(said.hideBar(45, 2, 5, language)).toContain("0:45");
+            expect(said.hideBar(45, 2, 5, language)).toContain("2/5");
+            expect(said.waitBar(45, language)).toContain("0:45");
+            expect(said.hidingBar("0:45", language)).not.toBe(said.bar(3, "0:45", language));
+        });
         it(`fits one command in ${language}`, () => {
             const lines = [
                 said.found(LONG, LONG, 11, language),
+                said.readyOffer(language).lead + said.readyOffer(language).ready.label,
+                said.readyMarked(language).lead + said.readyMarked(language).undo.label,
+                said.readyUndone(language),
+                said.allReady(language),
                 said.hiddenBar(3599, 11, language),
                 said.seekBar(11, language),
-                said.waitBar(60, language),
+                said.waitBar(3599, language),
+                said.hideBar(3599, 11, 11, language),
+                said.hidingBar("59:59", language),
                 said.bar(11, "59:59", language),
                 said.summary(11, 11, language),
                 said.hideSubtitle(60, language),

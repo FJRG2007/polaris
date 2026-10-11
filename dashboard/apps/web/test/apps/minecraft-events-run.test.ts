@@ -1971,8 +1971,9 @@ const plan = await import("@polaris-app/game-servers/src/lib/minecraft/events/pl
 const build = await import("@polaris-app/game-servers/src/lib/minecraft/events/kinds/build-battle");
 const boss = await import("@polaris-app/game-servers/src/lib/minecraft/events/kinds/boss");
 const hill = await import("@polaris-app/game-servers/src/lib/minecraft/events/kinds/hill");
-const hillService =
-    await import("@polaris-app/game-servers/src/lib/minecraft/events/kinds/hill-service");
+const hillService = await import(
+    "@polaris-app/game-servers/src/lib/minecraft/events/kinds/hill-service"
+);
 const playing = await import("@polaris-app/game-servers/src/lib/minecraft/activity");
 const arrival = await import("@polaris-app/game-servers/src/lib/minecraft/events/kinds/arrival");
 const arenaKind = await import("@polaris-app/game-servers/src/lib/minecraft/events/kinds/arena");
@@ -5528,8 +5529,9 @@ describe("a horde defense", () => {
     });
 });
 
-const infectionKind =
-    await import("@polaris-app/game-servers/src/lib/minecraft/events/kinds/meteor-infection");
+const infectionKind = await import(
+    "@polaris-app/game-servers/src/lib/minecraft/events/kinds/meteor-infection"
+);
 
 describe("a meteor shower", () => {
     const start = () =>
@@ -5959,8 +5961,9 @@ describe("a meteor shower", () => {
 
 const parkour = await import("@polaris-app/game-servers/src/lib/minecraft/events/kinds/parkour");
 const spleef = await import("@polaris-app/game-servers/src/lib/minecraft/events/kinds/spleef");
-const snowballPack =
-    await import("@polaris-app/game-servers/src/lib/minecraft/events/kinds/snowball-pack");
+const snowballPack = await import(
+    "@polaris-app/game-servers/src/lib/minecraft/events/kinds/snowball-pack"
+);
 
 /** Players typing in the chat, as the server log records it. */
 function chat(...said: [string, string][]): void {
@@ -6023,15 +6026,17 @@ function keptTheRules(allowed: readonly ("tnt" | "water" | "lava" | "fire")[] = 
     const fills = world.sent.filter((line) => line.includes(" fill "));
     // The ring is drawn again as it shrinks and moves: its floor's own block
     // painted over its own ring block and back, never anything else.
-    const repaint = new RegExp(
-        ` (${hill.PLATFORM_BLOCK}|${hill.RING_BLOCK}) replace (${hill.RING_BLOCK}|${hill.PLATFORM_BLOCK})$`
+    const repaints = [hill.PLAIN, hill.DEATH].map(
+        (look) => new RegExp(` (${look.floor}|${look.ring}) replace (${look.ring}|${look.floor})$`)
     );
     for (const line of fills)
         expect(
             line.endsWith(" keep") ||
                 / minecraft:air replace minecraft:\S+$/.test(line) ||
-                (repaint.test(line) &&
-                    !line.includes(`${hill.RING_BLOCK} replace ${hill.RING_BLOCK}`))
+                (repaints.some((repaint) => repaint.test(line)) &&
+                    ![hill.PLAIN, hill.DEATH].some((look) =>
+                        line.includes(`${look.ring} replace ${look.ring}`)
+                    ))
         ).toBe(true);
     // Everything built is taken out again: by its own box, or by a larger one
     // of the same block that holds it (an arena comes down a block at a time
@@ -6053,7 +6058,10 @@ function keptTheRules(allowed: readonly ("tnt" | "water" | "lava" | "fire")[] = 
         expect(
             removed.some((other) => {
                 const r = parse(other);
-                return r.block === b.block && holds(r.at, b.at);
+                // Taken down by its id, whatever way it was turned.
+                return r.block === b.block!.replace(/\[.*$/, "") || r.block === b.block
+                    ? holds(r.at, b.at)
+                    : false;
             }),
             one
         ).toBe(true);
@@ -6746,8 +6754,9 @@ describe("spleef", () => {
         expect(world.sent.slice(back).filter((line) => line.startsWith("xp set Ana"))).toHaveLength(
             2
         );
-        const stashService =
-            await import("@polaris-app/game-servers/src/lib/minecraft/events/kinds/stash-service");
+        const stashService = await import(
+            "@polaris-app/game-servers/src/lib/minecraft/events/kinds/stash-service"
+        );
         expect(await stashService.failedStashes(SERVER)).toEqual([]);
         expect(stashRows.size).toBe(0);
     });
@@ -7379,8 +7388,9 @@ describe("a TNT run", () => {
     });
 });
 
-const dropperKind =
-    await import("@polaris-app/game-servers/src/lib/minecraft/events/kinds/dropper");
+const dropperKind = await import(
+    "@polaris-app/game-servers/src/lib/minecraft/events/kinds/dropper"
+);
 
 describe("a dropper", () => {
     const run = () => ({
@@ -7809,7 +7819,7 @@ async function joinAndStart(presetId: string, joiners = ["Ana", "Ben"]): Promise
 /** A king of the hill anybody walks to: fists only off. */
 function walkInHill() {
     const preset = newPreset("king-of-the-hill", "hill");
-    return { ...preset, options: { ...preset.options, fistsOnly: false } };
+    return { ...preset, options: { ...preset.options, fistsOnly: false, radius: 6 } };
 }
 
 // ------------------------------------------------------------------ players' own things
@@ -8013,8 +8023,9 @@ describe("players' own things through an arena", () => {
         const kept = state().run!.entrants.find((one) => one.name === "Ana")!.stash!;
         // As if the slots were never emptied.
         world.inv.Ana = copyOf(ana);
-        const stashService =
-            await import("@polaris-app/game-servers/src/lib/minecraft/events/kinds/stash-service");
+        const stashService = await import(
+            "@polaris-app/game-servers/src/lib/minecraft/events/kinds/stash-service"
+        );
         const how = await stashService.giveBack(
             fakeServer(),
             "Ana",
@@ -8071,8 +8082,9 @@ describe("players' own things through an arena", () => {
         setUp([duelOf()]);
         await joinAndStart("duel");
         const kept = state().run!.entrants.find((one) => one.name === "Ana")!.stash!;
-        const stashService =
-            await import("@polaris-app/game-servers/src/lib/minecraft/events/kinds/stash-service");
+        const stashService = await import(
+            "@polaris-app/game-servers/src/lib/minecraft/events/kinds/stash-service"
+        );
         // The kit off first, as an end takes it before anything is given back.
         await fakeServer().say(["clear Ana *[minecraft:custom_data={polaris_event:1b}]"]);
         // A give-back that ran to the end once...
@@ -8100,8 +8112,9 @@ describe("players' own things through an arena", () => {
             [103, { ...ana.get(103)! }]
         ]);
         stashRows.get(kept.record!)!.writing = JSON.stringify(kept.kept.map((one) => one.slot));
-        const stashService =
-            await import("@polaris-app/game-servers/src/lib/minecraft/events/kinds/stash-service");
+        const stashService = await import(
+            "@polaris-app/game-servers/src/lib/minecraft/events/kinds/stash-service"
+        );
         const from = world.sent.length;
         expect(await stashService.giveBack(fakeServer(), "Ana", kept, async () => undefined)).toBe(
             "done"
@@ -8125,8 +8138,9 @@ describe("players' own things through an arena", () => {
         // ever written there by a give-back.
         world.inv.Ana = new Map([[0, { ...ana.get(0)! }]]);
         world.pickUp = true;
-        const stashService =
-            await import("@polaris-app/game-servers/src/lib/minecraft/events/kinds/stash-service");
+        const stashService = await import(
+            "@polaris-app/game-servers/src/lib/minecraft/events/kinds/stash-service"
+        );
         expect(await stashService.giveBack(fakeServer(), "Ana", kept, async () => undefined)).toBe(
             "done"
         );
@@ -8146,8 +8160,9 @@ describe("players' own things through an arena", () => {
         expect(kept.experience).toEqual({ levels: 12, points: 7 });
         // A prize delivered before the give-back.
         world.levels.Ana = 5;
-        const stashService =
-            await import("@polaris-app/game-servers/src/lib/minecraft/events/kinds/stash-service");
+        const stashService = await import(
+            "@polaris-app/game-servers/src/lib/minecraft/events/kinds/stash-service"
+        );
         const from = world.sent.length;
         expect(await stashService.giveBack(fakeServer(), "Ana", kept, async () => undefined)).toBe(
             "done"
@@ -8166,8 +8181,9 @@ describe("players' own things through an arena", () => {
         setUp([duelOf()]);
         await joinAndStart("duel");
         const kept = state().run!.entrants.find((one) => one.name === "Ana")!.stash!;
-        const stashService =
-            await import("@polaris-app/game-servers/src/lib/minecraft/events/kinds/stash-service");
+        const stashService = await import(
+            "@polaris-app/game-servers/src/lib/minecraft/events/kinds/stash-service"
+        );
         await fakeServer().say(["clear Ana *[minecraft:custom_data={polaris_event:1b}]"]);
         // Every stack back, then gone the moment her experience is asked for.
         world.onLine = (line) => {
@@ -8203,8 +8219,9 @@ describe("players' own things through an arena", () => {
         setUp([duelOf()]);
         await joinAndStart("duel");
         const kept = state().run!.entrants.find((one) => one.name === "Ana")!.stash!;
-        const stashService =
-            await import("@polaris-app/game-servers/src/lib/minecraft/events/kinds/stash-service");
+        const stashService = await import(
+            "@polaris-app/game-servers/src/lib/minecraft/events/kinds/stash-service"
+        );
         await fakeServer().say(["clear Ana *[minecraft:custom_data={polaris_event:1b}]"]);
         expect(await stashService.giveBack(fakeServer(), "Ana", kept, async () => undefined)).toBe(
             "done"
@@ -8256,8 +8273,9 @@ describe("players' own things through an arena", () => {
         await joinAndStart("duel");
         const kept = state().run!.entrants.find((one) => one.name === "Ana")!.stash!;
         expect(kept.experience).toEqual({ levels: 0, points: 1 });
-        const stashService =
-            await import("@polaris-app/game-servers/src/lib/minecraft/events/kinds/stash-service");
+        const stashService = await import(
+            "@polaris-app/game-servers/src/lib/minecraft/events/kinds/stash-service"
+        );
         await fakeServer().say(["clear Ana *[minecraft:custom_data={polaris_event:1b}]"]);
         // Earned since, so it is added; and the server refuses the add.
         world.levels.Ana = 3;
@@ -8491,8 +8509,9 @@ describe("players' own things through an arena", () => {
             dismissedAt: null,
             updatedAt: new Date()
         });
-        const stashService =
-            await import("@polaris-app/game-servers/src/lib/minecraft/events/kinds/stash-service");
+        const stashService = await import(
+            "@polaris-app/game-servers/src/lib/minecraft/events/kinds/stash-service"
+        );
         const failed = await stashService.failedStashes(SERVER);
         expect(failed[0]).toMatchObject({
             player: "Ana",
@@ -8668,7 +8687,7 @@ describe("a king of the hill", () => {
         for (const bolt of bolts) {
             expect(bolt).toMatch(/distance=\d+(\.\d+)?\.\.,scores=\{pe_khp=8\.\.\}/);
             // Only on somebody still up at the platform, never on the ground under it.
-            const floor = hill.platformBox(run.place!, 6);
+            const floor = hill.platformBox(run.place!, catalog.RING_RADIUS);
             expect(bolt).toContain(
                 ` at @s if entity @s[x=${floor.x1},y=${run.place!.y},z=${floor.z1},dx=${floor.x2 - floor.x1},dy=2,dz=${floor.z2 - floor.z1}] run summon `
             );
@@ -8779,7 +8798,7 @@ describe("a king of the hill", () => {
         ).toBe(true);
         const place0 = state().run!.place!;
         expect(world.sent).toContain(
-            `execute in minecraft:overworld positioned ${place0.x + 0.5} ${place0.y} ${place0.z + 0.5} as @a[tag=pe_arena,distance=..6] run effect give @s minecraft:regeneration 3 1 true`
+            `execute in minecraft:overworld positioned ${place0.x + 0.5} ${place0.y} ${place0.z + 0.5} as @a[tag=pe_arena,distance=..${catalog.RING_RADIUS}] run effect give @s minecraft:regeneration 3 1 true`
         );
         expect(world.sent.some((line) => line.includes("resistance 10 4"))).toBe(false);
         // The side panel reads each time held as a time.
@@ -8982,11 +9001,11 @@ describe("a king of the hill", () => {
         // Through the first round: the ring drawn again smaller, and double at its end.
         const first = world.sent.length;
         await play(50_000);
-        expect(state().run!.ring!.radius).toBeLessThan(6);
+        expect(state().run!.ring!.radius).toBeLessThan(catalog.RING_RADIUS);
         expect(world.sent.some((line) => line.includes("Double points!"))).toBe(true);
         expect(
             world.sent.some((line) =>
-                / minecraft:yellow_concrete replace minecraft:smooth_stone$/.test(line)
+                / minecraft:ochre_froglight replace minecraft:deepslate_tiles$/.test(line)
             )
         ).toBe(true);
         expect(
@@ -9016,15 +9035,16 @@ describe("a king of the hill", () => {
         await play(30_000);
         const run = state().run!;
         // And the fire its storm can light over it, swept with it.
-        expect(run.arena?.blocks).toEqual([...hill.PLATFORM_BLOCKS, hill.FIRE]);
+        // In the ring's own look, on a server that has its blocks.
+        expect(run.arena?.blocks).toEqual([...hill.lookBlocks(hill.DEATH), hill.FIRE]);
         expect(run.readyAt).not.toBeNull();
         // Only into air proven empty.
-        const build = world.sent.find((line) => line.includes(" minecraft:smooth_stone keep"));
+        const build = world.sent.find((line) => line.includes(` ${hill.DEATH.floor} keep`));
         expect(build).toBeDefined();
         await play(4 * 60_000);
         expect(state().run).toBeNull();
         expect(
-            world.sent.some((line) => / minecraft:air replace minecraft:smooth_stone$/.test(line))
+            world.sent.some((line) => line.endsWith(` minecraft:air replace ${hill.DEATH.floor}`))
         ).toBe(true);
         keptTheRules();
     });
@@ -9053,7 +9073,7 @@ describe("a king of the hill", () => {
         await play(4 * 60_000);
         expect(state().run).toBeNull();
         expect(
-            world.sent.some((line) => / minecraft:air replace minecraft:smooth_stone$/.test(line))
+            world.sent.some((line) => line.endsWith(` minecraft:air replace ${hill.PLAIN.floor}`))
         ).toBe(true);
         keptTheRules();
     });
@@ -9067,8 +9087,9 @@ describe("a team duel", () => {
         expect(world.sent.filter((line) => /(^| run )spawnpoint /.test(line))).toEqual([]);
 
     it("brings a fallen duellist back to their side without touching anybody's spawn point", async () => {
-        const duel =
-            await import("@polaris-app/game-servers/src/lib/minecraft/events/kinds/team-duel");
+        const duel = await import(
+            "@polaris-app/game-servers/src/lib/minecraft/events/kinds/team-duel"
+        );
         world.online = ["Ana", "Ben"];
         // Ana sleeps in a bed; Ben never has.
         world.homes = { Ana: [120, -40] };
@@ -9109,8 +9130,9 @@ describe("a team duel", () => {
     });
 
     it("has the Polaris plugin or mod respawn a fallen duellist on their side, the spot set again when forgotten", async () => {
-        const duel =
-            await import("@polaris-app/game-servers/src/lib/minecraft/events/kinds/team-duel");
+        const duel = await import(
+            "@polaris-app/game-servers/src/lib/minecraft/events/kinds/team-duel"
+        );
         world.online = ["Ana", "Ben"];
         world.homes = { Ana: [120, -40] };
         world.respawnMod = true;
@@ -11999,7 +12021,8 @@ describe("hide and seek", () => {
         await play(2_100);
         expect(state().owedLines.map((one) => [one.player, one.reason])).toEqual([
             ["Ben", "radar"],
-            ["Ben", "effects"]
+            ["Ben", "effects"],
+            ["Ben", "seek-sides"]
         ]);
         const told = (name: string) =>
             world.sent.filter(
@@ -12029,7 +12052,7 @@ describe("hide and seek", () => {
         world.online = ["Ana", "Cy"];
         await events.cancelEvent("owner", SERVER);
         await play(2_100);
-        expect(state().owedLines).toHaveLength(2);
+        expect(state().owedLines).toHaveLength(3);
         vi.setSystemTime(Date.now() + stored.PENDING_KEPT_MS + 1);
         world.sent = [];
         world.online = [...names];
@@ -12055,6 +12078,9 @@ describe("hide and seek", () => {
         const hiders = names.filter((name) => name !== seeker) as [string, string];
         // The sides set up, names hidden from the other, the seeker blind in the cage.
         expect(world.sent).toContain("team modify pe_hs_seek nametagVisibility hideForOtherTeams");
+        // Nobody blocks or pushes anybody, hider or seeker.
+        expect(world.sent).toContain("team modify pe_hs_seek collisionRule never");
+        expect(world.sent).toContain("team modify pe_hs_hide collisionRule never");
         expect(world.sent).toContain(
             `execute if entity @a[name=${seeker},team=] run team join pe_hs_seek ${seeker}`
         );
@@ -12067,11 +12093,28 @@ describe("hide and seek", () => {
         for (const line of hs.fireproofLines(hiders[0])) expect(world.sent).toContain(line);
         expect(world.sent).not.toContain(hs.fireproofLines(seeker)[1]);
         expect(hs.stateOf(state().run!.game)?.seekers).toEqual([seeker]);
+        // Everybody can read the countdown: the hiders the time left to hide,
+        // the seeker when they can start, the boss bar the same for all.
+        let from = world.sent.length;
+        const shown = (who: string, words: string) =>
+            world.sent.slice(from).some((line) => line.includes(who) && line.includes(words));
+        await play(2_100);
+        expect(shown(`title ${hiders[0]} actionbar`, "Time left to hide")).toBe(true);
+        expect(shown(`title ${seeker} actionbar`, "You can start seeking in")).toBe(true);
+        expect(shown("bossbar set", "Time left to hide")).toBe(true);
+        expect(shown(`title ${hiders[0]} actionbar`, "Time hidden")).toBe(false);
 
         // Let out once the hiding time is up, the cage down by its barrier alone.
         await play(run.readyAt! + 60_000 - Date.now() + 2_100);
         expect(world.sent).toContain(cageDown);
         expect(hs.stateOf(state().run!.game)?.released).toBe(true);
+        // Then the time left in the game for everybody, and each hider's time
+        // hidden, named as what it is.
+        from = world.sent.length;
+        await play(2_100);
+        expect(shown("bossbar set", "Time left:")).toBe(true);
+        expect(shown(`title ${hiders[0]} actionbar`, "Time hidden:")).toBe(true);
+        expect(shown(`title ${hiders[0]} actionbar`, "Time left to hide")).toBe(false);
 
         // The seeker strikes beside a hider who was hurt: found, and seeking now.
         const at = world.at[hiders[0]]!;
@@ -12086,8 +12129,9 @@ describe("hide and seek", () => {
         expect(saidToAll(`${seeker} found ${hiders[0]}`)).toBe(true);
         // Found: what the game gave them taken off, and only from them.
         for (const line of hs.effectsOff(hiders[0])) expect(world.sent).toContain(line);
-        // The side panel keeps up: a find is worth its points at once.
-        expect(world.sent).toContain(`scoreboard players set ${seeker} pe_score ${hs.FIND_POINTS}`);
+        // The side panel keeps up: a seeker has the point for taking part, and
+        // the time hidden is all that counts.
+        expect(world.sent).toContain(`scoreboard players set ${seeker} pe_score 1`);
         // A seeker strikes beside a hider who was not hit: nobody found.
         (world.tags.pe_hit_struck ??= new Set()).add(seeker);
         world.at[seeker] = [...world.at[hiders[1]]!];
@@ -12105,20 +12149,84 @@ describe("hide and seek", () => {
             outcome: "finished",
             note: "Every hider was found"
         });
-        // A point a second hidden, and the finds: the first found hid a
-        // minute and found the last; the last hid a few seconds longer; the
-        // seeker found one.
-        const score = (name: string) =>
-            done.history[0]!.podium.find((one) => one.name === name)?.score ?? 0;
-        expect(score(hiders[1])).toBeGreaterThanOrEqual(60);
-        expect(score(hiders[1])).toBeLessThan(80);
-        expect(score(hiders[0])).toBeGreaterThanOrEqual(60 + hs.FIND_POINTS);
-        expect(score(seeker)).toBe(hs.FIND_POINTS);
+        // A point for taking part and a point a second hidden once the seeker
+        // was out - the hiding time is everybody's. The last found wins, though
+        // the first found found them: finds only break a tie.
+        const podium = done.history[0]!.podium;
+        const score = (name: string) => podium.find((one) => one.name === name)?.score ?? 0;
+        expect(podium.map((one) => one.name)).toEqual([hiders[1], hiders[0], seeker]);
+        expect(score(hiders[1])).toBeGreaterThan(score(hiders[0]));
+        expect(score(hiders[1])).toBeLessThan(20);
+        expect(score(seeker)).toBe(1);
+        // The same winner in the chat as on the podium.
+        expect(
+            world.sent.some(
+                (line) => line.includes(hiders[1]) && /1st|#1|\b1\./.test(visible(line))
+            )
+        ).toBe(true);
+        // The sides' tags off with the teams.
+        expect(world.sent).toContain("tag @a[tag=pe_hider] remove pe_hider");
         expect(world.sent).toContain("team remove pe_hs_hide");
         expect(world.sent).toContain("scoreboard objectives remove pe_hsd");
         for (const line of hs.effectsOff()) expect(world.sent).toContain(line);
         expect(done.arenaLeftovers).toEqual([]);
         onlyOurBlocks();
+    });
+
+    it("lets the seekers out at once when every hider is ready, and never takes that back", async () => {
+        const hs = await kind();
+        world.online = [...names];
+        setUp([hideOf(120)]);
+        await joinAndStart("hide", names);
+        const run = state().run!;
+        const [seeker] = hs.seekersFor(run.id, names, 1) as [string];
+        const hiders = names.filter((name) => name !== seeker) as [string, string];
+        const game = () => hs.stateOf(state().run!.game)!;
+        await play(2_100);
+        // [Ready] offered to every hider, never to a seeker.
+        const offered = (name: string) =>
+            world.sent.some(
+                (line) =>
+                    line.startsWith(`tellraw ${name} `) && line.includes("/trigger pe_join set 3")
+            );
+        expect(offered(hiders[0])).toBe(true);
+        expect(offered(hiders[1])).toBe(true);
+        expect(offered(seeker)).toBe(false);
+        const endsAt = state().run!.endsAt;
+
+        // One ready, and taken back while the others hide.
+        world.pressed = { [hiders[0]]: commands.DONE_VALUE };
+        await play(2_100);
+        expect(game().ready).toEqual([hiders[0]]);
+        expect(
+            world.sent.some(
+                (line) => line.startsWith(`title ${hiders[0]} actionbar`) && line.includes("1/2")
+            )
+        ).toBe(true);
+        world.pressed = { [hiders[0]]: commands.UNDO_VALUE };
+        await play(2_100);
+        expect(game().ready).toEqual([]);
+
+        // A seeker's press counts for nothing; the hiders still wait for the last.
+        world.pressed = { [seeker]: commands.DONE_VALUE, [hiders[0]]: commands.DONE_VALUE };
+        await play(2_100);
+        expect(game().ready).toEqual([hiders[0]]);
+        expect(game().released).toBe(false);
+
+        // The last hider ready: the seekers out now, the time to seek kept whole.
+        world.pressed = { [hiders[1]]: commands.DONE_VALUE };
+        await play(2_100);
+        expect(game().released).toBe(true);
+        const at = game().allReadyAt!;
+        expect(at).not.toBeNull();
+        expect(state().run!.endsAt).toBe(endsAt - (run.readyAt! + 120_000 - at));
+        expect(saidToAll("Every hider is ready")).toBe(true);
+
+        // Locked: taking it back now changes nothing.
+        world.pressed = { [hiders[1]]: commands.UNDO_VALUE };
+        await play(2_100);
+        expect(game().released).toBe(true);
+        expect(game().allReadyAt).toBe(at);
     });
 
     it("by the game's statistics where the pack is not on, finds on the first hit and never by a fall", async () => {
@@ -12180,8 +12288,9 @@ describe("hide and seek", () => {
     it("builds a manor for the players, works its panels at Go, and takes them down first at the end", async () => {
         const hs = await kind();
         const manor = await manorKind();
-        const panels =
-            await import("@polaris-app/game-servers/src/lib/minecraft/events/kinds/secret-panels");
+        const panels = await import(
+            "@polaris-app/game-servers/src/lib/minecraft/events/kinds/secret-panels"
+        );
         world.online = [...names];
         setUp([hideOf(60)]);
         await joinAndStart("hide", names);
@@ -12786,8 +12895,9 @@ describe("the pace of an event", () => {
     });
 });
 
-const mazeKind =
-    await import("@polaris-app/game-servers/src/lib/minecraft/events/kinds/nether-maze");
+const mazeKind = await import(
+    "@polaris-app/game-servers/src/lib/minecraft/events/kinds/nether-maze"
+);
 const radarKit = await import("@polaris-app/game-servers/src/lib/minecraft/events/kinds/radar");
 
 describe("a deadly nether maze", () => {
@@ -13039,8 +13149,9 @@ describe("an acid rain", () => {
     });
 });
 
-const elytraKind =
-    await import("@polaris-app/game-servers/src/lib/minecraft/events/kinds/elytra-race");
+const elytraKind = await import(
+    "@polaris-app/game-servers/src/lib/minecraft/events/kinds/elytra-race"
+);
 
 describe("an elytra race", () => {
     const run = () => ({
@@ -13164,8 +13275,9 @@ describe("an elytra race", () => {
     });
 });
 
-const downhillKind =
-    await import("@polaris-app/game-servers/src/lib/minecraft/events/kinds/downhill-race");
+const downhillKind = await import(
+    "@polaris-app/game-servers/src/lib/minecraft/events/kinds/downhill-race"
+);
 
 describe("a downhill boat race", () => {
     const race = () => ({
