@@ -266,6 +266,35 @@ export function approximateOnMods(check: string): boolean {
 /** The most those checks reach on their own on a modded server: "Possible". */
 export const MODDED_APPROXIMATE_MAX = 55;
 
+/** The block checks among them: they model a block's hardness and reach, which
+ *  an event leaves alone, so only a modded server's unknown blocks fool them. */
+const BLOCK_CHECKS: ReadonlySet<EngineCheckPart> = new Set<EngineCheckPart>([
+    "FarPlace",
+    "Place",
+    "FastBreak",
+    "FarBreak",
+    "Break"
+]);
+
+/**
+ * Whether a flag is proof enough to keep somebody off an event's podium. Not the
+ * movement and timer checks above, on any server: an event moves its players
+ * itself - teleports, levitation, knockback, a launch, a fall through a dropper
+ * with resistance on - and builds its arena while they wait, which drops the
+ * tick rate, and these read both as the player's own doing. On a real server
+ * they fired for everybody in a dropper and a maze and emptied the podium. Nor
+ * the chat checks, which a trivia round answered quickly trips. The block checks
+ * only on a modded server (`modded`), where they are approximate; on any other a
+ * fast-break or nuker in a mining rush still does, as does every other check -
+ * aim, reach, packets, the X-Ray probe.
+ */
+export function disqualifiesFromEvent(check: string, modded = false): boolean {
+    const part = engineCheckPart(check);
+    if (part === "Chat") return false;
+    if (!approximateOnMods(check)) return true;
+    return !modded && part !== null && BLOCK_CHECKS.has(part);
+}
+
 function alertsValue(
     checks: readonly { readonly check: string; readonly alerts: number }[]
 ): number {

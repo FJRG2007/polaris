@@ -22,6 +22,8 @@ interface World {
     chestOpenedAfter: number;
     chestChecks: number;
     flagged: string[];
+    /** The server's software, its `TYPE`: whether it runs mods. */
+    software: string;
     sent: string[];
     /** The server log, for what players say in the chat. */
     log: string;
@@ -230,6 +232,7 @@ const world: World = {
     chestOpenedAfter: 3,
     chestChecks: 0,
     flagged: [],
+    software: "PAPER",
     sent: [],
     log: "",
     bossAlive: true,
@@ -1805,6 +1808,7 @@ vi.mock("@polaris/db", () => ({
         installedApp: {
             findUnique: async () => ({
                 ownerId: "owner",
+                applicationId: "app",
                 name: "ExampleSMP",
                 catalogId: "minecraft",
                 status: "running",
@@ -1826,7 +1830,12 @@ vi.mock("@polaris/db", () => ({
             }
         },
         minecraftAnticheatFlag: {
-            groupBy: async () => world.flagged.map((player) => ({ player }))
+            // "name" is caught by reach; "name:Check" by that check.
+            groupBy: async () =>
+                world.flagged.map((one) => {
+                    const [player, check = "Reach"] = one.split(":");
+                    return { player, check };
+                })
         },
         gamePlayerLink: {
             findMany: async () =>
@@ -1893,6 +1902,9 @@ vi.mock("@polaris/app-host", () => ({
         i18nLocaleService: {
             getUserLocale: async (userId: string) => world.locales[userId] ?? "en-US",
             storedLocale: async (userId: string) => world.locales[userId] ?? null
+        },
+        envVarService: {
+            listEnvVars: async () => [{ key: "TYPE", value: world.software }]
         }
     }
 }));
@@ -2029,6 +2041,7 @@ beforeEach(() => {
     world.chestOpenedAfter = 3;
     world.chestChecks = 0;
     world.flagged = [];
+    world.software = "PAPER";
     world.sent = [];
     world.log = "";
     world.bossAlive = true;
@@ -2273,6 +2286,28 @@ describe("a mining rush, from start to podium", () => {
         expect(entry?.podium).toEqual([{ place: 1, name: "Ben", score: 14 }]);
         expect(entry?.disqualified).toEqual(["Ana"]);
         expect(world.sent.some((line) => line.startsWith("give Ana"))).toBe(false);
+    });
+
+    it("keeps on the podium somebody flagged only by checks an event's own moves trip", async () => {
+        const rush = { ...newPreset("mining-rush", "rush"), minutes: 3 };
+        setUp([rush]);
+        await events.startEvent({
+            ownerId: "owner",
+            installedAppId: SERVER,
+            presetId: "rush",
+            trigger: "manual",
+            startedBy: null
+        });
+        await play(2_100);
+        world.scores = { Ana: 50, Ben: 14 };
+        world.flagged = ["ana:Simulation", "ana:GroundSpoof", "ben:TimerLimit", "ben:ChatA"];
+        await play(3 * 60_000);
+        const entry = state().history[0];
+        expect(entry?.podium).toEqual([
+            { place: 1, name: "Ana", score: 50 },
+            { place: 2, name: "Ben", score: 14 }
+        ]);
+        expect(entry?.disqualified).toEqual([]);
     });
 });
 
@@ -12480,6 +12515,31 @@ describe("SkyWars", () => {
         expect(state().history[0]).toMatchObject({ note: "Only one player was left" });
     });
 
+    it("never cheers as winner the last one left when the anti-cheat keeps them off the podium", async () => {
+        const sw = await kind();
+        world.online = [...names];
+        setUp([warOf()]);
+        await joinAndStart("war", names);
+        const run = state().run!;
+        const { layout, at } = await placedOf(run);
+        const play0 = sw.playArea(layout, at);
+        world.at.Cy = [at.x + 0.5, play0.y1 - 3, at.z + 0.5];
+        await play(2_100);
+        world.at.Ben = [at.x + 0.5, play0.y1 - 3, at.z + 0.5];
+        world.flagged = ["ana"];
+        await play(2_100);
+        const done = state();
+        expect(done.history[0]).toMatchObject({
+            note: "Only one player was left",
+            disqualified: ["Ana"],
+            podium: [
+                { place: 1, name: "Ben", score: 2 },
+                { place: 2, name: "Cy", score: 1 }
+            ]
+        });
+        expect(saidToAll("Ana is the last one left and wins.")).toBe(false);
+    });
+
     it("picked up after a restart, keeps who is out and does not put them out again", async () => {
         const sw = await kind();
         world.online = [...names];
@@ -13232,5 +13292,28 @@ describe("a downhill boat race", () => {
         expect(world.sent).toContain(
             `execute in minecraft:overworld run tp Ben ${spot.x.toFixed(3)} ${spot.y.toFixed(3)} ${spot.z.toFixed(3)} ${spot.yaw.toFixed(1)} 0.0`
         );
+    });
+});
+
+describe("an event's block checks, by server software", () => {
+    it.each([
+        ["PAPER", ["Ana"]],
+        ["FABRIC", []]
+    ])("on %s, judges a fast-breaker by whether the server runs mods", async (software, out) => {
+        const rush = { ...newPreset("mining-rush", "rush"), minutes: 3 };
+        setUp([rush]);
+        world.software = software;
+        await events.startEvent({
+            ownerId: "owner",
+            installedAppId: SERVER,
+            presetId: "rush",
+            trigger: "manual",
+            startedBy: null
+        });
+        await play(2_100);
+        world.scores = { Ana: 50, Ben: 14 };
+        world.flagged = ["ana:FastBreak"];
+        await play(3 * 60_000);
+        expect(state().history[0]?.disqualified).toEqual(out);
     });
 });

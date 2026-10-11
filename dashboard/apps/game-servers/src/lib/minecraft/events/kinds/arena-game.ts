@@ -136,8 +136,13 @@ export interface ArenaGame {
     results(run: stored.EventRun): Map<string, number>;
     /** What breaks a tie on score, the lower the better (`plan.podium`). */
     tiebreak?(run: stored.EventRun): Record<string, number>;
-    /** Said with the results. */
-    resultLines(run: stored.EventRun, language: speech.Speech): string[];
+    /** Said with the results. Never names as winner anybody in `disqualified`
+     *  (lowercased): the podium below it leaves them off. */
+    resultLines(
+        run: stored.EventRun,
+        language: speech.Speech,
+        disqualified: ReadonlySet<string>
+    ): string[];
     /** Its teams and counts removed, with the rest of the event's own. */
     endLines?(run: stored.EventRun): string[];
     /**

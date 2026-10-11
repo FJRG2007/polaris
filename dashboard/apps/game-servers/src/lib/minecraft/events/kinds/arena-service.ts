@@ -1278,10 +1278,14 @@ export function quickLines(run: stored.EventRun): string[] {
 }
 
 /** Said with the results: how the teams did, what the theme was. */
-export function resultLines(run: stored.EventRun, language: speech.Speech): string[] {
+export function resultLines(
+    run: stored.EventRun,
+    language: speech.Speech,
+    disqualified: ReadonlySet<string> = new Set()
+): string[] {
     if (run.readyAt === null) return [];
     const game = gameOf(run.preset.kind);
-    if (game) return game.resultLines(run, language);
+    if (game) return game.resultLines(run, language, disqualified);
     if (run.preset.kind === "team-duel") {
         return [
             commands.say(messages.duelResult(run.tally["0"] ?? 0, run.tally["1"] ?? 0, language))

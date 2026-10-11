@@ -234,14 +234,9 @@ async function tick(ctx: KindContext, lines: string[]): Promise<string | null> {
 
     let decided: string | null = null;
     const left = alive();
-    if (left.length <= 1) {
-        if (left[0])
-            lines.push(
-                commands.say(messages.tag(language) + warMessages.winner(left[0].name, language)),
-                commands.sound(commands.SOUNDS.win)
-            );
-        decided = said.LAST_ONE;
-    }
+    // The winner is named with the results (`resultLines`), once the anti-cheat
+    // has been asked: named here, a player kept off the podium was cheered.
+    if (left.length <= 1) decided = said.LAST_ONE;
 
     // Whoever is out kept in the gallery, unhurt and unable to hurt.
     const gallery = sw.galleryFloor(layout, at);
@@ -334,12 +329,14 @@ export const skyWars: ArenaGame = {
             sw.stateOf(run.game),
             run.entrants.map((one) => one.name)
         ),
-    resultLines: (run, language) => {
+    resultLines: (run, language, disqualified) => {
         const state = sw.stateOf(run.game);
         const left = run.entrants.filter(
             (one) => !state.out.some((out) => lower(out.name) === lower(one.name))
         );
-        return left.length === 1 ? [commands.say(warMessages.winner(left[0]!.name, language))] : [];
+        return left.length === 1 && !disqualified.has(lower(left[0]!.name))
+            ? [commands.say(warMessages.winner(left[0]!.name, language))]
+            : [];
     },
     endLines: () => [...sw.TEARDOWN],
     closeLines: (box) =>
