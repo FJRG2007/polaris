@@ -20,6 +20,7 @@
  */
 
 import type { SettingsOverview } from "./overview";
+import { checkForNewBuild } from "@/lib/new-build";
 import { clearUpdateInProgress, markUpdateInProgress } from "@/lib/update-in-progress";
 import { LogViewer } from "@/components/log-viewer";
 import type { NamespaceTranslator } from "@/lib/i18n/types";
@@ -102,6 +103,13 @@ let lastAutoCheck = 0;
 /** Floor between two automatic checks, so returning to the tab a few times in a row
  *  does not re-ask on every one. */
 const AUTO_CHECK_FLOOR_MS = 30_000;
+
+/** How long one overview request may take before it is asked again, and how the
+ *  retries space out while the dashboard is not answering. The server's slowest
+ *  path (GitHub, the registry, the IP echo) is bounded well inside the timeout. */
+const OVERVIEW_TIMEOUT_MS = 30_000;
+const OVERVIEW_RETRY_FIRST_MS = 2_000;
+const OVERVIEW_RETRY_MAX_MS = 30_000;
 
 /** How often the open page re-asks on its own. The answer is cached server-side for
  *  ten minutes and shared by every tab, so this costs a request rather than a GitHub
@@ -226,26 +234,61 @@ export function SettingsView({
      * One request for the three of them: they all land in the same render, and
      * three round trips would fill the update line, then the addresses, then the
      * IPs, each a frame apart. A failure leaves the skeletons standing rather
-     * than replacing them with a wrong answer - the Check button is right there,
-     * and it is the same question asked again.
+     * than replacing them with a wrong answer, and asks again by itself: the page
+     * is most often opened right after an update, while the new dashboard is
+     * still coming up, and an answer that never comes back must not leave the
+     * card blank until somebody thinks to reload.
      */
     useEffect(() => {
         const controller = new AbortController();
-        void fetch("/api/admin/settings/overview", { signal: controller.signal })
-            .then((answer) => (answer.ok ? (answer.json() as Promise<SettingsOverview>) : null))
-            .then((overview) => {
-                if (!overview) return;
-                setStatus(overview.status);
-                setAddresses(overview.addresses);
-                setNetwork({ publicIp: overview.publicIp, serverIp: overview.serverIp });
-            })
-            .catch(() => undefined);
-        return () => controller.abort();
+        let timer: ReturnType<typeof setTimeout> | null = null;
+        let delay = OVERVIEW_RETRY_FIRST_MS;
+        const load = async (): Promise<void> => {
+            // One attempt's own abort: the page leaving, or the attempt running long.
+            const attempt = new AbortController();
+            const leave = () => attempt.abort();
+            controller.signal.addEventListener("abort", leave);
+            const slow = setTimeout(leave, OVERVIEW_TIMEOUT_MS);
+            try {
+                const answer = await fetch("/api/admin/settings/overview", {
+                    cache: "no-store",
+                    signal: attempt.signal
+                });
+                if (answer.ok) {
+                    const overview = (await answer.json()) as SettingsOverview;
+                    // A check that answered first is newer than this one.
+                    setStatus((current) => current ?? overview.status);
+                    setAddresses(overview.addresses);
+                    setNetwork({ publicIp: overview.publicIp, serverIp: overview.serverIp });
+                    return;
+                }
+            } catch {
+                if (controller.signal.aborted) return;
+            } finally {
+                clearTimeout(slow);
+                controller.signal.removeEventListener("abort", leave);
+            }
+            timer = setTimeout(() => void load(), delay);
+            delay = Math.min(delay * 2, OVERVIEW_RETRY_MAX_MS);
+        };
+        void load();
+        return () => {
+            controller.abort();
+            if (timer) clearTimeout(timer);
+        };
     }, []);
 
     function onCheck(force = true) {
         startTransition(async () => {
-            setStatus(await checkUpdatesAction(force));
+            // A check that cannot reach the server (a restart under way, a tab
+            // left on the previous build) keeps what is on screen, and asks
+            // whether Polaris was updated under this tab so the update notice
+            // and its reload can take over.
+            const answer = await checkUpdatesAction(force).catch(() => {
+                void checkForNewBuild();
+                return null;
+            });
+            if (answer) setStatus(answer);
         });
     }
 
