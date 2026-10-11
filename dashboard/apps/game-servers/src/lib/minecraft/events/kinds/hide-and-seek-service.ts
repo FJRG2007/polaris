@@ -257,9 +257,10 @@ async function tick(ctx: KindContext, lines: string[]): Promise<string | null> {
     const taken = await hitsService.take(ctx);
     const on = new Set(here.keys());
     // Back on the server: the radar code again, for a minimap that forgot it.
-    for (const one of run.entrants)
-        if (on.has(lower(one.name)) && !memory.seen.has(lower(one.name)))
-            lines.push(radarOff(one.name));
+    const back = run.entrants.filter(
+        (one) => on.has(lower(one.name)) && !memory.seen.has(lower(one.name))
+    );
+    for (const one of back) lines.push(radarOff(one.name));
     memory.seen = on;
     const struck =
         taken?.struck ??
@@ -282,6 +283,13 @@ async function tick(ctx: KindContext, lines: string[]): Promise<string | null> {
     if (!state.released && state.allReadyAt === null && now < planned)
         readyTick(ctx, state, here, planned, lines, await ctx.chat());
     const releaseAt = state.allReadyAt ?? planned;
+
+    // A seeker who was away when the cage came down: their sight and legs back.
+    if (state.released) {
+        const seeking = new Set(state.seekers.map(lower));
+        for (const one of back)
+            if (seeking.has(lower(one.name))) lines.push(...hs.releasedLines(one.name));
+    }
 
     // The seekers let out: the cage down, their sight and legs back.
     if (!state.released && now >= releaseAt) {

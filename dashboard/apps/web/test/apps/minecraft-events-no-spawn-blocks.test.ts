@@ -74,7 +74,7 @@ describe("no event map sets a spawn point", () => {
         for (const file of files) {
             const lines = readFileSync(file, "utf8").split("\n");
             lines.forEach((line, index) => {
-                if (!/minecraft:([a-z_]+_)?bedb\b|respawn_anchor/.test(line)) return;
+                if (!/minecraft:([a-z_]+_)?bed\b|respawn_anchor/.test(line)) return;
                 // Drawn only for a house built before `BEDLESS_SINCE`, so a run
                 // picked up after an update rebuilds and takes down what it built.
                 const legacy =
