@@ -62,9 +62,9 @@ that window is fetched from the server as the list is scrolled to its end.
 ## What stops it coming back
 
 `folder-window.test.ts` asserts a row the second command still returns is
-never dropped, that every uid missing from the newest window is found, and
-when a list may reach for older mail. `mail-arrives-whole.test.ts` covers the
-older fetch being serialized against a running pass.
+never dropped, that every uid missing from the newest window is found, when a
+list may reach for older mail, and that the older fetch never runs beside the
+mailbox's pass or a second reach for the same folder.
 
 ## The general rule
 
