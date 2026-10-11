@@ -51,6 +51,7 @@ public final class PolarisMod {
         NeoForge.EVENT_BUS.register(new EventGuard());
         // The season Polaris says it is, on players' screens only; idle until told.
         NeoForge.EVENT_BUS.register(new SeasonalDecor());
+        NeoForge.EVENT_BUS.register(new SeasonalMobs());
         if (AntiXray.wanted(System.getenv())) {
             AntiXrayLink.start(PolarisConfig.linkFromEnvironment(System.getenv()));
             NeoForge.EVENT_BUS.register(new AntiXray());

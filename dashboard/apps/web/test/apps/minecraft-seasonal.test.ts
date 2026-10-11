@@ -107,3 +107,57 @@ describe("the line the jar is told", () => {
         expect(seasonal.SEASON_HOLD_SECONDS).toBeGreaterThan(10 * 60);
     });
 });
+
+describe("the seasonal mobs", () => {
+    it("default to none: an owner turns them on", () => {
+        expect(seasonal.seasonalMobs({})).toEqual({ nightSpawns: 1, snowGolems: 0 });
+    });
+
+    it("keep a server's own choice", () => {
+        expect(
+            seasonal.seasonalMobs({
+                [seasonal.NIGHT_SPAWNS_KEY]: 1.5,
+                [seasonal.SNOW_GOLEMS_KEY]: 1
+            })
+        ).toEqual({ nightSpawns: 1.5, snowGolems: 1 });
+    });
+
+    it("fall back to the default for anything that is not one of the choices", () => {
+        expect(
+            seasonal.seasonalMobs({
+                [seasonal.NIGHT_SPAWNS_KEY]: 50,
+                [seasonal.SNOW_GOLEMS_KEY]: "3"
+            })
+        ).toEqual({ nightSpawns: 1, snowGolems: 0 });
+    });
+
+    it("go on the line as whole percentages after the hold", () => {
+        expect(seasonal.seasonCommand("halloween", { nightSpawns: 1.25, snowGolems: 0.5 })).toBe(
+            `polaris season set halloween ${seasonal.SEASON_HOLD_SECONDS} 125 50`
+        );
+        expect(seasonal.seasonCommand("winter", { nightSpawns: 1, snowGolems: 0 })).toBe(
+            `polaris season set winter ${seasonal.SEASON_HOLD_SECONDS} 100 0`
+        );
+    });
+
+    it("never add to a clear", () => {
+        expect(seasonal.seasonCommand(null, { nightSpawns: 3, snowGolems: 3 })).toBe(
+            "polaris season clear"
+        );
+    });
+
+    it("stay within what the jar takes: 100-400 spawns, 0-400 golems", () => {
+        for (const choice of seasonal.NIGHT_SPAWN_CHOICES) {
+            expect(choice * 100).toBeGreaterThanOrEqual(100);
+            expect(choice * 100).toBeLessThanOrEqual(400);
+        }
+        for (const choice of seasonal.SNOW_GOLEM_CHOICES) {
+            expect(choice * 100).toBeGreaterThanOrEqual(0);
+            expect(choice * 100).toBeLessThanOrEqual(400);
+        }
+        expect(seasonal.NIGHT_SPAWN_CHOICES[0]).toBe(1);
+        expect(seasonal.SNOW_GOLEM_CHOICES[0]).toBe(0);
+        expect(seasonal.NIGHT_SPAWN_CHOICES).toContain(seasonal.DEFAULT_NIGHT_SPAWNS);
+        expect(seasonal.SNOW_GOLEM_CHOICES).toContain(seasonal.DEFAULT_SNOW_GOLEMS);
+    });
+});

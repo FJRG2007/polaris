@@ -36,11 +36,14 @@ const OLD_JAR_RETRY_MS = 90_000;
 /** Servers told at once on a sweep: each is a console trip or two. */
 const SWEEP_CONCURRENCY = 8;
 
-/** Per server, the last line it took, or when its Polaris jar was found too old
- *  to decorate, or when it answered with no Polaris jar at all. */
+/** Per server, the last line it took (and whether its jar was too old for the
+ *  mob settings), or when its Polaris jar was found too old to decorate, or when
+ *  it answered with no Polaris jar at all. */
 const told = new Map<
     string,
-    { readonly line: string } | { readonly oldJarAt: number } | { readonly noJarAt: number }
+    | { readonly line: string; readonly mobsMissing?: boolean }
+    | { readonly oldJarAt: number }
+    | { readonly noJarAt: number }
 >();
 
 /** When this server may be asked again, if it is being left alone for now. */
@@ -78,16 +81,17 @@ export function decorationOf(
 
 /** Tell one server. A line it already took out of season is not sent again. */
 async function tell(row: ServerRow, allowed: boolean, now: Date): Promise<boolean> {
-    const line = seasonal.seasonCommand(decorationOf(readInstallConfig(row.config), allowed, now));
+    const config = readInstallConfig(row.config);
+    const decoration = decorationOf(config, allowed, now);
+    const clearLine = seasonal.seasonCommand(null);
     const last = told.get(row.id);
     const again = askAgainAt(last);
     if (again !== null && now.getTime() < again) return false;
-    if (last && "line" in last && last.line === line && line === seasonal.seasonCommand(null))
-        return false;
+    if (!decoration && last && "line" in last && last.line === clearLine) return false;
     return withServerContainer(row.ownerId, row.id, async (server) => {
         // A server that is down has nothing up, and starts with nothing.
         if (!server.running || server.edition !== "java") {
-            told.set(row.id, { line: seasonal.seasonCommand(null) });
+            told.set(row.id, { line: clearLine });
             return false;
         }
         const reading = await capsReading(server);
@@ -106,8 +110,15 @@ async function tell(row: ServerRow, allowed: boolean, now: Date): Promise<boolea
             );
             return false;
         }
+        // A jar from before the mob settings is told the season alone: it
+        // refuses a line with more on it.
+        const mobs = reading.caps.has(seasonal.MOBS_CAP);
+        const line = seasonal.seasonCommand(
+            decoration,
+            mobs ? seasonal.seasonalMobs(config) : null
+        );
         await server.say([line]);
-        told.set(row.id, { line });
+        told.set(row.id, { line, mobsMissing: decoration !== null && !mobs });
         return true;
     }).catch((caught: unknown) => {
         console.error(`[minecraft-seasonal] could not tell ${row.id} the season:`, caught);
@@ -156,6 +167,13 @@ export interface SeasonalView {
     readonly needsRestart: boolean;
     /** The server answered with no Polaris plugin or mod to draw them. */
     readonly unavailable: boolean;
+    /** Halloween night spawns, as a multiple of the usual. */
+    readonly nightSpawns: number;
+    /** Winter snow golems, as a multiple of the usual few. */
+    readonly snowGolems: number;
+    /** The server's jar shows the decorations but predates the seasonal mobs:
+     *  a restart loads the one that brings them. */
+    readonly mobsNeedRestart: boolean;
 }
 
 export async function seasonalView(installedAppId: string): Promise<SeasonalView> {
@@ -173,18 +191,31 @@ export async function seasonalView(installedAppId: string): Promise<SeasonalView
         blocked: !allowed,
         paused: readEventState(config).run !== null,
         needsRestart: last !== undefined && "oldJarAt" in last,
-        unavailable: last !== undefined && "noJarAt" in last
+        unavailable: last !== undefined && "noJarAt" in last,
+        ...seasonal.seasonalMobs(config),
+        mobsNeedRestart: last !== undefined && "line" in last && last.mobsMissing === true
     };
 }
 
-/** Turn this server's decorations on or off, and tell it now. */
+/** What a save may change; whatever is left out stays as it is. */
+export interface SeasonalPatch {
+    readonly on?: boolean;
+    readonly nightSpawns?: number;
+    readonly snowGolems?: number;
+}
+
+/** Change this server's seasonal settings, and tell it now. */
 export async function setSeasonal(
     ownerId: string,
     installedAppId: string,
-    on: boolean
+    patch: SeasonalPatch
 ): Promise<SeasonalView> {
+    const changes: Record<string, unknown> = {};
     // Absent is on, so on is written as removing the key.
-    await patchInstallConfig(installedAppId, { [seasonal.SEASONAL_KEY]: on ? null : false });
+    if (patch.on !== undefined) changes[seasonal.SEASONAL_KEY] = patch.on ? null : false;
+    if (patch.nightSpawns !== undefined) changes[seasonal.NIGHT_SPAWNS_KEY] = patch.nightSpawns;
+    if (patch.snowGolems !== undefined) changes[seasonal.SNOW_GOLEMS_KEY] = patch.snowGolems;
+    await patchInstallConfig(installedAppId, changes);
     // Asked again now rather than when the last answer runs out, so a server
     // restarted onto a newer jar is reached on the switch.
     told.delete(installedAppId);

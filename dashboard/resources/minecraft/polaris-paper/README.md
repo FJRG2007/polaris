@@ -93,9 +93,31 @@ before they can reach one (a web slows whoever is in it, and the server holds
 air there); in winter snow falls round
 players under the open sky and a thin layer lies on some grass. The dashboard
 decides the season from Polaris's own dates and the server's time zone, and
-says so with `polaris season set <halloween|winter> <seconds>` (repeated while
-it lasts) or `polaris season clear`; `polaris season status` answers what is up.
-A season nobody repeats ends on its own when its seconds run out.
+says so with `polaris season set <halloween|winter> <seconds> [<spawns%> <golems%>]`
+(repeated while it lasts) or `polaris season clear`; `polaris season status`
+answers what is up. A season nobody repeats ends on its own when its seconds run
+out.
+
+### Seasonal mobs
+
+Listed as the `season-mobs` capability; a jar without it is told the season
+alone.
+
+- Halloween: a zombie or skeleton spawning at night in the overworld usually
+  wears a carved pumpkin or a jack o'lantern. It never drops it, and it comes
+  off at sunrise so the mob still burns. With `<spawns%>` over 100 (the
+  dashboard's default is 150), a natural night spawn of a monster may bring
+  another of its kind to the same spot - never within 24 blocks of a player or
+  where 24 monsters are already about.
+- Winter: snow golems turn up 14-30 blocks from a player standing somewhere
+  cold enough to snow, two near each player at 100% of `<golems%>` (0 brings
+  none), some still wearing their pumpkin. They leave no snow trail and leave
+  when no player is within 96 blocks.
+
+Every mob this adds or dresses carries a tag (`polaris_season_head`,
+`polaris_season_golem`). The season ending or changing takes the pumpkins off
+and sends the golems away, and a chunk loaded out of season does the same, so
+nothing is left behind.
 
 Every block is sent to one player's game only and never set in the world, so
 nothing is saved and a reloaded chunk shows the world as it is. Only natural
