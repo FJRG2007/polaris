@@ -325,9 +325,8 @@ describe("an acid rain's weather", () => {
         expect(surges.map((one) => one.level)).toEqual(surges.map((_, index) => index + 1));
         const calms = spells.filter((one) => one.sky === "calm");
         expect(calms.map((one) => one.calm)).toEqual(calms.map((_, index) => index));
-        // Wind every second surge; huts fall from the second.
-        expect(surges[0]!.wind).toBe(0);
-        expect(surges[1]!.wind).toBeGreaterThan(0);
+        // Huts fall from the second surge; no wind anywhere.
+        expect(spells.every((one) => !("wind" in one))).toBe(true);
         expect(surges[0]!.collapse).toBeNull();
         expect(surges[1]!.collapse).toBe(0);
     });
@@ -352,11 +351,9 @@ describe("an acid rain's weather", () => {
                 if (collapsed.some((hut) => hut < 0 || hut >= 3)) fail("no such hut");
                 for (const one of spells) {
                     if (one.sky !== "downpour" && one.to - one.from < 5_000) fail("a sliver");
-                    if (one.sky === "calm" && (one.wind !== 0 || one.strikes.length > 0))
-                        fail("a stormy calm");
+                    if (one.sky === "calm" && one.strikes.length > 0) fail("a stormy calm");
                     if (one.strikes.some((when) => when < one.from || when >= one.to))
                         fail("a strike outside its spell");
-                    if (one.wind < 0 || one.wind > 4) fail("no such wind");
                 }
             }
         expect(problems.slice(0, 5)).toEqual([]);
@@ -398,20 +395,12 @@ describe("an acid rain's weather", () => {
         );
     });
 
-    it("blows the rain in from the wind's side: a block there, at the feet or the head, covers it", () => {
-        const gust = acid.FUNCTIONS.gust!;
-        expect(gust[0]).toBe("tag @s add pe_wet");
-        expect(gust).toContain(
-            "execute if score #wind polaris_acid matches 1 unless block ~ ~ ~-1 minecraft:air run tag @s remove pe_wet"
-        );
-        expect(gust).toContain(
-            "execute if score #wind polaris_acid matches 2 unless block ~1 ~1 ~ minecraft:air run tag @s remove pe_wet"
-        );
-        expect(gust).toHaveLength(9);
-        // Only for whoever a roof already covers.
-        expect(acid.FUNCTIONS.expose).toContain(
-            "execute if score #wind polaris_acid matches 1.. if entity @s[tag=!pe_wet] run function polaris:acid/gust"
-        );
+    it("has no wind: a roof over the head is all the cover there is", () => {
+        expect(acid.FUNCTIONS.gust).toBeUndefined();
+        expect(Object.values(acid.FUNCTIONS).flat().join("\n")).not.toContain("#wind");
+        const built = acid.arena({ size: "small", acidity: "mild" }, "w", SITE, Y);
+        for (const spell of acid.forecast(SIX, "w", 4))
+            expect(acid.skyLines(built, spell).join("\n")).not.toContain("#wind");
     });
 });
 
@@ -565,13 +554,14 @@ describe("what an acid rain hands out and says", () => {
                 said.bar("wet", acid.gauge(40), 40, 0, 3, language),
                 said.bar("umbrella", acid.gauge(40), 40, 6, 3, language),
                 said.skyBar(
-                    { sky: "surge", level: 2, wind: 3 },
+                    { sky: "surge", level: 2 },
                     { sky: "calm", level: 0 },
                     "0:12",
                     language
                 ),
-                said.skyBar({ sky: "downpour", level: 5, wind: 1 }, null, "0:48", language),
-                said.skySubtitle("calm", 0, language),
+                said.skyBar({ sky: "downpour", level: 5 }, null, "0:48", language),
+                said.skySubtitle("calm", language),
+                said.howItWorks(language),
                 said.calmLine(12, 35, 10, language),
                 said.picked("antidote", 35, language),
                 said.sidebarTitle(language),
@@ -591,7 +581,9 @@ describe("what an acid rain hands out and says", () => {
             ...acid.dropLines(built, ["blocks", "antidote", "umbrella"], "nbt"),
             ...acid.collapseLines(built, 0),
             acid.strikeLine(built),
-            acid.cobblestoneLine("Ana_with_a_long", "components", 16)
+            acid.cobblestoneLine("Ana_with_a_long", "components", 16),
+            acid.pickaxeLine("Ana_with_a_long", "components"),
+            ...acid.reclaimLines(built, "components")
         ])
             expect(commandBytes(line)).toBeLessThanOrEqual(COMMAND_BYTES_MAX);
     });
@@ -630,7 +622,50 @@ describe("a shelter in the acid rain", () => {
     it("is explained at Go in both languages", () => {
         for (const language of ["en", "es"] as const) {
             expect(said.howItWorks(language).length).toBeGreaterThan(40);
-            expect(said.goSubtitle(language)).toMatch(/cover|cubierto/);
+            expect(said.goSubtitle(language)).toMatch(/roof|techo/);
+            // What to do, on the boss bar all along.
+            for (const sky of ["drizzle", "surge", "calm", "downpour"] as const)
+                expect(said.skyBar({ sky, level: 1 }, null, "0:10", language)).toContain(
+                    said.skyDo(sky, language)
+                );
+            expect(said.howItWorks(language)).toMatch(/pickaxe|pico/);
         }
+    });
+
+    it("hands everybody a pickaxe that breaks the shelter blocks and nothing else", () => {
+        const now = acid.pickaxeLine("Ana", "components");
+        expect(now).toMatch(/^give Ana minecraft:stone_pickaxe\[/);
+        expect(now).toContain("minecraft:custom_data={polaris_event:1b}");
+        expect(now).toContain(
+            'minecraft:can_break={blocks:["minecraft:cobblestone","minecraft:mossy_cobblestone","minecraft:lime_stained_glass"]}'
+        );
+        expect(now).toContain("minecraft:unbreakable={}");
+        expect(now).toMatch(/ 1$/);
+        // Never the floor, the glass walls or the roof.
+        for (const block of ["mossy_stone_bricks", 'minecraft:glass"', "barrier", "sea_lantern"])
+            expect(now).not.toContain(block);
+        const old = acid.pickaxeLine("Ana", "nbt");
+        expect(old).toContain(
+            'CanDestroy:["minecraft:cobblestone","minecraft:mossy_cobblestone","minecraft:lime_stained_glass"]'
+        );
+        expect(old).toContain("Unbreakable:1b");
+        expect(stage.clearMarked("Ana", "nbt")).toEqual(
+            expect.arrayContaining([
+                "clear Ana minecraft:stone_pickaxe{polaris_event:1b}",
+                "clear Ana minecraft:mossy_cobblestone{polaris_event:1b}"
+            ])
+        );
+    });
+
+    it("gives a broken block back as kit, only inside the arena, never what was thrown", () => {
+        const one = built();
+        const [line] = acid.reclaimLines(one, "components");
+        const { x, z } = one.center;
+        expect(line).toContain(
+            `x=${x - one.half},y=${one.floor + 1},z=${z - one.half},dx=${2 * one.half},dy=${acid.ROOF - 2},dz=${2 * one.half}`
+        );
+        expect(line).toContain("unless data entity @s Thrower");
+        expect(line).toContain('"minecraft:can_place_on":{blocks:["minecraft:mossy_stone_bricks"');
+        expect(acid.reclaimLines(one, "nbt")[0]).toContain("CanPlaceOn:[");
     });
 });

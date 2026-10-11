@@ -12923,8 +12923,12 @@ describe("an acid rain", () => {
         // What players place, and what the rain leaves of it, is the arena's.
         for (const box of acidKind.sweepBoxes(built))
             expect(state().run!.stage!.boxes).toContainEqual(box);
+        // A pickaxe for the shelter blocks, so nobody is ever shut in.
+        expect(world.sent).toContain(acidKind.pickaxeLine("Ana", "components"));
         await play(2_100);
         for (const line of acidKind.dripLines(built)) expect(world.sent).toContain(line);
+        // The quick look gives back what a broken block let fall, as kit.
+        expect(world.sent).toContain(acidKind.reclaimLines(built, "components")[0]);
 
         // The rain filled Ben's bar; Ana has had some, and is told she is in it.
         scores("pe_acid").Ben = acidKind.ACID_MAX;

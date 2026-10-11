@@ -7,6 +7,13 @@
  * eats it: a block it falls on turns mossy, then to green glass, then is gone.
  * The last one left wins; at the end of the time, whoever has the least acid.
  *
+ * **Nobody is ever shut in.** Players are in adventure mode on a stage, where
+ * a block can be broken only with an item that names it: everybody gets a
+ * marked pickaxe that breaks the shelter blocks and nothing else (`pickaxeLine`),
+ * and whatever a broken block drops is made marked cobblestone again on the
+ * quick look (`reclaimLines`), so a block taken down is a block to put up
+ * somewhere else. Before it, a player who walled themselves in stayed there.
+ *
  * **The world's weather is never touched.** Rain over the whole server would
  * fall on every player in it: this rain is particles over the arena alone, and
  * what it does is worked out by the events data pack (`FUNCTIONS`).
@@ -33,10 +40,10 @@
  * arena (blocks, an antidote, a rare umbrella) and rebuild - and the last
  * minute an acid downpour. Surges change the board: lightning strikes the
  * shelter of somebody hiding (visual only: it takes the shelter's blocks, never
- * the player), a hut collapses, and wind blows the rain in sideways, so a
- * shelter needs a wall on that side too. The phase is on the boss bar with its
- * countdown, each player's acid on their action bar and everybody's on the
- * side panel.
+ * the player) and a hut collapses. There is no wind: a rain that blew in from a
+ * compass side asked players for a direction nothing in the arena shows. The
+ * phase is on the boss bar with its countdown and what to do, each player's
+ * acid on their action bar and everybody's on the side panel.
  *
  * Every function in the pack is written in commands the oldest release the
  * pack loads on (1.13) can read, since one line it cannot read drops the whole
@@ -55,6 +62,7 @@ import { seeded } from "../trivia-bank";
 import * as catalog from "../catalog";
 import type { EventOptions } from "../catalog";
 import type { Box, Flavour, Spot, Volume } from "./stage";
+import { giveMarked, reclaimBrokenDrops } from "./arena";
 
 export type AcidSize = EventOptions<"acid-rain">["size"];
 export type Acidity = EventOptions<"acid-rain">["acidity"];
@@ -281,13 +289,40 @@ export function cobblestoneLine(name: string, items: Flavour["items"], count: nu
         : `give ${name} minecraft:cobblestone{polaris_event:1b,CanPlaceOn:[${PLACE_ON.map((one) => `"${one}"`).join(",")}]} ${count}`;
 }
 
+/** How an arena's item marker is spelled for a stage's `Flavour`. */
+const markerOf = (items: Flavour["items"]) => (items === "components" ? "components" : "tag");
+
+/** The pickaxe: breaks the shelter blocks - placed, left by the rain or a hut's -
+ *  and nothing else, even in adventure mode; it never wears out. */
+export const PICKAXE = "minecraft:stone_pickaxe";
+
+export function pickaxeLine(name: string, items: Flavour["items"]): string {
+    return giveMarked(name, PICKAXE, 1, markerOf(items), { breaks: SHELTER, unbreakable: true });
+}
+
+/**
+ * What a broken shelter block let fall, made marked again and placeable on the
+ * arena, before anybody can pick it up plain (a block's drop waits ten ticks,
+ * the quick look comes every eight): the block comes back to whoever broke it,
+ * as the kit it was. Never what somebody threw.
+ */
+export function reclaimLines(acid: Acid, items: Flavour["items"]): string[] {
+    const { x, z } = acid.center;
+    const inside = {
+        x1: x - acid.half,
+        y1: acid.floor + 1,
+        z1: z - acid.half,
+        x2: x + acid.half,
+        y2: acid.floor + ROOF - 1,
+        z2: z + acid.half
+    };
+    return [reclaimBrokenDrops(inside, markerOf(items), PLACE_ON)];
+}
+
 // ------------------------------------------------------------------ the weather
 
 /** What the sky over the arena is doing. */
 export type Sky = "drizzle" | "surge" | "calm" | "downpour";
-
-/** Where the wind blows the rain in from: none, north, east, south or west. */
-export type Wind = 0 | 1 | 2 | 3 | 4;
 
 /** One stretch of weather, its times counted from "Go!". */
 export interface Spell {
@@ -298,7 +333,6 @@ export interface Spell {
     readonly level: number;
     /** Which calm it is, from 0; -1 otherwise. */
     readonly calm: number;
-    readonly wind: Wind;
     /** The hut that falls in as it starts, by its place in `Acid.huts`. */
     readonly collapse: number | null;
     /** When lightning strikes in it. */
@@ -326,16 +360,14 @@ const CYCLE: readonly (readonly [Sky, number])[] = [
 
 /**
  * The weather from "Go!" to the end, `total` ms later: an opening drizzle,
- * surges, calms and drizzles in turn, and the downpour last. Every second
- * surge is windy, and so is the downpour; from the second surge on, each
- * brings a hut down while one stands; lightning strikes once in the middle of
+ * surges, calms and drizzles in turn, and the downpour last. From the second
+ * surge on, each brings a hut down while one stands; lightning strikes once in the middle of
  * a surge, twice from the third, and every so often in the downpour. Fixed by
  * the run, so a restart picks the same weather back up.
  */
 export function forecast(total: number, seed: string, huts: number): Spell[] {
     if (total <= 0) return [];
     const random = seeded(`acid-sky-${seed}`);
-    const blow = (): Wind => (1 + Math.min(3, Math.floor(random() * 4))) as Wind;
     const downpourAt = Math.max(0, total - Math.min(DOWNPOUR_MS, Math.round(total / 3)));
     const spells: Spell[] = [];
     let at = 0;
@@ -345,14 +377,13 @@ export function forecast(total: number, seed: string, huts: number): Spell[] {
         const [sky, length] = step < 0 ? (["drizzle", OPENING_MS] as const) : CYCLE[step % 3]!;
         const to = Math.min(at + length, downpourAt);
         if (to - at < SHORTEST_MS) break;
-        const plain = { sky, from: at, to, level: 0, calm: -1, wind: 0 as Wind, collapse: null };
+        const plain = { sky, from: at, to, level: 0, calm: -1, collapse: null };
         if (sky === "surge") {
             level += 1;
             const span = to - at;
             spells.push({
                 ...plain,
                 level,
-                wind: level % 2 === 0 ? blow() : 0,
                 collapse: level >= 2 && level - 2 < huts ? level - 2 : null,
                 strikes:
                     level >= 3
@@ -372,7 +403,6 @@ export function forecast(total: number, seed: string, huts: number): Spell[] {
         to: total,
         level: level + 1,
         calm: -1,
-        wind: blow(),
         collapse: level >= 1 && level - 1 < huts ? level - 1 : null,
         strikes
     });
@@ -507,11 +537,6 @@ function score(name: string): string {
     return `#${name} ${OBJECTIVE}`;
 }
 
-/** A relative coordinate: `~` for none. */
-function rel(by: number): string {
-    return by === 0 ? "~" : `~${by}`;
-}
-
 /** A player coming in: no acid, nothing picked up, no umbrella. */
 export function racerScores(name: string): string[] {
     return [ACID_SCORE, GOT_SCORE, UMBRELLA_SCORE].map(
@@ -522,21 +547,13 @@ export function racerScores(name: string): string[] {
 /** Over the cover a player can be under: from two over their feet to past the roof. */
 const LOOK_UP = Array.from({ length: ROOF }, (_, index) => index + 2);
 
-/** Which way each wind comes from, as a step on the ground: north is -z. */
-const WINDS: readonly (readonly [Wind, number, number])[] = [
-    [1, 0, -1],
-    [2, 1, 0],
-    [3, 0, 1],
-    [4, -1, 0]
-];
-
 const IN_RAIN = `tag=pe_in,scores={${ACID_SCORE}=0..}`;
 
 /**
  * The functions, by name under `polaris:acid/`. Every tick the rain is drawn
  * over the arena as hard as the spell says, and the supplies sparkle and are
  * picked up; every half second everybody inside with nothing over their head
- * - or, in a wind, nothing on its side - takes the dose. `corrode` is run by
+ * takes the dose. `corrode` is run by
  * the quick look at each stand it scatters over the arena, `strike` by the
  * lightning.
  */
@@ -586,24 +603,12 @@ export const FUNCTIONS: Readonly<Record<string, readonly string[]>> = {
             (up) =>
                 `execute unless block ~ ~${up} ~ minecraft:air unless block ~ ~${up} ~ ${ROOF_BLOCK} run tag @s remove ${WET_TAG}`
         ),
-        `execute if score ${score("wind")} matches 1.. if entity @s[tag=!${WET_TAG}] run function polaris:acid/gust`,
         `scoreboard players operation @s[tag=${WET_TAG}] ${ACID_SCORE} += ${score("dose")}`,
         `effect give @s[tag=${WET_TAG}] minecraft:poison 1 0 true`,
         `execute if entity @s[tag=${WET_TAG}] run playsound minecraft:block.fire.extinguish master @s ~ ~ ~ 0.4 1.6`,
         `tag @s[tag=${WET_TAG}] remove ${DRY_TAG}`,
         `tag @s[tag=!${WET_TAG}] add ${DRY_TAG}`,
         `tag @s remove ${WET_TAG}`
-    ],
-    // Rain blown in sideways: a roof alone is not enough, it takes a block on
-    // the wind's side too, at the feet or the head.
-    gust: [
-        `tag @s add ${WET_TAG}`,
-        ...WINDS.flatMap(([wind, dx, dz]) =>
-            [0, 1].map(
-                (up) =>
-                    `execute if score ${score("wind")} matches ${wind} unless block ${rel(dx)} ${rel(up)} ${rel(dz)} minecraft:air run tag @s remove ${WET_TAG}`
-            )
-        )
     ],
     // One step at a time, the last step first, so a block goes one step a drop.
     corrode: [
@@ -677,16 +682,14 @@ export function armLines(acid: Acid, spell: Spell): string[] {
     ];
 }
 
-/** The pack told what a spell is: its dose, its bites, how hard it rains and
- *  where the wind is from. */
+/** The pack told what a spell is: its dose, its bites and how hard it rains. */
 export function skyLines(acid: Pick<Acid, "dose" | "bite">, spell: Spell): string[] {
     const set = (name: string, value: number) => `scoreboard players set ${score(name)} ${value}`;
     return [
         set("dose", doseOf(acid, spell)),
         set("bite", biteOf(acid, spell)),
         set("b", 0),
-        set("rain", rainOf(spell)),
-        set("wind", spell.wind)
+        set("rain", rainOf(spell))
     ];
 }
 

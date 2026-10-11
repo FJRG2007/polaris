@@ -324,13 +324,25 @@ left out.
   and the barrier, their acid bar fills (`pe_acid`); full, they are out. The
   world's weather is never changed. Everybody gets marked cobblestone that
   goes only on the arena's floor and shelters (`can_place_on` / `CanPlaceOn`),
-  16 at "Go!" and 8 more every 40 seconds. Each look of the main tick scatters
-  a few invisible stands with `spreadplayers ... under` onto the highest block
-  under the roof, and that block moves one step: cobblestone, mossy
-  cobblestone, lime glass, air - never the floor or the walls. The last one in
-  wins; at the end of the time, the driest. What players placed and what the
-  rain left is taken out by sweep boxes over the inside, written down at "Go!".
-  Needs 1.17, for `spreadplayers ... under`.
+  16 at "Go!" and more at every calm, and a marked, unbreakable stone pickaxe
+  that breaks the shelter blocks - cobblestone, mossy cobblestone, lime glass -
+  and nothing else (`can_break` / `CanDestroy`): players are in adventure mode,
+  and without it a player who walled themselves in stayed there. What a broken
+  block lets fall is made marked, placeable kit again on the quick look
+  (`acid-rain.reclaimLines`), before its ten-tick pickup delay ends, so the
+  block goes back to whoever broke it. The rain comes in waves
+  (`acid-rain.forecast`): an opening drizzle to build in, then surges, calms
+  and drizzles in turn, and a downpour for the last minute; a calm drops
+  glowing supplies (blocks, an antidote, an umbrella every second calm),
+  surges strike a sheltered player's roof with lightning and bring a hut down.
+  The boss bar names the sky, says what to do under it and when the next one
+  comes. There is no wind. Each look scatters a few invisible stands with
+  `spreadplayers ... under` onto the highest block under the roof, and that
+  block moves one step: cobblestone, mossy cobblestone, lime glass, air -
+  never the floor or the walls; the block over each sheltered head is bitten
+  too. The last one in wins; at the end of the time, the driest. What players
+  placed and what the rain left is taken out by sweep boxes over the inside,
+  written down at "Go!". Needs 1.17, for `spreadplayers ... under`.
 - **Elytra race** (`elytra-race`) is a loop of rings in the sky, 40 to 80
   blocks over the ground, taken from an ice boat race's track
   (`boat-race.laidOut`): rings over its points, each facing one of the four ways,
@@ -1276,6 +1288,16 @@ A new kind follows all of them. A change to an old kind must not undo one.
   language when the player is linked, otherwise the server's. Lines nobody in
   particular reads (the boss bar, the boss's name) are in the server's
   language (`7c53b0edf`, `cc5923ba4`).
+
+- **A player in adventure mode can break only what an item names.** Acid rain
+  handed out cobblestone that could be placed (`can_place_on`) and nothing
+  that could break it: a roof built too low or a wall built round yourself was
+  there for good, and the operator's players called it a trap. Whatever a kind
+  lets players build, it also hands them the item that takes it down
+  (`can_break`), and gives back what that drops, marked (acid rain's pickaxe,
+  feat/events-seek-acid). A rule a player has to read a compass for - acid
+  rain's wind "from the north" - is a rule nobody follows: what the screen
+  says to do has to be something the player can see.
 
 ### The world
 

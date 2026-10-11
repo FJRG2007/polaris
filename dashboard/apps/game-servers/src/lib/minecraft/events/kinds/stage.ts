@@ -610,6 +610,8 @@ export function clearMarked(name: string, items: Flavour["items"]): string[] {
               `clear ${name} minecraft:snowball{polaris_event:1b}`,
               `clear ${name} minecraft:oak_boat{polaris_event:1b}`,
               `clear ${name} minecraft:cobblestone{polaris_event:1b}`,
+              `clear ${name} minecraft:mossy_cobblestone{polaris_event:1b}`,
+              `clear ${name} minecraft:stone_pickaxe{polaris_event:1b}`,
               `clear ${name} minecraft:elytra{polaris_event:1b}`,
               `clear ${name} minecraft:firework_rocket{polaris_event:1b}`
           ];
