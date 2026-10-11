@@ -10,6 +10,7 @@
  */
 
 import * as stage from "./stage";
+import * as outsiders from "./outsiders";
 import * as spleef from "./spleef";
 import * as snowballPack from "./snowball-pack";
 import * as snowballPackService from "./snowball-pack-service";
@@ -722,7 +723,11 @@ async function admit(
     const where = commands.readWhere(await server.say([commands.WHERE]));
     const facing = commands.readFacing(await server.say([commands.FACING]));
     const dimensions = commands.readDimensions(await server.say([commands.DIMENSIONS]));
-    const modes = stage.readGameModes(await server.say([stage.GAME_MODES]));
+    // Held near it before they came up: the mode they had then (`kinds/outsiders`).
+    const modes = outsiders.withTrueModes(
+        stage.readGameModes(await server.say([stage.GAME_MODES])),
+        loop.run.heldOut ?? []
+    );
     const current = state(loop);
     const fresh: stage.Saved[] = [];
     for (const name of names) {

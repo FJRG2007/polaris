@@ -15,6 +15,23 @@ own play).
   A player's own things are stashed in the database before they enter an arena
   and given back after, with the health and hunger they came in with;
   `keepInventory` is on for any event a player can die in.
+- **Nobody outside an event can change it.** Every event with a space of its
+  own registers it where the tick finds it - an arena's box on `run.arena`, a
+  stage's or the boss arena's proved volume (or what it built) on `run.stage`
+  (`outsiders.guardedVolume`) - and each tick, before the kind's own, whoever
+  is near it and not taking part is dealt with (`kinds/outsiders.ts`). Within
+  `MARGIN` blocks they are held in adventure mode, tagged `pe_held`, creative
+  included, the mode they had written on the run first (`heldOut`); inside
+  the space itself they are set down on the ground beyond its nearest side
+  (`spreadplayers`, which keeps off fluids). They get their own mode back
+  `LET_GO` blocks further off and at the end, and whoever was off then is
+  owed it when next seen; every line that gives it back needs the tag still
+  on, adventure mode and neither event tag, so no entrant's mode is touched.
+  Who takes part is told by the event tags and by name (joined and not kept
+  out, taken in and not yet sent back). An event taking somebody in who was
+  held writes down the mode they had before (`outsiders.trueMode`). This is
+  the half with no restart; hits, explosions, pistons and fluids are the
+  mod's.
 - **Everything it changes is written down before it is changed** (game rules,
   the time of day) on the run, so whatever ends the event - its end, a call-off,
   a Polaris restart - puts back exactly that.

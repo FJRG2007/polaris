@@ -88,6 +88,17 @@ export const keptOutSchema = z.object({
 
 export type KeptOut = z.infer<typeof keptOutSchema>;
 
+/** Somebody not in the event held in adventure mode near its space
+ *  (`kinds/outsiders`): the game mode to give back, and whether they are held
+ *  now - kept once let go, so the end can owe it to whoever was off. */
+export const heldOutSchema = z.object({
+    name: z.string(),
+    mode: z.enum(GAMEMODES),
+    holding: z.boolean().default(true)
+});
+
+export type HeldOut = z.infer<typeof heldOutSchema>;
+
 /** Somebody brought into an event from the Events screen rather than by typing
  *  `join`: who, by whom - their user id, and their name as it read then - and when. */
 export const forcedSchema = z.object({
@@ -305,6 +316,8 @@ export const runSchema = z.object({
     /** Taken from and then kept out (`keptOut`), and not yet put back or given
      *  back their things: never played, only sent home at the end. */
     sentOut: z.array(entrantSchema).default([]),
+    /** Who not in it is held near its space, and was (`kinds/outsiders`). */
+    heldOut: z.array(heldOutSchema).default([]),
     /** How the kit it handed out is marked, and which items it was. */
     marker: z.enum(MARKERS).nullable().default(null),
     kit: z.array(z.string()).default([]),
