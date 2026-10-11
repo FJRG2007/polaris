@@ -75,9 +75,8 @@ vi.mock("@polaris-app/game-servers/src/lib/minecraft/live-values", () => ({
     liveContext: async () => ({ values: {}, recipients: null })
 }));
 
-const { runConsoleSchedules } = await import(
-    "@polaris-app/game-servers/src/lib/console-run-service"
-);
+const { runConsoleSchedules } =
+    await import("@polaris-app/game-servers/src/lib/console-run-service");
 
 const schedule = (patch: Partial<ConsoleSchedule> = {}): ConsoleSchedule => ({
     id: "22222222-1111-4111-8111-111111111111",

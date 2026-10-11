@@ -64,9 +64,17 @@ const saveSchema = z.object({
         .array(
             z.object({
                 name: z.string().max(40),
-                label: z.string().max(MAX_VARIABLE_LABEL * 2).optional(),
-                type: z.enum(CUSTOM_VARIABLE_TYPES as [CustomVariableType, ...CustomVariableType[]]),
-                initial: z.string().max(MAX_VARIABLE_VALUE * 4).optional()
+                label: z
+                    .string()
+                    .max(MAX_VARIABLE_LABEL * 2)
+                    .optional(),
+                type: z.enum(
+                    CUSTOM_VARIABLE_TYPES as [CustomVariableType, ...CustomVariableType[]]
+                ),
+                initial: z
+                    .string()
+                    .max(MAX_VARIABLE_VALUE * 4)
+                    .optional()
             })
         )
         .max(MAX_CUSTOM_VARIABLES)
@@ -94,7 +102,12 @@ export async function saveConsoleCommandAction(
     input: SaveConsoleCommandInput
 ): Promise<{ commands?: SavedCommand[]; error?: string }> {
     const parsed = saveSchema.safeParse(input);
-    if (!parsed.success) return { error: (await issueText(parsed.error.issues[0]?.message)) ?? (await gameWords("games"))("errors.checkTheCommandAndTry") };
+    if (!parsed.success)
+        return {
+            error:
+                (await issueText(parsed.error.issues[0]?.message)) ??
+                (await gameWords("games"))("errors.checkTheCommandAndTry")
+        };
     const variables = (parsed.data.variables ?? []).map(normalizeCustomVariable);
     const problem = customVariablesProblem(parsed.data.command, variables);
     if (problem) return { error: await messageText(problem) };
@@ -121,7 +134,12 @@ export async function saveConsoleCommandAction(
         });
         return { commands };
     } catch (caught) {
-        return { error: caught instanceof Error ? await messageText(caught.message) : (await gameWords("games"))("errors.thatCommandCouldNotBe") };
+        return {
+            error:
+                caught instanceof Error
+                    ? await messageText(caught.message)
+                    : (await gameWords("games"))("errors.thatCommandCouldNotBe")
+        };
     }
 }
 
@@ -129,11 +147,14 @@ export async function deleteConsoleCommandAction(
     installedAppId: string,
     id: string
 ): Promise<{ commands?: SavedCommand[]; error?: string }> {
-    const parsed = z.object({ installedAppId: z.string().uuid(), id: z.string().min(1).max(64) }).safeParse({
-        installedAppId,
-        id
-    });
-    if (!parsed.success) return { error: (await gameWords("games"))("errors.thatCommandCouldNotBe2") };
+    const parsed = z
+        .object({ installedAppId: z.string().uuid(), id: z.string().min(1).max(64) })
+        .safeParse({
+            installedAppId,
+            id
+        });
+    if (!parsed.success)
+        return { error: (await gameWords("games"))("errors.thatCommandCouldNotBe2") };
     try {
         const { user } = await requireGameServer("games.console", parsed.data.installedAppId);
         const commands = await deleteConsoleCommand(parsed.data.installedAppId, parsed.data.id);
@@ -146,7 +167,12 @@ export async function deleteConsoleCommandAction(
         });
         return { commands };
     } catch (caught) {
-        return { error: caught instanceof Error ? await messageText(caught.message) : (await gameWords("games"))("errors.thatCommandCouldNotBe2") };
+        return {
+            error:
+                caught instanceof Error
+                    ? await messageText(caught.message)
+                    : (await gameWords("games"))("errors.thatCommandCouldNotBe2")
+        };
     }
 }
 
@@ -214,7 +240,10 @@ export async function runKeptCommandAction(
         const replies = await runKeptCommand(resolved.user.id, resolved.access, resolved.run);
         return {
             replies: await Promise.all(
-                replies.map(async (reply) => ({ ...reply, output: await messageText(reply.output) }))
+                replies.map(async (reply) => ({
+                    ...reply,
+                    output: await messageText(reply.output)
+                }))
             )
         };
     } catch (caught) {

@@ -73,7 +73,10 @@ export function normalizeSavedCommand(input: {
     if (/[\0\r\n]/.test(command)) return null;
     const id = input.id.trim();
     if (id.length === 0 || id.length > 64) return null;
-    const label = (input.label ?? "").replace(/[\0\r\n]/g, " ").trim().slice(0, MAX_SAVED_LABEL);
+    const label = (input.label ?? "")
+        .replace(/[\0\r\n]/g, " ")
+        .trim()
+        .slice(0, MAX_SAVED_LABEL);
     const variables = (input.variables ?? []).map(normalizeCustomVariable);
     if (customVariablesProblem(command, variables)) return null;
     return {
@@ -123,11 +126,15 @@ export function readSavedCommands(config: Record<string, unknown>): SavedCommand
 
 /** The list with one entry added, or the entry of that id rewritten in place -
  *  editing must not move a button somebody has learned the position of. */
-export function withSavedCommand(list: readonly SavedCommand[], entry: SavedCommand): SavedCommand[] {
+export function withSavedCommand(
+    list: readonly SavedCommand[],
+    entry: SavedCommand
+): SavedCommand[] {
     if (list.some((kept) => kept.id === entry.id)) {
         return list.map((kept) => (kept.id === entry.id ? entry : kept));
     }
-    if (list.length >= MAX_SAVED_COMMANDS) throw new Error(gameMessage("games", "lib.maxCommands", { count: MAX_SAVED_COMMANDS }));
+    if (list.length >= MAX_SAVED_COMMANDS)
+        throw new Error(gameMessage("games", "lib.maxCommands", { count: MAX_SAVED_COMMANDS }));
     return [...list, entry];
 }
 
@@ -140,5 +147,7 @@ export function withoutSavedCommand(list: readonly SavedCommand[], id: string): 
  *  selected, and sends the second kind straight away. */
 export function placeholderRange(command: string): { start: number; end: number } | null {
     const found = PLACEHOLDER.exec(command);
-    return found?.index === undefined ? null : { start: found.index, end: found.index + found[0].length };
+    return found?.index === undefined
+        ? null
+        : { start: found.index, end: found.index + found[0].length };
 }

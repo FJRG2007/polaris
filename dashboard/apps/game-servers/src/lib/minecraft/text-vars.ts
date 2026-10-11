@@ -185,16 +185,14 @@ export const VARIABLES: readonly VariableSpec[] = [
         bedrock: false,
         width: 32
     },
-    ...STATS_RANKINGS.map(
-        (name): VariableSpec => ({
-            name,
-            label: gameMessage("minecraft", `sidebar.blocks.${name}` as GameKey<"minecraft">),
-            kind: "server",
-            sample: RANKINGS[name].sample.join(", "),
-            bedrock: false,
-            width: 32
-        })
-    ),
+    ...STATS_RANKINGS.map((name): VariableSpec => ({
+        name,
+        label: gameMessage("minecraft", `sidebar.blocks.${name}` as GameKey<"minecraft">),
+        kind: "server",
+        sample: RANKINGS[name].sample.join(", "),
+        bedrock: false,
+        width: 32
+    })),
     {
         // Polaris's own record, so it costs the server nothing to read.
         name: EVENTS_RANKING,

@@ -50,7 +50,10 @@ export async function saveConsoleCommand(
 
 /** Forget one, and the schedules made from it with it: a schedule nobody can see
  *  the button for is a command nobody remembers is still running. */
-export async function deleteConsoleCommand(installedAppId: string, id: string): Promise<SavedCommand[]> {
+export async function deleteConsoleCommand(
+    installedAppId: string,
+    id: string
+): Promise<SavedCommand[]> {
     const list = withoutSavedCommand(await readConsoleCommands(installedAppId), id);
     const schedules = (await readConsoleSchedulesOf(installedAppId)).filter(
         (schedule) => schedule.commandId !== id
@@ -80,7 +83,9 @@ export async function addConsoleSchedule(
     let list = await readConsoleSchedulesOf(installedAppId);
     if (list.length >= MAX_CONSOLE_SCHEDULES) list = list.filter(isActive);
     if (list.length >= MAX_CONSOLE_SCHEDULES) {
-        throw new Error(gameMessage("games", "consoleSchedule.errors.tooMany", { count: MAX_CONSOLE_SCHEDULES }));
+        throw new Error(
+            gameMessage("games", "consoleSchedule.errors.tooMany", { count: MAX_CONSOLE_SCHEDULES })
+        );
     }
     const next = [...list, schedule];
     await patchInstallConfig(installedAppId, { [CONSOLE_SCHEDULES_KEY]: next });
@@ -92,7 +97,9 @@ export async function removeConsoleSchedule(
     installedAppId: string,
     id: string
 ): Promise<ConsoleSchedule[]> {
-    const next = (await readConsoleSchedulesOf(installedAppId)).filter((schedule) => schedule.id !== id);
+    const next = (await readConsoleSchedulesOf(installedAppId)).filter(
+        (schedule) => schedule.id !== id
+    );
     await patchInstallConfig(installedAppId, { [CONSOLE_SCHEDULES_KEY]: next });
     return next;
 }
