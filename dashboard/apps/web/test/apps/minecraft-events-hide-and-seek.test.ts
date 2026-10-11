@@ -11,6 +11,7 @@ import * as commands from "@polaris-app/game-servers/src/lib/minecraft/events/co
 import * as messages from "@polaris-app/game-servers/src/lib/minecraft/events/messages";
 import * as hs from "@polaris-app/game-servers/src/lib/minecraft/events/kinds/hide-and-seek";
 import * as doors from "@polaris-app/game-servers/src/lib/minecraft/events/kinds/secret-doors";
+import * as panels from "@polaris-app/game-servers/src/lib/minecraft/events/kinds/secret-panels";
 import * as pack from "@polaris-app/game-servers/src/lib/minecraft/events/kinds/snowball-pack";
 import * as said from "@polaris-app/game-servers/src/lib/minecraft/events/kinds/hide-and-seek-messages";
 import {
@@ -627,6 +628,58 @@ describe("hide and seek's rules", () => {
         expect(hs.nextReveal(0, release, null, end)).toBeNull();
     });
 
+    it("hands the freeze potions once, inside the seeking and never near its end, to hiders drawn from the run", () => {
+        const release = 1_000_000;
+        const end = release + 300_000;
+        for (let run = 0; run < 500; run += 1) {
+            const at = hs.freezeAt(`frz-${run}`, release, end)!;
+            expect(at).toBeGreaterThanOrEqual(release + 300_000 * hs.FREEZE_EARLIEST - 1);
+            expect(at).toBeLessThanOrEqual(release + 300_000 * hs.FREEZE_LATEST + 1);
+        }
+        // No time left for a potion to be thrown: none at all.
+        expect(hs.freezeAt("frz", release, release + 40_000)).toBeNull();
+        const hiders = ["Ana", "Cy", "Dee", "Eve"];
+        expect(hs.freezeHolders("r", hiders, 1)).toHaveLength(1);
+        expect(hs.freezeHolders("r", hiders, 9)).toHaveLength(4);
+        expect(hs.freezeHolders("r", hiders, 0)).toEqual([]);
+        // The same draw whatever order the names come in.
+        expect(hs.freezeHolders("r", [...hiders].reverse(), 2)).toEqual(
+            hs.freezeHolders("r", hiders, 2)
+        );
+        const spread = new Set(
+            Array.from({ length: 200 }, (_, n) => hs.freezeHolders(`s${n}`, hiders, 1)[0])
+        );
+        expect(spread.size).toBe(4);
+        expect(hs.freezeArmLines(5)).toContain("scoreboard players set #len polaris_frz 100");
+    });
+
+    it("freezes only seekers a thrown potion comes near, and counts it down", () => {
+        const tick = panels.FUNCTIONS.tick!;
+        const reach = tick.filter((line) => line.includes('{id:"minecraft:splash_potion"}}'));
+        // `Item` from 1.14, `Potion` in 1.13.
+        expect(reach).toHaveLength(2);
+        expect(reach[0]).toContain('nbt={Item:{id:"minecraft:splash_potion"}}');
+        expect(reach[1]).toContain('nbt={Potion:{id:"minecraft:splash_potion"}}');
+        for (const line of reach) {
+            // Only somebody tagged a seeker, near the thrown potion - never a hider.
+            expect(line).toMatch(
+                /^execute as @a\[tag=pe_arena,tag=pe_seeker\] at @s if entity @e\[/
+            );
+            expect(line).toContain(`distance=..${panels.FREEZE_REACH},`);
+            expect(line).not.toContain("pe_hider");
+            // Never by the thrown potion's type: its name changed in 1.21.5.
+            expect(line).not.toMatch(/type=minecraft:(potion|splash_potion)/);
+        }
+        expect(panels.FUNCTIONS.frozen).toEqual([
+            "scoreboard players remove @s polaris_frz 1",
+            "effect give @s minecraft:slowness 1 10 true",
+            "effect give @s minecraft:weakness 1 100 true",
+            "particle minecraft:item_snowball ~ ~1 ~ 0.3 0.5 0.3 0 2 normal"
+        ]);
+        expect(panels.TEARDOWN).toContain("scoreboard objectives remove polaris_frz");
+        expect(hs.TEARDOWN).toContain("effect clear @a[tag=pe_seeker] minecraft:weakness");
+    });
+
     it("finds a hider only beside a seeker who struck", () => {
         const at = { x: 0, y: 100, z: 0 };
         expect(hs.foundBy(at, [{ name: "Ben", x: 2, y: 100, z: 0 }])).toBe("Ben");
@@ -728,6 +781,8 @@ describe("what hide and seek says", () => {
                 said.readyUndone(language),
                 said.allReady(language),
                 said.revealTold(language),
+                said.freezeTold(15, language),
+                said.freezeAnnounced(3, language),
                 said.hiddenBar(3599, 11, language),
                 said.seekBar(11, language),
                 said.waitBar(3599, language),

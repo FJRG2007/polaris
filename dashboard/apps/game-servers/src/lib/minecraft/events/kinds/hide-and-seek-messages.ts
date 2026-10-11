@@ -132,6 +132,20 @@ export function revealTold(language: Language): string {
         : `${WARN}You made a sound: the seekers heard roughly where you are.`;
 }
 
+/** A hider handed a freeze potion. */
+export function freezeTold(seconds: number, language: Language): string {
+    return language === "es"
+        ? `${GOOD}Tienes una poción de hielo: lánzala a un buscador y no podrá moverse ni golpear durante ${seconds} s. Solo afecta a los buscadores.`
+        : `${GOOD}You have a freeze potion: throw it at a seeker and they cannot move or strike for ${seconds}s. It only touches seekers.`;
+}
+
+/** Everybody else, when the potions are handed out. */
+export function freezeAnnounced(count: number, language: Language): string {
+    return language === "es"
+        ? `${WARN}${count === 1 ? "Un escondido tiene" : `${count} escondidos tienen`} una poción de hielo. Cuidado, buscadores.`
+        : `${WARN}${count === 1 ? "A hider has" : `${count} hiders have`} a freeze potion. Seekers, watch out.`;
+}
+
 /** Every hider ready: the rest of the time to hide is skipped. */
 export function allReady(language: Language): string {
     return language === "es"

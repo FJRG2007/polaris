@@ -82,8 +82,12 @@ export const SNEAK = "polaris_sneak";
 export const CROUCHED = "polaris_crch";
 /** Ticks before a player is thrown by a pad again. */
 export const PAD_WAIT = "polaris_padw";
+/** Ticks a seeker stays frozen (hide and seek's freeze potion); `#len` holds
+ *  how many a hit is worth. */
+export const FROZEN = "polaris_frz";
 const OBJECTIVES: readonly (readonly [string, string])[] = [
     [PAD_WAIT, "dummy"],
+    [FROZEN, "dummy"],
     [LEFT, "dummy"],
     [LAST, "dummy"],
     [ID, "dummy"],
@@ -164,11 +168,33 @@ export const MATERIALS = [
     "minecraft:birch_planks",
     "minecraft:quartz_block",
     "minecraft:hay_block",
-    "minecraft:white_wool"
+    "minecraft:white_wool",
+    // The themed rooms (design 7). Only blocks every release from 1.13 knows:
+    // a function naming one it does not is refused whole.
+    "minecraft:nether_bricks",
+    "minecraft:red_nether_bricks",
+    "minecraft:end_stone_bricks",
+    "minecraft:end_stone",
+    "minecraft:purpur_block"
 ] as const;
 export type Material = (typeof MATERIALS)[number];
 const FACINGS = ["north", "south", "east", "west"] as const;
 export type Facing = (typeof FACINGS)[number];
+
+/** The seekers' tag (`hide-and-seek.SIDE_TAGS`): on a server team or ours. */
+const SEEKER_TAG = "pe_seeker";
+/** How near a thrown splash potion has to come to a seeker to freeze them. */
+export const FREEZE_REACH = 3;
+/**
+ * A thrown splash potion: whatever carries a splash potion and is not a
+ * dropped item, a frame or a marker. Not by its type: the thrown potion's
+ * entity was renamed in 1.21.5, and a name the server does not know is a
+ * function it refuses to load. Its stack is `Item` from 1.14 and `Potion` in
+ * 1.13, so both are looked for. The game's kit is the only splash potion in an
+ * arena: everybody's own things were taken at the door.
+ */
+const THROWN = (field: "Item" | "Potion"): string =>
+    `@e[type=!minecraft:player,type=!minecraft:item,type=!minecraft:item_frame,type=!minecraft:armor_stand,type=!minecraft:painting,distance=..${FREEZE_REACH},nbt={${field}:{id:"minecraft:splash_potion"}}]`;
 
 /** Anything but a dropped item, a marker, a painting or what the house shows. */
 const SOMEBODY = `@e[type=!minecraft:item,type=!minecraft:armor_stand,type=!minecraft:painting,type=!minecraft:item_frame,tag=!${DECOR}`;
@@ -207,7 +233,22 @@ export const FUNCTIONS: Readonly<Record<string, readonly string[]>> = {
         `execute as @a[tag=${IN_ARENA}] at @s if entity ${MARKER},tag=pe_key_crouch,distance=..${KEY_NEAR}] run function polaris:panel/crouched`,
         // Launch pads: whoever stands on one, unless just thrown.
         `scoreboard players remove @a[tag=${IN_ARENA},scores={${PAD_WAIT}=1..}] ${PAD_WAIT} 1`,
-        `execute as @a[tag=${IN_ARENA}] at @s if entity ${MARKER},tag=${PAD},distance=..${ON_PAD}] unless score @s ${PAD_WAIT} matches 1.. run function polaris:panel/launch`
+        `execute as @a[tag=${IN_ARENA}] at @s if entity ${MARKER},tag=${PAD},distance=..${ON_PAD}] unless score @s ${PAD_WAIT} matches 1.. run function polaris:panel/launch`,
+        // Hide and seek's freeze potion: a seeker it comes near stands still
+        // for as long as `#len` says, counted down here; nobody else.
+        ...(["Item", "Potion"] as const).map(
+            (field) =>
+                `execute as @a[tag=${IN_ARENA},tag=${SEEKER_TAG}] at @s if entity ${THROWN(field)} run scoreboard players operation @s ${FROZEN} = #len ${FROZEN}`
+        ),
+        `execute as @a[tag=${IN_ARENA},scores={${FROZEN}=1..}] at @s run function polaris:panel/frozen`
+    ],
+    // Unable to walk (Slowness 10, as in the cage) or to strike (Weakness 100,
+    // as a hider), a second at a time, so it ends a second after the count.
+    frozen: [
+        `scoreboard players remove @s ${FROZEN} 1`,
+        "effect give @s minecraft:slowness 1 10 true",
+        "effect give @s minecraft:weakness 1 100 true",
+        "particle minecraft:item_snowball ~ ~1 ~ 0.3 0.5 0.3 0 2 normal"
     ],
     launch: [
         `effect give @s minecraft:levitation ${LAUNCH_SECONDS} ${LAUNCH_AMPLIFIER} true`,

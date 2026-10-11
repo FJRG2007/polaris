@@ -574,3 +574,68 @@ describe("the manor's launch pads and levers in the data pack", () => {
         );
     });
 });
+
+describe("the manor's themed rooms (design 7)", () => {
+    const THEMED = ["nether", "deep", "end", "belfry", "village"];
+    const housesWith = (name: string, era: model.Era = model.NEWEST) => {
+        const out: manor.Manor[] = [];
+        for (let seed = 0; seed < 40 && out.length < 6; seed += 1) {
+            const house = manor.manorFor(`themed-${name}-${seed}`, 4, era);
+            if (house.rooms.some((room) => room.template === name)) out.push(house);
+        }
+        return out;
+    };
+    const roomOf = (house: manor.Manor, name: string) =>
+        house.rooms
+            .filter((room) => room.template === name)
+            .map((room) => room.j * house.count + room.i);
+
+    it("draws none of them in a house built by an older design", () => {
+        for (let seed = 0; seed < 12; seed += 1)
+            for (const design of [5, 6]) {
+                const house = manor.manorFor(`themed-old-${seed}`, 4, model.NEWEST, design);
+                expect(house.rooms.filter((room) => THEMED.includes(room.template))).toEqual([]);
+            }
+    });
+
+    it("hides a place inside another: a cellar under the hut, the tower, the house and the bell tower", () => {
+        for (const name of ["nether", "end", "village", "belfry"]) {
+            const houses = housesWith(name);
+            expect(houses.length).toBeGreaterThan(0);
+            for (const house of houses) {
+                const mine = roomOf(house, name);
+                const under = house.spots.filter(
+                    (spot) => mine.includes(spot.room) && spot.feet < 0
+                );
+                expect(under.length, `${name} in ${house.count} rooms`).toBeGreaterThan(0);
+            }
+        }
+    });
+
+    it("opens a secret door high in the bell tower, with a key across the room and a button inside", () => {
+        let high = 0;
+        for (const house of housesWith("belfry")) {
+            const mine = roomOf(house, "belfry");
+            for (const panel of house.panels.filter(
+                (one) => mine.includes(one.room) && one.shape === "wall" && one.level >= 5
+            )) {
+                high += 1;
+                expect(house.keys.some((key) => key.id === panel.id && !key.inside)).toBe(true);
+                expect(house.keys.some((key) => key.id === panel.id && key.inside)).toBe(true);
+                expect(house.spots.some((spot) => mine.includes(spot.room) && spot.feet >= 5)).toBe(
+                    true
+                );
+            }
+        }
+        expect(high).toBeGreaterThan(0);
+    });
+
+    it("leaves the deep dark and the bell tower out where the server cannot show them", () => {
+        for (let seed = 0; seed < 24; seed += 1) {
+            const house = manor.manorFor(`themed-era-${seed}`, 4, model.OLDEST);
+            expect(
+                house.rooms.filter((room) => room.template === "deep" || room.template === "belfry")
+            ).toEqual([]);
+        }
+    });
+});

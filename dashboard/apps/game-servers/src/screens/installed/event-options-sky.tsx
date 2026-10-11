@@ -609,6 +609,31 @@ export function HideAndSeekFields({
                     field="revealSeconds"
                 />
                 <NumberField
+                    label={t("editor.freezePotions")}
+                    hint={t("editor.freezePotionsHint", { max: catalog.MOST_FREEZE_POTIONS })}
+                    min={0}
+                    max={catalog.MOST_FREEZE_POTIONS}
+                    value={value.freezePotions}
+                    onChange={(freezePotions) => onChange({ ...value, freezePotions })}
+                    issues={issues}
+                    field="freezePotions"
+                />
+                {value.freezePotions > 0 && (
+                    <NumberField
+                        label={t("editor.freezeSeconds")}
+                        hint={t("editor.range", {
+                            min: catalog.FREEZE_SECONDS_RANGE.min,
+                            max: catalog.FREEZE_SECONDS_RANGE.max
+                        })}
+                        min={catalog.FREEZE_SECONDS_RANGE.min}
+                        max={catalog.FREEZE_SECONDS_RANGE.max}
+                        value={value.freezeSeconds}
+                        onChange={(freezeSeconds) => onChange({ ...value, freezeSeconds })}
+                        issues={issues}
+                        field="freezeSeconds"
+                    />
+                )}
+                <NumberField
                     label={t("editor.powerUpMinutes")}
                     hint={t("editor.powerUpMinutesHint")}
                     min={0}

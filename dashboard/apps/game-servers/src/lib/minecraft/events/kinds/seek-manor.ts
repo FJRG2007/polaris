@@ -55,7 +55,7 @@ import { seeded, shuffled } from "../trivia-bank";
 import * as model from "./seek-grid";
 
 /** The layout's version, written into the run when it is built. */
-export const DESIGN = 6;
+export const DESIGN = 7;
 /** The first design built as a manor: every design from here on is one. */
 export const FIRST = 4;
 /** The most who can play, in the largest house. */
@@ -485,7 +485,7 @@ export function drawManor(
     // The nooks in each room's walls, then the room itself.
     plans.forEach((plan, room) => {
         const template = templates[room]!;
-        if (!plain) nooksOf(draft, plan, template.style, doorsOf(room), room, era, random);
+        if (!plain) nooksOf(draft, plan, template.style, doorsOf(room), room, era, random, design);
     });
     plans.forEach((plan, room) => {
         const template = templates[room]!;
@@ -553,7 +553,9 @@ export function drawManor(
     // A panel left with no key is plain wall or floor: nothing opens it.
     for (const panel of draft.panels)
         if (!keys.some((key) => key.id === panel.id && !key.inside))
-            for (const level of panel.shape === "wall" ? [1, 2] : [0])
+            for (const level of panel.shape === "wall"
+                ? [panel.level, panel.level + 1]
+                : [panel.level])
                 grid.panels.delete(grid.index(panel.x, level, panel.z));
     return {
         design,
@@ -656,6 +658,36 @@ function canvasOf(
             );
             draft.insideKeys.push({ panel: id, x: button.x, level: inside.level, z: button.z });
         },
+        wallPanel(u, level, v, facing, inside) {
+            const at = place.at(u, v);
+            const material = panels.MATERIALS.find((one) => one === model.bare(style.face));
+            if (!material || !grid.free(at.x, level, at.z) || !grid.free(at.x, level + 1, at.z))
+                return false;
+            grid.set(material, at.x, level, at.z, at.x, level + 1, at.z);
+            grid.panel(at.x, level, at.z, "wall");
+            grid.panel(at.x, level + 1, at.z, "wall");
+            const [dx, dz] = STEP[place.side(facing)];
+            const id = draft.nextPanel++;
+            draft.panels.push({
+                id,
+                x: at.x,
+                level,
+                z: at.z,
+                shape: "wall",
+                material,
+                front: { x: at.x - dx, feet: level, z: at.z - dz },
+                room
+            });
+            const button = place.at(inside.u, inside.v);
+            canvas.set(
+                `minecraft:stone_button[face=wall,facing=${inside.facing},powered=false]`,
+                inside.u,
+                inside.level,
+                inside.v
+            );
+            draft.insideKeys.push({ panel: id, x: button.x, level: inside.level, z: button.z });
+            return true;
+        },
         display(block, u, level, v) {
             if (!era.display) return;
             const at = place.at(u, v);
@@ -689,7 +721,8 @@ function nooksOf(
     doors: readonly { side: Side; at: number }[],
     room: number,
     era: model.Era,
-    random: () => number
+    random: () => number,
+    design: number
 ): void {
     const { grid } = draft;
     const x0 = origin(plan.i);
@@ -776,6 +809,14 @@ function nooksOf(
                 continue;
             setDoor(grid, cell, wall.inward);
             grid.clear(front.x, 1, front.z, front.x, 2, front.z);
+            // From design 7 a door always leads somewhere: a closet a block
+            // deep behind it, lit from its floor, room for one to hide.
+            if (design >= rooms.CLOSETS_SINCE) {
+                const closet = wall.cell(along, 1);
+                grid.set(LAMP, closet.x, 0, closet.z);
+                grid.clear(closet.x, 1, closet.z, closet.x, 2, closet.z);
+                draft.spots.push({ room, x: closet.x, feet: 1, z: closet.z });
+            }
         }
 }
 

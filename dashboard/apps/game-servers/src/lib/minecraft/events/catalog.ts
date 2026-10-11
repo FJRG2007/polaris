@@ -342,6 +342,12 @@ export const SEEK_MINUTES = { min: 1, max: 60 } as const;
  *  be set to. */
 export const REVEAL_SECONDS = 60;
 export const MOST_REVEAL_SECONDS = 600;
+/** Hide and seek's freeze potions: how many hiders get one, and how long a
+ *  seeker it reaches stands still, by default and at the most. */
+export const FREEZE_POTIONS = 1;
+export const MOST_FREEZE_POTIONS = 3;
+export const FREEZE_SECONDS = 5;
+export const FREEZE_SECONDS_RANGE = { min: 2, max: 15 } as const;
 
 /** What each kind can be set to. Every field has a default, so an event made on
  *  an older version of this screen reads as a whole one. */
@@ -733,6 +739,21 @@ export const optionsSchemas = {
             .min(0, problem("atLeast", { count: 0 }))
             .max(MOST_REVEAL_SECONDS, problem("atMost", { count: MOST_REVEAL_SECONDS }))
             .default(REVEAL_SECONDS),
+        /** Hiders handed a freeze potion once, at a moment of the seeking
+         *  drawn from the run; 0 for none. */
+        freezePotions: z
+            .number()
+            .int()
+            .min(0, problem("atLeast", { count: 0 }))
+            .max(MOST_FREEZE_POTIONS, problem("atMost", { count: MOST_FREEZE_POTIONS }))
+            .default(FREEZE_POTIONS),
+        /** Seconds a seeker the potion reaches cannot move or strike. */
+        freezeSeconds: z
+            .number()
+            .int()
+            .min(FREEZE_SECONDS_RANGE.min, problem("atLeast", { count: FREEZE_SECONDS_RANGE.min }))
+            .max(FREEZE_SECONDS_RANGE.max, problem("atMost", { count: FREEZE_SECONDS_RANGE.max }))
+            .default(FREEZE_SECONDS),
         /** Minutes between the hiders' power-ups; 0 for none. */
         powerUpMinutes: z
             .number()

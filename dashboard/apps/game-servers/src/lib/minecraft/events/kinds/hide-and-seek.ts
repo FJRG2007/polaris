@@ -1764,7 +1764,11 @@ export const stateSchema = z.object({
     powerAt: z.number().nullable().default(null),
     powers: z
         .record(z.object({ kind: z.enum(["invisible", "fast"]), until: z.number() }))
-        .default({})
+        .default({}),
+    /** When the freeze potions are handed out (`freezeAt`), and to whom: set
+     *  once, so nobody is given a second. */
+    freezeAt: z.number().nullable().default(null),
+    freezeGiven: z.array(z.string()).default([])
 });
 export type SeekState = z.infer<typeof stateSchema>;
 
@@ -1850,9 +1854,11 @@ export { RADAR_OFF, RADAR_RESET } from "./radar";
 export const TEARDOWN = [
     // A seeker still waiting when it is called off is not left blind for the
     // rest of the wait (`waitingLines`); by team or by tag, before either goes.
+    // A seeker frozen by a potion when it ends walks and strikes again.
     ...[`@a[team=${TEAMS[0]}]`, `@a[tag=${SIDE_TAGS[0]}]`].flatMap((who) => [
         `effect clear ${who} minecraft:blindness`,
-        `effect clear ${who} minecraft:slowness`
+        `effect clear ${who} minecraft:slowness`,
+        `effect clear ${who} minecraft:weakness`
     ]),
     ...TEAMS.map((team) => `team remove ${team}`),
     ...SIDE_TAGS.map((tag) => `tag @a[tag=${tag}] remove ${tag}`),
@@ -2029,5 +2035,47 @@ export function effectsOff(name?: string): string[] {
     return [
         ...EFFECTS.map((effect) => `effect clear ${tagged} minecraft:${effect}`),
         `tag ${tagged} remove ${FX_TAG}`
+    ];
+}
+
+// ------------------------------------------------------------------ the freeze potion
+
+/**
+ * Once a game, at a moment drawn from the run's id, `freezePotions` hiders
+ * still hidden are each handed a splash potion. Thrown, it does nothing of its
+ * own (a splash of water); the events data pack (`secret-panels.ts`) freezes
+ * every seeker it comes within `FREEZE_REACH` of for `freezeSeconds`: unable to
+ * walk or to strike. Nobody else - not the hider who threw it, not another
+ * hider - is touched. The potion is the run's kit, marked, so it is taken back
+ * at the end like any other, thrown or not.
+ */
+export const FREEZE_ITEM = "minecraft:splash_potion";
+/** Where in the seeking the potions are handed out: between these fractions
+ *  of it, and never in the last `FREEZE_QUIET` seconds. */
+export const FREEZE_EARLIEST = 0.15;
+export const FREEZE_LATEST = 0.6;
+export const FREEZE_QUIET = 30;
+
+/** When the potions are handed out, or null when there is no time left for
+ *  one to be used. */
+export function freezeAt(seed: string, releaseAt: number, endsAt: number): number | null {
+    const span = endsAt - releaseAt;
+    const share = FREEZE_EARLIEST + seeded(`${seed}-freeze`)() * (FREEZE_LATEST - FREEZE_EARLIEST);
+    const at = Math.round(releaseAt + span * share);
+    return at <= endsAt - FREEZE_QUIET * 1000 ? at : null;
+}
+
+/** Which of `hiders` get one: `count` of them, drawn from the run's id. */
+export function freezeHolders(seed: string, hiders: readonly string[], count: number): string[] {
+    if (count <= 0) return [];
+    const order = [...hiders].sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()));
+    return shuffled(order, seeded(`${seed}-freeze-holders`)).slice(0, count);
+}
+
+/** What arms the pack for this game's potions: a hit worth `seconds`. */
+export function freezeArmLines(seconds: number): string[] {
+    return [
+        `scoreboard objectives add ${panels.FROZEN} dummy`,
+        `scoreboard players set #len ${panels.FROZEN} ${Math.max(1, Math.round(seconds)) * 20}`
     ];
 }
