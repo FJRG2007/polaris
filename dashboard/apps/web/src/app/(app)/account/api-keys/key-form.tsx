@@ -22,6 +22,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
 import { ScopePicker } from "./scope-picker";
+import { holdReload } from "@/lib/reload-safety";
 import type { NamespaceTranslator } from "@/lib/i18n/types";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { ArrowLeft, Copy, KeyRound } from "lucide-react";
@@ -152,7 +153,11 @@ export function KeyForm({
         if (!issued || copied) return;
         const warn = (event: BeforeUnloadEvent) => event.preventDefault();
         window.addEventListener("beforeunload", warn);
-        return () => window.removeEventListener("beforeunload", warn);
+        const release = holdReload();
+        return () => {
+            window.removeEventListener("beforeunload", warn);
+            release();
+        };
     }, [copied, issued]);
 
     const custom = expiry === CUSTOM_EXPIRY;

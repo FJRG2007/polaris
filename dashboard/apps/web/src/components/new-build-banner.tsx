@@ -81,7 +81,7 @@ export function NewBuildBanner({ served }: { served: string | null }) {
      */
     const reload = () => {
         if (held?.session) rememberCall(held.session, held.withVideo, held.viewerId);
-        window.location.reload();
+        reloadNow();
     };
 
     useEffect(() => {

@@ -8,15 +8,17 @@
  * same address on the new build and never sees a refused click. When any of it
  * is not, the tab keeps offering instead.
  *
- * Three sources, because no single one sees everything:
+ * Two sources, because neither sees everything:
  *
- * - Holds: the screens that know they are busy say so (a recording, a call).
- * - The page's own unload guards: every screen that already warns before it is
- *   closed with unsaved work (`beforeunload` + `preventDefault`) answers a probe
- *   of the same event, so they are asked rather than listed here.
+ * - Holds: the screens that know they are busy say so (a recording, a file
+ *   staged or on its way, an unsaved edit, a key not yet copied).
  * - What is on the page: focus inside a text field, a file on the move, a video
  *   or sound playing - each somebody in the middle of something, whether or not
  *   the screen has told anybody.
+ *
+ * The page's `beforeunload` guards are not probed by dispatching that event:
+ * every listener would run, and some leave the page in their own way (a call
+ * room hangs up on it). A screen that warns before unload holds as well.
  */
 
 import { isUnderWay, transfersNow } from "@/components/transfers/transfer-store";
@@ -59,19 +61,6 @@ function isEditable(element: Element | null): boolean {
     return element instanceof HTMLElement && element.isContentEditable;
 }
 
-/**
- * Ask every unload guard on the page whether it would object.
- *
- * Each guard does `event.preventDefault()` on `beforeunload` while it has unsaved
- * work, so dispatching the same event and reading `defaultPrevented` is that
- * question asked of all of them at once, including guards added after this file.
- */
-function guardsObject(): boolean {
-    const probe = new Event("beforeunload", { cancelable: true });
-    window.dispatchEvent(probe);
-    return probe.defaultPrevented;
-}
-
 function isPlaying(media: Element): boolean {
     return media instanceof HTMLMediaElement && !media.paused && !media.ended;
 }
@@ -81,9 +70,7 @@ export function safeToReload(): boolean {
     if (isEditable(document.activeElement)) return false;
     if (transfersNow().some(isUnderWay)) return false;
     // Somebody watching or listening is looking, even with no hand on the page.
-    if ([...document.querySelectorAll("video, audio")].some((media) => isPlaying(media)))
-        return false;
-    return !guardsObject();
+    return ![...document.querySelectorAll("video, audio")].some((media) => isPlaying(media));
 }
 
 /** The reload itself, kept here so there is one place that leaves the page (and

@@ -23,6 +23,7 @@
  * and can stay open with the text still in it.
  */
 
+import { holdReload } from "@/lib/reload-safety";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 /** A write with its value already in it. False when the server would not take it. */
@@ -164,7 +165,11 @@ export function useAutosave(settleMs: number = SETTLE_MS): Autosave {
         if (!busy) return;
         const warn = (event: BeforeUnloadEvent) => event.preventDefault();
         window.addEventListener("beforeunload", warn);
-        return () => window.removeEventListener("beforeunload", warn);
+        const release = holdReload();
+        return () => {
+            window.removeEventListener("beforeunload", warn);
+            release();
+        };
     }, [busy]);
 
     // Torn off the page - a navigation, the view behind re-rendering - there is

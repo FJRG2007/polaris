@@ -3,9 +3,9 @@
 /**
  * When a reload would cost somebody something.
  *
- * Pinned: a hold, focus in a text field, a transfer under way and any page guard
- * that warns before unload and media playing each make it unsafe; buttons and
- * checkboxes do not.
+ * Pinned: a hold, focus in a text field, a transfer under way and media playing
+ * each make it unsafe; buttons and checkboxes do not, and asking never runs the
+ * page's own unload listeners.
  */
 
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -67,11 +67,11 @@ describe("whether the tab can reload by itself", () => {
         expect(safeToReload()).toBe(true);
     });
 
-    it("asks the page's own unsaved-work guards", () => {
-        const guard = (event: Event) => event.preventDefault();
-        window.addEventListener("beforeunload", guard);
-        expect(safeToReload()).toBe(false);
-        window.removeEventListener("beforeunload", guard);
+    it("never fires the page's unload listeners to ask", () => {
+        const leave = vi.fn();
+        window.addEventListener("beforeunload", leave);
         expect(safeToReload()).toBe(true);
+        expect(leave).not.toHaveBeenCalled();
+        window.removeEventListener("beforeunload", leave);
     });
 });
