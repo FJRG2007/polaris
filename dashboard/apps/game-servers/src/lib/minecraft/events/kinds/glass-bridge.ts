@@ -357,11 +357,13 @@ export function bridgeFills(box: Box, steps: number): Fill[] {
         for (let z = f.z1; z <= f.z2; z += 1)
             fill((x + z) % 2 === 0 ? FINISH_DARK : FINISH_LIGHT, x, y, z);
 
-    // The start: a rim round its edge, then its floor, its corner the proof.
+    // The start: its floor between the rims, then a rim along each side - the
+    // last one's corner the proof, so nothing before it may have filled it
+    // (every fill keeps what is there).
     const s = layout.start;
+    fill(START_FLOOR, s.x1, y, s.z1 + 1, s.x2, y, s.z2 - 1);
     fill(START_RIM, s.x1, y, s.z1, s.x2, y, s.z1);
     fill(START_RIM, s.x1, y, s.z2, s.x2, y, s.z2);
-    fill(START_FLOOR, s.x1, y, s.z1, s.x2, y, s.z2);
     return fills;
 }
 

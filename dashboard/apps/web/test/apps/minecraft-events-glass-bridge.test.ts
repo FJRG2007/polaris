@@ -50,9 +50,9 @@ describe("the bridge", () => {
                 expect(glass.BRIDGE_BLOCKS).toContain(bare(fill.block));
                 expect(fill.block).not.toMatch(/bed|respawn_anchor|spawner|beacon/);
             }
-            // The start's floor last: its corner is the proof the blocks stayed.
+            // The start's south rim last: its corner is the proof the blocks stayed.
             const layout = glass.layoutOf(box, steps);
-            expect(fills.at(-1)!.box).toEqual(layout.start);
+            expect(fills.at(-1)!.box).toEqual({ ...layout.start, z1: layout.start.z2 });
             // Every row's two panels, the same glass, with air between them.
             for (let row = 0; row < steps; row += 1) {
                 const [north, south] = [
