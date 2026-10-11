@@ -27,6 +27,11 @@ const HOUSE_LABELS: Readonly<Record<(typeof catalog.HOUSE_SIZES)[number], GameKe
     large: "editor.labels.house.large"
 };
 
+const SEEK_TIME_LABELS: Readonly<Record<"auto" | "manual", GameKey<"minecraft">>> = {
+    auto: "editor.labels.seekTime.auto",
+    manual: "editor.labels.seekTime.manual"
+};
+
 const MAZE_SIZE_LABELS: Readonly<
     Record<(typeof catalog.MAZE_SIZES)[number], GameKey<"minecraft">>
 > = {
@@ -560,6 +565,39 @@ export function HideAndSeekFields({
                         aria-label={t("editor.house")}
                     />
                 </Field>
+                <Field label={t("editor.seekTime")} hint={t("editor.seekTimeHint")}>
+                    <Select
+                        value={value.seekMinutes === "auto" ? "auto" : "manual"}
+                        onValueChange={(mode) =>
+                            onChange({
+                                ...value,
+                                seekMinutes:
+                                    mode === "auto"
+                                        ? "auto"
+                                        : catalog.SEEK_MINUTES_BY_ROOMS[
+                                              catalog.houseRooms(0, value.house)
+                                          ]!
+                            })
+                        }
+                        options={options(t, SEEK_TIME_LABELS)}
+                        aria-label={t("editor.seekTime")}
+                    />
+                </Field>
+                {value.seekMinutes !== "auto" && (
+                    <NumberField
+                        label={t("editor.seekMinutes")}
+                        hint={t("editor.range", {
+                            min: catalog.SEEK_MINUTES.min,
+                            max: catalog.SEEK_MINUTES.max
+                        })}
+                        min={catalog.SEEK_MINUTES.min}
+                        max={catalog.SEEK_MINUTES.max}
+                        value={value.seekMinutes}
+                        onChange={(seekMinutes) => onChange({ ...value, seekMinutes })}
+                        issues={issues}
+                        field="seekMinutes"
+                    />
+                )}
                 <NumberField
                     label={t("editor.powerUpMinutes")}
                     hint={t("editor.powerUpMinutesHint")}

@@ -406,7 +406,17 @@ left out.
   keeps its knockback; a fall off the platform lands under Resistance V
   (`hill.catchLine`), never Slow Falling, so nobody can die or be kicked for
   floating. Walked to (fists only off), it stays on the ground and none of what
-  follows applies.
+  follows applies. Its circle is `RING_RADIUS` (10) by default; one saved on
+  the old 6 is moved to 10 once (`toRingRadius`, fists only).
+- **The king of the ring's look** (`hill.DEATH`, from 1.19; `hill.PLAIN`
+  before, and for one walked to): a floor of deepslate tiles edged in sculk,
+  reinforced deepslate at the corners with a soul campfire on each, a wither
+  skeleton's skull in the middle of each side looking in, and the ring a line
+  of ochre froglight, under the soul sand valley's sky, with souls and ash
+  drifting over it (`hill.ambientLines`) and a heartbeat through a round that
+  counts double. The look a platform was built in is read back from its
+  arena's block list (`hill.lookOf`), so a restart keeps it, and every block of
+  it is in that list for the teardown.
 - **Each blow throws further** (`hill.knockbackLines`), from 1.21, where a
   player's punch reads the `attack_knockback` attribute: every fighter punches
   at `ATTACK_KNOCKBACK` and starts at `FRESH_RESISTANCE` knockback resistance,
@@ -690,24 +700,56 @@ left out.
   up to and secret rooms behind bookcases (see "Building a map" for how it is
   laid out and checked, and "Secret doors" below for how they open). Each room has four lamps in its
   floor and no more, so corners stay dim but never dark enough for a monster.
-  The seekers (`seekers`, never everybody) are drawn from the run's id and
-  wait in a barrier cage in the middle room, blind and unable to walk, for
-  `hideSeconds` (45 by default, up to 90: the house takes longer to cross than
-  the old hall did); the hiders start round it. Then the cage's barrier comes
-  down, only inside its own box, and that it did is written into the run, so a
-  restart neither lets them out early nor builds it again. Two teams hide each
-  side's names from the other
-  (`nametagVisibility hideForOtherTeams`), friendly fire off; hiders are
-  under Weakness 101, so only a seeker can strike. A hider hurt by a player
-  (the events data pack, see "Hits" below) is found by the seeker the game
-  says hurt them, from 1.19.4; before, by the nearest seeker within five
-  blocks who struck. A drop off the gallery, four blocks up, hurts, and is
-  never a find. Whoever is found joins the seekers. Nobody is hurt
-  (Resistance IV, Regeneration, Saturation every tick). Scoring: a hider
-  scores a point for every second hidden while on the server, from "Go!" to
-  being found; a seeker scores 30 a find (`FIND_POINTS`: half a minute of
-  hiding, so a seeker who finds most of a group early keeps up with a hider
-  who lasts). It ends when every hider is found, or when time is up.
+  The seekers (`seekers`, never everybody) are drawn from the run's id, and
+  rotate: the server keeps who sought first in its last games, the latest
+  first (`state.lastSeekers`, `hs.rememberSeekers`, at most 16), and the draw
+  takes anybody not in that list before anybody in it, then whoever sought
+  longest ago (`hs.seekersFor`) - a group of five each seeks once every five
+  games. They wait in a barrier cage in the middle room, blind and unable to
+  walk, for `hideSeconds` (90 by default, 15 to 180; a saved event still on
+  the old 45 or 75 is moved to 90 once); the hiders start round it. Each hider
+  is offered a [Ready] button (the build battle's [Done], `readyTick`); a
+  hider can take it back with [Not yet] until every hider on the server is
+  ready, and then the rest of the hiding is skipped, the seekers come out at
+  once and that is written down (`allReadyAt`), so nobody can take it back.
+  Then the cage's barrier comes down, only inside its own box, and that it
+  did is written into the run, so a restart neither lets them out early nor
+  builds it again.
+- **Hide and seek's length** is the time to hide and then the time to seek
+  (`catalog.playSeconds`), never one cut out of the other. The time to seek
+  (`seekMinutes`) is "auto" by default: 5, 7 or 9 minutes for a house of 3, 4
+  or 5 rooms a side (`SEEK_MINUTES_BY_ROOMS`), the house being the one its
+  players were given (`catalog.houseRooms`, "By player count" or a size set by
+  hand). Set by hand, it is 1 to 60 minutes. The preset's own `minutes` is not
+  used, and the editor hides it. A skipped hiding takes the run's end as much
+  earlier, so the time to seek stays whole. Saved before (defaults 10), a hide
+  and seek on the default length of 7 minutes is moved to "auto"; one on a
+  length somebody chose keeps that whole length, the hiding taken off it
+  (`toSeekMinutes`).
+- **What hide and seek shows**: the boss bar is one countdown for everybody -
+  the time left to hide, then the time left in the game and how many are
+  still hidden. A hider's action bar says the time left to hide and how many
+  hiders are ready, and once the seekers are out their own "Time hidden",
+  written as minutes and seconds in words ("1m 05s") so it is never read as
+  a countdown. A seeker's says when they can start seeking, then how many are
+  still hidden.
+- **Hide and seek's sides**: two teams hide each side's names from the other
+  (`nametagVisibility`: a seeker's hidden from hiders, a hider's never shown),
+  with `collisionRule never`, so nobody can block a doorway with their body or
+  be pushed out of a spot; friendly fire off. A player already on a team of
+  the server's own is left on it and tagged `pe_seeker` or `pe_hider` instead.
+  Hiders are under Weakness 101, so only a seeker can strike. A hider hurt by
+  a player (the events data pack, see "Hits" below) is found by the seeker
+  the game says hurt them, from 1.19.4; before, by the nearest seeker within
+  five blocks who struck. A drop off the gallery, four blocks up, hurts, and
+  is never a find. Whoever is found joins the seekers. Nobody is hurt
+  (Resistance IV, Regeneration, Saturation every tick). It ends when every
+  hider is found, or when time is up.
+- **Who wins hide and seek**: the hider hidden longest - the last found, or
+  still hidden at the end. A point for taking part and a point a second
+  hidden while on the server, counted only once the seekers are out
+  (`hs.scoresOf`: the time to hide is everybody's); finds only break a tie
+  (`hs.tiebreakOf`). The chat's results and the podium are the same ranking.
 - **SkyWars** needs 1.17 (`catalog.stashesFirst`): its loot is fought over,
   so it must never sit beside what a player brought, and only from 1.17 is
   that put away first; an older server is refused before anything starts.
@@ -1055,7 +1097,11 @@ that lack it, for their next start. A move to a release with no build takes it
 off - a jar for the wrong release ends the boot.
 
 **Stash** (`polaris stash save|restore <player> <key>`, `EventStash.java`). The
-41 slots (never the ender chest, never the kit), experience, health, hunger and
+41 slots (never the ender chest, never the kit), and every stack a player
+could carry in past them - the one on the cursor, the crafting grids, and a
+trash slot mod's slot (`PlayerPersisted.BalmData.TrashSlot`) - kept as loose
+entries (`LOOSE`, slot -1000) and given back to any free slot or dropped as
+theirs; experience, health, hunger and
 effects, written to `world/polaris/stash/<key>.dat` before anything is taken,
 and taken and given back in one tick each. The merge rule is the dashboard's:
 each stack to its own slot, what the player holds there moved to a free slot,
@@ -1644,6 +1690,13 @@ One entry per bug: what a player saw, why, and the rule that keeps it gone.
   on the card had come in, so detection itself did not fail. The start now
   says what counts (`bingo-messages.countsFromNow`). Whether those players
   expected carried items to count is an inference.
+- **A trash slot carried things into events.** A trash slot mod adds a slot to
+  the inventory screen that no command can read back or empty, and the stack
+  in it came in with the player and out again with whatever they had picked
+  up. The Polaris mod now stashes that slot, the cursor and the crafting grids
+  with the rest (`EventStash.LOOSE`); where the mod is not on, a player with
+  something in that slot is kept out and told to empty it
+  (`stash.readTrash`, refusal `trash`).
 - **Hide and seek is won by a minimap radar.** Each entrant is sent Xaero's
   Minimap fair-play code at Go, again when they come back on the server, and
   the reset code at the end (`hs.RADAR_OFF`, `hs.RADAR_RESET`). Its limit:

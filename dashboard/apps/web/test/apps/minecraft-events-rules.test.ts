@@ -165,20 +165,90 @@ describe("hide and seek's time to hide", () => {
     };
 
     it("brings the old default up once, and keeps one chosen since", () => {
+        expect(catalog.HIDE_SECONDS).toBe(90);
         expect(read(7, 45)).toBe(catalog.HIDE_SECONDS);
         expect(read(7, 60)).toBe(60);
+        expect(read(9, 75)).toBe(catalog.HIDE_SECONDS);
+        expect(read(9, 45)).toBe(45);
         expect(read(catalog.DEFAULTS_VERSION, 45)).toBe(45);
+        expect(read(catalog.DEFAULTS_VERSION, 75)).toBe(75);
+        expect(
+            (
+                catalog.newPreset("hide-and-seek", "x")
+                    .options as catalog.EventOptions<"hide-and-seek">
+            ).hideSeconds
+        ).toBe(90);
     });
 
-    it("leaves the seekers at least half the event", () => {
-        expect(catalog.presetSchema.safeParse(seek(90, 3)).success).toBe(true);
-        const long = catalog.presetSchema.safeParse(seek(91, 3));
-        expect(long.success).toBe(false);
-        expect(long.error?.issues[0]?.path).toEqual(["options", "hideSeconds"]);
-        expect(english(long.error?.issues[0]?.message)).toBe("At most 90 seconds, half the event");
-        expect(catalog.presetSchema.safeParse(seek(catalog.MOST_HIDE_SECONDS, 6)).success).toBe(
+    it("brings it up in a three-minute event too, and lets it be as long as allowed", () => {
+        const preset = catalog
+            .readEventsConfig({
+                [catalog.EVENTS_KEY]: { presets: [seek(75, 3)], settings: { defaults: 9 } }
+            })
+            .presets.find((one) => one.id === "seek")!;
+        expect((preset.options as catalog.EventOptions<"hide-and-seek">).hideSeconds).toBe(90);
+        expect(catalog.presetSchema.safeParse(preset).success).toBe(true);
+        // The hiding no longer comes out of the seeking: any time to hide fits.
+        expect(catalog.presetSchema.safeParse(seek(catalog.MOST_HIDE_SECONDS, 3)).success).toBe(
             true
         );
+        expect(catalog.presetSchema.safeParse(seek(catalog.MOST_HIDE_SECONDS + 1)).success).toBe(
+            false
+        );
+        expect(catalog.presetSchema.safeParse(seek(14)).success).toBe(false);
+    });
+});
+
+describe("hide and seek's time to seek", () => {
+    type Seek = catalog.EventPreset & { options: catalog.EventOptions<"hide-and-seek"> };
+    const seek = (options: Partial<catalog.EventOptions<"hide-and-seek">> = {}, minutes = 7) => {
+        const preset = catalog.newPreset("hide-and-seek", "seek") as Seek;
+        return { ...preset, minutes, options: { ...preset.options, ...options } } as Seek;
+    };
+    const read = (preset: Seek, defaults: number) =>
+        catalog
+            .readEventsConfig({
+                [catalog.EVENTS_KEY]: { presets: [preset], settings: { defaults } }
+            })
+            .presets.find((one) => one.id === "seek")!
+            .options as catalog.EventOptions<"hide-and-seek">;
+
+    it("follows the arena's size by default, after the whole time to hide", () => {
+        const fresh = seek();
+        expect(fresh.options.seekMinutes).toBe("auto");
+        // By who joined: 3, 4 or 5 rooms a side, 5, 7 or 9 minutes to seek.
+        expect(catalog.playSeconds(fresh, 4)).toBe(90 + 5 * 60);
+        expect(catalog.playSeconds(fresh, 12)).toBe(90 + 7 * 60);
+        expect(catalog.playSeconds(fresh, 30)).toBe(90 + 9 * 60);
+        // A size chosen by hand wins over the count.
+        expect(catalog.playSeconds(seek({ house: "large" }), 2)).toBe(90 + 9 * 60);
+        // Before anybody joined, the smallest: what the screen and the draw plan for.
+        expect(catalog.runMinutes(fresh)).toBe(Math.ceil((90 + 5 * 60) / 60));
+        // Set by hand: those minutes to seek, after the hiding.
+        const set = seek({ seekMinutes: 12, hideSeconds: 60 });
+        expect(catalog.playSeconds(set, 30)).toBe(60 + 12 * 60);
+        expect(catalog.presetSchema.safeParse(seek({ seekMinutes: 0 })).success).toBe(false);
+        expect(catalog.presetSchema.safeParse(seek({ seekMinutes: 61 })).success).toBe(false);
+        // Every other kind plays its minutes.
+        expect(catalog.playSeconds(catalog.newPreset("spleef", "s"))).toBe(
+            catalog.newPreset("spleef", "s").minutes * 60
+        );
+    });
+
+    it("moves a saved one to automatic only while it is on the old default length", () => {
+        const old = (minutes: number, hideSeconds = 75) => {
+            const preset = seek({ hideSeconds }, minutes);
+            const { seekMinutes: _gone, ...options } = preset.options;
+            return { ...preset, options } as unknown as Seek;
+        };
+        expect(read(old(7), 9).seekMinutes).toBe("auto");
+        // A length somebody chose keeps its whole length: the hiding comes off it.
+        expect(read(old(15), 9).seekMinutes).toBe(Math.round((15 * 60 - 75) / 60));
+        expect(read(old(3, 45), 7).seekMinutes).toBe(2);
+        expect(read(old(60, 15), 9).seekMinutes).toBe(catalog.SEEK_MINUTES.max);
+        // Saved since: whatever it says is kept.
+        expect(read(seek({ seekMinutes: 4 }, 7), catalog.DEFAULTS_VERSION).seekMinutes).toBe(4);
+        expect(read(old(15), catalog.DEFAULTS_VERSION).seekMinutes).toBe("auto");
     });
 });
 
@@ -1194,5 +1264,38 @@ describe("a duel or a capture the flag saved when players were sent back at a fe
         expect(read.presets[0]!.options).toMatchObject({ kit: "iron" });
         for (const preset of read.presets.slice(0, 2))
             expect(preset.options).not.toHaveProperty("downHearts");
+    });
+});
+
+describe("the king of the ring's size", () => {
+    const ring = (radius: number, fistsOnly: boolean) => {
+        const preset = catalog.newPreset("king-of-the-hill", "ring");
+        return { ...preset, options: { ...preset.options, radius, fistsOnly } };
+    };
+    const read = (defaults: number, radius: number, fistsOnly = true) =>
+        (
+            catalog
+                .readEventsConfig({
+                    [catalog.EVENTS_KEY]: {
+                        presets: [ring(radius, fistsOnly)],
+                        settings: { defaults }
+                    }
+                })
+                .presets.find((one) => one.id === "ring")!
+                .options as catalog.EventOptions<"king-of-the-hill">
+        ).radius;
+
+    it("is ten across now, the old six brought up once, a size chosen since kept", () => {
+        expect(catalog.RING_RADIUS).toBe(10);
+        expect(
+            (
+                catalog.newPreset("king-of-the-hill", "x")
+                    .options as catalog.EventOptions<"king-of-the-hill">
+            ).radius
+        ).toBe(10);
+        expect(read(9, 6)).toBe(10);
+        expect(read(9, 8)).toBe(8);
+        expect(read(9, 6, false)).toBe(6);
+        expect(read(catalog.DEFAULTS_VERSION, 6)).toBe(6);
     });
 });

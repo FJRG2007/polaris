@@ -29,6 +29,7 @@ import * as written from "../messages";
 import * as commands from "../commands";
 import type * as stored from "../state";
 import * as hitsService from "./hits-service";
+import * as build from "./build-battle";
 import * as said from "./hide-and-seek-messages";
 import type { ArenaGame, KindContext } from "./arena-game";
 
@@ -114,12 +115,14 @@ function memoryOf(runId: string): Memory {
     return memory;
 }
 
-/** Who seeks from the start: drawn from the run's id among who was brought in. */
-function firstSeekers(run: stored.EventRun): string[] {
+/** Who seeks from the start: drawn from the run's id among who was brought in,
+ *  not whoever sought first last time when there are others. */
+export function firstSeekers(run: stored.EventRun): string[] {
     return hs.seekersFor(
         run.id,
         run.entrants.map((one) => one.name),
-        optionsOf(run).seekers
+        optionsOf(run).seekers,
+        run.seekersBefore
     );
 }
 
@@ -275,7 +278,10 @@ async function tick(ctx: KindContext, lines: string[]): Promise<string | null> {
                 countedAt: start
             })
     );
-    const releaseAt = start + options.hideSeconds * 1000;
+    const planned = start + options.hideSeconds * 1000;
+    if (!state.released && state.allReadyAt === null && now < planned)
+        readyTick(ctx, state, here, planned, lines, await ctx.chat());
+    const releaseAt = state.allReadyAt ?? planned;
 
     // The seekers let out: the cage down, their sight and legs back.
     if (!state.released && now >= releaseAt) {
@@ -289,15 +295,17 @@ async function tick(ctx: KindContext, lines: string[]): Promise<string | null> {
     }
 
     // Every hider on the server hidden for the time since the last look - at
-    // most two ticks' worth, so a stall is not counted as hiding.
+    // most two ticks' worth, so a stall is not counted as hiding - once the
+    // seekers are out: the time to hide is everybody's, and worth nothing.
     const elapsed = Math.max(
         0,
-        Math.min(now - (state.countedAt ?? start), 2 * ctx.tickSeconds * 1000)
+        Math.min(now - Math.max(state.countedAt ?? start, releaseAt), 2 * ctx.tickSeconds * 1000)
     );
     state.countedAt = now;
-    for (const one of run.entrants)
-        if (!hs.seeks(state, one.name) && here.has(lower(one.name)))
-            state.hidden[one.name] = (state.hidden[one.name] ?? 0) + elapsed;
+    if (state.released)
+        for (const one of run.entrants)
+            if (!hs.seeks(state, one.name) && here.has(lower(one.name)))
+                state.hidden[one.name] = (state.hidden[one.name] ?? 0) + elapsed;
 
     // Found: a hider hurt by a seeker - the one the game says, or else beside
     // a seeker who struck.
@@ -387,11 +395,18 @@ async function tick(ctx: KindContext, lines: string[]): Promise<string | null> {
             arena.actionbarTo(
                 one.name,
                 !seeking
-                    ? seekMessages.hiddenBar(
-                          (state.hidden[one.name] ?? 0) / 1000,
-                          hiders.length,
-                          language
-                      ) + boost
+                    ? (state.released
+                          ? seekMessages.hiddenBar(
+                                (state.hidden[one.name] ?? 0) / 1000,
+                                hiders.length,
+                                language
+                            )
+                          : seekMessages.hideBar(
+                                (releaseAt - now) / 1000,
+                                readyHere(state, here),
+                                hidersHere(state, here).length,
+                                language
+                            )) + boost
                     : state.released
                       ? seekMessages.seekBar(hiders.length, language)
                       : seekMessages.waitBar((releaseAt - now) / 1000, language)
@@ -399,8 +414,16 @@ async function tick(ctx: KindContext, lines: string[]): Promise<string | null> {
         );
     }
     lines.push(
+        // One countdown for everybody: the time left to hide, then the time
+        // left in the game.
         `bossbar set ${commands.BAR} name ${commands.text(
-            seekMessages.bar(hiders.length, messages.clock((run.endsAt - now) / 1000), language)
+            state.released
+                ? seekMessages.bar(
+                      hiders.length,
+                      messages.clock((ctx.run.endsAt - now) / 1000),
+                      language
+                  )
+                : seekMessages.hidingBar(messages.clock((releaseAt - now) / 1000), language)
         )}`,
         ...arena.keepThrown(box),
         // Anything the house itself let fall - a block a seeker knocked loose -
@@ -417,6 +440,78 @@ async function tick(ctx: KindContext, lines: string[]): Promise<string | null> {
     ctx.run = { ...ctx.run, game: state, points: Object.fromEntries(scores) };
     await ctx.persist();
     return hiders.length === 0 ? said.ALL_FOUND : null;
+}
+
+/** The hiders on the server, by their names as they joined. */
+function hidersHere(state: hs.SeekState, here: ReadonlyMap<string, unknown>): string[] {
+    return [...here.keys()].filter((name) => !hs.seeks(state, name));
+}
+
+/** How many hiders on the server are ready. */
+function readyHere(state: hs.SeekState, here: ReadonlyMap<string, unknown>): number {
+    const ready = new Set(state.ready.map(lower));
+    return hidersHere(state, here).filter((name) => ready.has(lower(name))).length;
+}
+
+/**
+ * The [Ready] button while the seekers wait, the build battle's [Done] by
+ * another name: offered to each hider once, read with the join buttons'
+ * trigger (or typed `done` / `undo`), taken back with [Not yet] until every
+ * hider on the server is ready. Then the rest of the time to hide is skipped
+ * - the seekers come out now, and the run ends as much earlier, so the time to
+ * seek is the same - and that is written down, so nobody can take it back.
+ */
+function readyTick(
+    ctx: KindContext,
+    state: hs.SeekState,
+    here: ReadonlyMap<string, unknown>,
+    planned: number,
+    lines: string[],
+    chat: readonly { name: string; text: string }[] | null
+): void {
+    const language = ctx.language;
+    const tag = messages.tag(language);
+    const hiders = new Map(
+        ctx.run.entrants
+            .filter((one) => !hs.seeks(state, one.name))
+            .map((one) => [lower(one.name), one.name])
+    );
+    const offer = (lead: string, name: string) =>
+        commands.buttonsLine(name, tag + lead, [
+            {
+                ...seekMessages.readyOffer(language).ready,
+                color: "green",
+                value: commands.DONE_VALUE
+            }
+        ]);
+    if (!state.readyOffered) {
+        lines.push(...commands.joinTriggerLines());
+        for (const name of hiders.values())
+            lines.push(offer(seekMessages.readyOffer(language).lead, name));
+        state.readyOffered = true;
+    }
+    for (const said of chat ?? []) {
+        const name = hiders.get(lower(said.name));
+        const word = build.readDone(said.text);
+        if (!name || !word) continue;
+        const marked = state.ready.some((one) => lower(one) === lower(name));
+        if (word === "done" && !marked) {
+            state.ready = [...state.ready, name];
+            const back = seekMessages.readyMarked(language);
+            lines.push(
+                commands.buttonsLine(name, tag + back.lead, [
+                    { ...back.undo, color: "gray", value: commands.UNDO_VALUE }
+                ])
+            );
+        } else if (word === "undo" && marked) {
+            state.ready = state.ready.filter((one) => lower(one) !== lower(name));
+            lines.push(offer(seekMessages.readyUndone(language), name));
+        }
+    }
+    if (!build.everybodyDone([...hiders.values()], new Set(here.keys()), state.ready)) return;
+    state.allReadyAt = ctx.now;
+    ctx.run = { ...ctx.run, endsAt: ctx.run.endsAt - Math.max(0, planned - ctx.now) };
+    lines.push(commands.say(tag + seekMessages.allReady(language)));
 }
 
 /** What the server can show, asked once before the house is built. */
@@ -462,6 +557,11 @@ export const hideAndSeek: ArenaGame = {
             hs.stateOf(run.game),
             run.entrants.map((one) => one.name)
         ),
+    tiebreak: (run) =>
+        hs.tiebreakOf(
+            hs.stateOf(run.game),
+            run.entrants.map((one) => one.name)
+        ),
     resultLines: (run, language) => {
         const state = hs.stateOf(run.game);
         if (!state) return [];
@@ -483,6 +583,7 @@ export const hideAndSeek: ArenaGame = {
     // Not on at the end: the radar and what the game gave them are taken off when they are next.
     owedLines: (_run, name) => [
         { reason: "radar", lines: [radarLine(name, hs.RADAR_RESET)] },
-        { reason: "effects", lines: hs.effectsOff(name) }
+        { reason: "effects", lines: hs.effectsOff(name) },
+        { reason: "seek-sides", lines: hs.sideTagsOff(name) }
     ]
 };

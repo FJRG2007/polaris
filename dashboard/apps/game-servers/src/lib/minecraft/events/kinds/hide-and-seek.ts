@@ -103,8 +103,6 @@ export const MOST = 12;
 /** How far from its center the ground under it is judged. */
 export const REACH = Math.ceil(SIZE / 2);
 
-/** What a find is worth to its seeker: half a minute hidden. */
-export const FIND_POINTS = 30;
 /** How close a seeker who struck must be to a hider who was hurt. */
 export const FIND_REACH = 5;
 
@@ -1669,11 +1667,39 @@ export function seekerSpot(box: Box, mirror: Mirror, index: number, design = DES
 // ------------------------------------------------------------------ the game
 
 /** Who seeks first: drawn from the run's id among the players, in the order of
- *  their names; never everybody. */
-export function seekersFor(seed: string, names: readonly string[], wanted: number): string[] {
+ *  their names; never everybody. `before` is who sought first in earlier games,
+ *  the latest first: anybody not in it is drawn before anybody in it, and of
+ *  those in it whoever sought longest ago goes first, so the seeker rotates
+ *  through the group instead of the same player seeking game after game. */
+export function seekersFor(
+    seed: string,
+    names: readonly string[],
+    wanted: number,
+    before: readonly string[] = []
+): string[] {
     const count = Math.max(1, Math.min(wanted, names.length - 1));
     const sorted = [...names].sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()));
-    return shuffled(sorted, seeded(`${seed}-seekers`)).slice(0, count);
+    const drawn = shuffled(sorted, seeded(`${seed}-seekers`));
+    const recent = before.map((one) => one.toLowerCase());
+    const when = (one: string) => recent.indexOf(one.toLowerCase());
+    const fresh = drawn.filter((one) => when(one) < 0);
+    // Longest ago (furthest down the list) first; a stable sort keeps the draw.
+    const repeat = drawn.filter((one) => when(one) >= 0).sort((a, b) => when(b) - when(a));
+    return [...fresh, ...repeat].slice(0, count);
+}
+
+/** The seekers remembered for the next draw (`seekersFor`): this game's
+ *  first, then the earlier ones not among them, at most `REMEMBERED`. */
+export const REMEMBERED = 16;
+export function rememberSeekers(latest: readonly string[], earlier: readonly string[]): string[] {
+    const seen = new Set<string>();
+    const out: string[] = [];
+    for (const one of [...latest, ...earlier]) {
+        if (seen.has(one.toLowerCase())) continue;
+        seen.add(one.toLowerCase());
+        out.push(one);
+    }
+    return out.slice(0, REMEMBERED);
 }
 
 /**
@@ -1713,6 +1739,13 @@ export const stateSchema = z.object({
     finds: z.array(findSchema).default([]),
     /** Whether the cage has come down. */
     released: z.boolean().default(false),
+    /** The hiders who pressed [Ready] while the seekers wait, and whether
+     *  the button was offered. */
+    ready: z.array(z.string()).default([]),
+    readyOffered: z.boolean().default(false),
+    /** When every hider was ready, and the seekers let out then: set once,
+     *  never taken back. */
+    allReadyAt: z.number().nullable().default(null),
     /** Milliseconds each hider has been hidden and on the server, by name. */
     hidden: z.record(z.number()).default({}),
     /** When the hidden time was last added to. */
@@ -1747,21 +1780,39 @@ export function seeks(state: SeekState, name: string): boolean {
     );
 }
 
-/** The scores: a point a second hidden, `FIND_POINTS` a find. */
+/**
+ * The scores: a point for taking part, and a point a second hidden once the
+ * seekers are let out. The winner is whoever stayed hidden longest - the last
+ * found, or still hidden at the end - and everybody else follows by the time
+ * they stayed hidden; finds only break a tie (`tiebreakOf`). Before, a find was
+ * worth half a minute, and a hider found early who then found others stood
+ * over the last one found: what the players read as the wrong winner.
+ */
 export function scoresOf(state: SeekState | null, names: readonly string[]): Map<string, number> {
-    return new Map(
-        names.map((name) => {
-            const hidden = Math.floor((state?.hidden[name] ?? 0) / 1000);
-            const finds =
-                state?.finds.filter((one) => one.by.toLowerCase() === name.toLowerCase()).length ??
-                0;
-            return [name, hidden + finds * FIND_POINTS];
-        })
+    return new Map(names.map((name) => [name, 1 + Math.floor((state?.hidden[name] ?? 0) / 1000)]));
+}
+
+/** What breaks a tie on time hidden, the lower the better: more finds. */
+export function tiebreakOf(
+    state: SeekState | null,
+    names: readonly string[]
+): Record<string, number> {
+    return Object.fromEntries(
+        names.map((name) => [
+            name,
+            -(state?.finds.filter((one) => one.by.toLowerCase() === name.toLowerCase()).length ?? 0)
+        ])
     );
 }
 
-/** The two sides, each blind to the other's names, nobody hurting their own. */
+/** The two sides, each blind to the other's names, nobody hurting their own,
+ *  nobody blocking anybody's way (`collisionRule never`). A hider's name is
+ *  shown to nobody, through a wall least of all. */
 export const TEAMS = ["pe_hs_seek", "pe_hs_hide"] as const;
+/** Each side's tag as well as its team: the Polaris mod withholds a hider from
+ *  a seeker who cannot see them (`EventSeek.java`) by either, and a player on
+ *  one of the server's own teams never joins ours. */
+export const SIDE_TAGS = ["pe_seeker", "pe_hider"] as const;
 export const DEALT = "pe_hsd";
 export const TAKEN = "pe_hst";
 export const READ_DEALT = `execute as @a run scoreboard players get @s ${DEALT}`;
@@ -1775,7 +1826,8 @@ export function setupLines(names: readonly [string, string]): string[] {
             `team add ${team} ${JSON.stringify({ text: names[index] })}`,
             `team modify ${team} color ${index === 0 ? "red" : "green"}`,
             `team modify ${team} friendlyFire false`,
-            `team modify ${team} nametagVisibility hideForOtherTeams`
+            `team modify ${team} nametagVisibility ${index === 0 ? "hideForOtherTeams" : "never"}`,
+            `team modify ${team} collisionRule never`
         );
     });
     for (const [objective, criterion] of [
@@ -1794,6 +1846,7 @@ export { RADAR_OFF, RADAR_RESET } from "./radar";
 
 export const TEARDOWN = [
     ...TEAMS.map((team) => `team remove ${team}`),
+    ...SIDE_TAGS.map((tag) => `tag @a[tag=${tag}] remove ${tag}`),
     ...[DEALT, TAKEN].map((objective) => `scoreboard objectives remove ${objective}`),
     ...hits.TAGS_OFF,
     ...doors.TEARDOWN,
@@ -1801,14 +1854,24 @@ export const TEARDOWN = [
 ];
 
 /** Onto a side's team, only if they are on none of the server's own - or, found,
- *  from the hiders' onto the seekers'. */
+ *  from the hiders' onto the seekers' - and its tag, whatever their team. */
 export function joinSide(name: string, seeker: boolean): string[] {
     return seeker
         ? [
               `execute if entity @a[name=${name},team=] run team join ${TEAMS[0]} ${name}`,
-              `execute if entity @a[name=${name},team=${TEAMS[1]}] run team join ${TEAMS[0]} ${name}`
+              `execute if entity @a[name=${name},team=${TEAMS[1]}] run team join ${TEAMS[0]} ${name}`,
+              `tag ${name} remove ${SIDE_TAGS[1]}`,
+              `tag ${name} add ${SIDE_TAGS[0]}`
           ]
-        : [`execute if entity @a[name=${name},team=] run team join ${TEAMS[1]} ${name}`];
+        : [
+              `execute if entity @a[name=${name},team=] run team join ${TEAMS[1]} ${name}`,
+              `tag ${name} add ${SIDE_TAGS[1]}`
+          ];
+}
+
+/** A side's tags off one player who was not on when it ended. */
+export function sideTagsOff(name: string): string[] {
+    return SIDE_TAGS.map((tag) => `tag ${name} remove ${tag}`);
 }
 
 /** A seeker before the cage comes down: blind, and unable to walk. */

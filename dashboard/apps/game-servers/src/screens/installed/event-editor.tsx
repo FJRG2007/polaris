@@ -1275,7 +1275,9 @@ export function EventEditor({
                         {draft.kind !== "trivia" &&
                             draft.kind !== "waves" &&
                             draft.kind !== "village-defense" &&
-                            draft.kind !== "gathering" && (
+                            draft.kind !== "gathering" &&
+                            // Hide and seek sets its time to seek with its options.
+                            draft.kind !== "hide-and-seek" && (
                                 <Field
                                     label={
                                         draft.kind === "build-battle"
