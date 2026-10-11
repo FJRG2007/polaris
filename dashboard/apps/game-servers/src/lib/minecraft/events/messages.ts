@@ -172,8 +172,8 @@ const RULES: Readonly<Record<EventKind, Text>> = {
         es: "Hay un pez legendario enganchado. Cada captura lo agota; gana quien más haya pescado cuando lo saquéis."
     },
     "nether-maze": {
-        en: "Find the room in the middle of the maze. Fire, magma and lava send you back to the start.",
-        es: "Encuentra la sala del centro del laberinto. El fuego, el magma y la lava te devuelven a la salida."
+        en: "Climb the maze floor by floor to the room in the middle of the top one. Fire, magma, lava and the doorway flames send you back; soul sand slows you down.",
+        es: "Sube el laberinto planta a planta hasta la sala del centro de la última. El fuego, el magma, la lava y las llamas de las puertas te devuelven; la arena de almas te frena."
     },
     "acid-rain": {
         en: "Stay under cover: the rain fills your acid bar, and full you are out. It comes in waves and eats roofs; patch yours, and in each calm run for the glowing supplies. Your pickaxe breaks any shelter, yours or anybody else's.",

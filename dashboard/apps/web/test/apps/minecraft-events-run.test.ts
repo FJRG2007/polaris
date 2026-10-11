@@ -12793,7 +12793,7 @@ describe("a deadly nether maze", () => {
                 (line) =>
                     line.startsWith(
                         "execute as @a[tag=pe_in,scores={pe_mback=1..}] run tellraw @s"
-                    ) && visible(line).includes("back to the starting room")
+                    ) && visible(line).includes("back to where this floor starts")
             )
         ).toBe(true);
         expect(scores("pe_mback").Ben).toBe(0);
@@ -12808,11 +12808,11 @@ describe("a deadly nether maze", () => {
         expect(told("Ben", radarKit.RADAR_OFF)).toHaveLength(1);
         expect(told("Ana", radarKit.RADAR_OFF)).toEqual([]);
 
-        // Ana in the middle, finished.
+        // Ana in the middle of the top floor, finished.
         const middle = { x: built.goal.x1 + 1.5, z: built.goal.z1 + 1.5 };
-        world.at.Ana = [middle.x, built.floor + 1, middle.z];
+        world.at.Ana = [middle.x, built.goalFloor + 1, middle.z];
         // Ben made it to the middle's door, not finished: every room counts.
-        world.at.Ben = [middle.x + 1, built.floor + 1, middle.z];
+        world.at.Ben = [middle.x + 1, built.goalFloor + 1, middle.z];
         scores("pe_mfin").Ana = Math.floor(Date.now() / 50) % 2147483647;
         const rooms = mazeKind.roomsToGo(built);
         await play(2_100);
@@ -12846,6 +12846,8 @@ describe("a deadly nether maze", () => {
                 )
         ).toBe(true);
         expect(told("Ana", radarKit.RADAR_RESET)).toHaveLength(1);
+        // Off the racers' team - their name tags back - on the way home.
+        expect(world.sent.slice(beforeLeaving)).toContain(mazeKind.leaveTeam("Ben"));
         for (const line of mazeKind.stopLines(built.boxes)) expect(world.sent).toContain(line);
         for (const line of mazeKind.SCORES_REMOVED) expect(world.sent).toContain(line);
         expect(world.inside.size).toBe(0);
