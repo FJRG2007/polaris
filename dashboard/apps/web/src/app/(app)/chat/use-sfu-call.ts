@@ -1585,7 +1585,7 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
             // Fetched now rather than imported: see `livekit` above. It is one
             // request, cached, and it happens while the browser is already
             // waiting on the ticket.
-            const { ParticipantEvent, Room, RoomEvent } = await livekit();
+            const { ConnectionState, ParticipantEvent, Room, RoomEvent } = await livekit();
             if (stopped) {
                 connecting = false;
                 return;
@@ -1741,11 +1741,14 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
                     resortStates();
                     // Gone now, which the roster only says once the seat is
                     // swept - see `call-arrivals`.
-                    if (presence.current) {
+                    queueMicrotask(() => {
+                        if (stopped || !presence.current) return;
+                        if (joined.state !== ConnectionState.Connected) return;
+                        if (joined.remoteParticipants.has(participant.identity)) return;
                         announceChange(
                             arrivals.fromMediaLeft(presence.current, participant.identity)
                         );
-                    }
+                    });
                 })
                 .on(RoomEvent.ActiveSpeakersChanged, onSpeakers)
                 // A moderator's mute lifted reaches the media server's side of

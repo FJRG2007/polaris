@@ -60,11 +60,18 @@ export function ControlHint({
         const button = anchor.current?.getBoundingClientRect();
         const own = box.current?.getBoundingClientRect();
         if (!button || !own) return;
-        setAt(placeHint(button, own, { width: window.innerWidth, height: window.innerHeight }));
+        const next = placeHint(button, own, { width: window.innerWidth, height: window.innerHeight });
+        setAt((current) =>
+            current && next && current.left === next.left && current.top === next.top
+                ? current
+                : next
+        );
     }, [anchor]);
 
+    const text = hint?.text;
+    const tone = hint?.tone;
     useLayoutEffect(() => {
-        if (!hint) {
+        if (text === undefined) {
             setAt(null);
             return;
         }
@@ -80,7 +87,7 @@ export function ControlHint({
             window.removeEventListener("resize", place);
             window.removeEventListener("scroll", place, true);
         };
-    }, [hint, anchor, place]);
+    }, [text, tone, anchor, place]);
 
     if (!hint || typeof document === "undefined") return null;
     return createPortal(
