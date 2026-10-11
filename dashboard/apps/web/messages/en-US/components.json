@@ -513,7 +513,7 @@
     },
     "build": {
         "title": "Polaris has been updated",
-        "body": "This tab is still running the previous version. Reload when you are ready - anything half-written on this page is lost{call, select, yes {, though you will come straight back into your call} other {}}.",
+        "body": "This tab is still on the previous version. It reloads by itself as soon as nothing is in progress, or reload now{call, select, yes { - you will come straight back into your call} other { - anything half-written on this page is lost}}.",
         "reload": "Reload",
         "hide": "Hide until something needs it",
         "later": "Later"

@@ -8,10 +8,15 @@
  * So the tab asks, on a slow timer and whenever it comes back to the foreground,
  * and says so the moment the answer changes.
  *
- * It offers rather than acts. A reload costs whatever is half-written on the
- * screen - a message, a task, a form - so the tab keeps working on the old build
- * for as long as the reader wants it to, and this waits in the corner stack the
- * shell lays out - above a ringing call rather than over it, which is what two
+ * When reloading would cost nothing (see `lib/reload-safety`), the tab takes the
+ * update by itself, at a moment nobody is looking: as soon as it goes to the
+ * background, or after a couple of minutes with no hand on it. (A link pressed
+ * on the old bundle needs nothing from here: the router sees the server's build
+ * differ from its own and loads the page in full.) Never during a call, a
+ * recording, a transfer, media playing or anything half-typed - then it offers
+ * rather than acts, because a reload costs whatever is half-written on the
+ * screen, and the tab keeps working on the old build for as long as the reader
+ * wants it to. The offer waits in the corner stack the shell lays out - above a ringing call rather than over it, which is what two
  * cards that each pinned themselves to the same corner used to do. The one
  * thing it does not do is go away by itself: dismissing hides it for this tab,
  * and the next failed action brings it straight back, because by then it is the
@@ -31,10 +36,33 @@ import {
     subscribeToBuild,
     watchForStaleFailures
 } from "@/lib/new-build";
+import { reloadNow, safeToReload } from "@/lib/reload-safety";
 
 /** Slow on purpose. Nothing here is urgent - the failure it prevents needs the
  *  reader to click something first - and every open tab pays for it. */
 const POLL_MS = 2 * 60 * 1000;
+
+/** How long a visible tab has to sit untouched before it updates by itself. */
+const IDLE_MS = 2 * 60 * 1000;
+
+/** Where the tab remembers taking an update by itself. During a rollover two
+ *  builds answer side by side, and a reload can land on the old one and see the
+ *  new one again; this keeps that from becoming a loop. */
+const AUTO_KEY = "polaris.autoBuildReloadAt";
+const AUTO_COOLDOWN_MS = 10 * 60 * 1000;
+
+/** Claim the one automatic reload this tab gets per cooldown. False when it was
+ *  already spent, or when storage is refused and the claim cannot be kept. */
+function claimAutoReload(): boolean {
+    try {
+        const last = Number(window.sessionStorage.getItem(AUTO_KEY) ?? "0");
+        if (Number.isFinite(last) && Date.now() - last < AUTO_COOLDOWN_MS) return false;
+        window.sessionStorage.setItem(AUTO_KEY, String(Date.now()));
+        return true;
+    } catch {
+        return false;
+    }
+}
 
 export function NewBuildBanner({ served }: { served: string | null }) {
     const t = useTranslations("components");
@@ -84,6 +112,38 @@ export function NewBuildBanner({ served }: { served: string | null }) {
     useEffect(() => {
         if (ready) setDismissed(false);
     }, [ready]);
+
+    // Taking the update by itself. A call is never interrupted for it: the
+    // reader is in it, and walking back in is for when they chose the reload.
+    const inCall = Boolean(held?.session);
+    useEffect(() => {
+        if (!ready || inCall) return;
+        const quietly = () => {
+            if (safeToReload() && claimAutoReload()) reloadNow();
+        };
+        // In the background: nobody is looking, so the tab is fresh when they come back.
+        const onHide = () => {
+            if (document.visibilityState === "hidden") quietly();
+        };
+        if (document.visibilityState === "hidden") quietly();
+        document.addEventListener("visibilitychange", onHide);
+
+        // Untouched for a while in the foreground - unless they said Later.
+        let idle: ReturnType<typeof setTimeout> | null = null;
+        const rearm = () => {
+            if (idle) clearTimeout(idle);
+            idle = dismissed ? null : setTimeout(quietly, IDLE_MS);
+        };
+        const activity = ["pointerdown", "keydown", "wheel", "touchstart"] as const;
+        for (const name of activity) window.addEventListener(name, rearm, { passive: true });
+        rearm();
+
+        return () => {
+            if (idle) clearTimeout(idle);
+            document.removeEventListener("visibilitychange", onHide);
+            for (const name of activity) window.removeEventListener(name, rearm);
+        };
+    }, [ready, inCall, dismissed]);
 
     if (!ready || dismissed) return null;
 

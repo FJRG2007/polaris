@@ -513,7 +513,7 @@
     },
     "build": {
         "title": "Polaris se ha actualizado",
-        "body": "Esta pestaña sigue con la versión anterior. Recarga cuando quieras: se pierde lo que tengas a medio escribir en esta página{call, select, yes {, aunque volverás directamente a tu llamada} other {}}.",
+        "body": "Esta pestaña sigue con la versión anterior. Se recarga sola en cuanto no haya nada a medias, o recarga ahora{call, select, yes {: volverás directamente a tu llamada} other {: se pierde lo que tengas a medio escribir en esta página}}.",
         "reload": "Recargar",
         "hide": "Ocultar hasta que haga falta",
         "later": "Luego"

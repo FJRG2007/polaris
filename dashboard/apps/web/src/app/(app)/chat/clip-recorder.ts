@@ -29,6 +29,7 @@ import { micGain } from "./mic-gain";
 import { canShareScreen } from "./call-media";
 import { filterMic, type FilteredMic } from "./mic-filter";
 import { micCleanup, micConstraints } from "./mic-cleanup";
+import { holdReload } from "@/lib/reload-safety";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { recordingExtension, recordingType } from "./recording-format";
 
@@ -153,6 +154,8 @@ interface Machinery {
 
 export function useClipRecorder(options: { maxBytes: number }): ClipRecording {
     const [stage, setStage] = useState<ClipStage>("idle");
+    // Anything but idle is a clip somebody is making or has not sent yet.
+    useEffect(() => (stage === "idle" ? undefined : holdReload()), [stage]);
     const [seconds, setSeconds] = useState(0);
     const [file, setFile] = useState<File | null>(null);
     const [preview, setPreview] = useState<string | null>(null);
