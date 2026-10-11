@@ -142,15 +142,32 @@ describe("the seasons sweep", () => {
         expect(sent).toEqual([]);
     });
 
-    it("leaves a server whose jar cannot decorate alone for a while", async () => {
+    it("leaves a server with no Polaris jar alone for a while", async () => {
         const { sweepSeasons } = await service();
+        answer = "other";
         caps = new Set();
         await sweepSeasons(HALLOWEEN);
+        answer = "polaris";
         caps = new Set(["season"]);
         await sweepSeasons(new Date(HALLOWEEN.getTime() + 2 * 60_000));
         expect(sent).toEqual([]);
         await sweepSeasons(new Date(HALLOWEEN.getTime() + 31 * 60_000));
         expect(sent).toEqual(["polaris season set halloween 3600"]);
+    });
+
+    it("decorates within a pass of a restart onto a jar that can", async () => {
+        // The operator updates Polaris, then restarts the server onto the newer jar
+        // it keeps there. The pass before the restart found the older jar; the one
+        // after it must not wait half an hour to notice.
+        const { sweepSeasons, seasonalView } = await service();
+        caps = new Set(["stash"]);
+        await sweepSeasons(HALLOWEEN);
+        caps = new Set(["stash", "season"]);
+        await sweepSeasons(new Date(HALLOWEEN.getTime() + 60_000));
+        expect(sent).toEqual([]);
+        await sweepSeasons(new Date(HALLOWEEN.getTime() + 2 * 60_000 - 5_000));
+        expect(sent).toEqual(["polaris season set halloween 3600"]);
+        expect(await seasonalView(INSTALL)).toMatchObject({ needsRestart: false });
     });
 
     it("asks a console that did not answer again on the next pass", async () => {
