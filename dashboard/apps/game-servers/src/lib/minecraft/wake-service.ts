@@ -25,6 +25,7 @@
  * not keep waking an empty world.
  */
 
+import { heldByCopies } from "../duplicate-busy";
 import { prisma } from "@polaris/db";
 import { routesByHostname } from "@polaris/core";
 import { readSchedule, scheduleModeAt, wakesOnJoin, WOKEN_AT_KEY } from "./schedule";
@@ -92,6 +93,9 @@ export async function wakeForJoin(hostname: string, now: Date = new Date()): Pro
     const server = await serverNamed(hostname);
     if (!server) return "unknown";
     if (!wakesOnJoin(server.config)) return "refused";
+    // Held by a copy: its files are being read, and a player knocking does not
+    // change that.
+    if ((await heldByCopies().catch(() => new Set<string>())).has(server.id)) return "refused";
 
     // "Keep stopped" is the one window that means it, and a player knocking is not
     // a reason to overrule the person who wrote it. Sleep and no schedule at all

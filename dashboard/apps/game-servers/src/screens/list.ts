@@ -16,6 +16,7 @@
 import { type GameId } from "@polaris/core";
 import type { GameKey } from "../../messages";
 import type { GameServerFacts, GameServerLive } from "../lib/games-service";
+import type { DuplicatePermission, DuplicateState } from "../lib/duplicate-plan";
 
 /** What the page knows about one server before anything is polled. */
 export interface GameServerSeed {
@@ -39,6 +40,11 @@ export interface GameServerSeed {
      *  with. */
     favorite: boolean;
     archived: boolean;
+    /** Whether THIS viewer may duplicate it, and why not when they may not. */
+    duplicate?: DuplicatePermission;
+    /** How far it has got, when it is a copy still being made or one that
+     *  stopped part-way. Null for every ordinary server. */
+    copy?: DuplicateState | null;
 }
 
 /** What a row is, as its two reads catch up with the seed. */

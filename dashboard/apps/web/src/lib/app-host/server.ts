@@ -65,6 +65,7 @@ import type {
 } from "@/lib/backups/sources/types";
 import type { SessionUser } from "@/lib/session";
 import type { TargetRow } from "@/lib/deploy/runtime";
+import type { InstallCopyProgress, InstallCopySource } from "@/lib/apps/install-duplicate";
 import type {
     CalendarLink,
     CalendarPerson,
@@ -99,6 +100,7 @@ const load = {
     appContainerMetrics: once(() => import("@/lib/app-container-metrics")),
     appsInstallAccess: once(() => import("@/lib/apps/install-access")),
     appsInstallConfig: once(() => import("@/lib/apps/install-config")),
+    appsInstallDuplicate: once(() => import("@/lib/apps/install-duplicate")),
     appsInstallPresence: once(() => import("@/lib/apps/install-presence")),
     appsInstallSecret: once(() => import("@/lib/apps/install-secret")),
     appsInstallService: once(() => import("@/lib/apps/install-service")),
@@ -212,6 +214,13 @@ export const serverHost = {
         installEnvSecret: later(load.appsInstallSecret, "installEnvSecret"),
         installEnvValue: later(load.appsInstallSecret, "installEnvValue"),
         readInstallEnvSecret: later(load.appsInstallSecret, "readInstallEnvSecret")
+    },
+    appsInstallDuplicate: {
+        copyInstallData: later(load.appsInstallDuplicate, "copyInstallData"),
+        createInstallCopy: later(load.appsInstallDuplicate, "createInstallCopy"),
+        measureInstallData: later(load.appsInstallDuplicate, "measureInstallData"),
+        readInstallCopySource: later(load.appsInstallDuplicate, "readInstallCopySource"),
+        verifyInstallCopy: later(load.appsInstallDuplicate, "verifyInstallCopy")
     },
     appsInstallService: {
         installApp: later(load.appsInstallService, "installApp"),
@@ -497,6 +506,8 @@ declare module "@polaris/app-host" {
         InstallAccessEntry: InstallAccessEntry;
         InstallAccessView: InstallAccessView;
         InstallConfig: InstallConfig;
+        InstallCopyProgress: InstallCopyProgress;
+        InstallCopySource: InstallCopySource;
         InstallSeed: InstallSeed;
         InstalledAppSetting: InstalledAppSetting;
         InstalledSlotHost: InstalledSlotHost;

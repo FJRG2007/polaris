@@ -1218,5 +1218,53 @@
         "noMatch": "No player online matches that.",
         "more": "{count} more. Type to narrow the list.",
         "useTyped": "Use \"{name}\""
+    },
+    "duplicate": {
+        "duplicate": "Duplicate",
+        "duplicateNamed": "Duplicate {name}",
+        "retry": "Try the copy again",
+        "retryNamed": "Try copying {name} again",
+        "stillCopying": "Still being copied",
+        "title": "Duplicate {name}",
+        "description": "A new server with the same game, settings, mods, world, schedules and player rules, on its own port and storage.",
+        "name": "Name of the copy",
+        "defaultName": "{name} copy",
+        "defaultNameNumbered": "{name} copy {count}",
+        "nameRequired": "Give the copy a name.",
+        "nameTooLong": "Keep the name to {max} characters.",
+        "nameTaken": "You already have a server called {name}. Pick another name.",
+        "nameTakenShort": "You already have a server with this name.",
+        "checking": "Checking the size of its files...",
+        "stopsWhileCopying": "The server stops while its files are copied and starts again when the copy is done.",
+        "sizes": "Its files take {need}; the machine has {free} free.",
+        "wontFit": "Its files take {need} and the machine has only {free} free. Free up space or remove old backups first.",
+        "sizeUnknown": "The server is off, so its size is checked when the copy starts.",
+        "whatChanges": "The copy gets its own address, port and passwords. Chat links are not copied.",
+        "cancel": "Cancel",
+        "confirm": "Duplicate",
+        "from": "Copy of {name}",
+        "progress": "Copy progress",
+        "cannotCreate": "You can't create servers, so you can't duplicate this one.",
+        "notOwner": "Only the person who created this server can duplicate it.",
+        "couldNotStart": "Couldn't start the copy. Try again.",
+        "nothingToRetry": "This server isn't a copy that stopped part-way.",
+        "alreadyCopying": "This server is already being copied. Wait for that copy to finish.",
+        "busy": "This server is being copied. It can be started once the copy is done.",
+        "stage": {
+            "preparing": "Preparing copy",
+            "stopping": "Stopping source",
+            "copying": "Copying files",
+            "starting": "Starting copy",
+            "failed": "Copy failed"
+        },
+        "failure": {
+            "noSpace": "Not enough disk space: the files take {need} and the machine has {free} free. Free up space, then try again.",
+            "copyFailed": "The files couldn't be copied. {name} is unchanged. Try again, or delete this copy.",
+            "timedOut": "The copy took too long and was stopped. {name} is unchanged. Try again.",
+            "wrongVolume": "The copy started on empty storage instead of the copied files. Delete this copy and duplicate again.",
+            "startFailed": "The files were copied but the server didn't start. Open it to see its log, or try again.",
+            "interrupted": "Polaris restarted during the copy. {name} was started again. Try again, or delete this copy.",
+            "neverDeployed": "This server has never started, so it has no files to copy. Start it once first."
+        }
     }
 }

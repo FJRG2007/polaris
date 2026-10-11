@@ -24,6 +24,7 @@ import { broadcastToMinecraft, getServerPlayers, runConsoleLine } from "./servic
 import { readPendingRestart } from "../games-restart";
 import { runDueRestart } from "../games-restart-service";
 import { gameServerCatalogIds } from "../game-catalog";
+import { heldByCopies } from "../duplicate-busy";
 import {
     CHECKED_AT_KEY,
     EMPTY_SINCE_KEY,
@@ -186,7 +187,11 @@ export async function sweepGameSchedules(
     let started = 0;
     let stopped = 0;
     let restarted = 0;
+    // A copy holding a server is the one thing a schedule must not undo: it would
+    // start the world while it is being read.
+    const held = pending.length === 0 ? new Set<string>() : await heldByCopies().catch(() => new Set<string>());
     for (const { install, config, schedule, waiting } of pending) {
+        if (held.has(install.id)) continue;
         const desiredState = desired.get(install.applicationId as string);
         if (desiredState === undefined) continue;
         const app = { desiredState };

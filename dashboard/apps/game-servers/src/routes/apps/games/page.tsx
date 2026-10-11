@@ -15,12 +15,15 @@ import { GamesView } from "../../../screens/games-view";
 import { isGameServerApp } from "../../../lib/games-service";
 import { adoptGameServersApp } from "../../../lib/game-install";
 import { NO_GAME_SERVER_PREFS, readGameServerPrefs } from "../../../lib/games-prefs";
+import { prisma } from "@polaris/db";
+import * as duplicatePlan from "../../../lib/duplicate-plan";
 import { host } from "@polaris/app-host";
 
 const { findApp } = host.appsCatalog;
 const { listInstalledApps } = host.appsInstallService;
 const { requirePermissionAny, userHasManage } = host.session;
 const { gamePermissionsFor, reachableInstallIds } = host.appsInstallAccess;
+const { readInstallConfig } = host.appsInstallConfig;
 
 export const dynamic = "force-dynamic";
 
@@ -45,7 +48,7 @@ export default async function GameServersPage() {
         )
     ]);
     const games = installs.filter((install) => isGameServerApp(install.catalogId));
-    const [prefs, held] = await Promise.all([
+    const [prefs, held, copying] = await Promise.all([
         // Where this person keeps each of them - starred, put away - read for the
         // whole list in one go. Theirs alone: the same server is one somebody else
         // may have archived, and neither of them decides that for the other.
@@ -53,7 +56,10 @@ export default async function GameServersPage() {
             user.id,
             games.map((install) => install.id)
         ),
-        Promise.all(games.map((install) => gamePermissionsFor(user, install.id)))
+        Promise.all(games.map((install) => gamePermissionsFor(user, install.id))),
+        // The copies still being made, and the ones that stopped part-way: their
+        // rows say how far they got instead of being an ordinary server.
+        copyStates(games.map((install) => install.id))
     ]);
     const servers = games.map((install, index) => {
         const pref = prefs.get(install.id) ?? NO_GAME_SERVER_PREFS;
@@ -69,9 +75,32 @@ export default async function GameServersPage() {
             // Deleting stays with whoever created it. "Manage this server"
             // was never an offer to take it off somebody.
             canRemove: install.ownerId === user.id || user.isAdmin,
+            // The same rule the duplicate action enforces, so the menu never
+            // offers a copy the action would refuse.
+            duplicate: duplicatePlan.duplicatePermission({
+                canCreate,
+                isOwner: install.ownerId === user.id,
+                isAdmin: user.isAdmin
+            }),
+            copy: copying.get(install.id) ?? null,
             favorite: pref.favorite,
             archived: pref.archived
         };
     });
     return <GamesView servers={servers} installed={installed !== null} canCreate={canCreate} />;
+}
+
+/** The copy state of each install that carries one, in one read. */
+async function copyStates(ids: readonly string[]): Promise<Map<string, duplicatePlan.DuplicateState>> {
+    if (ids.length === 0) return new Map();
+    const rows = await prisma.installedApp.findMany({
+        where: { id: { in: [...ids] }, config: { contains: `"${duplicatePlan.DUPLICATE_KEY}":{` } },
+        select: { id: true, config: true }
+    });
+    const states = new Map<string, duplicatePlan.DuplicateState>();
+    for (const row of rows) {
+        const state = duplicatePlan.readDuplicateState(readInstallConfig(row.config));
+        if (state) states.set(row.id, state);
+    }
+    return states;
 }

@@ -1143,6 +1143,34 @@ export async function setConsolePassword(
 }
 
 /**
+ * Write the console password the deploy already holds into the server's config,
+ * and restart it so the server takes it.
+ *
+ * For a server whose files were copied from another: the copy's config still
+ * names the source's password, while its deploy was given one of its own, so
+ * Polaris would speak a password the copy has never heard. The running server is
+ * not asked first, as `setConsolePassword` does - it is the one thing that does
+ * not know the new password - so the file is written and the server restarted.
+ * False when there is no config to write yet; the image writes one from the
+ * environment on its first start, which already carries the right password.
+ */
+export async function adoptConsolePassword(
+    ownerId: string,
+    installedAppId: string,
+    password: string
+): Promise<boolean> {
+    if (!access.isConsolePassword(password)) throw new Error(access.CONSOLE_PASSWORD_HINT);
+    const written = await withFivemServer(ownerId, installedAppId, async (server) => {
+        const cfg = await readContainerFile(server.container, SERVER_CFG);
+        if (cfg === null) return false;
+        await writeContainerFile(server.container, SERVER_CFG, writeSetting(cfg, RCON_PASSWORD_KEY, password));
+        return true;
+    });
+    if (written) await restartServer(ownerId, installedAppId);
+    return written;
+}
+
+/**
  * Change the key the server runs on.
  *
  * Write-only, like every credential on these screens: it is never read back, and

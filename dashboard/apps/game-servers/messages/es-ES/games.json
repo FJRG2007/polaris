@@ -1218,5 +1218,53 @@
         "noMatch": "Ningún jugador conectado coincide.",
         "more": "{count} más. Escribe para acotar la lista.",
         "useTyped": "Usar «{name}»"
+    },
+    "duplicate": {
+        "duplicate": "Duplicar",
+        "duplicateNamed": "Duplicar {name}",
+        "retry": "Reintentar la copia",
+        "retryNamed": "Reintentar la copia de {name}",
+        "stillCopying": "Copiándose todavía",
+        "title": "Duplicar {name}",
+        "description": "Un servidor nuevo con el mismo juego, ajustes, mods, mundo, horarios y reglas de jugadores, con su propio puerto y almacenamiento.",
+        "name": "Nombre de la copia",
+        "defaultName": "{name} copia",
+        "defaultNameNumbered": "{name} copia {count}",
+        "nameRequired": "Ponle un nombre a la copia.",
+        "nameTooLong": "El nombre puede tener como máximo {max} caracteres.",
+        "nameTaken": "Ya tienes un servidor llamado {name}. Elige otro nombre.",
+        "nameTakenShort": "Ya tienes un servidor con este nombre.",
+        "checking": "Comprobando el tamaño de sus archivos...",
+        "stopsWhileCopying": "El servidor se detiene mientras se copian sus archivos y vuelve a arrancar al terminar la copia.",
+        "sizes": "Sus archivos ocupan {need}; la máquina tiene {free} libres.",
+        "wontFit": "Sus archivos ocupan {need} y la máquina solo tiene {free} libres. Libera espacio o borra copias de seguridad antiguas primero.",
+        "sizeUnknown": "El servidor está apagado, así que su tamaño se comprueba al empezar la copia.",
+        "whatChanges": "La copia tiene su propia dirección, puerto y contraseñas. Los enlaces de chat no se copian.",
+        "cancel": "Cancelar",
+        "confirm": "Duplicar",
+        "from": "Copia de {name}",
+        "progress": "Progreso de copia",
+        "cannotCreate": "No puedes crear servidores, así que no puedes duplicar este.",
+        "notOwner": "Solo quien creó este servidor puede duplicarlo.",
+        "couldNotStart": "No se pudo empezar la copia. Inténtalo de nuevo.",
+        "nothingToRetry": "Este servidor no es una copia que se quedara a medias.",
+        "alreadyCopying": "Este servidor ya se está copiando. Espera a que termine esa copia.",
+        "busy": "Este servidor se está copiando. Podrás arrancarlo cuando termine la copia.",
+        "stage": {
+            "preparing": "Preparando copia",
+            "stopping": "Parando original",
+            "copying": "Copiando archivos",
+            "starting": "Arrancando copia",
+            "failed": "La copia falló"
+        },
+        "failure": {
+            "noSpace": "No hay espacio suficiente: los archivos ocupan {need} y la máquina tiene {free} libres. Libera espacio y vuelve a intentarlo.",
+            "copyFailed": "No se pudieron copiar los archivos. {name} no ha cambiado. Inténtalo de nuevo o borra esta copia.",
+            "timedOut": "La copia tardó demasiado y se detuvo. {name} no ha cambiado. Inténtalo de nuevo.",
+            "wrongVolume": "La copia arrancó con un almacenamiento vacío en lugar de los archivos copiados. Borra esta copia y vuelve a duplicar.",
+            "startFailed": "Los archivos se copiaron pero el servidor no arrancó. Ábrelo para ver su registro o inténtalo de nuevo.",
+            "interrupted": "Polaris se reinició durante la copia. {name} se volvió a arrancar. Inténtalo de nuevo o borra esta copia.",
+            "neverDeployed": "Este servidor nunca ha arrancado, así que no tiene archivos que copiar. Arráncalo una vez primero."
+        }
     }
 }

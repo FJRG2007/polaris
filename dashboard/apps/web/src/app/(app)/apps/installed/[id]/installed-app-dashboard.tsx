@@ -28,6 +28,7 @@ import {
     ArrowLeft,
     ChevronDown,
     ChevronRight,
+    CopyPlus,
     Play,
     RefreshCw,
     Square,
@@ -76,7 +77,8 @@ export function InstalledAppDashboard({
     slot = null,
     held = [],
     canManage = true,
-    canRemove = true
+    canRemove = true,
+    duplicate = null
 }: {
     app: InstalledAppDetail;
     /** What the app was deployed with, for a panel that edits its settings. */
@@ -91,6 +93,12 @@ export function InstalledAppDashboard({
     canManage?: boolean;
     /** Whether they may remove it. The owner's, and an administrator's. */
     canRemove?: boolean;
+    /** Whether they may duplicate it - a game server only - and why not. Null
+     *  hides the action. */
+    duplicate?:
+        | { readonly allowed: true }
+        | { readonly allowed: false; readonly reason: "cannot-create" | "not-owner" }
+        | null;
 }) {
     const t = useTranslations("installed");
     const words = useTranslations("catalog");
@@ -203,6 +211,32 @@ export function InstalledAppDashboard({
                                 </Button>
                             </>
                         )}
+                        {duplicate &&
+                            (duplicate.allowed ? (
+                                <Button asChild size="sm" variant="secondary">
+                                    <Link href={`/apps/games?duplicate=${encodeURIComponent(app.id)}`}>
+                                        <CopyPlus className="size-4" /> {t("duplicate")}
+                                    </Link>
+                                </Button>
+                            ) : (
+                                // Focusable and titled rather than `disabled`: a
+                                // disabled button takes no hover or focus, and the
+                                // reason would be unreachable.
+                                <Button
+                                    size="sm"
+                                    variant="secondary"
+                                    aria-disabled="true"
+                                    className="cursor-not-allowed opacity-50"
+                                    title={t(
+                                        duplicate.reason === "cannot-create"
+                                            ? "duplicateCannotCreate"
+                                            : "duplicateNotOwner"
+                                    )}
+                                    onClick={(event) => event.preventDefault()}
+                                >
+                                    <CopyPlus className="size-4" /> {t("duplicate")}
+                                </Button>
+                            ))}
                         {canRemove && (
                             <Button
                                 size="sm"

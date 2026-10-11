@@ -16,6 +16,7 @@ import { gameOfServer } from "@polaris/core";
 import { host } from "@polaris/app-host";
 import { gameMessage } from "./game-message";
 import { flushGameWorld } from "./games-flush";
+import { refuseWhileCopying } from "./duplicate-busy";
 import { clearCrashLoop } from "./games-health";
 import { runArkCommand } from "./ark/service";
 import { runFivemCommand } from "./fivem/service";
@@ -45,6 +46,8 @@ export async function setServerRunning(
 ): Promise<void> {
     const applicationId = access.install.applicationId;
     if (!applicationId) throw new Error(gameMessage("games", "errors.thisServerHasNotBeen"));
+    // A copy is reading this server's files, or writing the files of this copy.
+    if (running) await refuseWhileCopying(access.install.id);
     // Written out before it goes down. A stop that does not finish gracefully
     // is killed, and what a kill costs is the last few minutes everyone played.
     if (!running) await flushGameWorld(access.ownerId, access.install.id);

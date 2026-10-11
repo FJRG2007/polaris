@@ -48,5 +48,8 @@
         "hostPort": "Redeploy restarts it: it binds port {port}/{protocol} on the server, which two versions cannot share.",
         "volumes": "Redeploy restarts it: it keeps data on {names}, which two copies must not write at once.",
         "other": "Redeploy restarts it. Its service settings in Deploy say why."
-    }
+    },
+    "duplicate": "Duplicate",
+    "duplicateCannotCreate": "You can't create servers, so you can't duplicate this one.",
+    "duplicateNotOwner": "Only the person who created this server can duplicate it."
 }
