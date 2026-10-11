@@ -25,7 +25,8 @@ const LEVEL_RANK: Record<LogLevel, number> = { default: 0, info: 1, warn: 2, err
 // `\w*errors?` so the named errors a runtime throws - TypeError, ReferenceError,
 // OSError - colour like the failures they are, which is what a stack trace leads
 // with and what the eye goes to first.
-const ERROR_RE = /\b(\w*errors?|fatal|panic|exception|traceback|unhandled|failed|failure|denied|refused)\b/i;
+const ERROR_RE =
+    /\b(\w*errors?|fatal|panic|exception|traceback|unhandled|failed|failure|denied|refused)\b/i;
 const WARN_RE = /\b(warn|warning|warnings|deprecated|deprecation)\b/i;
 const INFO_RE = /\b(info|notice|listening|started|ready|success|succeeded|completed?)\b/i;
 
@@ -170,7 +171,11 @@ export function foldRepeats(entries: readonly LogEntry[]): LogRow[] {
     while (index < entries.length) {
         let period = 1;
         let times = 1;
-        for (let candidate = 1; candidate <= MAX_PERIOD && index + candidate * 2 <= entries.length; candidate += 1) {
+        for (
+            let candidate = 1;
+            candidate <= MAX_PERIOD && index + candidate * 2 <= entries.length;
+            candidate += 1
+        ) {
             let count = 1;
             while (sameBlock(keys, index, index + count * candidate, candidate)) count += 1;
             // Strictly more lines covered, so a tie keeps the shorter period:
@@ -189,7 +194,12 @@ export function foldRepeats(entries: readonly LogEntry[]): LogRow[] {
     return rows;
 }
 
-function sameBlock(keys: readonly string[], first: number, second: number, period: number): boolean {
+function sameBlock(
+    keys: readonly string[],
+    first: number,
+    second: number,
+    period: number
+): boolean {
     if (second + period > keys.length) return false;
     for (let offset = 0; offset < period; offset += 1) {
         if (keys[first + offset] !== keys[second + offset]) return false;
@@ -224,5 +234,7 @@ export function matchRanges(text: string, query: string): Array<[number, number]
 export function formatLogTime(stamp: string, format: DisplayFormat, withDate = false): string {
     const date = new Date(stamp);
     if (Number.isNaN(date.getTime())) return stamp;
-    return withDate ? format.dateTime(date, { seconds: true }) : format.time(date, { seconds: true });
+    return withDate
+        ? format.dateTime(date, { seconds: true })
+        : format.time(date, { seconds: true });
 }

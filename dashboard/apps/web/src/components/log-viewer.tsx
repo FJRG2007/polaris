@@ -26,7 +26,16 @@ import { useDisplayFormat } from "./display-format";
 import { useFollowBottom } from "@/lib/use-follow-bottom";
 import { useTranslations } from "@/components/i18n/i18n-provider";
 import { memo, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { Check, ChevronDown, ChevronUp, Copy, Download, ListCollapse, ListFilter, Search } from "lucide-react";
+import {
+    Check,
+    ChevronDown,
+    ChevronUp,
+    Copy,
+    Download,
+    ListCollapse,
+    ListFilter,
+    Search
+} from "lucide-react";
 import * as logLines from "@/lib/log-lines";
 
 const LEVEL_CLASS: Record<logLines.LogLevel, string> = {
@@ -60,7 +69,11 @@ const viewSchema = z.object({
 
 type ViewOptions = z.infer<typeof viewSchema>;
 
-const DEFAULT_VIEW: ViewOptions = { levels: [...logLines.LOG_BUCKETS], collapse: true, onlyMatches: true };
+const DEFAULT_VIEW: ViewOptions = {
+    levels: [...logLines.LOG_BUCKETS],
+    collapse: true,
+    onlyMatches: true
+};
 
 function readView(key: string): ViewOptions {
     try {
@@ -81,7 +94,8 @@ function writeView(key: string, view: ViewOptions): void {
     }
 }
 
-const CHIP_CLASS = "inline-flex h-7 items-center gap-1.5 rounded border px-2 text-xs transition-colors";
+const CHIP_CLASS =
+    "inline-flex h-7 items-center gap-1.5 rounded border px-2 text-xs transition-colors";
 const CHIP_ON = "border-border bg-muted text-foreground";
 const CHIP_OFF = "border-dashed border-border text-muted-foreground hover:text-foreground";
 
@@ -287,7 +301,10 @@ export function LogViewer({
                                     aria-live="polite"
                                 >
                                     {active !== null
-                                        ? t("logViewer.matchPosition", { current: active + 1, total: hits.length })
+                                        ? t("logViewer.matchPosition", {
+                                              current: active + 1,
+                                              total: hits.length
+                                          })
                                         : t("logViewer.matchCount", { total: hits.length })}
                                 </span>
                                 <Button
@@ -329,11 +346,27 @@ export function LogViewer({
                     </div>
                 )}
                 <div className="ml-auto flex shrink-0 items-center gap-2">
-                    <Button type="button" variant="outline" size="sm" onClick={copyAll} disabled={!log}>
-                        {copiedAll ? <Check className="size-4 text-success" /> : <Copy className="size-4" />}
+                    <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={copyAll}
+                        disabled={!log}
+                    >
+                        {copiedAll ? (
+                            <Check className="size-4 text-success" />
+                        ) : (
+                            <Copy className="size-4" />
+                        )}
                         {copiedAll ? t("logViewer.copied") : t("logViewer.copyAll")}
                     </Button>
-                    <Button type="button" variant="outline" size="sm" onClick={exportLog} disabled={!log}>
+                    <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={exportLog}
+                        disabled={!log}
+                    >
                         <Download className="size-4" />
                         {t("logViewer.export")}
                     </Button>
@@ -341,7 +374,11 @@ export function LogViewer({
             </div>
 
             <div className="flex flex-wrap items-center gap-1.5">
-                <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label={t("logViewer.levels")}>
+                <div
+                    className="flex flex-wrap items-center gap-1.5"
+                    role="group"
+                    aria-label={t("logViewer.levels")}
+                >
                     {logLines.LOG_BUCKETS.map((level) => {
                         const on = view.levels.includes(level);
                         return (
@@ -352,7 +389,13 @@ export function LogViewer({
                                 aria-pressed={on}
                                 className={cn(CHIP_CLASS, on ? CHIP_ON : CHIP_OFF)}
                             >
-                                <span className={cn("size-2 rounded-full", CHIP_DOT[level], !on && "opacity-40")} />
+                                <span
+                                    className={cn(
+                                        "size-2 rounded-full",
+                                        CHIP_DOT[level],
+                                        !on && "opacity-40"
+                                    )}
+                                />
                                 {t(`logViewer.level.${level}`)}
                                 <span className="tabular-nums text-muted-foreground">
                                     {t("logViewer.levelCount", { count: counts[level] })}
@@ -394,7 +437,10 @@ export function LogViewer({
                     <>
                         {hiddenCount > 0 && (
                             <p className="px-3 py-1 text-[0.6875rem] text-zinc-500">
-                                {t("logViewer.hidden", { hidden: hiddenCount, shown: MAX_LOG_ROWS })}
+                                {t("logViewer.hidden", {
+                                    hidden: hiddenCount,
+                                    shown: MAX_LOG_ROWS
+                                })}
                             </p>
                         )}
                         {shown.map(({ row, lead }, index) => (
@@ -502,7 +548,9 @@ const LogRow = memo(function LogRow({
                     {time ?? ""}
                 </span>
             )}
-            <span className={cn("min-w-0 flex-1 whitespace-pre-wrap break-words", LEVEL_CLASS[level])}>
+            <span
+                className={cn("min-w-0 flex-1 whitespace-pre-wrap break-words", LEVEL_CLASS[level])}
+            >
                 {text ? <Highlighted text={text} query={query} /> : " "}
                 {badge && (
                     <span
@@ -519,7 +567,11 @@ const LogRow = memo(function LogRow({
                 aria-label={t("logViewer.copyEntry")}
                 className="absolute right-1 top-1/2 hidden -translate-y-1/2 rounded p-1 text-zinc-400 transition-colors hover:bg-white/10 hover:text-zinc-100 group-hover:block"
             >
-                {copied ? <Check className="size-3.5 text-success" /> : <Copy className="size-3.5" />}
+                {copied ? (
+                    <Check className="size-3.5 text-success" />
+                ) : (
+                    <Copy className="size-3.5" />
+                )}
             </button>
         </div>
     );
