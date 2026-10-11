@@ -431,7 +431,11 @@ $ErrorActionPreference = "Stop"
 $manifest = "${scriptUrl(manifestUrl)}"
 $foreign = $manifest -replace 'pack\\.tsv$', 'foreign.tsv'
 $root = $env:POLARIS_MC_ROOT
-if (-not $root) { $root = Join-Path $env:APPDATA ".minecraft" }
+if (-not $root) {
+    if ($env:APPDATA) { $root = Join-Path $env:APPDATA ".minecraft" }
+    elseif ($IsMacOS) { $root = Join-Path $HOME "Library/Application Support/minecraft" }
+    else { $root = Join-Path $HOME ".minecraft" }
+}
 $game = Join-Path (Join-Path $root "polaris") "${profile.key}"
 $dir = $env:POLARIS_MC_DIR
 $own = $false
