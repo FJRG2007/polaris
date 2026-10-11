@@ -3024,7 +3024,10 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
 
             void (async () => {
                 if (which === "camera") {
-                    await quality.retune(camera.current, quality.cameraConstraints(level));
+                    await quality.retune(
+                        camera.current,
+                        quality.cameraConstraints(level, undefined, camera.current?.getSettings())
+                    );
                     if (cameraOn && camera.current) {
                         // The canvas follows the camera's new size by itself -
                         // it reads it on every frame - so the background never
@@ -3032,7 +3035,10 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
                         await publish(CAMERA, outgoingCamera(), { again: true });
                     }
                 } else {
-                    await quality.retune(screen.current, quality.screenConstraints(level));
+                    await quality.retune(
+                        screen.current,
+                        quality.screenConstraints(level, screen.current?.getSettings())
+                    );
                     if (screen.current) {
                         screen.current.contentHint = quality.screenIsMotion(level)
                             ? "motion"
@@ -3157,7 +3163,14 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
                     );
                     if (next.level !== autoCamera.current.level) {
                         moved = true;
-                        void quality.retune(camera.current, quality.cameraConstraints(next.level));
+                        void quality.retune(
+                            camera.current,
+                            quality.cameraConstraints(
+                                next.level,
+                                undefined,
+                                camera.current?.getSettings()
+                            )
+                        );
                     }
                     autoCamera.current = next;
                 }
@@ -3170,7 +3183,10 @@ export function useSfuCall(meetingId: string | null, options?: { video?: boolean
                     );
                     if (next.level !== autoScreen.current.level) {
                         moved = true;
-                        void quality.retune(screen.current, quality.screenConstraints(next.level));
+                        void quality.retune(
+                            screen.current,
+                            quality.screenConstraints(next.level, screen.current?.getSettings())
+                        );
                     }
                     autoScreen.current = next;
                 }

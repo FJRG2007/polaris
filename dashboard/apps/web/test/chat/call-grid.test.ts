@@ -8,7 +8,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { fitTiles, TILE_RATIO } from "@/app/(app)/chat/call-grid";
+import { fillsTile, fitTiles, TILE_RATIO } from "@/app/(app)/chat/call-grid";
 
 describe("fitTiles", () => {
     it("keeps every tile 16:9", () => {
@@ -48,5 +48,26 @@ describe("fitTiles", () => {
     it("is nothing until the panel has a size", () => {
         expect(fitTiles(3, 0, 0, 8).width).toBe(0);
         expect(fitTiles(0, 800, 600, 8).width).toBe(0);
+    });
+});
+
+describe("fillsTile", () => {
+    it("trims a camera near the tile's shape to fill it", () => {
+        expect(fillsTile(16 / 9, TILE_RATIO)).toBe(true);
+        expect(fillsTile(4 / 3, TILE_RATIO)).toBe(true);
+    });
+
+    it("shows an upright phone whole in a wide tile, and a wide camera whole in a tall one", () => {
+        expect(fillsTile(9 / 16, TILE_RATIO)).toBe(false);
+        expect(fillsTile(16 / 9, 390 / 844)).toBe(false);
+    });
+
+    it("fills an upright tile with an upright camera, as a phone held upright in full screen", () => {
+        expect(fillsTile(9 / 16, 390 / 844)).toBe(true);
+    });
+
+    it("fills while either shape is still unknown", () => {
+        expect(fillsTile(null, TILE_RATIO)).toBe(true);
+        expect(fillsTile(4 / 3, null)).toBe(true);
     });
 });

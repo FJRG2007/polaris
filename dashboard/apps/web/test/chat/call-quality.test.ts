@@ -95,9 +95,23 @@ describe("what the camera is asked for", () => {
             // being handed an exact 1080p, refusing, and the call carrying no
             // picture at all rather than a smaller one.
             expect(want.width).toEqual({ ideal: CAMERA_LADDER.rungs[level].width });
-            expect(want.height).toEqual({ ideal: CAMERA_LADDER.rungs[level].height });
             expect(want.frameRate).toEqual({ ideal: CAMERA_LADDER.rungs[level].frameRate });
         }
+    });
+
+    it("names one edge, so a camera of any shape keeps it rather than being cropped", () => {
+        // Both edges named a shape as well as a size: a 4:3 webcam lost its top
+        // and bottom, and a phone held upright sent a strip across its middle.
+        for (const level of LEVELS) expect(cameraConstraints(level).height).toBeUndefined();
+    });
+
+    it("puts the long edge up the picture of a camera held upright", () => {
+        const upright = cameraConstraints("low", undefined, { width: 720, height: 1280 });
+        expect(upright.height).toEqual({ ideal: CAMERA_LADDER.rungs.low.width });
+        expect(upright.width).toBeUndefined();
+        const wide = cameraConstraints("low", undefined, { width: 1280, height: 720 });
+        expect(wide.width).toEqual({ ideal: CAMERA_LADDER.rungs.low.width });
+        expect(wide.height).toBeUndefined();
     });
 
     it("names a chosen device exactly, because opening a different one is worse", () => {
@@ -131,7 +145,12 @@ describe("what a screen is asked for", () => {
             expect(screenConstraints(level).width).toEqual({
                 ideal: SCREEN_LADDER.rungs[level].width
             });
+            // One edge: an ultrawide or a monitor turned upright keeps its shape.
+            expect(screenConstraints(level).height).toBeUndefined();
         }
+        const upright = screenConstraints("low", { width: 1080, height: 1920 });
+        expect(upright.height).toEqual({ ideal: SCREEN_LADDER.rungs.low.width });
+        expect(upright.width).toBeUndefined();
     });
 
     it("calls the fast rungs motion and the slow ones detail", () => {

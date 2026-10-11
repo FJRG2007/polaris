@@ -16,6 +16,26 @@ import { useEffect, useState } from "react";
 /** A video frame's shape. Cameras and screens both send 16:9. */
 export const TILE_RATIO = 16 / 9;
 
+/**
+ * How far a camera's shape may be from its tile's before cropping it to fill the
+ * tile stops being a trim and starts being a different picture. 4:3 in a 16:9
+ * tile is a third apart and loses a little above and below; an upright phone in
+ * a wide tile is three times apart and would keep only a strip across the face.
+ */
+export const COVER_WITHIN = 1.4;
+
+/**
+ * Whether a picture is cropped to fill its tile (true) or shown whole inside it
+ * (false). Either way it keeps its own shape - nothing here ever stretches a
+ * picture to fit. Unknown shapes fill, which is how a tile drew before either
+ * was measured.
+ */
+export function fillsTile(picture: number | null, tile: number | null): boolean {
+    if (!picture || !tile || picture <= 0 || tile <= 0) return true;
+    const apart = picture > tile ? picture / tile : tile / picture;
+    return apart <= COVER_WITHIN;
+}
+
 export interface TileFit {
     readonly columns: number;
     readonly width: number;
