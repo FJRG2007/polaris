@@ -190,6 +190,10 @@ const RULES: Readonly<Record<EventKind, Text>> = {
     impostor: {
         en: "The crew does its tasks round the station; a hidden impostor kills with a hit. Report a body or press the button on the table, then vote somebody out.",
         es: "La tripulación hace sus tareas por la estación; un impostor oculto mata de un golpe. Reporta un cuerpo o pulsa el botón de la mesa y votad a quién expulsar."
+    },
+    "glass-bridge": {
+        en: "Cross the bridge row by row. In every row one glass panel holds and the other breaks under you; fall and you are out. The first across wins.",
+        es: "Cruza el puente fila a fila. En cada fila un panel de cristal aguanta y el otro se rompe bajo tus pies; si caes, quedas fuera. Gana el primero en cruzar."
     }
 };
 

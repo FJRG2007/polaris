@@ -173,6 +173,7 @@ Rare catch, Bingo rush, Boss fishing) leave the world alone.
 | Hide and seek                                                  | day   | clear   |
 | SkyWars                                                        | day   | clear   |
 | Impostor                                                       | day   | clear   |
+| Glass bridge                                                   | day   | clear   |
 | TNT run, Dropper, Nether maze                                  | day   | clear   |
 | Elytra race, Downhill boat race                                | day   | clear   |
 | Acid rain                                                      | day   | -       |
@@ -879,6 +880,34 @@ left out.
   ("Who wins" below). Where the Polaris mod or plugin is on the server, a
   ghost's chat reaches only other ghosts ("Impostor ghosts" under "In-server
   work"); elsewhere they are asked not to tell.
+- **Glass bridge** (`glass-bridge`) is a bridge of `steps` rows (12 by
+  default, 6 to 20) built in the sky between a start platform and a finish
+  platform, each row two 3 by 3 glass panels side by side with a block of air
+  between the lanes and between the rows (`glass-bridge.layoutOf`). In every
+  row one panel holds and the other breaks; both are plain glass, and which
+  is which is drawn from the run's id and the row (`safeLane`), so a restart
+  draws the same bridge. A pool of water `DROP` (12) blocks under it catches
+  whoever falls; a roofed gallery along the north side is where they watch
+  from. `mode` is `free` (everybody on the bridge at once) or `turns` (one at
+  a time, in an order drawn from the run's id: `orderFor`, said in chat at
+  "Go!"); in turns a walker who has not reached a new row in `turnSeconds`
+  (20, 10 to 60) is out, and waiting players are held on the start. Only a
+  walker - everybody still going, or the one whose turn it is - carries
+  `pe_gb_walk` and can break glass. The events data pack breaks a panel the
+  game tick a walker stands on it (`glass-bridge.FUNCTIONS`, under
+  `polaris:glass/`): an invisible marker stand sits on each panel that breaks
+  and shatters it - air where its glass was, a glass sound, a puff - then
+  goes. The look over RCON comes round twice a second and backs it up,
+  breaking a breaking panel it still sees somebody standing on
+  (`breakingUnder`). Falling under the glass, through a panel or off a side,
+  is out; standing on the finish is across. Scored as a race
+  (`catalog.FINISH_BASE` less the seconds it took for a finish - from "Go!",
+  or from the start of their turn - otherwise the rows reached), ties broken
+  by who got there first; the first across wins, and when nobody crossed,
+  whoever got furthest. Nobody can hurt or push anybody (Resistance V and
+  Weakness). It ends once everybody has crossed or is out, or when its
+  minutes run out. Its markers and the switch are taken away at the end
+  (`stopLines`).
 - **SkyWars** needs 1.17 (`catalog.stashesFirst`): its loot is fought over,
   so it must never sit beside what a player brought, and only from 1.17 is
   that put away first; an older server is refused before anything starts.
@@ -1275,6 +1304,7 @@ Everything below is part of the arena's own boxes: built into air with
 | Team duel        | a stone rim round the floor and a post of light at each corner                                                                                                                                                                                                                                                                                             |
 | Hot potato       | a floor in orange and white stripes or rings, hay bales and lit spruce posts, glass walls on a stone rim, sea lanterns up the corners, a spruce gallery                                                                                                                                                                                                    |
 | Hide and seek    | a stone brick house under a dark oak roof, spruce walls between nine rooms, oak closets, spruce hatches, birch lofts on log posts, bookcases in spruce alcoves, barrel steps up oak wardrobes, birch crow's nests, spruce beams; from design 5 a hall of stone brick posts up to spruce nests, a slime block pad under a spruce ledge, levers on the walls |
+| Glass bridge     | plain glass panels, a light gray start with a cyan rim, a finish in black and white squares, quartz arches over both ends with hanging lanterns, quartz posts with lanterns at the outer corners, a spruce gallery behind white glass under a barrier roof, a prismarine pool lit by sea lanterns                                                          |
 | Impostor         | each room floored in its own drawn stone, wood or concrete, light gray concrete walls under a quartz roof lit by sea lanterns, gray concrete corridors, a polished andesite meeting room with a dark oak table, a red middle and a stone button, polished diorite consoles with a lever, a button or a weighted plate, iron trapdoor vents                 |
 | SkyWars          | grass, dirt and flecked stone islands with oaks, boulders and flowers, invisible cages and gallery over the middle, barrier walls                                                                                                                                                                                                                          |
 | Capture the flag | the duel's rim and posts, bases in red and blue, banners on sea lanterns, cover of stone brick, spruce and chiseled stone                                                                                                                                                                                                                                  |

@@ -10,11 +10,13 @@ import { captureTheFlag } from "./capture-the-flag-service";
 import { hotPotato } from "./hot-potato-service";
 import { hideAndSeek } from "./hide-and-seek-service";
 import { impostor } from "./impostor-service";
+import { glassBridge } from "./glass-bridge-service";
 import { skyWars } from "./sky-wars-service";
 
 const GAMES: Partial<Record<EventKind, ArenaGame>> = {
     "capture-the-flag": captureTheFlag,
     "hide-and-seek": hideAndSeek,
+    "glass-bridge": glassBridge,
     "hot-potato": hotPotato,
     impostor,
     "sky-wars": skyWars

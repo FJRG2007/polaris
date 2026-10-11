@@ -1798,6 +1798,11 @@
                 "label": "Impostor",
                 "summary": "Se construye en el cielo una estación de salas, mayor cuantos más juegan, unidas por pasillos alrededor de una sala de reuniones con una mesa y un botón de emergencia. A cada uno se le dice en privado si es tripulante o impostor, y los nombres van ocultos. La tripulación hace tareas en las consolas de las salas; los impostores las fingen, matan de un golpe y se cuelan de una sala a otra por conductos ocultos. Encontrar un cuerpo o pulsar el botón llama a todos a la mesa para hablar y votar a quién echar. La tripulación gana al terminar todas las tareas o echar a todos los impostores; los impostores ganan cuando son tantos como la tripulación. Al menos 4 jugadores.",
                 "unit": "points"
+            },
+            "glass-bridge": {
+                "label": "Puente frágil",
+                "summary": "Se construye en el cielo un largo puente de cristal con dos paneles en cada fila. En cada fila un panel aguanta y el otro se rompe bajo quien lo pisa, y los dos parecen iguales. Cruzad todos a la vez o de uno en uno en un orden sorteado; quien cae acaba en la piscina de abajo, queda fuera y mira desde la grada. Gana el primero en cruzar; si nadie lo logra, quien más lejos llegó.",
+                "unit": "jumps"
             }
         },
         "triggers": {
@@ -2376,6 +2381,10 @@
                 "medium": "Mediano: 11 por 11 salas",
                 "large": "Grande: 15 por 15 salas"
             },
+            "glassMode": {
+                "free": "Todos a la vez",
+                "turns": "De uno en uno"
+            },
             "mazeHazards": {
                 "few": "Pocos",
                 "some": "Algunos",
@@ -2521,7 +2530,12 @@
         "discussionSecondsHint": "De 0 a 120 antes de abrir la votación.",
         "votingSeconds": "Para votar (segundos)",
         "votingSecondsHint": "De 15 a 120 para votar o saltar.",
-        "confirmEjects": "Decir si el expulsado era impostor"
+        "confirmEjects": "Decir si el expulsado era impostor",
+        "glassMode": "Cómo se cruza",
+        "glassSteps": "Filas de cristal",
+        "glassStepsHint": "De 6 a 20.",
+        "turnSeconds": "Tiempo por fila (segundos)",
+        "turnSecondsHint": "De 10 a 60 que tiene cada jugador por turnos para llegar a la siguiente fila antes de quedar fuera."
     },
     "moderation": {
         "announcements": {

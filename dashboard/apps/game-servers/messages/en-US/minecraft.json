@@ -1798,6 +1798,11 @@
                 "label": "Impostor",
                 "summary": "A station of rooms is built in the sky, bigger the more who play, joined by corridors round a meeting room with a table and an emergency button. Everybody is told privately whether they are crew or an impostor, and names are hidden. The crew work through tasks at consoles in the rooms; impostors fake them, kill with a hit and slip between rooms through hidden vents. A body found or the button pressed calls everybody to the table to talk and vote somebody out. The crew win by finishing every task or voting out every impostor; the impostors win once they are as many as the crew. At least 4 players.",
                 "unit": "points"
+            },
+            "glass-bridge": {
+                "label": "Glass bridge",
+                "summary": "A long bridge of glass is built in the sky, two panels side by side in every row. In each row one panel holds and the other breaks under whoever stands on it, and both look the same. Cross everybody at once or one at a time in a drawn order; fall and you land in the pool below, out, and watch from the gallery. The first across wins; short of that, whoever got furthest.",
+                "unit": "jumps"
             }
         },
         "triggers": {
@@ -2376,6 +2381,10 @@
                 "medium": "Medium: 11 by 11 rooms",
                 "large": "Large: 15 by 15 rooms"
             },
+            "glassMode": {
+                "free": "Everybody at once",
+                "turns": "One at a time"
+            },
             "mazeHazards": {
                 "few": "A few",
                 "some": "Some",
@@ -2521,7 +2530,12 @@
         "discussionSecondsHint": "0 to 120 before the vote opens.",
         "votingSeconds": "Voting time (seconds)",
         "votingSecondsHint": "15 to 120 to vote or skip.",
-        "confirmEjects": "Say whether who was voted out was an impostor"
+        "confirmEjects": "Say whether who was voted out was an impostor",
+        "glassMode": "How it is crossed",
+        "glassSteps": "Rows of glass",
+        "glassStepsHint": "6 to 20.",
+        "turnSeconds": "Time for each row (seconds)",
+        "turnSecondsHint": "10 to 60 a player in turns has to reach the next row before they are out."
     },
     "moderation": {
         "announcements": {

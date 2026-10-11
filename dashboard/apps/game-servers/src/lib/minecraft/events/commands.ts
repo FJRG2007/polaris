@@ -209,6 +209,9 @@ export function hasScoreboard(preset: EventPreset): boolean {
     if (preset.kind === "spleef" || lastStanding(preset)) return false;
     // Points would tell everybody who has killed: an impostor's are kept to the end.
     if (preset.kind === "impostor") return false;
+    // A finish is scored as a race's, far over any row: each walker's rows and
+    // who is across are on their action bar and the boss bar instead.
+    if (preset.kind === "glass-bridge") return false;
     if (preset.kind === "explorer")
         return (preset.options as EventOptions<"explorer">).mode === "distance";
     return true;

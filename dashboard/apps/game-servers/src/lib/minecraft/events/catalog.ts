@@ -62,7 +62,8 @@ export const EVENT_KINDS = [
     "acid-rain",
     "elytra-race",
     "downhill-race",
-    "impostor"
+    "impostor",
+    "glass-bridge"
 ] as const;
 
 export type EventKind = (typeof EVENT_KINDS)[number];
@@ -251,6 +252,9 @@ export const THEME_MODES = ["random", "mine"] as const;
 export const BINGO_GOALS = ["line", "card"] as const;
 /** What a SkyWars island's chests hold: plain survival gear, or rich. */
 export const SKY_WARS_LOOT = ["normal", "rich"] as const;
+
+/** How a glass bridge is crossed: everybody at once, or one at a time. */
+export const GLASS_BRIDGE_MODES = ["free", "turns"] as const;
 /** A nether maze's rooms a side, and how many of them are deadly. */
 export const MAZE_SIZES = ["small", "medium", "large"] as const;
 export const MAZE_HAZARDS = ["few", "some", "many"] as const;
@@ -772,6 +776,25 @@ export const optionsSchemas = {
             .max(40, problem("atMost", { count: 40 }))
             .default(20)
     }),
+    "glass-bridge": z.object({
+        place: placeSchema.default({ mode: "players" }),
+        /** Everybody on the bridge at once, or one at a time in a drawn order. */
+        mode: z.enum(GLASS_BRIDGE_MODES).default("free"),
+        /** Rows of panels to cross. */
+        steps: z
+            .number()
+            .int()
+            .min(6, problem("atLeast", { count: 6 }))
+            .max(20, problem("atMost", { count: 20 }))
+            .default(12),
+        /** In turns, the seconds a walker has to reach each next row. */
+        turnSeconds: z
+            .number()
+            .int()
+            .min(10, problem("atLeast", { count: 10 }))
+            .max(60, problem("atMost", { count: 60 }))
+            .default(20)
+    }),
     "sky-wars": z.object({
         place: placeSchema.default({ mode: "players" }),
         loot: z.enum(SKY_WARS_LOOT).default("normal"),
@@ -1058,7 +1081,11 @@ export const presetSchema = z
             kind: z.literal("downhill-race"),
             options: optionsSchemas["downhill-race"]
         }),
-        presetBase.extend({ kind: z.literal("impostor"), options: optionsSchemas.impostor })
+        presetBase.extend({ kind: z.literal("impostor"), options: optionsSchemas.impostor }),
+        presetBase.extend({
+            kind: z.literal("glass-bridge"),
+            options: optionsSchemas["glass-bridge"]
+        })
     ])
     .superRefine((value, context) => {
         // An impostor game below four is refused here, not only played as four.
@@ -1141,7 +1168,7 @@ export type RandomEvents = z.infer<typeof randomSchema>;
  * value an operator chooses later, even one that happens to be an old default,
  * is theirs.
  */
-export const DEFAULTS_VERSION = 11;
+export const DEFAULTS_VERSION = 12;
 
 /** Events saved before this were brought up to their kind's defaults once
  *  (`toKindDefaults`). */
@@ -1184,7 +1211,8 @@ const KIND_SINCE: Partial<Readonly<Record<EventKind, number>>> = {
     "acid-rain": 5,
     "elytra-race": 6,
     "downhill-race": 7,
-    impostor: 11
+    impostor: 11,
+    "glass-bridge": 12
 };
 
 export const settingsSchema = z.object({
@@ -1284,7 +1312,8 @@ export const KIND_NAMES: Readonly<Record<EventKind, Readonly<Record<Language, st
     "acid-rain": { en: "Acid rain", es: "Lluvia ácida" },
     "elytra-race": { en: "Elytra race", es: "Carrera aérea" },
     "downhill-race": { en: "Downhill boat race", es: "Descenso en barca" },
-    impostor: { en: "Impostor", es: "Impostor" }
+    impostor: { en: "Impostor", es: "Impostor" },
+    "glass-bridge": { en: "Glass bridge", es: "Puente frágil" }
 };
 
 /** What an event of each kind is. Its name and summary on a screen are the
@@ -1436,6 +1465,10 @@ export const KIND_INFO: Readonly<Record<EventKind, KindInfo>> = {
     impostor: {
         unit: "points",
         competitive: true
+    },
+    "glass-bridge": {
+        unit: "jumps",
+        competitive: true
     }
 };
 
@@ -1566,7 +1599,8 @@ export const DEFAULT_PRIZES: Readonly<Record<EventKind, Rewards>> = {
     "acid-rain": STANDARD,
     "elytra-race": STANDARD,
     "downhill-race": QUICK,
-    impostor: STANDARD
+    impostor: STANDARD,
+    "glass-bridge": QUICK
 };
 
 /** The names a king of the ring was given by default while it was a hill, and
@@ -1619,7 +1653,8 @@ export const DEFAULT_MINUTES: Readonly<Record<EventKind, number>> = {
     "acid-rain": 6,
     "elytra-race": 8,
     "downhill-race": 5,
-    impostor: 15
+    impostor: 15,
+    "glass-bridge": 10
 };
 
 /** What every kind ran for before `DEFAULT_MINUTES`: an event still on exactly
@@ -2069,7 +2104,8 @@ export const DEFAULT_MIN_SCORE: Readonly<Record<EventKind, number>> = {
     "acid-rain": 1,
     "elytra-race": 1,
     "downhill-race": 1,
-    impostor: 10
+    impostor: 10,
+    "glass-bridge": 1
 };
 
 /** Whether the minimum is something an operator can set for this event. A
@@ -2214,6 +2250,7 @@ export function readyToPlay(run: {
         case "hot-potato":
         case "sky-wars":
         case "impostor":
+        case "glass-bridge":
             // The arena writes its own start when everybody is in it.
             return run.readyAt !== null;
         default:
@@ -2348,6 +2385,7 @@ export function playsInArena(preset: EventPreset): boolean {
         preset.kind === "hot-potato" ||
         preset.kind === "sky-wars" ||
         preset.kind === "impostor" ||
+        preset.kind === "glass-bridge" ||
         hillFistsOnly(preset)
     );
 }
@@ -2365,7 +2403,8 @@ const RACES: readonly EventKind[] = [
     "dropper",
     "nether-maze",
     "elytra-race",
-    "downhill-race"
+    "downhill-race",
+    "glass-bridge"
 ];
 
 /** How long a race took, in seconds, when the score is a finish; null for a
@@ -2585,7 +2624,8 @@ export const WORLD_NEEDS: Readonly<Record<EventKind, WorldNeeds>> = {
     "acid-rain": { time: "day", weather: null },
     "elytra-race": { time: "day", weather: "clear" },
     "downhill-race": { time: "day", weather: "clear" },
-    impostor: { time: "day", weather: "clear" }
+    impostor: { time: "day", weather: "clear" },
+    "glass-bridge": { time: "day", weather: "clear" }
 };
 
 export function worldNeeds(preset: Pick<EventPreset, "kind">): WorldNeeds {

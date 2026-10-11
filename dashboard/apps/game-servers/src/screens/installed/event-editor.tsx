@@ -41,6 +41,7 @@ import {
     DownhillRaceFields,
     DropperFields,
     ElytraRaceFields,
+    GlassBridgeFields,
     HideAndSeekFields,
     HotPotatoFields,
     ImpostorFields,
@@ -1184,6 +1185,14 @@ function OptionsFields({
             return (
                 <HotPotatoFields
                     value={preset.options as catalog.EventOptions<"hot-potato">}
+                    onChange={onChange}
+                    issues={issues}
+                />
+            );
+        case "glass-bridge":
+            return (
+                <GlassBridgeFields
+                    value={preset.options as catalog.EventOptions<"glass-bridge">}
                     onChange={onChange}
                     issues={issues}
                 />

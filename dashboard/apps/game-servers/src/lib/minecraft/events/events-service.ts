@@ -237,6 +237,8 @@ const TICK_MS = 2_000;
  */
 const KIND_TICK_MS: Partial<Record<catalog.EventKind, number>> = {
     "hot-potato": 500,
+    // A step onto the next row seen within the half second.
+    "glass-bridge": 500,
     // A kill, a switch and a vote answered within the second.
     impostor: 1_000
 };
@@ -2159,6 +2161,7 @@ async function play(
         case "hot-potato":
         case "sky-wars":
         case "impostor":
+        case "glass-bridge":
             decided = await arenaService.arenaTick(
                 kindContext(installedAppId, loop, server, now),
                 lines
