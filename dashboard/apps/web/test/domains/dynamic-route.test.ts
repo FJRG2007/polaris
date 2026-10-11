@@ -86,6 +86,25 @@ describe("a route with email obfuscation", () => {
         expect(config).not.toContain("forwardAuth");
     });
 
+    it("compresses on the way out, since the proxy asks the app for plain bytes", () => {
+        // Without this every script, style and JSON response on the route reaches the
+        // browser uncompressed - several times its size on the operator's own uplink.
+        const config = withSecret(() => renderDynamicConfig([route({ emailObfuscation: true })]));
+
+        expect(config).toMatch(/middlewares: \[polaris-edge-compress, /);
+        expect(config).toContain(
+            'polaris-edge-compress:\n      compress:\n        excludedContentTypes: ["text/event-stream"]'
+        );
+    });
+
+    it("leaves a direct route's compression to the app", () => {
+        const config = withSecret(() =>
+            renderDynamicConfig([route({ emailObfuscation: true })], { proxyAvailable: false })
+        );
+
+        expect(config).not.toContain("polaris-edge-compress");
+    });
+
     it("routes direct when the guard's proxy is not answering", () => {
         // The guard is a separate container on its own release cadence. One older than
         // the control plane has no proxy listener, and pointing a route at it turns a

@@ -286,6 +286,9 @@ export interface RenderOptions {
     readonly frameAvailable?: boolean;
 }
 
+/** The one compress middleware every proxied route shares. */
+const EDGE_COMPRESS = "polaris-edge-compress";
+
 /**
  * Whether this route's response is served through the guard rather than straight from
  * the app.
@@ -378,6 +381,16 @@ function routeMiddlewares(
     }
     names.push(...chain.late);
     if (isProxied) {
+        // The guard asks the app for `identity` so it can rewrite the HTML, which
+        // leaves every response on the route - scripts, styles, JSON - travelling to
+        // the browser uncompressed, several times its size. Compressed again here, on
+        // the way out. A response that is already encoded is left alone, and an event
+        // stream is excluded so it is never held back to fill a compression buffer.
+        defs.set(
+            EDGE_COMPRESS,
+            `    ${EDGE_COMPRESS}:\n      compress:\n        excludedContentTypes: ["text/event-stream"]`
+        );
+        names.unshift(EDGE_COMPRESS);
         // Where the guard should forward to, signed so a client cannot point it
         // somewhere else. Traefik overwrites whatever value the client sent.
         const upstream = `${name}-origin`;
