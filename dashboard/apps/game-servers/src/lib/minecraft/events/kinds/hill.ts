@@ -114,7 +114,6 @@ const ROYAL_BLOCKS = [
     "minecraft:red_carpet",
     "minecraft:light",
     "minecraft:soul_campfire",
-    "minecraft:chain",
     "minecraft:polished_blackstone_brick_stairs",
     "minecraft:polished_blackstone_stairs",
     "minecraft:polished_blackstone_brick_wall",
@@ -312,7 +311,7 @@ function royalPieces(place: Point, radius: number): { box: Box; block: string }[
     one(x + 3, y, dais, "minecraft:soul_campfire");
 
     // The crown, floating over the middle of the ring well out of reach: a
-    // band of gold set with froglight, eight points, a lantern on a chain.
+    // band of gold set with froglight, eight points, a lantern hung under it.
     const band = y + 10;
     for (let dx = -2; dx <= 2; dx += 1)
         for (let dz = -2; dz <= 2; dz += 1) {
@@ -323,7 +322,6 @@ function royalPieces(place: Point, radius: number): { box: Box; block: string }[
                 one(x + dx, band + 1, z + dz, "minecraft:gold_block");
         }
     one(x, band, z, "minecraft:gold_block");
-    one(x, band - 1, z, "minecraft:chain");
 
     // What hangs on, stands on or lies on all that: last.
     for (const [sx, sz] of corners) one(x + sx * half, y + 1, z + sz * half, ROYAL.top!);
@@ -362,7 +360,7 @@ function royalPieces(place: Point, radius: number): { box: Box; block: string }[
     one(x + 2, y + 1, dais + 2, `${ROYAL.middle}[rotation=8]`);
     for (const [sx, sz] of corners)
         one(x + sx * 2, band + 2, z + sz * 2, "minecraft:end_rod[facing=up]");
-    one(x, band - 2, z, `${ROYAL.top}[hanging=true]`);
+    one(x, band - 1, z, `${ROYAL.top}[hanging=true]`);
     // Light nobody sees or bumps into, over the floor: however the ring
     // shrinks and its froglight goes back to floor, no block of it is dark.
     for (let dx = 0; dx <= half - 1; dx += LIGHT_EVERY)
