@@ -19,7 +19,7 @@ import { RichText } from "@/components/rich-text/rich-text";
 import { MessageList } from "@/app/(app)/chat/message-list";
 import { ChannelMembers } from "@/app/(app)/chat/members-panel";
 import { PersonCardProvider } from "@/app/(app)/chat/person-card";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, onTestFinished, vi } from "vitest";
 import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 
 const GRACE = "0193aaaa-0000-7000-8000-000000000001";
@@ -56,10 +56,10 @@ vi.mock("@/app/(app)/chat/actions", () => ({
             { userId: ADA, name: "Ada", role: "member" }
         ]
     }),
-    listMembersAction: async () => ({
+    listRosterAction: async () => ({
         members: [
-            { userId: GRACE, name: "Grace Hopper", role: "owner" },
-            { userId: ADA, name: "Ada", role: "member" }
+            { userId: GRACE, name: "Grace Hopper", role: "owner", online: true },
+            { userId: ADA, name: "Ada", role: "member", online: false }
         ]
     }),
     saveMediaAction: async () => ({}),
@@ -93,7 +93,8 @@ vi.mock("@/app/(app)/chat/chat-context", () => ({
     })
 }));
 vi.mock("@/components/presence-store", () => ({
-    usePresence: () => ({ status: "online", note: "Writing a compiler" })
+    usePresence: () => ({ status: "online", note: "Writing a compiler" }),
+    useKnownPresence: () => new Map()
 }));
 vi.mock("@/app/(app)/chat/use-wide-screen", () => ({ useWideScreen: () => true }));
 
@@ -292,6 +293,13 @@ describe("a mention", () => {
 
 describe("the roster", () => {
     it("opens the card for the person pressed", async () => {
+        // The roster draws only the rows that fit, and jsdom lays nothing out:
+        // a box with a height is what lets it draw any.
+        const measured = Element.prototype.getBoundingClientRect;
+        Element.prototype.getBoundingClientRect = () => new DOMRect(0, 0, 240, 600);
+        onTestFinished(() => {
+            Element.prototype.getBoundingClientRect = measured;
+        });
         const user = userEvent.setup();
         render(
             <ChannelMembers

@@ -2235,8 +2235,10 @@ export function ChannelView({
                     onPins={() => setPinsOpen(true)}
                     // In a conversation with a roster this opens it; in a
                     // one-to-one it opens the other person, which is what the
-                    // column beside a direct message is for.
-                    onMembers={members.toggle}
+                    // column beside a direct message is for. Not in a voice
+                    // room: the call already shows who is in it, and the chat
+                    // beside it is too narrow to share with a roster.
+                    onMembers={voiceRoom ? undefined : members.toggle}
                 />
 
                 <PinnedBar pins={pins.pins} onJump={jumpHere} onShowAll={() => setPinsOpen(true)} />
@@ -2436,7 +2438,7 @@ export function ChannelView({
                 />
             )}
 
-            {channel.kind !== "dm" && !thread && !searching && (
+            {channel.kind !== "dm" && !voiceRoom && !thread && !searching && (
                 <ChannelMembers
                     channel={channel}
                     open={members.open}

@@ -35,6 +35,8 @@ import { storeAttachment } from "@/lib/chat/attachments";
 import type { SavedMediaView } from "@/lib/chat/saved-media";
 import type { LinkPreviewView } from "@/lib/chat/link-preview";
 import { listBlocked } from "@/lib/blocks";
+import { listChannelRoster } from "@/lib/chat/roster";
+import type { ChatRosterMember } from "@/lib/chat/roster-groups";
 import { allowedBy } from "@/lib/privacy-service";
 import { FriendError, friendIds, requestFriend } from "@/lib/friends-service";
 import { groupStandings, mayJoinGroup } from "@/lib/chat/group-reach";
@@ -340,6 +342,20 @@ export async function listMembersAction(
 ): Promise<{ members?: ChatMemberView[]; error?: string }> {
     const me = await actor();
     const result = await guard(() => chat.listChannelMembers(me, channelId));
+    return result.error ? { error: result.error } : { members: result.value };
+}
+
+/** The members list beside a conversation, with who is around - see `roster`. */
+export async function listRosterAction(
+    channelId: unknown
+): Promise<{ members?: ChatRosterMember[]; error?: string }> {
+    const user = await requirePermission("chat.use");
+    const parsed = z.string().uuid().safeParse(channelId);
+    if (!parsed.success)
+        return { error: (await getTranslations("chat"))("errors.notInConversation") };
+    const result = await guard(() =>
+        listChannelRoster({ id: user.id, isAdmin: Boolean(user.isAdmin) }, parsed.data)
+    );
     return result.error ? { error: result.error } : { members: result.value };
 }
 
