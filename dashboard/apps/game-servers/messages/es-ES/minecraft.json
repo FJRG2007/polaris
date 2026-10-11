@@ -2493,7 +2493,7 @@
         "seekersHint": "De 1 a 3. Todos los encontrados buscan con ellos.",
         "fuseSeconds": "Mecha (segundos)",
         "fuseSecondsHint": "De 10 a 40 hasta que explota la patata.",
-        "ropeLength": "Largo de la cuerda",
+        "ropeLength": "Largo cuerda",
         "ropeLengthHint": "De 6 a 16 bloques desde el centro hasta la línea de cada equipo.",
         "chestLoot": "Qué hay en los cofres",
         "house": "Tamaño arena",
