@@ -403,20 +403,40 @@ async function giveBackInServer(
     save: (left: stash.Stash | null) => Promise<void>
 ): Promise<GiveBack> {
     let owed = [...kept.mod];
+    let dropped = 0;
+    // Told whenever the give-back stops, so a stack at their feet is never
+    // taken for one lost.
+    const tell = async () => {
+        if (dropped === 0) return;
+        await server
+            .sayAll([
+                `tellraw ${name} ${commands.text(
+                    messages.tag(speech.EVERY) + messages.keptAtFeet(dropped, speech.EVERY)
+                )}`
+            ])
+            .catch(() => undefined);
+    };
     for (const key of kept.mod) {
         const line = inServer.stashLine("restore", name, key);
         const reply = line ? inServer.parseStashReply(await server.say([line])) : null;
         // The mod is gone (a move off it) or did not answer: what it keeps is in
         // the world's own files, and is asked for again later.
-        if (!reply) return "later";
+        if (!reply) {
+            await tell();
+            return "later";
+        }
         if (!reply.ok) {
-            if (reply.why === "offline") return "offline";
-            if (reply.why !== "missing") return "later";
+            if (reply.why !== "missing") {
+                await tell();
+                return reply.why === "offline" ? "offline" : "later";
+            }
             console.warn("polaris: the mod had no stash under a key", server.installedAppId, name);
         }
+        dropped += reply.dropped ?? 0;
         owed = owed.filter((one) => one !== key);
         await save(owed.length > 0 ? { ...kept, mod: owed } : null);
     }
+    await tell();
     return "done";
 }
 

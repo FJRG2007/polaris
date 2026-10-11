@@ -128,8 +128,26 @@ describe("giving back in the server", () => {
         expect(
             await giveBack(server, "Ana", kept(["a", "a-1"]), async (left) => void saves.push(left))
         ).toBe("done");
-        expect(said).toEqual(["polaris stash restore Ana a", "polaris stash restore Ana a-1"]);
+        expect(said.slice(0, 2)).toEqual([
+            "polaris stash restore Ana a",
+            "polaris stash restore Ana a-1"
+        ]);
         expect(saves.at(-1)).toBeNull();
+    });
+
+    it("tells them what had no room and lies at their feet, as theirs", async () => {
+        answer = () => '{"ok":true,"restored":true,"slotted":12,"moved":0,"dropped":2}';
+        expect(await giveBack(server, "Ana", kept(["a", "a-1"]), async () => undefined)).toBe(
+            "done"
+        );
+        const told = said.filter((one) => one.startsWith("tellraw Ana "));
+        expect(told).toHaveLength(1);
+        const text = JSON.parse(told[0]!.slice("tellraw Ana ".length)) as { polaris: string };
+        expect(Buffer.from(text.polaris, "base64").toString("utf8")).toContain("4 stacks");
+        answer = () => '{"ok":true,"restored":true,"slotted":12,"moved":0,"dropped":0}';
+        said = [];
+        await giveBack(server, "Ana", kept(["a"]), async () => undefined);
+        expect(said.some((one) => one.startsWith("tellraw"))).toBe(false);
     });
 
     it("waits for somebody offline, and for a mod that no longer answers", async () => {

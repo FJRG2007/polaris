@@ -15,6 +15,7 @@ import net.minecraft.server.MinecraftServer;
 import net.neoforged.bus.api.EventPriority;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.neoforge.event.RegisterCommandsEvent;
+import net.neoforged.neoforge.event.entity.item.ItemTossEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerRespawnPositionEvent;
 import net.neoforged.neoforge.event.tick.ServerTickEvent;
@@ -231,5 +232,11 @@ final class EventCommands {
     @SubscribeEvent
     public void onPlayerSaved(PlayerEvent.SaveToFile event) {
         EventStash.playerSaved(event.getEntity().getUUID());
+    }
+
+    /** First, so a screen a stash closes never lets a stack reach the ground. */
+    @SubscribeEvent(priority = EventPriority.HIGHEST)
+    public void onToss(ItemTossEvent event) {
+        if (EventStash.caught(event.getPlayer().getUUID(), event.getEntity().getItem())) event.setCanceled(true);
     }
 }
