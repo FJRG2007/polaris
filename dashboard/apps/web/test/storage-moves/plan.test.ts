@@ -73,6 +73,35 @@ describe("placements", () => {
     });
 });
 
+describe("shared originals", () => {
+    const bind = (source: string): plan.Placement => ({ kind: "bind", source, connectionId: null });
+    const nas = (source: string, connectionId = CONN): plan.Placement => ({ kind: "nas", source, connectionId });
+
+    it("finds a folder another volume uses, holds or sits inside", () => {
+        expect(plan.placementsOverlap(bind("polaris/deploy/games/data"), bind("polaris/deploy/games/data/"))).toBe(true);
+        expect(plan.placementsOverlap(bind("polaris/deploy/games/data"), bind("polaris/deploy/games"))).toBe(true);
+        expect(plan.placementsOverlap(bind("polaris/deploy/games"), bind("polaris/deploy/games/data"))).toBe(true);
+        expect(plan.placementsOverlap(nas("media"), nas("media/films"))).toBe(true);
+    });
+
+    it("does not confuse neighbours, other shares or other kinds", () => {
+        expect(plan.placementsOverlap(bind("polaris/deploy/games/data"), bind("polaris/deploy/games/data2"))).toBe(false);
+        expect(plan.placementsOverlap(nas("media"), nas("media", `${CONN}x`))).toBe(false);
+        expect(plan.placementsOverlap(bind("media"), nas("media"))).toBe(false);
+        expect(
+            plan.placementsOverlap(
+                { kind: "volume", source: "data", connectionId: null },
+                { kind: "volume", source: "data2", connectionId: null }
+            )
+        ).toBe(false);
+    });
+
+    it("lists every folder above a source, and only the name of a named volume", () => {
+        expect(plan.sourceAncestors(bind("/a/b/c/"))).toEqual(["a", "a/b", "a/b/c"]);
+        expect(plan.sourceAncestors({ kind: "volume", source: "data", connectionId: null })).toEqual(["data"]);
+    });
+});
+
 describe("mount rendering", () => {
     it("mounts a named volume by its real docker name and a share under its connection", () => {
         expect(plan.composeVolume({ kind: "volume", source: "data", connectionId: null }, "/from", "polaris-ab12cd34_data")).toEqual({

@@ -23,6 +23,7 @@ CREATE TABLE IF NOT EXISTS "StorageMove" (
     "error" TEXT,
     "originRemoved" BOOLEAN,
     "leaseUntil" TIMESTAMP(3),
+    "leaseToken" TEXT,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
     "finishedAt" TIMESTAMP(3),

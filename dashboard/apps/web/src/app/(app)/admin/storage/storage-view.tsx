@@ -370,12 +370,15 @@ function errorText(t: T, error: MoveError): string {
                 return t("storage.errors.gone");
             case "cleanFailed":
                 return t("storage.errors.cleanFailed");
+            case "originShared":
+                return t("storage.errors.originShared");
             case "copy":
                 return t("storage.errors.copy");
             default:
                 return t("storage.errors.unexpected");
         }
     })();
+    if (error.notRestored) return `${base} ${t("storage.errors.notRestored")}`;
     return error.notRestarted ? `${base} ${t("storage.errors.notRestarted")}` : base;
 }
 
@@ -442,7 +445,7 @@ function MoveRow({ move, t, serverName, onChanged }: { move: MoveView; t: T; ser
                     </p>
                 </div>
             ) : null}
-            {move.error ? (
+            {move.error && !(move.originShared && move.error.code === "originShared") ? (
                 <div className="text-xs text-danger-ink">
                     <p>{errorText(t, move.error)}</p>
                     {move.error.detail ? (
@@ -453,15 +456,19 @@ function MoveRow({ move, t, serverName, onChanged }: { move: MoveView; t: T; ser
             {move.state === "moved" ? (
                 <div className="flex flex-wrap items-center gap-2">
                     <p className="min-w-0 flex-1 text-xs text-muted-foreground">
-                        {t("storage.moves.keptHint", { origin: serverName(move.originLabel) })}
+                        {move.originShared
+                            ? t("storage.moves.sharedHint", { origin: serverName(move.originLabel) })
+                            : t("storage.moves.keptHint", { origin: serverName(move.originLabel) })}
                     </p>
                     <Button size="sm" variant="ghost" disabled={pending !== null} onClick={() => void answer("keep")}>
                         {pending === "keep" ? <Loader2 className="size-4 animate-spin" aria-hidden /> : null}
                         {t("storage.moves.keep")}
                     </Button>
-                    <Button size="sm" variant="secondary" disabled={pending !== null} onClick={() => setConfirming(true)}>
-                        {t("storage.moves.remove")}
-                    </Button>
+                    {move.originShared ? null : (
+                        <Button size="sm" variant="secondary" disabled={pending !== null} onClick={() => setConfirming(true)}>
+                            {t("storage.moves.remove")}
+                        </Button>
+                    )}
                 </div>
             ) : null}
             {move.state === "finished" ? (

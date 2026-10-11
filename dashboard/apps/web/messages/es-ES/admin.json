@@ -3102,7 +3102,7 @@
             "checking": "Conectando...",
             "connectedNoSize": "Conectado. Este recurso no informa de su tamaño.",
             "denied": "El recurso rechazó el usuario o la contraseña.",
-            "notMounted": "Los recursos NFS requieren la edición completa de Polaris, que los monta en el servidor.",
+            "notMounted": "Polaris solo monta recursos compartidos en el servidor en su edición completa, y esta instalación es la limitada.",
             "missing": "Esta ubicación ya no existe.",
             "unreachable": "Polaris no pudo conectar con este recurso. Comprueba que el NAS está encendido y que la dirección es correcta.",
             "test": "Probar conexión",
@@ -3185,6 +3185,7 @@
             "removeDescription": "El servicio ya funciona en {target}. Esto libera el espacio y no se puede deshacer.",
             "removedHint": "Se quitó el original.",
             "keptDone": "El original se conservó en {origin}.",
+            "sharedHint": "El servicio funciona con la copia. El original en {origin} también lo usa otro volumen, así que se conserva.",
             "answerGone": "Este traslado ya tiene respuesta."
         },
         "states": {
@@ -3212,7 +3213,9 @@
             "cleanFailed": "No se pudo quitar el original. Sigue ahí; inténtalo de nuevo.",
             "copy": "La copia se detuvo antes de terminar. El servicio siguió en el original.",
             "unexpected": "Algo salió mal. El servicio siguió en el original.",
-            "notRestarted": "No se pudo volver a arrancar el servicio; arráncalo desde su página."
+            "notRestarted": "No se pudo volver a arrancar el servicio; arráncalo desde su página.",
+            "notRestored": "No se pudo devolver su volumen al original y sigue apuntando a la copia. Muévelo de nuevo en Datos guardados.",
+            "originShared": "Otro volumen sigue usando el original, así que solo se puede conservar."
         }
     }
 }

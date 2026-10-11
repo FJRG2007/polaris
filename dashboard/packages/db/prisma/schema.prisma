@@ -12885,6 +12885,8 @@ model StorageMove {
     // Whether the original's files were removed (true) or kept (false) at the end.
     originRemoved Boolean?
     leaseUntil    DateTime?
+    // Which worker holds the lease: only it may renew, release or advance it.
+    leaseToken    String?
     createdAt     DateTime  @default(now())
     updatedAt     DateTime  @updatedAt
     finishedAt    DateTime?

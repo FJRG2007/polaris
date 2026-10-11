@@ -148,6 +148,31 @@ export function parsePlacement(json: string): Placement {
     throw new Error("Malformed placement");
 }
 
+function pathOf(source: string): string {
+    return source.replace(/\\/g, "/").replace(/\/+/g, "/").replace(/^\/|\/$/g, "");
+}
+
+/** A placement's source and every folder above it, outermost first. A named
+ *  volume has no folders, only its name. */
+export function sourceAncestors(placement: Placement): string[] {
+    if (placement.kind === "volume") return [placement.source];
+    const parts = pathOf(placement.source).split("/");
+    return parts.map((_, index) => parts.slice(0, index + 1).join("/"));
+}
+
+/**
+ * Whether two placements reach the same files: the same named volume, or two
+ * folders on the same disk or share where one is the other or holds it.
+ * Emptying either one would take files from the other.
+ */
+export function placementsOverlap(left: Placement, right: Placement): boolean {
+    if (left.kind !== right.kind || left.connectionId !== right.connectionId) return false;
+    if (left.kind === "volume") return left.source === right.source;
+    const a = pathOf(left.source);
+    const b = pathOf(right.source);
+    return a === b || a.startsWith(`${b}/`) || b.startsWith(`${a}/`);
+}
+
 /** Where Polaris keeps the server folders of Deploy's services (see deploy-volume-service). */
 const DEPLOY_BIND_ROOT = "polaris/deploy";
 /** Where moved volumes go on a NAS share. */

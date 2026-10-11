@@ -3102,7 +3102,7 @@
             "checking": "Connecting...",
             "connectedNoSize": "Connected. This share does not report its size.",
             "denied": "The share refused the username or password.",
-            "notMounted": "NFS shares need the full edition of Polaris, which mounts them on the server.",
+            "notMounted": "Polaris mounts shares on the server only in its full edition, and this install is the limited one.",
             "missing": "This location no longer exists.",
             "unreachable": "Polaris could not reach this share. Check that the NAS is on and the address is right.",
             "test": "Test connection",
@@ -3185,6 +3185,7 @@
             "removeDescription": "The service already runs on {target}. This frees the space and cannot be undone.",
             "removedHint": "The original was removed.",
             "keptDone": "The original was kept on {origin}.",
+            "sharedHint": "The service runs on the copy. The original on {origin} is also used by another volume, so it is kept.",
             "answerGone": "This move has already been answered."
         },
         "states": {
@@ -3212,7 +3213,9 @@
             "cleanFailed": "The original could not be removed. It is still there; try again.",
             "copy": "The copy stopped before it finished. The service stayed on the original.",
             "unexpected": "Something went wrong. The service stayed on the original.",
-            "notRestarted": "The service could not be started again; start it from its page."
+            "notRestarted": "The service could not be started again; start it from its page.",
+            "notRestored": "Its volume could not be put back on the original and still points at the copy. Move it again under Service data.",
+            "originShared": "Another volume still uses the original, so it can only be kept."
         }
     }
 }

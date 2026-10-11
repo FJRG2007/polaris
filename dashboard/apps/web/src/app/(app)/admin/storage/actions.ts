@@ -126,7 +126,8 @@ export async function answerMoveAction(input: unknown): Promise<{ error?: string
     const parsed = answerSchema.safeParse(input);
     if (!parsed.success) return { error: t("storage.moves.answerGone") };
     const done = await moves.answerMove(parsed.data.id, parsed.data.answer);
-    if (!done) return { error: t("storage.moves.answerGone") };
+    if (done === "gone") return { error: t("storage.moves.answerGone") };
+    if (done === "shared") return { error: t("storage.errors.originShared") };
     await recordAudit({
         actorId: admin.id,
         action: parsed.data.answer === "remove" ? "storage.move.remove-original" : "storage.move.keep-original",

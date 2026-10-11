@@ -51,12 +51,15 @@ export interface MoveError {
         | "startFailed"
         | "gone"
         | "unexpected"
-        | "cleanFailed";
+        | "cleanFailed"
+        | "originShared";
     readonly detail?: string;
     readonly freeBytes?: number;
     readonly neededBytes?: number;
     /** The rollback could not start the app again. */
     readonly notRestarted?: boolean;
+    /** The rollback could not point the volume back at the original. */
+    readonly notRestored?: boolean;
 }
 
 class MoveFailure extends Error {
@@ -64,6 +67,9 @@ class MoveFailure extends Error {
         super(reason.code);
     }
 }
+
+/** Another worker took the move over; this one stops without writing anything. */
+class LeaseLost extends Error {}
 
 // ---------------------------------------------------------------------------
 // Locations
@@ -336,6 +342,8 @@ export interface MoveView {
     readonly fileCount: number | null;
     readonly error: MoveError | null;
     readonly originRemoved: boolean | null;
+    /** Another volume still uses the original, so it may only be kept. */
+    readonly originShared: boolean;
     readonly createdAt: string;
     readonly finishedAt: string | null;
 }
@@ -363,6 +371,15 @@ export async function listMoves(): Promise<MoveView[]> {
     ]);
     const appName = new Map(apps.map((app) => [app.id, app.name]));
     const volumeName = new Map(volumes.map((volume) => [volume.id, volume.name]));
+    const shared = new Set(
+        (
+            await Promise.all(
+                rows
+                    .filter((row) => row.state === "moved")
+                    .map(async (row) => ((await originShared(row.volumeId, plan.parsePlacement(row.origin))) ? row.id : null))
+            )
+        ).filter((id): id is string => id !== null)
+    );
     return rows.map((row) => {
         const total = row.totalBytes === null ? null : Number(row.totalBytes);
         const copied = row.copiedBytes === null ? null : Number(row.copiedBytes);
@@ -382,6 +399,7 @@ export async function listMoves(): Promise<MoveView[]> {
             fileCount: row.fileCount,
             error: errorOf(row.error),
             originRemoved: row.originRemoved,
+            originShared: shared.has(row.id),
             createdAt: row.createdAt.toISOString(),
             finishedAt: row.finishedAt?.toISOString() ?? null
         };
@@ -452,6 +470,9 @@ export async function startMove(input: {
     const originLabel = origin.kind === "nas" ? (volume.connection?.name ?? server) : server;
 
     const created = await prisma.$transaction(async (tx) => {
+        // Two starts for one app wait for each other here, so the second sees the
+        // first one's move.
+        await tx.$queryRaw`SELECT "id" FROM "Application" WHERE "id" = ${app.id}::uuid FOR UPDATE`;
         const running = await tx.storageMove.findFirst({
             where: { applicationId: app.id, state: { in: [...plan.BLOCKING_STATES] } },
             select: { id: true }
@@ -483,17 +504,52 @@ export async function startMove(input: {
     return { id: created.id };
 }
 
+/**
+ * Whether another volume still reaches the files at `origin`: the same named
+ * volume, or a folder that is, holds or sits inside it. Emptying the original
+ * would take those files from it.
+ */
+async function originShared(volumeId: string, origin: plan.Placement): Promise<boolean> {
+    const names = plan.sourceAncestors(origin);
+    const candidates = await prisma.volume.findMany({
+        where: {
+            id: { not: volumeId },
+            kind: origin.kind,
+            connectionId: origin.connectionId,
+            OR: [
+                { source: { in: names } },
+                { source: null, name: { in: names } },
+                ...(origin.kind === "volume" ? [] : [{ source: { startsWith: `${names[names.length - 1]}/` } }])
+            ]
+        },
+        select: { kind: true, source: true, name: true, connectionId: true },
+        take: 50
+    });
+    return candidates.some((row) => {
+        const placement = plan.placementOf(row);
+        return placement !== null && plan.placementsOverlap(origin, placement);
+    });
+}
+
 /** The person's answer to a finished move: empty the original, or keep it. */
-export async function answerMove(id: string, answer: "remove" | "keep"): Promise<boolean> {
+export async function answerMove(id: string, answer: "remove" | "keep"): Promise<"ok" | "gone" | "shared"> {
+    if (answer === "remove") {
+        const row = await prisma.storageMove.findFirst({
+            where: { id, state: "moved" },
+            select: { volumeId: true, origin: true }
+        });
+        if (!row) return "gone";
+        if (await originShared(row.volumeId, plan.parsePlacement(row.origin))) return "shared";
+    }
     const next = plan.nextState("moved", answer);
     const updated = await prisma.storageMove.updateMany({
         where: { id, state: "moved" },
         data: answer === "keep" ? { state: next, originRemoved: false, finishedAt: new Date() } : { state: next, error: null }
     });
-    if (updated.count === 0) return false;
+    if (updated.count === 0) return "gone";
     if (answer === "remove")
         void runMove(id).catch((caught: unknown) => console.error("polaris: storage clean-up failed to run:", caught));
-    return true;
+    return "ok";
 }
 
 /** The cron backstop: every move a worker should be holding and is not. */
@@ -513,17 +569,24 @@ export async function sweepStorageMoves(): Promise<{ resumed: number }> {
     return { resumed: rows.length };
 }
 
-async function takeLease(id: string): Promise<boolean> {
+/** Take a free or lapsed lease, answering the token that holds it. */
+async function takeLease(id: string): Promise<string | null> {
     const now = new Date();
+    const token = crypto.randomUUID();
     const taken = await prisma.storageMove.updateMany({
         where: { id, OR: [{ leaseUntil: null }, { leaseUntil: { lt: now } }] },
-        data: { leaseUntil: new Date(now.getTime() + LEASE_MS) }
+        data: { leaseUntil: new Date(now.getTime() + LEASE_MS), leaseToken: token }
     });
-    return taken.count === 1;
+    return taken.count === 1 ? token : null;
 }
 
-async function renewLease(id: string): Promise<void> {
-    await prisma.storageMove.update({ where: { id }, data: { leaseUntil: new Date(Date.now() + LEASE_MS) } });
+/** Extend this worker's lease; throws when another worker has taken it over. */
+async function renewLease(id: string, token: string): Promise<void> {
+    const renewed = await prisma.storageMove.updateMany({
+        where: { id, leaseToken: token },
+        data: { leaseUntil: new Date(Date.now() + LEASE_MS) }
+    });
+    if (renewed.count === 0) throw new LeaseLost();
 }
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -543,9 +606,11 @@ interface MoveContext {
         target: TargetRow;
     };
     readonly mountPath: string;
+    /** The token of the lease this worker holds. */
+    readonly lease: string;
 }
 
-async function contextOf(row: MoveRow): Promise<MoveContext> {
+async function contextOf(row: MoveRow, lease: string): Promise<MoveContext> {
     const [app, volume] = await Promise.all([
         prisma.application.findUnique({
             where: { id: row.applicationId },
@@ -566,7 +631,8 @@ async function contextOf(row: MoveRow): Promise<MoveContext> {
         origin: plan.parsePlacement(row.origin),
         destination: plan.parsePlacement(row.destination),
         app: { ...app, target: app.target as TargetRow },
-        mountPath: volume.mountPath
+        mountPath: volume.mountPath,
+        lease
     };
 }
 
@@ -576,55 +642,70 @@ async function contextOf(row: MoveRow): Promise<MoveContext> {
  * one that carries on.
  */
 export async function runMove(id: string): Promise<void> {
-    if (!(await takeLease(id))) return;
+    const lease = await takeLease(id);
+    if (!lease) return;
+    const held = { id, leaseToken: lease };
     try {
         for (;;) {
-            const row = await prisma.storageMove.findUnique({ where: { id } });
+            const row = await prisma.storageMove.findFirst({ where: held });
             if (!row || !plan.isMoveState(row.state) || !plan.WORKING_STATES.includes(row.state)) return;
             const state = row.state;
             try {
-                await step(row, state);
-                await prisma.storageMove.update({
-                    where: { id },
+                await step(row, state, lease);
+                const advanced = await prisma.storageMove.updateMany({
+                    where: held,
                     data: {
                         state: plan.nextState(state, "ok"),
                         ...(state === "cleaning" ? { originRemoved: true, finishedAt: new Date() } : {}),
                         ...(state === "rolling-back" ? { finishedAt: new Date() } : {})
                     }
                 });
+                if (advanced.count === 0) return;
             } catch (caught) {
+                if (caught instanceof LeaseLost) return;
                 const reason: MoveError =
                     caught instanceof MoveFailure ? caught.reason : { code: state === "cleaning" ? "cleanFailed" : "unexpected" };
                 if (!(caught instanceof MoveFailure)) console.error(`polaris: storage move ${id} failed at ${state}:`, caught);
                 if (state === "rolling-back") {
                     // The rollback could not finish; what it could not do is said beside the
-                    // first reason rather than replacing it.
+                    // first reason rather than replacing it. A volume still switched means
+                    // putting it back failed; otherwise it was starting the app again.
                     const first = errorOf(row.error) ?? reason;
-                    await prisma.storageMove.update({
-                        where: { id },
+                    const after = await prisma.storageMove.findFirst({ where: held, select: { switched: true } });
+                    if (!after) return;
+                    await prisma.storageMove.updateMany({
+                        where: held,
                         data: {
                             state: "failed",
                             finishedAt: new Date(),
-                            error: JSON.stringify({ ...first, notRestarted: true })
+                            error: JSON.stringify({
+                                ...first,
+                                ...(after.switched ? { notRestored: true } : row.wasRunning ? { notRestarted: true } : {})
+                            })
                         }
                     });
                     return;
                 }
-                await prisma.storageMove.update({
-                    where: { id },
+                const failed = await prisma.storageMove.updateMany({
+                    where: held,
                     data: { state: plan.nextState(state, "fail"), error: JSON.stringify(reason) }
                 });
+                if (failed.count === 0) return;
             }
-            await renewLease(id);
+            await renewLease(id, lease);
         }
+    } catch (caught) {
+        if (!(caught instanceof LeaseLost)) throw caught;
     } finally {
-        await prisma.storageMove.update({ where: { id }, data: { leaseUntil: null } }).catch(() => undefined);
+        await prisma.storageMove
+            .updateMany({ where: held, data: { leaseUntil: null, leaseToken: null } })
+            .catch(() => undefined);
     }
 }
 
-async function step(row: MoveRow, state: plan.MoveState): Promise<void> {
+async function step(row: MoveRow, state: plan.MoveState, lease: string): Promise<void> {
     if (state === "queued") return;
-    const context = await contextOf(row);
+    const context = await contextOf(row, lease);
     if (state === "stopping") return stopApp(context);
     if (state === "copying") return copy(context);
     if (state === "switching") return switchVolume(context);
@@ -732,7 +813,7 @@ async function runOneShot(
             missing = 0;
             if (onTick) await onTick(name);
         }
-        await renewLease(context.row.id);
+        await renewLease(context.row.id, context.lease);
         await sleep(POLL_MS);
     }
 }
@@ -797,15 +878,19 @@ async function switchVolume(context: MoveContext): Promise<void> {
         const status = parseContainerState(await ports.inspect(container).catch(() => null)).status;
         if (status === "running" || status === "restarting") throw new MoveFailure({ code: "stillRunning" });
     });
-    await setPlacement(context.row.volumeId, context.destination);
-    await prisma.storageMove.update({ where: { id: context.row.id }, data: { switched: true } });
+    await setPlacement(context, context.destination, true);
 }
 
-async function setPlacement(volumeId: string, placement: plan.Placement): Promise<void> {
-    await prisma.volume.update({
-        where: { id: volumeId },
-        data: { kind: placement.kind, source: placement.source, connectionId: placement.connectionId }
-    });
+/** Point the volume at `placement` and record whether that is the copy, together:
+ *  a rollback decides from `switched` whether the copy may be emptied. */
+async function setPlacement(context: MoveContext, placement: plan.Placement, switched: boolean): Promise<void> {
+    await prisma.$transaction([
+        prisma.volume.update({
+            where: { id: context.row.volumeId },
+            data: { kind: placement.kind, source: placement.source, connectionId: placement.connectionId }
+        }),
+        prisma.storageMove.update({ where: { id: context.row.id }, data: { switched } })
+    ]);
 }
 
 /**
@@ -822,7 +907,7 @@ async function startApp(context: MoveContext, rollingBack: boolean): Promise<voi
         if (deployment?.status === "running") return;
         if (!deployment || deployment.status === "failed" || deployment.status === "cancelled" || Date.now() > deadline)
             throw rollingBack ? new Error("The app did not start again") : new MoveFailure({ code: "startFailed" });
-        await renewLease(context.row.id);
+        await renewLease(context.row.id, context.lease);
         await sleep(POLL_MS);
     }
 }
@@ -847,8 +932,7 @@ async function rollBack(context: MoveContext): Promise<void> {
             }).catch((caught: unknown) => console.error(`polaris: storage move ${context.row.id} left its copy:`, caught));
         }
         if (action === "restore-volume") {
-            await setPlacement(context.row.volumeId, context.origin);
-            await prisma.storageMove.update({ where: { id: context.row.id }, data: { switched: false } });
+            await setPlacement(context, context.origin, false);
         }
         if (action === "start-app") await startApp(context, true);
     }
@@ -865,6 +949,7 @@ async function cleanOrigin(context: MoveContext): Promise<void> {
         // so its name is the one recorded when the copy found it.
         const dockerName = recordedDockerName(context.row.origin);
         if (context.origin.kind === "volume" && !dockerName) throw new MoveFailure({ code: "cleanFailed" });
+        if (await originShared(context.row.volumeId, context.origin)) throw new MoveFailure({ code: "originShared" });
         const spec = plan.cleanupSpec(context.row.id, context.origin, dockerName);
         const { exitCode, log } = await runOneShot(context, ports, spec);
         if (exitCode !== 0) throw new MoveFailure({ code: "cleanFailed", detail: log.trim().slice(-300) || undefined });
