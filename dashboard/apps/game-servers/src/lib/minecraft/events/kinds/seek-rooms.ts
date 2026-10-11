@@ -26,6 +26,11 @@
  * - what the wall nooks round it are opened by (`entrances`): a painting, a
  *   panel of the wall's own blocks, a door, a wall you can walk through (from
  *   1.19.4), or a waterfall.
+ * - `pad`s (from design 5): slime blocks in the floor the data pack throws a
+ *   player up from (`secret-panels.ts`).
+ *
+ * A template added in a later design says so (`since`): a house an older
+ * design built never draws it, so it is drawn exactly as it was.
  *
  * Every piece of furniture of a kind has the same size wherever it stands,
  * whether or not it hides anything: a hollow crate stack and a full one, a
@@ -71,6 +76,8 @@ export interface Style {
 export interface Canvas {
     readonly random: () => number;
     readonly era: Era;
+    /** The house's design (`seek-manor.DESIGN`). */
+    readonly design: number;
     readonly style: Style;
     /** Its doorways, by side and where along it they start (two wide). */
     readonly doors: readonly { readonly side: Side; readonly at: number }[];
@@ -98,6 +105,9 @@ export interface Canvas {
     display(block: string, u: number, level: number, v: number): void;
     hook(hook: Hook): void;
     spot(u: number, feet: number, v: number): void;
+    /** A launch pad in the floor (from design 5): a slime block the pack
+     *  throws whoever stands on it up from. */
+    pad(u: number, v: number): void;
 }
 
 export interface Template {
@@ -105,6 +115,8 @@ export interface Template {
     readonly style: Style;
     /** Whether the server can show it at all. */
     readonly fits?: (era: Era) => boolean;
+    /** The first design that draws it. */
+    readonly since?: number;
     draw(canvas: Canvas): void;
 }
 
@@ -659,6 +671,59 @@ const SNOW: Template = {
     }
 };
 
+/**
+ * A tall hall built to climb (design 5): everything in it is seen from the
+ * door and has to be reached.
+ *
+ * - a launch pad in the floor beside a ledge under the roof in one corner,
+ *   with crates on it to crouch behind;
+ * - two runs of posts, each a block higher than the last with a gap of one
+ *   between, up to a crow's nest in each of the two far corners - a jump a
+ *   player makes, never a step (`seek-grid.walk`'s jumps);
+ * - a trapdoor into a cellar in the last corner.
+ *
+ * The posts run two blocks in from the walls, clear of every doorway's
+ * landing, and the nests and the ledge are over the doorways' height.
+ */
+export const ATRIUM_SINCE = 5;
+
+const ATRIUM: Template = {
+    name: "atrium",
+    since: ATRIUM_SINCE,
+    style: {
+        face: "minecraft:polished_andesite",
+        floor: "minecraft:smooth_stone",
+        entrances: ["panel", "painting", "door"]
+    },
+    draw(c) {
+        const deck = "minecraft:spruce_planks";
+        const crate = c.era.scaffold ? "minecraft:barrel[facing=up]" : "minecraft:oak_planks";
+        const post = "minecraft:stone_bricks";
+        // The ledge in the north-west corner, and the pad that throws you up
+        // beside it.
+        c.set(deck, 0, 5, 0, 3, 5, 2);
+        c.set(crate, 0, 6, 2, 1, 7, 2);
+        c.spot(0, 6, 0);
+        c.pad(2, 3);
+        // Posts along the south side up to a nest in the south-east corner...
+        for (const [step, u] of [3, 5, 7, 9].entries()) c.set(post, u, 1, 11, u, step + 1, 11);
+        c.set(deck, 11, 5, 11, 13, 5, 13);
+        c.set(crate, 12, 6, 11, 13, 7, 11);
+        c.spot(13, 6, 12);
+        // ...and along the east side up to one in the north-east corner.
+        for (const [step, v] of [9, 7, 5, 3].entries()) c.set(post, 11, 1, v, 11, step + 1, v);
+        c.set(deck, 11, 5, 0, 13, 5, 1);
+        c.set(crate, 12, 6, 1, 13, 7, 1);
+        c.spot(13, 6, 0);
+        // A cellar under a trapdoor in the south-west corner.
+        cellar(c, 1, 10, 3, 12);
+        hatch(c, "oak", 1, 11, "east");
+        c.spot(3, -3, 12);
+        rug(c, "cyan", 5, 7);
+        tile(c, 7, 4);
+    }
+};
+
 /** Every template but the foyer, which is only ever the middle room. */
 export const TEMPLATES: readonly Template[] = [
     LIBRARY,
@@ -670,7 +735,8 @@ export const TEMPLATES: readonly Template[] = [
     GALLERY,
     WORKSHOP,
     BEDROOM,
-    SNOW
+    SNOW,
+    ATRIUM
 ];
 
 /** A plain room, for a house that falls back to its bare walls. */

@@ -4,7 +4,7 @@
  */
 
 import type { Language } from "../catalog";
-import type { Cover, Crate, Sky, Wind } from "./acid-rain";
+import type { Cover, Crate, Sky } from "./acid-rain";
 
 /** Under "Get ready", in the middle of the arena. */
 export function readySubtitle(language: Language): string {
@@ -20,24 +20,15 @@ export function goTitle(language: Language): string {
 
 export function goSubtitle(language: Language): string {
     return language === "es"
-        ? "&fQuédate a cubierto: la lluvia se come los techos"
-        : "&fStay under cover - the rain eats roofs";
+        ? "&fConstruye un techo y quédate debajo"
+        : "&fBuild a roof and stay under it";
 }
 
-/** Told to everybody at "Go!": the whole game in one line. */
+/** Told to everybody at "Go!": the whole game in three short steps. */
 export function howItWorks(language: Language): string {
     return language === "es"
-        ? "&fBajo la lluvia sube tu ácido; a 100 quedas fuera. &7La lluvia se come los techos: &frepáralos con tu piedra. &7Llega en oleadas: en cada &bcalma&7, corre a por los suministros que brillan. El último minuto, diluvio."
-        : "&fOut in the rain your acid goes up; at 100 you are out. &7The rain eats roofs: &fpatch them with your cobblestone. &7It comes in waves: in each &bcalm&7, run for the glowing supplies. The last minute is a downpour.";
-}
-
-/** Where the wind comes from. */
-export function windName(wind: Wind, language: Language): string {
-    const names =
-        language === "es"
-            ? ["", "el norte", "el este", "el sur", "el oeste"]
-            : ["", "the north", "the east", "the south", "the west"];
-    return names[wind] ?? "";
+        ? "&f1. &aPon tu piedra encima de ti: &fbajo techo no te moja. &f2. &7Fuera, tu ácido sube; &fa 100 quedas fuera. &f3. &7La lluvia se come los techos: &frepáralos. &7Tu &fpico &7rompe la piedra y te la devuelve. En la &bcalma&7, corre a por lo que brilla."
+        : "&f1. &aPut your cobblestone over your head: &fa roof keeps you dry. &f2. &7Out in the rain your acid rises; &fat 100 you are out. &f3. &7The rain eats roofs: &fpatch them. &7Your &fpickaxe &7breaks cobblestone and gives it back. In a &bcalm&7, run for what glows.";
 }
 
 /** What the sky is doing, as a name. */
@@ -45,40 +36,47 @@ export function skyName(sky: Sky, level: number, language: Language): string {
     if (language === "es")
         return {
             drizzle: "&aLlovizna",
-            surge: `&c&lTormenta ${level}`,
+            surge: `&c&lTormenta ácida ${level}`,
             calm: "&b&lCalma",
             downpour: "&5&lDiluvio ácido"
         }[sky];
     return {
         drizzle: "&aDrizzle",
-        surge: `&c&lSurge ${level}`,
+        surge: `&c&lAcid storm ${level}`,
         calm: "&b&lCalm",
         downpour: "&5&lAcid downpour"
     }[sky];
 }
 
-/** The boss bar: what the sky is doing, what comes next and when. */
+/** What to do under each sky, in a few words: on the boss bar all along. */
+export function skyDo(sky: Sky, language: Language): string {
+    const es = language === "es";
+    switch (sky) {
+        case "drizzle":
+            return es ? "&fconstruye tu techo" : "&fbuild your roof";
+        case "surge":
+            return es ? "&fquédate bajo techo" : "&fstay under a roof";
+        case "calm":
+            return es ? "&fcorre a por lo que brilla" : "&fgrab what glows";
+        case "downpour":
+            return es ? "&faguanta bajo techo" : "&fhold on under a roof";
+    }
+}
+
+/** The boss bar: what the sky is doing, what to do, what comes next and when. */
 export function skyBar(
-    spell: { sky: Sky; level: number; wind: Wind },
+    spell: { sky: Sky; level: number },
     next: { sky: Sky; level: number } | null,
     clock: string,
     language: Language
 ): string {
     const name = skyName(spell.sky, spell.level, language);
-    const wind =
-        spell.wind > 0
-            ? language === "es"
-                ? ` &7| &fviento de ${windName(spell.wind, language)}`
-                : ` &7| &fwind from ${windName(spell.wind, language)}`
-            : "";
-    if (!next)
-        return language === "es"
-            ? `${name}${wind} &7- aguanta &f${clock}`
-            : `${name}${wind} &7- hold on &f${clock}`;
+    const todo = skyDo(spell.sky, language);
+    if (!next) return `${name} &7- ${todo} &f${clock}`;
     const coming = skyName(next.sky, next.level, language).replace(/&l/g, "");
     return language === "es"
-        ? `${name}${wind} &7- ${coming} &7en &f${clock}`
-        : `${name}${wind} &7- ${coming} &7in &f${clock}`;
+        ? `${name} &7- ${todo} &7| ${coming} &7en &f${clock}`
+        : `${name} &7- ${todo} &7| ${coming} &7in &f${clock}`;
 }
 
 /** The title when the sky changes. */
@@ -87,12 +85,8 @@ export function skyTitle(sky: Sky, level: number, language: Language): string {
 }
 
 /** Under it: what to do now. */
-export function skySubtitle(sky: Sky, wind: Wind, language: Language): string {
+export function skySubtitle(sky: Sky, language: Language): string {
     const es = language === "es";
-    if (wind > 0 && sky !== "calm")
-        return es
-            ? `&fViento de ${windName(wind, language)}: tapa también ese lado`
-            : `&fWind from ${windName(wind, language)}: wall that side too`;
     switch (sky) {
         case "drizzle":
             return es ? "&aLlovizna: repara tu techo" : "&aDrizzle: patch your roof";

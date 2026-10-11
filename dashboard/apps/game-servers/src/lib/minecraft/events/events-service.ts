@@ -1260,6 +1260,7 @@ function startLoop(
         run.preset.kind === "downhill-race" ||
         run.preset.kind === "nether-maze" ||
         run.preset.kind === "elytra-race" ||
+        run.preset.kind === "acid-rain" ||
         arenaService.quickens(run.preset)
     ) {
         loop.quick = setInterval(() => void quickLook(loop), QUICK_MS);

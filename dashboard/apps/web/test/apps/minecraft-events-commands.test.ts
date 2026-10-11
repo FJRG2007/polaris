@@ -2656,6 +2656,8 @@ describe("what an arena sends", () => {
             "clear Ana minecraft:snowball{polaris_event:1b}",
             "clear Ana minecraft:oak_boat{polaris_event:1b}",
             "clear Ana minecraft:cobblestone{polaris_event:1b}",
+            "clear Ana minecraft:mossy_cobblestone{polaris_event:1b}",
+            "clear Ana minecraft:stone_pickaxe{polaris_event:1b}",
             "clear Ana minecraft:elytra{polaris_event:1b}",
             "clear Ana minecraft:firework_rocket{polaris_event:1b}"
         ]);

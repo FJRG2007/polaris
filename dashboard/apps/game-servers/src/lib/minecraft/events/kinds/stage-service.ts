@@ -1583,6 +1583,12 @@ export function quickLines(loop: StageLoop): string[] {
             lost: told(boatMessages.lost(language))
         });
     }
+    // An acid rain: what a broken shelter block let fall, kit again before
+    // anybody picks it up plain.
+    if (layout.kind === "acid-rain")
+        return state(loop).armed && loop.items
+            ? acidRain.reclaimLines(layout.acid, loop.items)
+            : [];
     if (layout.kind !== "parkour") return [];
     // Before the start: nobody off the start pad.
     if (holding(loop)) return parkour.holdLines(layout.course);
@@ -2143,6 +2149,7 @@ async function acidTick(
     const inNow = () => state(loop).racers.filter((one) => one.outAt === null);
     if (!current.armed && current.goAt !== null && now >= current.goAt) {
         const { items } = await tools.flavour();
+        loop.items ??= items;
         // Whatever players place and whatever the rain leaves of it is the
         // arena's too: written down before the first block is handed out.
         change(loop, { boxes: [...current.boxes, ...acidRain.sweepBoxes(acid)] });
@@ -2150,6 +2157,7 @@ async function acidTick(
             if (racer.outAt !== null) continue;
             lines.push(
                 acidRain.cobblestoneLine(racer.name, items, acidRain.START_BLOCKS),
+                acidRain.pickaxeLine(racer.name, items),
                 `title ${racer.name} subtitle ${commands.text(acidMessages.goSubtitle(language))}`,
                 `title ${racer.name} title ${commands.text(acidMessages.goTitle(language))}`,
                 soundFor(racer.name, commands.SOUNDS.start),
@@ -2166,6 +2174,8 @@ async function acidTick(
         change(loop, { armed: true });
         dirty = true;
     } else if (current.armed && current.goAt !== null) {
+        // After a restart: what the quick look needs to give broken blocks back.
+        loop.items ??= (await tools.flavour()).items;
         const index = acidRain.spellAt(spells, since);
         const spell = spells[index];
         if (spell && index !== loop.acidSpell) {
@@ -2296,7 +2306,7 @@ async function acidSpellLines(
     const lines: string[] = [];
     for (const racer of standing)
         lines.push(
-            `title ${racer.name} subtitle ${commands.text(acidMessages.skySubtitle(spell.sky, spell.wind, language))}`,
+            `title ${racer.name} subtitle ${commands.text(acidMessages.skySubtitle(spell.sky, language))}`,
             `title ${racer.name} title ${commands.text(acidMessages.skyTitle(spell.sky, spell.level, language))}`,
             soundFor(racer.name, acidRain.SKY_SOUNDS[spell.sky])
         );

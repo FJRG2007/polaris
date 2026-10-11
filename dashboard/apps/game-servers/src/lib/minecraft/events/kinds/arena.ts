@@ -359,7 +359,8 @@ export function killBrokenDrops(box: Box, marker: Marker): string {
 /**
  * What a block broken in the box let fall, made kit again: marked and placeable
  * on `placeOn`, as it was handed out, so it stacks with the rest and is taken
- * back with it. Never what somebody threw (it has a `Thrower`).
+ * back with it. Never what somebody threw (it has a `Thrower`), and never an
+ * item the event summoned itself (it has a tag).
  */
 export function reclaimBrokenDrops(box: Box, marker: Marker, placeOn: readonly string[]): string {
     const list = `[${placeOn.map((one) => `"${one}"`).join(",")}]`;
@@ -367,7 +368,7 @@ export function reclaimBrokenDrops(box: Box, marker: Marker, placeOn: readonly s
         marker === "components"
             ? `{components:{"minecraft:custom_data":{${MARK}},"minecraft:can_place_on":{blocks:${list}}}}`
             : `{tag:{${MARK},CanPlaceOn:${list}}}`;
-    return `execute in minecraft:overworld as @e[type=minecraft:item,${within(box)},nbt=!{Item:${markedItem(marker)}}] unless data entity @s Thrower run data merge entity @s {Item:${item}}`;
+    return `execute in minecraft:overworld as @e[type=minecraft:item,${within(box)},tag=,nbt=!{Item:${markedItem(marker)}}] unless data entity @s Thrower run data merge entity @s {Item:${item}}`;
 }
 
 /**

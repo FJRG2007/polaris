@@ -77,11 +77,12 @@ function roomsOf(run: stored.EventRun): number {
 function manorOf(run: stored.EventRun): manor.Manor {
     const rooms = roomsOf(run);
     const era = gameOf(run).era ?? model.OLDEST;
-    const key = `${run.id}:${rooms}:${era.scaffold}:${era.snow}:${era.display}`;
+    const design = designOf(run);
+    const key = `${run.id}:${design}:${rooms}:${era.scaffold}:${era.snow}:${era.display}`;
     let built = manors.get(key);
     if (!built) {
         if (manors.size >= 8) manors.delete(manors.keys().next().value!);
-        built = manor.manorFor(run.id, rooms, era);
+        built = manor.manorFor(run.id, rooms, era, design);
         manors.set(key, built);
     }
     return built;
@@ -89,7 +90,7 @@ function manorOf(run: stored.EventRun): manor.Manor {
 
 /** Whether a run plays in a manor. */
 function inManor(run: stored.EventRun): boolean {
-    return designOf(run) >= manor.DESIGN;
+    return designOf(run) >= manor.FIRST;
 }
 
 /** What one run keeps between ticks: nothing that must survive a restart. */
@@ -136,7 +137,7 @@ function designOf(run: stored.EventRun): number {
 async function mirrorOf(ctx: KindContext): Promise<hs.Mirror> {
     const run = ctx.run;
     const design = designOf(run);
-    if (design >= manor.DESIGN) return { flipX: false, flipZ: false };
+    if (design >= manor.FIRST) return { flipX: false, flipZ: false };
     if (design >= hs.HOUSE) return layoutOf(run.id, design);
     for (const test of hs.mirrorTests(run.arena!.box, design))
         if (commands.readTest(await ctx.server.say([test.line])) === "passed") return test.mirror;
@@ -159,7 +160,7 @@ function spotOf(
         0,
         hiders.findIndex((one) => one.name === entrant.name)
     );
-    if (design >= manor.DESIGN) {
+    if (design >= manor.FIRST) {
         const house = manorOf(run);
         return at >= 0 ? manor.seekerSpot(box, house, at) : manor.hiderSpot(box, house, index);
     }
@@ -183,7 +184,7 @@ async function goLines(ctx: KindContext): Promise<string[]> {
     // The secret doors worked by the pack, where it is on: elsewhere they stay
     // open as they were built, still a way in.
     const design = designOf(run);
-    const house = design >= manor.DESIGN ? manorOf(run) : null;
+    const house = design >= manor.FIRST ? manorOf(run) : null;
     const layout = !house && design >= hs.HOUSE ? layoutOf(run.id, design) : null;
     const packOn = house ? await hitsService.ensure(ctx) : false;
     if (house)
@@ -192,7 +193,8 @@ async function goLines(ctx: KindContext): Promise<string[]> {
                 ? manor.armLines(run.arena!.box, house, run.id)
                 : manor.openLines(run.arena!.box, house)),
             `tellraw @a[tag=${arena.IN_ARENA}] ${commands.text(
-                messages.tag(language) + seekMessages.manorTip(language, packOn)
+                messages.tag(language) +
+                    seekMessages.manorTip(language, packOn, house.pads.length > 0)
             )}`
         );
     if (layout && (await hitsService.ensure(ctx)))
@@ -437,7 +439,7 @@ export const hideAndSeek: ArenaGame = {
     box: (run, place) => manor.hallBox(place, place.y + arena.ALTITUDE, roomsOf(run)),
     prepare,
     built: (run) => ({
-        design: manor.DESIGN,
+        design: gameOf(run).design ?? manor.DESIGN,
         era: gameOf(run).era ?? model.OLDEST,
         rooms: roomsOf(run)
     }),
