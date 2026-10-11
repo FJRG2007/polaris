@@ -14,7 +14,7 @@ import { stripFormatting } from "./parse";
 import type { InventoryItem } from "./inventory";
 import * as transfer from "./inventory-transfer";
 import { AIR, itemArgument } from "./item-argument";
-import { readSlot, sameStack, writeSlot } from "./item-service";
+import { readSlot, sameStack, slotReplaced, writeSlot } from "./item-service";
 import { withServerContainer, type ServerContainer } from "./service";
 import {
     askerOf,
@@ -205,8 +205,11 @@ export async function applyPlanNow(
     server: ServerContainer,
     installedAppId: string,
     player: string,
-    plan: readonly transfer.PlannedSlot[]
-): Promise<{ written: number; skipped: number[] }> {
+    plan: readonly transfer.PlannedSlot[],
+    /** The slots the game said it put a stack in: in, wherever it went next.
+     *  Filled as each is answered, so a caller still has them if a later slot throws. */
+    confirmed: number[] = []
+): Promise<{ written: number; skipped: number[]; confirmed: number[] }> {
     let written = 0;
     const skipped: number[] = [];
     for (const one of transfer.writesOf(plan)) {
@@ -221,22 +224,24 @@ export async function applyPlanNow(
             continue;
         }
         try {
-            if (argument?.ok && one.after)
-                await writeSlot(
-                    server,
-                    installedAppId,
-                    player,
-                    one.slot,
-                    argument.value,
-                    one.after.count
-                );
-            else await writeSlot(server, installedAppId, player, one.slot, AIR, 1);
+            const reply =
+                argument?.ok && one.after
+                    ? await writeSlot(
+                          server,
+                          installedAppId,
+                          player,
+                          one.slot,
+                          argument.value,
+                          one.after.count
+                      )
+                    : await writeSlot(server, installedAppId, player, one.slot, AIR, 1);
             written += 1;
+            if (slotReplaced(reply)) confirmed.push(one.slot);
         } catch {
             skipped.push(one.slot);
         }
     }
-    return { written, skipped };
+    return { written, skipped, confirmed };
 }
 
 /**

@@ -193,7 +193,9 @@ describe("a bag exported and imported back", () => {
             "replace"
         );
         const done = await service.applyPlanNow(server as never, "server", "Bob", plan);
-        expect(done).toEqual({ written: 5, skipped: [] });
+        // Every write the game said went in.
+        expect(done).toMatchObject({ written: 5, skipped: [] });
+        expect(done.confirmed).toHaveLength(5);
         expect(await bagOf("Bob")).toEqual(before);
         expect(bags.get("Bob")!.get(0)!.data).toBe(SWORD);
     });

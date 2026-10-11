@@ -51,6 +51,11 @@ function printedDigest(item: InventoryItem): string | null {
     return createHash("sha256").update(item.data.snbt).digest("hex").slice(0, 16);
 }
 
+/** The same item, as many: what a slot write is read back as. */
+function sameKind(left: InventoryItem | undefined, right: InventoryItem): boolean {
+    return left !== undefined && left.id === right.id && left.count === right.count;
+}
+
 /** The same stack exactly: id, count and every member of its data. */
 function whole(left: InventoryItem | undefined, right: InventoryItem): boolean {
     if (left === undefined || left.id !== right.id || left.count !== right.count) return false;
@@ -629,7 +634,9 @@ export async function giveBack(
                 where: { id: kept.record },
                 data: { writing: JSON.stringify(toWrite.map((each) => each.one.slot)) }
             });
-        await applyPlanNow(server, server.installedAppId, name, plan).catch(() => undefined);
+        const answered: number[] = [];
+        await applyPlanNow(server, server.installedAppId, name, plan, answered).catch(() => null);
+        const confirmed = new Set(answered);
         // Too long for one command: built in storage and handed over, each
         // into its slot only while that is still empty.
         for (const each of toWrite) {
@@ -643,6 +650,21 @@ export async function giveBack(
             await save({ ...kept, kept: kept.kept.filter((one) => !given.includes(one)) });
             return "offline";
         }
+        // Slots a stack written now turned up in, other than its own: each
+        // taken by one stack only.
+        const claimed = new Set<number>();
+        const arrived = (item: InventoryItem): boolean => {
+            const slot = after.items.find(
+                (one) =>
+                    !claimed.has(one.slot) &&
+                    whole(one, item) &&
+                    !toWrite.some((each) => each.one.slot === one.slot) &&
+                    !sameKind(at(current.items, one.slot), one)
+            )?.slot;
+            if (slot === undefined) return false;
+            claimed.add(slot);
+            return true;
+        };
         for (const each of toWrite) {
             const there = at(after.items, each.one.slot);
             // Written into a slot that was empty a moment ago: the same item, as
@@ -660,7 +682,21 @@ export async function giveBack(
                         each.one.slot
                     );
             }
-            // Taken meanwhile - picked up into, or moved: at their feet instead.
+            // Gone from its slot by the time it is read back, but the game said
+            // it went in, or it is in another slot it was not in before: moved
+            // the moment it landed - by the player, or a mod sorting their bag -
+            // thrown, or put away. Given: a second copy at their feet is a
+            // duplicate (a bow came home twice that way, in two slots).
+            else if (confirmed.has(each.one.slot) || arrived(each.item)) {
+                given.push(each.one);
+                console.warn(
+                    "polaris: a stack given back left its slot as it arrived",
+                    server.installedAppId,
+                    name,
+                    each.one.slot
+                );
+            }
+            // Never written - its slot taken before it could be: at their feet.
             else toDrop.push(each);
         }
     }

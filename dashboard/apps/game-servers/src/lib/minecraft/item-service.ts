@@ -100,8 +100,17 @@ export function sameStack(left: InventoryItem | null, right: InventoryItem | nul
     );
 }
 
+/** What the game answers a slot write that went in: "Replaced a slot on Ana
+ *  with [Bow]", from either spelling of the command. */
+const REPLACED = /^Replaced a slot\b/i;
+
+/** Whether the game's answer to a slot write says the stack went in. */
+export function slotReplaced(reply: string): boolean {
+    return REPLACED.test(stripFormatting(reply).trim());
+}
+
 /**
- * Put a stack in a slot, or empty it.
+ * Put a stack in a slot, or empty it. Answers what the game said to it.
  *
  * The command is chosen once per server and remembered: the modern one is tried,
  * and a server that does not have it says so in a sentence this recognises rather
@@ -114,7 +123,7 @@ export async function writeSlot(
     slot: number,
     argument: string,
     count: number
-): Promise<void> {
+): Promise<string> {
     const named = replaceSlot(slot);
     if (!named) refuse("unsupported");
     const stored = await storedCommand(installedAppId);
@@ -122,7 +131,7 @@ export async function writeSlot(
     const reply = await server.say(argv(first, player, named, argument, count));
     if (!UNKNOWN_COMMAND.test(stripFormatting(reply))) {
         if (!stored) await patchInstallConfig(installedAppId, { [COMMAND_KEY]: first });
-        return;
+        return reply;
     }
     // Only reached on a server that has neither spelling, or an older one seen
     // for the first time. Either way the answer is one more attempt, not a guess.
@@ -130,6 +139,7 @@ export async function writeSlot(
     const legacy = await server.say(argv("replaceitem", player, named, argument, count));
     if (UNKNOWN_COMMAND.test(stripFormatting(legacy))) refuse("unsupported");
     await patchInstallConfig(installedAppId, { [COMMAND_KEY]: "replaceitem" });
+    return legacy;
 }
 
 function argv(
