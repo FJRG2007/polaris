@@ -44,6 +44,8 @@ public final class PolarisMod {
                 .build());
         ATTACHMENTS.register(modBus);
         NeoForge.EVENT_BUS.register(new EventCommands(version));
+        // An impostor game's dead talk only to each other; idle outside one.
+        NeoForge.EVENT_BUS.register(new EventGhosts());
         if (AntiXray.wanted(System.getenv())) {
             AntiXrayLink.start(PolarisConfig.linkFromEnvironment(System.getenv()));
             NeoForge.EVENT_BUS.register(new AntiXray());

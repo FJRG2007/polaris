@@ -1793,6 +1793,11 @@
                 "label": "Downhill boat race",
                 "summary": "A walled road of ice runs down from a start high in the air to a finish far below, dropping a block at a time. Every racer gets a boat at the top; pass every gate in order on the way down, and the first over the finish wins. Fall off or lose the boat and you are put back at your last gate with a new one.",
                 "unit": "gates"
+            },
+            "impostor": {
+                "label": "Impostor",
+                "summary": "A station of rooms is built in the sky, bigger the more who play, joined by corridors round a meeting room with a table and an emergency button. Everybody is told privately whether they are crew or an impostor, and names are hidden. The crew work through tasks at consoles in the rooms; impostors fake them, kill with a hit and slip between rooms through hidden vents. A body found or the button pressed calls everybody to the table to talk and vote somebody out. The crew win by finishing every task or voting out every impostor; the impostors win once they are as many as the crew. At least 4 players.",
+                "unit": "points"
             }
         },
         "triggers": {
@@ -2500,7 +2505,20 @@
         "elytraObstacles": "Pillars",
         "elytraObstaclesHint": "Pillars beside the line between rings, never on it.",
         "downhillSteepness": "Slope",
-        "downhillSteepnessHint": "How often the ice drops a block on the way down."
+        "downhillSteepnessHint": "How often the ice drops a block on the way down.",
+        "impostorCount": "Impostors",
+        "impostorCountHint": "1 to 3, never more than one for every three players.",
+        "killCooldown": "Between kills (seconds)",
+        "killCooldownHint": "10 to 60 an impostor waits after a kill, at the start and after a meeting.",
+        "impostorTasks": "Tasks for each crew member",
+        "impostorTasksHint": "1 to 8.",
+        "emergencies": "Emergency meetings each",
+        "emergenciesHint": "0 to 3 times each player can press the button.",
+        "discussionSeconds": "Talking time (seconds)",
+        "discussionSecondsHint": "0 to 120 before the vote opens.",
+        "votingSeconds": "Voting time (seconds)",
+        "votingSecondsHint": "15 to 120 to vote or skip.",
+        "confirmEjects": "Say whether who was voted out was an impostor"
     },
     "moderation": {
         "announcements": {

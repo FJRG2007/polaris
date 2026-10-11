@@ -186,6 +186,10 @@ const RULES: Readonly<Record<EventKind, Text>> = {
     "downhill-race": {
         en: "Ride your boat down the ice from the start at the top through every gate. The first over the finish at the bottom wins.",
         es: "Baja en barca por el hielo desde la salida en lo alto pasando por cada puerta. Gana el primero en cruzar la meta de abajo."
+    },
+    impostor: {
+        en: "The crew does its tasks round the station; a hidden impostor kills with a hit. Report a body or press the button on the table, then vote somebody out.",
+        es: "La tripulación hace sus tareas por la estación; un impostor oculto mata de un golpe. Reporta un cuerpo o pulsa el botón de la mesa y votad a quién expulsar."
     }
 };
 

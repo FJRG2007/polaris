@@ -61,7 +61,8 @@ export const EVENT_KINDS = [
     "nether-maze",
     "acid-rain",
     "elytra-race",
-    "downhill-race"
+    "downhill-race",
+    "impostor"
 ] as const;
 
 export type EventKind = (typeof EVENT_KINDS)[number];
@@ -311,6 +312,9 @@ function legacySpleef(value: unknown): unknown {
 /** The king of the hill's circle, and what every one was given before it. */
 export const RING_RADIUS = 10;
 const OLD_RING_RADIUS = 6;
+
+/** The fewest an impostor game is played by: one impostor among three crew. */
+export const IMPOSTOR_FLOOR = 4;
 
 /** Hide and seek's time to hide, and the most it may be. */
 export const HIDE_SECONDS = 90;
@@ -841,6 +845,52 @@ export const optionsSchemas = {
             .min(25, problem("atLeast", { count: 25 }))
             .max(40, problem("atMost", { count: 40 }))
             .default(30)
+    }),
+    impostor: z.object({
+        place: placeSchema.default({ mode: "players" }),
+        /** Impostors asked for: never more than one for every three players
+         *  (`kinds/impostor` `impostorCount`). */
+        impostors: z
+            .number()
+            .int()
+            .min(1, problem("atLeast", { count: 1 }))
+            .max(3, problem("atMost", { count: 3 }))
+            .default(1),
+        /** Seconds an impostor waits between kills, and after "Go!" and a meeting. */
+        killCooldown: z
+            .number()
+            .int()
+            .min(10, problem("atLeast", { count: 10 }))
+            .max(60, problem("atMost", { count: 60 }))
+            .default(30),
+        /** Tasks each crew member is given. */
+        tasks: z
+            .number()
+            .int()
+            .min(1, problem("atLeast", { count: 1 }))
+            .max(8, problem("atMost", { count: 8 }))
+            .default(4),
+        /** Emergency meetings each player can call. */
+        emergencies: z
+            .number()
+            .int()
+            .min(0, problem("atLeast", { count: 0 }))
+            .max(3, problem("atMost", { count: 3 }))
+            .default(1),
+        discussionSeconds: z
+            .number()
+            .int()
+            .min(0, problem("atLeast", { count: 0 }))
+            .max(120, problem("atMost", { count: 120 }))
+            .default(30),
+        votingSeconds: z
+            .number()
+            .int()
+            .min(15, problem("atLeast", { count: 15 }))
+            .max(120, problem("atMost", { count: 120 }))
+            .default(30),
+        /** Whether everybody is told if whoever was voted out was an impostor. */
+        confirmEjects: z.boolean().default(true)
     })
 } as const satisfies Record<EventKind, z.ZodTypeAny>;
 
@@ -986,8 +1036,22 @@ export const presetSchema = z
         presetBase.extend({
             kind: z.literal("downhill-race"),
             options: optionsSchemas["downhill-race"]
-        })
+        }),
+        presetBase.extend({ kind: z.literal("impostor"), options: optionsSchemas.impostor })
     ])
+    .superRefine((value, context) => {
+        // An impostor game below four is refused here, not only played as four.
+        if (
+            value.kind === "impostor" &&
+            value.minPlayers !== undefined &&
+            value.minPlayers < IMPOSTOR_FLOOR
+        )
+            context.addIssue({
+                code: z.ZodIssueCode.custom,
+                path: ["minPlayers"],
+                message: problem("atLeast", { count: IMPOSTOR_FLOOR })
+            });
+    })
     .transform((value) => value as EventPreset);
 
 const TIME = /^([01]\d|2[0-3]):([0-5]\d)$/;
@@ -1056,7 +1120,7 @@ export type RandomEvents = z.infer<typeof randomSchema>;
  * value an operator chooses later, even one that happens to be an old default,
  * is theirs.
  */
-export const DEFAULTS_VERSION = 10;
+export const DEFAULTS_VERSION = 11;
 
 /** Events saved before this were brought up to their kind's defaults once
  *  (`toKindDefaults`). */
@@ -1098,7 +1162,8 @@ const KIND_SINCE: Partial<Readonly<Record<EventKind, number>>> = {
     "nether-maze": 4,
     "acid-rain": 5,
     "elytra-race": 6,
-    "downhill-race": 7
+    "downhill-race": 7,
+    impostor: 11
 };
 
 export const settingsSchema = z.object({
@@ -1197,7 +1262,8 @@ export const KIND_NAMES: Readonly<Record<EventKind, Readonly<Record<Language, st
     "nether-maze": { en: "Deadly nether maze", es: "Laberintos mortales" },
     "acid-rain": { en: "Acid rain", es: "Lluvia ácida" },
     "elytra-race": { en: "Elytra race", es: "Carrera aérea" },
-    "downhill-race": { en: "Downhill boat race", es: "Descenso en barca" }
+    "downhill-race": { en: "Downhill boat race", es: "Descenso en barca" },
+    impostor: { en: "Impostor", es: "Impostor" }
 };
 
 /** What an event of each kind is. Its name and summary on a screen are the
@@ -1345,6 +1411,10 @@ export const KIND_INFO: Readonly<Record<EventKind, KindInfo>> = {
     "downhill-race": {
         unit: "gates",
         competitive: true
+    },
+    impostor: {
+        unit: "points",
+        competitive: true
     }
 };
 
@@ -1474,7 +1544,8 @@ export const DEFAULT_PRIZES: Readonly<Record<EventKind, Rewards>> = {
     "nether-maze": STANDARD,
     "acid-rain": STANDARD,
     "elytra-race": STANDARD,
-    "downhill-race": QUICK
+    "downhill-race": QUICK,
+    impostor: STANDARD
 };
 
 /** The names a king of the ring was given by default while it was a hill, and
@@ -1526,7 +1597,8 @@ export const DEFAULT_MINUTES: Readonly<Record<EventKind, number>> = {
     "nether-maze": 6,
     "acid-rain": 6,
     "elytra-race": 8,
-    "downhill-race": 5
+    "downhill-race": 5,
+    impostor: 15
 };
 
 /** What every kind ran for before `DEFAULT_MINUTES`: an event still on exactly
@@ -1917,8 +1989,18 @@ export function minPlayersOf(preset: EventPreset): number {
 }
 
 export function defaultMinPlayers(kind: EventKind): number {
-    if (kind === "build-battle") return BUILD_BATTLE_FLOOR;
+    if (playersFloor(kind) > 1) return playersFloor(kind);
     return KIND_INFO[kind].competitive ? 2 : 1;
+}
+
+/** The fewest players a kind can be played by at all, whatever the event says:
+ *  a build battle's three (`BUILD_BATTLE_FLOOR`), an impostor game's four - one
+ *  impostor among three crew (`IMPOSTOR_FLOOR`). The editor refuses less, and
+ *  fewer joining calls the event off. */
+export function playersFloor(kind: EventKind): number {
+    if (kind === "build-battle") return BUILD_BATTLE_FLOOR;
+    if (kind === "impostor") return IMPOSTOR_FLOOR;
+    return 1;
 }
 
 /** A build battle is voted on by the others: with two, each vote is for the
@@ -1965,7 +2047,8 @@ export const DEFAULT_MIN_SCORE: Readonly<Record<EventKind, number>> = {
     "nether-maze": 1,
     "acid-rain": 1,
     "elytra-race": 1,
-    "downhill-race": 1
+    "downhill-race": 1,
+    impostor: 10
 };
 
 /** Whether the minimum is something an operator can set for this event. A
@@ -2109,6 +2192,7 @@ export function readyToPlay(run: {
         case "hide-and-seek":
         case "hot-potato":
         case "sky-wars":
+        case "impostor":
             // The arena writes its own start when everybody is in it.
             return run.readyAt !== null;
         default:
@@ -2242,6 +2326,7 @@ export function playsInArena(preset: EventPreset): boolean {
         preset.kind === "hide-and-seek" ||
         preset.kind === "hot-potato" ||
         preset.kind === "sky-wars" ||
+        preset.kind === "impostor" ||
         hillFistsOnly(preset)
     );
 }
@@ -2478,7 +2563,8 @@ export const WORLD_NEEDS: Readonly<Record<EventKind, WorldNeeds>> = {
     // stage, so the arena can be seen.
     "acid-rain": { time: "day", weather: null },
     "elytra-race": { time: "day", weather: "clear" },
-    "downhill-race": { time: "day", weather: "clear" }
+    "downhill-race": { time: "day", weather: "clear" },
+    impostor: { time: "day", weather: "clear" }
 };
 
 export function worldNeeds(preset: Pick<EventPreset, "kind">): WorldNeeds {
@@ -2501,7 +2587,7 @@ export function countdownSecondsFor(preset: EventPreset, settings: EventSettings
  *  battle voted on by the others - or for any competition with prizes. */
 /** The fewest an event that takes joiners can be played by at all. */
 function joinersFloor(preset: EventPreset): number {
-    return preset.kind === "build-battle" ? BUILD_BATTLE_FLOOR : 1;
+    return playersFloor(preset.kind);
 }
 
 export function joinersNeeded(preset: EventPreset): number {
@@ -2513,10 +2599,7 @@ export function joinersNeeded(preset: EventPreset): number {
         awardsPrizes(preset)
             ? PRIZE_COMPETITION_FLOOR
             : 1;
-    return Math.max(
-        preset.kind === "build-battle" ? BUILD_BATTLE_FLOOR : floor,
-        minPlayersOf(preset)
-    );
+    return Math.max(floor, playersFloor(preset.kind), minPlayersOf(preset));
 }
 
 /** The events that bring mobs up near the players, and so hold mob griefing
@@ -2531,13 +2614,15 @@ export function summonsMobs(preset: EventPreset): boolean {
 /** The events players fight each other in, which a server with PvP off cannot run. */
 export function needsPvp(preset: EventPreset): boolean {
     // Pushing is punching: with PvP off, nobody on the hill could move anybody.
-    // A flag is defended, a hider found and a potato passed with a blow too.
+    // A flag is defended, a hider found and a potato passed with a blow too,
+    // and an impostor kills with one.
     return (
         preset.kind === "team-duel" ||
         preset.kind === "capture-the-flag" ||
         preset.kind === "hide-and-seek" ||
         preset.kind === "hot-potato" ||
         preset.kind === "sky-wars" ||
+        preset.kind === "impostor" ||
         hillFistsOnly(preset)
     );
 }

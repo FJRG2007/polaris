@@ -126,10 +126,12 @@ const joinable = {
 const retried: string[] = [];
 const retriedArenas: string[] = [];
 
-const { MinecraftEvents } =
-    await import("@polaris-app/game-servers/src/screens/installed/minecraft-events");
-const { EventEditor } =
-    await import("@polaris-app/game-servers/src/screens/installed/event-editor");
+const { MinecraftEvents } = await import(
+    "@polaris-app/game-servers/src/screens/installed/minecraft-events"
+);
+const { EventEditor } = await import(
+    "@polaris-app/game-servers/src/screens/installed/event-editor"
+);
 
 afterEach(() => {
     cleanup();
@@ -720,8 +722,9 @@ describe("setting up a meteor shower", () => {
 
 describe("the parkour and spleef editors", () => {
     it("sets a course's jumps, difficulty and height, and says a wrong one beside the field", async () => {
-        const { EventEditor } =
-            await import("@polaris-app/game-servers/src/screens/installed/event-editor");
+        const { EventEditor } = await import(
+            "@polaris-app/game-servers/src/screens/installed/event-editor"
+        );
         const saved: unknown[] = [];
         render(
             <EventEditor
@@ -761,8 +764,9 @@ describe("the parkour and spleef editors", () => {
     });
 
     it("says how big a spleef floor comes out", async () => {
-        const { EventEditor } =
-            await import("@polaris-app/game-servers/src/screens/installed/event-editor");
+        const { EventEditor } = await import(
+            "@polaris-app/game-servers/src/screens/installed/event-editor"
+        );
         render(
             <EventEditor
                 preset={catalog.newPreset("spleef", "floor")}
@@ -896,8 +900,9 @@ describe("the TNT run, ice boat race and dropper editors", () => {
 
 describe("the editor of an event players join", () => {
     const edit = async (preset: catalog.EventPreset, saved: catalog.EventPreset[]) => {
-        const { EventEditor } =
-            await import("@polaris-app/game-servers/src/screens/installed/event-editor");
+        const { EventEditor } = await import(
+            "@polaris-app/game-servers/src/screens/installed/event-editor"
+        );
         render(
             <EventEditor
                 preset={preset}
@@ -938,6 +943,32 @@ describe("the editor of an event players join", () => {
             screen.queryAllByRole("spinbutton").some((input) => input.getAttribute("max") === "6")
         ).toBe(false);
         expect(catalog.newPreset("team-duel", "duel").options).not.toHaveProperty("downHearts");
+    });
+
+    it("saves an impostor game's settings, and never fewer than four players", async () => {
+        const saved: catalog.EventPreset[] = [];
+        await edit(catalog.newPreset("impostor", "imp"), saved);
+        const field = (label: RegExp) => screen.getByLabelText(label) as HTMLInputElement;
+        expect(field(/^Impostors/).value).toBe("1");
+        expect(field(/^Between kills/).value).toBe("30");
+        expect(field(/^Minimum player count/).value).toBe("4");
+        expect(field(/^Minimum player count/).min).toBe("4");
+        fireEvent.change(field(/^Minimum player count/), { target: { value: "3" } });
+        await waitFor(() => expect(screen.getAllByText("At least 4").length).toBeGreaterThan(0));
+        expect(done().disabled).toBe(true);
+        fireEvent.change(field(/^Minimum player count/), { target: { value: "6" } });
+        fireEvent.change(field(/^Impostors/), { target: { value: "4" } });
+        await waitFor(() => expect(screen.getAllByText("At most 3").length).toBeGreaterThan(0));
+        fireEvent.change(field(/^Impostors/), { target: { value: "2" } });
+        fireEvent.click(screen.getByLabelText(/^Say whether who was voted out/));
+        await waitFor(() => expect(done().disabled).toBe(false));
+        fireEvent.click(done());
+        expect(saved.at(-1)).toMatchObject({ minPlayers: 6 });
+        expect(saved.at(-1)!.options).toEqual({
+            ...catalog.newPreset("impostor", "imp").options,
+            impostors: 2,
+            confirmEjects: false
+        });
     });
 });
 
@@ -997,8 +1028,9 @@ describe("the editor in Spanish", () => {
     });
 
     it("names each choice in the reader's language", async () => {
-        const { options, LOOT_LABELS } =
-            await import("@polaris-app/game-servers/src/screens/installed/event-editor");
+        const { options, LOOT_LABELS } = await import(
+            "@polaris-app/game-servers/src/screens/installed/event-editor"
+        );
         const { gameCatalogs } = await import("@polaris-app/game-servers/messages");
         expect(options(gameCatalogs.translator("es-ES", "minecraft"), LOOT_LABELS)[0]).toEqual({
             value: "treasure",
