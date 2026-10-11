@@ -1370,6 +1370,8 @@
         "dismiss": "Hide for now",
         "notAllowed": "Only someone who manages the system can do this.",
         "unknownServer": "That server is not one Polaris deploys to.",
-        "unreachable": "Polaris could not reach that server. Check that it is on and try again."
+        "unreachable": "Polaris could not reach that server. Check that it is on and try again.",
+        "move": "Move data",
+        "moveHint": "Move a service's data to a NAS or another location."
     }
 }

@@ -42,6 +42,7 @@ import { sweepDueScheduledMessages } from "@/lib/chat/scheduled";
 import { sweepConnectionHealth } from "@/lib/connections/health";
 import { pollSpotify } from "@/lib/presence-activity/spotify-poll";
 import { pruneDriveJobs, sweepDriveJobs } from "@/lib/drive-jobs";
+import { sweepStorageMoves } from "@/lib/storage-moves/service";
 import { liftExpiredSuspensions } from "@/lib/user-admin-service";
 import { sweepSilentSessions } from "@/lib/agents/session-runtime";
 import { reapLeftoverContainers } from "@/lib/agents/leftover-containers";
@@ -204,6 +205,15 @@ export const SCHEDULED_JOBS: readonly ScheduledJob[] = [
         // return.
         leaseMs: null,
         run: sweepDriveJobs
+    },
+    {
+        key: "storage-moves",
+        // The backstop behind the kick the Move button gives: a move whose worker
+        // went away with the container during a rollover is picked up here, at
+        // the step it had reached. Each move is taken under its own lease.
+        everyMs: Number(process.env.POLARIS_STORAGE_MOVES_MS) || MINUTE,
+        leaseMs: null,
+        run: sweepStorageMoves
     },
     {
         key: "drive-jobs-prune",

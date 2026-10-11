@@ -7,7 +7,8 @@
  * person reliably looks is the screen they are already on - a host was found at
  * 99% with its database crash-looping, and nothing anywhere had said so. Names
  * the machine, how much is left and what is using it, and carries the button
- * that removes what Polaris can safely remove there. Never a volume.
+ * that removes what Polaris can safely remove there. Never a volume: for those
+ * it offers the way to move a service's data to another location.
  *
  * Hidden for this tab once dismissed, until the level gets worse.
  */
@@ -148,6 +149,11 @@ export function DiskAlertBanner() {
                                 {busy === reading.machine
                                     ? t("diskAlert.freeing")
                                     : t("diskAlert.free")}
+                            </Button>
+                            <Button size="sm" variant="secondary" asChild>
+                                <Link href="/admin/storage" title={t("diskAlert.moveHint")}>
+                                    {t("diskAlert.move")}
+                                </Link>
                             </Button>
                             <Button size="sm" variant="ghost" asChild>
                                 <Link href="/apps/servers">{t("diskAlert.details")}</Link>

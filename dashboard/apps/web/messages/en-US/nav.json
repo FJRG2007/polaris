@@ -318,7 +318,8 @@
         "Keyboard shortcuts": "Keyboard shortcuts",
         "CRM": "CRM",
         "Companies": "Companies",
-        "Opportunities": "Opportunities"
+        "Opportunities": "Opportunities",
+        "Storage locations": "Storage locations"
     },
     "errors": {
         "favoritesNotSaved": "Those favorites could not be saved.",

@@ -3083,5 +3083,136 @@
             "off": "Off for everyone.",
             "notSaved": "The change could not be saved. Try again in a moment."
         }
+    },
+    "storage": {
+        "title": "Storage locations",
+        "description": "Where service data lives and how full each place is. Move a volume to another location to free a disk.",
+        "thisServer": "This server",
+        "loadFailed": "This could not be loaded. It will try again shortly.",
+        "protocols": {
+            "smb": "SMB",
+            "nfs": "NFS",
+            "unas": "UniFi"
+        },
+        "locations": {
+            "title": "Locations",
+            "add": "Add NAS share",
+            "serverKind": "Server disk",
+            "freeOf": "{free} free of {total}",
+            "checking": "Connecting...",
+            "connectedNoSize": "Connected. This share does not report its size.",
+            "denied": "The share refused the username or password.",
+            "notMounted": "NFS shares need the full edition of Polaris, which mounts them on the server.",
+            "missing": "This location no longer exists.",
+            "unreachable": "Polaris could not reach this share. Check that the NAS is on and the address is right.",
+            "test": "Test connection",
+            "volumes": "{count, plural, one {# volume} other {# volumes}}",
+            "owner": "owned by {name}",
+            "noNas": "No NAS share yet. Add one to keep service data on it.",
+            "manageHint": "Shares are also listed in Drive, where they can be edited or removed.",
+            "manageLink": "Open Drive"
+        },
+        "form": {
+            "title": "Add a NAS share",
+            "description": "Polaris mounts it on the server that runs each service. The password is stored encrypted.",
+            "protocol": "Protocol",
+            "name": "Name",
+            "namePlaceholder": "Office NAS",
+            "host": "Address",
+            "share": "Share",
+            "export": "Export path",
+            "username": "Username",
+            "password": "Password",
+            "domain": "Domain",
+            "nfsHint": "NFS shares use the server's own access rules, so no account is needed.",
+            "cancel": "Cancel",
+            "submit": "Add and test",
+            "errors": {
+                "nameRequired": "Give it a name.",
+                "nameTooLong": "Use 120 characters or fewer.",
+                "hostRequired": "Enter the NAS address.",
+                "hostInvalid": "Enter a host name or IP address, like nas.local or 192.168.1.20.",
+                "pathRequired": "Enter the share or export.",
+                "pathInvalid": "That path cannot be used.",
+                "shareInvalid": "Enter only the share name, without the address or slashes.",
+                "exportInvalid": "Enter the export as a full path, like /volume1/data.",
+                "usernameInvalid": "That username is too long.",
+                "passwordInvalid": "That password is too long.",
+                "domainInvalid": "That domain is too long."
+            }
+        },
+        "volumes": {
+            "title": "Service data",
+            "description": "Each volume and where it lives. Game servers are listed first.",
+            "empty": "No service has a volume yet.",
+            "game": "Game server",
+            "move": "Move",
+            "busy": "A move of this service is in progress.",
+            "notDeployed": "Deploy this service first; there is nothing to move yet.",
+            "nowhere": "Add a NAS share owned by this service's owner to move it.",
+            "swarm": "Services on a swarm cannot be moved from here yet."
+        },
+        "move": {
+            "title": "Move {volume} of {app}",
+            "description": "{app} stops while its files are copied and checked, then starts on the new location. The original stays until you remove it.",
+            "from": "Now on {location}",
+            "to": "Move to",
+            "start": "Move",
+            "refused": {
+                "missing": "This volume no longer exists.",
+                "notDeployed": "Deploy this service first; there is nothing to move yet.",
+                "busy": "A move of this service is already in progress.",
+                "sameLocation": "The volume is already there.",
+                "notOffered": "That location is not available for this service.",
+                "swarm": "Services on a swarm cannot be moved from here yet."
+            }
+        },
+        "moves": {
+            "title": "Data moves",
+            "empty": "Nothing has been moved yet.",
+            "what": "{volume} of {app}",
+            "to": "to",
+            "removedVolume": "A removed volume",
+            "removedApp": "a removed service",
+            "progress": "{copied} of {total} copied",
+            "measuring": "Measuring the data...",
+            "keptHint": "The service runs on the copy. The original is still on {origin}.",
+            "keep": "Keep original",
+            "remove": "Remove original",
+            "removeKind": "original",
+            "removeTitle": "Remove the original?",
+            "removeQuestion": "Remove the original files of {volume} from {origin}?",
+            "removeDescription": "The service already runs on {target}. This frees the space and cannot be undone.",
+            "removedHint": "The original was removed.",
+            "keptDone": "The original was kept on {origin}.",
+            "answerGone": "This move has already been answered."
+        },
+        "states": {
+            "queued": "Waiting",
+            "stopping": "Stopping the service",
+            "copying": "Copying",
+            "switching": "Switching",
+            "starting": "Starting the service",
+            "moved": "Moved",
+            "cleaning": "Removing original",
+            "finished": "Done",
+            "rollingBack": "Putting it back",
+            "failed": "Not moved"
+        },
+        "errors": {
+            "noSpace": "The destination does not have enough free space. Nothing was changed.",
+            "noSpaceSized": "The destination has {free} free and the data needs {needed}. Nothing was changed.",
+            "mismatch": "The copy did not match the original, so the service stayed on the original.",
+            "unreadable": "Polaris could not read the original files. Nothing was changed.",
+            "unwritable": "Polaris could not write to the destination. Check that the share's account can write there.",
+            "mount": "Polaris could not mount the share. Test it under Locations.",
+            "stillRunning": "Something started the service during the move, so it stayed on the original. Try again.",
+            "startFailed": "The service did not start on the new location, so it was put back on the original.",
+            "gone": "The service or volume was removed during the move.",
+            "cleanFailed": "The original could not be removed. It is still there; try again.",
+            "copy": "The copy stopped before it finished. The service stayed on the original.",
+            "unexpected": "Something went wrong. The service stayed on the original.",
+            "notRestarted": "The service could not be started again; start it from its page."
+        }
     }
 }
