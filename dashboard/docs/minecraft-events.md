@@ -14,7 +14,12 @@ own play).
   anything went in (see "Blocks players left in an event's space" below).
   A player's own things are stashed in the database before they enter an arena
   and given back after, with the health and hunger they came in with;
-  `keepInventory` is on for any event a player can die in.
+  `keepInventory` is on for any event a player can die in. Inside, everybody
+  starts the same (`kinds/fair-start.ts`): healed and fed once the last look
+  on the way in has kept what they brought, with no experience, and with
+  their own effects cleared where the Polaris mod keeps them (it gives them
+  back; the plain stash keeps none, so there they are left on). Nothing is
+  put back by that: the stash's own give-back does it.
 - **Nobody outside an event can change it.** Every event with a space of its
   own registers it where the tick finds it - an arena's box on `run.arena`, a
   stage's or the boss arena's proved volume (or what it built) on `run.stage`
@@ -696,8 +701,8 @@ left out.
       a death, whose player comes back as a new one, by the kill the game
       counted. Before 1.19.4, the rival who struck last. The team duel
       credits the same way.
-- **Hot potato** is a platform walled in glass three high (13 by 13 up to
-  six players, 17 by 17 up to twelve, 21 by 21 up to twenty-four), its floor
+- **Hot potato** is a platform walled in glass three high (17 by 17 up to
+  six players, 23 by 23 up to twelve, 29 by 29 up to twenty-four), its floor
   in stripes or in rings round the middle and cover on it - hay bales and lit
   posts - drawn from the run's id (`hot-potato.coverFor`): a few cells turned
   four ways round the middle so no side is better, none touching, all well
@@ -721,11 +726,14 @@ left out.
   the next tick, so it cannot bounce straight back. A hit is seen on the
   next tick, up to two seconds after it lands. When the fuse runs out every
   holder is out at once, ranked together - particles and a sound where each
-  stands, never a block or an entity - and goes to the gallery; three seconds later the next round starts. Somebody
+  stands, never a block or an entity - and goes to their own seat in the
+  gallery (by entrant, moved once); three seconds later the next round starts. Somebody
   off the server two ticks running is out too. The round, the holder and the
   fuse's end are clock times in the run, so a restart picks the fuse up where
   it was. The last one left wins; everybody else is ranked by when they went
-  out, the same moment the same place.
+  out. A tie - several still in when the clock runs out, or out at the same
+  moment - goes to who held a potato for less time in all (`tiebreakOf`, the
+  one in hand counted to the end), so the clock never hands out two firsts.
 - **Hide and seek** is played in a closed house in the air: nine rooms, three
   by three, 39 by 39 inside under a solid roof, a doorway in every wall between
   two rooms, a loft along an outer wall of two corner rooms, places to climb
@@ -1459,7 +1467,11 @@ A new kind follows all of them. A change to an old kind must not undo one.
   only gets called off once the countdown is over. The Run button is disabled
   for the same reason, so the screen and the server agree.
 - **Nobody wins by standing still, in creative, or with a farm.** Players
-  seen in creative or spectator, AFK players where `afkCounts`, and players
+  seen in creative or spectator - in an event with a space of its own, only
+  while inside it (`commands.notSurvivalInside`): it puts its players in
+  adventure, so a watcher in creative, or the mode a racer had before
+  joining, is nobody's to be judged by, nor an impostor's ghost - AFK players
+  where `afkCounts`, and players
   caught by Anti X-Ray or the anti-cheat are left off the podium - by a check
   the event cannot trip itself (see "Who wins"). Ore placed
   during a mining rush is taken off the count. A gathering of iron counts

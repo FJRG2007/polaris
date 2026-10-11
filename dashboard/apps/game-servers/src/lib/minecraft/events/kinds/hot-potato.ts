@@ -46,10 +46,10 @@ export function potatoesFor(left: number): number {
     return Math.max(1, Math.min(left - 1, Math.ceil(left / PER_POTATO)));
 }
 
-/** The platform's half width: 6 (a 13 by 13 floor) up to six players, 8 up to
- *  twelve, 10 past. */
+/** The platform's half width: 8 (a 17 by 17 floor) up to six players, 11 up to
+ *  twelve, 14 past - room to run from whoever holds it. */
 export function halfWidth(players: number): number {
-    return players <= 6 ? 6 : players <= 12 ? 8 : 10;
+    return players <= 6 ? 8 : players <= 12 ? 11 : 14;
 }
 
 /** How far from its center the ground under it is judged. */
@@ -140,7 +140,10 @@ export const stateSchema = z.preprocess(
         fuseEndsAt: z.number().nullable().default(null),
         /** Between rounds: the next one starts then. */
         pauseUntil: z.number().nullable().default(null),
-        out: z.array(outSchema).default([])
+        out: z.array(outSchema).default([]),
+        /** How long each has held a potato, in ms, for every potato that has
+         *  left their hands: what breaks a tie (`tiebreakOf`). */
+        held: z.record(z.string(), z.number()).default({})
     })
 );
 export type PotatoState = z.infer<typeof stateSchema>;
@@ -464,6 +467,37 @@ export function hurtByHolder(
 export function canPass(state: PotatoState, name: string, now: number): boolean {
     const holder = holderNamed(state, name);
     return holder !== null && now >= holder.passedAt + PASS_COOLDOWN_MS;
+}
+
+/** `name`'s time holding a potato added up, as it leaves their hands at `now`. */
+export function letGo(state: PotatoState, name: string, now: number): void {
+    const holder = holderNamed(state, name);
+    if (!holder) return;
+    const key = holder.name;
+    state.held[key] = (state.held[key] ?? 0) + Math.max(0, now - holder.passedAt);
+}
+
+/**
+ * What breaks a tie on score, the lower the better: how long each held a
+ * potato, the one in their hands still counting up to `now`. Two still in
+ * when the clock runs out share no first place - the one who held it less
+ * is ahead; nor do two blown at once.
+ */
+export function tiebreakOf(
+    state: PotatoState | null,
+    names: readonly string[],
+    now: number
+): Record<string, number> {
+    const held = new Map(
+        Object.entries(state?.held ?? {}).map(([name, ms]) => [name.toLowerCase(), ms])
+    );
+    const after: Record<string, number> = {};
+    for (const name of names) {
+        const holder = state ? holderNamed(state, name) : null;
+        const holding = holder ? Math.max(0, now - holder.passedAt) : 0;
+        after[name] = (held.get(name.toLowerCase()) ?? 0) + holding;
+    }
+    return after;
 }
 
 /** The scores: who went out first has one, each after one more, and whoever is

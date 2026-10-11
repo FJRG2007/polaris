@@ -54,6 +54,7 @@ vi.mock("@polaris-app/game-servers/src/lib/minecraft/service", () => ({
 const { stashIn, giveBack, vitalsSettled } = await import(
     "@polaris-app/game-servers/src/lib/minecraft/events/kinds/stash-service"
 );
+const fair = await import("@polaris-app/game-servers/src/lib/minecraft/events/kinds/fair-start");
 type Stash = Parameters<typeof giveBack>[2];
 
 const f = Math.fround;
@@ -312,5 +313,44 @@ describe("health and hunger through an event", () => {
             expect(await giveBack(server, "Ana", kept, async () => undefined, wait)).toBe("done");
             await expectBack(joined, ended);
         }
+    });
+});
+
+describe("an even start", () => {
+    it("starts somebody hurt and hungry whole and fed, and gives back what they had", async () => {
+        const joined = { health: 6.5, food: 9, saturation: 0, exhaustion: 2.1 };
+        ana = { ...joined, absorption: 0 };
+        const kept = await cameIn();
+        // The plain stash keeps no effects: theirs are left on them.
+        expect(fair.clearLines("Ana", kept)).toEqual([]);
+        await server.sayAll(fair.evenLines("Ana", kept));
+        expect(ana.health).toBe(20);
+        expect(ana.food).toBe(20);
+        expect(ana.saturation).toBe(20);
+        const ended = { ...ana };
+        expect(await giveBack(server, "Ana", kept, async () => undefined, wait)).toBe("done");
+        await expectBack(joined, ended);
+    });
+
+    it("clears effects only where the mod keeps them, and evens out only what comes back", () => {
+        const mod = {
+            barrels: [],
+            casing: [],
+            kept: [],
+            experience: null,
+            vitals: null,
+            state: "stashed" as const,
+            record: null,
+            mod: ["k1"]
+        };
+        expect(fair.clearLines("Ana", mod)).toEqual(["effect clear Ana"]);
+        expect(fair.evenLines("Ana", mod)).toEqual([
+            "effect give Ana minecraft:instant_health 1 10 true",
+            "effect give Ana minecraft:saturation 1 19 true"
+        ]);
+        // Nothing kept, or kept with no health to give back: left as they are.
+        expect(fair.evenLines("Ana", null)).toEqual([]);
+        expect(fair.clearLines("Ana", null)).toEqual([]);
+        expect(fair.evenLines("Ana", { ...mod, mod: [] })).toEqual([]);
     });
 });

@@ -50,7 +50,7 @@ describe("hot potato's platform", () => {
                 block: "minecraft:orange_terracotta",
                 box: { x1: floor.x1, z1: floor.z1, y1: floor.y1 }
             });
-            expect(floor.x2 - floor.x1 + 1).toBe(players <= 6 ? 13 : players <= 12 ? 17 : 21);
+            expect(floor.x2 - floor.x1 + 1).toBe(players <= 6 ? 17 : players <= 12 ? 23 : 29);
             // The whole floor is laid, whichever way.
             const laid = new Set<string>();
             for (const one of fills.filter(
@@ -206,6 +206,26 @@ describe("hot potato's rounds", () => {
         });
         expect(potato.stateOf(null)).toBeNull();
         expect(potato.stateOf({ round: "x" })).toBeNull();
+    });
+
+    it("breaks a tie by how long each held a potato, the one in hand counted to the end", () => {
+        const state = potato.stateSchema.parse({
+            holders: [{ name: "Ben", passedAt: 50_000 }],
+            held: { Ana: 4_000, Cy: 9_000 }
+        });
+        expect(potato.tiebreakOf(state, ["Ana", "Ben", "Cy", "Dee"], 60_000)).toEqual({
+            Ana: 4_000,
+            Ben: 10_000,
+            Cy: 9_000,
+            Dee: 0
+        });
+        // Passed on: their time is kept, and only theirs.
+        potato.letGo(state, "ben", 52_000);
+        potato.letGo(state, "Dee", 52_000);
+        expect(state.held).toEqual({ Ana: 4_000, Ben: 2_000, Cy: 9_000 });
+        // A run written before any time was kept reads as nobody holding long.
+        expect(potato.stateSchema.parse({}).held).toEqual({});
+        expect(potato.tiebreakOf(null, ["Ana"], 1)).toEqual({ Ana: 0 });
     });
 
     it("goes off with particles and a sound, and nothing that breaks or hurts", () => {

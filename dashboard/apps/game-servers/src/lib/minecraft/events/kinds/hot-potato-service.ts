@@ -185,6 +185,7 @@ async function tick(ctx: KindContext, lines: string[]): Promise<string | null> {
     const putOut = (name: string) => {
         state.out.push({ name, round: state.round, at: now });
         if (!potato.holderNamed(state, name)) return;
+        potato.letGo(state, name, now);
         lines.push(...takenLines(name, marker));
         state.holders = state.holders.filter((one) => lower(one.name) !== lower(name));
         if (state.holders.length === 0) {
@@ -242,6 +243,7 @@ async function tick(ctx: KindContext, lines: string[]): Promise<string | null> {
               )
             : null;
         if (!hit) continue;
+        potato.letGo(state, holder, now);
         lines.push(
             ...takenLines(holder, marker),
             ...handedLines(hit, marker, itemCommand, language),
@@ -252,15 +254,27 @@ async function tick(ctx: KindContext, lines: string[]): Promise<string | null> {
         );
     }
 
-    // The fuse out: whoever holds one is out, with a bang and nothing broken.
+    // The fuse out: whoever holds one is out, with a bang and nothing broken,
+    // and sent to their own seat in the gallery - the one they are kept in
+    // from now on, so nobody is moved twice in one look.
+    const seatOf = (name: string) =>
+        potato.gallerySpot(
+            box,
+            Math.max(
+                0,
+                run.entrants.findIndex((one) => lower(one.name) === lower(name))
+            )
+        );
+    const seated = new Set<string>();
     if (state.holders.length > 0 && state.fuseEndsAt !== null && now >= state.fuseEndsAt) {
         const blown = namesOf(state);
         for (const name of blown) {
             const at = here.get(lower(name));
             if (at) lines.push(...potato.boomLines(at));
             putOut(name);
+            seated.add(lower(name));
             lines.push(
-                arena.moveTo(name, potato.gallerySpot(box, state.out.length - 1)),
+                arena.moveTo(name, seatOf(name)),
                 ...arena.titleTo(
                     name,
                     potatoMessages.outTitle(language),
@@ -309,17 +323,18 @@ async function tick(ctx: KindContext, lines: string[]): Promise<string | null> {
     // ones out kept in the gallery, the rest on the platform.
     const fuseLeft = state.fuseEndsAt === null ? 0 : (state.fuseEndsAt - now) / 1000;
     const gallery = potato.galleryOf(box);
-    for (const [index, one] of run.entrants.entries()) {
+    for (const one of run.entrants) {
         const at = here.get(lower(one.name));
         if (!at) continue;
         lines.push(...potato.unhurtLines(one.name));
         if (isOut(one.name)) {
-            const seated =
+            const inGallery =
                 at.x >= gallery.x1 &&
                 at.x < gallery.x2 + 1 &&
                 at.z >= gallery.z1 &&
                 at.z < gallery.z2 + 1;
-            if (!seated) lines.push(arena.moveTo(one.name, potato.gallerySpot(box, index)));
+            if (!inGallery && !seated.has(lower(one.name)))
+                lines.push(arena.moveTo(one.name, seatOf(one.name)));
             lines.push(
                 potato.weakLine(one.name),
                 arena.actionbarTo(one.name, potatoMessages.galleryBar(language))
@@ -379,6 +394,12 @@ export const hotPotato: ArenaGame = {
         potato.scoresOf(
             potato.stateOf(run.game),
             run.entrants.map((one) => one.name)
+        ),
+    tiebreak: (run) =>
+        potato.tiebreakOf(
+            potato.stateOf(run.game),
+            run.entrants.map((one) => one.name),
+            run.endsAt
         ),
     resultLines: (run, language, disqualified) => {
         const state = potato.stateOf(run.game);

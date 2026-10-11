@@ -152,6 +152,9 @@ interface World {
     /** A duel's counts, per player: health (20 when not said), damage dealt,
      *  deaths and players killed. */
     hp: Record<string, number>;
+    /** Each player's health and hunger as `data get entity` reads them, for
+     *  those set: nobody else's is read at all. */
+    vitals: Record<string, { health: number; food: number; saturation: number }>;
     /** Health not said is no score at all, as the game has it until a
      *  player's health first changes after the count was made. */
     hpUnset: boolean;
@@ -307,6 +310,7 @@ const world: World = {
     solidCount: 0,
     refuseBlocks: false,
     hp: {},
+    vitals: {},
     dealt: {},
     died: {},
     pk: {},
@@ -1385,6 +1389,66 @@ function answer(sent: string): string {
     // The game's own tick count, twenty a second.
     if (line === "time query gametime")
         return `The time is ${Math.floor(Date.now() / 50) % 2147483647}`;
+    // Healed, fed and hurt the way the game does it, for those whose health
+    // and hunger the test set.
+    const healed = /^effect give (\w+) minecraft:instant_health 1 \d+ true$/.exec(line);
+    if (healed && world.vitals[healed[1]!]) {
+        world.vitals[healed[1]!]!.health = 20;
+        return "Applied effect Instant Health";
+    }
+    const fed = /^effect give (\w+) minecraft:saturation 1 (\d+) true$/.exec(line);
+    if (fed && world.vitals[fed[1]!]) {
+        const one = world.vitals[fed[1]!]!;
+        one.food = Math.min(one.food + Number(fed[2]) + 1, 20);
+        one.saturation = Math.min(one.saturation + 2 * (Number(fed[2]) + 1), one.food);
+        return "Applied effect Saturation";
+    }
+    // Hunger's whole course at once: every 4 exhaustion a point of
+    // saturation, or of food once saturation is gone.
+    const starved = /^effect give (\w+) minecraft:hunger (\d+) (\d+) true$/.exec(line);
+    if (starved && world.vitals[starved[1]!]) {
+        const one = world.vitals[starved[1]!]!;
+        let points = Math.floor((0.1 * (Number(starved[3]) + 1) * Number(starved[2])) / 4);
+        for (; points > 0; points -= 1)
+            if (one.saturation > 0) one.saturation = Math.max(0, one.saturation - 1);
+            else one.food = Math.max(0, one.food - 1);
+        return "Applied effect Hunger";
+    }
+    const hurt = /^damage (\w+) (\S+) minecraft:generic_kill$/.exec(line);
+    if (hurt && world.vitals[hurt[1]!]) {
+        const one = world.vitals[hurt[1]!]!;
+        one.health = Math.max(0, one.health - Number(hurt[2]));
+        return `Applied 1 damage to ${hurt[1]}`;
+    }
+    // A player's health and hunger, where the test set them.
+    const vital =
+        /^data get entity (\w+) (Health|foodLevel|foodSaturationLevel|foodExhaustionLevel|AbsorptionAmount)$/.exec(
+            line
+        );
+    if (vital && world.vitals[vital[1]!]) {
+        const one = world.vitals[vital[1]!]!;
+        const value =
+            vital[2] === "Health"
+                ? `${one.health}f`
+                : vital[2] === "foodLevel"
+                  ? `${one.food}`
+                  : vital[2] === "foodSaturationLevel"
+                    ? `${one.saturation}f`
+                    : "0.0f";
+        return `${vital[1]} has the following entity data: ${value}`;
+    }
+    // The same among those inside an event's own space, less its ghosts.
+    const offInside =
+        /^execute as @a\[tag=(pe_\w+),(?:tag=!(pe_\w+),)?gamemode=!survival,gamemode=!adventure\]/.exec(
+            line
+        );
+    if (offInside) {
+        const inside = offInside[1] === "pe_in" ? world.inside : tagged(offInside[1]!);
+        return world.creative
+            .filter((name) => inside.has(name) && !(offInside[2] && tagged(offInside[2]).has(name)))
+            .map((name) => `${name} has the following entity data: [0.0d, 64.0d, 0.0d]`)
+            .join("\n");
+    }
     if (line.startsWith("execute as @a[gamemode=!survival,gamemode=!adventure]")) {
         return world.creative
             .map((name) => `${name} has the following entity data: [0.0d, 64.0d, 0.0d]`)
@@ -2187,6 +2251,7 @@ beforeEach(() => {
     world.bossName = "";
     world.bossMaxHealth = 0;
     world.bukkit = false;
+    world.vitals = {};
     world.essentials = false;
     world.pluginGot = [];
     world.glued = false;
@@ -7278,6 +7343,40 @@ describe("a TNT run", () => {
             (line) => line.endsWith(" minecraft:tnt keep") && line.includes(" fill ")
         );
 
+    it("starts everybody whole and fed, and gives each back the health they came with", async () => {
+        world.online = ["Ana", "Ben", "Cy"];
+        // Ana comes up hurt and hungry, with a level to her name: what she
+        // carries is kept, her health and hunger with it.
+        world.vitals.Ana = { health: 7, food: 10, saturation: 0 };
+        world.levels.Ana = 3;
+        setUp([run()]);
+        await startArena("tnt");
+        await play(2_100);
+        chat(["Ana", "join"], ["Ben", "unirse"], ["Cy", "join"]);
+        await play(44_000);
+        expect(state().run?.stage?.racers.map((one) => one.name)).toEqual(["Ana", "Ben", "Cy"]);
+        const heal = world.sent.indexOf("effect give Ana minecraft:instant_health 1 10 true");
+        const feed = world.sent.indexOf("effect give Ana minecraft:saturation 1 19 true");
+        const moved = world.sent.findIndex((line) => line.includes(" tp Ana "));
+        expect(moved).toBeGreaterThan(-1);
+        expect(heal).toBeGreaterThan(moved);
+        expect(feed).toBeGreaterThan(moved);
+        expect(world.vitals.Ana).toEqual({ health: 20, food: 20, saturation: 20 });
+        // The plain stash keeps no effects: hers are left on her.
+        expect(world.sent).not.toContain("effect clear Ana");
+        // Before "Go!", not after it.
+        const go = world.sent.findIndex(
+            (line) => line.includes(" title ") && visible(line).endsWith(" title 1")
+        );
+        if (go > -1) expect(heal).toBeLessThan(go);
+
+        await events.cancelEvent("owner", SERVER);
+        await play(20_000);
+        // Home with the health she came up with, through the stash's own way back.
+        expect(world.sent).toContain("damage Ana 13 minecraft:generic_kill");
+        expect(world.vitals.Ana).toEqual({ health: 7, food: 10, saturation: 0 });
+    });
+
     it("puts its pack on before a block is built, arms it only at Go, and plays to the last one standing", async () => {
         world.online = ["Ana", "Ben", "Cy"];
         setUp([run()]);
@@ -7609,6 +7708,41 @@ describe("a dropper", () => {
         expect(world.inside.size).toBe(0);
         keptTheRules(["water"]);
         expect(after.stageLeftovers).toEqual([]);
+    });
+
+    it("keeps off the podium only a racer in creative inside the shaft, not a watcher in creative or a mode from before joining", async () => {
+        world.online = ["Ana", "Ben", "Cy"];
+        // Ana is in creative while it opens, and back in survival to join;
+        // Cy, an operator, watches in creative the whole time and never joins.
+        world.creative = ["Ana", "Cy"];
+        setUp([run()]);
+        await startArena("drop");
+        await play(20_000);
+        world.creative = ["Cy"];
+        chat(["Ana", "join"], ["Ben", "unirse"]);
+        await play(44_000);
+        const shaft = shaftNow();
+        const spawn = dropperKind.spawn(shaft);
+        expect(state().run!.readyAt).not.toBeNull();
+        // Ben switches to creative inside the shaft to fly down: that one counts.
+        world.creative = ["Cy", "Ben"];
+        await play(16_000);
+        world.creative = ["Cy"];
+        world.at.Ben = [spawn.x, shaft.water, spawn.z];
+        scores("pe_low").Ben = shaft.water * 64;
+        scores("pe_drop").Ben = Math.floor(Date.now() / 50) % 2147483647;
+        await play(2_100);
+        world.at.Ana = [spawn.x, shaft.water, spawn.z];
+        scores("pe_low").Ana = shaft.water * 64;
+        scores("pe_drop").Ana = Math.floor(Date.now() / 50) % 2147483647;
+        await play(6_100);
+        const after = state();
+        expect(after.run).toBeNull();
+        expect(after.history[0]?.podium?.map((one) => one.name)).toEqual(["Ana"]);
+        expect(after.history[0]?.disqualified).toEqual(["Ben"]);
+        expect(
+            world.sent.some((line) => line.startsWith("tellraw @a") && visible(line).includes("Cy"))
+        ).toBe(false);
     });
 
     it("names the places of two who reach the water in one look by the game's tick", async () => {
@@ -12066,6 +12200,70 @@ describe("hot potato", () => {
         expect(potato.stateOf(state().run!.game)!.out.map((one) => one.name)).toEqual(
             before.holders.map((one) => one.name)
         );
+    });
+
+    it("starts everybody whole and fed in its arena, and gives back the health they came with", async () => {
+        world.online = ["Ana", "Ben", "Cy"];
+        world.vitals.Ana = { health: 5, food: 8, saturation: 0 };
+        world.levels.Ana = 2;
+        setUp([potatoOf(40)]);
+        await joinAndStart("potato", ["Ana", "Ben", "Cy"]);
+        const moved = world.sent.findIndex((line) => line.includes(" tp Ana "));
+        const heal = world.sent.indexOf("effect give Ana minecraft:instant_health 1 10 true");
+        expect(moved).toBeGreaterThan(-1);
+        expect(heal).toBeGreaterThan(moved);
+        expect(world.sent).toContain("effect give Ana minecraft:saturation 1 19 true");
+        expect(world.sent).not.toContain("effect clear Ana");
+        await events.cancelEvent("owner", SERVER);
+        await play(20_000);
+        expect(world.sent).toContain("damage Ana 15 minecraft:generic_kill");
+        expect(world.vitals.Ana).toEqual({ health: 5, food: 8, saturation: 0 });
+    });
+
+    it("sends whoever the fuse caught to one seat in the gallery, moved once", async () => {
+        const potato = await kind();
+        world.online = ["Ana", "Ben", "Cy"];
+        setUp([potatoOf(40)]);
+        await joinAndStart("potato", ["Ana", "Ben", "Cy"]);
+        await play(2_100);
+        const holder = (await holderNow())!;
+        const run = state().run!;
+        const before = world.sent.length;
+        await play(potato.stateOf(run.game)!.fuseEndsAt! - Date.now() + 600);
+        const moves = world.sent.slice(before).filter((line) => line.includes(` tp ${holder} `));
+        expect(moves).toHaveLength(1);
+        const index = run.entrants.findIndex((one) => one.name === holder);
+        const seat = potato.gallerySpot(run.arena!.box, index);
+        expect(world.at[holder]).toEqual([seat.x + 0.5, seat.y, seat.z + 0.5]);
+        // And left there on the looks after.
+        const after = world.sent.length;
+        await play(2_100);
+        expect(world.sent.slice(after).some((line) => line.includes(` tp ${holder} `))).toBe(false);
+    });
+
+    it("gives first place to one player when the clock runs out with several left: who held it least", async () => {
+        const potato = await kind();
+        const crowd = ["Ana", "Ben", "Cy", "Dee", "Eve", "Fay"];
+        world.online = crowd;
+        setUp([potatoOf(40, 3)]);
+        await joinAndStart("potato", crowd);
+        // Nobody passes it: a holder goes off every round, and the clock runs
+        // out in the middle of a round with two still in.
+        await play(state().run!.endsAt - Date.now() - 2_000);
+        const game = potato.stateOf(state().run!.game)!;
+        const left = crowd.filter((name) => !game.out.some((one) => one.name === name));
+        expect(left).toHaveLength(2);
+        const holding = game.holders[0]!.name;
+        const free = left.find((name) => name !== holding)!;
+        await play(6_000);
+        const done = state();
+        expect(done.run).toBeNull();
+        const podium = done.history[0]!.podium;
+        expect(podium.slice(0, 2).map((one) => [one.place, one.name])).toEqual([
+            [1, free],
+            [2, holding]
+        ]);
+        expect(done.history[0]!.delivered.filter((one) => one.levels === 15)).toHaveLength(1);
     });
 
     it("puts out somebody who left the server, rather than wait for them", async () => {
