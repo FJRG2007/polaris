@@ -153,7 +153,7 @@ describe("log filters", () => {
         fireEvent.click(screen.getByRole("button", { name: "Next match" }));
         fireEvent.click(screen.getByRole("button", { name: "Next match" }));
         const marked = () =>
-            container.querySelector('[data-row][class*="bg-yellow-400/10"]')?.textContent ?? "";
+            container.querySelector('[data-row][class*="bg-warning-soft"]')?.textContent ?? "";
         expect(marked()).toContain("line 500 needle");
 
         rerender(<LogViewer log={lines(3100)} name="cap" searchable />);

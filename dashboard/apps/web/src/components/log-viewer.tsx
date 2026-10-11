@@ -475,7 +475,7 @@ function Highlighted({ text, query }: { text: string; query: string }) {
     for (const [start, end] of ranges) {
         if (start > at) parts.push(text.slice(at, start));
         parts.push(
-            <mark key={start} className="rounded-sm bg-yellow-400/30 text-inherit">
+            <mark key={start} className="rounded-sm bg-warning/30 text-inherit">
                 {text.slice(start, end)}
             </mark>
         );
@@ -535,7 +535,7 @@ const LogRow = memo(function LogRow({
             className={cn(
                 "group relative flex gap-2 px-3 pr-9 hover:bg-white/5",
                 repeated && "border-l-2 border-zinc-600 pl-2.5",
-                active && "bg-yellow-400/10"
+                active && "bg-warning-soft"
             )}
         >
             {gutter && (
