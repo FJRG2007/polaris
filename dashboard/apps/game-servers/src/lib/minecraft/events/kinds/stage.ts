@@ -369,6 +369,9 @@ export function floatDown(volume: Volume, seconds: number): string {
     return `${WORLD} effect give @e[type=!player,${at},dx=${dx},dy=${dy},dz=${dz}] minecraft:slow_falling ${seconds} 0 true`;
 }
 
+/** Longer than anybody burns once out of the fire: 15 seconds after lava. */
+export const BURN_SECONDS = 16;
+
 /**
  * Nothing that happens to them for a few seconds can make them fall to their
  * death: Resistance V takes every hit the game lets it, a fall included. Given
@@ -379,9 +382,16 @@ export function floatDown(volume: Volume, seconds: number): string {
  * tick in the air with nothing round them - Slow Falling is not exempt - and
  * kicks after 80 where flight is off, so a player let down slowly from a stage
  * high in the sky was kicked for flying on the way home.
+ *
+ * Nor can they burn to death at home: a player still on fire from the event's
+ * lava kept burning there, and no command puts a player out, so the fire is
+ * outlasted instead (`BURN_SECONDS`).
  */
 export function fallProof(selector: string, seconds = 10): string[] {
-    return [`effect give ${selector} minecraft:resistance ${seconds} 4 true`];
+    return [
+        `effect give ${selector} minecraft:resistance ${seconds} 4 true`,
+        `effect give ${selector} minecraft:fire_resistance ${BURN_SECONDS} 0 true`
+    ];
 }
 
 /** The same for everything in a volume and over it, players included: what is

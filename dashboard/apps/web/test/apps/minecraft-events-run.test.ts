@@ -6293,6 +6293,16 @@ describe("a parkour race", () => {
         // Fall-proof before being moved off the course.
         const proof = world.sent.indexOf("effect give Ben minecraft:resistance 10 4 true");
         expect(proof).toBeGreaterThan(0);
+        // Nor left to burn at home: whatever fire they bring is outlasted.
+        const fireproof = world.sent.indexOf("effect give Ben minecraft:fire_resistance 16 0 true");
+        expect(fireproof).toBeGreaterThan(0);
+        expect(
+            world.sent.findIndex(
+                (line, index) =>
+                    index > fireproof &&
+                    line.startsWith("execute in minecraft:overworld run tp Ben ")
+            )
+        ).toBeGreaterThan(fireproof);
         expect(
             world.sent.findIndex(
                 (line, index) =>
