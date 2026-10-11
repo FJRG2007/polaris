@@ -599,7 +599,8 @@ const BEDROOM: Template = {
             [7, 2],
             [2, 10]
         ] as const;
-        const solid = Math.floor(c.random() * wardrobes.length);
+        const solid =
+            c.design >= CLOSETS_SINCE ? -1 : Math.floor(c.random() * wardrobes.length);
         wardrobes.forEach(([u, v], index) => {
             c.set(
                 "minecraft:oak_door[facing=south,half=lower,hinge=left,open=false]",
@@ -699,6 +700,14 @@ export const ATRIUM_SINCE = 5;
  * house that is gone. The bedroom builds a look-alike instead.
  */
 export const BEDLESS_SINCE = 6;
+
+/**
+ * From design 7 no door opens onto a wall: every wardrobe is hollow, and a
+ * door hung on a room's solid wall (`seek-manor.ts`) has a closet behind it.
+ * The themed rooms, the lofts with secret doors and the set dressing come in
+ * with it.
+ */
+export const CLOSETS_SINCE = 7;
 
 const ATRIUM: Template = {
     name: "atrium",

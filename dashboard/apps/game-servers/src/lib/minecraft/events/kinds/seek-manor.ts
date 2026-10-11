@@ -55,7 +55,7 @@ import { seeded, shuffled } from "../trivia-bank";
 import * as model from "./seek-grid";
 
 /** The layout's version, written into the run when it is built. */
-export const DESIGN = 6;
+export const DESIGN = 7;
 /** The first design built as a manor: every design from here on is one. */
 export const FIRST = 4;
 /** The most who can play, in the largest house. */
@@ -485,7 +485,8 @@ export function drawManor(
     // The nooks in each room's walls, then the room itself.
     plans.forEach((plan, room) => {
         const template = templates[room]!;
-        if (!plain) nooksOf(draft, plan, template.style, doorsOf(room), room, era, random);
+        if (!plain)
+            nooksOf(draft, plan, template.style, doorsOf(room), room, era, random, design);
     });
     plans.forEach((plan, room) => {
         const template = templates[room]!;
@@ -689,7 +690,8 @@ function nooksOf(
     doors: readonly { side: Side; at: number }[],
     room: number,
     era: model.Era,
-    random: () => number
+    random: () => number,
+    design: number
 ): void {
     const { grid } = draft;
     const x0 = origin(plan.i);
@@ -776,6 +778,14 @@ function nooksOf(
                 continue;
             setDoor(grid, cell, wall.inward);
             grid.clear(front.x, 1, front.z, front.x, 2, front.z);
+            // From design 7 a door always leads somewhere: a closet a block
+            // deep behind it, lit from its floor, room for one to hide.
+            if (design >= rooms.CLOSETS_SINCE) {
+                const closet = wall.cell(along, 1);
+                grid.set(LAMP, closet.x, 0, closet.z);
+                grid.clear(closet.x, 1, closet.z, closet.x, 2, closet.z);
+                draft.spots.push({ room, x: closet.x, feet: 1, z: closet.z });
+            }
         }
 }
 
