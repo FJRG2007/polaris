@@ -474,8 +474,13 @@ export async function fightTick(ctx: KindContext, seconds: number, lines: string
         );
     const everybody = `@a[tag=${arena.IN_ARENA}]`;
     if (ring.round > was.round) {
-        // A new round: everybody back on their own spot, the ring whole again.
+        // A new round: everybody back on their own spot, the ring whole again,
+        // and on equal terms - what the last round left on them cleared, health
+        // and food full.
         lines.push(
+            `effect clear ${everybody}`,
+            arena.HEAL_INSIDE,
+            `effect give ${everybody} minecraft:saturation 1 20 true`,
             ...run.entrants.flatMap((one, index) =>
                 hill
                     .enterLines(one.name, starts[index % starts.length]!, overGround)

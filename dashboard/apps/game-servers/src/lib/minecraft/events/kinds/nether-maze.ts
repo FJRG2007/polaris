@@ -1276,7 +1276,8 @@ const NOWHERE = 2_147_483_647;
 /**
  * The racers' own team: nobody's name over their head in the maze
  * (`nametagVisibility never`), so nobody is found or followed through a wall
- * by it, and no pushing in a corridor (`collisionRule never`). Made with the
+ * by it, no pushing in a corridor (`collisionRule never`) and no hitting each
+ * other (`friendlyFire false`) - the maze is the danger. Made with the
  * scores and gone with them; taking the team away takes everybody off it.
  */
 export const RACERS_TEAM = "pe_maze";
@@ -1287,7 +1288,8 @@ export const SCORES_ADDED = [
     ),
     `team add ${RACERS_TEAM}`,
     `team modify ${RACERS_TEAM} nametagVisibility never`,
-    `team modify ${RACERS_TEAM} collisionRule never`
+    `team modify ${RACERS_TEAM} collisionRule never`,
+    `team modify ${RACERS_TEAM} friendlyFire false`
 ];
 export const SCORES_REMOVED = [
     ...[FINISH_SCORE, BACK_SCORE].map((name) => `scoreboard objectives remove ${name}`),

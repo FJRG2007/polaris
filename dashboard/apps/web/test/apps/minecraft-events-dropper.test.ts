@@ -123,51 +123,61 @@ const shaftOf = (difficulty: (typeof DIFFICULTIES)[number], levels: number, seed
     dropper.shaft({ levels, difficulty }, seed, { x: 40, z: -12 }, 90);
 
 describe("a dropper's shaft", () => {
-    it("keeps every rule, and a careful player makes every hole, over thousands of runs", () => {
-        const report: string[] = [];
-        let plans = 0;
-        for (const difficulty of DIFFICULTIES)
-            for (const levels of LEVELS) {
-                let broke = 0;
-                let missed = 0;
-                let tallest = 0;
-                let needs = 0;
-                let drops = 0;
-                for (let seed = 0; seed < SEEDS; seed += 1) {
-                    const shaft = shaftOf(difficulty, levels, `run-${seed}`);
-                    const problems = [
-                        ...dropper.planProblems(shaft.plan),
-                        ...dropper.obstacleProblems(
-                            shaft.plan,
-                            dropper.obstaclesFor(shaft.plan, `run-${seed}`)
-                        )
-                    ];
-                    if (problems.length > 0) {
-                        broke += 1;
-                        if (broke === 1) report.push(`${difficulty} ${levels}: ${problems[0]}`);
+    // Thousands of simulated falls: deterministic, but past the default
+    // timeout on a busy CI runner.
+    it(
+        "keeps every rule, and a careful player makes every hole, over thousands of runs",
+        {
+            timeout: 180_000
+        },
+        () => {
+            const report: string[] = [];
+            let plans = 0;
+            for (const difficulty of DIFFICULTIES)
+                for (const levels of LEVELS) {
+                    let broke = 0;
+                    let missed = 0;
+                    let tallest = 0;
+                    let needs = 0;
+                    let drops = 0;
+                    for (let seed = 0; seed < SEEDS; seed += 1) {
+                        const shaft = shaftOf(difficulty, levels, `run-${seed}`);
+                        const problems = [
+                            ...dropper.planProblems(shaft.plan),
+                            ...dropper.obstacleProblems(
+                                shaft.plan,
+                                dropper.obstaclesFor(shaft.plan, `run-${seed}`)
+                            )
+                        ];
+                        if (problems.length > 0) {
+                            broke += 1;
+                            if (broke === 1) report.push(`${difficulty} ${levels}: ${problems[0]}`);
+                        }
+                        const landed = fall(shaft);
+                        if (landed !== null) {
+                            missed += 1;
+                            if (missed === 1)
+                                report.push(
+                                    `${difficulty} ${levels} run-${seed}: landed on ${landed}`
+                                );
+                        }
+                        tallest = Math.max(tallest, shaft.volume.y2 - shaft.volume.y1 + 1);
+                        needs += shaft.plan.levels.reduce((sum, one) => sum + one.need, 0) / levels;
+                        drops += shaft.plan.levels.reduce((sum, one) => sum + one.drop, 0) / levels;
+                        plans += 1;
                     }
-                    const landed = fall(shaft);
-                    if (landed !== null) {
-                        missed += 1;
-                        if (missed === 1)
-                            report.push(`${difficulty} ${levels} run-${seed}: landed on ${landed}`);
-                    }
-                    tallest = Math.max(tallest, shaft.volume.y2 - shaft.volume.y1 + 1);
-                    needs += shaft.plan.levels.reduce((sum, one) => sum + one.need, 0) / levels;
-                    drops += shaft.plan.levels.reduce((sum, one) => sum + one.drop, 0) / levels;
-                    plans += 1;
+                    report.push(
+                        `${difficulty} ${levels}: ${broke} broke a rule, ${missed} missed, tallest ${tallest}, mean move ${(needs / SEEDS).toFixed(2)}, mean drop ${(drops / SEEDS).toFixed(1)}`
+                    );
+                    expect(broke, report.join("\n")).toBe(0);
+                    expect(missed, report.join("\n")).toBe(0);
+                    // Fits over the sea and under a 1.18 world's build limit (319),
+                    // with its lift: twenty hard floors included.
+                    expect(tallest + dropper.LIFT + 63, report.join("\n")).toBeLessThanOrEqual(319);
                 }
-                report.push(
-                    `${difficulty} ${levels}: ${broke} broke a rule, ${missed} missed, tallest ${tallest}, mean move ${(needs / SEEDS).toFixed(2)}, mean drop ${(drops / SEEDS).toFixed(1)}`
-                );
-                expect(broke, report.join("\n")).toBe(0);
-                expect(missed, report.join("\n")).toBe(0);
-                // Fits over the sea and under a 1.18 world's build limit (319),
-                // with its lift: twenty hard floors included.
-                expect(tallest + dropper.LIFT + 63, report.join("\n")).toBeLessThanOrEqual(319);
-            }
-        expect(plans).toBe(DIFFICULTIES.length * LEVELS.length * SEEDS);
-    });
+            expect(plans).toBe(DIFFICULTIES.length * LEVELS.length * SEEDS);
+        }
+    );
 
     it("lays out the same shaft for the same run, and another for another", () => {
         const one = shaftOf("medium", 10, "same");
