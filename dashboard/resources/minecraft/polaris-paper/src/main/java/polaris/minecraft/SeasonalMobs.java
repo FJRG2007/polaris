@@ -126,6 +126,17 @@ final class SeasonalMobs implements Listener {
         extras.clear();
     }
 
+    /**
+     * One more spawn at a spot, placed later under the same caps as the night's
+     * extras ({@link SeasonalHalloween}'s witches and blood night); false when the
+     * queue is already full. Placed as a custom spawn, so it brings none of its own.
+     */
+    boolean queueExtra(World world, EntityType type, Location at) {
+        if (extras.size() >= EXTRA_QUEUE) return false;
+        extras.addLast(new Extra(world.getUID(), type, at.clone()));
+        return true;
+    }
+
     void status(JsonObject reply) {
         reply.addProperty("spawnPercent", spawns);
         reply.addProperty("golemPercent", golems);

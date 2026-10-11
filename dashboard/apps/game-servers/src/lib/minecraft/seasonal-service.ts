@@ -17,7 +17,9 @@ import { readSchedule } from "./schedule";
 import { readEventState } from "./events/state";
 import { withServerContainer } from "./service";
 import { capsReading, forgetCapabilities } from "./events/in-server";
-import { readEventsConfig } from "./events/catalog";
+import { chosenLanguage, readEventsConfig } from "./events/catalog";
+import * as halloween from "./seasonal-halloween";
+import { homeLanguage } from "./speech-service";
 
 const { readInstallConfig, patchInstallConfig } = host.appsInstallConfig;
 const { seasonsAllowed } = host.seasonalService;
@@ -41,7 +43,7 @@ const SWEEP_CONCURRENCY = 8;
  *  it answered with no Polaris jar at all. */
 const told = new Map<
     string,
-    | { readonly line: string; readonly mobsMissing?: boolean }
+    | { readonly line: string; readonly mobsMissing?: boolean; readonly halloweenMissing?: boolean }
     | { readonly oldJarAt: number }
     | { readonly noJarAt: number }
 >();
@@ -77,6 +79,20 @@ export function decorationOf(
         serverOn: seasonal.seasonalOn(config),
         eventRunning: readEventState(config).run !== null
     });
+}
+
+/** The Halloween line for one server, in its own language. */
+async function halloweenCommandFor(
+    ownerId: string,
+    config: Record<string, unknown>,
+    now: Date
+): Promise<string> {
+    const language = await homeLanguage(ownerId, chosenLanguage(config)).catch(() => "en" as const);
+    return halloween.halloweenCommand(
+        halloween.halloweenSettings(config),
+        halloween.bloodNightKey(now, zoneOf(config)),
+        language
+    );
 }
 
 /** Tell one server. A line it already took out of season is not sent again. */
@@ -117,8 +133,18 @@ async function tell(row: ServerRow, allowed: boolean, now: Date): Promise<boolea
             decoration,
             mobs ? seasonal.seasonalMobs(config) : null
         );
-        await server.say([line]);
-        told.set(row.id, { line, mobsMissing: decoration !== null && !mobs });
+        const lines = [line];
+        const halloweenLine =
+            decoration === "halloween" && reading.caps.has(halloween.HALLOWEEN_CAP)
+                ? await halloweenCommandFor(row.ownerId, config, now)
+                : null;
+        if (halloweenLine) lines.push(halloweenLine);
+        await server.say(lines);
+        told.set(row.id, {
+            line,
+            mobsMissing: decoration !== null && !mobs,
+            halloweenMissing: decoration === "halloween" && !halloweenLine
+        });
         return true;
     }).catch((caught: unknown) => {
         console.error(`[minecraft-seasonal] could not tell ${row.id} the season:`, caught);
@@ -174,6 +200,10 @@ export interface SeasonalView {
     /** The server's jar shows the decorations but predates the seasonal mobs:
      *  a restart loads the one that brings them. */
     readonly mobsNeedRestart: boolean;
+    /** Halloween's extra touches (`seasonal-halloween.ts`). */
+    readonly halloween: halloween.HalloweenSettings;
+    /** The jar shows Halloween but predates its extra touches. */
+    readonly halloweenNeedsRestart: boolean;
 }
 
 export async function seasonalView(installedAppId: string): Promise<SeasonalView> {
@@ -193,7 +223,10 @@ export async function seasonalView(installedAppId: string): Promise<SeasonalView
         needsRestart: last !== undefined && "oldJarAt" in last,
         unavailable: last !== undefined && "noJarAt" in last,
         ...seasonal.seasonalMobs(config),
-        mobsNeedRestart: last !== undefined && "line" in last && last.mobsMissing === true
+        mobsNeedRestart: last !== undefined && "line" in last && last.mobsMissing === true,
+        halloween: halloween.halloweenSettings(config),
+        halloweenNeedsRestart:
+            last !== undefined && "line" in last && last.halloweenMissing === true
     };
 }
 
@@ -202,6 +235,7 @@ export interface SeasonalPatch {
     readonly on?: boolean;
     readonly nightSpawns?: number;
     readonly snowGolems?: number;
+    readonly halloween?: Partial<halloween.HalloweenSettings>;
 }
 
 /** Change this server's seasonal settings, and tell it now. */
@@ -215,6 +249,16 @@ export async function setSeasonal(
     if (patch.on !== undefined) changes[seasonal.SEASONAL_KEY] = patch.on ? null : false;
     if (patch.nightSpawns !== undefined) changes[seasonal.NIGHT_SPAWNS_KEY] = patch.nightSpawns;
     if (patch.snowGolems !== undefined) changes[seasonal.SNOW_GOLEMS_KEY] = patch.snowGolems;
+    if (patch.halloween !== undefined) {
+        const current = await prisma.installedApp.findUnique({
+            where: { id: installedAppId },
+            select: { config: true }
+        });
+        changes[halloween.HALLOWEEN_KEY] = halloween.patchHalloween(
+            readInstallConfig(current?.config),
+            patch.halloween
+        );
+    }
     await patchInstallConfig(installedAppId, changes);
     // Asked again now rather than when the last answer runs out, so a server
     // restarted onto a newer jar is reached on the switch.

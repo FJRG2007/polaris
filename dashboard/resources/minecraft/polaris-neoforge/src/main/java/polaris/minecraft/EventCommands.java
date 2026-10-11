@@ -37,12 +37,13 @@ import net.neoforged.neoforge.event.tick.ServerTickEvent;
  * - {@code polaris sounds status|refresh} ({@link SoundPack}).
  * - {@code polaris season set <halloween|winter> <seconds> [<spawns%> <golems%>]},
  *   {@code clear}, {@code status} ({@link SeasonalDecor}, {@link SeasonalMobs}).
+ * - {@code polaris season halloween key=value ...} ({@link SeasonalHalloween}).
  *
  * Hide and seek ({@link EventSeek}) needs no command: it follows the tags.
  */
 final class EventCommands {
     /** What `polaris caps` lists; the dashboard checks each by name. */
-    static final String[] CAPS = {"stash", "batch", "seek", "respawn", "guard", "season", "season-mobs"};
+    static final String[] CAPS = {"stash", "batch", "seek", "respawn", "guard", "season", "season-mobs", "season-halloween"};
 
     private final String version;
 
@@ -75,6 +76,9 @@ final class EventCommands {
                                                                 IntegerArgumentType.getInteger(context, "seconds"),
                                                                 IntegerArgumentType.getInteger(context, "spawns"),
                                                                 IntegerArgumentType.getInteger(context, "golems")))))))))
+                        .then(Commands.literal("halloween").then(Commands.argument("settings", StringArgumentType.greedyString())
+                                .executes(context -> answer(context, server -> SeasonalHalloween.configure(server,
+                                        StringArgumentType.getString(context, "settings"))))))
                         .then(Commands.literal("clear").executes(context -> answer(context, SeasonalDecor::clear)))
                         .then(Commands.literal("status").executes(context -> answer(context, server -> SeasonalDecor.status()))))
                 .then(Commands.literal("stash")

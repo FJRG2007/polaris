@@ -308,6 +308,33 @@ final class SeasonalDecor {
         seen.clear();
     }
 
+    /**
+     * Whether this player is shown a pumpkin at {@code pos}; if so it is taken
+     * down for them (their game shows the real block again) and not shown again
+     * until the chunk is decided anew. For {@link SeasonalHalloween}'s traps.
+     */
+    static boolean takePumpkin(ServerPlayer player, BlockPos pos) {
+        Seen one = seen.get(player.getUUID());
+        if (one == null || one.dimension != player.serverLevel().dimension()) return false;
+        long key = ChunkPos.asLong(pos.getX() >> 4, pos.getZ() >> 4);
+        List<Fake> fakes = one.chunks.get(key);
+        if (fakes == null) return false;
+        for (int i = 0; i < fakes.size(); i++) {
+            Fake fake = fakes.get(i);
+            if (!fake.pos().equals(pos) || !pumpkin(fake.shown())) continue;
+            List<Fake> kept = new ArrayList<>(fakes);
+            kept.remove(i);
+            one.chunks.put(key, kept);
+            restore(player, fake);
+            return true;
+        }
+        return false;
+    }
+
+    private static boolean pumpkin(BlockState state) {
+        return state.is(Blocks.PUMPKIN) || state.is(Blocks.CARVED_PUMPKIN) || state.is(Blocks.JACK_O_LANTERN);
+    }
+
     private static void show(ServerPlayer player, Fake fake) {
         player.connection.send(new ClientboundBlockUpdatePacket(fake.pos(), fake.shown()));
     }
@@ -441,7 +468,7 @@ final class SeasonalDecor {
      * nothing but natural blocks from one below to one above it. A block anybody
      * placed - a path, a slab, a plank, a torch - rules the spot out.
      */
-    private static boolean naturalGrass(ServerLevel level, BlockPos ground) {
+    static boolean naturalGrass(ServerLevel level, BlockPos ground) {
         if (!level.getBlockState(ground).is(Blocks.GRASS_BLOCK)) return false;
         if (!level.getBlockState(ground.above()).isAir()) return false;
         if (!level.getBlockState(ground.below()).is(BlockTags.DIRT)) return false;
