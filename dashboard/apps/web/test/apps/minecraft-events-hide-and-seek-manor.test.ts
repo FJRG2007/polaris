@@ -145,10 +145,10 @@ describe("hide and seek's manor", () => {
         expect(manor.holdTicks(0)).toBe(manor.HOLD_MIN);
     });
 
-    it("mixes the keys: buttons, rugs, tiles to look up from, things to stare at", () => {
+    it("mixes the keys of a design 4 house: buttons, rugs, tiles to look up from, things to stare at", () => {
         const kinds = new Set<string>();
         for (let seed = 0; seed < 20; seed += 1)
-            for (const key of manor.manorFor(`kinds-${seed}`, 3, model.NEWEST).keys)
+            for (const key of manor.manorFor(`kinds-${seed}`, 3, model.NEWEST, 4).keys)
                 if (!key.inside) kinds.add(key.kind);
         expect([...kinds].sort()).toEqual(["btn", "crouch", "gaze", "up"]);
     });
@@ -225,7 +225,7 @@ describe("hide and seek's manor in the world", () => {
         const solidAfter = fills.slice(fluid).filter((one) => !/water|lava/.test(one.block));
         expect(solidAfter).toHaveLength(1);
         expect(fills.at(-1)!.box.x1).toBe(fills.at(-1)!.box.x2);
-        const hung = /(_button|ladder|_banner|_door|_trapdoor)\[/;
+        const hung = /(_button|lever|ladder|_banner|_door|_trapdoor)\[/;
         const firstOther = fills.findIndex((one, index) => index > 1 && !hung.test(one.block));
         expect(fills.slice(firstOther).some((one) => hung.test(one.block))).toBe(false);
         // Scaffolding checks its support a tick after it is placed and drops
@@ -405,5 +405,175 @@ describe("the mazes", () => {
         const tree = maze.carve(5, seeded("tree"), 0);
         const passages = tree.east.filter(Boolean).length + tree.south.filter(Boolean).length;
         expect(passages).toBe(24);
+    });
+});
+describe("the manor's climbs and switches (design 5)", () => {
+    const eras = [model.NEWEST, model.OLDEST, { scaffold: true, snow: true, display: false }];
+
+    it("has a hall to climb in every house: a pad up to a ledge, two parkours, a crawlspace", () => {
+        for (const era of eras)
+            for (let seed = 0; seed < 6; seed += 1)
+                for (const count of [3, 4]) {
+                    const house = manor.manorFor(`climb-${seed}`, count, era);
+                    expect(house.design).toBe(manor.DESIGN);
+                    expect(house.bare).toBe(false);
+                    expect(manor.manorProblems(house)).toEqual([]);
+                    const halls = house.rooms
+                        .map((room, index) => ({ room, index }))
+                        .filter(({ room }) => room.template === "atrium");
+                    expect(halls.length).toBeGreaterThanOrEqual(1);
+                    expect(house.pads.length).toBe(halls.length);
+                    expect(house.grid.jumps).toBe(true);
+                    for (const pad of house.pads) {
+                        expect(house.grid.get(pad.x, 0, pad.z)).toBe("minecraft:slime_block");
+                        expect(house.grid.padAt(pad.x, 0, pad.z)).toBe(panels.PAD_RISE);
+                    }
+                    // Each hall's ledge and nests are places to hide, six up,
+                    // and every one of them is reached (`manorProblems` above).
+                    for (const { index } of halls) {
+                        const high = house.spots.filter(
+                            (spot) => spot.room === index && spot.feet === 6
+                        );
+                        expect(high).toHaveLength(3);
+                        expect(
+                            house.spots.some((spot) => spot.room === index && spot.feet < 0)
+                        ).toBe(true);
+                    }
+                }
+    }, 120_000);
+
+    it("reaches the nests only by jumping, and the ledge only off the pad", () => {
+        const house = manor.manorFor("jumps", 3, model.NEWEST);
+        const start = manor.hiderCells(house)[0]!;
+        const from = { x: start.x, feet: 1, z: start.z };
+        const high = house.spots.filter((spot) => spot.feet === 6);
+        const reached = (grid: model.Grid) => {
+            const steps = model.walk(grid, from, "seeker");
+            return high.filter((spot) => steps[grid.index(spot.x, spot.feet, spot.z)]! >= 0).length;
+        };
+        expect(reached(house.grid)).toBe(3);
+        // The same house walked with no jumps and no pads: none of them.
+        const flat = new model.Grid(house.grid.size, false);
+        for (const part of house.grid.boxes())
+            flat.set(part.block, part.x1, part.l1, part.z1, part.x2, part.l2, part.z2);
+        expect(reached(flat)).toBe(0);
+    });
+
+    it("puts a lever on the wall for its secret panels, the key anybody sees", () => {
+        let levers = 0;
+        let outside = 0;
+        for (let seed = 0; seed < 20; seed += 1) {
+            const house = manor.manorFor(`lever-${seed}`, 3, model.NEWEST);
+            for (const key of house.keys.filter((one) => !one.inside)) {
+                outside += 1;
+                if (key.kind !== "lever") continue;
+                levers += 1;
+                const block = house.grid.get(key.x, key.level, key.z)!;
+                expect(block).toMatch(/^minecraft:lever\[face=wall,facing=\w+,powered=false\]$/);
+                expect(key.level).toBe(2);
+                const panel = house.panels.find((one) => one.id === key.id)!;
+                expect(
+                    Math.hypot(key.from.x - panel.front.x, key.from.z - panel.front.z)
+                ).toBeGreaterThanOrEqual(manor.KEY_DISTANCE);
+                expect(key.hold).toBeGreaterThanOrEqual(manor.HOLD_MIN);
+            }
+        }
+        expect(outside).toBeGreaterThan(20);
+        expect(levers / outside).toBeGreaterThan(0.7);
+    });
+
+    it("draws a design 4 house as it was: no hall to climb, no pads, no levers, no jumps", () => {
+        for (let seed = 0; seed < 12; seed += 1) {
+            const house = manor.manorFor(`old-design-${seed}`, 3, model.NEWEST, 4);
+            expect(house.design).toBe(4);
+            expect(house.grid.jumps).toBe(false);
+            expect(house.pads).toEqual([]);
+            expect(house.rooms.some((room) => room.template === "atrium")).toBe(false);
+            expect(house.keys.some((key) => key.kind === "lever")).toBe(false);
+            expect(manor.manorProblems(house)).toEqual([]);
+        }
+    });
+
+    it("takes its pads and levers down with the house, levers before their wall", () => {
+        const house = manor.manorFor("down", 3, model.NEWEST);
+        const blocks = manor.manorBlocks(house);
+        expect(blocks).toContain("minecraft:slime_block");
+        expect(blocks).toContain("minecraft:lever");
+        expect(blocks.indexOf("minecraft:lever")).toBeLessThan(blocks.indexOf("minecraft:stone"));
+        const fills = manor.manorFills(box, house);
+        const lever = fills.findIndex((one) => one.block.startsWith("minecraft:lever["));
+        const wall = fills.findIndex((one) => one.block === "minecraft:stone");
+        expect(lever).toBeGreaterThan(-1);
+        expect(lever).toBeLessThan(wall);
+    });
+
+    it("arms a marker on each pad where a player's feet are, and takes it away again", () => {
+        const house = manor.manorFor("pads", 3, model.NEWEST);
+        const lines = manor.armLines(box, house, "pads");
+        const pads = lines.filter((line) => line.includes(`"${panels.PAD}"`));
+        expect(pads).toHaveLength(house.pads.length);
+        for (const pad of house.pads)
+            expect(
+                pads.some((line) =>
+                    line.includes(
+                        `summon minecraft:armor_stand ${box.x1 + pad.x + 0.5} ${box.y1 + model.BASE + 1} ${box.z1 + pad.z + 0.5} `
+                    )
+                )
+            ).toBe(true);
+        expect(panels.stopLines(box).some((line) => line.includes(`tag=${panels.PAD},`))).toBe(
+            true
+        );
+    });
+});
+
+describe("the manor's launch pads and levers in the data pack", () => {
+    it("throws a player onto the ledge with a second of Levitation, never Slow Falling", () => {
+        const arc = panels.launchArc();
+        // Up from the floor's feet (1) to the ledge's (6), with room to step on.
+        expect(arc.peak).toBeGreaterThanOrEqual(5.5);
+        // Head under the roof: feet at most at level 1 + peak, a body 1.8 tall,
+        // and the roof's first block at level `ROOF`.
+        expect(1 + arc.peak + 1.8).toBeLessThan(model.ROOF);
+        expect(panels.PAD_RISE).toBe(Math.floor(arc.peak));
+        // Never hanging three seconds where flight is off: the game kicks at four.
+        expect(arc.hanging).toBeLessThan(60);
+        expect(arc.ticks).toBeLessThan(60);
+        const all = Object.values(panels.FUNCTIONS).flat().join("\n");
+        expect(all).not.toContain("slow_falling");
+        expect(panels.FUNCTIONS.launch).toContain(
+            `effect give @s minecraft:levitation ${panels.LAUNCH_SECONDS} ${panels.LAUNCH_AMPLIFIER} true`
+        );
+        // Once a stand, then a wait before the same player is thrown again.
+        const tick = panels.FUNCTIONS.tick!.join("\n");
+        expect(tick).toContain(
+            `tag=${panels.PAD},distance=..0.7] unless score @s ${panels.PAD_WAIT} matches 1.. run function polaris:panel/launch`
+        );
+        expect(panels.FUNCTIONS.launch).toContain(
+            `scoreboard players set @s ${panels.PAD_WAIT} ${panels.PAD_WAIT_TICKS}`
+        );
+        expect(panels.PAD_WAIT_TICKS).toBeGreaterThan(arc.ticks);
+    });
+
+    it("fires a lever once each time it is pulled, either way", () => {
+        const lever = panels.FUNCTIONS.key_work!.filter((line) => line.includes("pe_key_lever"));
+        expect(lever).toHaveLength(4);
+        expect(lever[0]).toContain(
+            `minecraft:lever[powered=true] unless score @s ${panels.COUNT} matches 1 run function polaris:panel/fire`
+        );
+        expect(lever[1]).toContain(
+            `minecraft:lever[powered=false] unless score @s ${panels.COUNT} matches 0 run function polaris:panel/fire`
+        );
+        // The way it was, written after the fire, so the next look does not fire again.
+        expect(lever[2]).toMatch(/powered=true\] run scoreboard players set @s polaris_kt 1$/);
+        expect(lever[3]).toMatch(/powered=false\] run scoreboard players set @s polaris_kt 0$/);
+    });
+
+    it("is heard and seen where a panel opens or shuts", () => {
+        const open = panels.FUNCTIONS.open!.join("\n");
+        expect(open).toContain("playsound minecraft:block.piston.extend");
+        expect(open).toContain("particle minecraft:cloud");
+        expect(panels.FUNCTIONS.shut!.join("\n")).toContain(
+            "playsound minecraft:block.piston.contract"
+        );
     });
 });

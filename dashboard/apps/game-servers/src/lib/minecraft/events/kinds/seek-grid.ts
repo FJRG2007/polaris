@@ -71,11 +71,11 @@ const CELL_OF: Readonly<Record<string, Cell>> = {
 
 /** Blocks with no collision at all: a body fits in them. */
 const NO_COLLISION =
-    /(_button|_carpet|_banner|_wall_banner|torch|poppy|dandelion|cornflower|azure_bluet|oxeye_daisy|allium|fern|grass$|short_grass|_sapling|tall_grass|_pressure_plate|_sign)$/;
+    /(_button|lever|_carpet|_banner|_wall_banner|torch|poppy|dandelion|cornflower|azure_bluet|oxeye_daisy|allium|fern|grass$|short_grass|_sapling|tall_grass|_pressure_plate|_sign)$/;
 
 /** Whole blocks light does not go through. Everything else lets it by. */
 const LIT_THROUGH =
-    /(_button|_carpet|_banner|torch|poppy|dandelion|cornflower|azure_bluet|oxeye_daisy|allium|fern|grass$|_sapling|_pressure_plate|_sign|ladder|_door|_trapdoor|_fence|_wall$|iron_bars|glass|glass_pane|leaves|water|lava|scaffolding|_slab|_stairs|anvil|cauldron|_bed|_head|lantern|vine|lectern)$/;
+    /(_button|lever|_carpet|_banner|torch|poppy|dandelion|cornflower|azure_bluet|oxeye_daisy|allium|fern|grass$|_sapling|_pressure_plate|_sign|ladder|_door|_trapdoor|_fence|_wall$|iron_bars|glass|glass_pane|leaves|water|lava|scaffolding|_slab|_stairs|anvil|cauldron|_bed|_head|lantern|vine|lectern)$/;
 /** Blocks that take more of the light than air: leaves and water. */
 const DIMMING = /(leaves|water)$/;
 /** What gives light, and how much. */
@@ -115,10 +115,17 @@ export class Grid {
     readonly size: number;
     private readonly cells: (string | null)[];
     readonly panels = new Map<number, PanelCell>();
+    /** Launch pads, by the index of their block: how many levels a player
+     *  standing on one is thrown up (`secret-panels.launchArc`). */
+    readonly pads = new Map<number, number>();
+    /** Whether a player jumps a gap of one block here, as on a parkour: a
+     *  house from design 5 on is checked with the jumps it is built for. */
+    readonly jumps: boolean;
     static readonly LEVELS = ROOF - DEEP;
 
-    constructor(size: number) {
+    constructor(size: number, jumps = false) {
         this.size = size;
+        this.jumps = jumps;
         this.cells = new Array(size * size * Grid.LEVELS).fill(null);
     }
 
@@ -177,6 +184,16 @@ export class Grid {
     /** Marks a set cell as a panel the data pack opens and shuts. */
     panel(x: number, level: number, z: number, shape: PanelCell["shape"]): void {
         if (this.inside(x, level, z)) this.panels.set(this.index(x, level, z), { shape });
+    }
+
+    /** Marks a set cell as a launch pad that throws whoever stands on it `rise` up. */
+    pad(x: number, level: number, z: number, rise: number): void {
+        if (this.inside(x, level, z)) this.pads.set(this.index(x, level, z), rise);
+    }
+
+    /** How far a pad here throws, or 0 where there is none. */
+    padAt(x: number, level: number, z: number): number {
+        return this.inside(x, level, z) ? (this.pads.get(this.index(x, level, z)) ?? 0) : 0;
     }
 
     panelAt(x: number, level: number, z: number): PanelCell | null {
@@ -291,11 +308,15 @@ export function moves(grid: Grid, walker: Walker) {
         (floor(x, feet - 1, z) || climb(x, feet, z) || fluid(x, feet, z)) &&
         at(x, feet, z) !== "snow";
     /** Where a body put at `feet` comes to rest: down three at most, or into
-     *  water from any height; null where it would fall further. */
+     *  water or onto a launch pad's slime from any height; null where it would
+     *  fall further. */
     const land = (x: number, feet: number, z: number): number | null => {
         for (let level = feet; level > DEEP; level -= 1) {
             if (!open(x, level, z)) return null;
-            if (held(x, level, z)) return feet - level <= 3 || fluid(x, level, z) ? level : null;
+            if (held(x, level, z))
+                return feet - level <= 3 || fluid(x, level, z) || grid.padAt(x, level - 1, z) > 0
+                    ? level
+                    : null;
         }
         return null;
     };
@@ -306,8 +327,12 @@ export function moves(grid: Grid, walker: Walker) {
  * Every place a walker reaches from `start` the way a player moves: level, a
  * block up with room to jump it, down three at most (or into water), up and
  * down ladders and scaffolding, swimming, through doors, hatches and panels
- * (anyone can open them), down through powder snow and never up it. Answers
- * how many moves each place took, -1 where it was never reached.
+ * (anyone can open them), down through powder snow and never up it. In a
+ * house built with them (`Grid.jumps`, `Grid.pads`): across a gap of one block,
+ * level, down or a block up, with room over the head to jump; and up a launch
+ * pad's column as high as it throws, stepping off onto whatever is beside it
+ * on the way, or falling back onto the pad. Answers how many moves each place
+ * took, -1 where it was never reached.
  */
 export function walk(
     grid: Grid,
@@ -407,6 +432,38 @@ function explore(
             }
         }
         if ((swims || climbs) && m.held(x, feet + 1, z)) visit(x, feet + 1, z, here);
+        const stands = m.held(x, feet, z);
+        // Thrown up by a pad: every height on the way is somewhere to step off.
+        const rise = stands ? grid.padAt(x, feet - 1, z) : 0;
+        for (let up = 1; up <= rise && m.fits(x, feet + up, z); up += 1)
+            visit(x, feet + up, z, here);
+        // In the air over a pad: back down onto it.
+        if (!stands && !swims && !climbs) {
+            const rest = m.land(x, feet, z);
+            if (rest !== null && rest < feet && grid.padAt(x, rest - 1, z) > 0)
+                visit(x, rest, z, here);
+        }
+        // A jump over a gap of one block, from something to stand on.
+        if (grid.jumps && stands && !swims && !climbs && m.open(x, feet + 2, z))
+            for (const [dx, dz] of [
+                [1, 0],
+                [-1, 0],
+                [0, 1],
+                [0, -1]
+            ] as const) {
+                const gx = x + dx;
+                const gz = z + dz;
+                const tx = x + 2 * dx;
+                const tz = z + 2 * dz;
+                if (!m.fits(gx, feet, gz) || !m.open(gx, feet + 2, gz)) continue;
+                if (m.held(gx, feet, gz)) continue; // no gap: a plain step
+                if (m.fits(tx, feet, tz)) {
+                    const rest = m.land(tx, feet, tz);
+                    if (rest !== null) visit(tx, rest, tz, here);
+                }
+                if (m.fits(tx, feet + 1, tz) && m.held(tx, feet + 1, tz))
+                    visit(tx, feet + 1, tz, here);
+            }
         // Down: off a ladder, in water, or through what opens in the floor.
         const under = feet - 1;
         if (

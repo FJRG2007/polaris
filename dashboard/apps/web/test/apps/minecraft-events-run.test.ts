@@ -12180,10 +12180,11 @@ describe("hide and seek", () => {
         expect(manor.manorProblems(house)).toEqual([]);
         // Its paintings and display blocks, once it is built.
         for (const line of manor.decorLines(box, house)) expect(world.sent).toContain(line);
-        // At Go: every panel and key marked, and the seekers' way home.
+        // At Go: every panel, key and launch pad marked, and the seekers' way home.
         const arm = manor.armLines(box, house, run.id);
+        expect(house.pads.length).toBeGreaterThan(0);
         expect(arm.filter((line) => line.includes("summon minecraft:armor_stand"))).toHaveLength(
-            house.panels.length + house.keys.length + 1
+            house.panels.length + house.keys.length + house.pads.length + 1
         );
         for (const line of arm) expect(world.sent).toContain(line);
         await events.cancelEvent("owner", SERVER);

@@ -25,6 +25,15 @@
  * from, a head to stare at (`secret-panels.ts`). It stays open long enough to
  * walk from the key to it, worked out from the walk itself.
  *
+ * From design 5 every house also has things to climb and switches anybody can
+ * see: a hall with a launch pad up to a ledge and two parkours of posts up to
+ * crow's nests (`seek-rooms.ts`'s atrium, the first room drawn), and a lever on
+ * the wall for each secret panel, wherever there is room for one, in place of
+ * a hidden key - a key nobody could tell from the furniture round it was a
+ * secret nobody found. The house is walked with the jumps and the pads it is
+ * built for (`seek-grid.walk`). A run built by design 4 still draws its own
+ * house, exactly as it was.
+ *
  * A house is checked before it is used (`manorProblems`): every place a hider
  * can get to a seeker can too (lava aside, which a seeker is sent back from),
  * every floor and every hiding place reached, every key far enough from its
@@ -46,7 +55,9 @@ import { seeded, shuffled } from "../trivia-bank";
 import * as model from "./seek-grid";
 
 /** The layout's version, written into the run when it is built. */
-export const DESIGN = 4;
+export const DESIGN = 5;
+/** The first design built as a manor: every design from here on is one. */
+export const FIRST = 4;
 /** The most who can play, in the largest house. */
 export const MOST = 24;
 /** Times a house is drawn again before its rooms are left plain. */
@@ -114,6 +125,8 @@ const ROOF_BLOCK = "minecraft:dark_oak_planks";
 const BOARDS = "minecraft:spruce_planks";
 const BANNER = "minecraft:white_wall_banner";
 const PAINTINGS = ["minecraft:wanderer", "minecraft:graham"] as const;
+/** A launch pad's block (design 5). */
+const PAD_BLOCK = "minecraft:slime_block";
 
 /** A secret panel: its lower block, in the house's own terms. */
 export interface Panel {
@@ -201,6 +214,8 @@ export interface Manor {
     /** The middle of the cage. */
     readonly middle: { readonly x: number; readonly z: number };
     readonly bare: boolean;
+    /** Launch pads (design 5): the slime block's place, in the floor. */
+    readonly pads: readonly { readonly x: number; readonly z: number }[];
 }
 
 const origin = (index: number) => model.WALL + index * (model.ROOM + model.WALL);
@@ -308,6 +323,7 @@ interface Draft {
     shown: Shown[];
     spots: Manor["spots"][number][];
     nooks: Manor["nooks"][number][];
+    pads: { x: number; z: number }[];
     nextPanel: number;
 }
 
@@ -377,12 +393,13 @@ export function drawManor(
     count: number,
     era: model.Era,
     draw: number,
-    plain = false
+    plain = false,
+    design = DESIGN
 ): Manor {
     const random = seeded(`${seed}-manor-${draw}`);
     const pick = <T>(list: readonly T[]): T => list[Math.floor(random() * list.length)]!;
     const size = sizeOf(count);
-    const grid = new model.Grid(size);
+    const grid = new model.Grid(size, design >= rooms.ATRIUM_SINCE);
     const middle = { i: Math.floor(count / 2), j: Math.floor(count / 2) };
     const cageRoom = middle.j * count + middle.i;
     const links = drawLinks(count, random, pick);
@@ -395,10 +412,16 @@ export function drawManor(
         shown: [],
         spots: [],
         nooks: [],
+        pads: [],
         nextPanel: 1
     };
     const deck: rooms.Template[] = [];
-    const usable = rooms.TEMPLATES.filter((one) => !one.fits || one.fits(era));
+    const usable = rooms.TEMPLATES.filter(
+        (one) => (!one.fits || one.fits(era)) && (one.since ?? 0) <= design
+    );
+    // From design 5 the hall to climb is the first room drawn, so every house
+    // has one; it comes round again with the rest of the deck in a big house.
+    let climb = usable.find((one) => one.name === "atrium");
     const plans: RoomPlan[] = [];
     const templates: rooms.Template[] = [];
     for (let room = 0; room < count * count; room += 1) {
@@ -408,7 +431,14 @@ export function drawManor(
         if (plain) template = rooms.PLAIN;
         else if (room === cageRoom) template = rooms.FOYER;
         else {
-            if (deck.length === 0) deck.push(...shuffled(usable, random));
+            if (deck.length === 0) {
+                deck.push(...shuffled(usable, random));
+                if (climb) {
+                    deck.splice(deck.indexOf(climb), 1);
+                    deck.push(climb);
+                    climb = undefined;
+                }
+            }
             template = deck.pop()!;
         }
         const fixed = room === cageRoom || plain;
@@ -467,7 +497,9 @@ export function drawManor(
             const local = rooms.SIDES.find((one) => place.side(one) === door.side)!;
             return { side: local, at: door.at };
         });
-        template.draw(canvasOf(draft, place, template.style, localDoors, era, random, room));
+        template.draw(
+            canvasOf(draft, place, template.style, localDoors, era, random, room, design)
+        );
     });
 
     // Lamps in every room's floor and ceiling - what stands on the floor's
@@ -520,14 +552,14 @@ export function drawManor(
 
     // Paintings on solid wall too, the same as the ones over a gap.
     if (!plain) decoyPaintings(draft, plans, random);
-    const keys = chooseKeys(draft, random);
+    const keys = chooseKeys(draft, random, design >= rooms.ATRIUM_SINCE ? count : 0);
     // A panel left with no key is plain wall or floor: nothing opens it.
     for (const panel of draft.panels)
         if (!keys.some((key) => key.id === panel.id && !key.inside))
             for (const level of panel.shape === "wall" ? [1, 2] : [0])
                 grid.panels.delete(grid.index(panel.x, level, panel.z));
     return {
-        design: DESIGN,
+        design,
         count,
         size,
         era,
@@ -543,7 +575,8 @@ export function drawManor(
         spots: draft.spots,
         nooks: draft.nooks,
         middle: mid,
-        bare: plain
+        bare: plain,
+        pads: draft.pads
     };
 }
 
@@ -565,7 +598,8 @@ function canvasOf(
     doors: rooms.Canvas["doors"],
     era: model.Era,
     random: () => number,
-    room: number
+    room: number,
+    design: number
 ): rooms.Canvas {
     const { grid } = draft;
     const box = (u1: number, v1: number, u2: number, v2: number) => {
@@ -581,6 +615,7 @@ function canvasOf(
     const canvas: rooms.Canvas = {
         random,
         era,
+        design,
         style,
         doors,
         set(block, u1, l1, v1, u2 = u1, l2 = l1, v2 = v1) {
@@ -637,6 +672,13 @@ function canvasOf(
         spot(u, feet, v) {
             const at = place.at(u, v);
             draft.spots.push({ room, x: at.x, feet, z: at.z });
+        },
+        pad(u, v) {
+            const at = place.at(u, v);
+            if (!grid.free(at.x, 0, at.z)) return;
+            grid.set(PAD_BLOCK, at.x, 0, at.z);
+            grid.pad(at.x, 0, at.z, panels.PAD_RISE);
+            draft.pads.push({ x: at.x, z: at.z });
         }
     };
     return canvas;
@@ -913,13 +955,67 @@ const KIND_OF: Readonly<Record<rooms.HookKind, panels.KeyKind>> = {
     gaze: "gaze"
 };
 
-/** A key for each panel among its room's hooks, far enough from it, and its
- *  button inside; a panel left with no key is turned back into wall. Holds
- *  are filled in once the walk can be measured (`withHolds`). */
-function chooseKeys(draft: Draft, random: () => number): Key[] {
+/**
+ * A lever for a panel (design 5) on its room's wall, at head height where
+ * somebody can stand in front of it, far enough from the panel, never on a
+ * nook, a door, a painting or anything already there. Null where the room has
+ * no such place.
+ */
+function leverFor(
+    draft: Draft,
+    panel: Panel,
+    count: number,
+    random: () => number
+): Omit<Key, "id"> | null {
+    const { grid } = draft;
+    const x0 = origin(panel.room % count);
+    const z0 = origin(Math.floor(panel.room / count));
+    const hung = new Set(draft.paintings.map((one) => `${one.x},${one.z}`));
+    const walk = model.moves(grid, "seeker");
+    const sites: { x: number; z: number; from: { x: number; z: number }; facing: Side }[] = [];
+    for (const side of rooms.SIDES) {
+        const wall = wallOf(x0, z0, side);
+        for (let along = 1; along < rooms.LAST; along += 1) {
+            const face = wall.cell(along, 0);
+            const at = wall.room(along, 0);
+            const from = wall.room(along, 1);
+            if (grid.cell(face.x, 2, face.z) !== "solid" || grid.panelAt(face.x, 2, face.z))
+                continue;
+            if (!grid.free(at.x, 2, at.z) || hung.has(`${at.x},${at.z}`)) continue;
+            if (!walk.held(at.x, 1, at.z) || !walk.held(from.x, 1, from.z)) continue;
+            if (Math.hypot(from.x - panel.front.x, from.z - panel.front.z) < KEY_DISTANCE) continue;
+            sites.push({ x: at.x, z: at.z, from, facing: wall.inward });
+        }
+    }
+    if (sites.length === 0) return null;
+    const site = sites[Math.floor(random() * sites.length)]!;
+    grid.set(`minecraft:lever[face=wall,facing=${site.facing},powered=false]`, site.x, 2, site.z);
+    return {
+        kind: "lever",
+        x: site.x,
+        level: 2,
+        z: site.z,
+        from: site.from,
+        hold: HOLD_MIN,
+        inside: false
+    };
+}
+
+/** A key for each panel - from design 5 a lever on its room's wall
+ *  (`leverFor`, given the house's rooms along a side as `levers`), else one of
+ *  its room's hooks far enough from it - and its button inside; a panel left
+ *  with no key is turned back into wall. Holds are filled in once the walk can
+ *  be measured (`withHolds`). */
+function chooseKeys(draft: Draft, random: () => number, levers = 0): Key[] {
     const used = new Set<number>();
     const keys: Key[] = [];
     for (const panel of draft.panels) {
+        const lever = levers > 0 ? leverFor(draft, panel, levers, random) : null;
+        if (lever) {
+            keys.push({ id: panel.id, ...lever });
+            insideKey(draft, panel, keys);
+            continue;
+        }
         const choices = draft.hooks
             .map((one, index) => ({ one, index }))
             .filter(
@@ -941,20 +1037,25 @@ function chooseKeys(draft: Draft, random: () => number): Key[] {
             hold: HOLD_MIN,
             inside: false
         });
-        const inside = draft.insideKeys.find((each) => each.panel === panel.id);
-        if (inside)
-            keys.push({
-                id: panel.id,
-                kind: "btn",
-                x: inside.x,
-                level: inside.level,
-                z: inside.z,
-                from: { x: inside.x, z: inside.z },
-                hold: INSIDE_HOLD,
-                inside: true
-            });
+        insideKey(draft, panel, keys);
     }
     return keys;
+}
+
+/** A panel's button inside, to get out by. */
+function insideKey(draft: Draft, panel: Panel, keys: Key[]): void {
+    const inside = draft.insideKeys.find((each) => each.panel === panel.id);
+    if (inside)
+        keys.push({
+            id: panel.id,
+            kind: "btn",
+            x: inside.x,
+            level: inside.level,
+            z: inside.z,
+            from: { x: inside.x, z: inside.z },
+            hold: INSIDE_HOLD,
+            inside: true
+        });
 }
 
 /** Ticks a panel is held open after its key: the walk from the key to the
@@ -978,14 +1079,15 @@ function withHolds(manor: Omit<Manor, "keys">, keys: readonly Key[]): Key[] {
     });
 }
 
-/** A run's house: drawn from the run's id until one keeps every rule. */
-export function manorFor(seed: string, count: number, era: model.Era): Manor {
+/** A run's house: drawn from the run's id until one keeps every rule, by the
+ *  design it was built by (design 4 is still drawn as it was). */
+export function manorFor(seed: string, count: number, era: model.Era, design = DESIGN): Manor {
     for (let draw = 0; draw < DRAWS; draw += 1) {
-        const drawn = drawManor(seed, count, era, draw);
+        const drawn = drawManor(seed, count, era, draw, false, design);
         const manor = { ...drawn, keys: withHolds(drawn, drawn.keys) };
         if (manorProblems(manor).length === 0) return manor;
     }
-    const plain = drawManor(seed, count, era, 0, true);
+    const plain = drawManor(seed, count, era, 0, true, design);
     return { ...plain, keys: withHolds(plain, plain.keys) };
 }
 
@@ -1132,7 +1234,7 @@ function worldOf(box: Box, x: number, level: number, z: number) {
 /** Every kind of block it is built of, as bare ids, in the order it comes
  *  down: the lava and water first, so nothing runs as the rest goes; then what
  *  hangs on something or stands on it - a painting's banners, buttons,
- *  ladders, doors, trapdoors, rugs, flowers, heads, beds, scaffolding - before
+ *  levers, ladders, doors, trapdoors, rugs, flowers, heads, beds, scaffolding - before
  *  what holds it up. */
 export function manorBlocks(manor: Manor): string[] {
     const ids = new Set<string>([BARRIER, ROOF_BLOCK]);
@@ -1147,7 +1249,7 @@ export function manorBlocks(manor: Manor): string[] {
             ? 0
             : /powder_snow/.test(id)
               ? 1
-              : /(_button|ladder|_banner|_door|_trapdoor|_carpet|poppy|dandelion|cornflower|azure_bluet|_skull|_bed|scaffolding|torch)$/.test(
+              : /(_button|lever|ladder|_banner|_door|_trapdoor|_carpet|poppy|dandelion|cornflower|azure_bluet|_skull|_bed|scaffolding|torch)$/.test(
                       id
                   )
                 ? 2
@@ -1178,7 +1280,7 @@ export function manorFills(box: Box, manor: Manor): Fill[] {
         const id = model.bare(block);
         if (/lava|water/.test(id)) return 3;
         if (/scaffolding$/.test(id)) return 2;
-        if (/(_button|ladder|_banner|_door|_trapdoor)$/.test(id)) return 0;
+        if (/(_button|lever|ladder|_banner|_door|_trapdoor)$/.test(id)) return 0;
         return 1;
     };
     const parts = manor.grid.boxes().sort((a, b) => order(a.block) - order(b.block));
@@ -1261,7 +1363,8 @@ export function armLines(box: Box, manor: Manor, seed: string): string[] {
             kind: key.kind,
             hold: key.hold
         })),
-        home
+        home,
+        manor.pads.map((pad) => worldOf(box, pad.x, 1, pad.z))
     );
 }
 

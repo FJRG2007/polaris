@@ -927,6 +927,32 @@ new map:
     secret rooms, 2 of each climb, 6 closets, 6 hatches, 4 bushes and 26
     pieces of cover.
 
+    From design 4 the house is a manor of rooms drawn from templates
+    (`kinds/seek-manor.ts`, `kinds/seek-rooms.ts`), walked by `seek-grid.ts`,
+    with secret panels of the wall's own blocks opened by keys
+    (`kinds/secret-panels.ts`). Design 5 adds what a player can see is there
+    to find:
+
+    - **a hall to climb** (the atrium, the first room drawn, so in every
+      house): a slime block launch pad beside a spruce ledge six up in one
+      corner, two runs of stone brick posts - each a block higher, a gap of
+      one between - up to a crow's nest in each far corner, and a trapdoor
+      into a cellar in the last. Each ledge and nest has crates to crouch
+      behind. A pad throws only where the events data pack is on; without
+      it the pad is a block and the tip at "Go!" leaves pads out;
+    - **levers as keys**: a lever on the room's wall, at head height and at
+      least `KEY_DISTANCE` from its panel, in place of a hidden key wherever
+      the room has a place for one (most of them); a hook is the fallback.
+      Opening a panel plays a piston's sound with a puff of cloud, shutting
+      it the piston pulling back, so whoever pulled the lever hears which
+      wall moved;
+    - **the walk knows**: the house is checked with the jumps a player makes
+      (a gap of one, level, down, or a block up) and the pads' throw
+      (`PAD_RISE`, from `launchArc`), and a nest is reachable only that way.
+
+    A run built by design 4 still draws exactly its own house
+    (`manorFor(seed, count, era, 4)`: no hall, no pads, no levers, no jumps).
+
 - **No island is a jump from another**: SkyWars' islands are drawn from the
   run's id (`sky-wars.layoutFor`) - each a blob with a waving edge, grass over
   dirt over stone narrowing to a point and flecked with andesite and ore, an
@@ -962,25 +988,25 @@ new map:
 Everything below is part of the arena's own boxes: built into air with
 `keep`, and taken out with the rest.
 
-| Arena            | Look                                                                                                                                                                                                                            |
-| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Spleef           | each floor walled in its own color, a sea lantern on every corner post                                                                                                                                                          |
-| TNT run          | TNT floors, a rim in its own color at each one, glass walls, corner lanterns                                                                                                                                                    |
-| Dropper          | light walls (one of five stones a run) banded by each floor's color in an order of its own, a ring of light round every hole, blocks of color hanging between floors                                                            |
-| Ice boat race    | packed ice, white walls with a glass rail and lights, an arch over each gate                                                                                                                                                    |
-| Nether maze      | netherrack walls and roof, glowstone over every other room, a nether-brick starting room, and a finish booth at the goal: gold and black chequer underfoot, chequered walls, sea lanterns over it and over the way in           |
-| Acid rain        | mossy stone floor with a sea lantern in each corner, glass walls, an invisible roof, cobblestone huts                                                                                                                           |
-| Elytra race      | orange concrete rings, a white start ring lit at its corners, yellow glass boosters, magenta pillars                                                                                                                            |
-| Downhill race    | the boat race's ice, walls and arches, stepping down a block at a time; a finish gantry two chequers high with lit posts between chequered walls; a white glass net under the finish                                            |
-| Parkour          | the course's theme, a light under every checkpoint                                                                                                                                                                              |
-| King of the ring | polished stone edge, sea lanterns at the corners, the circle drawn in yellow                                                                                                                                                    |
-| Build battle     | a stone curb between plots and glowstone where the lines meet, at floor level                                                                                                                                                   |
-| Team duel        | a stone rim round the floor and a post of light at each corner                                                                                                                                                                  |
-| Hot potato       | a floor in orange and white stripes or rings, hay bales and lit spruce posts, glass walls on a stone rim, sea lanterns up the corners, a spruce gallery                                                                         |
-| Hide and seek    | a stone brick house under a dark oak roof, spruce walls between nine rooms, oak closets, spruce hatches, birch lofts on log posts, bookcases in spruce alcoves, barrel steps up oak wardrobes, birch crow's nests, spruce beams |
-| SkyWars          | grass, dirt and flecked stone islands with oaks, boulders and flowers, invisible cages and gallery over the middle, barrier walls                                                                                               |
-| Capture the flag | the duel's rim and posts, bases in red and blue, banners on sea lanterns, cover of stone brick, spruce and chiseled stone                                                                                                       |
-| Boss sky arena   | glass, with a pillar of sea lantern at each corner                                                                                                                                                                              |
+| Arena            | Look                                                                                                                                                                                                                                                                                                                                                       |
+| ---------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Spleef           | each floor walled in its own color, a sea lantern on every corner post                                                                                                                                                                                                                                                                                     |
+| TNT run          | TNT floors, a rim in its own color at each one, glass walls, corner lanterns                                                                                                                                                                                                                                                                               |
+| Dropper          | light walls (one of five stones a run) banded by each floor's color in an order of its own, a ring of light round every hole, blocks of color hanging between floors                                                                                                                                                                                       |
+| Ice boat race    | packed ice, white walls with a glass rail and lights, an arch over each gate                                                                                                                                                                                                                                                                               |
+| Nether maze      | netherrack walls and roof, glowstone over every other room, a nether-brick starting room, and a finish booth at the goal: gold and black chequer underfoot, chequered walls, sea lanterns over it and over the way in                                                                                                                                      |
+| Acid rain        | mossy stone floor with a sea lantern in each corner, glass walls, an invisible roof, cobblestone huts                                                                                                                                                                                                                                                      |
+| Elytra race      | orange concrete rings, a white start ring lit at its corners, yellow glass boosters, magenta pillars                                                                                                                                                                                                                                                       |
+| Downhill race    | the boat race's ice, walls and arches, stepping down a block at a time; a finish gantry two chequers high with lit posts between chequered walls; a white glass net under the finish                                                                                                                                                                       |
+| Parkour          | the course's theme, a light under every checkpoint                                                                                                                                                                                                                                                                                                         |
+| King of the ring | polished stone edge, sea lanterns at the corners, the circle drawn in yellow                                                                                                                                                                                                                                                                               |
+| Build battle     | a stone curb between plots and glowstone where the lines meet, at floor level                                                                                                                                                                                                                                                                              |
+| Team duel        | a stone rim round the floor and a post of light at each corner                                                                                                                                                                                                                                                                                             |
+| Hot potato       | a floor in orange and white stripes or rings, hay bales and lit spruce posts, glass walls on a stone rim, sea lanterns up the corners, a spruce gallery                                                                                                                                                                                                    |
+| Hide and seek    | a stone brick house under a dark oak roof, spruce walls between nine rooms, oak closets, spruce hatches, birch lofts on log posts, bookcases in spruce alcoves, barrel steps up oak wardrobes, birch crow's nests, spruce beams; from design 5 a hall of stone brick posts up to spruce nests, a slime block pad under a spruce ledge, levers on the walls |
+| SkyWars          | grass, dirt and flecked stone islands with oaks, boulders and flowers, invisible cages and gallery over the middle, barrier walls                                                                                                                                                                                                                          |
+| Capture the flag | the duel's rim and posts, bases in red and blue, banners on sea lanterns, cover of stone brick, spruce and chiseled stone                                                                                                                                                                                                                                  |
+| Boss sky arena   | glass, with a pillar of sea lantern at each corner                                                                                                                                                                                                                                                                                                         |
 
 ## In-server work (the Polaris mod)
 
@@ -1298,6 +1324,18 @@ A new kind follows all of them. A change to an old kind must not undo one.
   feat/events-seek-acid). A rule a player has to read a compass for - acid
   rain's wind "from the north" - is a rule nobody follows: what the screen
   says to do has to be something the player can see.
+- **A secret nobody can tell from the furniture is not there.** Hide and
+  seek's design 4 panels were opened by keys that looked exactly like the
+  decor round them, and the panels exactly like the wall, and nothing moved
+  or sounded when one opened: the operator saw no secrets at all. A secret
+  needs something a player notices and tries - a lever on a wall, a slime
+  block in the floor - and an answer they hear and see when it works
+  (feat/events-seek-acid).
+- **Launch a player with Levitation, never Slow Falling.** A server with
+  flight off kicks a player who hovers for four seconds, and Slow Falling is
+  not one of the game's exceptions; Levitation is. Hide and seek's pads give a
+  second of Levitation VIII, about six blocks up, then an ordinary fall
+  (`secret-panels.launchArc` works the arc out the way the game does).
 
 ### The world
 

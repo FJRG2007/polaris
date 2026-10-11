@@ -19,7 +19,20 @@
  *   two seconds from up to seven blocks away: the classic test, facing the
  *   thing from the eyes, a block out and back along where the player looks,
  *   which lands on their feet only when the two agree;
- * - a rug (`crouch`) crouched on three times (`sneak_time`, read each tick).
+ * - a rug (`crouch`) crouched on three times (`sneak_time`, read each tick);
+ * - a lever (`lever`, from design 5): pulled either way. Nothing else in the
+ *   house looks like one, so it is the key anybody sees and tries.
+ *
+ * A panel that opens or shuts is heard and seen: a piston's sound and a puff
+ * of cloud where it is, so whoever pulled a lever across the room knows which
+ * wall moved.
+ *
+ * Launch pads (`PAD`, from design 5) are slime blocks in the floor: standing on
+ * one gives a second of Levitation, strong enough to throw a player up onto a
+ * ledge beside it (`launchArc`), then a moment before the same player is
+ * thrown again. Never Slow Falling: a server that does not allow flight kicks a
+ * player who hovers, and Slow Falling is not one of the game's exceptions;
+ * Levitation is, and a second of it ends in an ordinary fall.
  *
  * A key carries its panel's number (`ID`) and how long the panel stays open
  * (`HOLD`): long enough to walk from the key to it and in, worked out from the
@@ -38,8 +51,9 @@
  * Pure.
  */
 
-/** Markers: a panel, a key of each kind, the seekers' way home. */
+/** Markers: a panel, a key of each kind, a launch pad, the seekers' way home. */
 export const PANEL = "pe_pnl";
+export const PAD = "pe_pad";
 export const KEY = "pe_key";
 export const HOME = "pe_hs_home";
 /** What the house shows that is not a block: paintings and display blocks. */
@@ -54,8 +68,8 @@ const IN_ARENA = "pe_arena";
 /** The seekers' team (`hide-and-seek.TEAMS`). */
 const SEEKERS = "pe_hs_seek";
 
-export type KeyKind = "btn" | "up" | "gaze" | "crouch";
-export const KEY_KINDS: readonly KeyKind[] = ["btn", "up", "gaze", "crouch"];
+export type KeyKind = "btn" | "up" | "gaze" | "crouch" | "lever";
+export const KEY_KINDS: readonly KeyKind[] = ["btn", "up", "gaze", "crouch", "lever"];
 
 /** Scores, at most 16 characters for the oldest releases. */
 export const LEFT = "polaris_pnl";
@@ -65,7 +79,10 @@ export const HOLD = "polaris_phold";
 export const COUNT = "polaris_kt";
 export const SNEAK = "polaris_sneak";
 export const CROUCHED = "polaris_crch";
+/** Ticks before a player is thrown by a pad again. */
+export const PAD_WAIT = "polaris_padw";
 const OBJECTIVES: readonly (readonly [string, string])[] = [
+    [PAD_WAIT, "dummy"],
     [LEFT, "dummy"],
     [LAST, "dummy"],
     [ID, "dummy"],
@@ -84,6 +101,50 @@ export const KEY_NEAR = 10;
 export const PANEL_NEAR = 16;
 /** How far from its key a panel may be. */
 export const REACH = 64;
+
+/** A pad's throw: a second of Levitation at this amplifier. */
+export const LAUNCH_SECONDS = 1;
+export const LAUNCH_AMPLIFIER = 7;
+/** Ticks before the same player is thrown again: past landing. */
+export const PAD_WAIT_TICKS = 40;
+/** How close to the middle of a pad a player's feet have to be. */
+const ON_PAD = 0.7;
+
+/**
+ * A player's flight off a pad, worked out the way the game moves a living
+ * thing each tick (1.13 to 1.21): it moves by its speed, then under
+ * Levitation the speed goes a fifth of the way to `0.05 * (amplifier + 1)`
+ * blocks a tick, without it 0.08 is taken off, and either way it keeps 98% of
+ * it. Answers the highest the feet get over where they started, and the
+ * ticks after the Levitation ends with the player still going up or hanging
+ * (speed above -0.03125 a tick) - what the game counts toward its "floating
+ * too long" kick, at 80, where flight is off.
+ */
+export function launchArc(
+    seconds = LAUNCH_SECONDS,
+    amplifier = LAUNCH_AMPLIFIER
+): { peak: number; hanging: number; ticks: number } {
+    const lift = seconds * 20;
+    let y = 0;
+    let speed = 0;
+    let peak = 0;
+    let hanging = 0;
+    let tick = 0;
+    for (; tick < 400; tick += 1) {
+        y += speed;
+        if (y < 0) break;
+        peak = Math.max(peak, y);
+        if (tick < lift) speed = (speed + (0.05 * (amplifier + 1) - speed) * 0.2) * 0.98;
+        else {
+            speed = (speed - 0.08) * 0.98;
+            if (speed >= -0.03125) hanging += 1;
+        }
+    }
+    return { peak, hanging, ticks: tick };
+}
+
+/** Levels a pad throws a player up, for the house's walk: whole ones only. */
+export const PAD_RISE = Math.floor(launchArc().peak);
 
 /** Every block a panel can be, by its number. Only these ever go back. */
 export const MATERIALS = [
@@ -143,7 +204,16 @@ export const FUNCTIONS: Readonly<Record<string, readonly string[]>> = {
         `execute as @a[tag=${IN_ARENA}] at @s as ${MARKER},tag=${PANEL},distance=..${PANEL_NEAR}] at @s run function polaris:panel/each`,
         // A crouch now and the tick before, for the rugs; only near one.
         `execute as @a[tag=${IN_ARENA}] at @s if entity ${MARKER},tag=pe_key_crouch,distance=..${KEY_NEAR}] run function polaris:panel/crouched`,
-        `execute as @a[tag=${IN_ARENA},team=${SEEKERS}] at @s if block ~ ~ ~ minecraft:lava run function polaris:panel/burnt`
+        `execute as @a[tag=${IN_ARENA},team=${SEEKERS}] at @s if block ~ ~ ~ minecraft:lava run function polaris:panel/burnt`,
+        // Launch pads: whoever stands on one, unless just thrown.
+        `scoreboard players remove @a[tag=${IN_ARENA},scores={${PAD_WAIT}=1..}] ${PAD_WAIT} 1`,
+        `execute as @a[tag=${IN_ARENA}] at @s if entity ${MARKER},tag=${PAD},distance=..${ON_PAD}] unless score @s ${PAD_WAIT} matches 1.. run function polaris:panel/launch`
+    ],
+    launch: [
+        `effect give @s minecraft:levitation ${LAUNCH_SECONDS} ${LAUNCH_AMPLIFIER} true`,
+        `scoreboard players set @s ${PAD_WAIT} ${PAD_WAIT_TICKS}`,
+        "playsound minecraft:entity.slime.jump block @a[distance=..16] ~ ~ ~ 1 0.6",
+        "particle minecraft:item_slime ~ ~0.2 ~ 0.4 0.1 0.4 0 16 normal"
     ],
     crouched: [
         `execute store result score @s ${CROUCHED} run scoreboard players get @s ${SNEAK}`,
@@ -160,7 +230,13 @@ export const FUNCTIONS: Readonly<Record<string, readonly string[]>> = {
         "execute if entity @s[tag=pe_key_gaze] run function polaris:panel/gaze",
         `execute if entity @s[tag=pe_key_crouch] if entity @a[tag=${IN_ARENA},distance=..0.8,scores={${SNEAK}=1..,${CROUCHED}=..0}] run scoreboard players add @s ${COUNT} 1`,
         `execute if entity @s[tag=pe_key_crouch] unless entity @a[tag=${IN_ARENA},distance=..1.5] run scoreboard players set @s ${COUNT} 0`,
-        `execute if entity @s[tag=pe_key_crouch] if score @s ${COUNT} matches ${CROUCHES}.. run function polaris:panel/fired`
+        `execute if entity @s[tag=pe_key_crouch] if score @s ${COUNT} matches ${CROUCHES}.. run function polaris:panel/fired`,
+        // A lever, pulled either way since the last look: its count is the
+        // way it was (1 on, 0 off), so it fires once a pull.
+        `execute if entity @s[tag=pe_key_lever] if block ~ ~ ~ minecraft:lever[powered=true] unless score @s ${COUNT} matches 1 run function polaris:panel/fire`,
+        `execute if entity @s[tag=pe_key_lever] if block ~ ~ ~ minecraft:lever[powered=false] unless score @s ${COUNT} matches 0 run function polaris:panel/fire`,
+        `execute if entity @s[tag=pe_key_lever] if block ~ ~ ~ minecraft:lever[powered=true] run scoreboard players set @s ${COUNT} 1`,
+        `execute if entity @s[tag=pe_key_lever] if block ~ ~ ~ minecraft:lever[powered=false] run scoreboard players set @s ${COUNT} 0`
     ],
     gaze: [
         `tag @s add ${HERE}`,
@@ -196,7 +272,9 @@ export const FUNCTIONS: Readonly<Record<string, readonly string[]>> = {
             (_, index) =>
                 `execute if entity @s[tag=pe_pnl_m${index},tag=${FLOOR_TAG}] run function polaris:panel/floor_open_${index}`
         ),
-        `tag @s add ${OPEN_TAG}`
+        `tag @s add ${OPEN_TAG}`,
+        "playsound minecraft:block.piston.extend block @a[distance=..24] ~ ~ ~ 1 0.7",
+        "particle minecraft:cloud ~ ~1 ~ 0.3 0.6 0.3 0.02 12 normal"
     ],
     shut: [
         ...MATERIALS.map(
@@ -207,7 +285,8 @@ export const FUNCTIONS: Readonly<Record<string, readonly string[]>> = {
             (_, index) =>
                 `execute if entity @s[tag=pe_pnl_m${index},tag=${FLOOR_TAG}] run function polaris:panel/floor_shut_${index}`
         ),
-        `tag @s remove ${OPEN_TAG}`
+        `tag @s remove ${OPEN_TAG}`,
+        "playsound minecraft:block.piston.contract block @a[distance=..24] ~ ~ ~ 1 0.7"
     ],
     // A seeker in the lava: back to the middle, the fire put out.
     burnt: [
@@ -264,16 +343,18 @@ function scored(scores: readonly (readonly [string, number])[]): string[] {
 /**
  * The panels of a house put to work: anything of ours left in its box from
  * before taken away, the scores made, a marker in each panel (in its lower
- * block) and on each key (a button's own block, the spot to stand on, the
- * middle of what to stare at), and the seekers' way home.
+ * block) and on each key (a button's or a lever's own block, the spot to stand
+ * on, the middle of what to stare at), one on each launch pad (where a player
+ * standing on it has their feet), and the seekers' way home.
  */
 export function armLines(
     box: BoxLike,
     panels: readonly PanelMark[],
     keys: readonly KeyMark[],
-    home: Point | null
+    home: Point | null,
+    pads: readonly Point[] = []
 ): string[] {
-    if (panels.length === 0 && !home) return [];
+    if (panels.length === 0 && pads.length === 0 && !home) return [];
     const lines = [
         ...stopLines(box),
         ...OBJECTIVES.map(
@@ -295,13 +376,15 @@ export function armLines(
                 [HOLD, key.hold]
             ])
         );
+    for (const pad of pads)
+        lines.push(stand(pad, [PAD]), `tag ${MARKER},tag=${NEW_TAG}] remove ${NEW_TAG}`);
     if (home) lines.push(stand(home, [HOME]), `tag ${MARKER},tag=${NEW_TAG}] remove ${NEW_TAG}`);
     return lines;
 }
 
 /** Every marker of ours in the box taken away: the panels stay as they are. */
 export function stopLines(box: BoxLike): string[] {
-    return [PANEL, KEY, HOME].map(
+    return [PANEL, KEY, PAD, HOME].map(
         (tag) => `execute in minecraft:overworld run kill ${markersIn(box, tag)}`
     );
 }

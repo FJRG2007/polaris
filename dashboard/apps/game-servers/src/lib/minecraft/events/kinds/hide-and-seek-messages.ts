@@ -90,8 +90,17 @@ export function secretTip(language: Language): string {
         : `${INFO}Some bookcases hide a room: press the button beside one. And look up.`;
 }
 
-/** Told at "Go!" in a manor (design 4): how its secrets open. */
-export function manorTip(language: Language, panels = true): string {
+/** Told at "Go!" in a manor (design 4 on): how its secrets open - from design
+ *  5, the levers, the launch pads and the parkours (`climbs`). */
+export function manorTip(language: Language, panels = true, climbs = false): string {
+    if (climbs && panels)
+        return language === "es"
+            ? `${INFO}Las ${GOOD}palancas${INFO} abren paredes secretas (escucha el pistón), los bloques de ${GOOD}slime${INFO} te lanzan a una cornisa y los ${GOOD}postes${INFO} llevan saltando a un nido. Hay cuadros que son puertas. La lava quema a los buscadores.`
+            : `${INFO}${GOOD}Levers${INFO} open secret walls (listen for the piston), ${GOOD}slime pads${INFO} launch you onto a ledge and the ${GOOD}posts${INFO} are a parkour up to a nest. Some paintings are doors. Lava burns seekers.`;
+    if (climbs)
+        return language === "es"
+            ? `${INFO}Los ${GOOD}postes${INFO} llevan saltando a un nido, y hay cuadros que son puertas y huecos en paredes y suelos que llevan a escondites.`
+            : `${INFO}The ${GOOD}posts${INFO} are a parkour up to a nest, and some paintings are doors and gaps in walls and floors lead to hiding places.`;
     if (!panels)
         return language === "es"
             ? `${INFO}Hay cuadros que son puertas, y huecos en paredes y suelos que llevan a escondites.`
