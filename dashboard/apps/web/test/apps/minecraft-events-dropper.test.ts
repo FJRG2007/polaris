@@ -593,8 +593,17 @@ describe("the dropper's data pack", () => {
             "scoreboard players set Ana pe_drop 0",
             `scoreboard players set Ana pe_low ${(shaft.top + 1) * 64}`,
             "scoreboard players set Ana pe_back 0",
-            "tag Ana remove polaris_drop_sent"
+            "tag Ana remove polaris_drop_sent",
+            "execute if entity @a[name=Ana,team=] run team join pe_dropper Ana"
         ]);
+        // Nobody pushes or punches anybody on the way down, and the team goes
+        // with the scores.
+        expect(dropper.SCORES_ADDED).toContain("team modify pe_dropper collisionRule never");
+        expect(dropper.SCORES_ADDED).toContain("team modify pe_dropper friendlyFire false");
+        expect(dropper.SCORES_REMOVED).toContain("team remove pe_dropper");
+        expect(dropper.leaveTeam("Ana")).toBe(
+            "execute if entity @a[name=Ana,team=pe_dropper] run team leave Ana"
+        );
         expect(dropper.backLines('"x"')).toEqual([
             'execute as @a[tag=pe_in,scores={pe_back=1..}] run tellraw @s "x"',
             "scoreboard players set @a[tag=pe_in,scores={pe_back=1..}] pe_back 0"

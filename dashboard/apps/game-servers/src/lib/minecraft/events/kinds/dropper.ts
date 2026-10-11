@@ -778,22 +778,47 @@ export const TOP_TAG = "polaris_drop_top";
 export const SENT_TAG = "polaris_drop_sent";
 const SCALE = 64;
 
-export const SCORES_ADDED = [FINISH_SCORE, LOWEST_SCORE, BACK_SCORE, OBJECTIVE].map(
-    (name) => `scoreboard objectives add ${name} dummy`
-);
+/**
+ * The racers' own team, so nobody is knocked off a floor's edge or into a
+ * wall on the way down: no pushing by falling into them (`collisionRule
+ * never`) and no punching (`friendlyFire false`) - what the parkour does for
+ * its own. Made with the scores and gone with them; taking the team away
+ * takes everybody off it.
+ */
+export const NO_PUSH_TEAM = "pe_dropper";
 
-export const SCORES_REMOVED = [FINISH_SCORE, LOWEST_SCORE, BACK_SCORE].map(
-    (name) => `scoreboard objectives remove ${name}`
-);
+export const SCORES_ADDED = [
+    ...[FINISH_SCORE, LOWEST_SCORE, BACK_SCORE, OBJECTIVE].map(
+        (name) => `scoreboard objectives add ${name} dummy`
+    ),
+    `team add ${NO_PUSH_TEAM}`,
+    `team modify ${NO_PUSH_TEAM} collisionRule never`,
+    `team modify ${NO_PUSH_TEAM} friendlyFire false`
+];
 
-/** A racer coming in, or let go again from the top: not finished, nowhere yet. */
+export const SCORES_REMOVED = [
+    ...[FINISH_SCORE, LOWEST_SCORE, BACK_SCORE].map(
+        (name) => `scoreboard objectives remove ${name}`
+    ),
+    `team remove ${NO_PUSH_TEAM}`
+];
+
+/** A racer coming in, or let go again from the top: not finished, nowhere yet,
+ *  and on the racers' team - only if they are on none of the server's own,
+ *  whose colour and prefix are theirs to keep. */
 export function racerScores(name: string, shaft: Shaft): string[] {
     return [
         `scoreboard players set ${name} ${FINISH_SCORE} 0`,
         `scoreboard players set ${name} ${LOWEST_SCORE} ${(shaft.top + 1) * SCALE}`,
         `scoreboard players set ${name} ${BACK_SCORE} 0`,
-        `tag ${name} remove ${SENT_TAG}`
+        `tag ${name} remove ${SENT_TAG}`,
+        `execute if entity @a[name=${name},team=] run team join ${NO_PUSH_TEAM} ${name}`
     ];
+}
+
+/** Off the racers' team, for one going home while the race goes on. */
+export function leaveTeam(name: string): string {
+    return `execute if entity @a[name=${name},team=${NO_PUSH_TEAM}] run team leave ${name}`;
 }
 
 function score(name: string): string {
