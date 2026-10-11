@@ -41,6 +41,15 @@ export interface SearchableSelectProps {
     searchPlaceholder: string;
     /** What the menu says when nothing is left after typing. */
     emptyText: string;
+    /**
+     * The most options drawn at once. A list of thousands - everybody on a busy
+     * server - is typed down rather than scrolled, and drawing every row of it
+     * on each keystroke is what makes the field lag. The rest are still found
+     * by typing; `moreText` says how many are not drawn.
+     */
+    limit?: number;
+    /** The line under a cut list, given how many options it left out. */
+    moreText?: (hidden: number) => string;
     placeholder?: string;
     disabled?: boolean;
     /** Class for the trigger. */
@@ -71,6 +80,8 @@ export function SearchableSelect({
     options,
     searchPlaceholder,
     emptyText,
+    limit,
+    moreText,
     placeholder,
     disabled,
     className,
@@ -80,7 +91,9 @@ export function SearchableSelect({
 }: SearchableSelectProps) {
     const [query, setQuery] = useState("");
     const selected = options.find((option) => option.value === value);
-    const shown = useMemo(() => filterSearchableOptions(options, query), [options, query]);
+    const found = useMemo(() => filterSearchableOptions(options, query), [options, query]);
+    const shown = limit !== undefined ? found.slice(0, limit) : found;
+    const hidden = found.length - shown.length;
 
     return (
         // An old search is not what somebody reopening the menu is looking for.
@@ -158,6 +171,11 @@ export function SearchableSelect({
                             )}
                         </DropdownMenuItem>
                     ))
+                )}
+                {hidden > 0 && moreText && (
+                    <p className="px-2 py-2 text-[0.75rem] text-muted-foreground">
+                        {moreText(hidden)}
+                    </p>
                 )}
             </DropdownMenuContent>
         </DropdownMenu>

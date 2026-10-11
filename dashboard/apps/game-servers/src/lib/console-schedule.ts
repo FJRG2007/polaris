@@ -18,6 +18,7 @@
  * Pure: the schedule math and the reading of the stored list.
  */
 
+import { z } from "zod";
 import { gameMessage } from "./game-message";
 import { readCustomVariables, type CustomVariable, type RunTarget } from "./console-vars";
 
@@ -70,6 +71,75 @@ export const MAX_AHEAD_MS = 366 * 24 * 60 * 60 * 1000;
 export const GRACE_MS = 10 * 60 * 1000;
 
 const MINUTE = 60 * 1000;
+
+/**
+ * The units a gap or a delay is typed in. Whole minutes and up, never seconds:
+ * the sweep that fires a schedule runs once a minute, so "in 30 seconds" or
+ * "every 20 seconds" would be a promise it breaks on every run.
+ */
+export const SPAN_UNITS = ["minutes", "hours", "days"] as const;
+export type SpanUnit = (typeof SPAN_UNITS)[number];
+
+const UNIT_MINUTES: Readonly<Record<SpanUnit, number>> = { minutes: 1, hours: 60, days: 24 * 60 };
+
+/** So many minutes, hours or days, as somebody types them. */
+export interface Span {
+    readonly amount: number;
+    readonly unit: SpanUnit;
+}
+
+/** The quick "in ..." choices for a first run, in minutes. */
+export const START_PRESETS = [1, 5, 15, 60] as const;
+
+/** The longest "in ..." a first run may be set for, in minutes. */
+export const MAX_START_IN_MINUTES = MAX_AHEAD_MS / MINUTE;
+
+export function spanMinutes(span: Span): number {
+    return span.amount * UNIT_MINUTES[span.unit];
+}
+
+/** The largest unit a number of minutes is a whole count of, for showing it. */
+export function spanOf(minutes: number): Span {
+    if (minutes % UNIT_MINUTES.days === 0)
+        return { amount: minutes / UNIT_MINUTES.days, unit: "days" };
+    if (minutes % UNIT_MINUTES.hours === 0)
+        return { amount: minutes / UNIT_MINUTES.hours, unit: "hours" };
+    return { amount: minutes, unit: "minutes" };
+}
+
+/** A whole number of units from one up, adding up to no more than `max` minutes. */
+function spanSchema(max: number, message: () => string) {
+    return z
+        .object({
+            amount: z.number({ invalid_type_error: message() }).int(message()).min(1, message()),
+            unit: z.enum(SPAN_UNITS)
+        })
+        .strict()
+        .refine((span) => spanMinutes(span) <= max, { message: message() });
+}
+
+/** "Every N ..." as typed: the gap the repeat is stored with, in whole minutes. */
+export const everySchema = spanSchema(MAX_EVERY_MINUTES, () =>
+    gameMessage("games", "consoleSchedule.errors.every")
+);
+
+/** "In N ..." as typed: how long from now the first run is. Checked on both
+ *  sides and turned into a moment by the server, on the server's clock. */
+export const startInSchema = spanSchema(MAX_START_IN_MINUTES, () =>
+    gameMessage("games", "consoleSchedule.errors.startIn")
+);
+
+/** What is wrong with a span as typed against one of the schemas above, as a
+ *  carried message, or null. */
+export function spanProblem(schema: typeof everySchema, span: Span): string | null {
+    const checked = schema.safeParse(span);
+    return checked.success ? null : (checked.error.issues[0]?.message ?? null);
+}
+
+/** The first moment an "in ..." names, counted from `now`. */
+export function startAfter(span: Span, now: Date): Date {
+    return new Date(now.getTime() + spanMinutes(span) * MINUTE);
+}
 
 /** Whether it still has a moment to come. */
 export function isActive(schedule: ConsoleSchedule): boolean {

@@ -42,9 +42,10 @@ export interface SavedCommand {
 /** Where the list lives on the install's own settings blob. */
 export const SAVED_COMMANDS_KEY = "consoleCommands";
 
-/** Enough for the commands a server is actually run with, and few enough that the
- *  row of them above the input stays a row rather than a wall. */
-export const MAX_SAVED_COMMANDS = 24;
+/** Enough for a server run from a long list of its own commands. They are
+ *  reached through a menu that is typed down to the one wanted, so the count is
+ *  bounded by what the install's settings should carry, not by screen width. */
+export const MAX_SAVED_COMMANDS = 100;
 
 export const MAX_SAVED_LABEL = 40;
 

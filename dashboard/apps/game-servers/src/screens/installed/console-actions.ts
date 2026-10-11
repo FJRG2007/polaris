@@ -38,6 +38,8 @@ import {
 } from "../../lib/console-vars";
 import {
     repeatProblem,
+    startAfter,
+    startInSchema,
     startProblem,
     type ConsoleSchedule,
     type ScheduleRepeat
@@ -267,6 +269,9 @@ const repeatSchema = z.discriminatedUnion("kind", [
 const scheduleSchema = z.object({
     /** When it first runs, ISO; absent for now. */
     firstAt: z.string().datetime({ offset: true }).optional(),
+    /** Or how long from now, counted on this clock rather than the browser's;
+     *  takes the place of `firstAt` when both come. */
+    startIn: startInSchema.optional(),
     repeat: repeatSchema
 });
 
@@ -277,7 +282,11 @@ export async function scheduleKeptCommandAction(
     input: ScheduleKeptCommandInput
 ): Promise<{ schedules?: ConsoleSchedule[]; error?: string }> {
     const words = await gameWords("games");
-    const when = scheduleSchema.safeParse({ firstAt: input.firstAt, repeat: input.repeat });
+    const when = scheduleSchema.safeParse({
+        firstAt: input.firstAt,
+        startIn: input.startIn,
+        repeat: input.repeat
+    });
     if (!when.success) {
         return {
             error:
@@ -287,7 +296,11 @@ export async function scheduleKeptCommandAction(
     }
     const repeat: ScheduleRepeat = when.data.repeat;
     const now = new Date();
-    const firstAt = when.data.firstAt ? new Date(when.data.firstAt) : now;
+    const firstAt = when.data.startIn
+        ? startAfter(when.data.startIn, now)
+        : when.data.firstAt
+          ? new Date(when.data.firstAt)
+          : now;
     const problem = repeatProblem(repeat) ?? startProblem(firstAt, now);
     if (problem) return { error: await messageText(problem) };
     try {

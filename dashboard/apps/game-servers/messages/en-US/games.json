@@ -368,7 +368,10 @@
         "keepHelp": "It sits above the console for everybody who runs this server. Put a blank in angle brackets - <example></example> - and pressing it fills the box instead of sending.",
         "summary": "{count} {count, plural, one {command} other {commands}}.",
         "summaryWaiting": "{count} {count, plural, one {command} other {commands}}, with {seconds}s of waiting.",
-        "messagePlaceholder": "message"
+        "messagePlaceholder": "message",
+        "keptCommands": "Kept commands ({count})",
+        "searchKept": "Search kept commands",
+        "noKeptMatch": "No kept command matches that."
     },
     "blueprint": {
         "blueprint": "Blueprint",
@@ -1164,7 +1167,8 @@
             "when": "Pick when it runs",
             "past": "That time has passed",
             "far": "Pick a time within a year",
-            "tooMany": "{count} schedules at most on one server. Stop one first."
+            "tooMany": "{count} schedules at most on one server. Stop one first.",
+            "startIn": "Whole minutes, hours or days, up to a year"
         },
         "missed": "Polaris was not running then",
         "noAccess": "Whoever set it up can no longer use the console",
@@ -1195,6 +1199,22 @@
         "finished": "Finished",
         "stop": "Stop {name}",
         "clear": "Clear {name}",
-        "stopFailed": "That schedule could not be stopped"
+        "stopFailed": "That schedule could not be stopped",
+        "inMinutes": "In {count} {count, plural, one {minute} other {minutes}}",
+        "inHours": "In {count} {count, plural, one {hour} other {hours}}",
+        "inCustom": "In...",
+        "atTime": "At a set time",
+        "startIn": "In",
+        "startInUnit": "Unit",
+        "intervalUnit": "Repeat unit",
+        "unitDays": "days",
+        "everyDays": "Every {count} {count, plural, one {day} other {days}}",
+        "precision": "Runs within a minute of the time set."
+    },
+    "playerPicker": {
+        "choose": "Choose a player",
+        "search": "Search players",
+        "noMatch": "No player online matches that.",
+        "more": "{count} more. Type to narrow the list."
     }
 }

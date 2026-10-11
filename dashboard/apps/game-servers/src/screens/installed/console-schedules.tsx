@@ -10,7 +10,7 @@ import { cn } from "@polaris/ui";
 import { hostUi } from "@polaris/app-host/client";
 import { CalendarClock, Square, X } from "lucide-react";
 import { type GameText, useGameText, useSchemaText } from "../game-text";
-import { isActive, type ConsoleSchedule } from "../../lib/console-schedule";
+import { isActive, spanOf, type ConsoleSchedule } from "../../lib/console-schedule";
 
 /** A moment in this browser's words, the date left out when it is today. */
 function when(iso: string, locale: string): string {
@@ -41,10 +41,13 @@ export function scheduleSummary(
             })
         );
     } else {
+        const gap = spanOf(repeat.minutes);
         parts.push(
-            repeat.minutes % 60 === 0
-                ? t("consoleSchedule.everyHours", { count: repeat.minutes / 60 })
-                : t("consoleSchedule.everyMinutes", { count: repeat.minutes })
+            gap.unit === "days"
+                ? t("consoleSchedule.everyDays", { count: gap.amount })
+                : gap.unit === "hours"
+                  ? t("consoleSchedule.everyHours", { count: gap.amount })
+                  : t("consoleSchedule.everyMinutes", { count: gap.amount })
         );
         if (repeat.kind === "times") {
             parts.push(t("consoleSchedule.progress", { done: schedule.done, total: repeat.times }));

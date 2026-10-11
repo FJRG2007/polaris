@@ -368,7 +368,10 @@
         "keepHelp": "Queda sobre la consola para todos los que gestionan este servidor. Pon un hueco entre ángulos - <example></example> - y al pulsarlo rellena la caja en vez de enviarlo.",
         "summary": "{count} {count, plural, one {comando} other {comandos}}.",
         "summaryWaiting": "{count} {count, plural, one {comando} other {comandos}}, con {seconds}s de espera.",
-        "messagePlaceholder": "mensaje"
+        "messagePlaceholder": "mensaje",
+        "keptCommands": "Comandos guardados ({count})",
+        "searchKept": "Buscar comandos guardados",
+        "noKeptMatch": "Ningún comando guardado coincide."
     },
     "blueprint": {
         "blueprint": "Plantilla",
@@ -1164,7 +1167,8 @@
             "when": "Elige cuándo",
             "past": "Esa hora ya ha pasado",
             "far": "Elige una hora dentro de un año",
-            "tooMany": "{count} programaciones como máximo por servidor. Detén una primero."
+            "tooMany": "{count} programaciones como máximo por servidor. Detén una primero.",
+            "startIn": "Minutos, horas o días enteros, hasta un año"
         },
         "missed": "Polaris estaba parado",
         "noAccess": "Quien lo programó ya no puede usar la consola",
@@ -1195,6 +1199,22 @@
         "finished": "Terminado",
         "stop": "Detener {name}",
         "clear": "Quitar {name}",
-        "stopFailed": "No se pudo detener esa programación"
+        "stopFailed": "No se pudo detener esa programación",
+        "inMinutes": "En {count} {count, plural, one {minuto} other {minutos}}",
+        "inHours": "En {count} {count, plural, one {hora} other {horas}}",
+        "inCustom": "Dentro de...",
+        "atTime": "A una hora",
+        "startIn": "En",
+        "startInUnit": "Unidad",
+        "intervalUnit": "Repetición",
+        "unitDays": "días",
+        "everyDays": "Cada {count} {count, plural, one {día} other {días}}",
+        "precision": "Se ejecuta como mucho un minuto después de la hora fijada."
+    },
+    "playerPicker": {
+        "choose": "Elige un jugador",
+        "search": "Buscar jugadores",
+        "noMatch": "Ningún jugador conectado coincide.",
+        "more": "{count} más. Escribe para acotar la lista."
     }
 }

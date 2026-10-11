@@ -10,6 +10,15 @@
 import { describe, expect, it } from "vitest";
 import {
     CONSOLE_SCHEDULES_KEY,
+    MAX_EVERY_MINUTES,
+    MAX_START_IN_MINUTES,
+    START_PRESETS,
+    everySchema,
+    spanMinutes,
+    spanOf,
+    spanProblem,
+    startAfter,
+    startInSchema,
     advance,
     readConsoleSchedules,
     repeatProblem,
@@ -143,5 +152,59 @@ describe("the stored list", () => {
         });
         expect(read).toEqual([kept]);
         expect(readConsoleSchedules({})).toEqual([]);
+    });
+});
+
+describe("a gap or a delay as typed", () => {
+    it("counts minutes, hours and days in minutes, and shows minutes in the largest whole unit", () => {
+        expect(spanMinutes({ amount: 90, unit: "minutes" })).toBe(90);
+        expect(spanMinutes({ amount: 2, unit: "hours" })).toBe(120);
+        expect(spanMinutes({ amount: 3, unit: "days" })).toBe(3 * 24 * 60);
+        expect(spanOf(90)).toEqual({ amount: 90, unit: "minutes" });
+        expect(spanOf(120)).toEqual({ amount: 2, unit: "hours" });
+        expect(spanOf(2880)).toEqual({ amount: 2, unit: "days" });
+    });
+
+    it("offers nothing finer than the minute the sweep runs on", () => {
+        expect(Math.min(...START_PRESETS)).toBeGreaterThanOrEqual(1);
+        expect(everySchema.safeParse({ amount: 30, unit: "seconds" }).success).toBe(false);
+        expect(startInSchema.safeParse({ amount: 30, unit: "seconds" }).success).toBe(false);
+    });
+
+    it("takes whole units from one up to the longest repeat", () => {
+        expect(spanProblem(everySchema, { amount: 1, unit: "minutes" })).toBeNull();
+        expect(spanProblem(everySchema, { amount: 7, unit: "days" })).toBeNull();
+        expect(spanMinutes({ amount: 7, unit: "days" })).toBe(MAX_EVERY_MINUTES);
+        for (const amount of [0, -1, 1.5, Number.NaN]) {
+            expect(english(spanProblem(everySchema, { amount, unit: "minutes" }))).toBe(
+                "Repeat every 1 minute to 7 days"
+            );
+        }
+        expect(english(spanProblem(everySchema, { amount: 8, unit: "days" }))).toBe(
+            "Repeat every 1 minute to 7 days"
+        );
+    });
+
+    it("takes an 'in ...' of up to a year, and counts it from now", () => {
+        expect(spanProblem(startInSchema, { amount: 366, unit: "days" })).toBeNull();
+        expect(spanMinutes({ amount: 366, unit: "days" })).toBe(MAX_START_IN_MINUTES);
+        expect(english(spanProblem(startInSchema, { amount: 367, unit: "days" }))).toBe(
+            "Whole minutes, hours or days, up to a year"
+        );
+        expect(english(spanProblem(startInSchema, { amount: 0, unit: "hours" }))).toBe(
+            "Whole minutes, hours or days, up to a year"
+        );
+        expect(startAfter({ amount: 15, unit: "minutes" }, at(0)).toISOString()).toBe(
+            at(15).toISOString()
+        );
+        expect(startAfter({ amount: 1, unit: "hours" }, at(0)).toISOString()).toBe(
+            at(60).toISOString()
+        );
+    });
+
+    it("keeps reading a stored repeat in minutes, whatever unit it was typed in", () => {
+        const stored = { ...schedule({ kind: "every", minutes: 2 * 24 * 60 }) };
+        const [read] = readConsoleSchedules({ [CONSOLE_SCHEDULES_KEY]: [stored] });
+        expect(read?.repeat).toEqual({ kind: "every", minutes: 2880 });
     });
 });
