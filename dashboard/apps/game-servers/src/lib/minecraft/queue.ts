@@ -13,6 +13,7 @@
 
 import { z } from "zod";
 import { IMPORT_MODES, transferStackSchema } from "./inventory-transfer";
+import { enchantmentListSchema } from "./enchantments";
 
 /** Every kind of thing that can wait. */
 export const QUEUED_KINDS = [
@@ -64,13 +65,21 @@ const itemPayload = z.object({
     count: z.number().int().min(1).max(2304)
 });
 
+/** Put on the item as it is handed over. Absent on everything written down
+ *  before enchanting a give existed, which is the plain item. */
+const enchanted = z.object({ enchantments: enchantmentListSchema.optional() });
+
 export const queuePayloadSchema = z.discriminatedUnion("kind", [
-    z.object({ kind: z.literal("give") }).merge(itemPayload),
+    z
+        .object({ kind: z.literal("give") })
+        .merge(itemPayload)
+        .merge(enchanted),
     z.object({ kind: z.literal("clear") }).merge(itemPayload),
     z.object({ kind: z.literal("clear-all") }),
     z
         .object({ kind: z.literal("set-slot"), slot: z.number().int().min(-128).max(127) })
-        .merge(itemPayload),
+        .merge(itemPayload)
+        .merge(enchanted),
     /** A bag imported from a file, written when they join: the stacks exactly
      *  as the file carries them, data and all. */
     z.object({
@@ -112,18 +121,25 @@ export interface QueuedAction {
     readonly createdAt: string;
 }
 
+/** " with minecraft:sharpness 5", for a log line about an enchanted item. */
+function enchantedNote(list: readonly { id: string; level: number }[] | undefined): string {
+    return list && list.length > 0
+        ? ` with ${list.map((one) => `${one.id} ${one.level}`).join(", ")}`
+        : "";
+}
+
 /** What is waiting, in a sentence somebody can act on. */
 export function describeQueued(action: QueuedAction): string {
     const payload = action.payload;
     switch (payload.kind) {
         case "give":
-            return `Give ${payload.count} x ${payload.item}`;
+            return `Give ${payload.count} x ${payload.item}${enchantedNote(payload.enchantments)}`;
         case "clear":
             return `Take away ${payload.count} x ${payload.item}`;
         case "clear-all":
             return "Empty their inventory";
         case "set-slot":
-            return `Put ${payload.count} x ${payload.item} in slot ${payload.slot}`;
+            return `Put ${payload.count} x ${payload.item}${enchantedNote(payload.enchantments)} in slot ${payload.slot}`;
         case "import-bag":
             return `Import ${payload.items.length} stacks (${payload.mode})`;
         case "ban":

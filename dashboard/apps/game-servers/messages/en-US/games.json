@@ -981,7 +981,9 @@
             "occupied": "Drop part of a stack on an empty slot or on the same item. Splitting onto something else is not something the game does.",
             "indivisible": "That stack carries its own data, so the items in it are not interchangeable and cannot be split.",
             "recipient": "The other player has to be on the server to receive it. Nothing was moved.",
-            "same": "Pick a different player to send it to."
+            "same": "Pick a different player to send it to.",
+            "rejected": "The server refused that stack. One of the enchantments may not exist on this version.",
+            "enchantUnsupported": "This server cannot take enchantments from Polaris: that needs Java Edition 1.13 or later."
         },
         "blueprints": {
             "survival": {
