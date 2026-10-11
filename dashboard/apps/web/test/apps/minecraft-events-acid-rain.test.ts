@@ -668,4 +668,9 @@ describe("a shelter in the acid rain", () => {
         expect(line).toContain('"minecraft:can_place_on":{blocks:["minecraft:mossy_stone_bricks"');
         expect(acid.reclaimLines(one, "nbt")[0]).toContain("CanPlaceOn:[");
     });
+
+    it("never makes a supply crate into kit", () => {
+        const [line] = acid.reclaimLines(built(), "components");
+        expect(line).toMatch(/@e\[type=minecraft:item,[^\]]*,tag=,/);
+    });
 });

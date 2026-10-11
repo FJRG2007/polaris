@@ -13,6 +13,9 @@
  * and whatever a broken block drops is made marked cobblestone again on the
  * quick look (`reclaimLines`), so a block taken down is a block to put up
  * somewhere else. Before it, a player who walled themselves in stayed there.
+ * The pickaxe breaks any shelter, not only its holder's: a block cannot say who
+ * placed it, so knocking a rival's roof off is part of the game, and the rules
+ * players are shown say so.
  *
  * **The world's weather is never touched.** Rain over the whole server would
  * fall on every player in it: this rain is particles over the arena alone, and
