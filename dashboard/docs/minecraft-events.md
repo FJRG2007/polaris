@@ -1780,8 +1780,9 @@ One entry per bug: what a player saw, why, and the rule that keeps it gone.
   passes (`StageState.proved`, `Arena.proved`) and carried to its leftover;
   once the event's own boxes are out it is swept with a plain
   `fill <slice> air`, sliced to `FILL_LIMIT`, and its dropped items killed
-  (`stage.sweepLines`), at every teardown: the end, a call-off, a refused
-  build and the minute sweep of leftovers. The rules that keep it safe: only
+  (`stage.sweepLines`; never one somebody threw, which stays theirs), at
+  every teardown: the end, a call-off, a refused build and the minute sweep
+  of leftovers. The rules that keep it safe: only
   a volume whose probe passed and is written down is swept; a run or
   leftover with none (from before this, or a probe that failed) keeps the
   per-block removal alone; never past the volume's own corners, and never

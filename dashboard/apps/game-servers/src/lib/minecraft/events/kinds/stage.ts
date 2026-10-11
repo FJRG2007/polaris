@@ -351,7 +351,8 @@ export function sweepFills(volume: Volume): string[] {
 }
 
 /** Every dropped item inside a proved volume killed: what the sweep or the
- *  event left lying in the sky. Items only - never a player, a pet or a mob. */
+ *  event left lying in the sky. Items only - never a player, a pet or a mob -
+ *  and never one somebody threw (it has a `Thrower`): those stay theirs. */
 export function dropsGone(volume: Volume): string {
     const x = Math.min(volume.x1, volume.x2);
     const y = Math.min(volume.y1, volume.y2);
@@ -359,7 +360,7 @@ export function dropsGone(volume: Volume): string {
     const dx = Math.abs(volume.x2 - volume.x1);
     const dy = Math.abs(volume.y2 - volume.y1);
     const dz = Math.abs(volume.z2 - volume.z1);
-    return `${WORLD} kill @e[type=minecraft:item,x=${x},y=${y},z=${z},dx=${dx},dy=${dy},dz=${dz}]`;
+    return `execute in minecraft:overworld as @e[type=minecraft:item,x=${x},y=${y},z=${z},dx=${dx},dy=${dy},dz=${dz}] unless data entity @s Thrower run kill @s`;
 }
 
 /** The whole sweep of a proved volume: its blocks, then the items it dropped. */

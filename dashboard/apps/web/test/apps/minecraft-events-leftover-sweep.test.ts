@@ -132,7 +132,7 @@ describe("the sweep of a proved volume", () => {
         }
         expect(total).toBe(stage.volumeOf(big));
         expect(stage.dropsGone(big)).toBe(
-            "execute in minecraft:overworld run kill @e[type=minecraft:item,x=-40,y=60,z=-40,dx=100,dy=140,dz=100]"
+            "execute in minecraft:overworld as @e[type=minecraft:item,x=-40,y=60,z=-40,dx=100,dy=140,dz=100] unless data entity @s Thrower run kill @s"
         );
     });
 
@@ -154,7 +154,9 @@ describe("a stage left over at the end", () => {
         for (const key of OUTSIDE) expect(blocks.has(key)).toBe(true);
         expect(
             lines.some((line) =>
-                /kill @e\[type=minecraft:item,x=10,y=100,z=10,dx=9,dy=9,dz=9\]/.test(line)
+                /as @e\[type=minecraft:item,x=10,y=100,z=10,dx=9,dy=9,dz=9\] unless data entity @s Thrower run kill @s/.test(
+                    line
+                )
             )
         ).toBe(true);
         // The per-box removal first, then the sweep, then the area let go.
@@ -174,7 +176,7 @@ describe("a stage left over at the end", () => {
         expect(blocks.get("14,101,14")).toBe(FOREIGN);
         expect(blocks.get("15,109,19")).toBe("minecraft:cobblestone");
         expect(lines.some((line) => / fill (-?\d+ ){6}minecraft:air$/.test(line))).toBe(false);
-        expect(lines.some((line) => / kill @e\[type=minecraft:item/.test(line))).toBe(false);
+        expect(lines.some((line) => /@e\[type=minecraft:item,x=/.test(line))).toBe(false);
     });
 
     it("keeps the proof and the area when a slice of the sweep does not answer", async () => {
