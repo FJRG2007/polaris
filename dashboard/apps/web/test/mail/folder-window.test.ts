@@ -56,4 +56,19 @@ describe("the newest window", () => {
         expect(source).toContain("await storeMessages(client, account, folder, fetched, false);");
         expect(source).toContain("if (isNew && arrivals) {");
     });
+
+    it("lists the window instead of trusting a count of the whole folder", async () => {
+        const source = await sync;
+        const refill = source.slice(source.indexOf("async function refillWindow"));
+        const body = refill.slice(0, refill.indexOf("\n}\n"));
+        expect(body).not.toContain("mailMessage.count(");
+    });
+
+    it("does not fetch Polaris' own draft copies again on every pass", async () => {
+        const source = await sync;
+        const refill = source.slice(source.indexOf("async function refillWindow"));
+        const body = refill.slice(0, refill.indexOf("\n}\n"));
+        expect(body).toContain("unstored.get(folder.id)");
+        expect(source).toContain("if (stored === 0) return;");
+    });
 });
