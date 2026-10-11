@@ -226,6 +226,10 @@ interface World {
     respawnMod: boolean;
     /** The respawn spot each player has on it, by name: the run's key and the spot. */
     respawnSpots: Map<string, { key: string; at: string }>;
+    /** It also answers `polaris guard`. */
+    guardMod: boolean;
+    /** The boxes it guards, by key: their corners as sent. */
+    guards: Map<string, string>;
 }
 
 const world: World = {
@@ -338,7 +342,9 @@ const world: World = {
     kinds: freshKinds(),
     board: {},
     respawnMod: false,
-    respawnSpots: new Map()
+    respawnSpots: new Map(),
+    guardMod: false,
+    guards: new Map()
 };
 let config: Record<string, unknown> = {};
 /** The kept-bag copies written to the database, by id. */
@@ -1724,7 +1730,20 @@ function answer(sent: string): string {
 function respawnModAnswer(line: string): string | null {
     if (!line.startsWith("polaris ")) return null;
     if (!world.respawnMod) return "Unknown or incomplete command, see below for error";
-    if (line === "polaris caps") return '{"ok":true,"polaris":"0.4.0","caps":["respawn"]}';
+    if (line === "polaris caps")
+        return world.guardMod
+            ? '{"ok":true,"polaris":"0.4.0","caps":["respawn","guard"]}'
+            : '{"ok":true,"polaris":"0.4.0","caps":["respawn"]}';
+    const guarding = /^polaris guard set (\S+) (.+)$/.exec(line);
+    if (guarding && world.guardMod) {
+        world.guards.set(guarding[1]!, guarding[2]!);
+        return '{"ok":true}';
+    }
+    const unguarded = /^polaris guard clear (\S+)$/.exec(line);
+    if (unguarded && world.guardMod) {
+        world.guards.delete(unguarded[1]!);
+        return '{"ok":true}';
+    }
     const set = /^polaris respawn set (\S+) (\S+) minecraft:overworld (.+)$/.exec(line);
     if (set) {
         if (!world.online.includes(set[2]!)) return '{"ok":false,"why":"offline"}';
@@ -2197,6 +2216,8 @@ beforeEach(() => {
     world.board = {};
     world.respawnMod = false;
     world.respawnSpots = new Map();
+    world.guardMod = false;
+    world.guards = new Map();
     inServer.forgetCapabilities("s");
     speechService.forget(SERVER);
     world.stormTicks = 0;
@@ -9272,6 +9293,32 @@ describe("a team duel", () => {
         await play(3 * 60_000);
         expect(state().run).toBeNull();
         expect(world.sent.filter((line) => line === release).length).toBeGreaterThan(before);
+    });
+
+    it("has the Polaris plugin or mod guard its arena while it lasts, and let it go at the end", async () => {
+        world.online = ["Ana", "Ben"];
+        world.respawnMod = true;
+        world.guardMod = true;
+        setUp([duelOf()]);
+        await joinAndStart("duel");
+        const run = state().run!;
+        const box = run.arena!.box;
+        const key = inServer.guardKey(run.id);
+        await play(2_100);
+        expect(world.guards.get(key)).toBe(
+            [box.x1, box.y1, box.z1, box.x2, box.y2, box.z2].join(" ")
+        );
+        // Not sent again every tick: again only after half a minute.
+        const sets = () => world.sent.filter((line) => line.startsWith("polaris guard set")).length;
+        const before = sets();
+        await play(4_200);
+        expect(sets()).toBe(before);
+        await play(inServer.GUARD_EVERY_MS);
+        expect(sets()).toBeGreaterThan(before);
+
+        await play(3 * 60_000);
+        expect(state().run).toBeNull();
+        expect(world.guards.size).toBe(0);
     });
 
     it("has the Polaris plugin or mod respawn a fallen duellist on their side, the spot set again when forgotten", async () => {

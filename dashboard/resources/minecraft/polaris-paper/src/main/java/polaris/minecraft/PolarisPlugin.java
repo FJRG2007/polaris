@@ -17,7 +17,8 @@ import org.bukkit.plugin.java.JavaPlugin;
  * turned off harmless: the login with {@code POLARIS_LOGIN=on}, and the server's
  * own sounds ({@link SoundPack}) wherever Polaris wrote its address, id and token
  * (unless {@code POLARIS_SOUNDS=off}). Where an event's players respawn
- * ({@link EventRespawn}) is idle until the dashboard runs one of its commands.
+ * ({@link EventRespawn}) and the guard on an event's space ({@link EventGuard})
+ * are idle until the dashboard runs one of their commands.
  */
 public final class PolarisPlugin extends JavaPlugin {
     private LoginGate gate;
@@ -31,6 +32,9 @@ public final class PolarisPlugin extends JavaPlugin {
         getServer().getPluginManager().registerEvents(respawns, this);
         // An impostor game's dead talk only to each other; idle outside one.
         getServer().getPluginManager().registerEvents(new EventGhosts(), this);
+        // Nobody outside an event changes its space; idle until one is guarded.
+        EventGuard guard = new EventGuard(this);
+        getServer().getPluginManager().registerEvents(guard, this);
         PluginCommand polaris = getCommand("polaris");
         if (polaris != null) {
             CommandExecutor soundsCommand = sounds != null
@@ -48,6 +52,8 @@ public final class PolarisPlugin extends JavaPlugin {
                     reply = caps(version);
                 else if (args[0].equalsIgnoreCase("respawn"))
                     reply = respawns.answer(Arrays.copyOfRange(args, 1, args.length));
+                else if (args[0].equalsIgnoreCase("guard"))
+                    reply = guard.answer(Arrays.copyOfRange(args, 1, args.length));
                 else reply = SoundPack.refused("usage");
                 sender.sendMessage(reply.toString());
                 return true;
@@ -69,13 +75,14 @@ public final class PolarisPlugin extends JavaPlugin {
     }
 
     /** `polaris caps`: what the dashboard may ask of this plugin, as the NeoForge
-     *  mod answers it. Only `respawn` here: the rest are the mod's alone. */
+     *  mod answers it. Only `respawn` and `guard` here: the rest are the mod's alone. */
     private static JsonObject caps(String version) {
         JsonObject reply = new JsonObject();
         reply.addProperty("ok", true);
         reply.addProperty("polaris", version);
         JsonArray caps = new JsonArray();
         caps.add("respawn");
+        caps.add("guard");
         reply.add("caps", caps);
         return reply;
     }

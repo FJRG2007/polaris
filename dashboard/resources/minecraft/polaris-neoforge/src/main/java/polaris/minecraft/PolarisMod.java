@@ -22,8 +22,8 @@ import org.slf4j.Logger;
  * environment switches it off (POLARIS_ANTIXRAY=off). Chat moderation and the
  * server's own sounds ({@link SoundPack}) run wherever Polaris wrote its
  * address, id and token, for either of them. The
- * event commands ({@link EventCommands}) are always there: idle until the
- * dashboard runs one.
+ * event commands ({@link EventCommands}) and the guard on an event's space
+ * ({@link EventGuard}) are always there: idle until the dashboard runs one.
  */
 @Mod(value = PolarisMod.ID, dist = Dist.DEDICATED_SERVER)
 public final class PolarisMod {
@@ -46,6 +46,8 @@ public final class PolarisMod {
         NeoForge.EVENT_BUS.register(new EventCommands(version));
         // An impostor game's dead talk only to each other; idle outside one.
         NeoForge.EVENT_BUS.register(new EventGhosts());
+        // Nobody outside an event changes its space; idle until one is guarded.
+        NeoForge.EVENT_BUS.register(new EventGuard());
         if (AntiXray.wanted(System.getenv())) {
             AntiXrayLink.start(PolarisConfig.linkFromEnvironment(System.getenv()));
             NeoForge.EVENT_BUS.register(new AntiXray());

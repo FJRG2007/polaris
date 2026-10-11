@@ -13,8 +13,9 @@
  * Hide and seek needs nothing from here: the mod hides a hider from seekers who
  * cannot see them on its own, by the event's teams.
  *
- * Where an arena's players come back after a death (`polaris respawn`) is the
- * one thing the Polaris Paper plugin answers too: it lists `respawn` alone.
+ * Where an arena's players come back after a death (`polaris respawn`) and the
+ * guard on an event's space (`polaris guard`) are what the Polaris Paper plugin
+ * answers too: it lists `respawn` and `guard` alone.
  */
 
 import { z } from "zod";
@@ -23,7 +24,7 @@ import { stripFormatting } from "../parse";
 import type { ServerContainer } from "../service";
 import { COMMAND_BYTES_MAX, commandBytes } from "../command-size";
 
-export type Capability = "stash" | "batch" | "seek" | "respawn";
+export type Capability = "stash" | "batch" | "seek" | "respawn" | "guard";
 
 const capsSchema = z.object({
     ok: z.literal(true),
@@ -54,7 +55,7 @@ export function parseCaps(reply: string): ReadonlySet<Capability> {
     if (!parsed.success) return new Set();
     return new Set(
         parsed.data.caps.filter((cap): cap is Capability =>
-            ["stash", "batch", "seek", "respawn"].includes(cap)
+            ["stash", "batch", "seek", "respawn", "guard"].includes(cap)
         )
     );
 }
@@ -172,6 +173,45 @@ const respawnListSchema = z.object({ ok: z.literal(true), players: z.array(z.str
 export function parseRespawnList(reply: string): ReadonlySet<string> | null {
     const parsed = respawnListSchema.safeParse(replyObject(reply));
     return parsed.success ? new Set(parsed.data.players.map((name) => name.toLowerCase())) : null;
+}
+
+// ------------------------------------------------------------------ guard
+
+/** How often a run's space is handed to the plugin or mod again; it lets
+ *  itself go after ten minutes without (`EventGuard.KEPT_MS`). */
+export const GUARD_EVERY_MS = 30_000;
+
+/** The key a run's space is guarded under: the same for the same run. */
+export function guardKey(runId: string): string {
+    return `pg${createHash("sha256").update(runId).digest("hex").slice(0, 24)}`;
+}
+
+/**
+ * The command that marks a run's space - an arena's box, a stage's volume -
+ * as the event's own: nobody without an event's tag breaks, places or uses
+ * anything in it, hits anybody in it, or reaches into it with an explosion,
+ * a piston, a fluid or a fire. Corners included, either way round.
+ */
+export function guardSet(
+    key: string,
+    volume: { x1: number; y1: number; z1: number; x2: number; y2: number; z2: number }
+): string {
+    const low = [
+        Math.min(volume.x1, volume.x2),
+        Math.min(volume.y1, volume.y2),
+        Math.min(volume.z1, volume.z2)
+    ];
+    const high = [
+        Math.max(volume.x1, volume.x2),
+        Math.max(volume.y1, volume.y2),
+        Math.max(volume.z1, volume.z2)
+    ];
+    return `polaris guard set ${key} ${[...low, ...high].map(Math.trunc).join(" ")}`;
+}
+
+/** The run's space let go: it is over. */
+export function guardClear(key: string): string {
+    return `polaris guard clear ${key}`;
 }
 
 // ------------------------------------------------------------------ batch
