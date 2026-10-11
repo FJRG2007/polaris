@@ -1349,6 +1349,7 @@
         "freeHint": "Quita imágenes de versiones antiguas, la caché de compilación y las imágenes que ningún contenedor usa. Nunca toca los volúmenes.",
         "freed": "{size} liberados.",
         "nothingFreed": "No queda nada más que se pueda quitar sin riesgo. Lo que queda son volúmenes y archivos, y solo tú puedes decidir qué se borra.",
+        "busy": "Hay un despliegue en curso ahí. Vuelve a intentarlo cuando termine.",
         "details": "Detalles",
         "dismiss": "Ocultar",
         "notAllowed": "Solo quien gestiona el sistema puede hacer esto.",

@@ -242,7 +242,9 @@
         "nothingFreedBody": "No quedaba nada que liberar. Lo que lo ocupa son volúmenes y los archivos que alguien puso en ellos, y solo una persona puede decidir qué sobra.",
         "lowTitle": "{server} se está quedando sin disco: {free} libres",
         "criticalTitle": "{server} casi no tiene disco: {free} libres",
-        "lowBody": "Polaris quitó lo que podía quitar sin riesgo. Abre Servidores para ver qué está usando el espacio."
+        "lowBody": "Polaris quitó lo que podía quitar sin riesgo. Abre Servidores para ver qué está usando el espacio.",
+        "busyBody": "Polaris no pudo limpiarlo porque había un despliegue en curso. Abre Servidores para liberar espacio cuando termine.",
+        "notFreedBody": "Polaris no pudo conectar para limpiarlo. Abre Servidores para ver qué está usando el espacio."
     },
     "cron": {
         "failedTitle": "Falló una tarea programada: {job}",

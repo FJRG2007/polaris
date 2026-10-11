@@ -271,7 +271,9 @@ function localMachine(): Machine {
         id: LOCAL_MACHINE,
         lock: LOCAL_MACHINE,
         async list() {
-            const reply = await daemon.dockerRequest("GET", "/system/df").catch(() => null);
+            const reply = await daemon
+                .dockerRequest("GET", "/system/df?type=image")
+                .catch(() => null);
             if (!reply || reply.status !== 200) return null;
             return parseDfReleaseImages(reply.body);
         },
@@ -418,6 +420,8 @@ export interface ReleaseSweep {
     readonly freed: number;
     /** False when the machine could not be listed, or was busy. */
     readonly ran: boolean;
+    /** True when it was skipped because a deploy was fetching or building there. */
+    readonly busy?: boolean;
 }
 
 async function sweepMachine(
@@ -463,7 +467,7 @@ async function sweepMachine(
             { whenIdle: true }
         );
     } catch (error) {
-        if (error instanceof ImageStoreBusy) return idle;
+        if (error instanceof ImageStoreBusy) return { ...idle, busy: true };
         throw error;
     }
 }

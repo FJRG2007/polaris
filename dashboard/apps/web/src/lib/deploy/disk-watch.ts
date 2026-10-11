@@ -24,7 +24,7 @@ import { notify } from "@/lib/notifications/dispatch";
 import { getLocalServerName } from "@/lib/local-server";
 import { wordsFor } from "@/lib/notifications/notice-words";
 import { getSetting, setSetting } from "@/lib/setting-store";
-import { LOCAL_MACHINE } from "@/lib/deploy/image-store-lock";
+import { ImageStoreBusy, LOCAL_MACHINE } from "@/lib/deploy/image-store-lock";
 import { hostSpace, reclaimHostSpace } from "@/lib/deploy/host-space";
 import { parseEngineSize, sweepReleaseImages } from "@/lib/deploy/release-retention";
 import {
@@ -204,22 +204,38 @@ export async function keepDiskReading(reading: DiskReading): Promise<void> {
 /**
  * Hand back what Polaris can safely remove on one machine: release images
  * nothing can still want, then build cache and images no container is on.
- * Never a volume. Returns the bytes freed, or null when the machine could not
- * be reached at all. Skipped (0) while a deploy is fetching or building there.
+ * Never a volume. Returns the bytes freed, `busy` when nothing ran because a
+ * deploy is fetching or building there, or null when the machine could not be
+ * reached at all.
  */
-export async function freeDiskSpace(machine: string): Promise<number | null> {
+export async function freeDiskSpace(machine: string): Promise<number | "busy" | null> {
     const releases = await sweepReleaseImages(machine).catch(() => []);
     const fromReleases = releases.reduce((sum, one) => sum + one.freed, 0);
-    const reclaimed =
+    let busy = releases.some((one) => one.busy);
+    const reclaim =
         machine === LOCAL_MACHINE
-            ? await reclaimHostSpace({ whenIdle: true }).catch(() => null)
-            : await reclaimServerSpace(machine, { whenIdle: true }).catch(() => null);
+            ? reclaimHostSpace({ whenIdle: true })
+            : reclaimServerSpace(machine, { whenIdle: true });
+    const reclaimed = await reclaim.catch((error: unknown) => {
+        if (error instanceof ImageStoreBusy) busy = true;
+        return null;
+    });
+    const freed = fromReleases + (reclaimed ?? 0);
+    if (busy && freed === 0) return "busy";
     if (reclaimed === null && !releases.some((one) => one.ran)) return null;
-    return fromReleases + (reclaimed ?? 0);
+    return freed;
 }
 
 /** Tell every administrator that a server Polaris deploys to is running out. */
-async function tell(reading: DiskReading): Promise<void> {
+async function tell(reading: DiskReading, freed: number | "busy" | null): Promise<void> {
+    const body =
+        freed === "busy"
+            ? "disk.busyBody"
+            : freed === null
+              ? "disk.notFreedBody"
+              : freed > 0
+                ? "disk.lowBody"
+                : "disk.nothingFreedBody";
     const admins = await prisma.user
         .findMany({ where: { isAdmin: true, ...VISIBLE_USER }, select: { id: true } })
         .catch(() => []);
@@ -233,7 +249,7 @@ async function tell(reading: DiskReading): Promise<void> {
                     server: reading.name ?? "",
                     free: `${(reading.free / GB).toFixed(1)} GB`
                 }),
-                body: t("disk.lowBody"),
+                body: t(body),
                 audience: "admins",
                 actionRequired: true,
                 href: "/apps/servers"
@@ -250,21 +266,31 @@ async function tell(reading: DiskReading): Promise<void> {
  * so it is read and shown here but not announced twice.
  */
 export async function watchDisks(): Promise<DiskReading[]> {
-    const before = new Map((await lastDiskReadings()).map((one) => [one.machine, one.level]));
+    const last = new Map((await lastDiskReadings()).map((one) => [one.machine, one]));
     const servers = await serversWithDeployments().catch(() => []);
     const readings: DiskReading[] = [];
-    for (const read of [() => readLocal(), ...servers.map((server) => () => readServer(server))]) {
-        let reading = await read().catch(() => null);
-        if (!reading) continue;
+    const machines = [
+        { id: LOCAL_MACHINE, read: () => readLocal() },
+        ...servers.map((server) => ({ id: server.id, read: () => readServer(server) }))
+    ];
+    for (const machine of machines) {
+        let reading = await machine.read().catch(() => null);
+        if (!reading) {
+            const kept = last.get(machine.id);
+            if (kept) readings.push(kept);
+            continue;
+        }
+        let freed: number | "busy" | null = null;
         if (reading.level !== "ok") {
-            const freed = await freeDiskSpace(reading.machine).catch(() => null);
-            if (freed) reading = (await readDisk(reading.machine).catch(() => null)) ?? reading;
+            freed = await freeDiskSpace(reading.machine).catch(() => null);
+            if (typeof freed === "number" && freed > 0)
+                reading = (await readDisk(reading.machine).catch(() => null)) ?? reading;
         }
         if (
             reading.machine !== LOCAL_MACHINE &&
-            worsened(before.get(reading.machine), reading.level)
+            worsened(last.get(reading.machine)?.level, reading.level)
         ) {
-            await tell(reading).catch((error: unknown) => {
+            await tell(reading, freed).catch((error: unknown) => {
                 console.error("polaris: could not report a server running out of disk:", error);
             });
         }

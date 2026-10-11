@@ -12,13 +12,13 @@
 import { z } from "zod";
 import { recordAudit } from "@/lib/audit-service";
 import { getTranslations } from "@/lib/i18n/request";
+import { runScheduledJob } from "@/lib/cron/scheduler";
 import { requireUser, sessionCan, type SessionUser } from "@/lib/session";
 import {
     freeDiskSpace,
     keepDiskReading,
     lastDiskReadings,
     readDisk,
-    watchDisks,
     type DiskReading
 } from "@/lib/deploy/disk-watch";
 
@@ -38,7 +38,8 @@ export async function diskAlertsAction(): Promise<DiskReading[]> {
     let readings = await lastDiskReadings();
     const newest = Math.max(0, ...readings.map((one) => Date.parse(one.checkedAt) || 0));
     if (readings.length === 0 || Date.now() - newest > STALE_MS) {
-        readings = await watchDisks().catch(() => readings);
+        const watched = await runScheduledJob("disk-watch").catch(() => null);
+        if (Array.isArray(watched)) readings = watched as DiskReading[];
     }
     return readings.filter((one) => one.level !== "ok");
 }
@@ -46,7 +47,7 @@ export async function diskAlertsAction(): Promise<DiskReading[]> {
 /** Free what Polaris can on one machine, and read its disk again. */
 export async function freeDiskSpaceAction(
     machine: string
-): Promise<{ freed?: number; reading?: DiskReading | null; error?: string }> {
+): Promise<{ freed?: number; busy?: boolean; reading?: DiskReading | null; error?: string }> {
     const user = await manager();
     const t = await getTranslations("components");
     if (!user) return { error: t("diskAlert.notAllowed") };
@@ -55,6 +56,7 @@ export async function freeDiskSpaceAction(
 
     const freed = await freeDiskSpace(parsed.data).catch(() => null);
     if (freed === null) return { error: t("diskAlert.unreachable") };
+    if (freed === "busy") return { busy: true };
     const reading = await readDisk(parsed.data).catch(() => null);
     if (reading) await keepDiskReading(reading).catch(() => undefined);
     await recordAudit({

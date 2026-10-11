@@ -1349,6 +1349,7 @@
         "freeHint": "Removes old release images, build cache and images no container uses. Volumes are never touched.",
         "freed": "{size} freed.",
         "nothingFreed": "Nothing else could be removed safely. What is left is volumes and files, and only you can decide what goes.",
+        "busy": "A deploy is running there. Try again once it finishes.",
         "details": "Details",
         "dismiss": "Hide for now",
         "notAllowed": "Only someone who manages the system can do this.",

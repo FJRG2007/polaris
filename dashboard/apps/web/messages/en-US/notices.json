@@ -242,7 +242,9 @@
         "nothingFreedBody": "There was nothing left to hand back. What is using it is volumes and the files somebody put in them, and only a person can decide what goes.",
         "lowTitle": "{server} is running out of disk: {free} free",
         "criticalTitle": "{server} is almost out of disk: {free} free",
-        "lowBody": "Polaris removed what it safely could. Open Servers to see what is using the space."
+        "lowBody": "Polaris removed what it safely could. Open Servers to see what is using the space.",
+        "busyBody": "Polaris could not clean it up because a deploy was running there. Open Servers to free up space once it finishes.",
+        "notFreedBody": "Polaris could not reach it to clean it up. Open Servers to see what is using the space."
     },
     "cron": {
         "failedTitle": "Scheduled job failed: {job}",

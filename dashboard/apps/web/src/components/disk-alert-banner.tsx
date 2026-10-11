@@ -77,13 +77,15 @@ export function DiskAlertBanner() {
             [reading.machine]:
                 "error" in result && result.error
                     ? { text: result.error, ok: false }
-                    : {
-                          text:
-                              "freed" in result && result.freed
-                                  ? t("diskAlert.freed", { size: size(result.freed) })
-                                  : t("diskAlert.nothingFreed"),
-                          ok: true
-                      }
+                    : "busy" in result && result.busy
+                      ? { text: t("diskAlert.busy"), ok: false }
+                      : {
+                            text:
+                                "freed" in result && result.freed
+                                    ? t("diskAlert.freed", { size: size(result.freed) })
+                                    : t("diskAlert.nothingFreed"),
+                            ok: true
+                        }
         }));
         refresh();
     };
