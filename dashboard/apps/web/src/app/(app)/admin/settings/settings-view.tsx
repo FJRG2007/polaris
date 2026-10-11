@@ -154,7 +154,9 @@ function isFailure(result: UpdateResult | null): boolean {
 
 function outcomeLabel(result: UpdateResult, t: Translate): string {
     if (result.code === null) return t("settings.log.noResult");
-    return result.code === 0 ? t("settings.log.success") : t("settings.log.failed", { code: result.code });
+    return result.code === 0
+        ? t("settings.log.success")
+        : t("settings.log.failed", { code: result.code });
 }
 
 function outcomeTone(result: UpdateResult): string {
@@ -720,7 +722,11 @@ export function SettingsView({
                         {updating ? (
                             <>
                                 <RefreshCw className="size-4 animate-spin text-primary" />
-                                <span>{step ? t("settings.updates.updatingStep", { step }) : t("settings.updates.updating")}</span>
+                                <span>
+                                    {step
+                                        ? t("settings.updates.updatingStep", { step })
+                                        : t("settings.updates.updating")}
+                                </span>
                             </>
                         ) : !status ? (
                             <Skeleton className="h-4 w-56" />
@@ -789,10 +795,15 @@ export function SettingsView({
                             </>
                         )}
                     </div>
-                    {checkFailed ? <p className="text-xs text-danger">{t("settings.updates.checkFailed")}</p> : null}
+                    {checkFailed ? (
+                        <p className="text-xs text-danger">{t("settings.updates.checkFailed")}</p>
+                    ) : null}
 
                     <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
-                        <Row label={t("settings.updates.runningBuild")} value={status?.current ?? null} />
+                        <Row
+                            label={t("settings.updates.runningBuild")}
+                            value={status?.current ?? null}
+                        />
                         <Row
                             label={
                                 status?.source === "build"
@@ -890,7 +901,9 @@ export function SettingsView({
                                         ) : (
                                             <DownloadCloud className="size-4" />
                                         )}
-                                        {updating ? t("settings.updates.updating") : t("settings.updates.updateNow")}
+                                        {updating
+                                            ? t("settings.updates.updating")
+                                            : t("settings.updates.updateNow")}
                                     </Button>
                                 </div>
                             ) : null}
@@ -935,9 +948,7 @@ export function SettingsView({
                                     }
                                 />
                             ) : null}
-                            {isFailure(logResult) ? (
-                                <p>{t("settings.log.reportNote")}</p>
-                            ) : null}
+                            {isFailure(logResult) ? <p>{t("settings.log.reportNote")}</p> : null}
                         </div>
                     ) : null}
                 </CardBody>
@@ -949,7 +960,9 @@ export function SettingsView({
                 </CardHeader>
                 <CardBody className="flex flex-col gap-4">
                     <div className="flex flex-col gap-1.5">
-                        <span className="text-sm text-muted-foreground">{t("settings.deployment.reachableAt")}</span>
+                        <span className="text-sm text-muted-foreground">
+                            {t("settings.deployment.reachableAt")}
+                        </span>
                         {addresses ? (
                             <AddressList
                                 addresses={addresses}
@@ -966,14 +979,25 @@ export function SettingsView({
                         )}
                     </div>
                     <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
-                        <Row label={t("settings.deployment.localHostname")} value={`${deployment.hostname}.local`} />
+                        <Row
+                            label={t("settings.deployment.localHostname")}
+                            value={`${deployment.hostname}.local`}
+                        />
                         <Row
                             label={t("settings.deployment.serverIp")}
-                            value={network ? (network.serverIp ?? t("settings.deployment.unknown")) : null}
+                            value={
+                                network
+                                    ? (network.serverIp ?? t("settings.deployment.unknown"))
+                                    : null
+                            }
                         />
                         <Row
                             label={t("settings.deployment.publicIp")}
-                            value={network ? (network.publicIp ?? t("settings.deployment.notDetected")) : null}
+                            value={
+                                network
+                                    ? (network.publicIp ?? t("settings.deployment.notDetected"))
+                                    : null
+                            }
                         />
                         <Row
                             label={t("settings.deployment.repository")}
@@ -1036,9 +1060,21 @@ function PublicPagesCard({ initialContact, pages }: { initialContact: string; pa
                 <p className="text-sm text-muted-foreground">{t("settings.publicPages.intro")}</p>
 
                 <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm">
-                    <Row label={t("settings.publicPages.home")} value={pages.home} href={pages.home} />
-                    <Row label={t("settings.publicPages.privacy")} value={pages.privacy} href={pages.privacy} />
-                    <Row label={t("settings.publicPages.terms")} value={pages.terms} href={pages.terms} />
+                    <Row
+                        label={t("settings.publicPages.home")}
+                        value={pages.home}
+                        href={pages.home}
+                    />
+                    <Row
+                        label={t("settings.publicPages.privacy")}
+                        value={pages.privacy}
+                        href={pages.privacy}
+                    />
+                    <Row
+                        label={t("settings.publicPages.terms")}
+                        value={pages.terms}
+                        href={pages.terms}
+                    />
                 </dl>
 
                 <label className="flex flex-col gap-1 text-sm">

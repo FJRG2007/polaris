@@ -141,7 +141,9 @@ describe("the update card after an update", () => {
         });
         expect(checkForNewBuild).toHaveBeenCalled();
         expect(screen.getAllByText("running-abc").length).toBeGreaterThan(0);
-        expect(screen.getByText("Could not check for updates. Try again in a moment.")).toBeTruthy();
+        expect(
+            screen.getByText("Could not check for updates. Try again in a moment.")
+        ).toBeTruthy();
     });
 
     it("says nothing about a refused check when a new build is what refused it", async () => {
@@ -155,7 +157,9 @@ describe("the update card after an update", () => {
             fireEvent.click(screen.getByRole("button", { name: "Check for updates" }));
             await vi.advanceTimersByTimeAsync(1_000);
         });
-        expect(screen.queryByText("Could not check for updates. Try again in a moment.")).toBeNull();
+        expect(
+            screen.queryByText("Could not check for updates. Try again in a moment.")
+        ).toBeNull();
     });
 
     it("stops asking for the overview when the answer is a refusal", async () => {
