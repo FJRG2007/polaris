@@ -69,7 +69,7 @@ describe("the newest window", () => {
         const refill = source.slice(source.indexOf("async function refillWindow"));
         const body = refill.slice(0, refill.indexOf("\n}\n"));
         expect(body).toContain("unstored.get(folder.id)");
-        expect(source).toContain("if (stored === 0) return;");
+        expect(source).toContain("if (stored === 0) return 0;");
     });
 });
 
@@ -106,12 +106,31 @@ describe("scrolling past the held window", () => {
 
     it("brings the next page down as old mail, below what is held, and lists again", async () => {
         const source = await sync;
-        const older = source.slice(source.indexOf("export async function fetchOlder"));
+        const older = source.slice(source.indexOf("async function fetchOlderNow"));
         const body = older.slice(0, older.indexOf("\n}\n"));
-        expect(body).toContain("storeMessages(client, account, folder, fetched, false)");
+        expect(body).toContain("(await storeMessages(client, account, folder, fetched, false)) > 0");
         expect(body).toContain("readOnly: true");
         const route = await readFile(`${SRC}app/api/mail/threads/route.ts`, "utf8");
         expect(route).toContain('page.cursor === "" && reachesForOlder(list)');
         expect(route).toContain("everyAccountId(user.id)");
+    });
+
+    it("skips Polaris' own draft copies instead of fetching them on every reach", async () => {
+        const source = await sync;
+        const older = source.slice(source.indexOf("async function fetchOlderNow"));
+        const body = older.slice(0, older.indexOf("\n}\n"));
+        expect(body).toContain("unstored.get(folderId)");
+        expect(body).toContain("held.length + skipped.size >= folder.total");
+        expect(body).toContain("...skipped]");
+    });
+
+    it("never runs beside the mailbox's pass or a second reach for the same folder", async () => {
+        const source = await sync;
+        const entry = source.slice(source.indexOf("export async function fetchOlder("));
+        const body = entry.slice(0, entry.indexOf("\n}\n"));
+        expect(body).toContain("olderRuns().get(folderId)");
+        expect(body).toContain("passes().get(accountId)");
+        const pass = source.slice(source.indexOf("export async function syncAccount"));
+        expect(pass.slice(0, pass.indexOf("\n}\n"))).toContain("settleOlder(accountId)");
     });
 });
